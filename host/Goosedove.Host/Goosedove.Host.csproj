@@ -7,6 +7,11 @@
 
   <ItemGroup>
     <PackageReference Include="ExcelDna.AddIn" Version="1.8.0" />
+    <PackageReference Include="pythonnet" Version="3.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="goosedove.cfg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
