@@ -13,3 +13,7 @@ wheels/
 
 # Generated performance reports
 /profiles/
+bin/
+obj/
+
+host/Goosedove.Host/goosedove.cfg
