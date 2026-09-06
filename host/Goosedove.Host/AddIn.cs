@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using ExcelDna.Integration;
 using Python.Runtime;
+using System.Linq.Expressions;
 
 namespace Goosedove.Host
 {
@@ -22,6 +23,7 @@ namespace Goosedove.Host
                     dynamic sys = Py.Import("sys");
                     sys.path.insert(0, config["pythonpath"]);
                     Bridge.Module = Py.Import("goosedove.excel.bridge");
+                    Registration.RegisterAll();
                 }
             }
             catch (Exception ex)
@@ -69,20 +71,56 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Worksheet functions. Each one forwards to Python by name.</summary>
-    public static class Functions
+    /// <summary>Asks Python which functions exist and registers each one with Excel.</summary>
+    public static class Registration
     {
-        [ExcelFunction(Description = "Confirms which goosedove Excel is running.")]
-        public static object Ping()
+        public static void RegisterAll()
         {
-            try
+            var delegates = new List<Delegate>();
+            var attributes = new List<object>();
+            var argumentAttributes = new List<List<object>>();
+
+            using (Py.GIL())
+            using (var specs = Bridge.Module.InvokeMethod("function_specs"))
             {
-                return Bridge.Call("Ping");
+                foreach (PyObject spec in new PyList(specs))
+                {
+                    var name = spec[0].As<string>();
+                    var description = spec[1].As<string>();
+                    var parameters = new List<string>();
+                    foreach (PyObject p in new PyList(spec[2]))
+                    {
+                        parameters.Add(p.As<string>());
+                    }
+
+                    delegates.Add(MakeDelegate(name, parameters.Count));
+                    attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description });
+                    var args = new List<object>();
+                    foreach (var p in parameters)
+                    {
+                        args.Add(new ExcelArgumentAttribute { Name = p });
+                    }
+                    argumentAttributes.Add(args);
+                }
             }
-            catch (Exception ex)
+
+            ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
+        }
+
+        // Excel-DNA needs a delegate with one typed parameter per argument.
+        // Build one that packs its arguments into an array and forwards by name.
+        private static Delegate MakeDelegate(string name, int parameterCount)
+        {
+            var parameters = new ParameterExpression[parameterCount];
+            for (var i = 0; i < parameterCount; i++)
             {
-                return "#ERROR host: " + ex.Message;
+                parameters[i] = Expression.Parameter(typeof(object), "arg" + i);
             }
+            var call = Expression.Call(
+                typeof(Bridge).GetMethod(nameof(Bridge.Call)),
+                Expression.Constant(name),
+                Expression.NewArrayInit(typeof(object), parameters));
+            return Expression.Lambda(call, parameters).Compile();
         }
     }
 

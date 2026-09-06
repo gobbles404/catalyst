@@ -50,3 +50,9 @@ def Ping() -> str:
     except PackageNotFoundError:
         release = "source checkout"
     return f"goosedove {release} from {goosedove.__file__}"
+
+
+@excel_function
+def Add(a: float, b: float) -> float:
+    """Add two numbers; proves arguments cross the seam."""
+    return a + b
