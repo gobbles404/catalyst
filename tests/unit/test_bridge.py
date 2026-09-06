@@ -40,7 +40,7 @@ def test_sum_range_reports_text_as_an_error() -> None:
 
 
 def test_scale_returns_a_block() -> None:
-    result = bridge.call("Scale", [[[1.0, 2.0], [3.0, None]], 10.0])
+    result = bridge.call("ScaleBlock", [[[1.0, 2.0], [3.0, None]], 10.0])
     assert isinstance(result, np.ndarray)
     block: NDArray[np.float64] = np.asarray(result, dtype=np.float64)
     assert block.shape == (2, 2)

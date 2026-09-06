@@ -9,5 +9,5 @@ if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $true
-$excel.Workbooks.Open($xll) | Out-Null
+$excel.RegisterXLL($xll) | Out-Null
 $excel.Workbooks.Add() | Out-Null
