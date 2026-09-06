@@ -7,10 +7,11 @@ on:
 
 jobs:
   check:
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    # Pinned runner image: "latest" is a moving target, and an image bump that
+    # changes libm or runtime behaviour would masquerade as model drift. Bump
+    # the pin deliberately and re-run the golden suite first. Python itself is
+    # pinned by .python-version (3.13.13), the production runtime.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
