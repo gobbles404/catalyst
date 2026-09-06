@@ -1,7 +1,7 @@
 [project]
 name = "second"
 version = "0.1.0"
-description = "A lazy pricing library for commodities derivatives."
+description = "A clever lazy pricing library for commodities derivatives."
 readme = "README.md"
 authors = [
     { name = "gobbles404", email = "jgiles926@gmail.com" }
