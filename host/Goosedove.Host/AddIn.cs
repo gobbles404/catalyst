@@ -57,7 +57,7 @@ namespace Goosedove.Host
                 {
                     foreach (var arg in args)
                     {
-                        using (var pyArg = arg.ToPython())
+                        using (var pyArg = Marshal.ToPython(arg))
                         {
                             pyArgs.Append(pyArg);
                         }
@@ -68,6 +68,38 @@ namespace Goosedove.Host
                     }
                 }
             }
+        }
+    }
+
+        /// <summary>Excel-DNA values to Python values: blanks to None, ranges to rows.</summary>
+    public static class Marshal
+    {
+        public static PyObject ToPython(object value)
+        {
+            if (value == null || value is ExcelEmpty || value is ExcelMissing || value is ExcelError)
+            {
+                return PyObject.None;
+            }
+            if (value is object[,] rect)
+            {
+                var rows = new PyList();
+                for (var r = 0; r < rect.GetLength(0); r++)
+                {
+                    using (var row = new PyList())
+                    {
+                        for (var c = 0; c < rect.GetLength(1); c++)
+                        {
+                            using (var cell = ToPython(rect[r, c]))
+                            {
+                                row.Append(cell);
+                            }
+                        }
+                        rows.Append(row);
+                    }
+                }
+                return rows;
+            }
+            return value.ToPython();
         }
     }
 

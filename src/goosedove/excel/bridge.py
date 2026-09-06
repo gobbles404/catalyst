@@ -56,3 +56,22 @@ def Ping() -> str:
 def Add(a: float, b: float) -> float:
     """Add two numbers; proves arguments cross the seam."""
     return a + b
+
+
+Cell = float | str | None
+Range = list[list[Cell]]
+
+
+@excel_function
+def SumRange(values: float | Range | None) -> float:
+    """Sum a numeric range; blanks count as zero, text is an error."""
+    rows: Range = values if isinstance(values, list) else [[values]]
+    total = 0.0
+    for row in rows:
+        for cell in row:
+            if cell is None:
+                continue
+            if isinstance(cell, str):
+                raise ValueError(f"text in numeric range: {cell!r}")
+            total += cell
+    return total
