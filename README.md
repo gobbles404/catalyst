@@ -1,4 +1,4 @@
-# second
+# goosedove
 
 A commodities derivatives pricing library for Excel.
 
