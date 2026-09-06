@@ -54,28 +54,35 @@ namespace Goosedove.Host
             {
                 return "#ERROR python did not start: " + StartupError;
             }
-            using (Py.GIL())
+            try
             {
-                using (var pyName = new PyString(name))
-                using (var pyArgs = new PyList())
+                using (Py.GIL())
                 {
-                    foreach (var arg in args)
+                    using (var pyName = new PyString(name))
+                    using (var pyArgs = new PyList())
                     {
-                        using (var pyArg = Marshal.ToPython(arg))
+                        foreach (var arg in args)
                         {
-                            pyArgs.Append(pyArg);
+                            using (var pyArg = Marshal.ToPython(arg))
+                            {
+                                pyArgs.Append(pyArg);
+                            }
+                        }
+                        using (var result = Module.InvokeMethod("call", pyName, pyArgs))
+                        {
+                            return Marshal.FromPython(result);
                         }
                     }
-                    using (var result = Module.InvokeMethod("call", pyName, pyArgs))
-                    {
-                        return result.AsManagedObject(typeof(object));
-                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                return "#ERROR host: " + ex.Message;
             }
         }
     }
 
-        /// <summary>Excel-DNA values to Python values: blanks to None, ranges to rows.</summary>
+    /// <summary>Excel-DNA values to Python and back: blanks to None, ranges to arrays or rows.</summary>
     public static class Marshal
     {
         public static PyObject ToPython(object value)
@@ -110,7 +117,45 @@ namespace Goosedove.Host
             return value.ToPython();
         }
 
-                // True when every cell is a number or blank; those ranges take the fast path.
+        /// <summary>Python results to Excel: a numpy block becomes object[,], everything else passes through.</summary>
+        public static object FromPython(PyObject value)
+        {
+            if (value == null || value.IsNone())
+            {
+                return null;
+            }
+            using (var isBlock = Bridge.Module.InvokeMethod("is_block", value))
+            {
+                if (!isBlock.As<bool>())
+                {
+                    return value.AsManagedObject(typeof(object));
+                }
+            }
+            using (var shape = value.GetAttr("shape"))
+            using (var flat = Bridge.Module.InvokeMethod("flatten_block", value))
+            using (var buffer = flat.GetBuffer(PyBUF.CONTIG_RO))
+            {
+                var rows = shape[0].As<int>();
+                var cols = shape[1].As<int>();
+                var bytes = new byte[buffer.Length];
+                buffer.Read(bytes, 0, bytes.Length, 0);
+                var doubles = new double[rows * cols];
+                Buffer.BlockCopy(bytes, 0, doubles, 0, bytes.Length);
+                var block = new object[rows, cols];
+                var i = 0;
+                for (var r = 0; r < rows; r++)
+                {
+                    for (var c = 0; c < cols; c++)
+                    {
+                        var d = doubles[i++];
+                        block[r, c] = double.IsNaN(d) ? (object)ExcelError.ExcelErrorNA : d;
+                    }
+                }
+                return block;
+            }
+        }
+
+        // True when every cell is a number or blank; those ranges take the fast path.
         private static bool IsNumeric(object[,] rect)
         {
             foreach (var cell in rect)

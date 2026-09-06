@@ -29,6 +29,16 @@ def numeric_block(pointer: int, rows: int, cols: int) -> NDArray[np.float64]:
     return np.frombuffer(buffer, dtype=np.float64).reshape(rows, cols).copy()
 
 
+def flatten_block(block: NDArray[np.float64]) -> NDArray[np.float64]:
+    """One contiguous 1-D float64 view for the host's buffer read."""
+    return np.ascontiguousarray(block, dtype=np.float64).reshape(-1)
+
+
+def is_block(value: object) -> bool:
+    """True when a result is a numeric array the host should return as a range."""
+    return isinstance(value, np.ndarray)
+
+
 def excel_function[F: Callable[..., object]](fn: F) -> F:
     """Register a plain function as a worksheet function under its own name."""
     _FUNCTIONS[fn.__name__] = fn
@@ -87,3 +97,17 @@ def SumRange(values: float | Range | NDArray[np.float64] | None) -> float:
                 raise ValueError(f"text in numeric range: {cell!r}")
             total += cell
     return total
+
+
+@excel_function
+def ScaleBlock(
+    values: float | Range | NDArray[np.float64] | None, factor: float
+) -> NDArray[np.float64]:
+    """Multiply every cell of a numeric range by a factor; returns a block."""
+    if isinstance(values, np.ndarray):
+        return values * factor
+    rows: Range = values if isinstance(values, list) else [[values]]
+    block = np.array(
+        [[np.nan if cell is None else cell for cell in row] for row in rows], dtype=np.float64
+    )
+    return block * factor
