@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from time import sleep
 
 from pyinstrument import Profiler
 
@@ -35,8 +34,12 @@ if __name__ == "__main__":
     nested = block.tolist()
 
     # Where the time goes, per shape: one HTML tree each.
-    profile_call(lambda: bridge.call("SumRange", [nested]), repo_root / "profiles" / "sum_nested.html")
-    profile_call(lambda: bridge.call("SumRange", [block]), repo_root / "profiles" / "sum_array.html")
+    profile_call(
+        lambda: bridge.call("SumRange", [nested]), repo_root / "profiles" / "sum_nested.html"
+    )
+    profile_call(
+        lambda: bridge.call("SumRange", [block]), repo_root / "profiles" / "sum_array.html"
+    )
 
     # How much it costs: repeated, no profiler attached.
     n = 200
