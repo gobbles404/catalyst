@@ -1,10 +1,15 @@
-# Python-generated files
+# Python cache files
 __pycache__/
 *.py[oc]
+
+# Build and packaging outputs
 build/
 dist/
 wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+
+# Generated performance reports
+/profiles/

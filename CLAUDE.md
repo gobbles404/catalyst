@@ -1,4 +1,4 @@
-# second
+# goosedove
 
 A commodities derivatives pricing library exposed to Excel through Excel-DNA.
 Python 3.13.13, managed with uv. Run everything through `uv run`.
@@ -19,10 +19,22 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
 
 ## Tests
 
-- Every behaviour gets a property test or a golden case. Never a test that asserts absence.
+- Use example tests for specific cases, property tests for general rules,
+  and goldens for reviewed reference outputs.
+- Test observable behavior and meaningful work budgets. Assertions that
+  unwanted work or side effects do not occur are valid.
 - Never change source and golden files in the same pull request.
 
 ## Pull requests
 
 - One purpose, under 400 lines. Conventional commit titles: `feat(scope): ...`, `fix(scope): ...`, `chore: ...`.
 - Say what you did not do.
+
+## Performance
+
+- Work is measured by counts, not time. Code that prices, caches, hashes, or
+  converts data takes a `WorkCounter` and reports what it did.
+- Every change to such code keeps or updates the budget tests under
+  `tests/performance`, and the pull request states the counts before and after.
+- `tools/performance` holds the profiler and memory scripts. Use them to find
+  where time goes; never gate a merge on a timing.

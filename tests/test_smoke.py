@@ -3,7 +3,10 @@ import sys
 
 
 def test_imports() -> None:
-    import second  # noqa: F401
+    from importlib import import_module
+
+    import_module("goosedove")
+
 
 def test_python_is_64_bit() -> None:
     assert sys.maxsize > 2**32
