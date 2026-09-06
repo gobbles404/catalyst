@@ -7,9 +7,13 @@ knows Excel exists.
 
 from __future__ import annotations
 
+import ctypes
 import inspect
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
+
+import numpy as np
+from numpy.typing import NDArray
 
 import goosedove
 
@@ -17,6 +21,12 @@ MISSING = object()
 """Marker the host passes for an argument the user left blank."""
 
 _FUNCTIONS: dict[str, Callable[..., object]] = {}
+
+
+def numeric_block(pointer: int, rows: int, cols: int) -> NDArray[np.float64]:
+    """Copy a pinned double[] from the host into a numpy array. NaN marks blanks."""
+    buffer = (ctypes.c_double * (rows * cols)).from_address(pointer)
+    return np.frombuffer(buffer, dtype=np.float64).reshape(rows, cols).copy()
 
 
 def excel_function[F: Callable[..., object]](fn: F) -> F:
@@ -63,8 +73,10 @@ Range = list[list[Cell]]
 
 
 @excel_function
-def SumRange(values: float | Range | None) -> float:
+def SumRange(values: float | Range | NDArray[np.float64] | None) -> float:
     """Sum a numeric range; blanks count as zero, text is an error."""
+    if isinstance(values, np.ndarray):
+        return float(np.nansum(values))
     rows: Range = values if isinstance(values, list) else [[values]]
     total = 0.0
     for row in rows:

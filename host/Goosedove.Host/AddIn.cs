@@ -21,7 +21,11 @@ namespace Goosedove.Host
                 using (Py.GIL())
                 {
                     dynamic sys = Py.Import("sys");
-                    sys.path.insert(0, config["pythonpath"]);
+                    var paths = config["pythonpath"].Split(';');
+                    for (var i = paths.Length - 1; i >= 0; i--)
+                    {
+                        sys.path.insert(0, paths[i].Trim());
+                    }
                     Bridge.Module = Py.Import("goosedove.excel.bridge");
                     Registration.RegisterAll();
                 }
@@ -82,6 +86,10 @@ namespace Goosedove.Host
             }
             if (value is object[,] rect)
             {
+                if (IsNumeric(rect))
+                {
+                    return NumericBlock(rect);
+                }
                 var rows = new PyList();
                 for (var r = 0; r < rect.GetLength(0); r++)
                 {
@@ -100,6 +108,48 @@ namespace Goosedove.Host
                 return rows;
             }
             return value.ToPython();
+        }
+
+                // True when every cell is a number or blank; those ranges take the fast path.
+        private static bool IsNumeric(object[,] rect)
+        {
+            foreach (var cell in rect)
+            {
+                if (!(cell is double || cell == null || cell is ExcelEmpty))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Unbox into one double[] (NaN for blanks) and let Python copy it from a pointer.
+        private static PyObject NumericBlock(object[,] rect)
+        {
+            int rows = rect.GetLength(0), cols = rect.GetLength(1);
+            var block = new double[rows * cols];
+            var i = 0;
+            for (var r = 0; r < rows; r++)
+            {
+                for (var c = 0; c < cols; c++)
+                {
+                    block[i++] = rect[r, c] is double d ? d : double.NaN;
+                }
+            }
+            var handle = System.Runtime.InteropServices.GCHandle.Alloc(block, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                using (var ptr = new PyInt(handle.AddrOfPinnedObject().ToInt64()))
+                using (var pyRows = new PyInt(rows))
+                using (var pyCols = new PyInt(cols))
+                {
+                    return Bridge.Module.InvokeMethod("numeric_block", ptr, pyRows, pyCols);
+                }
+            }
+            finally
+            {
+                handle.Free();
+            }
         }
     }
 
@@ -153,6 +203,16 @@ namespace Goosedove.Host
                 Expression.Constant(name),
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(call, parameters).Compile();
+        }
+    }
+
+    /// <summary>Always registered, even when Python failed to start, so the failure is visible.</summary>
+    public static class Status
+    {
+        [ExcelFunction(Description = "Reports whether Python started, and the error if it did not.")]
+        public static string GoosedoveStatus()
+        {
+            return Bridge.StartupError ?? "ok: python started and functions registered";
         }
     }
 
