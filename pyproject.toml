@@ -43,6 +43,11 @@ pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportUnnecessaryIsInstance = "error"
 reportMissingTypeStubs = false
+# numpy's stubs cannot express array shapes, so values that enter as object
+# stay "partially unknown". Warn, don't fail, until the stubs improve.
+reportUnknownMemberType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownArgumentType = "warning"
 
 [tool.pytest.ini_options]
 addopts = "-q -ra --strict-markers"

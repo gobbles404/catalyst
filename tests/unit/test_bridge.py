@@ -1,3 +1,6 @@
+import numpy as np
+from numpy.typing import NDArray
+
 from goosedove.excel import bridge
 
 
@@ -34,3 +37,12 @@ def test_sum_range_reports_text_as_an_error() -> None:
     result = bridge.call("SumRange", [[["e", 1.0]]])
     assert isinstance(result, str)
     assert result.startswith("#ERROR")
+
+
+def test_scale_returns_a_block() -> None:
+    result = bridge.call("Scale", [[[1.0, 2.0], [3.0, None]], 10.0])
+    assert isinstance(result, np.ndarray)
+    block: NDArray[np.float64] = np.asarray(result, dtype=np.float64)
+    assert block.shape == (2, 2)
+    assert block[0, 1] == 20.0
+    assert np.isnan(block[1, 1])

@@ -87,3 +87,15 @@ def SumRange(values: float | Range | NDArray[np.float64] | None) -> float:
                 raise ValueError(f"text in numeric range: {cell!r}")
             total += cell
     return total
+
+
+@excel_function
+def Scale(values: float | Range | NDArray[np.float64] | None, factor: float) -> NDArray[np.float64]:
+    """Multiply every cell of a numeric range by a factor; returns a block."""
+    if isinstance(values, np.ndarray):
+        return values * factor
+    rows: Range = values if isinstance(values, list) else [[values]]
+    block = np.array(
+        [[np.nan if cell is None else cell for cell in row] for row in rows], dtype=np.float64
+    )
+    return block * factor
