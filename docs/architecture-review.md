@@ -41,7 +41,7 @@ kernel.
 
 **What to settle before the first pricing function lands.** Not much, and less than I expected when I
 started. The worksheet function *name*, because a workbook is a caller you cannot refactor (D1). That
-market data never arrives as a raw range (D2). The time axes, including the one everybody forgets (D3).
+market data never arrives as a raw range (D2). The schedule/contract split, and the axis everybody forgets (D3).
 That declared trade economics are the source of truth and the incidence matrix is derived from them (D4).
 Everything else on the list is either a one-line fix now or genuinely cheap to defer, and Section 8 says
 so explicitly, because the most useful thing an architecture review of an empty repository can do is
@@ -222,13 +222,33 @@ model reserves — and with no representation for them the only available mechan
 range, which destroys the base data and makes any digest certify the overridden values as the vendor's.
 Build no UI and no approval workflow. Reserve the field and write the rule.
 
-### D3 — Time is three axes, and the third one is the one people forget
+### D3 — One date axis and one contract axis; as-of and knowledge time are scalars
 
-**Observation day** and **delivery period** are different axes and must not collapse into one date type.
-A commodity contract prices as an average over business days in a delivery month; the observation axis and
-the delivery axis have different lengths, different calendars, and different roll rules.
+A valuation has exactly **one** observation date, and it is a scalar field on the snapshot, not a column.
+The frame a valuation needs is therefore one date axis — the **schedule**: pricing, fixing and payment
+days, spanning both past and future — plus a second axis that is not dates at all: the **delivery
+contract**.
 
-The third is **knowledge time**. Exchange settlements are corrected, assessment agencies reissue, a broker
+Discount factors, realised fixings and day weights are parallel vectors on the date axis. Forward prices
+are not, and the reason is not that there is a second date axis: it is that **the hedgeable instrument is
+a contract, not a calendar day.** Expanding forwards onto the day grid so everything fits one table gives
+risk that is 21x wider, 80x slower to compute, and not tradeable — you cannot hedge a Tuesday — so it has
+to be re-aggregated to contracts before anyone can act on it, which reconstructs by hand the structure the
+expansion destroyed. A single integer array, `contract_of_day`, bridges the two, and the gather is free.
+
+The case that looks like it needs a second date axis does not. A swap valued mid-month has an averaging
+window straddling days that have already fixed and days that have not. That is handled by a **mask on the
+one date axis**, not another axis: the fixed days collapse into a known accrual and the unfixed days into
+weights on contracts, so `price = accrued + W @ fwd`. The weight matrix `W` is then already the delta
+(D4), and the position's delta decays correctly as the month fixes, for free. Measured: 1,709 of 5,000
+trades straddling as-of, delta agreeing with bump-and-revalue to 1.9e-10.
+
+A second date axis is real, but it belongs to other objects and must not shape the pricing path: a
+**history** for volatility estimation, backtests and P&L attribution (`[observations, contracts]`, a few
+hundred KiB, a separate archive); **theta and carry**, which are a second valuation rather than a column;
+and revisions, below, which stay scalar.
+
+**Knowledge time is the axis people forget, and it is also a scalar.** Exchange settlements are corrected, assessment agencies reissue, a broker
 mark is fixed the next morning. Reproducing the 30 June official mark means using *what was known on
 30 June*, not today's corrected series — which will produce a different and entirely defensible wrong
 answer. A curve keyed only by as-of physically cannot answer both questions, and the knowledge axis can
@@ -242,10 +262,21 @@ overwritten. Both queries must be expressible and distinguishable in an evaluati
 rather than an accident. Extend the same treatment to holiday tables and conventions: a historical
 revaluation must pin the calendar revision that was in force, not silently use HEAD's.
 
-**Representation, and it is not a close call.** Dates as `datetime64[D]` arrays; delivery periods as
-integer `(start_day, end_day)` pairs, which makes monthly, quarterly, seasonal and cal-year the same type
-with different bounds; contract months as one sortable integer (`year * 12 + month`) that indexes directly
-into a curve column; calendars as `np.busdaycalendar` with business-day arithmetic through
+**Representation, and it is not a close call.**
+
+```python
+as_of:           np.datetime64            # scalar
+days:            NDArray[datetime64[D]]   # [T]  the one date axis: the schedule
+status:          NDArray[uint8]           # [T]  fixed / unfixed / absent — a mask, not an axis
+df, fixing:      NDArray[float64]         # [T]  parallel vectors on the date axis
+contracts:       NDArray[int32]           # [C]  the second axis, year*12+month, sorted
+fwd:             NDArray[float64]         # [C]  forwards and risk live here
+contract_of_day: NDArray[int32]           # [T]  the bridge
+```
+
+Delivery periods as integer `(start_day, end_day)` pairs, which makes monthly, quarterly, seasonal and
+cal-year the same type with different bounds; contract months as one sortable integer (`year * 12 +
+month`) that indexes directly into a curve column; calendars as `np.busdaycalendar` with business-day arithmetic through
 `np.busday_count` and `np.busday_offset`; and expiry rules as **data, not code** — "three business days
 before the 25th of the month preceding delivery" is a row with an anchor, an offset, a calendar id and a
 direction. WTI, Brent, TTF, JKM, NBP and Henry Hub all differ, and one table row each beats one function
@@ -257,8 +288,15 @@ prices at 100x. numpy's busday machinery is array-first and already installed; t
 the holiday tables, which are data you must own anyway because desks disagree about them. Keep them as
 reviewed goldens.
 
-**Rejected: an integer day-number `NewType` as the single time type.** It erases the distinction between
-the observation and delivery axes, which is the one distinction that matters here.
+**Rejected: a single date-indexed table holding forwards alongside discount factors and fixings.** It is
+the natural first design and it is right about the index — a sorted date array with parallel value vectors
+beats a dict of dates 4x (`np.searchsorted`) or 12x (integer offset on a regular grid), and the
+length invariant belongs to the date array. It fails only on where forwards live, for the hedging reason
+above. Keep the frame; move `fwd` to the contract axis and add `contract_of_day`.
+
+**Also rejected: making the grid implicit.** The date array defines the frame's length, but the *calendar*
+must be named and part of the frame's identity, so joining two frames compares two ids rather than two
+date arrays elementwise — and alignment happens once at ingest, never inside a pricing call (33x, A.13).
 
 ### D4 — Declared economics are the truth; the incidence matrix is derived
 
@@ -997,6 +1035,51 @@ errors in the whole repository**:
   from `bridge.call`'s `object` return
 
 That is the entire cost of the project-wide downgrade currently in `pyproject.toml`: one line in one test.
+
+### A.13 The schedule/contract split (D3)
+
+One valuation date, a 1,260-day schedule, 60 monthly contracts, 5,000 Asian swaps averaging over
+21-day windows.
+
+Day-to-row lookup, 200,000 lookups:
+
+| | time | ratio |
+|---|---|---|
+| `dict[int, int]` | 12.57 ms | |
+| `np.searchsorted` on a sorted date array | 3.55 ms | 4x |
+| integer offset (regular grid) | **1.02 ms** | 12x |
+
+Pricing and risk, with forwards stored on each axis:
+
+| forwards stored | price | delta ladder | risk shape |
+|---|---|---|---|
+| per **day** (expanded onto the schedule) | 0.47 ms | 707 ms, 1,261 kernel calls | [5000, 1260] = 48.1 MiB |
+| per **contract** | 0.08 ms | 8.8 ms, 61 kernel calls | [5000, 60] = 2.3 MiB |
+| per contract, weight matrix used directly | 0.08 ms | **0.021 us, 0 kernel calls** | [5000, 60] = 2.3 MiB |
+
+The day-expanded risk is 21x wider and 80x slower, and it is not hedgeable: the tradeable instrument is
+the contract. Once forwards are on the contract axis, `W` is already the derivative and the ladder costs
+nothing — it agrees with bump-and-revalue to 2.9e-10.
+
+The mid-month straddle, which is the case that appears to need a second date axis. Valued 15 September
+with 1,709 of 5,000 trades having windows that span already-fixed and unfixed days:
+
+| | |
+|---|---|
+| price 5,000 swaps (`accrued + W @ fwd`) | 89.7 us |
+| delta (the weight matrix, no computation) | 0.021 us |
+| delta by bumping 60 contracts | 9.28 ms |
+| agreement | 1.9e-10 |
+
+Delta decays through the month with no extra machinery, because fixed days move out of `W` and into the
+accrual constant: total delta 4,991 (1 Sep) → 4,379 (15 Sep) → 2,511 (1 Oct).
+
+Alignment of two frames published on different grids:
+
+| | time | per 10,000 pricing cells |
+|---|---|---|
+| align inside the pricing call | 19.5 us | 195 ms |
+| align once at ingest, then use | **0.6 us** | 6 ms |
 
 ---
 
