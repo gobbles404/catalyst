@@ -89,15 +89,19 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Excel-DNA values to Python and back: blanks to None, ranges to arrays or rows.</summary>
+    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, ranges to arrays or rows.</summary>
     public static class Marshal
     {
         public static PyObject ToPython(object value)
         {
             // Errors never reach here: Bridge.Call returns them before marshaling.
-            if (value == null || value is ExcelEmpty || value is ExcelMissing)
+            if (value == null || value is ExcelEmpty)
             {
                 return PyObject.None;
+            }
+            if (value is ExcelMissing)
+            {
+                return Bridge.Module.GetAttr("MISSING");
             }
             if (value is object[,] rect)
             {

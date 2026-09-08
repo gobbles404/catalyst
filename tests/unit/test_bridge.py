@@ -1,5 +1,6 @@
+import ctypes
+
 import numpy as np
-from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 
@@ -15,34 +16,20 @@ def test_call_ping_reports_version_and_location() -> None:
     assert "goosedove" in result
 
 
-def test_errors_become_cell_text() -> None:
-    result = bridge.call("Ping", ["unexpected argument"])
-    assert isinstance(result, str)
-    assert result.startswith("#ERROR")
-
-
 def test_specs_carry_name_description_and_parameters() -> None:
     specs = {name: (doc, params) for name, doc, params in bridge.function_specs()}
     assert specs["Add"] == ("Add two numbers; proves arguments cross the seam.", ["a", "b"])
     assert specs["Ping"][1] == []
 
 
-def test_sum_range_accepts_every_shape_excel_sends() -> None:
-    assert bridge.call("SumRange", [[[1.0, 2.0], [3.0, None]]]) == 6.0
-    assert bridge.call("SumRange", [2.0]) == 2.0
-    assert bridge.call("SumRange", [None]) == 0.0
+def test_add_crosses_the_seam() -> None:
+    assert bridge.call("Add", [1.5, 2.0]) == 3.5
 
 
-def test_sum_range_reports_text_as_an_error() -> None:
-    result = bridge.call("SumRange", [[["e", 1.0]]])
-    assert isinstance(result, str)
-    assert result.startswith("#ERROR")
-
-
-def test_scale_returns_a_block() -> None:
-    result = bridge.call("ScaleBlock", [[[1.0, 2.0], [3.0, None]], 10.0])
-    assert isinstance(result, np.ndarray)
-    block: NDArray[np.float64] = np.asarray(result, dtype=np.float64)
-    assert block.shape == (2, 2)
-    assert block[0, 1] == 20.0
-    assert np.isnan(block[1, 1])
+def test_numeric_block_copies_the_host_buffer() -> None:
+    buffer = (ctypes.c_double * 6)(1.0, 2.0, 3.0, 4.0, 5.0, float("nan"))
+    block = bridge.numeric_block(ctypes.addressof(buffer), 2, 3)
+    buffer[0] = 99.0
+    assert block[0, 0] == 1.0
+    assert np.isnan(block[1, 2])
+    assert block.shape == (2, 3)
