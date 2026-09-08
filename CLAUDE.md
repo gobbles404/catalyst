@@ -14,7 +14,10 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
 
 ## Style
 
-- Validate untrusted input only at the Excel boundary. Inside, trust the types.
+- The seam guards once: `call` in `bridge.py` checks every argument against the
+  function's own signature, then the library trusts what it is given. `docs/inputs.md` is the map.
+- No coercion at the seam. A boolean is not a number, text is never a number, empty text is not text.
+- Blank and missing are different facts. Only a missing argument takes a declared default; a blank cell fails.
 - No `isinstance` or `type(x) is` checks on internal calls. No `runtime_checkable` Protocols.
 - No `__post_init__` that re-checks what its caller already established. Normalize, do not verify.
 - `match` over enums with `assert_never` in the default arm. `NewType` for units and digests.
@@ -31,7 +34,7 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
 
 ## Pull requests
 
-- One purpose, under 400 lines. Conventional commit titles: `feat(scope): ...`, `fix(scope): ...`, `chore: ...`.
+- One purpose. Conventional commit titles: `feat(scope): ...`, `fix(scope): ...`, `chore: ...`.
 - Say what you did not do.
 
 ## Performance

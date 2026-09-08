@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import cProfile
 from collections.abc import Callable
-from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
 
-import goosedove
 from goosedove.instrumentation.work_counts import (
     CACHE_HIT,
     CACHE_MISS,
@@ -44,23 +41,7 @@ def price_group(
 
 # --- helpers ---------------------------------------------------------------
 
-PACKAGE_DIR = str(Path(goosedove.__file__).parent)
-
-
-def call_profile(fn: Callable[[], object]) -> dict[str, int]:
-    """Which of the package's own functions ran, and how many times each."""
-    profiler = cProfile.Profile()
-    profiler.enable()
-    fn()
-    profiler.disable()
-    profile: dict[str, int] = {}
-    for entry in profiler.getstats():  # type: ignore[attr-defined]
-        code = entry.code
-        if isinstance(code, str):
-            continue
-        if code.co_filename.startswith(PACKAGE_DIR):
-            profile[code.co_qualname] = profile.get(code.co_qualname, 0) + entry.callcount
-    return profile
+CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 
 
 def fixed_group() -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -90,7 +71,7 @@ def test_warm_evaluation_does_no_pricing_work() -> None:
 
 # Characterization, not specification: this records the shape of work today so
 # that a change to it is visible in review. The two tests above state what must hold.
-def test_warm_evaluation_itemized() -> None:
+def test_warm_evaluation_itemized(call_profile: CallProfile) -> None:
     _cache.clear()
     q, p = fixed_group()
     price_group(q, p, WorkCounter())

@@ -1,0 +1,184 @@
+"""The scalar guard: every kind Excel can send against every kind a function can declare."""
+
+import ctypes
+from typing import cast
+
+import numpy as np
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from goosedove.excel import bridge
+from goosedove.excel.bridge import MISSING, excel_function
+
+
+@excel_function
+def Number(x: float) -> float:
+    return x
+
+
+@excel_function
+def Text(x: str) -> str:
+    return x
+
+
+@excel_function
+def Boolean(x: bool) -> bool:
+    return x
+
+
+@excel_function
+def Whole(x: int) -> int:
+    return x
+
+
+@excel_function
+def Rate(x: float = 0.05) -> float:
+    return x
+
+
+@excel_function
+def Boom(x: float) -> float:
+    raise ValueError("no curve for that date")
+
+
+# --- the matrix: rows arrive, columns are declared -------------------------
+
+ARRIVES = {
+    "number": 2.5,
+    "text": "Brent",
+    "boolean": True,
+    "blank": None,
+    "missing": MISSING,
+    "array": np.ones((1, 1)),
+}
+DECLARED = {"Number": "number", "Text": "text", "Boolean": "boolean", "Whole": "whole number"}
+PASSES = {("Number", "number"), ("Text", "text"), ("Boolean", "boolean")}
+
+
+@pytest.mark.parametrize("arrival", ARRIVES)
+@pytest.mark.parametrize("function", DECLARED)
+def test_scalar_matrix(function: str, arrival: str) -> None:
+    value = ARRIVES[arrival]
+    result = bridge.call(function, [value])
+    if (function, arrival) in PASSES:
+        assert result == value
+    else:
+        assert isinstance(result, str)
+        assert result.startswith(f"#ERROR {function}: x is ")
+        assert result.endswith(f", expected {DECLARED[function]}")
+
+
+# --- messages, exactly ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("function", "value", "text"),
+    [
+        ("Number", "Brent", "#ERROR Number: x is text 'Brent', expected number"),
+        ("Number", "123", "#ERROR Number: x is text '123', expected number"),
+        ("Number", True, "#ERROR Number: x is boolean TRUE, expected number"),
+        ("Boolean", "TRUE", "#ERROR Boolean: x is text 'TRUE', expected boolean"),
+        ("Number", None, "#ERROR Number: x is blank, expected number"),
+        ("Number", MISSING, "#ERROR Number: x is missing, expected number"),
+        ("Text", "", "#ERROR Text: x is empty text, expected text"),
+        ("Text", 46273.0, "#ERROR Text: x is number 46273.0, expected text"),
+        ("Boolean", 1.0, "#ERROR Boolean: x is number 1.0, expected boolean"),
+        ("Whole", 2.5, "#ERROR Whole: x is number 2.5, expected whole number"),
+        ("Whole", 2.9999999996, "#ERROR Whole: x is number 2.9999999996, expected whole number"),
+        ("Whole", True, "#ERROR Whole: x is boolean TRUE, expected whole number"),
+        ("Number", np.zeros((3, 1)), "#ERROR Number: x is 3x1 array, expected number"),
+        ("Number", [[1.0, "a"]], "#ERROR Number: x is 1x2 array, expected number"),
+        ("Number", [[5.0]], "#ERROR Number: x is 1x1 array, expected number"),
+    ],
+)
+def test_failure_names_argument_arrival_and_expectation(
+    function: str, value: object, text: str
+) -> None:
+    assert bridge.call(function, [value]) == text
+
+
+def test_library_failure_names_function_type_and_message() -> None:
+    assert bridge.call("Boom", [1.0]) == "#ERROR Boom: ValueError: no curve for that date"
+
+
+def test_wrong_number_of_arguments_fails() -> None:
+    assert bridge.call("Ping", ["unexpected"]) == "#ERROR Ping: expected 0 arguments, got 1"
+
+
+# --- whole numbers ----------------------------------------------------------
+
+
+@given(st.integers(min_value=-(2**53), max_value=2**53))
+def test_whole_accepts_every_integral_number(n: int) -> None:
+    result = bridge.call("Whole", [float(n)])
+    assert result == n
+    assert type(result) is int
+
+
+@given(st.floats(allow_nan=False, allow_infinity=False).filter(lambda f: not f.is_integer()))
+def test_whole_rejects_every_fractional_number(f: float) -> None:
+    result = bridge.call("Whole", [f])
+    assert isinstance(result, str)
+    assert result.endswith("expected whole number")
+
+
+# --- optional arguments: only missing takes the default ---------------------
+
+
+def test_missing_takes_the_declared_default() -> None:
+    assert bridge.call("Rate", [MISSING]) == 0.05
+
+
+def test_blank_never_takes_a_default() -> None:
+    assert bridge.call("Rate", [None]) == "#ERROR Rate: x is blank, expected number"
+
+
+def test_present_value_still_guarded_with_a_default() -> None:
+    assert bridge.call("Rate", [0.07]) == 0.07
+    assert bridge.call("Rate", ["7%"]) == "#ERROR Rate: x is text '7%', expected number"
+
+
+# --- the declaration itself is checked at registration ----------------------
+
+
+def test_unknown_declared_kind_refuses_to_register() -> None:
+    def Later(x: list[str]) -> str:
+        return ""
+
+    with pytest.raises(TypeError, match="Later: x declares list\\[str\\]"):
+        excel_function(Later)
+
+
+def test_default_of_the_wrong_kind_refuses_to_register() -> None:
+    def Wrong(x: float = cast(float, "x")) -> float:
+        return 0.0
+
+    with pytest.raises(TypeError, match="Wrong: x defaults to text 'x', expected number"):
+        excel_function(Wrong)
+
+
+def test_parameter_the_host_cannot_pass_refuses_to_register() -> None:
+    def Keyed(x: float, *, put: bool = False) -> float:
+        return x
+
+    with pytest.raises(TypeError, match="Keyed: put is keyword-only, which the host cannot pass"):
+        excel_function(Keyed)
+
+
+def test_duplicate_name_refuses_to_register() -> None:
+    def Again(x: float) -> float:
+        return x
+
+    Again.__name__ = "Number"
+    with pytest.raises(TypeError, match="Number is already registered"):
+        excel_function(Again)
+
+
+# --- the host's numeric buffer lands in a scalar slot as an array -----------
+
+
+def test_numeric_block_into_a_scalar_slot_fails_with_its_shape() -> None:
+    buffer = (ctypes.c_double * 2)(1.0, 2.0)
+    block = bridge.numeric_block(ctypes.addressof(buffer), 2, 1)
+    assert bridge.call("Add", [block, 1.0]) == "#ERROR Add: a is 2x1 array, expected number"
