@@ -3,6 +3,10 @@
 A commodities derivatives pricing library exposed to Excel through Excel-DNA.
 Python 3.13.13, managed with uv. Run everything through `uv run`.
 
+## Principles
+
+PRINCIPLES.md holds the tenets these rules derive from. When no rule applies, or a rule and a tenet conflict, the tenet decides.
+
 ## Before finishing any task
 
 Run `.\check.ps1` (format, lint, types, tests) and fix what it reports.
