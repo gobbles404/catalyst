@@ -1,8 +1,9 @@
 """The seam between the Excel host and this package.
 
-The host imports this module and uses exactly four names: MISSING,
-function_specs, call, and the module itself. Nothing else in the package
-knows Excel exists.
+The host imports this module and calls exactly five names: function_specs,
+call, numeric_block, flatten_block, and is_block. Blanks arrive as None.
+Excel errors never arrive; the host returns them before calling. Nothing
+else in the package knows Excel exists.
 """
 
 from __future__ import annotations
@@ -16,9 +17,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 import goosedove
-
-MISSING = object()
-"""Marker the host passes for an argument the user left blank."""
 
 _FUNCTIONS: dict[str, Callable[..., object]] = {}
 
@@ -54,10 +52,10 @@ def function_specs() -> list[tuple[str, str, list[str]]]:
 
 
 def call(name: str, args: list[object]) -> object:
-    """Run one registered function; blanks become None, errors become text."""
+    """Run one registered function; errors become text."""
     fn = _FUNCTIONS[name]
     try:
-        return fn(*[None if a is MISSING else a for a in args])
+        return fn(*args)
     except Exception as exc:
         return f"#ERROR {type(exc).__name__}: {exc}"
 

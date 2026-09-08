@@ -54,6 +54,13 @@ namespace Goosedove.Host
             {
                 return "#ERROR python did not start: " + StartupError;
             }
+            // An Excel error in any argument is the result, unchanged. Excel's own
+            // functions do the same, and it keeps an error from pricing as a blank.
+            var inputError = Marshal.FirstError(args);
+            if (inputError != null)
+            {
+                return inputError;
+            }
             try
             {
                 using (Py.GIL())
@@ -87,7 +94,8 @@ namespace Goosedove.Host
     {
         public static PyObject ToPython(object value)
         {
-            if (value == null || value is ExcelEmpty || value is ExcelMissing || value is ExcelError)
+            // Errors never reach here: Bridge.Call returns them before marshaling.
+            if (value == null || value is ExcelEmpty || value is ExcelMissing)
             {
                 return PyObject.None;
             }
@@ -153,6 +161,29 @@ namespace Goosedove.Host
                 }
                 return block;
             }
+        }
+
+        /// <summary>The first Excel error among the arguments, searching ranges cell by cell; null when there is none.</summary>
+        public static object FirstError(object[] args)
+        {
+            foreach (var arg in args)
+            {
+                if (arg is ExcelError)
+                {
+                    return arg;
+                }
+                if (arg is object[,] rect)
+                {
+                    foreach (var cell in rect)
+                    {
+                        if (cell is ExcelError)
+                        {
+                            return cell;
+                        }
+                    }
+                }
+            }
+            return null;
         }
 
         // True when every cell is a number or blank; those ranges take the fast path.
