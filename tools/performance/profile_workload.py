@@ -13,7 +13,7 @@ REPORTS = Path(__file__).resolve().parents[2] / "profiles"
 
 
 def profile_call[T](operation: Callable[[], T], report: Path, seconds: float = 0.5) -> T:
-    """Run one operation over and over under the profiler for about `seconds`, then write the report.
+    """Run one operation over and over under the profiler for `seconds`, then write the report.
 
     The profiler samples once a millisecond. One call of a microsecond is never seen, so the
     report shows how repeated calls split their time, not how long one took.
