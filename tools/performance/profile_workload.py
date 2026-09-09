@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from time import perf_counter
 
 from pyinstrument import Profiler
 
@@ -11,12 +12,20 @@ from goosedove.excel.bridge import Cells
 REPORTS = Path(__file__).resolve().parents[2] / "profiles"
 
 
-def profile_call[T](operation: Callable[[], T], report: Path) -> T:
-    """Run one operation under the profiler and write the report."""
+def profile_call[T](operation: Callable[[], T], report: Path, seconds: float = 0.5) -> T:
+    """Run one operation over and over under the profiler for `seconds`, then write the report.
+
+    The profiler samples once a millisecond. One call of a microsecond is never seen, so the
+    report shows how repeated calls split their time, not how long one took.
+    """
     profiler = Profiler()
+    deadline = perf_counter() + seconds
     profiler.start()
     try:
-        result = operation()
+        while True:
+            result = operation()
+            if perf_counter() >= deadline:
+                break
     finally:
         profiler.stop()
     report.write_text(profiler.output_html(), encoding="utf-8")
