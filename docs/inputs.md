@@ -10,7 +10,7 @@ A scalar is one of six kinds.
 
 | Kind | Examples | Notes |
 |---|---|---|
-| Number | `42`, `3.14`, a date, a time, `5%`, `$1,250` | Always a finite double. The format never travels: a date is its serial (2026-09-08 is 46273), 5% is 0.05, $1,250 is 1250, 14:30 is 0.604. Digits typed past the fifteenth become zeros. |
+| Number | `42`, `3.14`, a date, a time, `5%`, `$1,250` | Always a finite double. The format never travels: a date is its serial (2026-09-08 is 46273), 5% is 0.05, $1,250 is 1250, 14:30 is 0.604. Digits typed past the fifteenth become zeros. A workbook on the 1904 date system sends serials 1,462 days lower, with no signal. |
 | Text | `"Brent"`, `""`, `'123`, `"WTI "` | Exactly as typed, up to 32,767 characters. Empty text is text. A number stored as text is text. Trailing and non-breaking spaces survive. |
 | Boolean | `TRUE`, `FALSE` | Never a number. |
 | Blank | an empty cell | Never zero and never empty text. |
@@ -43,23 +43,25 @@ def Forward(price: float, days: float, rate: float) -> float: ...
 
 Rules:
 
-1. Match the declared kind exactly. No coercion. A boolean is not a number, `"123"` is not a number, and empty text is not text a function may receive.
+1. Match the declared type exactly. No coercion. A boolean is not a number, `"123"` is not a number, and empty text is not text a function may receive.
 2. Blank and missing match nothing. Only a missing argument takes a declared default; a blank cell never does.
-3. An array into a scalar slot fails, even a 1×1 one. `=Add(SEQUENCE(1), 2)` fails where Excel's own functions would take the one cell. A scalar into an array slot becomes a 1×1 array.
-4. Every cell of an array is checked as a scalar would be. A blank inside an array of numbers fails, so `A:A` fails on its first unused row.
+3. An array into a scalar slot fails, even a 1×1 one. `=Add(SEQUENCE(1), 2)` fails where Excel's own functions would take the one cell. A scalar into a range slot becomes a 1×1 range.
+4. Every cell of a range is checked as a scalar would be, and the range keeps its order. A blank inside a range of numbers fails, so `A:A` fails on its first unused row.
 5. A one-row-or-column type declares its orientation. A column type fails on a row.
-6. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside an array the message names the cell by row and column within the range, because no sheet address crosses.
+6. The boundary checks each argument alone, by type and shape, never by meaning. Which name goes with which column, whether a column is sorted, whether two arguments agree: all of that belongs to the library. The one documented exception is that a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999.
+7. Shape is checked before cells. A range of the wrong shape is reported as a shape failure even when it also holds a bad cell.
+8. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside a range the message names the cell the way `INDEX` counts, row then column from 1 within the range, because no sheet address crosses: `#ERROR SumColumn: values cell (3, 1) is blank, expected number`.
 
 Scalars, rows arriving against columns declared:
 
-| Arrives | number | whole number | text | boolean |
-|---|---|---|---|---|
-| Number | pass | pass when it has no fraction | fail | fail |
-| Text | fail | fail | pass unless empty | fail |
-| Boolean | fail | fail | fail | pass |
-| Blank | fail | fail | fail | fail |
-| Error | returned unchanged by the host | same | same | same |
-| Missing | fail, or the declared default | same | same | same |
+| Arrives | number | whole number | date | text | boolean |
+|---|---|---|---|---|---|
+| Number | pass | pass when it has no fraction | pass when whole and 61 or more | fail | fail |
+| Text | fail | fail | fail | pass unless empty | fail |
+| Boolean | fail | fail | fail | fail | pass |
+| Blank | fail | fail | fail | fail | fail |
+| Error | returned unchanged by the host | same | same | same | same |
+| Missing | fail, or the declared default | same | same | same | same |
 
 ## Declared types
 
@@ -73,27 +75,29 @@ Built in the scalar pull request:
 | `bool`, a boolean | TRUE or FALSE | `=Price(curve, TRUE)` | 1 or 0, `"TRUE"`, blank, missing, any array |
 | any of the above with a default | the argument missing | `=OptionPrice(curve, K, T)` | a blank cell |
 
-Decided, and built in the array pull request:
+Built in the range pull request. A date is a whole serial of 61 or more, handed over as a calendar date; a range keeps its order and its shape.
 
-| Declared | Accepts | Example | Fails on |
-|---|---|---|---|
-| `Block`, an array of numbers | a range of numbers with no blank cell, a scalar as 1×1 | `=ScaleBlock(A1:B2, 10)` | any blank, text, or boolean cell, named by row and column |
+| Declared | Accepts | Example | Hands over | Fails on |
+|---|---|---|---|---|
+| `Date` | one whole number from 61 to 2958465 | `=DateText(B5)` with B5 = 22-May-2026 | the date 2026-05-22 | 46164.5, `"2026-05-22"`, 60, 2958466 |
+| `Array` | a range of numbers, any shape | `=SumArray(A2:B4)` | the grid, as on the sheet | a blank, text, or boolean cell, named |
+| `Column` | a range of numbers, one column wide | `=SumColumn(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
+| `Row` | a range of numbers, one row tall | `=SumRow(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
+| `DateColumn` | a range of dates, one column wide | `=FirstDate(A2:A7)` | a plain list of dates | a fraction, a serial under 61, a blank |
+| `DateRow` | a range of dates, one row tall | `=LastDate(A1:F1)` | a plain list of dates | the same, or a column |
+| `TextColumn` | a range of text, one column wide | `=JoinColumn(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
+| `TextRow` | a range of text, one row tall | `=JoinRow(A1:C1)` | a plain list of text | the same, or a column |
 
-Next, one at a time, each when the first function needs it. Each adds one parser to the guard and one row here.
+A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one.
+
+Next, one at a time, each when the first function needs it. Each adds one rule to the guard and one row here.
 
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
-| Day, a calendar date | a whole serial | `=Expiry(B5)` with B5 = 08-Sep-2026 | A price typed into a date slot is also a whole number. `NOW()` has a fraction. Serials 1 to 60 fall on Excel's fictional 1900 leap day. |
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
 | A choice from text | text equal to one member: call, put | `=OptionPrice(curve, K, T, "put")` | C/P and +1/−1 are desk aliases and stay on the sheet. |
 | Unit | text equal to one member: bbl, MT, MWh, MMBtu | `=Convert(1000, "bbl", "MT")` | "BBLS" and "tonne" are aliases. `$/bbl` is a price, not a unit. |
 | Handle to a live object | the text a builder function returned | `=Forward(B1, B5)` with B1 = `=BuildCurve(A3:B62)` | A reopened workbook keeps the text, not the object. A rebuilt curve with unchanged text does not recalculate its dependents. |
-| Vector, a 1-D list of numbers | one row or one column | `=Npv(rates, B2:B25)` | A row and a column of the same numbers are the same Vector. |
-| Matrix, a full grid | a range with no blank cell | `=Surface(expiries, strikes, C3:L14)` | A blank in a vol grid. Axis labels selected with the grid. |
-| Days, a list of dates | one row or column of whole serials | `=Fixings(curve, B3:B25)` | Text dates from a CSV export. |
-| Curve, dates and values | N×2 with no blanks | `=BuildCurve(A3:B62)` | The header row inside the selection. |
-| Table with a header row | first row text naming the record's fields, body typed per column | `=PriceBook(curve, A1:H501)` | One text cell makes the host send every cell one at a time. Over-selected blank rows. |
-| Optional with a default | the argument missing, never a blank cell | `=OptionPrice(curve, K, T)` | A blank mark taking a default prices silently. |
 
 ## Decided
 
@@ -108,17 +112,26 @@ Decided 2026-09-08, strict in every case.
 7. Empty text fails a text slot.
 8. A one-row-or-column type declares its orientation; the other fails.
 
+Decided 2026-09-09, for ranges and dates.
+
+9. A cell is named the way `INDEX` counts: row then column, from 1, within the range that was passed.
+10. A `Column` or `Row` hands the function a plain list. An `Array` keeps its shape. Nothing is sorted or reordered.
+11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text, so the numbers stay on the host's fast road.
+12. Seven range types: `Array`, `Column`, `Row` of numbers; `DateColumn`, `DateRow` of dates; `TextColumn`, `TextRow` of text. A `TextArray` is possible and not built.
+13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
+14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the guard.
+15. Shape before cells. A wrong-shaped range is reported as such before any cell is looked at.
+
 ## Open questions
 
 Each waits for the type that raises it.
 
-1. Dates: whole serials only? Refuse 1 to 60? Text dates never?
-2. Rates and percentages: 0.05 or 5? The seam cannot see the format, so the library must say which.
-3. Choices from text: is folding "Call" to call coercion? Aliases stay on the sheet?
-4. Units: does the unit ride with the number, or arrive as its own argument? Is currency a unit?
-5. Handles: what the text carries, and how a rebuilt curve reaches its dependents when the handle text is unchanged.
-6. Tables: how headers are matched, trailing blank rows, a blank in a body column.
-7. An error inside a large range: the host returns it with no cell address. Should it name the cell? A host change.
-8. Newer Excel errors arrive as `#VALUE!`. Accept as a known renaming and say so?
+1. Rates and percentages: 0.05 or 5? The seam cannot see the format, so the library must say which.
+2. Choices from text: is folding "Call" to call coercion? Aliases stay on the sheet?
+3. Units: does the unit ride with the number, or arrive as its own argument? Is currency a unit?
+4. Handles: what the text carries, and how a rebuilt curve reaches its dependents when the handle text is unchanged.
+5. An error inside a large range: the host returns it with no cell address. Should it name the cell? A host change.
+6. Newer Excel errors arrive as `#VALUE!`. Accept as a known renaming and say so?
+7. A workbook on Excel's 1904 date system sends every date serial 1,462 days low, and nothing that crosses the seam says so. Should the host refuse such a workbook before calling?
 
 The way out, results returning to the sheet, is decided separately.
