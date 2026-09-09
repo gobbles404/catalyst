@@ -18,6 +18,7 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
   function's own signature, then the library trusts what it is given. `docs/inputs.md` is the map.
 - No coercion at the seam. A boolean is not a number, text is never a number, empty text is not text.
 - Blank and missing are different facts. Only a missing argument takes a declared default; a blank cell fails.
+- The seam checks each argument alone, by type and shape, never by meaning. Meaning belongs to the library.
 - No `isinstance` or `type(x) is` checks on internal calls. No `runtime_checkable` Protocols.
 - No `__post_init__` that re-checks what its caller already established. Normalize, do not verify.
 - `match` over enums with `assert_never` in the default arm. `NewType` for units and digests.
