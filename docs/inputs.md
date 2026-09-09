@@ -113,7 +113,7 @@ Decided 2026-09-09, for ranges and dates.
 
 9. A cell is named the way `INDEX` counts: row then column, from 1, within the range that was passed.
 10. A `Column` or `Row` hands the function a plain list. An `Array` keeps its shape. Nothing is sorted or reordered.
-11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text, so the numbers stay on the host's fast road.
+11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text.
 12. Seven range types: `Array`, `Column`, `Row` of numbers; `DateColumn`, `DateRow` of dates; `TextColumn`, `TextRow` of text. A `TextArray` is possible and not built.
 13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
 14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the validator.
@@ -126,6 +126,7 @@ Decided 2026-09-09, closing the input side.
 18. A unit is its own argument. One cell holds one value, never `1000 bbl`.
 19. An error inside a range comes back as that error, with no cell named.
 20. Newer Excel errors such as `#SPILL!` arrive as `#VALUE!`. Known, and left alone.
+21. Every range crosses the host the same way: a kind per cell, a number per cell, and the text cells in sheet order, in one pass. The host never chooses a road, and validating any range is one vectorized look.
 
 ## Not supported
 

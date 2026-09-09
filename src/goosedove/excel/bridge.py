@@ -1,21 +1,22 @@
 """The seam between the Excel host and this package.
 
 The host imports this module and uses six names: function_specs, call,
-numeric_block, flatten_block, is_block, and the value MISSING. A blank cell
-arrives as None, an omitted argument as MISSING, a range of numbers and
-blanks as a 2-D float64 array with NaN for the blanks, any other range as
-nested rows of cells, and Excel errors never arrive; the host returns them
-before calling. call validates the type of every argument against the
-function's own signature, once, by type and shape and never by meaning;
-past it nothing checks. docs/inputs.md is the map.
+cells_block, flatten_block, is_block, and the value MISSING. A blank cell
+arrives as None, an omitted argument as MISSING, and every range as Cells:
+one kind code per cell, one number per cell, and the text cells in sheet
+order, which cells_block builds from the host's buffers. Excel errors never
+arrive; the host returns them before calling. call validates the type of
+every argument against the function's own signature, once, by type and
+shape and never by meaning; past it nothing checks. docs/inputs.md is the map.
 """
 
 import ctypes
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from enum import IntEnum
 from importlib.metadata import PackageNotFoundError, version
-from typing import Final, NewType, cast
+from typing import Final, NewType, assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -60,6 +61,98 @@ class _Rejected(Exception):
         self.cell = cell
         self.value = value
         self.expected = expected
+
+
+# --- what arrives ------------------------------------------------------------
+
+
+class Kind(IntEnum):
+    """What one cell of a range holds. The codes are shared with the host."""
+
+    NUMBER = 0
+    TEXT = 1
+    BOOLEAN = 2
+    BLANK = 3
+    MISSING = 4
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class Cells:
+    """A range as the host sends it: a kind per cell, a number per cell, the text cells in order.
+
+    numbers holds the value of number and boolean cells and NaN elsewhere. texts holds every
+    text cell in sheet order, so the k-th text cell is the k-th TEXT in kinds.
+    """
+
+    kinds: NDArray[np.uint8]
+    numbers: NDArray[np.float64]
+    texts: tuple[str, ...]
+
+    @classmethod
+    def from_rows(cls, rows: Sequence[Sequence[object]]) -> "Cells":
+        """What the host would send for these cells, from Python values. Tests build ranges here."""
+        kinds = np.empty((len(rows), len(rows[0])), dtype=np.uint8)
+        numbers = np.full(kinds.shape, np.nan)
+        texts: list[str] = []
+        for r, row in enumerate(rows):
+            for c, cell in enumerate(row):
+                kind, number = _classify(cell)
+                kinds[r, c] = kind
+                numbers[r, c] = number
+                if kind is Kind.TEXT:
+                    texts.append(cast(str, cell))
+        return cls(kinds, numbers, tuple(texts))
+
+
+def _classify(cell: object) -> tuple[Kind, float]:
+    if cell is MISSING:
+        return Kind.MISSING, np.nan
+    if cell is None:
+        return Kind.BLANK, np.nan
+    if isinstance(cell, bool):
+        return Kind.BOOLEAN, 1.0 if cell else 0.0
+    if isinstance(cell, int | float):
+        return Kind.NUMBER, float(cell)
+    if isinstance(cell, str):
+        return Kind.TEXT, np.nan
+    raise TypeError(f"a cell cannot hold {type(cell).__name__}")
+
+
+def cells_block(kinds_pointer: int, numbers_pointer: int, rows: int, cols: int, text: str) -> Cells:
+    """Copy the host's pinned buffers into Cells. The text cells arrive joined with NUL."""
+    count = rows * cols
+    kinds = np.frombuffer((ctypes.c_uint8 * count).from_address(kinds_pointer), dtype=np.uint8)
+    numbers = np.frombuffer(
+        (ctypes.c_double * count).from_address(numbers_pointer), dtype=np.float64
+    )
+    kinds = kinds.reshape(rows, cols).copy()
+    texts = tuple(text.split("\0")) if (kinds == Kind.TEXT).any() else ()
+    return Cells(kinds, numbers.reshape(rows, cols).copy(), texts)
+
+
+def _cell(cells: Cells, i: int) -> object:
+    """The value at flat index i, as it arrived."""
+    kind = Kind(int(cells.kinds.flat[i]))
+    match kind:
+        case Kind.NUMBER:
+            return float(cells.numbers.flat[i])
+        case Kind.TEXT:
+            return cells.texts[int(np.count_nonzero(cells.kinds.ravel()[:i] == Kind.TEXT))]
+        case Kind.BOOLEAN:
+            return bool(cells.numbers.flat[i])
+        case Kind.BLANK:
+            return None
+        case Kind.MISSING:
+            return MISSING
+        case _:
+            assert_never(kind)
+
+
+def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected:
+    """The rejection for the first flagged cell, named as INDEX counts."""
+    i = int(bad.argmax())
+    r, c = divmod(i, cells.kinds.shape[1])
+    return _Rejected((r + 1, c + 1), _cell(cells, i), expected)
 
 
 # --- one cell ---------------------------------------------------------------
@@ -108,83 +201,46 @@ def _date(value: object) -> np.datetime64:
     return EXCEL_EPOCH + np.timedelta64(serial, "D")
 
 
-# --- every cell of a range --------------------------------------------------
-
-
-def _cells[T](
-    rule: Callable[[object], T], expected: str, rows: list[list[object]]
-) -> list[list[T]]:
-    """Apply one cell rule to nested rows; the first cell that fails is named as INDEX counts."""
-    grid: list[list[T]] = []
-    for r, row in enumerate(rows, start=1):
-        line: list[T] = []
-        for c, cell in enumerate(row, start=1):
-            try:
-                line.append(rule(cell))
-            except _Rejected:
-                raise _Rejected((r, c), cell, expected) from None
-        grid.append(line)
-    return grid
-
-
-def _cell_of(block: NDArray[np.float64], r: int, c: int) -> float | None:
-    """One cell of a numeric block as it arrived: a number, or None for a blank."""
-    cell = float(block[r, c])
-    return None if np.isnan(cell) else cell
-
-
-def _first_bad(bad: NDArray[np.bool_], block: NDArray[np.float64], expected: str) -> _Rejected:
-    """The rejection for the first flagged cell of a numeric block, named as INDEX counts."""
-    r, c = divmod(int(bad.argmax()), block.shape[1])
-    return _Rejected((r + 1, c + 1), _cell_of(block, r, c), expected)
+# --- every cell of a range, in one vectorized look ----------------------------
 
 
 def _numbers(value: object) -> NDArray[np.float64]:
     """Every cell a number, kept in sheet order. A scalar is a 1x1 range."""
-    if isinstance(value, np.ndarray):
-        block = cast(NDArray[np.float64], value)
-        blanks = np.isnan(block)
-        if blanks.any():
-            raise _first_bad(blanks, block, "number")
-        return block
-    if isinstance(value, list):
-        rows = cast(list[list[object]], value)
-        return np.array(_cells(_number, "number", rows), dtype=np.float64)
+    if isinstance(value, Cells):
+        bad = value.kinds != Kind.NUMBER
+        if bad.any():
+            raise _first_bad(value, bad, "number")
+        return value.numbers
     return np.array([[_number(value)]])
 
 
 def _dates(value: object) -> NDArray[np.datetime64]:
     """Every cell a date, kept in sheet order. A scalar is a 1x1 range."""
-    if isinstance(value, np.ndarray):
-        return _dates_of(cast(NDArray[np.float64], value))
-    if isinstance(value, list):
-        rows = cast(list[list[object]], value)
-        return np.array(_cells(_date, "date", rows), dtype="datetime64[D]")
+    if isinstance(value, Cells):
+        block = value.numbers
+        bad = (
+            (value.kinds != Kind.NUMBER)
+            | (block != np.floor(block))
+            | (block < FIRST_SERIAL)
+            | (block > LAST_SERIAL)
+        )
+        if bad.any():
+            raise _first_bad(value, bad, "date")
+        return EXCEL_EPOCH + block.astype(np.int64).astype("timedelta64[D]")
     return np.array([[_date(value)]])
 
 
-def _dates_of(block: NDArray[np.float64]) -> NDArray[np.datetime64]:
-    """Whole serials inside Excel's calendar become dates; the first other cell is named."""
-    bad = (
-        np.isnan(block)
-        | (block != np.floor(block))
-        | (block < FIRST_SERIAL)
-        | (block > LAST_SERIAL)
-    )
-    if bad.any():
-        raise _first_bad(bad, block, "date")
-    return EXCEL_EPOCH + block.astype(np.int64).astype("timedelta64[D]")
-
-
-def _texts(value: object) -> list[list[str]]:
-    """Every cell text, kept in sheet order. A scalar is a 1x1 range."""
-    if isinstance(value, np.ndarray):
-        # A numeric block holds only numbers and blanks, so its first cell already fails.
-        raise _Rejected((1, 1), _cell_of(cast(NDArray[np.float64], value), 0, 0), "text")
-    if isinstance(value, list):
-        rows = cast(list[list[object]], value)
-        return _cells(_text, "text", rows)
-    return [[_text(value)]]
+def _texts(value: object) -> NDArray[np.object_]:
+    """Every cell text with a character in it, kept in sheet order. A scalar is a 1x1 range."""
+    if isinstance(value, Cells):
+        bad = value.kinds != Kind.TEXT
+        if bad.any():
+            raise _first_bad(value, bad, "text")
+        if "" in value.texts:
+            r, c = divmod(value.texts.index(""), value.kinds.shape[1])
+            raise _Rejected((r + 1, c + 1), "", "text")
+        return np.array(value.texts, dtype=object).reshape(value.kinds.shape)
+    return np.array([[_text(value)]], dtype=object)
 
 
 # --- one column or one row: the shape is checked before any cell is --------
@@ -192,12 +248,9 @@ def _texts(value: object) -> list[list[str]]:
 
 def _shape(value: object) -> tuple[int, int]:
     """Rows and columns of what arrived. A scalar is 1x1."""
-    if isinstance(value, np.ndarray):
-        rows, cols = cast(NDArray[np.float64], value).shape
+    if isinstance(value, Cells):
+        rows, cols = value.kinds.shape
         return rows, cols
-    if isinstance(value, list):
-        grid = cast(list[list[object]], value)
-        return len(grid), len(grid[0])
     return 1, 1
 
 
@@ -233,7 +286,7 @@ def _date_row(value: object) -> NDArray[np.datetime64]:
 
 def _text_column(value: object) -> tuple[str, ...]:
     _one_column(value)
-    return tuple([row[0] for row in _texts(value)])
+    return tuple(_texts(value)[:, 0])
 
 
 def _text_row(value: object) -> tuple[str, ...]:
@@ -291,12 +344,9 @@ def describe(value: object) -> str:
         return f"number {value!r}"
     if isinstance(value, str):
         return f"text {value!r}" if value else "empty text"
-    if isinstance(value, np.ndarray):
-        rows, cols = cast(NDArray[np.float64], value).shape
+    if isinstance(value, Cells):
+        rows, cols = value.kinds.shape
         return f"{rows}x{cols} array"
-    if isinstance(value, list):
-        grid = cast(list[list[object]], value)
-        return f"{len(grid)}x{len(grid[0])} array"
     return type(value).__name__
 
 
@@ -382,13 +432,7 @@ def call(name: str, args: list[object]) -> object:
         return f"#ERROR {name}: {type(exc).__name__}: {exc}"
 
 
-# --- the host's buffers -----------------------------------------------------
-
-
-def numeric_block(pointer: int, rows: int, cols: int) -> NDArray[np.float64]:
-    """Copy a pinned double[] from the host into a numpy array. NaN marks blanks."""
-    buffer = (ctypes.c_double * (rows * cols)).from_address(pointer)
-    return np.frombuffer(buffer, dtype=np.float64).reshape(rows, cols).copy()
+# --- the way out ------------------------------------------------------------
 
 
 def flatten_block(block: NDArray[np.float64]) -> NDArray[np.float64]:
