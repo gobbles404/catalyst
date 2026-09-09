@@ -19,6 +19,7 @@ $formulas = [ordered]@{
     "=JoinColumn(E1:E2)" = "x, y"
     "=JoinColumn(I1:I2)" = "#ERROR JoinColumn: names cell (2, 1) is empty text, expected text"
     "=DateText(G1)"      = "2026-05-22"
+    "=RegisterAll()"     = "#NAME?"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.

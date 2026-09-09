@@ -34,7 +34,7 @@ namespace Goosedove.Host
     }
 
     /// <summary>The one place C# talks to Python: hand a name and arguments to bridge.call.</summary>
-    public static class Bridge
+    internal static class Bridge
     {
         public static PyObject Module;
         public static string StartupError;
@@ -94,7 +94,7 @@ namespace Goosedove.Host
     }
 
     /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells.</summary>
-    public static class Marshal
+    internal static class Marshal
     {
         /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
         public static object Append(PyList args, object value)
@@ -256,7 +256,7 @@ namespace Goosedove.Host
     }
 
     /// <summary>Asks Python which functions exist and registers each one with Excel.</summary>
-    public static class Registration
+    internal static class Registration
     {
         public static void RegisterAll()
         {
