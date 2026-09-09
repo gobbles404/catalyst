@@ -85,7 +85,7 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, ranges to one buffer or to rows of cells.</summary>
+    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells.</summary>
     public static class Marshal
     {
         /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
@@ -129,15 +129,19 @@ namespace Goosedove.Host
             return value.ToPython();
         }
 
+        // The codes of the seam's Kind enum.
+        private const byte Number = 0, Text = 1, Boolean = 2, Blank = 3, Missing = 4;
+
         // One pass over the cells, in sheet order. An Excel error anywhere is returned and
-        // nothing is built. All numbers and blanks ship as one buffer, NaN for the blanks.
-        // Anything else ships as rows of cells.
+        // nothing is built. Every other range ships the same way: one kind code per cell,
+        // one number per cell (NaN where there is none), and the text cells joined with NUL.
         private static PyObject Range(object[,] rect, out object error)
         {
             error = null;
             int rows = rect.GetLength(0), cols = rect.GetLength(1);
-            var block = new double[rows * cols];
-            var numeric = true;
+            var kinds = new byte[rows * cols];
+            var numbers = new double[rows * cols];
+            var texts = new List<string>();
             var i = 0;
             foreach (var cell in rect)
             {
@@ -148,39 +152,37 @@ namespace Goosedove.Host
                 }
                 if (cell is double d)
                 {
-                    block[i] = d;
+                    kinds[i] = Number;
+                    numbers[i] = d;
+                }
+                else if (cell is string s)
+                {
+                    kinds[i] = Text;
+                    numbers[i] = double.NaN;
+                    texts.Add(s);
+                }
+                else if (cell is bool b)
+                {
+                    kinds[i] = Boolean;
+                    numbers[i] = b ? 1.0 : 0.0;
                 }
                 else if (cell == null || cell is ExcelEmpty)
                 {
-                    block[i] = double.NaN;
+                    kinds[i] = Blank;
+                    numbers[i] = double.NaN;
+                }
+                else if (cell is ExcelMissing)
+                {
+                    kinds[i] = Missing;
+                    numbers[i] = double.NaN;
                 }
                 else
                 {
-                    numeric = false;
+                    throw new InvalidOperationException("a cell holds a " + cell.GetType().Name);
                 }
                 i++;
             }
-            return numeric ? NumericBlock(block, rows, cols) : Rows(rect);
-        }
-
-        private static PyObject Rows(object[,] rect)
-        {
-            var rows = new PyList();
-            for (var r = 0; r < rect.GetLength(0); r++)
-            {
-                using (var row = new PyList())
-                {
-                    for (var c = 0; c < rect.GetLength(1); c++)
-                    {
-                        using (var cell = Scalar(rect[r, c]))
-                        {
-                            row.Append(cell);
-                        }
-                    }
-                    rows.Append(row);
-                }
-            }
-            return rows;
+            return CellsBlock(kinds, numbers, rows, cols, string.Join("\0", texts));
         }
 
         /// <summary>Python results to Excel: a numpy block becomes object[,], everything else passes through.</summary>
@@ -221,22 +223,26 @@ namespace Goosedove.Host
             }
         }
 
-        // Pin the buffer and let Python copy it from a pointer.
-        private static PyObject NumericBlock(double[] block, int rows, int cols)
+        // Pin the buffers and let Python copy them from pointers.
+        private static PyObject CellsBlock(byte[] kinds, double[] numbers, int rows, int cols, string text)
         {
-            var handle = System.Runtime.InteropServices.GCHandle.Alloc(block, System.Runtime.InteropServices.GCHandleType.Pinned);
+            var kindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(kinds, System.Runtime.InteropServices.GCHandleType.Pinned);
+            var numbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(numbers, System.Runtime.InteropServices.GCHandleType.Pinned);
             try
             {
-                using (var ptr = new PyInt(handle.AddrOfPinnedObject().ToInt64()))
+                using (var pyKinds = new PyInt(kindsHandle.AddrOfPinnedObject().ToInt64()))
+                using (var pyNumbers = new PyInt(numbersHandle.AddrOfPinnedObject().ToInt64()))
                 using (var pyRows = new PyInt(rows))
                 using (var pyCols = new PyInt(cols))
+                using (var pyText = new PyString(text))
                 {
-                    return Bridge.Module.InvokeMethod("numeric_block", ptr, pyRows, pyCols);
+                    return Bridge.Module.InvokeMethod("cells_block", pyKinds, pyNumbers, pyRows, pyCols, pyText);
                 }
             }
             finally
             {
-                handle.Free();
+                kindsHandle.Free();
+                numbersHandle.Free();
             }
         }
     }

@@ -1,15 +1,13 @@
 """Type validation of scalars: every kind Excel can send against every declared type."""
 
-import ctypes
 from typing import cast
 
-import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, excel_function
+from goosedove.excel.bridge import MISSING, Cells, excel_function
 
 
 @excel_function
@@ -50,7 +48,7 @@ ARRIVES = {
     "boolean": True,
     "blank": None,
     "missing": MISSING,
-    "array": np.ones((1, 1)),
+    "array": Cells.from_rows([[1.0]]),
 }
 DECLARED = {"Number": "number", "Text": "text", "Boolean": "boolean", "Whole": "whole number"}
 PASSES = {("Number", "number"), ("Text", "text"), ("Boolean", "boolean")}
@@ -87,9 +85,13 @@ def test_scalar_matrix(function: str, arrival: str) -> None:
         ("Whole", 2.5, "#ERROR Whole: x is number 2.5, expected whole number"),
         ("Whole", 2.9999999996, "#ERROR Whole: x is number 2.9999999996, expected whole number"),
         ("Whole", True, "#ERROR Whole: x is boolean TRUE, expected whole number"),
-        ("Number", np.zeros((3, 1)), "#ERROR Number: x is 3x1 array, expected number"),
-        ("Number", [[1.0, "a"]], "#ERROR Number: x is 1x2 array, expected number"),
-        ("Number", [[5.0]], "#ERROR Number: x is 1x1 array, expected number"),
+        (
+            "Number",
+            Cells.from_rows([[0.0], [0.0], [0.0]]),
+            "#ERROR Number: x is 3x1 array, expected number",
+        ),
+        ("Number", Cells.from_rows([[1.0, "a"]]), "#ERROR Number: x is 1x2 array, expected number"),
+        ("Number", Cells.from_rows([[5.0]]), "#ERROR Number: x is 1x1 array, expected number"),
     ],
 )
 def test_failure_names_argument_arrival_and_expectation(
@@ -175,10 +177,9 @@ def test_duplicate_name_refuses_to_register() -> None:
         excel_function(Again)
 
 
-# --- the host's numeric buffer lands in a scalar slot as an array -----------
+# --- a range lands in a scalar slot as an array ------------------------------
 
 
-def test_numeric_block_into_a_scalar_slot_fails_with_its_shape() -> None:
-    buffer = (ctypes.c_double * 2)(1.0, 2.0)
-    block = bridge.numeric_block(ctypes.addressof(buffer), 2, 1)
-    assert bridge.call("Add", [block, 1.0]) == "#ERROR Add: a is 2x1 array, expected number"
+def test_range_into_a_scalar_slot_fails_with_its_shape() -> None:
+    column = Cells.from_rows([[1.0], [2.0]])
+    assert bridge.call("Add", [column, 1.0]) == "#ERROR Add: a is 2x1 array, expected number"
