@@ -54,13 +54,6 @@ namespace Goosedove.Host
             {
                 return "#ERROR python did not start: " + StartupError;
             }
-            // An Excel error in any argument is the result, unchanged. Excel's own
-            // functions do the same, and it keeps an error from pricing as a blank.
-            var inputError = Marshal.FirstError(args);
-            if (inputError != null)
-            {
-                return inputError;
-            }
             try
             {
                 using (Py.GIL())
@@ -70,9 +63,12 @@ namespace Goosedove.Host
                     {
                         foreach (var arg in args)
                         {
-                            using (var pyArg = Marshal.ToPython(arg))
+                            // An Excel error in any argument is the result, unchanged. Excel's own
+                            // functions do the same, and it keeps an error from pricing as a blank.
+                            var inputError = Marshal.Append(pyArgs, arg);
+                            if (inputError != null)
                             {
-                                pyArgs.Append(pyArg);
+                                return inputError;
                             }
                         }
                         using (var result = Module.InvokeMethod("call", pyName, pyArgs))
@@ -89,12 +85,39 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, ranges to arrays or rows.</summary>
+    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, ranges to one buffer or to rows of cells.</summary>
     public static class Marshal
     {
-        public static PyObject ToPython(object value)
+        /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
+        public static object Append(PyList args, object value)
         {
-            // Errors never reach here: Bridge.Call returns them before marshaling.
+            if (value is ExcelError)
+            {
+                return value;
+            }
+            if (value is object[,] rect)
+            {
+                object error;
+                var range = Range(rect, out error);
+                if (error != null)
+                {
+                    return error;
+                }
+                using (range)
+                {
+                    args.Append(range);
+                }
+                return null;
+            }
+            using (var scalar = Scalar(value))
+            {
+                args.Append(scalar);
+            }
+            return null;
+        }
+
+        private static PyObject Scalar(object value)
+        {
             if (value == null || value is ExcelEmpty)
             {
                 return PyObject.None;
@@ -103,30 +126,61 @@ namespace Goosedove.Host
             {
                 return Bridge.Module.GetAttr("MISSING");
             }
-            if (value is object[,] rect)
-            {
-                if (IsNumeric(rect))
-                {
-                    return NumericBlock(rect);
-                }
-                var rows = new PyList();
-                for (var r = 0; r < rect.GetLength(0); r++)
-                {
-                    using (var row = new PyList())
-                    {
-                        for (var c = 0; c < rect.GetLength(1); c++)
-                        {
-                            using (var cell = ToPython(rect[r, c]))
-                            {
-                                row.Append(cell);
-                            }
-                        }
-                        rows.Append(row);
-                    }
-                }
-                return rows;
-            }
             return value.ToPython();
+        }
+
+        // One pass over the cells, in sheet order. An Excel error anywhere is returned and
+        // nothing is built. All numbers and blanks ship as one buffer, NaN for the blanks.
+        // Anything else ships as rows of cells.
+        private static PyObject Range(object[,] rect, out object error)
+        {
+            error = null;
+            int rows = rect.GetLength(0), cols = rect.GetLength(1);
+            var block = new double[rows * cols];
+            var numeric = true;
+            var i = 0;
+            foreach (var cell in rect)
+            {
+                if (cell is ExcelError)
+                {
+                    error = cell;
+                    return null;
+                }
+                if (cell is double d)
+                {
+                    block[i] = d;
+                }
+                else if (cell == null || cell is ExcelEmpty)
+                {
+                    block[i] = double.NaN;
+                }
+                else
+                {
+                    numeric = false;
+                }
+                i++;
+            }
+            return numeric ? NumericBlock(block, rows, cols) : Rows(rect);
+        }
+
+        private static PyObject Rows(object[,] rect)
+        {
+            var rows = new PyList();
+            for (var r = 0; r < rect.GetLength(0); r++)
+            {
+                using (var row = new PyList())
+                {
+                    for (var c = 0; c < rect.GetLength(1); c++)
+                    {
+                        using (var cell = Scalar(rect[r, c]))
+                        {
+                            row.Append(cell);
+                        }
+                    }
+                    rows.Append(row);
+                }
+            }
+            return rows;
         }
 
         /// <summary>Python results to Excel: a numpy block becomes object[,], everything else passes through.</summary>
@@ -167,55 +221,9 @@ namespace Goosedove.Host
             }
         }
 
-        /// <summary>The first Excel error among the arguments, searching ranges cell by cell; null when there is none.</summary>
-        public static object FirstError(object[] args)
+        // Pin the buffer and let Python copy it from a pointer.
+        private static PyObject NumericBlock(double[] block, int rows, int cols)
         {
-            foreach (var arg in args)
-            {
-                if (arg is ExcelError)
-                {
-                    return arg;
-                }
-                if (arg is object[,] rect)
-                {
-                    foreach (var cell in rect)
-                    {
-                        if (cell is ExcelError)
-                        {
-                            return cell;
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        // True when every cell is a number or blank; those ranges take the fast path.
-        private static bool IsNumeric(object[,] rect)
-        {
-            foreach (var cell in rect)
-            {
-                if (!(cell is double || cell == null || cell is ExcelEmpty))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // Unbox into one double[] (NaN for blanks) and let Python copy it from a pointer.
-        private static PyObject NumericBlock(object[,] rect)
-        {
-            int rows = rect.GetLength(0), cols = rect.GetLength(1);
-            var block = new double[rows * cols];
-            var i = 0;
-            for (var r = 0; r < rows; r++)
-            {
-                for (var c = 0; c < cols; c++)
-                {
-                    block[i++] = rect[r, c] is double d ? d : double.NaN;
-                }
-            }
             var handle = System.Runtime.InteropServices.GCHandle.Alloc(block, System.Runtime.InteropServices.GCHandleType.Pinned);
             try
             {
