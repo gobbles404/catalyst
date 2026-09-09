@@ -1,4 +1,4 @@
-"""The range guard: every shape Excel can send against every range type a function can declare."""
+"""Type validation of ranges: every shape Excel can send against every declared range type."""
 
 import numpy as np
 import pytest
