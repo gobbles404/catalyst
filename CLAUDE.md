@@ -14,8 +14,8 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
 
 ## Style
 
-- The seam guards once: `call` in `bridge.py` checks every argument against the
-  function's own signature, then the library trusts what it is given. `docs/inputs.md` is the map.
+- The seam validates types, once: `call` in `bridge.py` checks every argument against the
+  function's own signature and hands the library the typed value. `docs/inputs.md` is the map.
 - No coercion at the seam. A boolean is not a number, text is never a number, empty text is not text.
 - Blank and missing are different facts. Only a missing argument takes a declared default; a blank cell fails.
 - The seam checks each argument alone, by type and shape, never by meaning. Meaning belongs to the library.

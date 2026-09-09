@@ -14,7 +14,7 @@ def test_accepted_scalar_call_itemized(call_profile: CallProfile) -> None:
     assert call_profile(lambda: bridge.call("Add", [1.0, 2.0])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 2,
+        "_validate": 2,
         "_number": 2,
         "Add": 1,
     }
@@ -24,7 +24,7 @@ def test_rejected_scalar_call_stops_at_the_first_failure(call_profile: CallProfi
     assert call_profile(lambda: bridge.call("Add", ["x", 2.0])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_number": 1,
         "_Rejected.__init__": 1,
         "describe": 1,
@@ -38,7 +38,7 @@ def test_accepted_column_call_itemized(call_profile: CallProfile) -> None:
     assert call_profile(lambda: bridge.call("SumColumn", [column])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -54,7 +54,7 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
     assert call_profile(lambda: bridge.call("FirstDate", [column])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_date_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -71,7 +71,7 @@ def test_rejected_numeric_block_names_the_cell_without_a_walk(call_profile: Call
     assert call_profile(lambda: bridge.call("SumColumn", [column])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -90,7 +90,7 @@ def test_rejected_range_call_walks_to_the_first_bad_cell(call_profile: CallProfi
     assert call_profile(lambda: bridge.call("SumArray", [rows])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_numbers": 1,
         "_cells": 1,
         "_number": 2,
@@ -106,7 +106,7 @@ def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
     assert call_profile(lambda: bridge.call("JoinColumn", [names])) == {
         "call": 1,
         "_arguments": 1,
-        "_guard": 1,
+        "_validate": 1,
         "_text_column": 1,
         "_one_column": 1,
         "_shape": 1,
