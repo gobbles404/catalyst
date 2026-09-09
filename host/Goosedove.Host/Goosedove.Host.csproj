@@ -1,8 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>10.0</LangVersion>
+    <!-- Only [ExcelFunction] methods and the functions registered from Python reach the sheet. -->
+    <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
   </PropertyGroup>
 
   <ItemGroup>

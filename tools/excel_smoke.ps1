@@ -19,6 +19,7 @@ $formulas = [ordered]@{
     "=JoinColumn(E1:E2)" = "x, y"
     "=JoinColumn(I1:I2)" = "#ERROR JoinColumn: names cell (2, 1) is empty text, expected text"
     "=DateText(G1)"      = "2026-05-22"
+    "=RegisterAll()"     = "#NAME?"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -36,22 +37,8 @@ $cells = [ordered]@{
 
 # --- build the host and tell it where Python is -----------------------------
 
-Push-Location $root
-try {
-    dotnet build host\Goosedove.Host -c Debug --nologo -v q
-    if ($LASTEXITCODE) { exit $LASTEXITCODE }
-    $python = & uv run python -c "import sys, sysconfig; print(sys.base_prefix); print(sysconfig.get_paths()['purelib']); print(f'python{sys.version_info.major}{sys.version_info.minor}.dll')"
-    if ($LASTEXITCODE) { exit $LASTEXITCODE }
-}
-finally {
-    Pop-Location
-}
-$out = Join-Path $root "host\Goosedove.Host\bin\Debug\net48"
-$xll = Join-Path $out "Goosedove.Host-AddIn64.xll"
-Set-Content -Path (Join-Path $out "goosedove.cfg") -Encoding ascii -Value @(
-    "pythondll=$($python[0])\$($python[2])",
-    "pythonpath=$root\src;$($python[1])"
-)
+. (Join-Path $PSScriptRoot "host_build.ps1")
+$xll = Build-HostAddIn -Root $root
 
 # --- a hidden Excel of our own; nothing the user has open is touched --------
 
