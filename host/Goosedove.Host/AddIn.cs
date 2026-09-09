@@ -4,6 +4,9 @@ using System.IO;
 using ExcelDna.Integration;
 using Python.Runtime;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Goosedove.Host.Tests")]
 
 namespace Goosedove.Host
 {
@@ -14,21 +17,9 @@ namespace Goosedove.Host
         {
             try
             {
-                var config = Config.Load();
-                Runtime.PythonDLL = config["pythondll"];
-                PythonEngine.Initialize();
-                PythonEngine.BeginAllowThreads();
-                using (Py.GIL())
-                {
-                    dynamic sys = Py.Import("sys");
-                    var paths = config["pythonpath"].Split(';');
-                    for (var i = paths.Length - 1; i >= 0; i--)
-                    {
-                        sys.path.insert(0, paths[i].Trim());
-                    }
-                    Bridge.Module = Py.Import("goosedove.excel.bridge");
-                    Registration.RegisterAll();
-                }
+                var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "goosedove.cfg"));
+                Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
+                Registration.RegisterAll();
             }
             catch (Exception ex)
             {
@@ -47,6 +38,23 @@ namespace Goosedove.Host
     {
         public static PyObject Module;
         public static string StartupError;
+
+        /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
+        public static void Start(string pythonDll, string[] pythonPath)
+        {
+            Runtime.PythonDLL = pythonDll;
+            PythonEngine.Initialize();
+            PythonEngine.BeginAllowThreads();
+            using (Py.GIL())
+            {
+                dynamic sys = Py.Import("sys");
+                for (var i = pythonPath.Length - 1; i >= 0; i--)
+                {
+                    sys.path.insert(0, pythonPath[i].Trim());
+                }
+                Module = Py.Import("goosedove.excel.bridge");
+            }
+        }
 
         public static object Call(string name, params object[] args)
         {
@@ -285,7 +293,7 @@ namespace Goosedove.Host
 
         // Excel-DNA needs a delegate with one typed parameter per argument.
         // Build one that packs its arguments into an array and forwards by name.
-        private static Delegate MakeDelegate(string name, int parameterCount)
+        internal static Delegate MakeDelegate(string name, int parameterCount)
         {
             var parameters = new ParameterExpression[parameterCount];
             for (var i = 0; i < parameterCount; i++)
@@ -310,13 +318,11 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Reads key=value lines from goosedove.cfg beside the .xll.</summary>
+    /// <summary>Reads key=value lines from a config file; the add-in keeps its own beside the .xll.</summary>
     internal static class Config
     {
-        public static Dictionary<string, string> Load()
+        public static Dictionary<string, string> Load(string path)
         {
-            var directory = Path.GetDirectoryName(ExcelDnaUtil.XllPath);
-            var path = Path.Combine(directory, "goosedove.cfg");
             var values = new Dictionary<string, string>();
             foreach (var line in File.ReadAllLines(path))
             {
