@@ -1,8 +1,10 @@
+$ErrorActionPreference = "Stop"
 $steps = @(
   "uv run ruff format .",
   "uv run ruff check --fix .",
   "uv run pyright",
-  "uv run pytest -n auto"
+  "uv run pytest -n auto",
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1"
 )
 foreach ($s in $steps) {
   Write-Host ">> $s"
