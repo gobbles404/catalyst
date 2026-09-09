@@ -10,7 +10,7 @@ A scalar is one of six kinds.
 
 | Kind | Examples | Notes |
 |---|---|---|
-| Number | `42`, `3.14`, a date, a time, `5%`, `$1,250` | Always a finite double. The format never travels: a date is its serial (2026-09-08 is 46273), 5% is 0.05, $1,250 is 1250, 14:30 is 0.604. Digits typed past the fifteenth become zeros. A workbook on the 1904 date system sends serials 1,462 days lower, with no signal. |
+| Number | `42`, `3.14`, a date, a time, `5%`, `$1,250` | Always a finite double. The format never travels: a date is its serial (2026-09-08 is 46273), 5% is 0.05, $1,250 is 1250, 14:30 is 0.604. Digits typed past the fifteenth become zeros. A workbook on the 1904 date system sends serials 1,462 days lower, with no signal; such workbooks are not supported. |
 | Text | `"Brent"`, `""`, `'123`, `"WTI "` | Exactly as typed, up to 32,767 characters. Empty text is text. A number stored as text is text. Trailing and non-breaking spaces survive. |
 | Boolean | `TRUE`, `FALSE` | Never a number. |
 | Blank | an empty cell | Never zero and never empty text. |
@@ -30,9 +30,9 @@ An array holds the six kinds, cell by cell.
 
 Everything in both tables was checked against the Excel-DNA source at the pinned version, and most rows were measured in Excel with a probe add-in.
 
-## The guard
+## Type validation
 
-One place checks: `call` in `bridge.py`, before the function runs. The host ships the six kinds unchanged. The library trusts whatever the guard hands it. Nothing else in the package checks a kind or a shape.
+One place checks: `call` in `bridge.py`, before the function runs. It validates the type of every argument against the function's signature and hands the library the typed value: a date from a serial, a plain list from a column, never the raw cell. The seam validates type; the library validates meaning. Nothing else in the package checks a kind or a shape.
 
 The declaration is the function's own signature.
 
@@ -90,14 +90,11 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 
 A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one.
 
-Next, one at a time, each when the first function needs it. Each adds one rule to the guard and one row here.
+Next, one at a time, each when the first function needs it. Each adds one rule to the validator and one row here.
 
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
-| A choice from text | text equal to one member: call, put | `=OptionPrice(curve, K, T, "put")` | C/P and +1/−1 are desk aliases and stay on the sheet. |
-| Unit | text equal to one member: bbl, MT, MWh, MMBtu | `=Convert(1000, "bbl", "MT")` | "BBLS" and "tonne" are aliases. `$/bbl` is a price, not a unit. |
-| Handle to a live object | the text a builder function returned | `=Forward(B1, B5)` with B1 = `=BuildCurve(A3:B62)` | A reopened workbook keeps the text, not the object. A rebuilt curve with unchanged text does not recalculate its dependents. |
 
 ## Decided
 
@@ -119,19 +116,24 @@ Decided 2026-09-09, for ranges and dates.
 11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text, so the numbers stay on the host's fast road.
 12. Seven range types: `Array`, `Column`, `Row` of numbers; `DateColumn`, `DateRow` of dates; `TextColumn`, `TextRow` of text. A `TextArray` is possible and not built.
 13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
-14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the guard.
+14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the validator.
 15. Shape before cells. A wrong-shaped range is reported as such before any cell is looked at.
 
-## Open questions
+Decided 2026-09-09, closing the input side.
 
-Each waits for the type that raises it.
+16. The seam never scales a number. A vol given in percent is divided by 100 in the library, in one place.
+17. A choice from text, such as call or put, crosses as text. The library decides what the text means.
+18. A unit is its own argument. One cell holds one value, never `1000 bbl`.
+19. An error inside a range comes back as that error, with no cell named.
+20. Newer Excel errors such as `#SPILL!` arrive as `#VALUE!`. Known, and left alone.
 
-1. Rates and percentages: 0.05 or 5? The seam cannot see the format, so the library must say which.
-2. Choices from text: is folding "Call" to call coercion? Aliases stay on the sheet?
-3. Units: does the unit ride with the number, or arrive as its own argument? Is currency a unit?
-4. Handles: what the text carries, and how a rebuilt curve reaches its dependents when the handle text is unchanged.
-5. An error inside a large range: the host returns it with no cell address. Should it name the cell? A host change.
-6. Newer Excel errors arrive as `#VALUE!`. Accept as a known renaming and say so?
-7. A workbook on Excel's 1904 date system sends every date serial 1,462 days low, and nothing that crosses the seam says so. Should the host refuse such a workbook before calling?
+## Not supported
+
+- References to other workbooks. The seam sees values only, so this is policy, not a check.
+- Workbooks on the 1904 date system. Their serials arrive 1,462 days low with no signal.
+
+## Parked
+
+Handles: text that stands for a live object such as a curve. The seam's part is one rule per object kind, the text must name a live object of that kind, checked before the library sees it. The text's format, the store, and columns of handles are designed when the first builder function exists.
 
 The way out, results returning to the sheet, is decided separately.

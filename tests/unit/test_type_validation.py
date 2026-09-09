@@ -1,4 +1,4 @@
-"""The scalar guard: every kind Excel can send against every kind a function can declare."""
+"""Type validation of scalars: every kind Excel can send against every declared type."""
 
 import ctypes
 from typing import cast
@@ -134,7 +134,7 @@ def test_blank_never_takes_a_default() -> None:
     assert bridge.call("Rate", [None]) == "#ERROR Rate: x is blank, expected number"
 
 
-def test_present_value_still_guarded_with_a_default() -> None:
+def test_present_value_still_validated_with_a_default() -> None:
     assert bridge.call("Rate", [0.07]) == 0.07
     assert bridge.call("Rate", ["7%"]) == "#ERROR Rate: x is text '7%', expected number"
 

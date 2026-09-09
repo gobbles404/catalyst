@@ -5,9 +5,9 @@ numeric_block, flatten_block, is_block, and the value MISSING. A blank cell
 arrives as None, an omitted argument as MISSING, a range of numbers and
 blanks as a 2-D float64 array with NaN for the blanks, any other range as
 nested rows of cells, and Excel errors never arrive; the host returns them
-before calling. call guards every argument against the function's own
-signature, once, by type and shape and never by meaning; past it nothing
-checks. docs/inputs.md is the map.
+before calling. call validates the type of every argument against the
+function's own signature, once, by type and shape and never by meaning;
+past it nothing checks. docs/inputs.md is the map.
 """
 
 import ctypes
@@ -46,8 +46,8 @@ class Missing:
 MISSING: Final = Missing()
 
 
-class GuardError(Exception):
-    """An argument that is not what the function declared."""
+class TypeValidationError(Exception):
+    """An argument whose type or shape is not what the function declared."""
 
 
 class _Rejected(Exception):
@@ -343,21 +343,21 @@ def function_specs() -> list[tuple[str, str, list[str]]]:
     ]
 
 
-# --- the guard --------------------------------------------------------------
+# --- type validation --------------------------------------------------------
 
 
-def _guard(parameter: Parameter, value: object) -> object:
+def _validate(parameter: Parameter, value: object) -> object:
     if value is MISSING and parameter.default is not MISSING:
         return parameter.default
     try:
         return parameter.accept(value)
     except _Rejected as rejected:
         if rejected.cell is None:
-            raise GuardError(
+            raise TypeValidationError(
                 f"{parameter.name} is {describe(value)}, expected {parameter.expected}"
             ) from None
         r, c = rejected.cell
-        raise GuardError(
+        raise TypeValidationError(
             f"{parameter.name} cell ({r}, {c}) is {describe(rejected.value)}, "
             f"expected {rejected.expected}"
         ) from None
@@ -365,16 +365,18 @@ def _guard(parameter: Parameter, value: object) -> object:
 
 def _arguments(registered: Registered, args: list[object]) -> list[object]:
     if len(args) != len(registered.parameters):
-        raise GuardError(f"expected {len(registered.parameters)} arguments, got {len(args)}")
-    return [_guard(p, value) for p, value in zip(registered.parameters, args, strict=True)]
+        raise TypeValidationError(
+            f"expected {len(registered.parameters)} arguments, got {len(args)}"
+        )
+    return [_validate(p, value) for p, value in zip(registered.parameters, args, strict=True)]
 
 
 def call(name: str, args: list[object]) -> object:
-    """Guard every argument, run the function, and turn any failure into cell text."""
+    """Validate every argument, run the function, and turn any failure into cell text."""
     registered = _FUNCTIONS[name]
     try:
         return registered.fn(*_arguments(registered, args))
-    except GuardError as failure:
+    except TypeValidationError as failure:
         return f"#ERROR {name}: {failure}"
     except Exception as exc:
         return f"#ERROR {name}: {type(exc).__name__}: {exc}"
