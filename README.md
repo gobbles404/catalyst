@@ -18,3 +18,13 @@ Requires Python 3.13.13 and uv 0.12.9 (`py -3.13 -m pip install uv==0.12.9`).
     .\check.ps1                 before pushing
     uv add <package>            add a dependency and update the lock
     .\measure.ps1               profile every worksheet function; reports land in profiles/
+    .\tools\excel_dev.ps1       build the add-in and open it in a fresh Excel
+
+## The add-in
+
+The host finds Python through `goosedove.cfg` beside the `.xll`, two lines:
+
+    pythondll=C:\...\python313.dll
+    pythonpath=C:\...\goosedove\src;C:\...\site-packages
+
+`tools\excel_dev.ps1` and `tools\excel_smoke.ps1` write it from the project's own environment. An add-in deployed elsewhere needs one written by hand.
