@@ -17,7 +17,7 @@ Requires Python 3.13.13 and uv 0.12.9 (`py -3.13 -m pip install uv==0.12.9`).
     uv run ruff format .        fix formatting
     .\check.ps1                 before pushing
     uv add <package>            add a dependency and update the lock
-    .\measure.ps1               profile every worksheet function; reports land in profiles/
+    .\measure.ps1               profile every probe; reports land in profiles/
     .\tools\excel_dev.ps1       build the add-in and open it in a fresh Excel
 
 ## The add-in

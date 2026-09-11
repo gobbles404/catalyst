@@ -6,7 +6,7 @@ from goosedove.excel import bridge
 
 
 def test_ping_is_registered() -> None:
-    names = [name for name, _, _ in bridge.function_specs()]
+    names = [name for name, _, _, _ in bridge.function_specs()]
     assert "Ping" in names
 
 
@@ -16,10 +16,30 @@ def test_call_ping_reports_version_and_location() -> None:
     assert "goosedove" in result
 
 
-def test_specs_carry_name_description_and_parameters() -> None:
-    specs = {name: (doc, params) for name, doc, params in bridge.function_specs()}
-    assert specs["Add"] == ("Add two numbers; proves arguments cross the seam.", ["a", "b"])
-    assert specs["Ping"][1] == []
+def test_specs_carry_name_description_parameters_and_hidden() -> None:
+    specs = {name: (doc, params, hidden) for name, doc, params, hidden in bridge.function_specs()}
+    assert specs["Add"] == (
+        "Probe: a number in and a number out; the reference for the cost of one call.",
+        ["a", "b"],
+        True,
+    )
+    assert specs["Ping"] == ("Confirm which goosedove Excel is running.", [], False)
+
+
+def test_every_probe_is_hidden_and_ping_is_not() -> None:
+    hidden = {name for name, _, _, hidden in bridge.function_specs() if hidden}
+    assert hidden >= {
+        "Nothing",
+        "Add",
+        "Times",
+        "EchoText",
+        "EchoBoolean",
+        "SumArray",
+        "Dot",
+        "Grid",
+        "Fail",
+    }
+    assert "Ping" not in hidden
 
 
 def test_add_crosses_the_seam() -> None:

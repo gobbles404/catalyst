@@ -19,7 +19,8 @@ namespace Goosedove.Host.Tests
             Bridge.Start(Path.Combine(python[0], python[2]), new[] { Path.Combine(root, "src"), python[1] });
             using (Py.GIL())
             {
-                // Result shapes the placeholders never produce; the tests need them on the way out.
+                // Result shapes the way-out tests need and no probe produces: a NaN inside a block and a
+                // one-dimensional result. TestNothing duplicates the Nothing probe until the way-out change.
                 PythonEngine.Exec(
                     "import numpy as np\n" +
                     "from goosedove.excel import bridge\n" +
