@@ -94,5 +94,17 @@ namespace Goosedove.Host.Tests
         {
             Assert.Equal("()", Attribute(new object[,] { { 1.0 }, { 2.0 } }, "texts"));
         }
+
+        // The seam promises a number, text, a boolean, or a block; the host says so if it gets anything else.
+        [Fact]
+        public void a_result_the_host_cannot_show_fails_loudly()
+        {
+            using (Py.GIL())
+            using (var missing = Bridge.Module.GetAttr("MISSING"))
+            {
+                var shown = Assert.IsType<string>(Marshal.FromPython(missing, "Fn"));
+                Assert.Equal("#ERROR host: Fn returned a Missing, which the host cannot show", shown);
+            }
+        }
     }
 }

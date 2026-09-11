@@ -34,6 +34,8 @@ def test_accepted_scalar_call_itemized(call_profile: CallProfile) -> None:
         "_validate": 2,
         "_number": 2,
         "Add": 1,
+        "_number_out": 1,
+        "_scalar": 1,
     }
 
 
@@ -58,6 +60,8 @@ def test_accepted_array_call_itemized(call_profile: CallProfile) -> None:
         "_validate": 1,
         "_numbers": 1,
         "SumArray": 1,
+        "_number_out": 1,
+        "_scalar": 1,
     }
 
 
@@ -72,6 +76,8 @@ def test_accepted_column_call_itemized(call_profile: CallProfile) -> None:
         "_one_column": 1,
         "_shape": 1,
         "_numbers": 1,
+        "_number_out": 1,
+        "_scalar": 1,
     }
 
 
@@ -86,6 +92,8 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
         "_one_column": 1,
         "_shape": 1,
         "_dates": 1,
+        "_text_out": 1,
+        "_scalar": 1,
     }
 
 
@@ -100,6 +108,8 @@ def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
         "_one_column": 1,
         "_shape": 1,
         "_texts": 1,
+        "_text_out": 1,
+        "_scalar": 1,
     }
 
 

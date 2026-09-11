@@ -28,10 +28,10 @@ namespace Goosedove.Host.Tests
             return grid;
         }
 
-        // The rows of tools\excel_smoke.ps1, without Excel.
+        // The rows of tools\excel_smoke.ps1, without Excel; the spilled ones are the tests below.
         public static IEnumerable<object[]> SmokeRows()
         {
-            yield return new object[] { "Nothing", new object[] { }, null };
+            yield return new object[] { "Zero", new object[] { }, 0.0 };
             yield return new object[] { "Add", new object[] { 1.0, 2.0 }, 3.0 };
             yield return new object[] { "Add", new object[] { 1.0, ExcelMissing.Value }, "#ERROR Add: b is missing, expected number" };
             yield return new object[] { "Add", new object[] { 1.0, true }, "#ERROR Add: b is boolean TRUE, expected number" };
@@ -68,10 +68,11 @@ namespace Goosedove.Host.Tests
             Assert.Contains("goosedove", (string)Bridge.Call("Ping"));
         }
 
+        // Blocks come back as plain doubles: no boxing, and no NaN, because the seam fails the call first.
         [Fact]
         public void a_grid_result_counts_across_then_down()
         {
-            var block = (object[,])Bridge.Call("Grid", 2.0, 3.0);
+            var block = (double[,])Bridge.Call("Grid", 2.0, 3.0);
             Assert.Equal(2, block.GetLength(0));
             Assert.Equal(3, block.GetLength(1));
             Assert.Equal(1.0, block[0, 0]);
@@ -80,29 +81,30 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void a_grid_result_becomes_cells_with_na_for_nan()
+        public void a_column_result_spills_down()
         {
-            var block = (object[,])Bridge.Call("TestGrid", 2.0);
-            Assert.Equal(2, block.GetLength(0));
-            Assert.Equal(2, block.GetLength(1));
-            Assert.Equal(ExcelError.ExcelErrorNA, block[0, 0]);
-            Assert.Equal(1.0, block[0, 1]);
-            Assert.Equal(3.0, block[1, 1]);
+            var block = (double[,])Bridge.Call("EchoColumn", Column(1.0, 2.0, 3.0));
+            Assert.Equal(3, block.GetLength(0));
+            Assert.Equal(1, block.GetLength(1));
+            Assert.Equal(3.0, block[2, 0]);
         }
 
         [Fact]
-        public void a_nothing_result_is_an_empty_cell()
+        public void a_row_result_spills_across()
         {
-            Assert.Null(Bridge.Call("TestNothing"));
+            var block = (double[,])Bridge.Call("EchoRow", Row(1.0, 2.0, 3.0));
+            Assert.Equal(1, block.GetLength(0));
+            Assert.Equal(3, block.GetLength(1));
+            Assert.Equal(3.0, block[0, 2]);
         }
 
-        // Today's truth, not the intent: a one-column result has no way back to the sheet yet.
-        // The way-out change replaces this test.
         [Fact]
-        public void a_one_column_result_fails_in_the_host_today()
+        public void a_single_cell_is_a_column_of_one()
         {
-            var shown = Assert.IsType<string>(Bridge.Call("TestVector", 3.0));
-            Assert.StartsWith("#ERROR host:", shown);
+            var block = (double[,])Bridge.Call("EchoColumn", 5.0);
+            Assert.Equal(1, block.GetLength(0));
+            Assert.Equal(1, block.GetLength(1));
+            Assert.Equal(5.0, block[0, 0]);
         }
     }
 }

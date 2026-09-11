@@ -37,6 +37,7 @@ namespace Goosedove.Host
     internal static class Bridge
     {
         public static PyObject Module;
+        public static PyObject BoolType;
         public static string StartupError;
 
         /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
@@ -53,6 +54,10 @@ namespace Goosedove.Host
                     sys.path.insert(0, pythonPath[i].Trim());
                 }
                 Module = Py.Import("goosedove.excel.bridge");
+                using (var builtins = Py.Import("builtins"))
+                {
+                    BoolType = builtins.GetAttr("bool");
+                }
             }
         }
 
@@ -81,7 +86,7 @@ namespace Goosedove.Host
                         }
                         using (var result = Module.InvokeMethod("call", pyName, pyArgs))
                         {
-                            return Marshal.FromPython(result);
+                            return Marshal.FromPython(result, name);
                         }
                     }
                 }
@@ -93,7 +98,7 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells.</summary>
+    /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells; a result read by its type, never asked about.</summary>
     internal static class Marshal
     {
         /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
@@ -193,40 +198,46 @@ namespace Goosedove.Host
             return CellsBlock(kinds, numbers, rows, cols, string.Join("\0", texts));
         }
 
-        /// <summary>Python results to Excel: a numpy block becomes object[,], everything else passes through.</summary>
-        public static object FromPython(PyObject value)
+        // The seam sends one of four things: a number, text, a boolean, or a two-dimensional block
+        // of doubles. Each is read by its type at the C level, with no trip into Python. Anything
+        // else is the seam's promise broken, and says so in the cell.
+        public static object FromPython(PyObject value, string name)
         {
-            if (value == null || value.IsNone())
+            if (PyFloat.IsFloatType(value))
             {
-                return null;
+                return value.As<double>();
             }
-            using (var isBlock = Bridge.Module.InvokeMethod("is_block", value))
+            if (PyString.IsStringType(value))
             {
-                if (!isBlock.As<bool>())
+                return value.As<string>();
+            }
+            if (value.IsInstance(Bridge.BoolType))
+            {
+                return value.As<bool>();
+            }
+            PyBuffer buffer;
+            try
+            {
+                // Never PyBUF.FORMATS: pythonnet 3.1.0 crashes on it (its issue 2371). CONTIG_RO
+                // carries the dimensions, the shape, the item size, and the pointer.
+                buffer = value.GetBuffer(PyBUF.CONTIG_RO);
+            }
+            catch (PythonException)
+            {
+                return "#ERROR host: " + name + " returned a " + value.GetPythonType().Name + ", which the host cannot show";
+            }
+            using (buffer)
+            {
+                if (buffer.Dimensions != 2 || buffer.ItemSize != sizeof(double))
                 {
-                    return value.AsManagedObject(typeof(object));
+                    return "#ERROR host: " + name + " returned a buffer that is not a block of doubles";
                 }
-            }
-            using (var shape = value.GetAttr("shape"))
-            using (var flat = Bridge.Module.InvokeMethod("flatten_block", value))
-            using (var buffer = flat.GetBuffer(PyBUF.CONTIG_RO))
-            {
-                var rows = shape[0].As<int>();
-                var cols = shape[1].As<int>();
-                var bytes = new byte[buffer.Length];
-                buffer.Read(bytes, 0, bytes.Length, 0);
+                var rows = (int)buffer.Shape[0];
+                var cols = (int)buffer.Shape[1];
                 var doubles = new double[rows * cols];
-                Buffer.BlockCopy(bytes, 0, doubles, 0, bytes.Length);
-                var block = new object[rows, cols];
-                var i = 0;
-                for (var r = 0; r < rows; r++)
-                {
-                    for (var c = 0; c < cols; c++)
-                    {
-                        var d = doubles[i++];
-                        block[r, c] = double.IsNaN(d) ? (object)ExcelError.ExcelErrorNA : d;
-                    }
-                }
+                System.Runtime.InteropServices.Marshal.Copy(buffer.Buffer, doubles, 0, doubles.Length);
+                var block = new double[rows, cols];
+                Buffer.BlockCopy(doubles, 0, block, 0, doubles.Length * sizeof(double));
                 return block;
             }
         }

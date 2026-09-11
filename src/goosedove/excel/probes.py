@@ -8,11 +8,10 @@ them, and they ship in the build everyone loads. They stay as long as the seam d
 """
 
 from collections.abc import Callable
-from typing import NoReturn
 
 import numpy as np
 
-from goosedove.excel.bridge import Array, Column, register
+from goosedove.excel.bridge import Array, Column, Row, register
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -21,9 +20,9 @@ def probe[F: Callable[..., object]](fn: F) -> F:
 
 
 @probe
-def Nothing() -> None:
+def Zero() -> float:
     """Probe: zero arguments and no work; the floor every other count is read against."""
-    return None
+    return 0.0
 
 
 @probe
@@ -63,6 +62,18 @@ def Dot(a: Column, b: Column) -> float:
 
 
 @probe
+def EchoColumn(values: Column) -> Column:
+    """Probe: a column in and the same column out, spilled down."""
+    return Column(values)
+
+
+@probe
+def EchoRow(values: Row) -> Row:
+    """Probe: a row in and the same row out, spilled across."""
+    return Row(values)
+
+
+@probe
 def Grid(rows: int, cols: int) -> Array:
     """Probe: a block out, rows by cols, counting 1, 2, 3 across then down."""
     if rows < 1 or cols < 1:
@@ -71,6 +82,6 @@ def Grid(rows: int, cols: int) -> Array:
 
 
 @probe
-def Fail() -> NoReturn:
+def Fail() -> float:
     """Probe: an error in the function body reaches the cell with its type and message."""
     raise ValueError("as asked")
