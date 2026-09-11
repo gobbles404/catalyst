@@ -50,7 +50,7 @@ Rules:
 5. A one-row-or-column type declares its orientation. A column type fails on a row.
 6. The boundary checks each argument alone, by type and shape, never by meaning. Which name goes with which column, whether a column is sorted, whether two arguments agree: all of that belongs to the library. The one documented exception is that a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999.
 7. Shape is checked before cells. A range of the wrong shape is reported as a shape failure even when it also holds a bad cell.
-8. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside a range the message names the cell the way `INDEX` counts, row then column from 1 within the range, because no sheet address crosses: `#ERROR SumColumn: values cell (3, 1) is blank, expected number`.
+8. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside a range the message names the cell the way `INDEX` counts, row then column from 1 within the range, because no sheet address crosses: `#ERROR Strip: values cell (3, 1) is blank, expected number`.
 
 Scalars, rows arriving against columns declared:
 
@@ -79,14 +79,14 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| `Date` | one whole number from 61 to 2958465 | `=DateText(B5)` with B5 = 22-May-2026 | the date 2026-05-22 | 46164.5, `"2026-05-22"`, 60, 2958466 |
-| `Array` | a range of numbers, any shape | `=SumArray(A2:B4)` | the grid, as on the sheet | a blank, text, or boolean cell, named |
-| `Column` | a range of numbers, one column wide | `=SumColumn(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
-| `Row` | a range of numbers, one row tall | `=SumRow(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
-| `DateColumn` | a range of dates, one column wide | `=FirstDate(A2:A7)` | a plain list of dates | a fraction, a serial under 61, a blank |
-| `DateRow` | a range of dates, one row tall | `=LastDate(A1:F1)` | a plain list of dates | the same, or a column |
-| `TextColumn` | a range of text, one column wide | `=JoinColumn(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
-| `TextRow` | a range of text, one row tall | `=JoinRow(A1:C1)` | a plain list of text | the same, or a column |
+| `Date` | one whole number from 61 to 2958465 | `=Discount(B5)` with B5 = 22-May-2026 | the date 2026-05-22 | 46164.5, `"2026-05-22"`, 60, 2958466 |
+| `Array` | a range of numbers, any shape | `=Total(A2:B4)` | the grid, as on the sheet | a blank, text, or boolean cell, named |
+| `Column` | a range of numbers, one column wide | `=Strip(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
+| `Row` | a range of numbers, one row tall | `=Weights(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
+| `DateColumn` | a range of dates, one column wide | `=Schedule(A2:A7)` | a plain list of dates | a fraction, a serial under 61, a blank |
+| `DateRow` | a range of dates, one row tall | `=Expiries(A1:F1)` | a plain list of dates | the same, or a column |
+| `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
+| `TextRow` | a range of text, one row tall | `=Headers(A1:C1)` | a plain list of text | the same, or a column |
 
 A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one.
 
