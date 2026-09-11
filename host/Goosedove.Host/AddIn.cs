@@ -61,7 +61,14 @@ namespace Goosedove.Host
             }
         }
 
+        /// <summary>The worksheet path: what every registered delegate calls, with no counter.</summary>
         public static object Call(string name, params object[] args)
+        {
+            return Call(null, name, args);
+        }
+
+        /// <summary>The same call, reporting what it did to the observer's counter.</summary>
+        internal static object Call(WorkCounter work, string name, params object[] args)
         {
             if (Module == null)
             {
@@ -74,19 +81,22 @@ namespace Goosedove.Host
                     using (var pyName = new PyString(name))
                     using (var pyArgs = new PyList())
                     {
+                        work?.Hit("objects_built", 2);
                         foreach (var arg in args)
                         {
                             // An Excel error in any argument is the result, unchanged. Excel's own
                             // functions do the same, and it keeps an error from pricing as a blank.
-                            var inputError = Marshal.Append(pyArgs, arg);
+                            var inputError = Marshal.Append(pyArgs, arg, work);
                             if (inputError != null)
                             {
                                 return inputError;
                             }
                         }
+                        work?.Hit("trips");
+                        work?.Hit("name_lookups");
                         using (var result = Module.InvokeMethod("call", pyName, pyArgs))
                         {
-                            return Marshal.FromPython(result, name);
+                            return Marshal.FromPython(result, name, work);
                         }
                     }
                 }
@@ -102,7 +112,7 @@ namespace Goosedove.Host
     internal static class Marshal
     {
         /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
-        public static object Append(PyList args, object value)
+        public static object Append(PyList args, object value, WorkCounter work = null)
         {
             if (value is ExcelError)
             {
@@ -111,7 +121,7 @@ namespace Goosedove.Host
             if (value is object[,] rect)
             {
                 object error;
-                var range = Range(rect, out error);
+                var range = Range(rect, out error, work);
                 if (error != null)
                 {
                     return error;
@@ -122,14 +132,15 @@ namespace Goosedove.Host
                 }
                 return null;
             }
-            using (var scalar = Scalar(value))
+            work?.Hit("objects_built");
+            using (var scalar = Scalar(value, work))
             {
                 args.Append(scalar);
             }
             return null;
         }
 
-        private static PyObject Scalar(object value)
+        private static PyObject Scalar(object value, WorkCounter work)
         {
             if (value == null || value is ExcelEmpty)
             {
@@ -137,6 +148,7 @@ namespace Goosedove.Host
             }
             if (value is ExcelMissing)
             {
+                work?.Hit("name_lookups");
                 return Bridge.Module.GetAttr("MISSING");
             }
             return value.ToPython();
@@ -148,18 +160,22 @@ namespace Goosedove.Host
         // One pass over the cells, in sheet order. An Excel error anywhere is returned and
         // nothing is built. Every other range ships the same way: one kind code per cell,
         // one number per cell (NaN where there is none), and the text cells joined with NUL.
-        private static PyObject Range(object[,] rect, out object error)
+        private static PyObject Range(object[,] rect, out object error, WorkCounter work)
         {
             error = null;
             int rows = rect.GetLength(0), cols = rect.GetLength(1);
             var kinds = new byte[rows * cols];
             var numbers = new double[rows * cols];
+            work?.Hit("buffers_allocated", 2);
+            work?.Hit("buffer_bytes", 9L * rows * cols);
             var texts = new List<string>();
             var i = 0;
             foreach (var cell in rect)
             {
                 if (cell is ExcelError)
                 {
+                    work?.Hit("cells_scanned", i + 1);
+                    work?.Hit("text_cells", texts.Count);
                     error = cell;
                     return null;
                 }
@@ -195,13 +211,15 @@ namespace Goosedove.Host
                 }
                 i++;
             }
-            return CellsBlock(kinds, numbers, rows, cols, string.Join("\0", texts));
+            work?.Hit("cells_scanned", i);
+            work?.Hit("text_cells", texts.Count);
+            return CellsBlock(kinds, numbers, rows, cols, string.Join("\0", texts), work);
         }
 
         // The seam sends one of four things: a number, text, a boolean, or a two-dimensional block
         // of doubles. Each is read by its type at the C level, with no trip into Python. Anything
         // else is the seam's promise broken, and says so in the cell.
-        public static object FromPython(PyObject value, string name)
+        public static object FromPython(PyObject value, string name, WorkCounter work = null)
         {
             if (PyFloat.IsFloatType(value))
             {
@@ -238,12 +256,16 @@ namespace Goosedove.Host
                 System.Runtime.InteropServices.Marshal.Copy(buffer.Buffer, doubles, 0, doubles.Length);
                 var block = new double[rows, cols];
                 Buffer.BlockCopy(doubles, 0, block, 0, doubles.Length * sizeof(double));
+                work?.Hit("buffers_allocated", 2);
+                work?.Hit("buffer_bytes", 16L * doubles.Length);
+                work?.Hit("result_copies", 2);
+                work?.Hit("result_cells", doubles.Length);
                 return block;
             }
         }
 
         // Pin the buffers and let Python copy them from pointers.
-        private static PyObject CellsBlock(byte[] kinds, double[] numbers, int rows, int cols, string text)
+        private static PyObject CellsBlock(byte[] kinds, double[] numbers, int rows, int cols, string text, WorkCounter work)
         {
             var kindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(kinds, System.Runtime.InteropServices.GCHandleType.Pinned);
             var numbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(numbers, System.Runtime.InteropServices.GCHandleType.Pinned);
@@ -255,6 +277,9 @@ namespace Goosedove.Host
                 using (var pyCols = new PyInt(cols))
                 using (var pyText = new PyString(text))
                 {
+                    work?.Hit("objects_built", 5);
+                    work?.Hit("trips");
+                    work?.Hit("name_lookups");
                     return Bridge.Module.InvokeMethod("cells_block", pyKinds, pyNumbers, pyRows, pyCols, pyText);
                 }
             }
@@ -313,7 +338,7 @@ namespace Goosedove.Host
                 parameters[i] = Expression.Parameter(typeof(object), "arg" + i);
             }
             var call = Expression.Call(
-                typeof(Bridge).GetMethod(nameof(Bridge.Call)),
+                typeof(Bridge).GetMethod(nameof(Bridge.Call), new[] { typeof(string), typeof(object[]) }),
                 Expression.Constant(name),
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(call, parameters).Compile();
