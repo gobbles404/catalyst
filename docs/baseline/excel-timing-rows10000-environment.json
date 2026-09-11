@@ -1,0 +1,19 @@
+{
+    "timestamp_utc":  "2026-09-11T11:05:21.2354828Z",
+    "revision":  "024486f4e457f2cd3f5e322272853f5943b00a51",
+    "host_sha256":  "ba32aee2e1d42b8346b240d6debe4ad33606b9dafd2bd0da357e808c8ee95de1",
+    "bridge_sha256":  "d62f32d4f8f5f7e47c09ad17b83453267b7fad420219d9134d0a32be21eac645",
+    "probes_sha256":  "13893651febfbf2953b3c07022088a227b18f18a11db4269d663c5213bb6b68a",
+    "excel_version":  "16.0",
+    "excel_build":  20326,
+    "excel_multithreaded_calculation":  true,
+    "excel_calculation_threads":  16,
+    "logical_processors":  16,
+    "configuration":  "Release",
+    "rows":  10000,
+    "copies":  100,
+    "batch_target_ms":  50,
+    "batches":  5,
+    "timed_scope":  "Range.Calculate or Application.Calculate over COM from a PowerShell loop: Excel, Excel-DNA, the host, Python, and the COM round trips. Excludes startup, building the sheets, and checking answers. per_call_us is a batch mean per formula the recalculation reaches; per_recalc_us per recalculation. Calls are counted from the formulas placed, never observed. Single-formula cases are placed a hundred times and timed as one range. The size curves share one workbook; each batching arrangement and the edit floor have a workbook of their own.",
+    "edit_scope":  "One input cell written over COM, then Application.Calculate in manual mode: Excel recalculates that cell\u0027s dependents and nothing else. The workbook is cleaned by one Application.Calculate off the clock first, because Range.Calculate leaves cells dirty. The full case of the same arrangement is Range.Calculate over every formula it placed. The \u0027no formula\u0027 row is the same write and calculate with nothing dependent, in an otherwise empty workbook."
+}

@@ -1,0 +1,261 @@
+probe,scenario,cells_in,cells_out,counter,count
+Zero,scalar,0,1,name_lookups,1
+Zero,scalar,0,1,objects_built,2
+Zero,scalar,0,1,trips,1
+Add,scalar,2,1,name_lookups,1
+Add,scalar,2,1,objects_built,4
+Add,scalar,2,1,trips,1
+Times,missing,1,1,name_lookups,2
+Times,missing,1,1,objects_built,4
+Times,missing,1,1,trips,1
+SumArray,cells in,1,1,buffer_bytes,9
+SumArray,cells in,1,1,buffers_allocated,2
+SumArray,cells in,1,1,cells_scanned,1
+SumArray,cells in,1,1,name_lookups,2
+SumArray,cells in,1,1,objects_built,7
+SumArray,cells in,1,1,trips,2
+Dot,two ranges in,2,1,buffer_bytes,18
+Dot,two ranges in,2,1,buffers_allocated,4
+Dot,two ranges in,2,1,cells_scanned,2
+Dot,two ranges in,2,1,name_lookups,3
+Dot,two ranges in,2,1,objects_built,12
+Dot,two ranges in,2,1,trips,3
+EchoColumn,round trip,1,1,buffer_bytes,25
+EchoColumn,round trip,1,1,buffers_allocated,4
+EchoColumn,round trip,1,1,cells_scanned,1
+EchoColumn,round trip,1,1,name_lookups,2
+EchoColumn,round trip,1,1,objects_built,7
+EchoColumn,round trip,1,1,result_cells,1
+EchoColumn,round trip,1,1,result_copies,2
+EchoColumn,round trip,1,1,trips,2
+Grid,cells out,2,1,buffer_bytes,16
+Grid,cells out,2,1,buffers_allocated,2
+Grid,cells out,2,1,name_lookups,1
+Grid,cells out,2,1,objects_built,4
+Grid,cells out,2,1,result_cells,1
+Grid,cells out,2,1,result_copies,2
+Grid,cells out,2,1,trips,1
+Marshal.Append,way in alone,1,0,buffer_bytes,9
+Marshal.Append,way in alone,1,0,buffers_allocated,2
+Marshal.Append,way in alone,1,0,cells_scanned,1
+Marshal.Append,way in alone,1,0,name_lookups,1
+Marshal.Append,way in alone,1,0,objects_built,5
+Marshal.Append,way in alone,1,0,trips,1
+Marshal.FromPython,way out alone,0,1,buffer_bytes,16
+Marshal.FromPython,way out alone,0,1,buffers_allocated,2
+Marshal.FromPython,way out alone,0,1,result_cells,1
+Marshal.FromPython,way out alone,0,1,result_copies,2
+SumArray,cells in,100,1,buffer_bytes,900
+SumArray,cells in,100,1,buffers_allocated,2
+SumArray,cells in,100,1,cells_scanned,100
+SumArray,cells in,100,1,name_lookups,2
+SumArray,cells in,100,1,objects_built,7
+SumArray,cells in,100,1,trips,2
+Dot,two ranges in,200,1,buffer_bytes,1800
+Dot,two ranges in,200,1,buffers_allocated,4
+Dot,two ranges in,200,1,cells_scanned,200
+Dot,two ranges in,200,1,name_lookups,3
+Dot,two ranges in,200,1,objects_built,12
+Dot,two ranges in,200,1,trips,3
+EchoColumn,round trip,100,100,buffer_bytes,2500
+EchoColumn,round trip,100,100,buffers_allocated,4
+EchoColumn,round trip,100,100,cells_scanned,100
+EchoColumn,round trip,100,100,name_lookups,2
+EchoColumn,round trip,100,100,objects_built,7
+EchoColumn,round trip,100,100,result_cells,100
+EchoColumn,round trip,100,100,result_copies,2
+EchoColumn,round trip,100,100,trips,2
+Grid,cells out,2,100,buffer_bytes,1600
+Grid,cells out,2,100,buffers_allocated,2
+Grid,cells out,2,100,name_lookups,1
+Grid,cells out,2,100,objects_built,4
+Grid,cells out,2,100,result_cells,100
+Grid,cells out,2,100,result_copies,2
+Grid,cells out,2,100,trips,1
+RowSums,one answer per row,100,10,buffer_bytes,1060
+RowSums,one answer per row,100,10,buffers_allocated,4
+RowSums,one answer per row,100,10,cells_scanned,100
+RowSums,one answer per row,100,10,name_lookups,2
+RowSums,one answer per row,100,10,objects_built,7
+RowSums,one answer per row,100,10,result_cells,10
+RowSums,one answer per row,100,10,result_copies,2
+RowSums,one answer per row,100,10,trips,2
+Marshal.Append,way in alone,100,0,buffer_bytes,900
+Marshal.Append,way in alone,100,0,buffers_allocated,2
+Marshal.Append,way in alone,100,0,cells_scanned,100
+Marshal.Append,way in alone,100,0,name_lookups,1
+Marshal.Append,way in alone,100,0,objects_built,5
+Marshal.Append,way in alone,100,0,trips,1
+Marshal.FromPython,way out alone,0,100,buffer_bytes,1600
+Marshal.FromPython,way out alone,0,100,buffers_allocated,2
+Marshal.FromPython,way out alone,0,100,result_cells,100
+Marshal.FromPython,way out alone,0,100,result_copies,2
+SumArray,cells in,1000,1,buffer_bytes,9000
+SumArray,cells in,1000,1,buffers_allocated,2
+SumArray,cells in,1000,1,cells_scanned,1000
+SumArray,cells in,1000,1,name_lookups,2
+SumArray,cells in,1000,1,objects_built,7
+SumArray,cells in,1000,1,trips,2
+Dot,two ranges in,2000,1,buffer_bytes,18000
+Dot,two ranges in,2000,1,buffers_allocated,4
+Dot,two ranges in,2000,1,cells_scanned,2000
+Dot,two ranges in,2000,1,name_lookups,3
+Dot,two ranges in,2000,1,objects_built,12
+Dot,two ranges in,2000,1,trips,3
+EchoColumn,round trip,1000,1000,buffer_bytes,25000
+EchoColumn,round trip,1000,1000,buffers_allocated,4
+EchoColumn,round trip,1000,1000,cells_scanned,1000
+EchoColumn,round trip,1000,1000,name_lookups,2
+EchoColumn,round trip,1000,1000,objects_built,7
+EchoColumn,round trip,1000,1000,result_cells,1000
+EchoColumn,round trip,1000,1000,result_copies,2
+EchoColumn,round trip,1000,1000,trips,2
+Grid,cells out,2,1000,buffer_bytes,16000
+Grid,cells out,2,1000,buffers_allocated,2
+Grid,cells out,2,1000,name_lookups,1
+Grid,cells out,2,1000,objects_built,4
+Grid,cells out,2,1000,result_cells,1000
+Grid,cells out,2,1000,result_copies,2
+Grid,cells out,2,1000,trips,1
+RowSums,one answer per row,1000,100,buffer_bytes,10600
+RowSums,one answer per row,1000,100,buffers_allocated,4
+RowSums,one answer per row,1000,100,cells_scanned,1000
+RowSums,one answer per row,1000,100,name_lookups,2
+RowSums,one answer per row,1000,100,objects_built,7
+RowSums,one answer per row,1000,100,result_cells,100
+RowSums,one answer per row,1000,100,result_copies,2
+RowSums,one answer per row,1000,100,trips,2
+Marshal.Append,way in alone,1000,0,buffer_bytes,9000
+Marshal.Append,way in alone,1000,0,buffers_allocated,2
+Marshal.Append,way in alone,1000,0,cells_scanned,1000
+Marshal.Append,way in alone,1000,0,name_lookups,1
+Marshal.Append,way in alone,1000,0,objects_built,5
+Marshal.Append,way in alone,1000,0,trips,1
+Marshal.FromPython,way out alone,0,1000,buffer_bytes,16000
+Marshal.FromPython,way out alone,0,1000,buffers_allocated,2
+Marshal.FromPython,way out alone,0,1000,result_cells,1000
+Marshal.FromPython,way out alone,0,1000,result_copies,2
+SumArray,cells in,10000,1,buffer_bytes,90000
+SumArray,cells in,10000,1,buffers_allocated,2
+SumArray,cells in,10000,1,cells_scanned,10000
+SumArray,cells in,10000,1,name_lookups,2
+SumArray,cells in,10000,1,objects_built,7
+SumArray,cells in,10000,1,trips,2
+Dot,two ranges in,20000,1,buffer_bytes,180000
+Dot,two ranges in,20000,1,buffers_allocated,4
+Dot,two ranges in,20000,1,cells_scanned,20000
+Dot,two ranges in,20000,1,name_lookups,3
+Dot,two ranges in,20000,1,objects_built,12
+Dot,two ranges in,20000,1,trips,3
+EchoColumn,round trip,10000,10000,buffer_bytes,250000
+EchoColumn,round trip,10000,10000,buffers_allocated,4
+EchoColumn,round trip,10000,10000,cells_scanned,10000
+EchoColumn,round trip,10000,10000,name_lookups,2
+EchoColumn,round trip,10000,10000,objects_built,7
+EchoColumn,round trip,10000,10000,result_cells,10000
+EchoColumn,round trip,10000,10000,result_copies,2
+EchoColumn,round trip,10000,10000,trips,2
+Grid,cells out,2,10000,buffer_bytes,160000
+Grid,cells out,2,10000,buffers_allocated,2
+Grid,cells out,2,10000,name_lookups,1
+Grid,cells out,2,10000,objects_built,4
+Grid,cells out,2,10000,result_cells,10000
+Grid,cells out,2,10000,result_copies,2
+Grid,cells out,2,10000,trips,1
+RowSums,one answer per row,10000,1000,buffer_bytes,106000
+RowSums,one answer per row,10000,1000,buffers_allocated,4
+RowSums,one answer per row,10000,1000,cells_scanned,10000
+RowSums,one answer per row,10000,1000,name_lookups,2
+RowSums,one answer per row,10000,1000,objects_built,7
+RowSums,one answer per row,10000,1000,result_cells,1000
+RowSums,one answer per row,10000,1000,result_copies,2
+RowSums,one answer per row,10000,1000,trips,2
+Marshal.Append,way in alone,10000,0,buffer_bytes,90000
+Marshal.Append,way in alone,10000,0,buffers_allocated,2
+Marshal.Append,way in alone,10000,0,cells_scanned,10000
+Marshal.Append,way in alone,10000,0,name_lookups,1
+Marshal.Append,way in alone,10000,0,objects_built,5
+Marshal.Append,way in alone,10000,0,trips,1
+Marshal.FromPython,way out alone,0,10000,buffer_bytes,160000
+Marshal.FromPython,way out alone,0,10000,buffers_allocated,2
+Marshal.FromPython,way out alone,0,10000,result_cells,10000
+Marshal.FromPython,way out alone,0,10000,result_copies,2
+SumArray,cells in,100000,1,buffer_bytes,900000
+SumArray,cells in,100000,1,buffers_allocated,2
+SumArray,cells in,100000,1,cells_scanned,100000
+SumArray,cells in,100000,1,name_lookups,2
+SumArray,cells in,100000,1,objects_built,7
+SumArray,cells in,100000,1,trips,2
+Dot,two ranges in,200000,1,buffer_bytes,1800000
+Dot,two ranges in,200000,1,buffers_allocated,4
+Dot,two ranges in,200000,1,cells_scanned,200000
+Dot,two ranges in,200000,1,name_lookups,3
+Dot,two ranges in,200000,1,objects_built,12
+Dot,two ranges in,200000,1,trips,3
+EchoColumn,round trip,100000,100000,buffer_bytes,2500000
+EchoColumn,round trip,100000,100000,buffers_allocated,4
+EchoColumn,round trip,100000,100000,cells_scanned,100000
+EchoColumn,round trip,100000,100000,name_lookups,2
+EchoColumn,round trip,100000,100000,objects_built,7
+EchoColumn,round trip,100000,100000,result_cells,100000
+EchoColumn,round trip,100000,100000,result_copies,2
+EchoColumn,round trip,100000,100000,trips,2
+Grid,cells out,2,100000,buffer_bytes,1600000
+Grid,cells out,2,100000,buffers_allocated,2
+Grid,cells out,2,100000,name_lookups,1
+Grid,cells out,2,100000,objects_built,4
+Grid,cells out,2,100000,result_cells,100000
+Grid,cells out,2,100000,result_copies,2
+Grid,cells out,2,100000,trips,1
+RowSums,one answer per row,100000,10000,buffer_bytes,1060000
+RowSums,one answer per row,100000,10000,buffers_allocated,4
+RowSums,one answer per row,100000,10000,cells_scanned,100000
+RowSums,one answer per row,100000,10000,name_lookups,2
+RowSums,one answer per row,100000,10000,objects_built,7
+RowSums,one answer per row,100000,10000,result_cells,10000
+RowSums,one answer per row,100000,10000,result_copies,2
+RowSums,one answer per row,100000,10000,trips,2
+Marshal.Append,way in alone,100000,0,buffer_bytes,900000
+Marshal.Append,way in alone,100000,0,buffers_allocated,2
+Marshal.Append,way in alone,100000,0,cells_scanned,100000
+Marshal.Append,way in alone,100000,0,name_lookups,1
+Marshal.Append,way in alone,100000,0,objects_built,5
+Marshal.Append,way in alone,100000,0,trips,1
+Marshal.FromPython,way out alone,0,100000,buffer_bytes,1600000
+Marshal.FromPython,way out alone,0,100000,buffers_allocated,2
+Marshal.FromPython,way out alone,0,100000,result_cells,100000
+Marshal.FromPython,way out alone,0,100000,result_copies,2
+EchoRow,rejected: shape,10000,0,buffer_bytes,90000
+EchoRow,rejected: shape,10000,0,buffers_allocated,2
+EchoRow,rejected: shape,10000,0,cells_scanned,10000
+EchoRow,rejected: shape,10000,0,name_lookups,2
+EchoRow,rejected: shape,10000,0,objects_built,7
+EchoRow,rejected: shape,10000,0,trips,2
+SumArray,rejected: text first,10000,0,buffer_bytes,90000
+SumArray,rejected: text first,10000,0,buffers_allocated,2
+SumArray,rejected: text first,10000,0,cells_scanned,10000
+SumArray,rejected: text first,10000,0,name_lookups,2
+SumArray,rejected: text first,10000,0,objects_built,7
+SumArray,rejected: text first,10000,0,text_cells,1
+SumArray,rejected: text first,10000,0,trips,2
+SumArray,rejected: text last,10000,0,buffer_bytes,90000
+SumArray,rejected: text last,10000,0,buffers_allocated,2
+SumArray,rejected: text last,10000,0,cells_scanned,10000
+SumArray,rejected: text last,10000,0,name_lookups,2
+SumArray,rejected: text last,10000,0,objects_built,7
+SumArray,rejected: text last,10000,0,text_cells,1
+SumArray,rejected: text last,10000,0,trips,2
+SumArray,rejected: blank deep,10000,0,buffer_bytes,90000
+SumArray,rejected: blank deep,10000,0,buffers_allocated,2
+SumArray,rejected: blank deep,10000,0,cells_scanned,10000
+SumArray,rejected: blank deep,10000,0,name_lookups,2
+SumArray,rejected: blank deep,10000,0,objects_built,7
+SumArray,rejected: blank deep,10000,0,trips,2
+SumArray,excel error first,10000,0,buffer_bytes,90000
+SumArray,excel error first,10000,0,buffers_allocated,2
+SumArray,excel error first,10000,0,cells_scanned,1
+SumArray,excel error first,10000,0,objects_built,2
+SumArray,excel error last,10000,0,buffer_bytes,90000
+SumArray,excel error last,10000,0,buffers_allocated,2
+SumArray,excel error last,10000,0,cells_scanned,10000
+SumArray,excel error last,10000,0,objects_built,2

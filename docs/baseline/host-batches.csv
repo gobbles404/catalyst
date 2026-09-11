@@ -1,0 +1,216 @@
+layer,probe,scenario,calls,cells_in,cells_out,batch,iterations,elapsed_ms,per_call_us,managed_bytes_per_call,gc0,gc1,gc2
+host,Zero,scalar,1,0,1,1,32768,82.554,2.519,360.0,2,0,0
+host,Zero,scalar,1,0,1,2,32768,81.907,2.500,360.0,2,0,0
+host,Zero,scalar,1,0,1,3,32768,82.898,2.530,360.0,1,0,0
+host,Zero,scalar,1,0,1,4,32768,82.528,2.519,360.0,2,0,0
+host,Zero,scalar,1,0,1,5,32768,82.940,2.531,360.0,2,0,0
+host,Add,scalar,1,2,1,1,16384,58.219,3.553,440.0,1,0,0
+host,Add,scalar,1,2,1,2,16384,58.533,3.573,440.0,1,0,0
+host,Add,scalar,1,2,1,3,16384,58.021,3.541,440.0,1,0,0
+host,Add,scalar,1,2,1,4,16384,58.313,3.559,440.0,1,0,0
+host,Add,scalar,1,2,1,5,16384,57.877,3.533,440.0,1,0,0
+host,Times,missing,1,1,1,1,16384,59.241,3.616,472.0,1,0,0
+host,Times,missing,1,1,1,2,16384,58.619,3.578,472.0,1,0,0
+host,Times,missing,1,1,1,3,16384,58.237,3.554,472.0,1,0,0
+host,Times,missing,1,1,1,4,16384,58.816,3.590,472.0,2,0,0
+host,Times,missing,1,1,1,5,16384,59.035,3.603,472.0,1,0,0
+host,SumArray,cells in,1,1,1,1,4096,77.510,18.923,904.0,1,0,0
+host,SumArray,cells in,1,1,1,2,4096,76.538,18.686,904.0,0,0,0
+host,SumArray,cells in,1,1,1,3,4096,77.177,18.842,904.0,1,0,0
+host,SumArray,cells in,1,1,1,4,4096,76.378,18.647,904.0,0,0,0
+host,SumArray,cells in,1,1,1,5,4096,77.273,18.866,904.0,1,0,0
+host,Dot,two ranges in,1,2,1,1,2048,68.908,33.647,1448.0,0,0,0
+host,Dot,two ranges in,1,2,1,2,2048,70.603,34.474,1448.1,1,0,0
+host,Dot,two ranges in,1,2,1,3,2048,69.052,33.717,1448.0,0,0,0
+host,Dot,two ranges in,1,2,1,4,2048,70.323,34.337,1448.1,1,0,0
+host,Dot,two ranges in,1,2,1,5,2048,79.497,38.817,1448.0,0,0,0
+host,EchoColumn,round trip,1,1,1,1,2048,51.053,24.928,1272.0,1,0,0
+host,EchoColumn,round trip,1,1,1,2,2048,52.470,25.620,1272.0,0,0,0
+host,EchoColumn,round trip,1,1,1,3,2048,49.613,24.225,1272.0,0,0,0
+host,EchoColumn,round trip,1,1,1,4,2048,52.017,25.399,1272.0,1,0,0
+host,EchoColumn,round trip,1,1,1,5,2048,50.597,24.706,1272.0,0,0,0
+host,Grid,cells out,1,2,1,1,8192,76.532,9.342,808.0,1,0,0
+host,Grid,cells out,1,2,1,2,8192,77.566,9.468,808.0,1,0,0
+host,Grid,cells out,1,2,1,3,8192,83.496,10.192,808.0,2,0,0
+host,Grid,cells out,1,2,1,4,8192,77.287,9.434,808.0,1,0,0
+host,Grid,cells out,1,2,1,5,8192,76.401,9.326,808.0,1,0,0
+host,Marshal.Append,way in alone,1,1,0,1,8192,78.305,9.559,568.0,1,0,0
+host,Marshal.Append,way in alone,1,1,0,2,8192,77.769,9.493,568.0,1,0,0
+host,Marshal.Append,way in alone,1,1,0,3,8192,78.502,9.583,568.0,0,0,0
+host,Marshal.Append,way in alone,1,1,0,4,8192,80.893,9.875,568.0,1,0,0
+host,Marshal.Append,way in alone,1,1,0,5,8192,84.388,10.301,568.0,1,0,0
+host,Marshal.FromPython,way out alone,1,0,1,1,65536,62.851,0.959,416.0,4,0,0
+host,Marshal.FromPython,way out alone,1,0,1,2,65536,63.418,0.968,416.0,4,0,0
+host,Marshal.FromPython,way out alone,1,0,1,3,65536,63.103,0.963,416.0,5,0,0
+host,Marshal.FromPython,way out alone,1,0,1,4,65536,63.202,0.964,416.0,4,0,0
+host,Marshal.FromPython,way out alone,1,0,1,5,65536,62.856,0.959,416.0,4,0,0
+host,SumArray,cells in,1,100,1,1,4096,88.878,21.699,1792.0,1,0,0
+host,SumArray,cells in,1,100,1,2,4096,87.578,21.381,1792.0,1,0,0
+host,SumArray,cells in,1,100,1,3,4096,88.187,21.530,1792.0,1,0,0
+host,SumArray,cells in,1,100,1,4,4096,89.637,21.884,1792.0,1,0,0
+host,SumArray,cells in,1,100,1,5,4096,88.312,21.561,1792.0,1,0,0
+host,Dot,two ranges in,1,200,1,1,2048,81.920,40.000,3224.1,1,0,0
+host,Dot,two ranges in,1,200,1,2,2048,81.311,39.703,3224.1,1,0,0
+host,Dot,two ranges in,1,200,1,3,2048,93.602,45.704,3224.1,1,0,0
+host,Dot,two ranges in,1,200,1,4,2048,82.496,40.281,3224.1,1,0,0
+host,Dot,two ranges in,1,200,1,5,2048,84.762,41.388,3224.1,1,0,0
+host,EchoColumn,round trip,1,100,100,1,2048,56.617,27.645,3744.0,1,0,0
+host,EchoColumn,round trip,1,100,100,2,2048,55.605,27.151,3744.0,2,0,0
+host,EchoColumn,round trip,1,100,100,3,2048,56.929,27.797,3744.0,1,0,0
+host,EchoColumn,round trip,1,100,100,4,2048,56.509,27.592,3744.0,1,0,0
+host,EchoColumn,round trip,1,100,100,5,2048,56.766,27.718,3744.0,1,0,0
+host,Grid,cells out,1,2,100,1,8192,79.579,9.714,2392.1,3,0,0
+host,Grid,cells out,1,2,100,2,8192,75.903,9.265,2392.1,3,0,0
+host,Grid,cells out,1,2,100,3,8192,78.841,9.624,2392.1,3,0,0
+host,Grid,cells out,1,2,100,4,8192,76.011,9.279,2392.1,3,0,0
+host,Grid,cells out,1,2,100,5,8192,76.683,9.361,2392.1,3,0,0
+host,RowSums,one answer per row,1,100,10,1,2048,56.503,27.589,2304.0,1,0,0
+host,RowSums,one answer per row,1,100,10,2,2048,57.449,28.051,2304.0,0,0,0
+host,RowSums,one answer per row,1,100,10,3,2048,58.055,28.347,2304.0,1,0,0
+host,RowSums,one answer per row,1,100,10,4,2048,62.744,30.637,2304.0,1,0,0
+host,RowSums,one answer per row,1,100,10,5,2048,62.017,30.282,2304.0,1,0,0
+host,Marshal.Append,way in alone,1,100,0,1,8192,94.914,11.586,1456.0,2,0,0
+host,Marshal.Append,way in alone,1,100,0,2,8192,94.917,11.587,1456.0,2,0,0
+host,Marshal.Append,way in alone,1,100,0,3,8192,94.092,11.486,1456.0,2,0,0
+host,Marshal.Append,way in alone,1,100,0,4,8192,94.185,11.497,1456.0,2,0,0
+host,Marshal.Append,way in alone,1,100,0,5,8192,92.783,11.326,1456.0,2,0,0
+host,Marshal.FromPython,way out alone,1,0,100,1,65536,68.276,1.042,2000.0,21,0,0
+host,Marshal.FromPython,way out alone,1,0,100,2,65536,70.566,1.077,2000.0,20,0,0
+host,Marshal.FromPython,way out alone,1,0,100,3,65536,67.563,1.031,2000.0,21,0,0
+host,Marshal.FromPython,way out alone,1,0,100,4,65536,69.201,1.056,2000.0,21,0,0
+host,Marshal.FromPython,way out alone,1,0,100,5,65536,69.740,1.064,2000.0,21,0,0
+host,SumArray,cells in,1,1000,1,1,2048,78.203,38.185,9888.3,3,0,0
+host,SumArray,cells in,1,1000,1,2,2048,81.646,39.866,9888.3,3,0,0
+host,SumArray,cells in,1,1000,1,3,2048,75.458,36.844,9888.3,3,0,0
+host,SumArray,cells in,1,1000,1,4,2048,78.620,38.389,9888.3,3,0,0
+host,SumArray,cells in,1,1000,1,5,2048,78.995,38.572,9888.3,4,0,0
+host,Dot,two ranges in,1,2000,1,1,1024,74.512,72.766,19416.5,3,0,0
+host,Dot,two ranges in,1,2000,1,2,1024,74.098,72.362,19416.5,3,0,0
+host,Dot,two ranges in,1,2000,1,3,1024,74.496,72.750,19416.7,4,0,0
+host,Dot,two ranges in,1,2000,1,4,1024,72.835,71.128,19416.5,3,0,0
+host,Dot,two ranges in,1,2000,1,5,1024,81.807,79.890,19416.5,3,0,0
+host,EchoColumn,round trip,1,1000,1000,1,2048,92.184,45.012,26240.0,9,0,0
+host,EchoColumn,round trip,1,1000,1000,2,2048,92.934,45.378,26240.0,8,0,0
+host,EchoColumn,round trip,1,1000,1000,3,2048,89.920,43.906,26240.0,9,0,0
+host,EchoColumn,round trip,1,1000,1000,4,2048,93.371,45.591,26240.0,8,0,0
+host,EchoColumn,round trip,1,1000,1000,5,2048,90.148,44.018,26240.0,9,0,0
+host,Grid,cells out,1,2,1000,1,8192,102.400,12.500,16792.4,21,1,1
+host,Grid,cells out,1,2,1000,2,8192,103.024,12.576,16792.4,22,0,0
+host,Grid,cells out,1,2,1000,3,8192,100.203,12.232,16792.4,22,0,0
+host,Grid,cells out,1,2,1000,4,8192,102.112,12.465,16792.4,22,0,0
+host,Grid,cells out,1,2,1000,5,8192,97.774,11.935,16792.4,22,0,0
+host,RowSums,one answer per row,1,1000,100,1,2048,74.756,36.502,11840.0,4,0,0
+host,RowSums,one answer per row,1,1000,100,2,2048,73.941,36.104,11840.0,4,0,0
+host,RowSums,one answer per row,1,1000,100,3,2048,75.486,36.858,11840.0,3,0,0
+host,RowSums,one answer per row,1,1000,100,4,2048,73.934,36.101,11840.0,4,0,0
+host,RowSums,one answer per row,1,1000,100,5,2048,76.785,37.493,11840.0,4,0,0
+host,Marshal.Append,way in alone,1,1000,0,1,2048,50.249,24.536,9552.0,3,0,0
+host,Marshal.Append,way in alone,1,1000,0,2,2048,53.131,25.943,9552.0,4,0,0
+host,Marshal.Append,way in alone,1,1000,0,3,2048,51.298,25.048,9552.0,3,0,0
+host,Marshal.Append,way in alone,1,1000,0,4,2048,51.935,25.359,9552.0,3,0,0
+host,Marshal.Append,way in alone,1,1000,0,5,2048,51.692,25.240,9552.0,3,0,0
+host,Marshal.FromPython,way out alone,1,0,1000,1,32768,62.383,1.904,16400.0,86,0,0
+host,Marshal.FromPython,way out alone,1,0,1000,2,32768,60.952,1.860,16400.0,85,0,0
+host,Marshal.FromPython,way out alone,1,0,1000,3,32768,59.326,1.810,16400.0,86,0,0
+host,Marshal.FromPython,way out alone,1,0,1000,4,32768,60.591,1.849,16400.0,86,0,0
+host,Marshal.FromPython,way out alone,1,0,1000,5,32768,63.079,1.925,16400.0,85,0,0
+host,SumArray,cells in,1,10000,1,1,512,95.937,187.377,90890.6,8,0,0
+host,SumArray,cells in,1,10000,1,2,512,90.722,177.192,90890.3,7,0,0
+host,SumArray,cells in,1,10000,1,3,512,92.311,180.295,90890.3,7,0,0
+host,SumArray,cells in,1,10000,1,4,512,90.795,177.334,90890.6,8,0,0
+host,SumArray,cells in,1,10000,1,5,512,93.696,183.000,90890.3,7,0,0
+host,Dot,two ranges in,1,20000,1,1,256,88.697,346.473,181420.5,7,0,0
+host,Dot,two ranges in,1,20000,1,2,256,89.159,348.278,181420.5,7,0,0
+host,Dot,two ranges in,1,20000,1,3,256,92.893,362.864,181421.2,8,0,0
+host,Dot,two ranges in,1,20000,1,4,256,90.225,352.439,181420.5,7,0,0
+host,Dot,two ranges in,1,20000,1,5,256,89.726,350.491,181420.5,7,0,0
+host,EchoColumn,round trip,1,10000,10000,1,256,50.481,197.192,251240.2,10,0,0
+host,EchoColumn,round trip,1,10000,10000,2,256,52.381,204.612,251240.2,10,0,0
+host,EchoColumn,round trip,1,10000,10000,3,256,51.100,199.611,251240.2,10,0,0
+host,EchoColumn,round trip,1,10000,10000,4,256,53.162,207.664,251240.2,10,0,0
+host,EchoColumn,round trip,1,10000,10000,5,256,50.496,197.252,251240.2,10,0,0
+host,Grid,cells out,1,2,10000,1,2048,68.525,33.459,160796.1,52,0,0
+host,Grid,cells out,1,2,10000,2,2048,69.717,34.042,160796.1,52,0,0
+host,Grid,cells out,1,2,10000,3,2048,73.986,36.126,160796.1,52,0,0
+host,Grid,cells out,1,2,10000,4,2048,60.719,29.648,160796.0,51,0,0
+host,Grid,cells out,1,2,10000,5,2048,67.230,32.827,160796.1,52,0,0
+host,RowSums,one answer per row,1,10000,1000,1,512,68.253,133.306,107240.1,8,0,0
+host,RowSums,one answer per row,1,10000,1000,2,512,59.847,116.888,107240.1,9,0,0
+host,RowSums,one answer per row,1,10000,1000,3,512,56.330,110.019,107240.1,9,0,0
+host,RowSums,one answer per row,1,10000,1000,4,512,60.911,118.967,107240.1,8,0,0
+host,RowSums,one answer per row,1,10000,1000,5,512,62.434,121.942,107240.1,9,0,0
+host,Marshal.Append,way in alone,1,10000,0,1,512,80.911,158.030,90552.1,7,0,0
+host,Marshal.Append,way in alone,1,10000,0,2,512,81.885,159.931,90552.1,7,0,0
+host,Marshal.Append,way in alone,1,10000,0,3,512,81.883,159.927,90552.1,8,0,0
+host,Marshal.Append,way in alone,1,10000,0,4,512,80.854,157.917,90552.1,7,0,0
+host,Marshal.Append,way in alone,1,10000,0,5,512,78.928,154.157,90552.1,7,0,0
+host,Marshal.FromPython,way out alone,1,0,10000,1,8192,70.183,8.567,160400.0,207,0,0
+host,Marshal.FromPython,way out alone,1,0,10000,2,8192,69.636,8.500,160400.0,208,0,0
+host,Marshal.FromPython,way out alone,1,0,10000,3,8192,72.972,8.908,160400.0,207,0,0
+host,Marshal.FromPython,way out alone,1,0,10000,4,8192,71.106,8.680,160400.0,208,0,0
+host,Marshal.FromPython,way out alone,1,0,10000,5,8192,71.860,8.772,160400.0,207,0,0
+host,SumArray,cells in,1,100000,1,1,32,69.273,2164.775,901806.0,6,6,6
+host,SumArray,cells in,1,100000,1,2,32,68.063,2126.978,901572.8,6,6,6
+host,SumArray,cells in,1,100000,1,3,32,69.822,2181.928,901780.8,6,6,6
+host,SumArray,cells in,1,100000,1,4,32,67.768,2117.750,901470.5,5,5,5
+host,SumArray,cells in,1,100000,1,5,32,66.790,2087.175,901776.3,6,6,6
+host,Dot,two ranges in,1,200000,1,1,16,71.416,4463.525,1802649.0,6,6,6
+host,Dot,two ranges in,1,200000,1,2,16,67.565,4222.806,1802081.5,5,5,5
+host,Dot,two ranges in,1,200000,1,3,16,69.285,4330.300,1802149.0,6,6,6
+host,Dot,two ranges in,1,200000,1,4,16,68.802,4300.100,1803109.0,6,6,6
+host,Dot,two ranges in,1,200000,1,5,16,69.183,4323.950,1802151.0,6,6,6
+host,EchoColumn,round trip,1,100000,100000,1,32,78.296,2446.759,2501974.3,11,11,11
+host,EchoColumn,round trip,1,100000,100000,2,32,81.385,2543.266,2501940.8,11,11,11
+host,EchoColumn,round trip,1,100000,100000,3,32,81.084,2533.884,2502642.8,11,11,11
+host,EchoColumn,round trip,1,100000,100000,4,32,77.669,2427.166,2501896.5,11,11,11
+host,EchoColumn,round trip,1,100000,100000,5,32,81.532,2547.869,2501875.5,11,11,11
+host,Grid,cells out,1,2,100000,1,128,84.607,660.989,1600894.6,15,15,15
+host,Grid,cells out,1,2,100000,2,128,65.482,511.578,1601233.8,13,13,13
+host,Grid,cells out,1,2,100000,3,128,62.978,492.017,1601096.6,11,11,11
+host,Grid,cells out,1,2,100000,4,128,86.959,679.366,1601362.9,14,14,14
+host,Grid,cells out,1,2,100000,5,128,65.068,508.343,1601357.0,13,13,13
+host,RowSums,one answer per row,1,100000,10000,1,64,77.793,1215.513,1062262.1,10,9,9
+host,RowSums,one answer per row,1,100000,10000,2,64,80.652,1260.191,1062265.6,12,10,10
+host,RowSums,one answer per row,1,100000,10000,3,64,78.937,1233.397,1062382.3,12,10,10
+host,RowSums,one answer per row,1,100000,10000,4,64,91.341,1427.209,1062247.3,11,10,10
+host,RowSums,one answer per row,1,100000,10000,5,64,84.021,1312.823,1062240.1,11,9,9
+host,Marshal.Append,way in alone,1,100000,0,1,32,56.871,1777.213,901475.8,6,6,6
+host,Marshal.Append,way in alone,1,100000,0,2,32,55.962,1748.813,901310.5,5,5,5
+host,Marshal.Append,way in alone,1,100000,0,3,32,57.618,1800.572,901311.5,6,6,6
+host,Marshal.Append,way in alone,1,100000,0,4,32,55.637,1738.644,901059.8,5,5,5
+host,Marshal.Append,way in alone,1,100000,0,5,32,55.027,1719.606,900888.5,5,5,5
+host,Marshal.FromPython,way out alone,1,0,100000,1,256,51.489,201.129,1600400.2,128,128,128
+host,Marshal.FromPython,way out alone,1,0,100000,2,256,55.464,216.657,1600400.2,128,128,128
+host,Marshal.FromPython,way out alone,1,0,100000,3,256,52.036,203.264,1600400.2,128,128,128
+host,Marshal.FromPython,way out alone,1,0,100000,4,256,51.463,201.029,1600400.2,128,128,128
+host,Marshal.FromPython,way out alone,1,0,100000,5,256,52.889,206.598,1600400.2,128,128,128
+host,EchoRow,rejected: shape,1,10000,0,1,512,85.118,166.245,91002.6,8,0,0
+host,EchoRow,rejected: shape,1,10000,0,2,512,91.169,178.064,91002.3,7,0,0
+host,EchoRow,rejected: shape,1,10000,0,3,512,87.721,171.329,91002.3,7,0,0
+host,EchoRow,rejected: shape,1,10000,0,4,512,87.373,170.650,91002.6,8,0,0
+host,EchoRow,rejected: shape,1,10000,0,5,512,85.870,167.714,91002.3,7,0,0
+host,SumArray,rejected: text first,1,10000,0,1,512,98.922,193.206,91090.3,7,0,0
+host,SumArray,rejected: text first,1,10000,0,2,512,101.193,197.642,91090.6,8,0,0
+host,SumArray,rejected: text first,1,10000,0,3,512,101.621,198.479,91090.3,7,0,0
+host,SumArray,rejected: text first,1,10000,0,4,512,98.039,191.482,91090.3,7,0,0
+host,SumArray,rejected: text first,1,10000,0,5,512,99.511,194.357,91090.6,8,0,0
+host,SumArray,rejected: text last,1,10000,0,1,256,50.127,195.807,91098.7,4,0,0
+host,SumArray,rejected: text last,1,10000,0,2,256,49.384,192.905,91098.7,4,0,0
+host,SumArray,rejected: text last,1,10000,0,3,256,50.017,195.378,91098.0,3,0,0
+host,SumArray,rejected: text last,1,10000,0,4,256,50.933,198.956,91098.7,4,0,0
+host,SumArray,rejected: text last,1,10000,0,5,256,50.257,196.316,91098.7,4,0,0
+host,SumArray,rejected: blank deep,1,10000,0,1,512,94.453,184.478,91002.6,8,0,0
+host,SumArray,rejected: blank deep,1,10000,0,2,512,95.981,187.464,91002.3,7,0,0
+host,SumArray,rejected: blank deep,1,10000,0,3,512,109.832,214.516,91002.6,8,0,0
+host,SumArray,rejected: blank deep,1,10000,0,4,512,95.437,186.401,91002.3,7,0,0
+host,SumArray,rejected: blank deep,1,10000,0,5,512,98.227,191.849,91002.3,7,0,0
+host,SumArray,excel error first,1,10000,0,1,32768,77.826,2.375,90208.0,468,0,0
+host,SumArray,excel error first,1,10000,0,2,32768,78.118,2.384,90208.0,468,0,0
+host,SumArray,excel error first,1,10000,0,3,32768,78.985,2.410,90208.0,468,0,0
+host,SumArray,excel error first,1,10000,0,4,32768,80.721,2.463,90208.0,468,0,0
+host,SumArray,excel error first,1,10000,0,5,32768,77.034,2.351,90208.0,468,0,0
+host,SumArray,excel error last,1,10000,0,1,512,68.000,132.812,90208.1,7,0,0
+host,SumArray,excel error last,1,10000,0,2,512,66.997,130.854,90208.1,7,0,0
+host,SumArray,excel error last,1,10000,0,3,512,68.107,133.022,90208.1,8,0,0
+host,SumArray,excel error last,1,10000,0,4,512,67.600,132.031,90208.1,7,0,0
+host,SumArray,excel error last,1,10000,0,5,512,70.997,138.666,90208.1,7,0,0
