@@ -26,6 +26,8 @@ def read(path: Path) -> dict[Key, list[float]]:
     means: dict[Key, list[float]] = defaultdict(list)
     with path.open(newline="", encoding="utf-8") as source:
         for row in csv.DictReader(source):
+            if not row["per_call_us"]:  # a row with no formula has no per-call figure
+                continue
             key = (row["probe"], row["scenario"], int(row["cells_in"]), int(row["cells_out"]))
             means[key].append(float(row["per_call_us"]))
     return means

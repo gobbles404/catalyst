@@ -356,6 +356,20 @@ namespace Goosedove.Host
         }
     }
 
+    /// <summary>
+    /// The floor under every probe: a function with the host's argument shape and no Python, so
+    /// what Excel and Excel-DNA charge for a call is measured beside what the seam adds. Hidden
+    /// from the function wizard like the probes.
+    /// </summary>
+    public static class Floor
+    {
+        [ExcelFunction(IsHidden = true, Description = "Probe: a number in and out with no Python; the Excel-DNA floor.")]
+        public static object HostAdd(object a, object b)
+        {
+            return (double)a + (double)b;
+        }
+    }
+
     /// <summary>Reads key=value lines from a config file; the add-in keeps its own beside the .xll.</summary>
     internal static class Config
     {
