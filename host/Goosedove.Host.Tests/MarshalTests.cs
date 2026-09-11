@@ -12,13 +12,20 @@ namespace Goosedove.Host.Tests
         private static string Described(object value)
         {
             using (Py.GIL())
-            using (var args = new PyList())
             {
-                Assert.Null(Marshal.Append(args, value));
-                using (var item = args[0])
-                using (var text = Bridge.Module.InvokeMethod("describe", item))
+                object error;
+                var item = Marshal.ToPython(value, out error);
+                Assert.Null(error);
+                try
                 {
-                    return text.As<string>();
+                    using (var text = Bridge.Module.InvokeMethod("describe", item))
+                    {
+                        return text.As<string>();
+                    }
+                }
+                finally
+                {
+                    Marshal.Release(item);
                 }
             }
         }
@@ -26,13 +33,15 @@ namespace Goosedove.Host.Tests
         private static string Attribute(object[,] grid, string name)
         {
             using (Py.GIL())
-            using (var args = new PyList())
             {
-                Assert.Null(Marshal.Append(args, grid));
-                using (var cells = args[0])
-                using (var attribute = cells.GetAttr(name))
+                object error;
+                using (var cells = Marshal.ToPython(grid, out error))
                 {
-                    return attribute.HasAttr("tolist") ? attribute.InvokeMethod("tolist").ToString() : attribute.ToString();
+                    Assert.Null(error);
+                    using (var attribute = cells.GetAttr(name))
+                    {
+                        return attribute.HasAttr("tolist") ? attribute.InvokeMethod("tolist").ToString() : attribute.ToString();
+                    }
                 }
             }
         }
@@ -48,10 +57,10 @@ namespace Goosedove.Host.Tests
         public void an_error_argument_comes_back_and_python_is_not_called()
         {
             using (Py.GIL())
-            using (var args = new PyList())
             {
-                Assert.Equal(ExcelError.ExcelErrorNA, Marshal.Append(args, ExcelError.ExcelErrorNA));
-                Assert.Equal(0, args.Length());
+                object error;
+                Assert.Null(Marshal.ToPython(ExcelError.ExcelErrorNA, out error));
+                Assert.Equal(ExcelError.ExcelErrorNA, error);
             }
         }
 
@@ -60,10 +69,10 @@ namespace Goosedove.Host.Tests
         {
             var grid = new object[,] { { "x" }, { ExcelError.ExcelErrorDiv0 } };
             using (Py.GIL())
-            using (var args = new PyList())
             {
-                Assert.Equal(ExcelError.ExcelErrorDiv0, Marshal.Append(args, grid));
-                Assert.Equal(0, args.Length());
+                object error;
+                Assert.Null(Marshal.ToPython(grid, out error));
+                Assert.Equal(ExcelError.ExcelErrorDiv0, error);
             }
         }
 
@@ -93,6 +102,19 @@ namespace Goosedove.Host.Tests
         public void a_range_of_only_numbers_carries_no_text()
         {
             Assert.Equal("()", Attribute(new object[,] { { 1.0 }, { 2.0 } }, "texts"));
+        }
+
+        [Fact]
+        public void an_omitted_argument_is_the_missing_held_since_start_and_releasing_it_keeps_it()
+        {
+            using (Py.GIL())
+            {
+                object error;
+                var first = Marshal.ToPython(ExcelMissing.Value, out error);
+                Assert.Same(Bridge.Missing, first);
+                Marshal.Release(first);
+                Assert.Equal("missing", Described(ExcelMissing.Value));
+            }
         }
 
         // The seam promises a number, text, a boolean, or an array; the host says so if it gets anything else.

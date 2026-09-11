@@ -74,7 +74,7 @@ namespace Goosedove.Host.Measure
                 Pair("logical_processors", System.Environment.ProcessorCount.ToString(CultureInfo.InvariantCulture)),
                 Pair("batch_target_ms", Measurements.BatchMilliseconds.ToString(CultureInfo.InvariantCulture)),
                 Pair("batches", Measurements.Batches.ToString(CultureInfo.InvariantCulture)),
-                Pair("timed_scope", "The registered delegate, Excel's path minus Excel-DNA: marshaling, the trip, validation, the probe, result conversion. Stage scenarios time Marshal.Append or Marshal.FromPython alone with the GIL held outside the clock. Excludes Excel and building inputs. per_call_us is a batch mean."),
+                Pair("timed_scope", "The registered delegate, Excel's path minus Excel-DNA: marshaling, the trip, validation, the probe, result conversion. Two stage rows, 'way in' and 'way out', time Marshal.ToPython and Marshal.FromPython alone with the GIL held outside the clock. Excludes Excel and building inputs. per_call_us is a batch mean."),
                 Pair("allocation_scope", "GC.GetAllocatedBytesForCurrentThread over the batch, divided by calls: managed bytes on this thread only, not Python, numpy, or Excel-DNA."),
             };
             var json = new StringBuilder("{\n");

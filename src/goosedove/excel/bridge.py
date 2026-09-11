@@ -1,18 +1,20 @@
 """The seam between the Excel host and this package.
 
-The host imports this module and uses four names: function_specs, call,
-cells_from_buffers, and the value MISSING. Importing it imports goosedove.excel
-first, the catalogue of every module that registers worksheet functions, so
-the function list is complete by the time the host asks. A blank cell arrives
-as None, an omitted argument as MISSING, and every range as Cells: one kind
-code per cell, one number per cell, and the text cells in sheet order, which
-cells_from_buffers builds from the host's buffers. Excel errors never arrive; the
-host returns them before calling. call validates the type of every argument
-against the function's own signature, once, by type and shape and never by
-meaning; past it nothing checks. On the way back, call converts the result by
-the function's declared return type, once, into the four things the host can
-show: a number, text, a boolean, or an array of numbers. docs/inputs.md and
-docs/outputs.md are the map.
+The host imports this module and uses four names: function_specs and entry
+at registration, and cells_from_buffers and the value MISSING, fetched once
+at start. Importing it imports goosedove.excel first, the catalogue of every
+module that registers worksheet functions, so the function list is complete by
+the time the host asks. For each function the host fetches its prepared path,
+entry(name), once, and calls it with each recalculation's inputs. A blank cell
+arrives as None, an omitted argument as MISSING, and every range as Cells: one
+kind code per cell, one number per cell, and the text cells in sheet order,
+which cells_from_buffers builds from the host's buffers. Excel errors never
+arrive; the host returns them before calling. The prepared path validates the
+type of every argument against the function's own signature, once, by type
+and shape and never by meaning; past it nothing checks. On the way back it
+converts the result by the function's declared return type, once, into the
+four things the host can show: a number, text, a boolean, or an array of
+numbers. docs/inputs.md and docs/outputs.md are the map.
 """
 
 import ctypes
@@ -539,6 +541,23 @@ class Registered:
     hidden: bool  # absent from Excel's function wizard, still callable by name
     convert: Callable[[object], object]  # the declared result's rule, from _RESULTS
 
+    def run(self, *args: object) -> object:
+        """The prepared path: validate the arguments, run the function, convert the result.
+
+        Everything that depends on the function alone was resolved at registration: the
+        validators, the result's rule, the name. A call supplies the inputs and runs it;
+        a failure becomes cell text.
+        """
+        name = self.fn.__name__
+        try:
+            return self.convert(self.fn(*_arguments(self, args)))
+        except TypeValidationError as failure:
+            return f"#ERROR {name}: {failure}"
+        except _BadResult as bad:
+            return f"#ERROR {name}: {bad.text}"
+        except Exception as exc:
+            return f"#ERROR {name}: {type(exc).__name__}: {exc}"
+
 
 _FUNCTIONS: dict[str, Registered] = {}
 
@@ -686,7 +705,7 @@ def _validate(parameter: Parameter, value: object) -> object:
         ) from None
 
 
-def _arguments(registered: Registered, args: list[object]) -> list[object]:
+def _arguments(registered: Registered, args: Sequence[object]) -> list[object]:
     if len(args) != len(registered.parameters):
         raise TypeValidationError(
             f"expected {len(registered.parameters)} arguments, got {len(args)}"
@@ -694,17 +713,14 @@ def _arguments(registered: Registered, args: list[object]) -> list[object]:
     return [_validate(p, value) for p, value in zip(registered.parameters, args, strict=True)]
 
 
-def call(name: str, args: list[object]) -> object:
-    """Validate the arguments, run the function, convert the result; a failure becomes cell text."""
-    registered = _FUNCTIONS[name]
-    try:
-        return registered.convert(registered.fn(*_arguments(registered, args)))
-    except TypeValidationError as failure:
-        return f"#ERROR {name}: {failure}"
-    except _BadResult as bad:
-        return f"#ERROR {name}: {bad.text}"
-    except Exception as exc:
-        return f"#ERROR {name}: {type(exc).__name__}: {exc}"
+def entry(name: str) -> Callable[..., object]:
+    """The prepared path of one registered function, for the host to fetch once and keep."""
+    return _FUNCTIONS[name].run
+
+
+def call(name: str, args: Sequence[object]) -> object:
+    """The prepared path reached by name, for callers that hold no entry: the tests."""
+    return _FUNCTIONS[name].run(*args)
 
 
 # --- the bridge's own worksheet function; the probes live in probes.py --------

@@ -21,7 +21,7 @@ Integers count as numbers, scalar or array, converted exactly. That is not coerc
 
 ## Result validation
 
-One place converts: `call` in `bridge.py`, after the function runs. It converts the result by the declared return type into one of the four things the host can show, a number, text, a boolean, or an array of numbers, and fails with the function's name when it cannot. The host reads the type it is handed and never asks Python a question about it.
+One place converts: the prepared path, `Registered.run` in `bridge.py`, after the function runs. It converts the result by the declared return type into one of the four things the host can show, a number, text, a boolean, or an array of numbers, and fails with the function's name when it cannot. The host reads the type it is handed and never asks Python a question about it.
 
 Rules:
 

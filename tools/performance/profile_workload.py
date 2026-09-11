@@ -9,6 +9,9 @@ from pyinstrument import Profiler
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
 
+# Each function's prepared path, fetched once as the host does at registration.
+ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+
 REPORTS = Path(__file__).resolve().parents[2] / "profiles"
 
 
@@ -40,18 +43,18 @@ def workloads() -> dict[str, Callable[[], object]]:
     weights = Cells.from_rows([[1.0] for _ in range(n)])
     grid = Cells.from_rows([[float(r * 100 + c) for c in range(100)] for r in range(100)])
     return {
-        "Zero": lambda: bridge.call("Zero", []),
-        "Add": lambda: bridge.call("Add", [1.0, 2.0]),
-        "Times": lambda: bridge.call("Times", [5.0, MISSING]),
-        "EchoText": lambda: bridge.call("EchoText", ["WTI"]),
-        "EchoBoolean": lambda: bridge.call("EchoBoolean", [True]),
-        "SumArray": lambda: bridge.call("SumArray", [grid]),
-        "Dot": lambda: bridge.call("Dot", [column, weights]),
-        "EchoColumn": lambda: bridge.call("EchoColumn", [column]),
-        "EchoRow": lambda: bridge.call("EchoRow", [row]),
-        "RowSums": lambda: bridge.call("RowSums", [grid]),
-        "Grid": lambda: bridge.call("Grid", [5000, 2]),
-        "Fail": lambda: bridge.call("Fail", []),
+        "Zero": lambda: ENTRY["Zero"](),
+        "Add": lambda: ENTRY["Add"](1.0, 2.0),
+        "Times": lambda: ENTRY["Times"](5.0, MISSING),
+        "EchoText": lambda: ENTRY["EchoText"]("WTI"),
+        "EchoBoolean": lambda: ENTRY["EchoBoolean"](True),
+        "SumArray": lambda: ENTRY["SumArray"](grid),
+        "Dot": lambda: ENTRY["Dot"](column, weights),
+        "EchoColumn": lambda: ENTRY["EchoColumn"](column),
+        "EchoRow": lambda: ENTRY["EchoRow"](row),
+        "RowSums": lambda: ENTRY["RowSums"](grid),
+        "Grid": lambda: ENTRY["Grid"](5000, 2),
+        "Fail": lambda: ENTRY["Fail"](),
     }
 
 

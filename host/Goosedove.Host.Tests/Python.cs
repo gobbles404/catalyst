@@ -59,4 +59,13 @@ namespace Goosedove.Host.Tests
     public sealed class PythonCollection : ICollectionFixture<PythonFixture>
     {
     }
+
+    /// <summary>The seam by name, for tests: prepare the path, then call it, the way a registered delegate does.</summary>
+    internal static class Seam
+    {
+        public static object Call(string name, params object[] args)
+        {
+            return Bridge.Call(Bridge.Prepare(name), args);
+        }
+    }
 }

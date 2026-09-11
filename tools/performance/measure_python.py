@@ -1,8 +1,9 @@
 """Warm timings of the Python side of the seam, one probe at a time, on inputs built first.
 
-Run with `uv run python tools/performance/measure_python.py`. The clock includes bridge.call
-on Cells already built: type validation, the probe, and result conversion. cells_from_buffers from
-the host's buffers is its own scenario, so what owning a range costs is timed apart. The clock
+Run with `uv run python tools/performance/measure_python.py`. The clock includes each function's
+prepared path, entry(name), held once as the host holds it, on Cells already built: type
+validation, the probe, and result conversion. cells_from_buffers from the host's buffers is its
+own scenario, so what owning a range costs is timed apart. The clock
 excludes the host, Excel, and building the inputs. Each row of python-timing.csv is one batch:
 a calibrated number of calls whose mean is the figure, never a percentile of single calls.
 Results are checked before and after the clock, never inside it. A second, untimed pass
@@ -30,6 +31,9 @@ from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
+
+# Each function's prepared path, fetched once as the host does at registration.
+ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ROOT / "profiles"
@@ -103,10 +107,10 @@ def host_buffers(n: int) -> tuple[int, int]:
 def scenarios() -> list[Scenario]:
     """Every timed case, with its inputs built here, before any clock starts."""
     cases = [
-        Scenario("Zero", "scalar", 0, 1, lambda: bridge.call("Zero", []), equals(0.0)),
-        Scenario("Add", "scalar", 2, 1, lambda: bridge.call("Add", [1.0, 2.0]), equals(3.0)),
+        Scenario("Zero", "scalar", 0, 1, lambda run=ENTRY["Zero"]: run(), equals(0.0)),
+        Scenario("Add", "scalar", 2, 1, lambda run=ENTRY["Add"]: run(1.0, 2.0), equals(3.0)),
         Scenario(
-            "Times", "missing", 1, 1, lambda: bridge.call("Times", [5.0, MISSING]), equals(5.0)
+            "Times", "missing", 1, 1, lambda run=ENTRY["Times"]: run(5.0, MISSING), equals(5.0)
         ),
     ]
     for n in SIZES:
@@ -118,7 +122,7 @@ def scenarios() -> list[Scenario]:
                 "cells in",
                 n,
                 1,
-                lambda c=cells: bridge.call("SumArray", [c]),
+                lambda run=ENTRY["SumArray"], c=cells: run(c),
                 equals(total(n)),
             )
         )
@@ -128,7 +132,7 @@ def scenarios() -> list[Scenario]:
                 "two ranges in",
                 2 * n,
                 1,
-                lambda c=cells, w=weights: bridge.call("Dot", [c, w]),
+                lambda run=ENTRY["Dot"], c=cells, w=weights: run(c, w),
                 equals(total(n)),
             )
         )
@@ -138,7 +142,7 @@ def scenarios() -> list[Scenario]:
                 "round trip",
                 n,
                 n,
-                lambda c=cells: bridge.call("EchoColumn", [c]),
+                lambda run=ENTRY["EchoColumn"], c=cells: run(c),
                 array(n, 1, total(n)),
             )
         )
@@ -148,7 +152,7 @@ def scenarios() -> list[Scenario]:
                 "cells out",
                 2,
                 n,
-                lambda n=n: bridge.call("Grid", [n, 1]),
+                lambda run=ENTRY["Grid"], n=n: run(n, 1),
                 array(n, 1, n * (n + 1) / 2),
             )
         )
@@ -161,7 +165,7 @@ def scenarios() -> list[Scenario]:
                     "one answer per row",
                     n,
                     count,
-                    lambda g=grid: bridge.call("RowSums", [g]),
+                    lambda run=ENTRY["RowSums"], g=grid: run(g),
                     array(count, 1, total(n)),
                 )
             )
@@ -172,7 +176,7 @@ def scenarios() -> list[Scenario]:
                 "owning a range",
                 n,
                 0,
-                lambda k=kinds, m=numbers, n=n: bridge.cells_from_buffers(k, m, n, 1, ""),
+                lambda own=bridge.cells_from_buffers, k=kinds, m=numbers, n=n: own(k, m, n, 1, ""),
                 lambda result: None,
             )
         )
@@ -197,7 +201,7 @@ def scenarios() -> list[Scenario]:
                 "rejected: shape",
                 n,
                 0,
-                lambda: bridge.call("EchoRow", [shape]),
+                lambda run=ENTRY["EchoRow"]: run(shape),
                 equals("#ERROR EchoRow: values is 10000x1 array, expected row of numbers"),
             ),
             Scenario(
@@ -205,7 +209,7 @@ def scenarios() -> list[Scenario]:
                 "rejected: text first",
                 n,
                 0,
-                lambda: bridge.call("SumArray", [first]),
+                lambda run=ENTRY["SumArray"]: run(first),
                 equals("#ERROR SumArray: values cell (1, 1) is text 'x', expected number"),
             ),
             Scenario(
@@ -213,7 +217,7 @@ def scenarios() -> list[Scenario]:
                 "rejected: text last",
                 n,
                 0,
-                lambda: bridge.call("SumArray", [last]),
+                lambda run=ENTRY["SumArray"]: run(last),
                 equals("#ERROR SumArray: values cell (10000, 1) is text 'x', expected number"),
             ),
             Scenario(
@@ -221,7 +225,7 @@ def scenarios() -> list[Scenario]:
                 "rejected: blank deep",
                 n,
                 0,
-                lambda: bridge.call("SumArray", [deep]),
+                lambda run=ENTRY["SumArray"]: run(deep),
                 equals("#ERROR SumArray: values cell (5001, 1) is blank, expected number"),
             ),
         )
@@ -298,9 +302,10 @@ def environment() -> dict[str, object]:
         "batch_target_ms": BATCH_MS,
         "batches": BATCHES,
         "timed_scope": (
-            "bridge.call on Cells built before the clock: validation, the probe, result "
-            "conversion. cells_from_buffers is timed apart. Excludes the host, Excel, and building "
-            "inputs. Each row is one batch; per_call_us is that batch's mean."
+            "Each function's prepared path, entry(name), held once, on Cells built before the "
+            "clock: validation, the probe, result conversion. cells_from_buffers is timed apart. "
+            "Excludes the host, Excel, and building inputs. Each row is one batch; per_call_us is "
+            "that batch's mean."
         ),
         "allocation_scope": (
             "tracemalloc peak of the Python heap during one warm call, numpy data included, "

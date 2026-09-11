@@ -13,6 +13,9 @@ from collections.abc import Callable
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells
 
+# Each function's prepared path, fetched once as the host does at registration.
+ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+
 N = 10_000
 SLACK = 1024  # bytes of small objects a call may make on top of its per-cell temporaries
 
@@ -30,25 +33,25 @@ def peak_bytes(fn: Callable[[], object]) -> int:
 
 
 def test_a_scalar_call_allocates_only_small_objects() -> None:
-    assert peak_bytes(lambda: bridge.call("Add", [1.0, 2.0])) <= SLACK
-    assert peak_bytes(lambda: bridge.call("Zero", [])) <= SLACK
-    assert peak_bytes(lambda: bridge.call("Fail", [])) <= SLACK
+    assert peak_bytes(lambda: ENTRY["Add"](1.0, 2.0)) <= SLACK
+    assert peak_bytes(lambda: ENTRY["Zero"]()) <= SLACK
+    assert peak_bytes(lambda: ENTRY["Fail"]()) <= SLACK
 
 
 # Today the kinds compare against an IntEnum makes numpy build an 8-byte-per-cell temporary
 # before the 1-byte mask; that is the 8 below, and the plain-integer compare lowers it to 1.
 def test_a_range_in_peaks_at_one_temporary_per_cell() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: bridge.call("SumArray", [column])) <= 8 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 8 * N + SLACK
 
 
 def test_a_column_out_adds_no_copy_of_its_own() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: bridge.call("EchoColumn", [column])) <= 8 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["EchoColumn"](column)) <= 8 * N + SLACK
 
 
 def test_a_block_out_peaks_at_the_block_and_its_finite_mask() -> None:
-    assert peak_bytes(lambda: bridge.call("Grid", [N // 2, 2])) <= 9 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
 
 
 def test_owning_a_range_peaks_at_the_two_copies_and_the_text_look() -> None:

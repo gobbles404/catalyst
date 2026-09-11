@@ -25,9 +25,9 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void a_registered_delegate_forwards_its_arguments_by_name()
+        public void a_registered_delegate_forwards_its_arguments_to_the_prepared_path()
         {
-            var add = Registration.MakeDelegate("Add", 2);
+            var add = Registration.MakeDelegate(Bridge.Prepare("Add"), 2);
             Assert.Equal(3.0, add.DynamicInvoke(1.0, 2.0));
         }
 
@@ -35,8 +35,8 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void the_delegate_has_one_parameter_per_declared_argument()
         {
-            Assert.Equal(2, Registration.MakeDelegate("Add", 2).GetType().GetMethod("Invoke").GetParameters().Length);
-            Assert.Empty(Registration.MakeDelegate("Ping", 0).GetType().GetMethod("Invoke").GetParameters());
+            Assert.Equal(2, Registration.MakeDelegate(Bridge.Prepare("Add"), 2).GetType().GetMethod("Invoke").GetParameters().Length);
+            Assert.Empty(Registration.MakeDelegate(Bridge.Prepare("Ping"), 0).GetType().GetMethod("Invoke").GetParameters());
         }
     }
 }

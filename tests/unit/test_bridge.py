@@ -1,6 +1,7 @@
 import ctypes
 
 import numpy as np
+import pytest
 
 from goosedove.excel import bridge
 
@@ -78,3 +79,20 @@ def test_cells_block_with_no_text_has_no_texts() -> None:
     numbers = (ctypes.c_double * 1)(2.0)
     cells = bridge.cells_from_buffers(ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 1, "")
     assert cells.texts == ()
+
+
+def test_entry_is_the_prepared_path_the_host_holds() -> None:
+    add = bridge.entry("Add")
+    assert add(1.0, 2.0) == 3.0
+    assert add(1.0, True) == "#ERROR Add: b is boolean TRUE, expected number"
+    assert add(1.0) == "#ERROR Add: expected 2 arguments, got 1"
+    assert bridge.entry("Fail")() == "#ERROR Fail: ValueError: as asked"
+
+
+def test_entry_of_an_unregistered_name_fails_at_registration_not_at_the_call() -> None:
+    with pytest.raises(KeyError):
+        bridge.entry("NoSuchFunction")
+
+
+def test_call_by_name_is_the_same_path() -> None:
+    assert bridge.call("Add", [1.0, 2.0]) == bridge.entry("Add")(1.0, 2.0)
