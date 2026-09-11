@@ -8,10 +8,11 @@ using Xunit.Abstractions;
 namespace Goosedove.Host.Tests
 {
     /// <summary>
-    /// What the host does for one call, counted at its boundaries: trips into Python, look-ups by
-    /// name, objects built, cells scanned, buffers allocated, copies made. The worksheet path
-    /// passes no counter; these tests supply one. Every dict is today's truth, pinned so a seam
-    /// change states what it moved.
+    /// What the host does for one call, counted at its boundaries: trips into Python, objects
+    /// built, cells scanned, buffers allocated, copies made, and look-ups by name, of which a
+    /// prepared call makes none, so their absence from every dict is asserted too. The worksheet
+    /// path passes no counter; these tests supply one. Every dict is today's truth, pinned so a
+    /// seam change states what it moved.
     /// </summary>
     [Collection("python")]
     public class HostWorkBudgets
@@ -49,9 +50,10 @@ namespace Goosedove.Host.Tests
         /// <summary>One warm call, counted. The first call of a name is not the one measured.</summary>
         private IReadOnlyDictionary<string, long> Counted(object expected, string name, params object[] args)
         {
-            Bridge.Call(name, args);
+            var prepared = Bridge.Prepare(name);
+            Bridge.Call(prepared, args);
             var work = new WorkCounter();
-            Assert.Equal(expected, Bridge.Call(work, name, args));
+            Assert.Equal(expected, Bridge.Call(work, prepared, args));
             var counts = work.Freeze();
             output.WriteLine(name + ": " + string.Join(", ", counts.OrderBy(pair => pair.Key).Select(pair => pair.Key + "=" + pair.Value)));
             return counts;
@@ -66,34 +68,33 @@ namespace Goosedove.Host.Tests
         {
             return new Dictionary<string, long>
             {
-                ["objects_built"] = 7,      // the name, the list, and the five values that carry a range
+                ["objects_built"] = 5,      // the five values that carry a range
                 ["trips"] = 2,              // cells_from_buffers, then the call
-                ["name_lookups"] = 2,
                 ["cells_scanned"] = cells,
                 ["buffers_allocated"] = 2,  // kinds and numbers
                 ["buffer_bytes"] = 9L * cells,
             };
         }
 
+        // The path is prepared at registration, so a call looks nothing up by name and builds only
+        // what carries its own arguments.
         [Fact]
-        public void a_scalar_call_is_one_trip_and_four_objects()
+        public void a_scalar_call_is_one_trip_and_two_objects()
         {
             Same(new Dictionary<string, long>
             {
-                ["objects_built"] = 4,  // the name, the list, two numbers
+                ["objects_built"] = 2,  // two numbers
                 ["trips"] = 1,
-                ["name_lookups"] = 1,
             }, Counted(3.0, "Add", 1.0, 2.0));
         }
 
         [Fact]
-        public void an_omitted_argument_is_looked_up_by_name()
+        public void an_omitted_argument_is_carried_by_the_missing_held_since_start()
         {
             Same(new Dictionary<string, long>
             {
-                ["objects_built"] = 4,
+                ["objects_built"] = 1,  // the number; MISSING is neither built nor looked up
                 ["trips"] = 1,
-                ["name_lookups"] = 2,  // MISSING, then the call
             }, Counted(5.0, "Times", 5.0, ExcelMissing.Value));
         }
 
@@ -131,8 +132,7 @@ namespace Goosedove.Host.Tests
             column[4, 0] = ExcelError.ExcelErrorNA;
             Same(new Dictionary<string, long>
             {
-                ["objects_built"] = 2,       // the name and the list, before any argument
-                ["cells_scanned"] = 5,
+                ["cells_scanned"] = 5,       // nothing is built before the first argument is read
                 ["buffers_allocated"] = 2,   // allocated before the scan, and wasted
                 ["buffer_bytes"] = 90000,
             }, Counted(ExcelError.ExcelErrorNA, "SumArray", column));
@@ -142,9 +142,10 @@ namespace Goosedove.Host.Tests
         // arrays are checked by shape here.
         private IReadOnlyDictionary<string, long> CountedBlock(string name, int rows, int cols, params object[] args)
         {
-            Bridge.Call(name, args);
+            var prepared = Bridge.Prepare(name);
+            Bridge.Call(prepared, args);
             var work = new WorkCounter();
-            var array = Assert.IsType<double[,]>(Bridge.Call(work, name, args));
+            var array = Assert.IsType<double[,]>(Bridge.Call(work, prepared, args));
             Assert.Equal(rows, array.GetLength(0));
             Assert.Equal(cols, array.GetLength(1));
             var counts = work.Freeze();
@@ -157,9 +158,8 @@ namespace Goosedove.Host.Tests
         {
             Same(new Dictionary<string, long>
             {
-                ["objects_built"] = 4,
+                ["objects_built"] = 2,       // two numbers
                 ["trips"] = 1,
-                ["name_lookups"] = 1,
                 ["buffers_allocated"] = 2,   // doubles[], then double[,]
                 ["buffer_bytes"] = 160000,   // 8 bytes per cell, twice
                 ["result_copies"] = 2,
@@ -197,22 +197,23 @@ namespace Goosedove.Host.Tests
             return bytes;
         }
 
-        // Measured 440 bytes on 2026-09-11 in Release: the name string, the argument list, two
-        // Python floats, the result, the boxed double, the argument array and the pythonnet wrappers.
+        // Measured 312 bytes on 2026-09-11 in Release, down from 440 when the path was looked up
+        // by name on every call: two Python floats, the result, the boxed double, the argument
+        // arrays and the pythonnet wrappers. The name string and the argument list are gone.
         [Fact]
-        public void a_registered_scalar_call_allocates_under_512_managed_bytes()
+        public void a_registered_scalar_call_allocates_under_384_managed_bytes()
         {
-            var add = (Func<object, object, object>)Registration.MakeDelegate("Add", 2);
+            var add = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Add"), 2);
             object first = 1.0, second = 2.0;  // Excel hands over boxed numbers
             var bytes = BytesPerCall(() => add(first, second), 10000);
             output.WriteLine("managed bytes per warm Add: " + bytes);
-            Assert.InRange(bytes, 0, 512);
+            Assert.InRange(bytes, 0, 384);
         }
 
         [Fact]
         public void a_range_in_allocates_nine_bytes_per_cell_and_nothing_else()
         {
-            var sum = (Func<object, object>)Registration.MakeDelegate("SumArray", 1);
+            var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
             object small = Column(1000), large = Column(10000);
             var slope = (BytesPerCall(() => sum(large), 20) - BytesPerCall(() => sum(small), 20)) / 9000;
             output.WriteLine("managed bytes per added input cell: " + slope);
@@ -222,7 +223,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_block_out_allocates_sixteen_bytes_per_cell_and_nothing_else()
         {
-            var grid = (Func<object, object, object>)Registration.MakeDelegate("Grid", 2);
+            var grid = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Grid"), 2);
             object one = 1.0, small = 1000.0, large = 10000.0;
             var slope = (BytesPerCall(() => grid(large, one), 20) - BytesPerCall(() => grid(small, one), 20)) / 9000;
             output.WriteLine("managed bytes per added output cell: " + slope);

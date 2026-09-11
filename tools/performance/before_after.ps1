@@ -75,7 +75,10 @@ try {
         $to = $pair[1]
         if (Test-Path $to) { Remove-Item -Recurse -Force $to }
         New-Item -ItemType Directory -Force -Path $to | Out-Null
-        Get-ChildItem $from -File | Where-Object { $_.Extension -in ".csv", ".json" } | Copy-Item -Destination $to
+        # Only what this run's runners wrote; a control run's files left in profiles/ stay out.
+        foreach ($name in "python-timing.csv", "python-allocation.csv", "python-environment.json", "excel-timing.csv", "excel-timing-environment.json") {
+            if (Test-Path (Join-Path $from $name)) { Copy-Item (Join-Path $from $name) $to }
+        }
         if (Test-Path (Join-Path $from "host-measure")) { Copy-Item -Recurse (Join-Path $from "host-measure") $to }
     }
     Invoke-Runner "compare" { & uv run python tools/performance/compare.py $before $after --before-label $beforeLabel --after-label $afterLabel } $root

@@ -59,20 +59,20 @@ namespace Goosedove.Host.Tests
         [MemberData(nameof(SmokeRows))]
         public void the_smoke_rows_hold(string name, object[] args, object shown)
         {
-            Assert.Equal(shown, Bridge.Call(name, args));
+            Assert.Equal(shown, Seam.Call(name, args));
         }
 
         [Fact]
         public void ping_says_which_goosedove_is_running()
         {
-            Assert.Contains("goosedove", (string)Bridge.Call("Ping"));
+            Assert.Contains("goosedove", (string)Seam.Call("Ping"));
         }
 
         // Arrays come back as plain doubles: no boxing, and no NaN, because the seam fails the call first.
         [Fact]
         public void a_grid_result_counts_across_then_down()
         {
-            var array = (double[,])Bridge.Call("Grid", 2.0, 3.0);
+            var array = (double[,])Seam.Call("Grid", 2.0, 3.0);
             Assert.Equal(2, array.GetLength(0));
             Assert.Equal(3, array.GetLength(1));
             Assert.Equal(1.0, array[0, 0]);
@@ -83,7 +83,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_column_result_spills_down()
         {
-            var array = (double[,])Bridge.Call("EchoColumn", Column(1.0, 2.0, 3.0));
+            var array = (double[,])Seam.Call("EchoColumn", Column(1.0, 2.0, 3.0));
             Assert.Equal(3, array.GetLength(0));
             Assert.Equal(1, array.GetLength(1));
             Assert.Equal(3.0, array[2, 0]);
@@ -92,7 +92,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_row_result_spills_across()
         {
-            var array = (double[,])Bridge.Call("EchoRow", Row(1.0, 2.0, 3.0));
+            var array = (double[,])Seam.Call("EchoRow", Row(1.0, 2.0, 3.0));
             Assert.Equal(1, array.GetLength(0));
             Assert.Equal(3, array.GetLength(1));
             Assert.Equal(3.0, array[0, 2]);
@@ -101,7 +101,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_single_cell_is_a_column_of_one()
         {
-            var array = (double[,])Bridge.Call("EchoColumn", 5.0);
+            var array = (double[,])Seam.Call("EchoColumn", 5.0);
             Assert.Equal(1, array.GetLength(0));
             Assert.Equal(1, array.GetLength(1));
             Assert.Equal(5.0, array[0, 0]);
@@ -111,7 +111,7 @@ namespace Goosedove.Host.Tests
         public void a_grid_in_gives_one_number_per_row_out()
         {
             var grid = new object[,] { { 1.0, 2.0 }, { 3.0, 4.0 }, { 5.0, 6.0 } };
-            var array = (double[,])Bridge.Call("RowSums", grid);
+            var array = (double[,])Seam.Call("RowSums", grid);
             Assert.Equal(3, array.GetLength(0));
             Assert.Equal(1, array.GetLength(1));
             Assert.Equal(7.0, array[1, 0]);

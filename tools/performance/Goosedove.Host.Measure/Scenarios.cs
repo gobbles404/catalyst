@@ -12,15 +12,16 @@ namespace Goosedove.Host.Measure
 
         internal static void Run(Measurements measurements)
         {
-            var zero = (Func<object>)Registration.MakeDelegate("Zero", 0);
-            var add = (Func<object, object, object>)Registration.MakeDelegate("Add", 2);
-            var times = (Func<object, object, object>)Registration.MakeDelegate("Times", 2);
-            var dot = (Func<object, object, object>)Registration.MakeDelegate("Dot", 2);
-            var sum = (Func<object, object>)Registration.MakeDelegate("SumArray", 1);
-            var echoColumn = (Func<object, object>)Registration.MakeDelegate("EchoColumn", 1);
-            var echoRow = (Func<object, object>)Registration.MakeDelegate("EchoRow", 1);
-            var rowSums = (Func<object, object>)Registration.MakeDelegate("RowSums", 1);
-            var grid = (Func<object, object, object>)Registration.MakeDelegate("Grid", 2);
+            var zero = (Func<object>)Registration.MakeDelegate(Bridge.Prepare("Zero"), 0);
+            var add = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Add"), 2);
+            var times = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Times"), 2);
+            var dot = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Dot"), 2);
+            var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
+            var echoColumn = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoColumn"), 1);
+            var echoRow = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoRow"), 1);
+            var rowSums = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("RowSums"), 1);
+            var grid = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Grid"), 2);
+            var gridPath = Bridge.Prepare("Grid");
             object one = 1.0, two = 2.0, five = 5.0, missing = ExcelMissing.Value;
 
             measurements.Run("Zero", "scalar", 0, 1, () => zero(), Equal(0.0), Counted("Zero"));
@@ -45,24 +46,22 @@ namespace Goosedove.Host.Measure
                 }
 
                 // The way in alone: scan, pin, hand over, own. The GIL is held outside the clock.
+                // The stage rows are named for the stage, not the method, so a rename never splits
+                // their history.
                 using (Py.GIL())
                 {
-                    measurements.Run("Marshal.Append", "way in alone", n, 0,
-                        () => { using (var args = new PyList()) { return Marshal.Append(args, column); } },
+                    measurements.Run("way in", "alone", n, 0,
+                        () => { object error; Marshal.Release(Marshal.ToPython(column, out error)); return error; },
                         Equal(null),
-                        () => { var work = new WorkCounter(); using (var args = new PyList()) { Marshal.Append(args, column, work); } return work.Freeze(); });
+                        () => { var work = new WorkCounter(); object error; Marshal.Release(Marshal.ToPython(column, out error, work)); return work.Freeze(); });
 
                     // The way out alone: an array Python already holds, read into double[,].
-                    using (var name = new PyString("Grid"))
-                    using (var args = new PyList())
                     using (var pyRows = new PyInt(n))
                     using (var pyCols = new PyInt(1))
                     {
-                        args.Append(pyRows);
-                        args.Append(pyCols);
-                        using (var array = Bridge.Module.InvokeMethod("call", name, args))
+                        using (var array = gridPath.Entry.Invoke(pyRows, pyCols))
                         {
-                            measurements.Run("Marshal.FromPython", "way out alone", 0, n,
+                            measurements.Run("way out", "alone", 0, n,
                                 () => Marshal.FromPython(array, "Grid"),
                                 ArrayOf(n, 1, counted),
                                 () => { var work = new WorkCounter(); Marshal.FromPython(array, "Grid", work); return work.Freeze(); });
@@ -99,10 +98,11 @@ namespace Goosedove.Host.Measure
 
         private static Func<IReadOnlyDictionary<string, long>> Counted(string name, params object[] args)
         {
+            var prepared = Bridge.Prepare(name);
             return () =>
             {
                 var work = new WorkCounter();
-                Bridge.Call(work, name, args);
+                Bridge.Call(work, prepared, args);
                 return work.Freeze();
             };
         }

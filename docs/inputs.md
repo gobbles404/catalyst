@@ -32,7 +32,7 @@ Everything in both tables was checked against the Excel-DNA source at the pinned
 
 ## Type validation
 
-One place checks: `call` in `bridge.py`, before the function runs. It validates the type of every argument against the function's signature and hands the library the typed value: a date from a serial, a plain list from a column, never the raw cell. The seam validates type; the library validates meaning. Nothing else in the package checks a kind or a shape.
+One place checks: the prepared path, `Registered.run` in `bridge.py`, which the host fetches once per function at registration with `entry`, and `call` reaches by name. It checks before the function runs. It validates the type of every argument against the function's signature and hands the library the typed value: a date from a serial, a plain list from a column, never the raw cell. The seam validates type; the library validates meaning. Nothing else in the package checks a kind or a shape.
 
 The declaration is the function's own signature.
 

@@ -34,11 +34,18 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>The one place C# talks to Python: hand a name and arguments to bridge.call.</summary>
+    /// <summary>
+    /// The one place C# talks to Python. Each function's path is prepared once, at registration:
+    /// the seam's entry for it, fetched by name and kept with the registered delegate. A call
+    /// hands that entry the arguments and nothing else. What every call shares, MISSING and the
+    /// range builder, is fetched once at start.
+    /// </summary>
     internal static class Bridge
     {
         public static PyObject Module;
         public static PyObject BoolType;
+        public static PyObject Missing;
+        public static PyObject CellsFromBuffers;
         public static string StartupError;
 
         /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
@@ -55,6 +62,8 @@ namespace Goosedove.Host
                     sys.path.insert(0, pythonPath[i].Trim());
                 }
                 Module = Py.Import("goosedove.excel.bridge");
+                Missing = Module.GetAttr("MISSING");
+                CellsFromBuffers = Module.GetAttr("cells_from_buffers");
                 using (var builtins = Py.Import("builtins"))
                 {
                     BoolType = builtins.GetAttr("bool");
@@ -62,14 +71,24 @@ namespace Goosedove.Host
             }
         }
 
-        /// <summary>The worksheet path: what every registered delegate calls, with no counter.</summary>
-        public static object Call(string name, params object[] args)
+        /// <summary>A function's prepared path, fetched from the seam once, by name, at registration.</summary>
+        public static Prepared Prepare(string name)
         {
-            return Call(null, name, args);
+            using (Py.GIL())
+            using (var pyName = new PyString(name))
+            {
+                return new Prepared(name, Module.InvokeMethod("entry", pyName));
+            }
+        }
+
+        /// <summary>The worksheet path: what every registered delegate calls, with no counter.</summary>
+        public static object Call(Prepared prepared, params object[] args)
+        {
+            return Call(null, prepared, args);
         }
 
         /// <summary>The same call, reporting what it did to the observer's counter.</summary>
-        internal static object Call(WorkCounter work, string name, params object[] args)
+        internal static object Call(WorkCounter work, Prepared prepared, params object[] args)
         {
             if (Module == null)
             {
@@ -79,25 +98,31 @@ namespace Goosedove.Host
             {
                 using (Py.GIL())
                 {
-                    using (var pyName = new PyString(name))
-                    using (var pyArgs = new PyList())
+                    var pyArgs = new PyObject[args.Length];
+                    try
                     {
-                        work?.Hit("objects_built", 2);
-                        foreach (var arg in args)
+                        for (var i = 0; i < args.Length; i++)
                         {
                             // An Excel error in any argument is the result, unchanged. Excel's own
                             // functions do the same, and it keeps an error from pricing as a blank.
-                            var inputError = Marshal.Append(pyArgs, arg, work);
+                            object inputError;
+                            pyArgs[i] = Marshal.ToPython(args[i], out inputError, work);
                             if (inputError != null)
                             {
                                 return inputError;
                             }
                         }
                         work?.Hit("trips");
-                        work?.Hit("name_lookups");
-                        using (var result = Module.InvokeMethod("call", pyName, pyArgs))
+                        using (var result = prepared.Entry.Invoke(pyArgs))
                         {
-                            return Marshal.FromPython(result, name, work);
+                            return Marshal.FromPython(result, prepared.Name, work);
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var arg in pyArgs)
+                        {
+                            Marshal.Release(arg);
                         }
                     }
                 }
@@ -109,50 +134,50 @@ namespace Goosedove.Host
         }
     }
 
+    /// <summary>One registered function's prepared path: its name, for messages, and the seam's entry for it.</summary>
+    internal sealed class Prepared
+    {
+        public readonly string Name;
+        public readonly PyObject Entry;
+
+        public Prepared(string name, PyObject entry)
+        {
+            Name = name;
+            Entry = entry;
+        }
+    }
+
     /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells; a result read by its type, never asked about.</summary>
     internal static class Marshal
     {
-        /// <summary>Appends one argument to the call. Returns the Excel error it holds, if any, and then appends nothing.</summary>
-        public static object Append(PyList args, object value, WorkCounter work = null)
+        /// <summary>One argument as Python sees it, or null with the Excel error it holds. Release it with Release.</summary>
+        public static PyObject ToPython(object value, out object error, WorkCounter work = null)
         {
+            error = null;
             if (value is ExcelError)
             {
-                return value;
+                error = value;
+                return null;
             }
             if (value is object[,] rect)
             {
-                object error;
-                var range = Range(rect, out error, work);
-                if (error != null)
-                {
-                    return error;
-                }
-                using (range)
-                {
-                    args.Append(range);
-                }
-                return null;
-            }
-            work?.Hit("objects_built");
-            using (var scalar = Scalar(value, work))
-            {
-                args.Append(scalar);
-            }
-            return null;
-        }
-
-        private static PyObject Scalar(object value, WorkCounter work)
-        {
-            if (value == null || value is ExcelEmpty)
-            {
-                return PyObject.None;
+                return Range(rect, out error, work);
             }
             if (value is ExcelMissing)
             {
-                work?.Hit("name_lookups");
-                return Bridge.Module.GetAttr("MISSING");
+                return Bridge.Missing;  // held since start: never built, never released
             }
-            return value.ToPython();
+            work?.Hit("objects_built");
+            return value == null || value is ExcelEmpty ? PyObject.None : value.ToPython();
+        }
+
+        /// <summary>Lets go of whatever ToPython returned: a built value is disposed, the shared MISSING and a null stay.</summary>
+        public static void Release(PyObject value)
+        {
+            if (value != null && !ReferenceEquals(value, Bridge.Missing))
+            {
+                value.Dispose();
+            }
         }
 
         // The codes of the seam's Kind enum.
@@ -280,8 +305,7 @@ namespace Goosedove.Host
                 {
                     work?.Hit("objects_built", 5);
                     work?.Hit("trips");
-                    work?.Hit("name_lookups");
-                    return Bridge.Module.InvokeMethod("cells_from_buffers", pyKinds, pyNumbers, pyRows, pyCols, pyText);
+                    return Bridge.CellsFromBuffers.Invoke(pyKinds, pyNumbers, pyRows, pyCols, pyText);
                 }
             }
             finally
@@ -315,7 +339,7 @@ namespace Goosedove.Host
                     }
                     var hidden = spec[3].As<bool>();
 
-                    delegates.Add(MakeDelegate(name, parameters.Count));
+                    delegates.Add(MakeDelegate(Bridge.Prepare(name), parameters.Count));
                     attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description, IsHidden = hidden });
                     var args = new List<object>();
                     foreach (var p in parameters)
@@ -329,9 +353,9 @@ namespace Goosedove.Host
             ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
         }
 
-        // Excel-DNA needs a delegate with one typed parameter per argument.
-        // Build one that packs its arguments into an array and forwards by name.
-        internal static Delegate MakeDelegate(string name, int parameterCount)
+        // Excel-DNA needs a delegate with one typed parameter per argument. Build one that packs
+        // its arguments into an array and hands them to the function's prepared path.
+        internal static Delegate MakeDelegate(Prepared prepared, int parameterCount)
         {
             var parameters = new ParameterExpression[parameterCount];
             for (var i = 0; i < parameterCount; i++)
@@ -339,8 +363,8 @@ namespace Goosedove.Host
                 parameters[i] = Expression.Parameter(typeof(object), "arg" + i);
             }
             var call = Expression.Call(
-                typeof(Bridge).GetMethod(nameof(Bridge.Call), new[] { typeof(string), typeof(object[]) }),
-                Expression.Constant(name),
+                typeof(Bridge).GetMethod(nameof(Bridge.Call), new[] { typeof(Prepared), typeof(object[]) }),
+                Expression.Constant(prepared),
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(call, parameters).Compile();
         }

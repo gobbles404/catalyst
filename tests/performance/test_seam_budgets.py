@@ -29,10 +29,15 @@ def FirstOfNames(names: TextColumn) -> str:
     return names[0]
 
 
+# Each registered function's prepared path, fetched once as the host does at registration; the
+# three test-only functions above are registered at import, so they are in it too.
+PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+
+
 def test_accepted_scalar_call_itemized(call_profile: CallProfile) -> None:
-    bridge.call("Add", [1.0, 2.0])
-    assert call_profile(lambda: bridge.call("Add", [1.0, 2.0])) == {
-        "call": 1,
+    PATH["Add"](1.0, 2.0)
+    assert call_profile(lambda: PATH["Add"](1.0, 2.0)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
         "_number": 2,
@@ -43,8 +48,8 @@ def test_accepted_scalar_call_itemized(call_profile: CallProfile) -> None:
 
 
 def test_rejected_scalar_call_stops_at_the_first_failure(call_profile: CallProfile) -> None:
-    assert call_profile(lambda: bridge.call("Add", ["x", 2.0])) == {
-        "call": 1,
+    assert call_profile(lambda: PATH["Add"]("x", 2.0)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_number": 1,
@@ -56,9 +61,9 @@ def test_rejected_scalar_call_stops_at_the_first_failure(call_profile: CallProfi
 # Every range is one vectorized look, however many cells it holds and whatever they hold.
 def test_accepted_array_call_itemized(call_profile: CallProfile) -> None:
     column = Cells.from_rows([[float(i)] for i in range(10_000)])
-    bridge.call("SumArray", [column])
-    assert call_profile(lambda: bridge.call("SumArray", [column])) == {
-        "call": 1,
+    PATH["SumArray"](column)
+    assert call_profile(lambda: PATH["SumArray"](column)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_numbers": 1,
@@ -70,9 +75,9 @@ def test_accepted_array_call_itemized(call_profile: CallProfile) -> None:
 
 def test_accepted_column_call_itemized(call_profile: CallProfile) -> None:
     column = Cells.from_rows([[float(i)] for i in range(10_000)])
-    bridge.call("FirstOfNumbers", [column])
-    assert call_profile(lambda: bridge.call("FirstOfNumbers", [column])) == {
-        "call": 1,
+    PATH["FirstOfNumbers"](column)
+    assert call_profile(lambda: PATH["FirstOfNumbers"](column)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_column": 1,
@@ -86,9 +91,9 @@ def test_accepted_column_call_itemized(call_profile: CallProfile) -> None:
 
 def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
     column = Cells.from_rows([[float(61 + i)] for i in range(10_000)])
-    bridge.call("FirstOfDates", [column])
-    assert call_profile(lambda: bridge.call("FirstOfDates", [column])) == {
-        "call": 1,
+    PATH["FirstOfDates"](column)
+    assert call_profile(lambda: PATH["FirstOfDates"](column)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_date_column": 1,
@@ -102,9 +107,9 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
 
 def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
     names = Cells.from_rows([[f"name{i}"] for i in range(10_000)])
-    bridge.call("FirstOfNames", [names])
-    assert call_profile(lambda: bridge.call("FirstOfNames", [names])) == {
-        "call": 1,
+    PATH["FirstOfNames"](names)
+    assert call_profile(lambda: PATH["FirstOfNames"](names)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_text_column": 1,
@@ -118,7 +123,7 @@ def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
 
 # A bad cell deep inside a range is found and named without a walk, whatever it holds.
 REJECTED_DEEP = {
-    "call": 1,
+    "Registered.run": 1,
     "_arguments": 1,
     "_validate": 1,
     "_numbers": 1,
@@ -133,14 +138,14 @@ def test_blank_deep_in_a_column_is_named_without_a_walk(call_profile: CallProfil
     rows: list[list[object]] = [[float(i)] for i in range(10_000)]
     rows[5_000][0] = None
     column = Cells.from_rows(rows)
-    assert call_profile(lambda: bridge.call("SumArray", [column])) == REJECTED_DEEP
+    assert call_profile(lambda: PATH["SumArray"](column)) == REJECTED_DEEP
 
 
 def test_text_deep_in_a_column_is_named_without_a_walk(call_profile: CallProfile) -> None:
     rows: list[list[object]] = [[float(i)] for i in range(10_000)]
     rows[5_000][0] = "n/a"
     column = Cells.from_rows(rows)
-    assert call_profile(lambda: bridge.call("SumArray", [column])) == REJECTED_DEEP
+    assert call_profile(lambda: PATH["SumArray"](column)) == REJECTED_DEEP
 
 
 # --- every probe, itemized on both ledgers ------------------------------------
@@ -165,9 +170,9 @@ def grid() -> Cells:
 
 
 def test_zero_is_the_floor_of_one_call(call_profile: CallProfile) -> None:
-    bridge.call("Zero", [])
-    assert call_profile(lambda: bridge.call("Zero", [])) == {
-        "call": 1,
+    PATH["Zero"]()
+    assert call_profile(lambda: PATH["Zero"]()) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "Zero": 1,
         "_number_out": 1,
@@ -176,9 +181,9 @@ def test_zero_is_the_floor_of_one_call(call_profile: CallProfile) -> None:
 
 
 def test_a_missing_argument_takes_its_default_without_a_look(call_profile: CallProfile) -> None:
-    bridge.call("Times", [5.0, MISSING])
-    assert call_profile(lambda: bridge.call("Times", [5.0, MISSING])) == {
-        "call": 1,
+    PATH["Times"](5.0, MISSING)
+    assert call_profile(lambda: PATH["Times"](5.0, MISSING)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
         "_number": 1,
@@ -189,9 +194,9 @@ def test_a_missing_argument_takes_its_default_without_a_look(call_profile: CallP
 
 
 def test_text_in_and_out_itemized(call_profile: CallProfile) -> None:
-    bridge.call("EchoText", ["WTI"])
-    assert call_profile(lambda: bridge.call("EchoText", ["WTI"])) == {
-        "call": 1,
+    PATH["EchoText"]("WTI")
+    assert call_profile(lambda: PATH["EchoText"]("WTI")) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_text": 1,
@@ -202,9 +207,9 @@ def test_text_in_and_out_itemized(call_profile: CallProfile) -> None:
 
 
 def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
-    bridge.call("EchoBoolean", [True])
-    assert call_profile(lambda: bridge.call("EchoBoolean", [True])) == {
-        "call": 1,
+    PATH["EchoBoolean"](True)
+    assert call_profile(lambda: PATH["EchoBoolean"](True)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_boolean": 1,
@@ -215,9 +220,9 @@ def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
 
 
 def test_a_failing_body_costs_no_look(call_profile: CallProfile) -> None:
-    bridge.call("Fail", [])
-    assert call_profile(lambda: bridge.call("Fail", [])) == {
-        "call": 1,
+    PATH["Fail"]()
+    assert call_profile(lambda: PATH["Fail"]()) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "Fail": 1,
     }
@@ -225,9 +230,9 @@ def test_a_failing_body_costs_no_look(call_profile: CallProfile) -> None:
 
 def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     a, b = column(), column()
-    bridge.call("Dot", [a, b])
-    assert call_profile(lambda: bridge.call("Dot", [a, b])) == {
-        "call": 1,
+    PATH["Dot"](a, b)
+    assert call_profile(lambda: PATH["Dot"](a, b)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
         "_column": 2,
@@ -238,7 +243,7 @@ def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallPr
         "_number_out": 1,
         "_scalar": 1,
     }
-    assert numpy_calls(lambda: bridge.call("Dot", [a, b])) == {
+    assert numpy_calls(lambda: PATH["Dot"](a, b)) == {
         "ndarray.any": 2,
         "ufunc.reduce": 2,
     }
@@ -246,8 +251,8 @@ def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallPr
 
 def test_a_sum_is_one_look_and_one_reduction(numpy_calls: CallProfile) -> None:
     values = column()
-    bridge.call("SumArray", [values])
-    assert numpy_calls(lambda: bridge.call("SumArray", [values])) == {
+    PATH["SumArray"](values)
+    assert numpy_calls(lambda: PATH["SumArray"](values)) == {
         "ndarray.any": 1,
         "ndarray.sum": 1,
         "ufunc.reduce": 2,
@@ -256,9 +261,9 @@ def test_a_sum_is_one_look_and_one_reduction(numpy_calls: CallProfile) -> None:
 
 def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     values = column()
-    bridge.call("EchoColumn", [values])
-    assert call_profile(lambda: bridge.call("EchoColumn", [values])) == {
-        "call": 1,
+    PATH["EchoColumn"](values)
+    assert call_profile(lambda: PATH["EchoColumn"](values)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_column": 1,
@@ -271,7 +276,7 @@ def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: Cal
         "_finite": 1,
     }
     # One look in (any), one look out (all); ascontiguousarray hands back the same array.
-    assert numpy_calls(lambda: bridge.call("EchoColumn", [values])) == {
+    assert numpy_calls(lambda: PATH["EchoColumn"](values)) == {
         "ndarray.any": 1,
         "ndarray.all": 1,
         "ndarray.reshape": 1,
@@ -284,9 +289,9 @@ def test_a_row_out_costs_what_a_column_out_costs(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     values = row()
-    bridge.call("EchoRow", [values])
-    assert call_profile(lambda: bridge.call("EchoRow", [values])) == {
-        "call": 1,
+    PATH["EchoRow"](values)
+    assert call_profile(lambda: PATH["EchoRow"](values)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_row": 1,
@@ -298,7 +303,7 @@ def test_a_row_out_costs_what_a_column_out_costs(
         "_dimensions": 1,
         "_finite": 1,
     }
-    assert numpy_calls(lambda: bridge.call("EchoRow", [values])) == {
+    assert numpy_calls(lambda: PATH["EchoRow"](values)) == {
         "ndarray.any": 1,
         "ndarray.all": 1,
         "ndarray.reshape": 1,
@@ -309,9 +314,9 @@ def test_a_row_out_costs_what_a_column_out_costs(
 
 def test_one_answer_per_row_itemized(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     values = grid()
-    bridge.call("RowSums", [values])
-    assert call_profile(lambda: bridge.call("RowSums", [values])) == {
-        "call": 1,
+    PATH["RowSums"](values)
+    assert call_profile(lambda: PATH["RowSums"](values)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_numbers": 1,
@@ -320,7 +325,7 @@ def test_one_answer_per_row_itemized(call_profile: CallProfile, numpy_calls: Cal
         "_dimensions": 1,
         "_finite": 1,
     }
-    assert numpy_calls(lambda: bridge.call("RowSums", [values])) == {
+    assert numpy_calls(lambda: PATH["RowSums"](values)) == {
         "ndarray.any": 1,
         "ndarray.sum": 1,
         "ndarray.all": 1,
@@ -333,9 +338,9 @@ def test_one_answer_per_row_itemized(call_profile: CallProfile, numpy_calls: Cal
 def test_a_block_out_from_nothing_in_itemized(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    bridge.call("Grid", [5000, 2])
-    assert call_profile(lambda: bridge.call("Grid", [5000, 2])) == {
-        "call": 1,
+    PATH["Grid"](5000, 2)
+    assert call_profile(lambda: PATH["Grid"](5000, 2)) == {
+        "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
         "_whole": 2,
@@ -345,7 +350,7 @@ def test_a_block_out_from_nothing_in_itemized(
         "_dimensions": 1,
         "_finite": 1,
     }
-    assert numpy_calls(lambda: bridge.call("Grid", [5000, 2])) == {
+    assert numpy_calls(lambda: PATH["Grid"](5000, 2)) == {
         "numpy.arange": 1,
         "ndarray.reshape": 1,
         "numpy.ascontiguousarray": 1,

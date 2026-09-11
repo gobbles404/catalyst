@@ -23,15 +23,15 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 
 ## Counts, as tests
 
-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `call`, `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.any`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.any`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
 
 **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
 
 | Counter | What the host did |
 |---|---|
-| `trips` | calls into Python: the seam's `call`, and `cells_from_buffers` once per range |
-| `name_lookups` | Python attributes fetched by their text name |
-| `objects_built` | Python objects the host made: the name, the argument list, each scalar, the five values that carry a range |
+| `trips` | calls into Python: the function's prepared path, and `cells_from_buffers` once per range |
+| `name_lookups` | Python attributes fetched by their text name; a prepared call makes none |
+| `objects_built` | Python objects the host made: each scalar, the five values that carry a range |
 | `cells_scanned` | cells visited by the range loop, the Excel error that stopped it included |
 | `text_cells` | text cells collected in that loop |
 | `buffers_allocated`, `buffer_bytes` | managed arrays made for a range in or an array out, and their payload bytes |
@@ -49,8 +49,8 @@ Each runner warms once, checks the answer, calibrates the number of calls until 
 
 | Command | Clock | Includes | Leaves out |
 |---|---|---|---|
-| `uv run python tools/performance/measure_python.py` | `bridge.call` on `Cells` built before the clock | validation, the probe, result conversion; `cells_from_buffers` from buffers as its own scenario | the host, Excel, building the inputs |
-| `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus `Marshal.Append` alone and `Marshal.FromPython` alone with the GIL held outside the clock | Excel and Excel-DNA |
+| `uv run python tools/performance/measure_python.py` | each function's prepared path, held once, on `Cells` built before the clock | validation, the probe, result conversion; `cells_from_buffers` from buffers as its own scenario | the host, Excel, building the inputs |
+| `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus two stage rows, `way in` (`Marshal.ToPython` alone) and `way out` (`Marshal.FromPython` alone), with the GIL held outside the clock | Excel and Excel-DNA |
 | `.\tools\performance\measure_excel.ps1` | `Range.Calculate` or `Application.Calculate` over COM in a hidden Excel | everything a user feels: Excel, Excel-DNA, the host, Python, and the COM round trips | startup, building the sheets, checking answers |
 | `uv run python tools/performance/summarize.py` | none | reads whatever CSVs exist under `profiles/` and writes `profiles/summary.md`, one table, a column per layer | |
 | `.\tools\performance\before_after.ps1` | the three runners above, on the base of the change and on this tree, one runner at a time on each | every row of every layer, side by side, in `profiles/compare.md` | nothing; a row that moved where the change did not aim is the finding |
