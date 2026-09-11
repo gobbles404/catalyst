@@ -120,7 +120,7 @@ def test_accepted_scalar(function: str, value: object, sent: object) -> None:
         ("OutDateRow", days("2026-05-22", "2026-05-23"), [[46164.0, 46165.0]]),
     ],
 )
-def test_accepted_block(function: str, value: object, sent: list[list[float]]) -> None:
+def test_accepted_array(function: str, value: object, sent: list[list[float]]) -> None:
     result = out(function, value)
     assert isinstance(result, np.ndarray)
     array = cast(NDArray[Any], result)

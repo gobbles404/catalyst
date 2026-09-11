@@ -68,7 +68,7 @@ namespace Goosedove.Host.Tests
         {
             return new Dictionary<string, long>
             {
-                ["objects_built"] = 5,      // the five values that carry a range
+                ["objects_built"] = 6,      // the six values that carry a range, the kinds seen among them
                 ["trips"] = 2,              // cells_from_buffers, then the call
                 ["cells_scanned"] = cells,
                 ["buffers_allocated"] = 2,  // kinds and numbers
@@ -140,7 +140,7 @@ namespace Goosedove.Host.Tests
 
         // Counted() compares the result with Assert.Equal, which a fresh double[,] never satisfies;
         // arrays are checked by shape here.
-        private IReadOnlyDictionary<string, long> CountedBlock(string name, int rows, int cols, params object[] args)
+        private IReadOnlyDictionary<string, long> CountedArray(string name, int rows, int cols, params object[] args)
         {
             var prepared = Bridge.Prepare(name);
             Bridge.Call(prepared, args);
@@ -154,7 +154,7 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void a_block_out_from_nothing_in_is_two_buffers_and_two_copies()
+        public void an_array_out_from_nothing_in_is_two_buffers_and_two_copies()
         {
             Same(new Dictionary<string, long>
             {
@@ -164,18 +164,18 @@ namespace Goosedove.Host.Tests
                 ["buffer_bytes"] = 160000,   // 8 bytes per cell, twice
                 ["result_copies"] = 2,
                 ["result_cells"] = 10000,
-            }, CountedBlock("Grid", 100, 100, 100.0, 100.0));
+            }, CountedArray("Grid", 100, 100, 100.0, 100.0));
         }
 
         [Fact]
-        public void one_answer_per_row_pays_a_range_in_and_a_block_out()
+        public void one_answer_per_row_pays_a_range_in_and_an_array_out()
         {
             var expected = RangeIn(100);
             expected["buffers_allocated"] = 4;
             expected["buffer_bytes"] = 9L * 100 + 16L * 10;
             expected["result_copies"] = 2;
             expected["result_cells"] = 10;
-            Same(expected, CountedBlock("RowSums", 10, 1, Grid(10, 10)));
+            Same(expected, CountedArray("RowSums", 10, 1, Grid(10, 10)));
         }
 
         // --- managed allocation, the CLR heap only: not Python, not numpy, not Excel-DNA ---------
@@ -221,7 +221,7 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void a_block_out_allocates_sixteen_bytes_per_cell_and_nothing_else()
+        public void an_array_out_allocates_sixteen_bytes_per_cell_and_nothing_else()
         {
             var grid = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Grid"), 2);
             object one = 1.0, small = 1000.0, large = 10000.0;

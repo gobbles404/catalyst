@@ -10,8 +10,8 @@ namespace Goosedove.Host
     ///   trips              calls into Python: the function's prepared path, and cells_from_buffers
     ///                      once per range
     ///   name_lookups       Python attributes fetched by their text name; a prepared call makes none
-    ///   objects_built      Python objects the host made: each scalar, and the five values that
-    ///                      carry a range
+    ///   objects_built      Python objects the host made: each scalar, and the six values that
+    ///                      carry a range, the kinds seen among them
     ///   cells_scanned      cells visited by the range loop, the Excel error that stopped it included
     ///   text_cells         text cells collected in that loop
     ///   buffers_allocated  managed arrays made for a range in or an array out

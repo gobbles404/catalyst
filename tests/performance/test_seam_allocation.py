@@ -38,24 +38,37 @@ def test_a_scalar_call_allocates_only_small_objects() -> None:
     assert peak_bytes(lambda: ENTRY["Fail"]()) <= SLACK
 
 
-# Today the kinds compare against an IntEnum makes numpy build an 8-byte-per-cell temporary
-# before the 1-byte mask; that is the 8 below, and the plain-integer compare lowers it to 1.
-def test_a_range_in_peaks_at_one_temporary_per_cell() -> None:
+# A range of numbers is accepted on the host's summary alone: no look at the kinds, so no
+# temporary per cell. Measured 192 bytes at ten thousand cells on 2026-09-11, down from 77,008
+# when every range paid a look and its 8-byte-per-cell scratch.
+def test_a_range_of_numbers_in_makes_no_temporary() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 8 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= SLACK
 
 
-def test_a_column_out_adds_no_copy_of_its_own() -> None:
+# A rejected range still takes the look that names the bad cell: the kinds compare against an
+# IntEnum casts through numpy's scratch buffer beside its 1-byte mask, and the mask stays alive
+# while the bad cell is read. Measured 87,239 at ten thousand cells; the ceiling is a bound at
+# this size, not a per-cell slope.
+def test_a_rejected_range_pays_one_look_and_its_temporaries() -> None:
+    rows: list[list[object]] = [[float(i)] for i in range(N)]
+    rows[-1][0] = "x"
+    column = Cells.from_rows(rows)
+    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 9 * N + SLACK
+
+
+# The way out still looks once, for finite numbers: one byte per cell. Measured 10,385.
+def test_a_column_out_adds_only_its_finite_mask() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["EchoColumn"](column)) <= 8 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["EchoColumn"](column)) <= N + SLACK
 
 
-def test_a_block_out_peaks_at_the_block_and_its_finite_mask() -> None:
+def test_an_array_out_peaks_at_the_array_and_its_finite_mask() -> None:
     assert peak_bytes(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
 
 
-def test_owning_a_range_peaks_at_the_two_copies_and_the_text_look() -> None:
+def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
     pointers = ctypes.addressof(kinds), ctypes.addressof(numbers)
-    assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "")) <= 9 * N + SLACK
+    assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "", 1)) <= 9 * N + SLACK

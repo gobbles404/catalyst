@@ -176,7 +176,9 @@ def scenarios() -> list[Scenario]:
                 "owning a range",
                 n,
                 0,
-                lambda own=bridge.cells_from_buffers, k=kinds, m=numbers, n=n: own(k, m, n, 1, ""),
+                lambda own=bridge.cells_from_buffers, k=kinds, m=numbers, n=n: own(
+                    k, m, n, 1, "", 1
+                ),
                 lambda result: None,
             )
         )
