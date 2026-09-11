@@ -354,7 +354,7 @@ def test_a_block_out_from_nothing_in_itemized(
     }
 
 
-# cells_block is the real entry for a range: what the host's pinned buffers cost to own.
+# cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
@@ -370,12 +370,12 @@ def test_cells_block_copies_each_buffer_once(
     text_cell: bool, call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     kinds, numbers, text = host_buffers(text_cell)
-    bridge.cells_block(kinds, numbers, N, 1, text)
-    assert call_profile(lambda: bridge.cells_block(kinds, numbers, N, 1, text)) == {
-        "cells_block": 1,
+    bridge.cells_from_buffers(kinds, numbers, N, 1, text)
+    assert call_profile(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text)) == {
+        "cells_from_buffers": 1,
     }
     # Two views, two copies, and one look for text cells whatever they hold.
-    assert numpy_calls(lambda: bridge.cells_block(kinds, numbers, N, 1, text)) == {
+    assert numpy_calls(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text)) == {
         "numpy.frombuffer": 2,
         "ndarray.reshape": 2,
         "ndarray.copy": 2,

@@ -1,17 +1,17 @@
 """The seam between the Excel host and this package.
 
 The host imports this module and uses four names: function_specs, call,
-cells_block, and the value MISSING. Importing it imports goosedove.excel
+cells_from_buffers, and the value MISSING. Importing it imports goosedove.excel
 first, the catalogue of every module that registers worksheet functions, so
 the function list is complete by the time the host asks. A blank cell arrives
 as None, an omitted argument as MISSING, and every range as Cells: one kind
 code per cell, one number per cell, and the text cells in sheet order, which
-cells_block builds from the host's buffers. Excel errors never arrive; the
+cells_from_buffers builds from the host's buffers. Excel errors never arrive; the
 host returns them before calling. call validates the type of every argument
 against the function's own signature, once, by type and shape and never by
 meaning; past it nothing checks. On the way back, call converts the result by
 the function's declared return type, once, into the four things the host can
-show: a number, text, a boolean, or a block of numbers. docs/inputs.md and
+show: a number, text, a boolean, or an array of numbers. docs/inputs.md and
 docs/outputs.md are the map.
 """
 
@@ -124,7 +124,9 @@ def _classify(cell: object) -> tuple[Kind, float]:
     raise TypeError(f"a cell cannot hold {type(cell).__name__}")
 
 
-def cells_block(kinds_pointer: int, numbers_pointer: int, rows: int, cols: int, text: str) -> Cells:
+def cells_from_buffers(
+    kinds_pointer: int, numbers_pointer: int, rows: int, cols: int, text: str
+) -> Cells:
     """Copy the host's pinned buffers into Cells. The text cells arrive joined with NUL."""
     count = rows * cols
     kinds = np.frombuffer((ctypes.c_uint8 * count).from_address(kinds_pointer), dtype=np.uint8)
@@ -223,16 +225,16 @@ def _numbers(value: object) -> NDArray[np.float64]:
 def _dates(value: object) -> NDArray[np.datetime64]:
     """Every cell a date, kept in sheet order. A scalar is a 1x1 range."""
     if isinstance(value, Cells):
-        block = value.numbers
+        array = value.numbers
         bad = (
             (value.kinds != Kind.NUMBER)
-            | (block != np.floor(block))
-            | (block < FIRST_SERIAL)
-            | (block > LAST_SERIAL)
+            | (array != np.floor(array))
+            | (array < FIRST_SERIAL)
+            | (array > LAST_SERIAL)
         )
         if bad.any():
             raise _first_bad(value, bad, "date")
-        return EXCEL_EPOCH + block.astype(np.int64).astype("timedelta64[D]")
+        return EXCEL_EPOCH + array.astype(np.int64).astype("timedelta64[D]")
     return np.array([[_date(value)]])
 
 
@@ -443,18 +445,18 @@ def _dimensions(value: object, ndim: int, expected: str) -> NDArray[Any]:
     return value
 
 
-def _finite(block: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[np.float64]:
-    """A block of finite numbers as contiguous float64, or the first bad cell as INDEX counts it."""
-    if block.size == 0:
+def _finite(array: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[np.float64]:
+    """Finite numbers as contiguous float64, or the first bad cell as INDEX counts it."""
+    if array.size == 0:
         raise _BadResult(f"returned {describe(value)}, expected {expected} with at least one cell")
-    if block.dtype.kind not in "fiu":
+    if array.dtype.kind not in "fiu":
         raise _returned(value, expected)
-    if block.dtype.kind in "iu":
-        big = (block > EXACT) | (block < -EXACT)  # two-sided: abs overflows on the int64 minimum
+    if array.dtype.kind in "iu":
+        big = (array > EXACT) | (array < -EXACT)  # two-sided: abs overflows on the int64 minimum
         if big.any():
-            r, c = divmod(int(big.argmax()), block.shape[1])
+            r, c = divmod(int(big.argmax()), array.shape[1])
             raise _BadResult(f"result cell ({r + 1}, {c + 1}) is beyond what a cell holds exactly")
-    out = np.ascontiguousarray(block, dtype=np.float64)
+    out = np.ascontiguousarray(array, dtype=np.float64)
     finite = np.isfinite(out)
     if not finite.all():
         r, c = divmod(int((~finite).argmax()), out.shape[1])
@@ -463,8 +465,8 @@ def _finite(block: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[
 
 
 def _array_out(value: object) -> NDArray[np.float64]:
-    block = _dimensions(value, 2, "array of numbers")
-    return _finite(block, block, "array of numbers")
+    array = _dimensions(value, 2, "array of numbers")
+    return _finite(array, array, "array of numbers")
 
 
 def _column_out(value: object) -> NDArray[np.float64]:

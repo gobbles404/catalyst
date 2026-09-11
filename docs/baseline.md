@@ -42,7 +42,7 @@ So a user pays about 7 µs for a scalar call through the seam. Excel's and Excel
 | 10,000 | 15.1 (14.5..15.3) | 180.3 (177.2..187.4) | 158.0 (154.2..159.9) | 450.1 (442.7..459.7) | 55.2 (53.9..57.5) |
 | 100,000 | 94.2 (93.4..95.4) | 2,127.0 (2,087.2..2,181.9) | 1,748.8 (1,719.6..1,800.6) | | |
 
-Owning the range, which is Python taking its own copy of the host's two buffers so the host can let go of them (`cells_block`), timed alone: 6.2 (6.1..6.3) at one cell, 6.4 (6.1..6.5) at a hundred, 7.5 (7.4..8.1) at a thousand, 16.9 (16.5..17.2) at ten thousand, 95.6 (91.9..121.6) at a hundred thousand.
+Owning the range, which is Python taking its own copy of the host's two buffers so the host can let go of them (`cells_from_buffers`, then named `cells_block`), timed alone: 6.2 (6.1..6.3) at one cell, 6.4 (6.1..6.5) at a hundred, 7.5 (7.4..8.1) at a thousand, 16.9 (16.5..17.2) at ten thousand, 95.6 (91.9..121.6) at a hundred thousand.
 
 Per added cell, from the 100 and 10,000 rows above: Excel charges about 41 nanoseconds for a cell through the seam and 5 for a cell through `SUM`; the host runner about 16, of which the way in alone is 15; the Python runner about 1. A range in is the host's cost: at ten thousand cells the host runner puts 158 of its 180 µs in the way in alone, and Python's validation and sum together are 15.
 
@@ -61,7 +61,7 @@ The shape rejection is decided in 2.6 µs of Python but still pays the transport
 
 ## What a cell out costs
 
-`=Grid(N, 1)`, two numbers in and a block of N cells out. A block is the rectangle of values one formula returns; Excel spills it, filling the cells below and beside the formula, as `=SEQUENCE(3)` fills three rows. The host runner also times the way out alone: a block Python already holds, copied into an array the host owns.
+`=Grid(N, 1)`, two numbers in and an array of N cells out. An array is the rectangle of values one formula returns; Excel spills it, filling the cells below and beside the formula, as `=SEQUENCE(3)` fills three rows. The host runner also times the way out alone: an array Python already holds, copied into memory the host owns.
 
 | Cells out | Python | Host | Host, way out alone | Excel `Grid` |
 |---:|---:|---:|---:|---:|
@@ -89,27 +89,27 @@ RowSums at 10,000 cells in is 1,000 rows of ten cells and 1,000 answers out. For
 
 ## The same answers three ways
 
-The batching question, in Excel: a thousand answers from a thousand one-row formulas, from ten formulas over hundred-row blocks, or from one formula over the whole column. The echo arrangements are `=Times(Ai)` filled down against `=EchoColumn` blocks; the RowSums arrangements are `=RowSums(Ai:Ji)` filled down against `=RowSums` blocks over ten columns. Full is every formula of the arrangement recalculated; edit is one input changed in the middle row and Excel recalculating what depends on it. Milliseconds per recalculation:
+The batching question, in Excel: a thousand answers from a thousand one-row formulas, from ten formulas over hundred-row arrays, or from one formula over the whole column. The echo arrangements are `=Times(Ai)` filled down against `=EchoColumn` arrays; the RowSums arrangements are `=RowSums(Ai:Ji)` filled down against `=RowSums` arrays over ten columns. Full is every formula of the arrangement recalculated; edit is one input changed in the middle row and Excel recalculating what depends on it. Milliseconds per recalculation:
 
 | Arrangement, 1,000 rows | Formulas | Echo, full | Echo, one edit | RowSums, full | RowSums, one edit |
 |---|---:|---:|---:|---:|---:|
 | one formula per row | 1,000 | 7.28 (7.11..9.04) | 0.82 (0.79..0.88) | 40.43 (40.01..41.06) | 0.91 (0.89..1.00) |
-| ten blocks of 100 | 10 | 1.08 (1.05..1.11) | 1.34 (0.88..1.58) | 1.46 (1.40..1.49) | 1.35 (0.96..1.36) |
-| one block of 1,000 | 1 | 1.03 (0.73..1.20) | 1.82 (1.34..2.01) | 1.02 (0.99..1.06) | 1.50 (1.47..1.55) |
+| ten arrays of 100 | 10 | 1.08 (1.05..1.11) | 1.34 (0.88..1.58) | 1.46 (1.40..1.49) | 1.35 (0.96..1.36) |
+| one array of 1,000 | 1 | 1.03 (0.73..1.20) | 1.82 (1.34..2.01) | 1.02 (0.99..1.06) | 1.50 (1.47..1.55) |
 | the edit's floor: the same write, nothing dependent | 0 | | 0.54 (0.52..0.58) | | |
 
 | Arrangement, 10,000 rows | Formulas | Echo, full | Echo, one edit | RowSums, full | RowSums, one edit |
 |---|---:|---:|---:|---:|---:|
 | one formula per row | 10,000 | 67.95 (65.72..69.46) | 0.89 (0.86..1.03) | 385.72 (382.69..396.76) | 1.22 (0.98..1.84) |
-| ten blocks of 1,000 | 10 | 2.50 (2.47..2.50) | 1.34 (1.18..1.41) | 5.91 (5.82..5.97) | 1.78 (1.42..2.00) |
-| one block of 10,000 | 1 | 2.09 (2.03..2.85) | 2.33 (2.16..3.16) | 8.09 (7.99..8.15) | 8.28 (7.93..9.53) |
+| ten arrays of 1,000 | 10 | 2.50 (2.47..2.50) | 1.34 (1.18..1.41) | 5.91 (5.82..5.97) | 1.78 (1.42..2.00) |
+| one array of 10,000 | 1 | 2.09 (2.03..2.85) | 2.33 (2.16..3.16) | 8.09 (7.99..8.15) | 8.28 (7.93..9.53) |
 | the edit's floor: the same write, nothing dependent | 0 | | 0.58 (0.55..0.60) | | |
 
 Three facts stand out.
 
-- **Blocks win a full recalculation by a wide margin.** At 1,000 rows, ten blocks or one block deliver the same answers in 1 to 1.5 ms against 7 ms for the echo and 40 ms for RowSums row by row. At 10,000 rows the margin is 68 ms against 2 to 2.5, and 386 ms against 6 to 8.
-- **A one-row formula that takes a range is the worst shape there is.** `=RowSums(Ai:Ji)` filled down costs 40 µs per row, five and a half times `=Add(Ai, Bi)`. The range is what costs, not the one-cell block it returns: a range in and a number out, `SumArray` over a hundred cells, costs 46 µs too. Each such row pays for a range in and a block out, which the counters pin at two trips, four buffers and two copies; what that costs inside Excel was not measured alone. A function that answers one row from a handful of single values is cheap; one that reads a range per row is not, whatever it returns.
-- **An edit costs one to two milliseconds whatever the arrangement, at 1,000 rows.** The floor, one cell written and Excel asked to recalculate with nothing depending on it, is 0.54 ms. One formula per row adds 0.3 to 0.4 ms to that; a block of 100 or 1,000 adds 0.8 to 1.3 ms. At 10,000 rows a whole-column block's edit grows to 2.3 ms for the echo and 8.3 ms for RowSums, against 0.9 and 1.2 per row.
+- **Arrays win a full recalculation by a wide margin.** At 1,000 rows, ten arrays or one array deliver the same answers in 1 to 1.5 ms against 7 ms for the echo and 40 ms for RowSums row by row. At 10,000 rows the margin is 68 ms against 2 to 2.5, and 386 ms against 6 to 8.
+- **A one-row formula that takes a range is the worst shape there is.** `=RowSums(Ai:Ji)` filled down costs 40 µs per row, five and a half times `=Add(Ai, Bi)`. The range is what costs, not the one-cell array it returns: a range in and a number out, `SumArray` over a hundred cells, costs 46 µs too. Each such row pays for a range in and an array out, which the counters pin at two trips, four buffers and two copies; what that costs inside Excel was not measured alone. A function that answers one row from a handful of single values is cheap; one that reads a range per row is not, whatever it returns.
+- **An edit costs one to two milliseconds whatever the arrangement, at 1,000 rows.** The floor, one cell written and Excel asked to recalculate with nothing depending on it, is 0.54 ms. One formula per row adds 0.3 to 0.4 ms to that; an array of 100 or 1,000 adds 0.8 to 1.3 ms. At 10,000 rows a whole-column array's edit grows to 2.3 ms for the echo and 8.3 ms for RowSums, against 0.9 and 1.2 per row.
 
 ## What the tests pin
 
@@ -121,22 +121,22 @@ The counts are tests, so a seam change states what it moved. A trip is one cross
 | an omitted argument, `Times(5)` | 1 | 2 | 4 | | | |
 | a range in, N cells | 2 | 2 | 7 | N | 2, 9N | |
 | an Excel error at cell 5 of 10,000 | 0 | 0 | 2 | 5 | 2, 90,000 | |
-| a block out, N cells, `Grid` | 1 | 1 | 4 | | 2, 16N | 2, N |
+| an array out, N cells, `Grid` | 1 | 1 | 4 | | 2, 16N | 2, N |
 | one answer per row, 100 in and 10 out | 2 | 2 | 7 | 100 | 4, 1,060 | 2, 10 |
 
-One text cell in a range adds one to `text_cells` and nothing else. A shape rejection pays the whole range budget. Memory the host's own runtime hands out per call and later reclaims, which measuring.md calls managed allocation, is metered on the host's thread. A warm call, one made after the first so nothing is being set up for the first time, allocates under 512 bytes; this session measured 440. A range in adds 9 bytes per cell and a block out 16, both pinned as ceilings with a little slack. This session's runner saw 90,890 bytes per `SumArray` call at ten thousand cells, 160,796 per `Grid` of ten thousand, and 251,240 per `EchoColumn` of ten thousand.
+One text cell in a range adds one to `text_cells` and nothing else. A shape rejection pays the whole range budget. Memory the host's own runtime hands out per call and later reclaims, which measuring.md calls managed allocation, is metered on the host's thread. A warm call, one made after the first so nothing is being set up for the first time, allocates under 512 bytes; this session measured 440. A range in adds 9 bytes per cell and an array out 16, both pinned as ceilings with a little slack. This session's runner saw 90,890 bytes per `SumArray` call at ten thousand cells, 160,796 per `Grid` of ten thousand, and 251,240 per `EchoColumn` of ten thousand.
 
 On the Python side, `call_profile` pins each probe's own functions exactly: a range is one look whatever it holds, a bad cell deep inside is named without a walk, a failing body costs no look. The numpy ledger pins three things. Owning a range is two views (reading the host's buffers where they lie), two copies, and one look for text. A sum is one look and one reduction, the folding of an array to one number as `SUM` does. A column out copies nothing of its own.
 
-The peaks from `tracemalloc`, Python's meter of how much memory a call holds at its highest point, are pinned as ceilings. A scalar call stays under 1,024 bytes; this session measured 160 to 256. A range in stays under 8 bytes per cell plus slack; measured 77,008 at ten thousand cells, which the test reads as a scratch array of 8-byte integers that the check of each cell's kind builds before its 1-byte-per-cell list of yes-or-no answers. A column out is the same 77,008. A block out stays under 9 per cell; measured 90,401. Owning a range stays under 9 per cell; measured 90,536.
+The peaks from `tracemalloc`, Python's meter of how much memory a call holds at its highest point, are pinned as ceilings. A scalar call stays under 1,024 bytes; this session measured 160 to 256. A range in stays under 8 bytes per cell plus slack; measured 77,008 at ten thousand cells, which the test reads as a scratch array of 8-byte integers that the check of each cell's kind builds before its 1-byte-per-cell list of yes-or-no answers. A column out is the same 77,008. An array out stays under 9 per cell; measured 90,401. Owning a range stays under 9 per cell; measured 90,536.
 
 ## What this says about the library's formulas
 
-Everything above is about one decision: whether a pricing function is called once per trade, once per block of trades, or once per sheet. The numbers say:
+Everything above is about one decision: whether a pricing function is called once per trade, once per array of trades, or once per sheet. The numbers say:
 
-- **Declare pricing functions over blocks.** In Excel, ten blocks of a hundred rows deliver a thousand answers in 1.08 ms (echo) and 1.46 ms (RowSums) per recalculation, against 7.28 ms for the same rows as `=Times(Ai)` and 40.43 ms as `=RowSums(Ai:Ji)`. So at a thousand rows a block is about seven times cheaper than the same rows as scalar calls, and twenty-eight to forty times cheaper than the same rows as one-row range formulas. Below a hundred rows nothing was measured in Excel. The host runner, which does measure a one-cell block, prices `EchoColumn` at one cell at 24.9 µs, seven of its scalar calls, and at a hundred cells at 27.6, eight; if Excel follows the host, the crossover is under ten rows, but that was not measured. A function that takes a column of trades and returns a column of prices is the default shape.
+- **Declare pricing functions over arrays.** In Excel, ten arrays of a hundred rows deliver a thousand answers in 1.08 ms (echo) and 1.46 ms (RowSums) per recalculation, against 7.28 ms for the same rows as `=Times(Ai)` and 40.43 ms as `=RowSums(Ai:Ji)`. So at a thousand rows an array formula is about seven times cheaper than the same rows as scalar calls, and twenty-eight to forty times cheaper than the same rows as one-row range formulas. Below a hundred rows nothing was measured in Excel. The host runner, which does measure a one-cell array, prices `EchoColumn` at one cell at 24.9 µs, seven of its scalar calls, and at a hundred cells at 27.6, eight; if Excel follows the host, the crossover is under ten rows, but that was not measured. A function that takes a column of trades and returns a column of prices is the default shape.
 - **A per-row formula takes single values, not a range.** The one shape to forbid is a range read per row: 40 µs per row against 7 for `=Add(Ai, Bi)`, whatever the formula returns.
-- **Blocks of a hundred to a thousand rows keep both bills small.** Ten blocks cost 1.1 to 1.5 ms for a thousand rows and 2.5 to 5.9 ms for ten thousand on a full recalculation, and 1.3 to 1.8 ms on an edit. One block over ten thousand rows costs 2.1 ms for the echo and 8.1 for RowSums on a full recalculation, and about the same on every edit, 2.3 and 8.3 ms, because one changed cell recalculates the whole block.
+- **Arrays of a hundred to a thousand rows keep both bills small.** Ten arrays cost 1.1 to 1.5 ms for a thousand rows and 2.5 to 5.9 ms for ten thousand on a full recalculation, and 1.3 to 1.8 ms on an edit. One array over ten thousand rows costs 2.1 ms for the echo and 8.1 for RowSums on a full recalculation, and about the same on every edit, 2.3 and 8.3 ms, because one changed cell recalculates the whole array.
 - **What a scalar call still costs is worth holding down.** Sheets will have per-trade formulas whatever the default. A user pays 7 µs per scalar call, a C# function with no Python pays 2 to 2.5, and without Excel the host runner times the seam's call at 3.6. The counters name the moves: one trip and one name lookup per call, four objects, and no buffer.
 
-For the seam itself, the curves say where the work is. A range in is the host's scan and two pinned buffers: 158 of the host runner's 180 µs at ten thousand cells. A cell out costs a user 110 nanoseconds through Excel. Beside it, the host runner charges 2.4 per cell, of which the way out alone is 0.8, and the Python runner about a nanosecond per cell in and 0.6 per cell out. The refactors that follow are judged against these rows: checking each cell's kind as a plain integer, against the 8-byte-per-cell peak; filling both buffers in one pass over the range and reusing them, against `buffers_allocated`; finding the Python function once instead of on every call, against `name_lookups` and `objects_built`; and handing a block to Excel with one copy instead of two, against `result_copies`.
+For the seam itself, the curves say where the work is. A range in is the host's scan and two pinned buffers: 158 of the host runner's 180 µs at ten thousand cells. A cell out costs a user 110 nanoseconds through Excel. Beside it, the host runner charges 2.4 per cell, of which the way out alone is 0.8, and the Python runner about a nanosecond per cell in and 0.6 per cell out. The refactors that follow are judged against these rows: checking each cell's kind as a plain integer, against the 8-byte-per-cell peak; filling both buffers in one pass over the range and reusing them, against `buffers_allocated`; finding the Python function once instead of on every call, against `name_lookups` and `objects_built`; and handing an array to Excel with one copy instead of two, against `result_copies`.

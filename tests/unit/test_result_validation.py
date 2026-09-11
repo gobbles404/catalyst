@@ -123,11 +123,11 @@ def test_accepted_scalar(function: str, value: object, sent: object) -> None:
 def test_accepted_block(function: str, value: object, sent: list[list[float]]) -> None:
     result = out(function, value)
     assert isinstance(result, np.ndarray)
-    block = cast(NDArray[Any], result)
-    assert block.tolist() == sent
-    assert block.dtype == np.float64
-    assert block.ndim == 2
-    assert block.flags.c_contiguous
+    array = cast(NDArray[Any], result)
+    assert array.tolist() == sent
+    assert array.dtype == np.float64
+    assert array.ndim == 2
+    assert array.flags.c_contiguous
 
 
 # --- messages, exactly ------------------------------------------------------
@@ -342,11 +342,11 @@ def test_text_is_counted_as_excel_counts_it() -> None:
 def test_the_first_bad_cell_is_named(rows: int, cols: int, data: st.DataObject) -> None:
     r = data.draw(st.integers(1, rows))
     c = data.draw(st.integers(1, cols))
-    block = np.ones((rows, cols))
-    block[r - 1, c - 1] = np.nan
-    block[rows - 1, cols - 1] = np.inf  # a later bad cell never wins
+    array = np.ones((rows, cols))
+    array[r - 1, c - 1] = np.nan
+    array[rows - 1, cols - 1] = np.inf  # a later bad cell never wins
     assert (
-        out("OutArray", block) == f"#ERROR OutArray: result cell ({r}, {c}) is not a finite number"
+        out("OutArray", array) == f"#ERROR OutArray: result cell ({r}, {c}) is not a finite number"
     )
 
 

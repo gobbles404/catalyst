@@ -95,7 +95,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("()", Attribute(new object[,] { { 1.0 }, { 2.0 } }, "texts"));
         }
 
-        // The seam promises a number, text, a boolean, or a block; the host says so if it gets anything else.
+        // The seam promises a number, text, a boolean, or an array; the host says so if it gets anything else.
         [Fact]
         public void a_result_the_host_cannot_show_fails_loudly()
         {

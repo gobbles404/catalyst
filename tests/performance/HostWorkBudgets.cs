@@ -67,7 +67,7 @@ namespace Goosedove.Host.Tests
             return new Dictionary<string, long>
             {
                 ["objects_built"] = 7,      // the name, the list, and the five values that carry a range
-                ["trips"] = 2,              // cells_block, then the call
+                ["trips"] = 2,              // cells_from_buffers, then the call
                 ["name_lookups"] = 2,
                 ["cells_scanned"] = cells,
                 ["buffers_allocated"] = 2,  // kinds and numbers
@@ -139,14 +139,14 @@ namespace Goosedove.Host.Tests
         }
 
         // Counted() compares the result with Assert.Equal, which a fresh double[,] never satisfies;
-        // blocks are checked by shape here.
+        // arrays are checked by shape here.
         private IReadOnlyDictionary<string, long> CountedBlock(string name, int rows, int cols, params object[] args)
         {
             Bridge.Call(name, args);
             var work = new WorkCounter();
-            var block = Assert.IsType<double[,]>(Bridge.Call(work, name, args));
-            Assert.Equal(rows, block.GetLength(0));
-            Assert.Equal(cols, block.GetLength(1));
+            var array = Assert.IsType<double[,]>(Bridge.Call(work, name, args));
+            Assert.Equal(rows, array.GetLength(0));
+            Assert.Equal(cols, array.GetLength(1));
             var counts = work.Freeze();
             output.WriteLine(name + ": " + string.Join(", ", counts.OrderBy(pair => pair.Key).Select(pair => pair.Key + "=" + pair.Value)));
             return counts;

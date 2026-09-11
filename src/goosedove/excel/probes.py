@@ -81,7 +81,7 @@ def RowSums(values: Array) -> Column:
 
 @probe
 def Grid(rows: int, cols: int) -> Array:
-    """Probe: a block out, rows by cols, counting 1, 2, 3 across then down."""
+    """Probe: an array out, rows by cols, counting 1, 2, 3 across then down."""
     if rows < 1 or cols < 1:
         raise ValueError(f"a grid needs at least one row and one column, not {rows} by {cols}")
     return Array(np.arange(1.0, rows * cols + 1).reshape(rows, cols))

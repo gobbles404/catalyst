@@ -1,7 +1,7 @@
 """Warm timings of the Python side of the seam, one probe at a time, on inputs built first.
 
 Run with `uv run python tools/performance/measure_python.py`. The clock includes bridge.call
-on Cells already built: type validation, the probe, and result conversion. cells_block from
+on Cells already built: type validation, the probe, and result conversion. cells_from_buffers from
 the host's buffers is its own scenario, so what owning a range costs is timed apart. The clock
 excludes the host, Excel, and building the inputs. Each row of python-timing.csv is one batch:
 a calibrated number of calls whose mean is the figure, never a percentile of single calls.
@@ -69,10 +69,10 @@ def equals(expected: object) -> Callable[[object], None]:
     return check
 
 
-def block(rows: int, cols: int, total: float) -> Callable[[object], None]:
+def array(rows: int, cols: int, total: float) -> Callable[[object], None]:
     def check(result: object) -> None:
         if not isinstance(result, np.ndarray):
-            raise AssertionError(f"got {result!r}, expected a block")
+            raise AssertionError(f"got {result!r}, expected an array")
         array = cast(NDArray[Any], result)
         if array.shape != (rows, cols) or float(array.sum()) != total:
             raise AssertionError(
@@ -139,7 +139,7 @@ def scenarios() -> list[Scenario]:
                 n,
                 n,
                 lambda c=cells: bridge.call("EchoColumn", [c]),
-                block(n, 1, total(n)),
+                array(n, 1, total(n)),
             )
         )
         cases.append(
@@ -149,7 +149,7 @@ def scenarios() -> list[Scenario]:
                 2,
                 n,
                 lambda n=n: bridge.call("Grid", [n, 1]),
-                block(n, 1, n * (n + 1) / 2),
+                array(n, 1, n * (n + 1) / 2),
             )
         )
         if n >= 10:
@@ -162,17 +162,17 @@ def scenarios() -> list[Scenario]:
                     n,
                     count,
                     lambda g=grid: bridge.call("RowSums", [g]),
-                    block(count, 1, total(n)),
+                    array(count, 1, total(n)),
                 )
             )
         kinds, numbers = host_buffers(n)
         cases.append(
             Scenario(
-                "cells_block",
+                "cells_from_buffers",
                 "owning a range",
                 n,
                 0,
-                lambda k=kinds, m=numbers, n=n: bridge.cells_block(k, m, n, 1, ""),
+                lambda k=kinds, m=numbers, n=n: bridge.cells_from_buffers(k, m, n, 1, ""),
                 lambda result: None,
             )
         )
@@ -299,7 +299,7 @@ def environment() -> dict[str, object]:
         "batches": BATCHES,
         "timed_scope": (
             "bridge.call on Cells built before the clock: validation, the probe, result "
-            "conversion. cells_block is timed apart. Excludes the host, Excel, and building "
+            "conversion. cells_from_buffers is timed apart. Excludes the host, Excel, and building "
             "inputs. Each row is one batch; per_call_us is that batch's mean."
         ),
         "allocation_scope": (

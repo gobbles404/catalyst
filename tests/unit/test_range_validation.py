@@ -60,7 +60,7 @@ def JoinRow(names: TextRow) -> str:
 
 # Every range arrives as Cells, whatever it holds. from_rows builds what the host would send.
 cells = Cells.from_rows
-BLOCK = cells([[1.0, 2.0], [3.0, 4.0]])
+ARRAY = cells([[1.0, 2.0], [3.0, 4.0]])
 COLUMN = cells([[1.0], [2.0], [3.0]])
 ROW = cells([[1.0, 2.0, 3.0]])
 ONE = cells([[5.0]])
@@ -82,7 +82,7 @@ DATES_BLOCK = cells([[46164.0, 46165.0], [46166.0, 46167.0]])
 @pytest.mark.parametrize(
     ("function", "value", "result"),
     [
-        ("SumArray", BLOCK, 10.0),
+        ("SumArray", ARRAY, 10.0),
         ("SumArray", COLUMN, 6.0),
         ("SumArray", 5.0, 5.0),
         ("SumArray", cells([[-1.0, 0.0], [0.0, -1.0]]), -2.0),
@@ -157,7 +157,7 @@ def test_column_and_row_are_handed_over_as_plain_lists() -> None:
 
 
 def test_array_keeps_the_shape_on_the_sheet() -> None:
-    assert bridge.call("ArrayShape", [BLOCK]) == "(2, 2)"
+    assert bridge.call("ArrayShape", [ARRAY]) == "(2, 2)"
     assert bridge.call("ArrayShape", [5.0]) == "(1, 1)"
 
 
@@ -215,7 +215,7 @@ def test_text_is_handed_over_as_a_tuple() -> None:
         ("SumArray", "x", "#ERROR SumArray: values is text 'x', expected array of numbers"),
         ("SumArray", None, "#ERROR SumArray: values is blank, expected array of numbers"),
         ("SumArray", MISSING, "#ERROR SumArray: values is missing, expected array of numbers"),
-        ("SumColumn", BLOCK, "#ERROR SumColumn: values is 2x2 array, expected column of numbers"),
+        ("SumColumn", ARRAY, "#ERROR SumColumn: values is 2x2 array, expected column of numbers"),
         ("SumColumn", ROW, "#ERROR SumColumn: values is 1x3 array, expected column of numbers"),
         (
             "SumColumn",
@@ -228,7 +228,7 @@ def test_text_is_handed_over_as_a_tuple() -> None:
             "#ERROR SumColumn: values cell (2, 1) is text 'n/a', expected number",
         ),
         ("SumRow", COLUMN, "#ERROR SumRow: values is 3x1 array, expected row of numbers"),
-        ("SumRow", BLOCK, "#ERROR SumRow: values is 2x2 array, expected row of numbers"),
+        ("SumRow", ARRAY, "#ERROR SumRow: values is 2x2 array, expected row of numbers"),
         ("SumRow", True, "#ERROR SumRow: values is boolean TRUE, expected row of numbers"),
         ("JoinRow", NAMES_COLUMN, "#ERROR JoinRow: names is 2x1 array, expected row of text"),
         ("JoinRow", NAMES_BLOCK, "#ERROR JoinRow: names is 2x2 array, expected row of text"),

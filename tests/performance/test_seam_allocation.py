@@ -55,4 +55,4 @@ def test_owning_a_range_peaks_at_the_two_copies_and_the_text_look() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
     pointers = ctypes.addressof(kinds), ctypes.addressof(numbers)
-    assert peak_bytes(lambda: bridge.cells_block(*pointers, N, 1, "")) <= 9 * N + SLACK
+    assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "")) <= 9 * N + SLACK
