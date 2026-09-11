@@ -4,22 +4,32 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 
 $formulas = [ordered]@{
-    "=GoosedoveStatus()" = "ok: python started and functions registered"
-    "=Add(1,2)"          = "3"
-    "=Add(1,)"           = "#ERROR Add: b is missing, expected number"
-    "=Add(1,TRUE)"       = "#ERROR Add: b is boolean TRUE, expected number"
-    "=SumColumn(A1:A3)"  = "6"
-    "=SumColumn(A1)"     = "1"
-    "=SumColumn(B1:B3)"  = "#ERROR SumColumn: values cell (1, 1) is text 'n/a', expected number"
-    "=SumColumn(C1:C3)"  = "#ERROR SumColumn: values cell (2, 1) is blank, expected number"
-    "=SumColumn(D1:D3)"  = "#N/A"
-    "=SumColumn(F1:F2)"  = "#N/A"
-    "=SumColumn(H1:H2)"  = "#ERROR SumColumn: values cell (2, 1) is boolean TRUE, expected number"
-    "=SumRow(A1:A3)"     = "#ERROR SumRow: values is 3x1 array, expected row of numbers"
-    "=JoinColumn(E1:E2)" = "x, y"
-    "=JoinColumn(I1:I2)" = "#ERROR JoinColumn: names cell (2, 1) is empty text, expected text"
-    "=DateText(G1)"      = "2026-05-22"
-    "=RegisterAll()"     = "#NAME?"
+    "=GoosedoveStatus()"          = "ok: python started and functions registered"
+    # Today's truth, not the intent: Excel-DNA shows a result of nothing as #NUM!. The way-out change decides.
+    "=Nothing()"                  = "#NUM!"
+    "=Add(1,2)"                   = "3"
+    "=Add(1,)"                    = "#ERROR Add: b is missing, expected number"
+    "=Add(1,TRUE)"                = "#ERROR Add: b is boolean TRUE, expected number"
+    "=Times(5)"                   = "5"
+    "=Times(5,2)"                 = "10"
+    "=Times(5,C2)"                = "#ERROR Times: factor is blank, expected number"
+    "=EchoText(E1)"               = "x"
+    "=EchoText(I2)"               = "#ERROR EchoText: label is empty text, expected text"
+    "=EchoBoolean(TRUE)"          = "TRUE"
+    "=EchoBoolean(1)"             = "#ERROR EchoBoolean: flag is number 1.0, expected boolean"
+    "=SumArray(A1:A3)"            = "6"
+    "=SumArray(A1)"               = "1"
+    "=SumArray(B1:B3)"            = "#ERROR SumArray: values cell (1, 1) is text 'n/a', expected number"
+    "=SumArray(C1:C3)"            = "#ERROR SumArray: values cell (2, 1) is blank, expected number"
+    "=SumArray(D1:D3)"            = "#N/A"
+    "=SumArray(F1:F2)"            = "#N/A"
+    "=SumArray(H1:H2)"            = "#ERROR SumArray: values cell (2, 1) is boolean TRUE, expected number"
+    "=Dot(A1:A3,{10;20;30})"      = "140"
+    "=Dot(A1:A3,{10,20,30})"      = "#ERROR Dot: b is 1x3 array, expected column of numbers"
+    "=INDEX(Grid(2,3),2,1)"       = "4"
+    "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
+    "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
+    "=RegisterAll()"              = "#NAME?"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -30,7 +40,6 @@ $cells = [ordered]@{
     "D1" = "1"; "D2" = "=NA()"; "D3" = "3"
     "E1" = "x"; "E2" = "y"
     "F1" = "x"; "F2" = "=NA()"
-    "G1" = "46164"
     "H1" = "1"; "H2" = "TRUE"
     "I1" = "x"; "I2" = '=""'
 }
@@ -67,8 +76,8 @@ try {
         $shown = $cell.Text
         $ok = ($shown -eq $formulas[$formula])
         if (-not $ok) { $failures++ }
-        Write-Host ("{0} {1,-22} {2}" -f $(if ($ok) { "ok  " } else { "FAIL" }), $formula, $shown)
-        if (-not $ok) { Write-Host ("     expected              {0}" -f $formulas[$formula]) }
+        Write-Host ("{0} {1,-28} {2}" -f $(if ($ok) { "ok  " } else { "FAIL" }), $formula, $shown)
+        if (-not $ok) { Write-Host ("     expected                    {0}" -f $formulas[$formula]) }
         $row++
     }
     $book.Close($false)

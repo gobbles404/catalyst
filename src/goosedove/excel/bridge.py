@@ -1,13 +1,15 @@
 """The seam between the Excel host and this package.
 
 The host imports this module and uses six names: function_specs, call,
-cells_block, flatten_block, is_block, and the value MISSING. A blank cell
-arrives as None, an omitted argument as MISSING, and every range as Cells:
-one kind code per cell, one number per cell, and the text cells in sheet
-order, which cells_block builds from the host's buffers. Excel errors never
-arrive; the host returns them before calling. call validates the type of
-every argument against the function's own signature, once, by type and
-shape and never by meaning; past it nothing checks. docs/inputs.md is the map.
+cells_block, flatten_block, is_block, and the value MISSING. Importing it
+imports goosedove.excel first, the catalogue of every module that registers
+worksheet functions, so the function list is complete by the time the host
+asks. A blank cell arrives as None, an omitted argument as MISSING, and every
+range as Cells: one kind code per cell, one number per cell, and the text
+cells in sheet order, which cells_block builds from the host's buffers. Excel
+errors never arrive; the host returns them before calling. call validates the
+type of every argument against the function's own signature, once, by type
+and shape and never by meaning; past it nothing checks. docs/inputs.md is the map.
 """
 
 import ctypes
@@ -327,6 +329,7 @@ class Registered:
     fn: Callable[..., object]
     description: str
     parameters: tuple[Parameter, ...]
+    hidden: bool  # absent from Excel's function wizard, still callable by name
 
 
 _FUNCTIONS: dict[str, Registered] = {}
@@ -375,20 +378,25 @@ def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
     return Parameter(spec.name, expected, accept, default)
 
 
-def excel_function[F: Callable[..., object]](fn: F) -> F:
+def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     """Register a worksheet function under its own name; the signature is the contract."""
     name = fn.__name__
     if name in _FUNCTIONS:
         raise TypeError(f"{name} is already registered")
     parameters = tuple(_parameter(name, spec) for spec in inspect.signature(fn).parameters.values())
-    _FUNCTIONS[name] = Registered(fn, (fn.__doc__ or "").strip(), parameters)
+    _FUNCTIONS[name] = Registered(fn, (fn.__doc__ or "").strip(), parameters, hidden)
     return fn
 
 
-def function_specs() -> list[tuple[str, str, list[str]]]:
-    """Name, description, and parameter names for every registered function."""
+def excel_function[F: Callable[..., object]](fn: F) -> F:
+    """Register a worksheet function that Excel lists in its function wizard."""
+    return register(fn, hidden=False)
+
+
+def function_specs() -> list[tuple[str, str, list[str], bool]]:
+    """Name, description, parameter names, and whether hidden, for every registered function."""
     return [
-        (name, registered.description, [p.name for p in registered.parameters])
+        (name, registered.description, [p.name for p in registered.parameters], registered.hidden)
         for name, registered in _FUNCTIONS.items()
     ]
 
@@ -445,7 +453,7 @@ def is_block(value: object) -> bool:
     return isinstance(value, np.ndarray)
 
 
-# --- placeholders: each proves one declared type crosses. Delete as real functions arrive.
+# --- the bridge's own worksheet function; the probes live in probes.py --------
 
 
 @excel_function
@@ -456,57 +464,3 @@ def Ping() -> str:
     except PackageNotFoundError:
         release = "source checkout"
     return f"goosedove {release} from {goosedove.__file__}"
-
-
-@excel_function
-def Add(a: float, b: float) -> float:
-    """Add two numbers; proves arguments cross the seam."""
-    return a + b
-
-
-@excel_function
-def DateText(day: Date) -> str:
-    """A date cell, written out; proves a date crosses."""
-    return str(day)
-
-
-@excel_function
-def SumArray(values: Array) -> float:
-    """Sum a range of numbers of any shape; proves an array crosses."""
-    return float(values.sum())
-
-
-@excel_function
-def SumColumn(values: Column) -> float:
-    """Sum one column of numbers; proves a column crosses."""
-    return float(values.sum())
-
-
-@excel_function
-def SumRow(values: Row) -> float:
-    """Sum one row of numbers; proves a row crosses."""
-    return float(values.sum())
-
-
-@excel_function
-def FirstDate(dates: DateColumn) -> str:
-    """The first date in a column of dates, as given; proves a column of dates crosses."""
-    return str(dates[0])
-
-
-@excel_function
-def LastDate(dates: DateRow) -> str:
-    """The last date in a row of dates, as given; proves a row of dates crosses."""
-    return str(dates[-1])
-
-
-@excel_function
-def JoinColumn(names: TextColumn) -> str:
-    """One column of text, joined with commas; proves a column of text crosses."""
-    return ", ".join(names)
-
-
-@excel_function
-def JoinRow(names: TextRow) -> str:
-    """One row of text, joined with commas; proves a row of text crosses."""
-    return ", ".join(names)

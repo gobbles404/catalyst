@@ -255,7 +255,7 @@ namespace Goosedove.Host
         }
     }
 
-    /// <summary>Asks Python which functions exist and registers each one with Excel.</summary>
+    /// <summary>Asks Python which functions exist and registers each one with Excel; a probe is registered hidden from the function wizard.</summary>
     internal static class Registration
     {
         public static void RegisterAll()
@@ -276,9 +276,10 @@ namespace Goosedove.Host
                     {
                         parameters.Add(p.As<string>());
                     }
+                    var hidden = spec[3].As<bool>();
 
                     delegates.Add(MakeDelegate(name, parameters.Count));
-                    attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description });
+                    attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description, IsHidden = hidden });
                     var args = new List<object>();
                     foreach (var p in parameters)
                     {

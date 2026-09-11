@@ -10,11 +10,53 @@ from goosedove.excel.bridge import (
     Array,
     Cells,
     Column,
+    Date,
     DateColumn,
+    DateRow,
     Row,
+    TextColumn,
     TextRow,
     excel_function,
 )
+
+# --- one function per declared range type and Date, the fixtures of this matrix --------
+# SumArray is a probe and needs no fixture here.
+
+
+@excel_function
+def DateText(day: Date) -> str:
+    return str(day)
+
+
+@excel_function
+def SumColumn(values: Column) -> float:
+    return float(values.sum())
+
+
+@excel_function
+def SumRow(values: Row) -> float:
+    return float(values.sum())
+
+
+@excel_function
+def FirstDate(dates: DateColumn) -> str:
+    return str(dates[0])
+
+
+@excel_function
+def LastDate(dates: DateRow) -> str:
+    return str(dates[-1])
+
+
+@excel_function
+def JoinColumn(names: TextColumn) -> str:
+    return ", ".join(names)
+
+
+@excel_function
+def JoinRow(names: TextRow) -> str:
+    return ", ".join(names)
+
 
 # Every range arrives as Cells, whatever it holds. from_rows builds what the host would send.
 cells = Cells.from_rows
