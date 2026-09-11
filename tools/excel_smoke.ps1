@@ -5,6 +5,7 @@ $root = Split-Path $PSScriptRoot -Parent
 
 $formulas = [ordered]@{
     "=GoosedoveStatus()"          = "ok: python started and functions registered"
+    "=HostAdd(1,2)"               = "3"
     "=Zero()"                     = "0"
     "=Add(1,2)"                   = "3"
     "=Add(1,)"                    = "#ERROR Add: b is missing, expected number"
