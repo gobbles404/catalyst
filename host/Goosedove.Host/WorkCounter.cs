@@ -7,16 +7,16 @@ namespace Goosedove.Host
     /// What the host did during one call, by name. An observer supplies one; a worksheet call
     /// never does, so the worksheet path builds nothing and pays only a null check at each
     /// boundary. The names, each a thing the host did:
-    ///   trips              calls into Python: the seam's call, and cells_block once per range
+    ///   trips              calls into Python: the seam's call, and cells_from_buffers once per range
     ///   name_lookups       Python attributes fetched by their text name
     ///   objects_built      Python objects the host made: the name, the argument list, each
     ///                      scalar, and the five values that carry a range
     ///   cells_scanned      cells visited by the range loop, the Excel error that stopped it included
     ///   text_cells         text cells collected in that loop
-    ///   buffers_allocated  managed arrays made for a range in or a block out
+    ///   buffers_allocated  managed arrays made for a range in or an array out
     ///   buffer_bytes       their payload bytes
-    ///   result_copies      copies made of a block on its way to Excel
-    ///   result_cells       cells in that block
+    ///   result_copies      copies made of an array on its way to Excel
+    ///   result_cells       cells in that array
     /// </summary>
     internal sealed class WorkCounter
     {

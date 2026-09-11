@@ -34,14 +34,14 @@ namespace Goosedove.Host.Measure
                 var total = Total(n);
                 measurements.Run("SumArray", "cells in", n, 1, () => sum(column), Equal(total), Counted("SumArray", column));
                 measurements.Run("Dot", "two ranges in", 2 * n, 1, () => dot(column, weights), Equal(total), Counted("Dot", column, weights));
-                measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), Block(n, 1, total), Counted("EchoColumn", column));
+                measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), ArrayOf(n, 1, total), Counted("EchoColumn", column));
                 object rows = (double)n;
                 var counted = (double)n * (n + 1) / 2;  // 1 + 2 + ... + n, in doubles before it overflows an int
-                measurements.Run("Grid", "cells out", 2, n, () => grid(rows, one), Block(n, 1, counted), Counted("Grid", rows, one));
+                measurements.Run("Grid", "cells out", 2, n, () => grid(rows, one), ArrayOf(n, 1, counted), Counted("Grid", rows, one));
                 if (n >= 10)
                 {
                     var wide = Grid(n / 10, 10);
-                    measurements.Run("RowSums", "one answer per row", n, n / 10, () => rowSums(wide), Block(n / 10, 1, total), Counted("RowSums", wide));
+                    measurements.Run("RowSums", "one answer per row", n, n / 10, () => rowSums(wide), ArrayOf(n / 10, 1, total), Counted("RowSums", wide));
                 }
 
                 // The way in alone: scan, pin, hand over, own. The GIL is held outside the clock.
@@ -52,7 +52,7 @@ namespace Goosedove.Host.Measure
                         Equal(null),
                         () => { var work = new WorkCounter(); using (var args = new PyList()) { Marshal.Append(args, column, work); } return work.Freeze(); });
 
-                    // The way out alone: a block Python already holds, read into double[,].
+                    // The way out alone: an array Python already holds, read into double[,].
                     using (var name = new PyString("Grid"))
                     using (var args = new PyList())
                     using (var pyRows = new PyInt(n))
@@ -60,12 +60,12 @@ namespace Goosedove.Host.Measure
                     {
                         args.Append(pyRows);
                         args.Append(pyCols);
-                        using (var block = Bridge.Module.InvokeMethod("call", name, args))
+                        using (var array = Bridge.Module.InvokeMethod("call", name, args))
                         {
                             measurements.Run("Marshal.FromPython", "way out alone", 0, n,
-                                () => Marshal.FromPython(block, "Grid"),
-                                Block(n, 1, counted),
-                                () => { var work = new WorkCounter(); Marshal.FromPython(block, "Grid", work); return work.Freeze(); });
+                                () => Marshal.FromPython(array, "Grid"),
+                                ArrayOf(n, 1, counted),
+                                () => { var work = new WorkCounter(); Marshal.FromPython(array, "Grid", work); return work.Freeze(); });
                         }
                     }
                 }
@@ -156,22 +156,22 @@ namespace Goosedove.Host.Measure
             };
         }
 
-        private static Action<object> Block(int rows, int cols, double total)
+        private static Action<object> ArrayOf(int rows, int cols, double total)
         {
             return actual =>
             {
-                if (!(actual is double[,] block) || block.GetLength(0) != rows || block.GetLength(1) != cols)
+                if (!(actual is double[,] array) || array.GetLength(0) != rows || array.GetLength(1) != cols)
                 {
-                    throw new InvalidOperationException("got " + (actual ?? "null") + ", expected a " + rows + "x" + cols + " block");
+                    throw new InvalidOperationException("got " + (actual ?? "null") + ", expected a " + rows + "x" + cols + " array");
                 }
                 var sum = 0.0;
-                foreach (var value in block)
+                foreach (var value in array)
                 {
                     sum += value;
                 }
                 if (sum != total)
                 {
-                    throw new InvalidOperationException("block sums to " + sum + ", expected " + total);
+                    throw new InvalidOperationException("array sums to " + sum + ", expected " + total);
                 }
             };
         }

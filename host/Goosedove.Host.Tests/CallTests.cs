@@ -68,54 +68,54 @@ namespace Goosedove.Host.Tests
             Assert.Contains("goosedove", (string)Bridge.Call("Ping"));
         }
 
-        // Blocks come back as plain doubles: no boxing, and no NaN, because the seam fails the call first.
+        // Arrays come back as plain doubles: no boxing, and no NaN, because the seam fails the call first.
         [Fact]
         public void a_grid_result_counts_across_then_down()
         {
-            var block = (double[,])Bridge.Call("Grid", 2.0, 3.0);
-            Assert.Equal(2, block.GetLength(0));
-            Assert.Equal(3, block.GetLength(1));
-            Assert.Equal(1.0, block[0, 0]);
-            Assert.Equal(4.0, block[1, 0]);
-            Assert.Equal(6.0, block[1, 2]);
+            var array = (double[,])Bridge.Call("Grid", 2.0, 3.0);
+            Assert.Equal(2, array.GetLength(0));
+            Assert.Equal(3, array.GetLength(1));
+            Assert.Equal(1.0, array[0, 0]);
+            Assert.Equal(4.0, array[1, 0]);
+            Assert.Equal(6.0, array[1, 2]);
         }
 
         [Fact]
         public void a_column_result_spills_down()
         {
-            var block = (double[,])Bridge.Call("EchoColumn", Column(1.0, 2.0, 3.0));
-            Assert.Equal(3, block.GetLength(0));
-            Assert.Equal(1, block.GetLength(1));
-            Assert.Equal(3.0, block[2, 0]);
+            var array = (double[,])Bridge.Call("EchoColumn", Column(1.0, 2.0, 3.0));
+            Assert.Equal(3, array.GetLength(0));
+            Assert.Equal(1, array.GetLength(1));
+            Assert.Equal(3.0, array[2, 0]);
         }
 
         [Fact]
         public void a_row_result_spills_across()
         {
-            var block = (double[,])Bridge.Call("EchoRow", Row(1.0, 2.0, 3.0));
-            Assert.Equal(1, block.GetLength(0));
-            Assert.Equal(3, block.GetLength(1));
-            Assert.Equal(3.0, block[0, 2]);
+            var array = (double[,])Bridge.Call("EchoRow", Row(1.0, 2.0, 3.0));
+            Assert.Equal(1, array.GetLength(0));
+            Assert.Equal(3, array.GetLength(1));
+            Assert.Equal(3.0, array[0, 2]);
         }
 
         [Fact]
         public void a_single_cell_is_a_column_of_one()
         {
-            var block = (double[,])Bridge.Call("EchoColumn", 5.0);
-            Assert.Equal(1, block.GetLength(0));
-            Assert.Equal(1, block.GetLength(1));
-            Assert.Equal(5.0, block[0, 0]);
+            var array = (double[,])Bridge.Call("EchoColumn", 5.0);
+            Assert.Equal(1, array.GetLength(0));
+            Assert.Equal(1, array.GetLength(1));
+            Assert.Equal(5.0, array[0, 0]);
         }
 
         [Fact]
         public void a_grid_in_gives_one_number_per_row_out()
         {
             var grid = new object[,] { { 1.0, 2.0 }, { 3.0, 4.0 }, { 5.0, 6.0 } };
-            var block = (double[,])Bridge.Call("RowSums", grid);
-            Assert.Equal(3, block.GetLength(0));
-            Assert.Equal(1, block.GetLength(1));
-            Assert.Equal(7.0, block[1, 0]);
-            Assert.Equal(11.0, block[2, 0]);
+            var array = (double[,])Bridge.Call("RowSums", grid);
+            Assert.Equal(3, array.GetLength(0));
+            Assert.Equal(1, array.GetLength(1));
+            Assert.Equal(7.0, array[1, 0]);
+            Assert.Equal(11.0, array[2, 0]);
         }
     }
 }

@@ -214,10 +214,10 @@ namespace Goosedove.Host
             }
             work?.Hit("cells_scanned", i);
             work?.Hit("text_cells", texts.Count);
-            return CellsBlock(kinds, numbers, rows, cols, string.Join("\0", texts), work);
+            return CellsFromBuffers(kinds, numbers, rows, cols, string.Join("\0", texts), work);
         }
 
-        // The seam sends one of four things: a number, text, a boolean, or a two-dimensional block
+        // The seam sends one of four things: a number, text, a boolean, or a two-dimensional array
         // of doubles. Each is read by its type at the C level, with no trip into Python. Anything
         // else is the seam's promise broken, and says so in the cell.
         public static object FromPython(PyObject value, string name, WorkCounter work = null)
@@ -249,24 +249,24 @@ namespace Goosedove.Host
             {
                 if (buffer.Dimensions != 2 || buffer.ItemSize != sizeof(double))
                 {
-                    return "#ERROR host: " + name + " returned a buffer that is not a block of doubles";
+                    return "#ERROR host: " + name + " returned a buffer that is not an array of doubles";
                 }
                 var rows = (int)buffer.Shape[0];
                 var cols = (int)buffer.Shape[1];
                 var doubles = new double[rows * cols];
                 System.Runtime.InteropServices.Marshal.Copy(buffer.Buffer, doubles, 0, doubles.Length);
-                var block = new double[rows, cols];
-                Buffer.BlockCopy(doubles, 0, block, 0, doubles.Length * sizeof(double));
+                var array = new double[rows, cols];
+                Buffer.BlockCopy(doubles, 0, array, 0, doubles.Length * sizeof(double));
                 work?.Hit("buffers_allocated", 2);
                 work?.Hit("buffer_bytes", 16L * doubles.Length);
                 work?.Hit("result_copies", 2);
                 work?.Hit("result_cells", doubles.Length);
-                return block;
+                return array;
             }
         }
 
         // Pin the buffers and let Python copy them from pointers.
-        private static PyObject CellsBlock(byte[] kinds, double[] numbers, int rows, int cols, string text, WorkCounter work)
+        private static PyObject CellsFromBuffers(byte[] kinds, double[] numbers, int rows, int cols, string text, WorkCounter work)
         {
             var kindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(kinds, System.Runtime.InteropServices.GCHandleType.Pinned);
             var numbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(numbers, System.Runtime.InteropServices.GCHandleType.Pinned);
@@ -281,7 +281,7 @@ namespace Goosedove.Host
                     work?.Hit("objects_built", 5);
                     work?.Hit("trips");
                     work?.Hit("name_lookups");
-                    return Bridge.Module.InvokeMethod("cells_block", pyKinds, pyNumbers, pyRows, pyCols, pyText);
+                    return Bridge.Module.InvokeMethod("cells_from_buffers", pyKinds, pyNumbers, pyRows, pyCols, pyText);
                 }
             }
             finally

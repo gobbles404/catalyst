@@ -207,16 +207,16 @@ try {
 
     # --- 4 and 5: the same answers three ways, then one input changed; a workbook each ---------
     # The full case recalculates every formula of the arrangement; the edit case changes the
-    # middle input and lets Excel recalculate what depends on it: one row's formula, or one block.
-    $block = $Rows / 10
+    # middle input and lets Excel recalculate what depends on it: one row's formula, or one array.
+    $each = $Rows / 10
     $middle = $Rows / 2
     $arrangements = @(
         @{ Name = "echo one per row"; Probe = "Times"; Cols = 1; Calls = $Rows; Kind = "rows"; Formula = "=Times(RC1)" },
-        @{ Name = "echo ten blocks"; Probe = "EchoColumn"; Cols = 1; Calls = 10; Kind = "blocks"; Formula = "=EchoColumn(A{0}:A{1})" },
-        @{ Name = "echo one block"; Probe = "EchoColumn"; Cols = 1; Calls = 1; Kind = "one"; Formula = "=EchoColumn(A1:A$Rows)" },
+        @{ Name = "echo ten arrays"; Probe = "EchoColumn"; Cols = 1; Calls = 10; Kind = "arrays"; Formula = "=EchoColumn(A{0}:A{1})" },
+        @{ Name = "echo one array"; Probe = "EchoColumn"; Cols = 1; Calls = 1; Kind = "one"; Formula = "=EchoColumn(A1:A$Rows)" },
         @{ Name = "rowsums one per row"; Probe = "RowSums"; Cols = 10; Calls = $Rows; Kind = "rows"; Formula = "=RowSums(RC1:RC10)" },
-        @{ Name = "rowsums ten blocks"; Probe = "RowSums"; Cols = 10; Calls = 10; Kind = "blocks"; Formula = "=RowSums(A{0}:J{1})" },
-        @{ Name = "rowsums one block"; Probe = "RowSums"; Cols = 10; Calls = 1; Kind = "one"; Formula = "=RowSums(A1:J$Rows)" }
+        @{ Name = "rowsums ten arrays"; Probe = "RowSums"; Cols = 10; Calls = 10; Kind = "arrays"; Formula = "=RowSums(A{0}:J{1})" },
+        @{ Name = "rowsums one array"; Probe = "RowSums"; Cols = 10; Calls = 1; Kind = "one"; Formula = "=RowSums(A1:J$Rows)" }
     )
     foreach ($arrangement in $arrangements) {
         Measure-Group {
@@ -225,10 +225,10 @@ try {
             $out = Own $sheet.Range($sheet.Cells.Item(1, 12), $sheet.Cells.Item($Rows, 12))   # column L, clear of every input
             switch ($arrangement.Kind) {
                 "rows" { $out.FormulaR1C1 = $arrangement.Formula }
-                "blocks" {
+                "arrays" {
                     for ($b = 0; $b -lt 10; $b++) {
-                        $top = $b * $block + 1
-                        $sheet.Cells.Item($top, 12).Formula2 = ($arrangement.Formula -f $top, ($top + $block - 1))
+                        $top = $b * $each + 1
+                        $sheet.Cells.Item($top, 12).Formula2 = ($arrangement.Formula -f $top, ($top + $each - 1))
                     }
                 }
                 "one" { $sheet.Cells.Item(1, 12).Formula2 = $arrangement.Formula }

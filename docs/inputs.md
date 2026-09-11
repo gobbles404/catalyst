@@ -25,7 +25,7 @@ An array holds the six kinds, cell by cell.
 | `{5}`, `SEQUENCE(1)`, a `FILTER` that matches one row | A 1×1 array. Excel does not unwrap it. |
 | `A1:A8`, `B1:D1`, `A1:D3`, `G1#`, `Table1[Price]`, `{1,2;3,4}`, `SEQUENCE(3)` | An array of that shape. A column is N×1, a row is 1×N, in sheet order. |
 | `A:A` | 1,048,576 rows, every unused cell blank. `1:1` is 16,384 columns. |
-| A range with hidden or filtered rows, or merged cells | Every row. A merged block is its top-left value and blanks. |
+| A range with hidden or filtered rows, or merged cells | Every row. A merged array is its top-left value and blanks. |
 | A reference to another sheet, or a defined name | The values only. No sheet, address, or name ever crosses. |
 
 Everything in both tables was checked against the Excel-DNA source at the pinned version, and most rows were measured in Excel with a probe add-in.
