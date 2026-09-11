@@ -51,11 +51,11 @@ def test_add_crosses_the_seam() -> None:
 
 
 # What the host sends for a 2x2 range holding 1.5, "n/a", a blank, and TRUE.
-def test_cells_block_copies_the_host_buffers() -> None:
+def test_cells_from_buffers_copies_the_host_buffers() -> None:
     kinds = (ctypes.c_uint8 * 4)(0, 1, 3, 2)
     numbers = (ctypes.c_double * 4)(1.5, float("nan"), float("nan"), 1.0)
     cells = bridge.cells_from_buffers(
-        ctypes.addressof(kinds), ctypes.addressof(numbers), 2, 2, "n/a"
+        ctypes.addressof(kinds), ctypes.addressof(numbers), 2, 2, "n/a", 0b1111
     )
     kinds[0] = 9
     numbers[0] = 99.0
@@ -63,22 +63,52 @@ def test_cells_block_copies_the_host_buffers() -> None:
     assert cells.numbers[0, 0] == 1.5
     assert np.isnan(cells.numbers[0, 1])
     assert cells.texts == ("n/a",)
+    assert cells.seen == 0b1111
 
 
-def test_cells_block_splits_the_joined_text_even_when_a_cell_is_empty() -> None:
+def test_cells_from_buffers_splits_the_joined_text_even_when_a_cell_is_empty() -> None:
     kinds = (ctypes.c_uint8 * 2)(1, 1)
     numbers = (ctypes.c_double * 2)(float("nan"), float("nan"))
     cells = bridge.cells_from_buffers(
-        ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 2, "x\0"
+        ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 2, "x\0", bridge.ONLY_TEXT
     )
     assert cells.texts == ("x", "")
 
 
-def test_cells_block_with_no_text_has_no_texts() -> None:
+def test_cells_from_buffers_with_no_text_has_no_texts() -> None:
     kinds = (ctypes.c_uint8 * 1)(0)
     numbers = (ctypes.c_double * 1)(2.0)
-    cells = bridge.cells_from_buffers(ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 1, "")
+    cells = bridge.cells_from_buffers(
+        ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 1, "", bridge.ONLY_NUMBERS
+    )
     assert cells.texts == ()
+
+
+# The host's summary is one bit per kind that occurred; from_rows computes the same one.
+def test_from_rows_sees_the_kinds_the_host_would_see() -> None:
+    assert bridge.Cells.from_rows([[1.0, 2.0]]).seen == bridge.ONLY_NUMBERS
+    assert bridge.Cells.from_rows([["a"], ["b"]]).seen == bridge.ONLY_TEXT
+    assert bridge.Cells.from_rows([[1.0, "x", None, True, bridge.MISSING]]).seen == 0b11111
+
+
+def test_from_rows_refuses_a_range_with_no_cells() -> None:
+    with pytest.raises(ValueError):
+        bridge.Cells.from_rows([[]])
+    with pytest.raises(ValueError):
+        bridge.Cells.from_rows([])
+
+
+# A bad cell is still named by its kind code when the summary says the range is not all numbers.
+def test_the_summary_decides_and_the_kinds_name_the_cell() -> None:
+    assert bridge.call("SumArray", [bridge.Cells.from_rows([[1.0, 2.0], [3.0, 4.0]])]) == 10.0
+    assert (
+        bridge.call("SumArray", [bridge.Cells.from_rows([[1.0, 2.0], [3.0, "x"]])])
+        == "#ERROR SumArray: values cell (2, 2) is text 'x', expected number"
+    )
+    assert (
+        bridge.call("SumArray", [bridge.Cells.from_rows([[1.0, True]])])
+        == "#ERROR SumArray: values cell (1, 2) is boolean TRUE, expected number"
+    )
 
 
 def test_entry_is_the_prepared_path_the_host_holds() -> None:

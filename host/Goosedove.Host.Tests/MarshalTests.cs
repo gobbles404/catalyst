@@ -88,6 +88,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("[[0, 1], [3, 2], [4, 3]]", Attribute(grid, "kinds"));
             Assert.Equal("[[1.5, nan], [nan, 1.0], [nan, nan]]", Attribute(grid, "numbers"));
             Assert.Equal("('n/a',)", Attribute(grid, "texts"));
+            Assert.Equal("31", Attribute(grid, "seen"));  // every kind occurred: one bit each
         }
 
         [Fact]
@@ -96,12 +97,14 @@ namespace Goosedove.Host.Tests
             var grid = new object[,] { { "x", 1.0 }, { "", "y" } };
             Assert.Equal("[[1, 0], [1, 1]]", Attribute(grid, "kinds"));
             Assert.Equal("('x', '', 'y')", Attribute(grid, "texts"));
+            Assert.Equal("3", Attribute(grid, "seen"));  // numbers and text
         }
 
         [Fact]
         public void a_range_of_only_numbers_carries_no_text()
         {
             Assert.Equal("()", Attribute(new object[,] { { 1.0 }, { 2.0 } }, "texts"));
+            Assert.Equal("1", Attribute(new object[,] { { 1.0 }, { 2.0 } }, "seen"));  // numbers only
         }
 
         [Fact]

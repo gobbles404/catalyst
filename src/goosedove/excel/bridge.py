@@ -7,8 +7,9 @@ module that registers worksheet functions, so the function list is complete by
 the time the host asks. For each function the host fetches its prepared path,
 entry(name), once, and calls it with each recalculation's inputs. A blank cell
 arrives as None, an omitted argument as MISSING, and every range as Cells: one
-kind code per cell, one number per cell, and the text cells in sheet order,
-which cells_from_buffers builds from the host's buffers. Excel errors never
+kind code per cell, one number per cell, the text cells in sheet order, and
+the host's summary of which kinds occurred, which cells_from_buffers builds
+from the host's buffers. Excel errors never
 arrive; the host returns them before calling. The prepared path validates the
 type of every argument against the function's own signature, once, by type
 and shape and never by meaning; past it nothing checks. On the way back it
@@ -86,30 +87,45 @@ class Kind(IntEnum):
 
 @dataclass(frozen=True, slots=True, eq=False)
 class Cells:
-    """A range as the host sends it: a kind per cell, a number per cell, the text cells in order.
+    """A range as the host sends it: a kind per cell, a number per cell, the text cells in order,
+    and which kinds occurred at all.
 
     numbers holds the value of number and boolean cells and NaN elsewhere. texts holds every
-    text cell in sheet order, so the k-th text cell is the k-th TEXT in kinds.
+    text cell in sheet order, so the k-th text cell is the k-th TEXT in kinds. seen is what the
+    host learned while it walked the range, one bit per kind that occurred, so a range of only
+    numbers is known to be one without a look at the kinds; the kinds still name the offending
+    cell when a look is needed.
     """
 
     kinds: NDArray[np.uint8]
     numbers: NDArray[np.float64]
     texts: tuple[str, ...]
+    seen: int
 
     @classmethod
     def from_rows(cls, rows: Sequence[Sequence[object]]) -> "Cells":
         """What the host would send for these cells, from Python values. Tests build ranges here."""
+        if not rows or not rows[0]:
+            raise ValueError("a range has at least one cell; Excel never sends fewer")
         kinds = np.empty((len(rows), len(rows[0])), dtype=np.uint8)
         numbers = np.full(kinds.shape, np.nan)
         texts: list[str] = []
+        seen = 0
         for r, row in enumerate(rows):
             for c, cell in enumerate(row):
                 kind, number = _classify(cell)
                 kinds[r, c] = kind
                 numbers[r, c] = number
+                seen |= 1 << kind
                 if kind is Kind.TEXT:
                     texts.append(cast(str, cell))
-        return cls(kinds, numbers, tuple(texts))
+        return cls(kinds, numbers, tuple(texts), seen)
+
+
+# The host's summary of a range: one bit per Kind that occurred. A range of only numbers
+# is ONLY_NUMBERS; anything else needs a look at the kinds to name the first bad cell.
+ONLY_NUMBERS: Final = 1 << Kind.NUMBER
+ONLY_TEXT: Final = 1 << Kind.TEXT
 
 
 def _classify(cell: object) -> tuple[Kind, float]:
@@ -127,17 +143,19 @@ def _classify(cell: object) -> tuple[Kind, float]:
 
 
 def cells_from_buffers(
-    kinds_pointer: int, numbers_pointer: int, rows: int, cols: int, text: str
+    kinds_pointer: int, numbers_pointer: int, rows: int, cols: int, text: str, seen: int
 ) -> Cells:
-    """Copy the host's pinned buffers into Cells. The text cells arrive joined with NUL."""
+    """Copy the host's pinned buffers into Cells. The text cells arrive joined with NUL.
+
+    seen is the host's summary of the kinds it met, so no look at the kinds is needed here.
+    """
     count = rows * cols
     kinds = np.frombuffer((ctypes.c_uint8 * count).from_address(kinds_pointer), dtype=np.uint8)
     numbers = np.frombuffer(
         (ctypes.c_double * count).from_address(numbers_pointer), dtype=np.float64
     )
-    kinds = kinds.reshape(rows, cols).copy()
-    texts = tuple(text.split("\0")) if (kinds == Kind.TEXT).any() else ()
-    return Cells(kinds, numbers.reshape(rows, cols).copy(), texts)
+    texts = tuple(text.split("\0")) if seen & ONLY_TEXT else ()
+    return Cells(kinds.reshape(rows, cols).copy(), numbers.reshape(rows, cols).copy(), texts, seen)
 
 
 def _cell(cells: Cells, i: int) -> object:
@@ -211,15 +229,14 @@ def _date(value: object) -> np.datetime64:
     return EXCEL_EPOCH + np.timedelta64(serial, "D")
 
 
-# --- every cell of a range, in one vectorized look ----------------------------
+# --- every cell of a range: no look when the host's summary settles it, one look otherwise ---
 
 
 def _numbers(value: object) -> NDArray[np.float64]:
     """Every cell a number, kept in sheet order. A scalar is a 1x1 range."""
     if isinstance(value, Cells):
-        bad = value.kinds != Kind.NUMBER
-        if bad.any():
-            raise _first_bad(value, bad, "number")
+        if value.seen != ONLY_NUMBERS:
+            raise _first_bad(value, value.kinds != Kind.NUMBER, "number")
         return value.numbers
     return np.array([[_number(value)]])
 
@@ -228,12 +245,9 @@ def _dates(value: object) -> NDArray[np.datetime64]:
     """Every cell a date, kept in sheet order. A scalar is a 1x1 range."""
     if isinstance(value, Cells):
         array = value.numbers
-        bad = (
-            (value.kinds != Kind.NUMBER)
-            | (array != np.floor(array))
-            | (array < FIRST_SERIAL)
-            | (array > LAST_SERIAL)
-        )
+        bad = (array != np.floor(array)) | (array < FIRST_SERIAL) | (array > LAST_SERIAL)
+        if value.seen != ONLY_NUMBERS:
+            bad |= value.kinds != Kind.NUMBER
         if bad.any():
             raise _first_bad(value, bad, "date")
         return EXCEL_EPOCH + array.astype(np.int64).astype("timedelta64[D]")
@@ -243,9 +257,8 @@ def _dates(value: object) -> NDArray[np.datetime64]:
 def _texts(value: object) -> NDArray[np.object_]:
     """Every cell text with a character in it, kept in sheet order. A scalar is a 1x1 range."""
     if isinstance(value, Cells):
-        bad = value.kinds != Kind.TEXT
-        if bad.any():
-            raise _first_bad(value, bad, "text")
+        if value.seen != ONLY_TEXT:
+            raise _first_bad(value, value.kinds != Kind.TEXT, "text")
         if "" in value.texts:
             r, c = divmod(value.texts.index(""), value.kinds.shape[1])
             raise _Rejected((r + 1, c + 1), "", "text")

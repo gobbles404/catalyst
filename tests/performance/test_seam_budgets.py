@@ -58,7 +58,8 @@ def test_rejected_scalar_call_stops_at_the_first_failure(call_profile: CallProfi
     }
 
 
-# Every range is one vectorized look, however many cells it holds and whatever they hold.
+# A range of numbers needs no look: the host's summary settles it. Whatever a range holds, the
+# seam's own functions run the same number of times.
 def test_accepted_array_call_itemized(call_profile: CallProfile) -> None:
     column = Cells.from_rows([[float(i)] for i in range(10_000)])
     PATH["SumArray"](column)
@@ -228,7 +229,9 @@ def test_a_failing_body_costs_no_look(call_profile: CallProfile) -> None:
     }
 
 
-def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
+def test_two_ranges_are_two_checks_and_no_look(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
     a, b = column(), column()
     PATH["Dot"](a, b)
     assert call_profile(lambda: PATH["Dot"](a, b)) == {
@@ -243,19 +246,16 @@ def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallPr
         "_number_out": 1,
         "_scalar": 1,
     }
-    assert numpy_calls(lambda: PATH["Dot"](a, b)) == {
-        "ndarray.any": 2,
-        "ufunc.reduce": 2,
-    }
+    # Two ranges of numbers: the host's summary settles both, so numpy takes no look at all.
+    assert numpy_calls(lambda: PATH["Dot"](a, b)) == {}
 
 
-def test_a_sum_is_one_look_and_one_reduction(numpy_calls: CallProfile) -> None:
+def test_a_sum_is_one_reduction_and_no_look(numpy_calls: CallProfile) -> None:
     values = column()
     PATH["SumArray"](values)
     assert numpy_calls(lambda: PATH["SumArray"](values)) == {
-        "ndarray.any": 1,
         "ndarray.sum": 1,
-        "ufunc.reduce": 2,
+        "ufunc.reduce": 1,
     }
 
 
@@ -275,13 +275,13 @@ def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: Cal
         "_dimensions": 1,
         "_finite": 1,
     }
-    # One look in (any), one look out (all); ascontiguousarray hands back the same array.
+    # No look in, the summary settles it; one look out (all); ascontiguousarray hands back the
+    # same array.
     assert numpy_calls(lambda: PATH["EchoColumn"](values)) == {
-        "ndarray.any": 1,
         "ndarray.all": 1,
         "ndarray.reshape": 1,
         "numpy.ascontiguousarray": 1,
-        "ufunc.reduce": 2,
+        "ufunc.reduce": 1,
     }
 
 
@@ -304,11 +304,10 @@ def test_a_row_out_costs_what_a_column_out_costs(
         "_finite": 1,
     }
     assert numpy_calls(lambda: PATH["EchoRow"](values)) == {
-        "ndarray.any": 1,
         "ndarray.all": 1,
         "ndarray.reshape": 1,
         "numpy.ascontiguousarray": 1,
-        "ufunc.reduce": 2,
+        "ufunc.reduce": 1,
     }
 
 
@@ -326,16 +325,15 @@ def test_one_answer_per_row_itemized(call_profile: CallProfile, numpy_calls: Cal
         "_finite": 1,
     }
     assert numpy_calls(lambda: PATH["RowSums"](values)) == {
-        "ndarray.any": 1,
         "ndarray.sum": 1,
         "ndarray.all": 1,
         "ndarray.reshape": 1,
         "numpy.ascontiguousarray": 1,
-        "ufunc.reduce": 3,
+        "ufunc.reduce": 2,
     }
 
 
-def test_a_block_out_from_nothing_in_itemized(
+def test_an_array_out_from_nothing_in_itemized(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     PATH["Grid"](5000, 2)
@@ -360,30 +358,29 @@ def test_a_block_out_from_nothing_in_itemized(
 
 
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
-def host_buffers(text_cell: bool) -> tuple[int, int, str]:
+def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
     _keep.extend((kinds, numbers))
-    return ctypes.addressof(kinds), ctypes.addressof(numbers), "x" if text_cell else ""
+    seen = bridge.ONLY_NUMBERS | (bridge.ONLY_TEXT if text_cell else 0)
+    return ctypes.addressof(kinds), ctypes.addressof(numbers), "x" if text_cell else "", seen
 
 
 _keep: list[object] = []
 
 
 @pytest.mark.parametrize("text_cell", [False, True], ids=["numbers", "one text cell"])
-def test_cells_block_copies_each_buffer_once(
+def test_cells_from_buffers_copies_each_buffer_once(
     text_cell: bool, call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    kinds, numbers, text = host_buffers(text_cell)
-    bridge.cells_from_buffers(kinds, numbers, N, 1, text)
-    assert call_profile(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text)) == {
+    kinds, numbers, text, seen = host_buffers(text_cell)
+    bridge.cells_from_buffers(kinds, numbers, N, 1, text, seen)
+    assert call_profile(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text, seen)) == {
         "cells_from_buffers": 1,
     }
-    # Two views, two copies, and one look for text cells whatever they hold.
-    assert numpy_calls(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text)) == {
+    # Two views, two copies, and no look: the host's summary says whether there is text.
+    assert numpy_calls(lambda: bridge.cells_from_buffers(kinds, numbers, N, 1, text, seen)) == {
         "numpy.frombuffer": 2,
         "ndarray.reshape": 2,
         "ndarray.copy": 2,
-        "ndarray.any": 1,
-        "ufunc.reduce": 1,
     }

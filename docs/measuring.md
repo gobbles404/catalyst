@@ -23,7 +23,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 
 ## Counts, as tests
 
-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.any`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. A range whose summary from the host says all numbers takes no look at its kinds, so `ndarray.any` appears only on the rejected and date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
 
 **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
 
@@ -31,7 +31,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 |---|---|
 | `trips` | calls into Python: the function's prepared path, and `cells_from_buffers` once per range |
 | `name_lookups` | Python attributes fetched by their text name; a prepared call makes none |
-| `objects_built` | Python objects the host made: each scalar, the five values that carry a range |
+| `objects_built` | Python objects the host made: each scalar, the six values that carry a range, the summary of kinds seen among them |
 | `cells_scanned` | cells visited by the range loop, the Excel error that stopped it included |
 | `text_cells` | text cells collected in that loop |
 | `buffers_allocated`, `buffer_bytes` | managed arrays made for a range in or an array out, and their payload bytes |

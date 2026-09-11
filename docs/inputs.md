@@ -126,7 +126,7 @@ Decided 2026-09-09, closing the input side.
 18. A unit is its own argument. One cell holds one value, never `1000 bbl`.
 19. An error inside a range comes back as that error, with no cell named.
 20. Newer Excel errors such as `#SPILL!` arrive as `#VALUE!`. Known, and left alone.
-21. Every range crosses the host the same way: a kind per cell, a number per cell, and the text cells in sheet order, in one pass. The host never chooses a road, and validating any range is one vectorized look.
+21. Every range crosses the host the same way: a kind per cell, a number per cell, the text cells in sheet order, and a summary of which kinds occurred, all from one pass. The host never chooses a road. A range the summary shows to be all numbers, or all text, is accepted without a look at the kinds; otherwise one look names the first offending cell.
 
 ## Not supported
 

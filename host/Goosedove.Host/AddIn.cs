@@ -180,12 +180,15 @@ namespace Goosedove.Host
             }
         }
 
-        // The codes of the seam's Kind enum.
+        // The codes of the seam's Kind enum, and the bit each sets in the summary of kinds seen.
         private const byte Number = 0, Text = 1, Boolean = 2, Blank = 3, Missing = 4;
+        private const byte NumberSeen = 1 << Number, TextSeen = 1 << Text, BooleanSeen = 1 << Boolean, BlankSeen = 1 << Blank, MissingSeen = 1 << Missing;
 
         // One pass over the cells, in sheet order. An Excel error anywhere is returned and
         // nothing is built. Every other range ships the same way: one kind code per cell,
-        // one number per cell (NaN where there is none), and the text cells joined with NUL.
+        // one number per cell (NaN where there is none), the text cells joined with NUL, and
+        // one bit per kind that occurred, so the seam learns "all numbers" from this pass and
+        // takes no look of its own.
         private static PyObject Range(object[,] rect, out object error, WorkCounter work)
         {
             error = null;
@@ -195,6 +198,7 @@ namespace Goosedove.Host
             work?.Hit("buffers_allocated", 2);
             work?.Hit("buffer_bytes", 9L * rows * cols);
             var texts = new List<string>();
+            byte seen = 0;
             var i = 0;
             foreach (var cell in rect)
             {
@@ -209,27 +213,32 @@ namespace Goosedove.Host
                 {
                     kinds[i] = Number;
                     numbers[i] = d;
+                    seen |= NumberSeen;
                 }
                 else if (cell is string s)
                 {
                     kinds[i] = Text;
                     numbers[i] = double.NaN;
                     texts.Add(s);
+                    seen |= TextSeen;
                 }
                 else if (cell is bool b)
                 {
                     kinds[i] = Boolean;
                     numbers[i] = b ? 1.0 : 0.0;
+                    seen |= BooleanSeen;
                 }
                 else if (cell == null || cell is ExcelEmpty)
                 {
                     kinds[i] = Blank;
                     numbers[i] = double.NaN;
+                    seen |= BlankSeen;
                 }
                 else if (cell is ExcelMissing)
                 {
                     kinds[i] = Missing;
                     numbers[i] = double.NaN;
+                    seen |= MissingSeen;
                 }
                 else
                 {
@@ -239,7 +248,7 @@ namespace Goosedove.Host
             }
             work?.Hit("cells_scanned", i);
             work?.Hit("text_cells", texts.Count);
-            return CellsFromBuffers(kinds, numbers, rows, cols, string.Join("\0", texts), work);
+            return CellsFromBuffers(kinds, numbers, rows, cols, string.Join("\0", texts), seen, work);
         }
 
         // The seam sends one of four things: a number, text, a boolean, or a two-dimensional array
@@ -290,8 +299,8 @@ namespace Goosedove.Host
             }
         }
 
-        // Pin the buffers and let Python copy them from pointers.
-        private static PyObject CellsFromBuffers(byte[] kinds, double[] numbers, int rows, int cols, string text, WorkCounter work)
+        // Pin the buffers and let Python copy them from pointers, with the kinds seen beside them.
+        private static PyObject CellsFromBuffers(byte[] kinds, double[] numbers, int rows, int cols, string text, byte seen, WorkCounter work)
         {
             var kindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(kinds, System.Runtime.InteropServices.GCHandleType.Pinned);
             var numbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(numbers, System.Runtime.InteropServices.GCHandleType.Pinned);
@@ -302,10 +311,11 @@ namespace Goosedove.Host
                 using (var pyRows = new PyInt(rows))
                 using (var pyCols = new PyInt(cols))
                 using (var pyText = new PyString(text))
+                using (var pySeen = new PyInt(seen))
                 {
-                    work?.Hit("objects_built", 5);
+                    work?.Hit("objects_built", 6);
                     work?.Hit("trips");
-                    return Bridge.CellsFromBuffers.Invoke(pyKinds, pyNumbers, pyRows, pyCols, pyText);
+                    return Bridge.CellsFromBuffers.Invoke(pyKinds, pyNumbers, pyRows, pyCols, pyText, pySeen);
                 }
             }
             finally

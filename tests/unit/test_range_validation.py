@@ -70,10 +70,10 @@ BOOLEAN_INSIDE = cells([[True]])
 MISSING_INSIDE = cells([[1.0, MISSING]])
 NAMES_ROW = cells([["x", "y"]])
 NAMES_COLUMN = cells([["x"], ["y"]])
-NAMES_BLOCK = cells([["a", "b"], ["c", "d"]])
+NAMES_ARRAY = cells([["a", "b"], ["c", "d"]])
 DATES_COLUMN = cells([[46164.0], [46165.0]])  # 22 and 23 May 2026
 DATES_ROW = cells([[46164.0, 46165.0]])
-DATES_BLOCK = cells([[46164.0, 46165.0], [46166.0, 46167.0]])
+DATES_ARRAY = cells([[46164.0, 46165.0], [46166.0, 46167.0]])
 
 
 # --- what passes, and what the function receives ---------------------------
@@ -231,7 +231,7 @@ def test_text_is_handed_over_as_a_tuple() -> None:
         ("SumRow", ARRAY, "#ERROR SumRow: values is 2x2 array, expected row of numbers"),
         ("SumRow", True, "#ERROR SumRow: values is boolean TRUE, expected row of numbers"),
         ("JoinRow", NAMES_COLUMN, "#ERROR JoinRow: names is 2x1 array, expected row of text"),
-        ("JoinRow", NAMES_BLOCK, "#ERROR JoinRow: names is 2x2 array, expected row of text"),
+        ("JoinRow", NAMES_ARRAY, "#ERROR JoinRow: names is 2x2 array, expected row of text"),
         (
             "JoinRow",
             cells([["x", ""]]),
@@ -255,7 +255,7 @@ def test_text_is_handed_over_as_a_tuple() -> None:
         ("JoinColumn", NAMES_ROW, "#ERROR JoinColumn: names is 1x2 array, expected column of text"),
         (
             "JoinColumn",
-            NAMES_BLOCK,
+            NAMES_ARRAY,
             "#ERROR JoinColumn: names is 2x2 array, expected column of text",
         ),
         (
@@ -302,7 +302,7 @@ def test_text_is_handed_over_as_a_tuple() -> None:
         ("FirstDate", 60.0, "#ERROR FirstDate: dates is number 60.0, expected column of dates"),
         ("FirstDate", DATES_ROW, "#ERROR FirstDate: dates is 1x2 array, expected column of dates"),
         ("LastDate", DATES_COLUMN, "#ERROR LastDate: dates is 2x1 array, expected row of dates"),
-        ("LastDate", DATES_BLOCK, "#ERROR LastDate: dates is 2x2 array, expected row of dates"),
+        ("LastDate", DATES_ARRAY, "#ERROR LastDate: dates is 2x2 array, expected row of dates"),
         (
             "LastDate",
             cells([[46164.0, 46164.5]]),
