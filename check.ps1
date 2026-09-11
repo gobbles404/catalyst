@@ -4,7 +4,7 @@ $steps = @(
   "uv run ruff check --fix .",
   "uv run pyright",
   "uv run pytest -n auto",
-  "dotnet test host\Goosedove.Host.Tests --nologo -v q",
+  "dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1"
 )
 foreach ($s in $steps) {
