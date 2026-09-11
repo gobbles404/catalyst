@@ -1,0 +1,37 @@
+probe,scenario,cells_in,cells_out,peak_bytes
+Zero,scalar,0,1,160
+Add,scalar,2,1,256
+Times,missing,1,1,224
+SumArray,cells in,1,1,1481
+Dot,two ranges in,2,1,1617
+EchoColumn,round trip,1,1,1481
+Grid,cells out,2,1,410
+cells_block,owning a range,1,0,1626
+SumArray,cells in,100,1,2372
+Dot,two ranges in,200,1,2508
+EchoColumn,round trip,100,100,2372
+Grid,cells out,2,100,1301
+RowSums,one answer per row,100,10,2372
+cells_block,owning a range,100,0,2616
+SumArray,cells in,1000,1,10472
+Dot,two ranges in,2000,1,10608
+EchoColumn,round trip,1000,1000,10472
+Grid,cells out,2,1000,9401
+RowSums,one answer per row,1000,100,10472
+cells_block,owning a range,1000,0,11648
+SumArray,cells in,10000,1,77008
+Dot,two ranges in,20000,1,77144
+EchoColumn,round trip,10000,10000,77008
+Grid,cells out,2,10000,90401
+RowSums,one answer per row,10000,1000,77008
+cells_block,owning a range,10000,0,90536
+SumArray,cells in,100000,1,167008
+Dot,two ranges in,200000,1,167144
+EchoColumn,round trip,100000,100000,167008
+Grid,cells out,2,100000,900401
+RowSums,one answer per row,100000,10000,167008
+cells_block,owning a range,100000,0,900536
+EchoRow,rejected: shape,10000,0,1914
+SumArray,rejected: text first,10000,0,77008
+SumArray,rejected: text last,10000,0,87247
+SumArray,rejected: blank deep,10000,0,77008

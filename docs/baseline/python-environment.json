@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-09-11T11:03:23.399004+00:00",
+  "revision": "024486f4e457f2cd3f5e322272853f5943b00a51",
+  "bridge_sha256": "d62f32d4f8f5f7e47c09ad17b83453267b7fad420219d9134d0a32be21eac645",
+  "probes_sha256": "13893651febfbf2953b3c07022088a227b18f18a11db4269d663c5213bb6b68a",
+  "python": "3.13.13 (tags/v3.13.13:01104ce, Apr  7 2026, 19:25:48) [MSC v.1944 64 bit (AMD64)]",
+  "numpy": "2.5.2",
+  "machine": "AMD64",
+  "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "batch_target_ms": 50.0,
+  "batches": 5,
+  "timed_scope": "bridge.call on Cells built before the clock: validation, the probe, result conversion. cells_block is timed apart. Excludes the host, Excel, and building inputs. Each row is one batch; per_call_us is that batch's mean.",
+  "allocation_scope": "tracemalloc peak of the Python heap during one warm call, numpy data included, the host's pinned buffers excluded."
+}

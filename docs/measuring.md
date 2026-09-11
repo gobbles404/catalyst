@@ -77,6 +77,10 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 - **Counts before time.** When a timing moves, the counters say what moved; when the counters move, the timing says whether it mattered.
 - **Variation is part of the answer.** Large outputs vary several-fold between batches under garbage collection; the min and max beside the median carry that, and `batches.csv` records collection counts per batch.
 
+## The baseline
+
+[baseline.md](baseline.md) holds one session's numbers at a named revision, the CSVs they were read from in `docs/baseline/`, and what they say about how the library's formulas should be shaped. A seam change is judged against those rows.
+
 ## Where reports land
 
 `profiles/`, ignored by git: `python-timing.csv`, `python-allocation.csv`, `python-environment.json`, `host-measure/batches.csv`, `host-measure/work.csv`, `host-measure/environment.json`, `excel-timing.csv`, `excel-timing-environment.json`, the same two with `-rows<N>` in the name for a control run, `summary.md`, and one HTML profile per probe.
