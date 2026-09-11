@@ -49,6 +49,7 @@ def workloads() -> dict[str, Callable[[], object]]:
         "Dot": lambda: bridge.call("Dot", [column, weights]),
         "EchoColumn": lambda: bridge.call("EchoColumn", [column]),
         "EchoRow": lambda: bridge.call("EchoRow", [row]),
+        "RowSums": lambda: bridge.call("RowSums", [grid]),
         "Grid": lambda: bridge.call("Grid", [5000, 2]),
         "Fail": lambda: bridge.call("Fail", []),
     }

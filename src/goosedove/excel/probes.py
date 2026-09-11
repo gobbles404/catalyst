@@ -74,6 +74,12 @@ def EchoRow(values: Row) -> Row:
 
 
 @probe
+def RowSums(values: Array) -> Column:
+    """Probe: a grid in, one number per row out, spilled down: the shape of pricing every row."""
+    return Column(values.sum(axis=1))
+
+
+@probe
 def Grid(rows: int, cols: int) -> Array:
     """Probe: a block out, rows by cols, counting 1, 2, 3 across then down."""
     if rows < 1 or cols < 1:

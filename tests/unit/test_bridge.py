@@ -38,6 +38,7 @@ def test_every_probe_is_hidden_and_ping_is_not() -> None:
         "Dot",
         "EchoColumn",
         "EchoRow",
+        "RowSums",
         "Grid",
         "Fail",
     }
