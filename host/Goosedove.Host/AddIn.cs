@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Goosedove.Host.Tests")]
+[assembly: InternalsVisibleTo("Goosedove.Host.Measure")]
 
 namespace Goosedove.Host
 {
