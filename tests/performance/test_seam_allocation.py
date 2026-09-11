@@ -46,15 +46,15 @@ def test_a_range_of_numbers_in_makes_no_temporary() -> None:
     assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= SLACK
 
 
-# A rejected range still takes the look that names the bad cell: the kinds compare against an
-# IntEnum casts through numpy's scratch buffer beside its 1-byte mask, and the mask stays alive
-# while the bad cell is read. Measured 87,239 at ten thousand cells; the ceiling is a bound at
-# this size, not a per-cell slope.
-def test_a_rejected_range_pays_one_look_and_its_temporaries() -> None:
+# A rejected range still takes the look that names the bad cell: one 1-byte mask over the
+# kinds, and a second one while the bad cell's text is found by counting the text cells before
+# it. Measured 20,640 at ten thousand cells with the bad cell last, down from 87,239 when the
+# compare against an IntEnum cast the kinds through numpy's 8-byte scratch buffer.
+def test_a_rejected_range_pays_one_look_and_its_two_masks() -> None:
     rows: list[list[object]] = [[float(i)] for i in range(N)]
     rows[-1][0] = "x"
     column = Cells.from_rows(rows)
-    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 9 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 2 * N + SLACK
 
 
 # The way out still looks once, for finite numbers: one byte per cell. Measured 10,385.
