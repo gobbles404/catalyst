@@ -28,6 +28,8 @@ $formulas = [ordered]@{
     "=ROWS(EchoColumn(A1:A3))"    = "3"
     "=COLUMNS(EchoRow({1,2,3}))"  = "3"
     "=SUM(EchoColumn(A1:A3))"     = "6"
+    "=ROWS(RowSums({1,2;3,4;5,6}))" = "3"
+    "=INDEX(RowSums({1,2;3,4;5,6}),2,1)" = "7"
     "=INDEX(Grid(2,3),2,1)"       = "4"
     "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"

@@ -106,5 +106,16 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1, block.GetLength(1));
             Assert.Equal(5.0, block[0, 0]);
         }
+
+        [Fact]
+        public void a_grid_in_gives_one_number_per_row_out()
+        {
+            var grid = new object[,] { { 1.0, 2.0 }, { 3.0, 4.0 }, { 5.0, 6.0 } };
+            var block = (double[,])Bridge.Call("RowSums", grid);
+            Assert.Equal(3, block.GetLength(0));
+            Assert.Equal(1, block.GetLength(1));
+            Assert.Equal(7.0, block[1, 0]);
+            Assert.Equal(11.0, block[2, 0]);
+        }
     }
 }
