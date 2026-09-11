@@ -41,6 +41,8 @@ The same file pins three managed-allocation ceilings with `GC.GetAllocatedBytesF
 
 A seam change states its counts before and after. A change that moves no counter is not the change it claims to be.
 
+**Before and after, every row.** A seam change is also measured across the whole seam, not only where it aimed. `tools/performance/before_after.ps1` checks the change's base out into a temporary worktree, runs the three runners on the base and on this tree in one session, one runner at a time on each side, and `compare.py` writes `profiles/compare.md`: every timed row of every layer with the before and after medians and their batch spreads, every host counter that differs, and the allocation figures. A row counts as moved only when its two batch spreads do not overlap, and even then a change with no effect moves rows by a few percent within one session: the rename that changed nothing moved a third of the rows, most by under 5% and a few by more where one side's early batches ran slow. Read a move as real when it is large, consistent across sizes, and where the change aimed; a large move where it did not aim is the finding. The pull request pastes the report whole.
+
 ## Time, as tools
 
 Each runner warms once, checks the answer, calibrates the number of calls until a batch takes about 50 ms, runs five batches, checks the last result of each batch outside the clock, and writes every batch as one row. `per_call_us` is a batch mean, never a percentile of single calls. Beside each CSV sits an environment file naming the revision, the hashes of the seam's source and the host's assembly, the runtimes, and one sentence saying what the clock includes.
@@ -51,6 +53,7 @@ Each runner warms once, checks the answer, calibrates the number of calls until 
 | `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus `Marshal.Append` alone and `Marshal.FromPython` alone with the GIL held outside the clock | Excel and Excel-DNA |
 | `.\tools\performance\measure_excel.ps1` | `Range.Calculate` or `Application.Calculate` over COM in a hidden Excel | everything a user feels: Excel, Excel-DNA, the host, Python, and the COM round trips | startup, building the sheets, checking answers |
 | `uv run python tools/performance/summarize.py` | none | reads whatever CSVs exist under `profiles/` and writes `profiles/summary.md`, one table, a column per layer | |
+| `.\tools\performance\before_after.ps1` | the three runners above, on the base of the change and on this tree, one runner at a time on each | every row of every layer, side by side, in `profiles/compare.md` | nothing; a row that moved where the change did not aim is the finding |
 | `uv run python tools/performance/profile_workload.py` | a sampling profiler over repeated calls | where a probe's time goes, as an HTML report per probe | how long one call took |
 
 `measure.ps1` runs the Python side: the profiler, the Python runner, and the summary. The host runner and the Excel runner have their own commands above; run the summary again after either, and it adds their columns. CI runs `measure.ps1` and uploads `profiles/`; the host runner is built in CI so it keeps compiling and is never run there.
