@@ -1,9 +1,12 @@
 """What one call through the seam costs, itemized: exact and deterministic."""
 
+import ctypes
 from collections.abc import Callable
 
+import pytest
+
 from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells, Column, DateColumn, TextColumn, excel_function
+from goosedove.excel.bridge import MISSING, Cells, Column, DateColumn, TextColumn, excel_function
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 
@@ -138,3 +141,244 @@ def test_text_deep_in_a_column_is_named_without_a_walk(call_profile: CallProfile
     rows[5_000][0] = "n/a"
     column = Cells.from_rows(rows)
     assert call_profile(lambda: bridge.call("SumArray", [column])) == REJECTED_DEEP
+
+
+# --- every probe, itemized on both ledgers ------------------------------------
+# The package ledger is the seam's own functions; the numpy ledger is the copies and
+# reductions numpy ran for them. Inputs are built inside the test: a large parameter would
+# put its repr into the test id, which pytest keeps in an environment variable that Windows
+# caps at 32,767 characters.
+
+N = 10_000
+
+
+def column() -> Cells:
+    return Cells.from_rows([[float(i)] for i in range(N)])
+
+
+def row() -> Cells:
+    return Cells.from_rows([[float(i) for i in range(N)]])
+
+
+def grid() -> Cells:
+    return Cells.from_rows([[float(r * 100 + c) for c in range(100)] for r in range(100)])
+
+
+def test_zero_is_the_floor_of_one_call(call_profile: CallProfile) -> None:
+    bridge.call("Zero", [])
+    assert call_profile(lambda: bridge.call("Zero", [])) == {
+        "call": 1,
+        "_arguments": 1,
+        "Zero": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+
+
+def test_a_missing_argument_takes_its_default_without_a_look(call_profile: CallProfile) -> None:
+    bridge.call("Times", [5.0, MISSING])
+    assert call_profile(lambda: bridge.call("Times", [5.0, MISSING])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_number": 1,
+        "Times": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+
+
+def test_text_in_and_out_itemized(call_profile: CallProfile) -> None:
+    bridge.call("EchoText", ["WTI"])
+    assert call_profile(lambda: bridge.call("EchoText", ["WTI"])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "EchoText": 1,
+        "_text_out": 1,
+        "_scalar": 1,
+    }
+
+
+def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
+    bridge.call("EchoBoolean", [True])
+    assert call_profile(lambda: bridge.call("EchoBoolean", [True])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_boolean": 1,
+        "EchoBoolean": 1,
+        "_boolean_out": 1,
+        "_scalar": 1,
+    }
+
+
+def test_a_failing_body_costs_no_look(call_profile: CallProfile) -> None:
+    bridge.call("Fail", [])
+    assert call_profile(lambda: bridge.call("Fail", [])) == {
+        "call": 1,
+        "_arguments": 1,
+        "Fail": 1,
+    }
+
+
+def test_two_ranges_are_two_looks(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
+    a, b = column(), column()
+    bridge.call("Dot", [a, b])
+    assert call_profile(lambda: bridge.call("Dot", [a, b])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_column": 2,
+        "_one_column": 2,
+        "_shape": 2,
+        "_numbers": 2,
+        "Dot": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: bridge.call("Dot", [a, b])) == {
+        "ndarray.any": 2,
+        "ufunc.reduce": 2,
+    }
+
+
+def test_a_sum_is_one_look_and_one_reduction(numpy_calls: CallProfile) -> None:
+    values = column()
+    bridge.call("SumArray", [values])
+    assert numpy_calls(lambda: bridge.call("SumArray", [values])) == {
+        "ndarray.any": 1,
+        "ndarray.sum": 1,
+        "ufunc.reduce": 2,
+    }
+
+
+def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
+    values = column()
+    bridge.call("EchoColumn", [values])
+    assert call_profile(lambda: bridge.call("EchoColumn", [values])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_column": 1,
+        "_one_column": 1,
+        "_shape": 1,
+        "_numbers": 1,
+        "EchoColumn": 1,
+        "_column_out": 1,
+        "_dimensions": 1,
+        "_finite": 1,
+    }
+    # One look in (any), one look out (all); ascontiguousarray hands back the same array.
+    assert numpy_calls(lambda: bridge.call("EchoColumn", [values])) == {
+        "ndarray.any": 1,
+        "ndarray.all": 1,
+        "ndarray.reshape": 1,
+        "numpy.ascontiguousarray": 1,
+        "ufunc.reduce": 2,
+    }
+
+
+def test_a_row_out_costs_what_a_column_out_costs(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    values = row()
+    bridge.call("EchoRow", [values])
+    assert call_profile(lambda: bridge.call("EchoRow", [values])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_row": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_numbers": 1,
+        "EchoRow": 1,
+        "_row_out": 1,
+        "_dimensions": 1,
+        "_finite": 1,
+    }
+    assert numpy_calls(lambda: bridge.call("EchoRow", [values])) == {
+        "ndarray.any": 1,
+        "ndarray.all": 1,
+        "ndarray.reshape": 1,
+        "numpy.ascontiguousarray": 1,
+        "ufunc.reduce": 2,
+    }
+
+
+def test_one_answer_per_row_itemized(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
+    values = grid()
+    bridge.call("RowSums", [values])
+    assert call_profile(lambda: bridge.call("RowSums", [values])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_numbers": 1,
+        "RowSums": 1,
+        "_column_out": 1,
+        "_dimensions": 1,
+        "_finite": 1,
+    }
+    assert numpy_calls(lambda: bridge.call("RowSums", [values])) == {
+        "ndarray.any": 1,
+        "ndarray.sum": 1,
+        "ndarray.all": 1,
+        "ndarray.reshape": 1,
+        "numpy.ascontiguousarray": 1,
+        "ufunc.reduce": 3,
+    }
+
+
+def test_a_block_out_from_nothing_in_itemized(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    bridge.call("Grid", [5000, 2])
+    assert call_profile(lambda: bridge.call("Grid", [5000, 2])) == {
+        "call": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_whole": 2,
+        "_number": 2,
+        "Grid": 1,
+        "_array_out": 1,
+        "_dimensions": 1,
+        "_finite": 1,
+    }
+    assert numpy_calls(lambda: bridge.call("Grid", [5000, 2])) == {
+        "numpy.arange": 1,
+        "ndarray.reshape": 1,
+        "numpy.ascontiguousarray": 1,
+        "ndarray.all": 1,
+        "ufunc.reduce": 1,
+    }
+
+
+# cells_block is the real entry for a range: what the host's pinned buffers cost to own.
+def host_buffers(text_cell: bool) -> tuple[int, int, str]:
+    kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))
+    numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
+    _keep.extend((kinds, numbers))
+    return ctypes.addressof(kinds), ctypes.addressof(numbers), "x" if text_cell else ""
+
+
+_keep: list[object] = []
+
+
+@pytest.mark.parametrize("text_cell", [False, True], ids=["numbers", "one text cell"])
+def test_cells_block_copies_each_buffer_once(
+    text_cell: bool, call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    kinds, numbers, text = host_buffers(text_cell)
+    bridge.cells_block(kinds, numbers, N, 1, text)
+    assert call_profile(lambda: bridge.cells_block(kinds, numbers, N, 1, text)) == {
+        "cells_block": 1,
+    }
+    # Two views, two copies, and one look for text cells whatever they hold.
+    assert numpy_calls(lambda: bridge.cells_block(kinds, numbers, N, 1, text)) == {
+        "numpy.frombuffer": 2,
+        "ndarray.reshape": 2,
+        "ndarray.copy": 2,
+        "ndarray.any": 1,
+        "ufunc.reduce": 1,
+    }
