@@ -26,8 +26,8 @@ def Boolean(x: bool) -> bool:
 
 
 @excel_function
-def Whole(x: int) -> int:
-    return x
+def Whole(x: int) -> str:
+    return f"{type(x).__name__} {x}"
 
 
 @excel_function
@@ -113,9 +113,7 @@ def test_wrong_number_of_arguments_fails() -> None:
 
 @given(st.integers(min_value=-(2**53), max_value=2**53))
 def test_whole_accepts_every_integral_number(n: int) -> None:
-    result = bridge.call("Whole", [float(n)])
-    assert result == n
-    assert type(result) is int
+    assert bridge.call("Whole", [float(n)]) == f"int {n}"
 
 
 @given(st.floats(allow_nan=False, allow_infinity=False).filter(lambda f: not f.is_integer()))

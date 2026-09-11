@@ -29,13 +29,15 @@ def test_specs_carry_name_description_parameters_and_hidden() -> None:
 def test_every_probe_is_hidden_and_ping_is_not() -> None:
     hidden = {name for name, _, _, hidden in bridge.function_specs() if hidden}
     assert hidden >= {
-        "Nothing",
+        "Zero",
         "Add",
         "Times",
         "EchoText",
         "EchoBoolean",
         "SumArray",
         "Dot",
+        "EchoColumn",
+        "EchoRow",
         "Grid",
         "Fail",
     }

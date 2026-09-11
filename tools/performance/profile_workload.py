@@ -36,16 +36,19 @@ def workloads() -> dict[str, Callable[[], object]]:
     """One representative call per probe, at a size a sheet might send."""
     n = 10_000
     column = Cells.from_rows([[float(i)] for i in range(n)])
+    row = Cells.from_rows([[float(i) for i in range(n)]])
     weights = Cells.from_rows([[1.0] for _ in range(n)])
     grid = Cells.from_rows([[float(r * 100 + c) for c in range(100)] for r in range(100)])
     return {
-        "Nothing": lambda: bridge.call("Nothing", []),
+        "Zero": lambda: bridge.call("Zero", []),
         "Add": lambda: bridge.call("Add", [1.0, 2.0]),
         "Times": lambda: bridge.call("Times", [5.0, MISSING]),
         "EchoText": lambda: bridge.call("EchoText", ["WTI"]),
         "EchoBoolean": lambda: bridge.call("EchoBoolean", [True]),
         "SumArray": lambda: bridge.call("SumArray", [grid]),
         "Dot": lambda: bridge.call("Dot", [column, weights]),
+        "EchoColumn": lambda: bridge.call("EchoColumn", [column]),
+        "EchoRow": lambda: bridge.call("EchoRow", [row]),
         "Grid": lambda: bridge.call("Grid", [5000, 2]),
         "Fail": lambda: bridge.call("Fail", []),
     }

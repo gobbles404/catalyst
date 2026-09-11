@@ -5,8 +5,7 @@ $root = Split-Path $PSScriptRoot -Parent
 
 $formulas = [ordered]@{
     "=GoosedoveStatus()"          = "ok: python started and functions registered"
-    # Today's truth, not the intent: Excel-DNA shows a result of nothing as #NUM!. The way-out change decides.
-    "=Nothing()"                  = "#NUM!"
+    "=Zero()"                     = "0"
     "=Add(1,2)"                   = "3"
     "=Add(1,)"                    = "#ERROR Add: b is missing, expected number"
     "=Add(1,TRUE)"                = "#ERROR Add: b is boolean TRUE, expected number"
@@ -26,6 +25,9 @@ $formulas = [ordered]@{
     "=SumArray(H1:H2)"            = "#ERROR SumArray: values cell (2, 1) is boolean TRUE, expected number"
     "=Dot(A1:A3,{10;20;30})"      = "140"
     "=Dot(A1:A3,{10,20,30})"      = "#ERROR Dot: b is 1x3 array, expected column of numbers"
+    "=ROWS(EchoColumn(A1:A3))"    = "3"
+    "=COLUMNS(EchoRow({1,2,3}))"  = "3"
+    "=SUM(EchoColumn(A1:A3))"     = "6"
     "=INDEX(Grid(2,3),2,1)"       = "4"
     "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
