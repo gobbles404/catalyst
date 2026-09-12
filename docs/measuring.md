@@ -31,10 +31,10 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 |---|---|
 | `trips` | calls into Python: the function's prepared path, and `cells_from_buffers` once per range |
 | `name_lookups` | Python attributes fetched by their text name; a prepared call makes none |
-| `objects_built` | Python objects the host made: each scalar, the six values that carry a range, the summary of kinds seen among them |
+| `objects_built` | Python objects the host made: each scalar; a range's rows, columns and kinds seen, its text when it has any, and the two buffer addresses when the buffers grow |
 | `cells_scanned` | cells visited by the range loop, the Excel error that stopped it included |
 | `text_cells` | text cells collected in that loop |
-| `buffers_allocated`, `buffer_bytes` | managed arrays made for a range in or an array out, and their payload bytes |
+| `buffers_allocated`, `buffer_bytes` | managed arrays made, and their payload bytes: for a range in only when the kept buffers grow to a larger range than any before, and for an array out |
 | `result_copies`, `result_cells` | copies made of an array on its way to Excel, and its cells |
 
 The same file pins three managed-allocation ceilings with `GC.GetAllocatedBytesForCurrentThread`: bytes per warm scalar call, bytes per added input cell, bytes per added output cell. Scope: the CLR heap on this thread only. Not Python, not numpy, not Excel-DNA.

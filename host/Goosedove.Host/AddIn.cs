@@ -37,8 +37,8 @@ namespace Goosedove.Host
     /// <summary>
     /// The one place C# talks to Python. Each function's path is prepared once, at registration:
     /// the seam's entry for it, fetched by name and kept with the registered delegate. A call
-    /// hands that entry the arguments and nothing else. What every call shares, MISSING and the
-    /// range builder, is fetched once at start.
+    /// hands that entry the arguments and nothing else. What every call shares, MISSING, the
+    /// range builder and the empty text, is fetched or made once at start.
     /// </summary>
     internal static class Bridge
     {
@@ -46,6 +46,7 @@ namespace Goosedove.Host
         public static PyObject BoolType;
         public static PyObject Missing;
         public static PyObject CellsFromBuffers;
+        public static PyObject EmptyText;
         public static string StartupError;
 
         /// <summary>Start Python once, put the package on its path, and import the bridge.</summary>
@@ -64,6 +65,7 @@ namespace Goosedove.Host
                 Module = Py.Import("goosedove.excel.bridge");
                 Missing = Module.GetAttr("MISSING");
                 CellsFromBuffers = Module.GetAttr("cells_from_buffers");
+                EmptyText = new PyString("");  // what a range with no text cells carries as its text
                 using (var builtins = Py.Import("builtins"))
                 {
                     BoolType = builtins.GetAttr("bool");
@@ -184,71 +186,132 @@ namespace Goosedove.Host
         private const byte Number = 0, Text = 1, Boolean = 2, Blank = 3, Missing = 4;
         private const byte NumberSeen = 1 << Number, TextSeen = 1 << Text, BooleanSeen = 1 << Boolean, BlankSeen = 1 << Blank, MissingSeen = 1 << Missing;
 
-        // One pass over the cells, in sheet order. An Excel error anywhere is returned and
-        // nothing is built. Every other range ships the same way: one kind code per cell,
-        // one number per cell (NaN where there is none), the text cells joined with NUL, and
-        // one bit per kind that occurred, so the seam learns "all numbers" from this pass and
-        // takes no look of its own.
+        // The two buffers a range crosses in, kept between calls and grown only when a larger
+        // range comes. They are pinned for as long as they live, and the two Python integers
+        // that carry their addresses are built when they are. One set per thread: Excel calls
+        // these functions on one thread, and the host runner and the tests each on their own.
+        [ThreadStatic] private static byte[] kindsBuffer;
+        [ThreadStatic] private static double[] numbersBuffer;
+        [ThreadStatic] private static System.Runtime.InteropServices.GCHandle kindsHandle;
+        [ThreadStatic] private static System.Runtime.InteropServices.GCHandle numbersHandle;
+        [ThreadStatic] private static PyObject kindsAddress;
+        [ThreadStatic] private static PyObject numbersAddress;
+        [ThreadStatic] private static List<string> textCells;
+
+        // Room for a range of this many cells: the buffers already there, or larger ones. The new
+        // set is whole before the old one goes, so a failure to grow leaves the old buffers pinned
+        // and the next range as safe as before.
+        private static void Reserve(int cells, WorkCounter work)
+        {
+            if (kindsBuffer != null && kindsBuffer.Length >= cells)
+            {
+                return;
+            }
+            var newKinds = new byte[cells];
+            var newNumbers = new double[cells];
+            var newKindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(newKinds, System.Runtime.InteropServices.GCHandleType.Pinned);
+            var newNumbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(newNumbers, System.Runtime.InteropServices.GCHandleType.Pinned);
+            PyObject newKindsAddress = null, newNumbersAddress = null;
+            try
+            {
+                newKindsAddress = new PyInt(newKindsHandle.AddrOfPinnedObject().ToInt64());
+                newNumbersAddress = new PyInt(newNumbersHandle.AddrOfPinnedObject().ToInt64());
+            }
+            catch
+            {
+                newKindsAddress?.Dispose();
+                newKindsHandle.Free();
+                newNumbersHandle.Free();
+                throw;
+            }
+            if (kindsBuffer != null)
+            {
+                kindsHandle.Free();
+                numbersHandle.Free();
+                kindsAddress.Dispose();
+                numbersAddress.Dispose();
+            }
+            kindsBuffer = newKinds;
+            numbersBuffer = newNumbers;
+            kindsHandle = newKindsHandle;
+            numbersHandle = newNumbersHandle;
+            kindsAddress = newKindsAddress;
+            numbersAddress = newNumbersAddress;
+            work?.Hit("buffers_allocated", 2);
+            work?.Hit("buffer_bytes", 9L * cells);
+            work?.Hit("objects_built", 2);
+        }
+
+        // One pass over the cells, in sheet order, into the kept buffers. An Excel error
+        // anywhere is returned and nothing is built. Every other range ships the same way: one
+        // kind code per cell, one number per cell (NaN where there is none), the text cells
+        // joined with NUL, and one bit per kind that occurred, so the seam learns "all numbers"
+        // from this pass and takes no look of its own. Python copies the buffers before it
+        // returns, so the next range may overwrite them.
         private static PyObject Range(object[,] rect, out object error, WorkCounter work)
         {
             error = null;
             int rows = rect.GetLength(0), cols = rect.GetLength(1);
-            var kinds = new byte[rows * cols];
-            var numbers = new double[rows * cols];
-            work?.Hit("buffers_allocated", 2);
-            work?.Hit("buffer_bytes", 9L * rows * cols);
-            var texts = new List<string>();
+            Reserve(rows * cols, work);
+            var kinds = kindsBuffer;
+            var numbers = numbersBuffer;
+            var texts = textCells ?? (textCells = new List<string>());
+            texts.Clear();
             byte seen = 0;
             var i = 0;
-            foreach (var cell in rect)
+            for (var r = 0; r < rows; r++)
             {
-                if (cell is ExcelError)
+                for (var c = 0; c < cols; c++)
                 {
-                    work?.Hit("cells_scanned", i + 1);
-                    work?.Hit("text_cells", texts.Count);
-                    error = cell;
-                    return null;
+                    var cell = rect[r, c];
+                    if (cell is ExcelError)
+                    {
+                        work?.Hit("cells_scanned", i + 1);
+                        work?.Hit("text_cells", texts.Count);
+                        error = cell;
+                        return null;
+                    }
+                    if (cell is double d)
+                    {
+                        kinds[i] = Number;
+                        numbers[i] = d;
+                        seen |= NumberSeen;
+                    }
+                    else if (cell is string s)
+                    {
+                        kinds[i] = Text;
+                        numbers[i] = double.NaN;
+                        texts.Add(s);
+                        seen |= TextSeen;
+                    }
+                    else if (cell is bool b)
+                    {
+                        kinds[i] = Boolean;
+                        numbers[i] = b ? 1.0 : 0.0;
+                        seen |= BooleanSeen;
+                    }
+                    else if (cell == null || cell is ExcelEmpty)
+                    {
+                        kinds[i] = Blank;
+                        numbers[i] = double.NaN;
+                        seen |= BlankSeen;
+                    }
+                    else if (cell is ExcelMissing)
+                    {
+                        kinds[i] = Missing;
+                        numbers[i] = double.NaN;
+                        seen |= MissingSeen;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("a cell holds a " + cell.GetType().Name);
+                    }
+                    i++;
                 }
-                if (cell is double d)
-                {
-                    kinds[i] = Number;
-                    numbers[i] = d;
-                    seen |= NumberSeen;
-                }
-                else if (cell is string s)
-                {
-                    kinds[i] = Text;
-                    numbers[i] = double.NaN;
-                    texts.Add(s);
-                    seen |= TextSeen;
-                }
-                else if (cell is bool b)
-                {
-                    kinds[i] = Boolean;
-                    numbers[i] = b ? 1.0 : 0.0;
-                    seen |= BooleanSeen;
-                }
-                else if (cell == null || cell is ExcelEmpty)
-                {
-                    kinds[i] = Blank;
-                    numbers[i] = double.NaN;
-                    seen |= BlankSeen;
-                }
-                else if (cell is ExcelMissing)
-                {
-                    kinds[i] = Missing;
-                    numbers[i] = double.NaN;
-                    seen |= MissingSeen;
-                }
-                else
-                {
-                    throw new InvalidOperationException("a cell holds a " + cell.GetType().Name);
-                }
-                i++;
             }
             work?.Hit("cells_scanned", i);
             work?.Hit("text_cells", texts.Count);
-            return CellsFromBuffers(kinds, numbers, rows, cols, string.Join("\0", texts), seen, work);
+            return CellsFromBuffers(rows, cols, texts.Count == 0 ? null : string.Join("\0", texts), seen, work);
         }
 
         // The seam sends one of four things: a number, text, a boolean, or a two-dimensional array
@@ -299,29 +362,25 @@ namespace Goosedove.Host
             }
         }
 
-        // Pin the buffers and let Python copy them from pointers, with the kinds seen beside them.
-        private static PyObject CellsFromBuffers(byte[] kinds, double[] numbers, int rows, int cols, string text, byte seen, WorkCounter work)
+        // Let Python copy the kept buffers from their addresses, with the shape, the kinds seen,
+        // and the text if there is any beside them; without text the shared empty string crosses.
+        private static PyObject CellsFromBuffers(int rows, int cols, string text, byte seen, WorkCounter work)
         {
-            var kindsHandle = System.Runtime.InteropServices.GCHandle.Alloc(kinds, System.Runtime.InteropServices.GCHandleType.Pinned);
-            var numbersHandle = System.Runtime.InteropServices.GCHandle.Alloc(numbers, System.Runtime.InteropServices.GCHandleType.Pinned);
-            try
+            using (var pyRows = new PyInt(rows))
+            using (var pyCols = new PyInt(cols))
+            using (var pySeen = new PyInt(seen))
             {
-                using (var pyKinds = new PyInt(kindsHandle.AddrOfPinnedObject().ToInt64()))
-                using (var pyNumbers = new PyInt(numbersHandle.AddrOfPinnedObject().ToInt64()))
-                using (var pyRows = new PyInt(rows))
-                using (var pyCols = new PyInt(cols))
-                using (var pyText = new PyString(text))
-                using (var pySeen = new PyInt(seen))
+                work?.Hit("objects_built", 3);
+                work?.Hit("trips");
+                if (text == null)
                 {
-                    work?.Hit("objects_built", 6);
-                    work?.Hit("trips");
-                    return Bridge.CellsFromBuffers.Invoke(pyKinds, pyNumbers, pyRows, pyCols, pyText, pySeen);
+                    return Bridge.CellsFromBuffers.Invoke(kindsAddress, numbersAddress, pyRows, pyCols, Bridge.EmptyText, pySeen);
                 }
-            }
-            finally
-            {
-                kindsHandle.Free();
-                numbersHandle.Free();
+                using (var pyText = new PyString(text))
+                {
+                    work?.Hit("objects_built");
+                    return Bridge.CellsFromBuffers.Invoke(kindsAddress, numbersAddress, pyRows, pyCols, pyText, pySeen);
+                }
             }
         }
     }

@@ -154,7 +154,9 @@ def cells_from_buffers(
 ) -> Cells:
     """Copy the host's pinned buffers into Cells. The text cells arrive joined with NUL.
 
-    seen is the host's summary of the kinds it met, so no look at the kinds is needed here.
+    The host keeps its buffers and fills them again for the next range, so the copies made
+    here are all that survives this call. seen is the host's summary of the kinds it met, so
+    no look at the kinds is needed here.
     """
     count = rows * cols
     kinds = np.frombuffer((ctypes.c_uint8 * count).from_address(kinds_pointer), dtype=np.uint8)
