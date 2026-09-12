@@ -100,7 +100,7 @@ The way in is type validation, before the function runs; the way out is the conv
 
 ## The declared input types
 
-A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. The eight range and date types are named labels: `Date` on a numpy day, the number and date ranges on numpy arrays, and the text ranges on tuples, so the seam can tell `Column` from `Array` though both hold numbers; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism.
+A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. The eight range and date types are named labels: `Date` on a numpy day, the number and date ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism.
 
 | Declared | Words of the sheet | Accept rule | Hands the function |
 |---|---|---|---|
@@ -109,7 +109,7 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `str` | text | `_text` | the text |
 | `bool` | boolean | `_boolean` | the boolean |
 | `Date` | date | `_date` | a numpy day |
-| `Array` | array of numbers | `_numbers` | the range's numbers array, in the sheet's shape |
+| `NumberArray` | array of numbers | `_numbers` | the range's numbers array, in the sheet's shape |
 | `Column` | column of numbers | `_column` | a flat view of the one column |
 | `Row` | row of numbers | `_row` | a flat view of the one row |
 | `DateColumn` | column of dates | `_date_column` | a flat array of numpy days |
@@ -123,7 +123,7 @@ A cell's kind is which of five things it holds, a number, text, a boolean, a bla
 
 A scalar into a range slot becomes a 1×1 range, and text into a text row or column becomes a one-text tuple: `SumArray(5.0)` is 5.0, and `"x"` into a row of text is `("x",)`. A rejected scalar in a range slot is named as the whole argument, with the range's words: `values is text 'x', expected array of numbers`. The reverse never happens. A range into a scalar slot fails with its shape, even a 1×1 range: `x is 1x1 array, expected number`.
 
-Shape before cells. The column and row types check the shape first, and a wrong shape rejects the whole argument by its shape before any cell is looked at: a 1×2 range holding a blank into a column slot fails as `values is 1x2 array, expected column of numbers`, not on the blank. A column or row that passes is handed over flat, a one-dimensional array or a tuple, while `Array` keeps the sheet's shape. Nothing is reordered: the first value of a column holding 3, 1, 2 is 3.
+Shape before cells. The column and row types check the shape first, and a wrong shape rejects the whole argument by its shape before any cell is looked at: a 1×2 range holding a blank into a column slot fails as `values is 1x2 array, expected column of numbers`, not on the blank. A column or row that passes is handed over flat, a one-dimensional array or a tuple, while `NumberArray` keeps the sheet's shape. Nothing is reordered: the first value of a column holding 3, 1, 2 is 3.
 
 Kind next. The summary of kinds is one number from the host with one bit per kind it saw in the range, so for a range of only numbers it is 1 and for a range with one text cell among numbers it is 3. A look is one pass over a whole range at once, one numpy operation; a walk is visiting cells one by one in Python, which the bridge never does on the host's path. The summary of kinds settles the kind check when it can: when it is exactly "only numbers", the numbers rule hands over the range's numbers array with no look; when it is exactly "only text", the text rule hands over the host's tuple with no look.
 
@@ -157,7 +157,7 @@ flowchart LR
 
 `tests/performance/test_seam_budgets.py` pins owning ten thousand cells at two views, two reshapes and two copies on the numpy ledger, with or without a text cell, and `tests/performance/test_seam_allocation.py` pins its ceiling at 9 bytes per cell plus the slack, its two copies; [baseline.md](baseline.md) records 90,752 bytes. The host counts a range in as two trips, one to own it and one for the prepared path, and three Python objects built to carry it, the rows, the columns and the summary of kinds; that table is in [baseline.md](baseline.md).
 
-After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `Array` hands over the numbers array itself. `Column` and `Row` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
+After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `Column` and `Row` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
 
 `Cells.from_rows` builds the same object from Python values, for tests. `Cells.from_rows([[1.0, "x"], [None, True]])` classifies each value, fills the kinds and the numbers, collects the texts, and sets the bits of the summary of kinds the host would have set; `tests/unit/test_bridge.py` pins that a row holding a number, a text, a blank, a boolean and a missing argument has all five bits. It rejects an empty range, since Excel never sends fewer than one cell. It is the one loop over cells in the bridge, and it is a test helper, not the host's path.
 
@@ -172,7 +172,7 @@ The result rule for a declared return type converts what the function returned i
 | `str` | `_text_out` | not text; empty; too long | the text |
 | `bool` | `_boolean_out` | not True or False | the boolean |
 | `Date` | `_date_out` | not a numpy day inside the calendar | the serial, as a float |
-| `Array` | `_array_out` | not a plain two-dimensional array of such numbers; empty | the array, as one unbroken run of 8-byte numbers |
+| `NumberArray` | `_array_out` | not a plain two-dimensional array of such numbers; empty | the array, as one unbroken run of 8-byte numbers |
 | `Column` | `_column_out` | not a plain one-dimensional array of such numbers; empty | reshaped to N by 1 |
 | `Row` | `_row_out` | the same | reshaped to 1 by N |
 | `DateColumn` | `_date_column_out` | not a one-dimensional array of such days; empty | serials, N by 1 |
@@ -184,7 +184,7 @@ Text length is counted the way Excel's LEN counts, in UTF-16 units: most charact
 
 A date goes out as its whole serial. Only a numpy value in days is a date; a Python date, a number, a day with a time, a month or a year are rejected as `returned <what it was>, expected date`. NaT, numpy's not-a-date, is `result is not a date`, and a day before 1900-03-01 or after 9999-12-31 is `result is a date outside 1900-03-01 to 9999-12-31`. A column or row of dates is converted the same way in one look, and the first NaT or out-of-calendar day is named as `result cell (i, 1)` or `result cell (1, i)`.
 
-Spill is how Excel lays an array result over neighbouring cells: a column spills down and a row spills across. Which way a result spills is decided by the declaration, [outputs.md](outputs.md) rule 3; here is the mechanism. A one-dimensional array of three values is reshaped to 3 by 1 when declared `Column` and to 1 by 3 when declared `Row`, and a bad second value is `result cell (2, 1)` in the one case and `result cell (1, 2)` in the other. `Array` keeps the two-dimensional shape as returned. A variant of numpy's array, a masked array say, is rejected by its own name, because it could hide cells behind the memory it shows.
+Spill is how Excel lays an array result over neighbouring cells: a column spills down and a row spills across. Which way a result spills is decided by the declaration, [outputs.md](outputs.md) rule 3; here is the mechanism. A one-dimensional array of three values is reshaped to 3 by 1 when declared `Column` and to 1 by 3 when declared `Row`, and a bad second value is `result cell (2, 1)` in the one case and `result cell (1, 2)` in the other. `NumberArray` keeps the two-dimensional shape as returned. A variant of numpy's array, a masked array say, is rejected by its own name, because it could hide cells behind the memory it shows.
 
 Every array leaves contiguous, in float64, numpy's ordinary 8-byte number and the one a cell holds, and in two dimensions; `tests/unit/test_result_validation.py` pins all three. Contiguous means laid out in memory in one unbroken run, row after row, so the host can copy it straight through. The finite check on an array is one look. An array of whole numbers is first checked against 2^53 from both sides, above and below, because taking absolute values would fail on the most negative number numpy holds. Then the array is made contiguous float64, a mask marks the cells that are not finite, and the first is named as INDEX counts. `tests/unit/test_result_validation.py` holds the property test: NaN at (r, c) and infinity at the last cell names (r, c).
 
@@ -215,12 +215,12 @@ The probes are the twelve hidden worksheet functions in the probes module. Each 
 | `Times(x, factor=1.0)` | a number and an optional number in | only a missing argument takes the default; a blank cell fails |
 | `EchoText(label)` | text in and out | text crosses both ways unchanged |
 | `EchoBoolean(flag)` | a boolean in and out | TRUE arrives as a boolean, not as the number 1, and returns as one |
-| `SumArray(values)` | an `Array` in, a number out | a range of any shape arrives as cells; the sum proves every cell did |
+| `SumArray(values)` | a `NumberArray` in, a number out | a range of any shape arrives as cells; the sum proves every cell did |
 | `Dot(a, b)` | two `Column`s in, a number out | two ranges in one call arrive as two ranges |
 | `EchoColumn(values)` | a `Column` in and out | a column in and the same column out, spilled down |
 | `EchoRow(values)` | a `Row` in and out | the same across; a row out costs what a column out costs |
-| `RowSums(values)` | an `Array` in, a `Column` out | a grid in and one number per row out: the shape of pricing every row |
-| `Grid(rows, cols)` | two whole numbers in, an `Array` out | an array out from nothing in; below one row or column it raises, and the cell shows `#ERROR Grid: ValueError: ...` |
+| `RowSums(values)` | a `NumberArray` in, a `Column` out | a grid in and one number per row out: the shape of pricing every row |
+| `Grid(rows, cols)` | two whole numbers in, a `NumberArray` out | an array out from nothing in; below one row or column it raises, and the cell shows `#ERROR Grid: ValueError: ...` |
 | `Fail()` | nothing in | an error in the body reaches the cell as `#ERROR Fail: ValueError: as asked` |
 
 `Ping` is not a probe. It is the bridge's own worksheet function, listed in the wizard, and returns `goosedove <version> from <path>`, with `source checkout` in place of the version when the package is not installed.

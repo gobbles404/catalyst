@@ -7,12 +7,12 @@ from hypothesis import strategies as st
 from goosedove.excel import bridge
 from goosedove.excel.bridge import (
     MISSING,
-    Array,
     Cells,
     Column,
     Date,
     DateColumn,
     DateRow,
+    NumberArray,
     Row,
     TextColumn,
     TextRow,
@@ -122,7 +122,7 @@ def RowShape(values: Row) -> str:
 
 
 @excel_function
-def ArrayShape(values: Array) -> str:
+def ArrayShape(values: NumberArray) -> str:
     return str(values.shape)
 
 
@@ -147,7 +147,7 @@ def FirstOfRow(values: Row) -> float:
 
 
 @excel_function
-def TopLeft(values: Array) -> float:
+def TopLeft(values: NumberArray) -> float:
     return float(values[0, 0])
 
 

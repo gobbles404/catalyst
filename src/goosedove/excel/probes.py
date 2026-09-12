@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from goosedove.excel.bridge import Array, Column, Row, register
+from goosedove.excel.bridge import Column, NumberArray, Row, register
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -50,7 +50,7 @@ def EchoBoolean(flag: bool) -> bool:
 
 
 @probe
-def SumArray(values: Array) -> float:
+def SumArray(values: NumberArray) -> float:
     """Probe: a range of any shape arrives as cells; the sum proves every cell did."""
     return float(values.sum())
 
@@ -74,17 +74,17 @@ def EchoRow(values: Row) -> Row:
 
 
 @probe
-def RowSums(values: Array) -> Column:
+def RowSums(values: NumberArray) -> Column:
     """Probe: a grid in, one number per row out, spilled down: the shape of pricing every row."""
     return Column(values.sum(axis=1))
 
 
 @probe
-def Grid(rows: int, cols: int) -> Array:
+def Grid(rows: int, cols: int) -> NumberArray:
     """Probe: an array out, rows by cols, counting 1, 2, 3 across then down."""
     if rows < 1 or cols < 1:
         raise ValueError(f"a grid needs at least one row and one column, not {rows} by {cols}")
-    return Array(np.arange(1.0, rows * cols + 1).reshape(rows, cols))
+    return NumberArray(np.arange(1.0, rows * cols + 1).reshape(rows, cols))
 
 
 @probe
