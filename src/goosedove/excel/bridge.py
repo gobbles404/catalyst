@@ -15,7 +15,7 @@ type of every argument against the function's own signature, once, by type
 and shape and never by meaning; past it nothing checks. On the way back it
 converts the result by the function's declared return type, once, into the
 four things the host can show: a number, text, a boolean, or an array of
-numbers. docs/inputs.md and docs/outputs.md are the map.
+numbers. docs/seam/inputs.md and docs/seam/outputs.md are the map.
 """
 
 import ctypes

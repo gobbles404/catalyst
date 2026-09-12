@@ -17,7 +17,7 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
 - The seam validates types, once: a function's prepared path, `Registered.run` in `bridge.py`,
   which the host fetches once at registration, checks every argument against the
   function's own signature and hands the library the typed value, and converts the result by
-  the declared return type. `docs/inputs.md` and `docs/outputs.md` are the map.
+  the declared return type. `docs/seam/inputs.md` and `docs/seam/outputs.md` are the map.
 - No coercion at the seam. A boolean is not a number, text is never a number, empty text is not text.
 - Blank and missing are different facts. Only a missing argument takes a declared default; a blank cell fails.
 - The seam checks each argument alone, by type and shape, never by meaning. Meaning belongs to the library.

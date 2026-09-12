@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 # The Python side: a sampling profile per probe, warm timings per probe and size, and the
 # one-table summary. The host runner and the Excel runner have their own commands; see
-# docs/measuring.md.
+# docs/seam/measuring.md.
 Push-Location $PSScriptRoot
 try {
     foreach ($script in @(
