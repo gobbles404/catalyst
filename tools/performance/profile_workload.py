@@ -42,6 +42,7 @@ def workloads() -> dict[str, Callable[[], object]]:
     row = Cells.from_rows([[float(i) for i in range(n)]])
     weights = Cells.from_rows([[1.0] for _ in range(n)])
     grid = Cells.from_rows([[float(r * 100 + c) for c in range(100)] for r in range(100)])
+    mixed = Cells.from_rows([[["nn", 1.0, True][i % 3]] for i in range(n)])
     return {
         "Zero": lambda: ENTRY["Zero"](),
         "Add": lambda: ENTRY["Add"](1.0, 2.0),
@@ -50,9 +51,7 @@ def workloads() -> dict[str, Callable[[], object]]:
         "EchoBoolean": lambda: ENTRY["EchoBoolean"](True),
         "SumArray": lambda: ENTRY["SumArray"](grid),
         "CountArray": lambda: ENTRY["CountArray"](grid),
-        "CountMixed": lambda: ENTRY["CountMixed"](
-            Cells.from_rows([[["nn", 1.0, True][i % 3]] for i in range(n)])
-        ),
+        "CountMixed": lambda: ENTRY["CountMixed"](mixed),
         "Dot": lambda: ENTRY["Dot"](column, weights),
         "EchoColumn": lambda: ENTRY["EchoColumn"](column),
         "EchoRow": lambda: ENTRY["EchoRow"](row),

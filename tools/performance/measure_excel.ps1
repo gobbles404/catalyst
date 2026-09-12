@@ -202,14 +202,18 @@ try {
         $column = 3
         foreach ($n in 100, 1000, 10000) {
             foreach ($shape in @(
-                @{ Probe = "CountArray"; Formula = "=CountArray(cells_in!R1C1:R${n}C1)" },
-                @{ Probe = "native COUNT"; Formula = "=COUNT(cells_in!R1C1:R${n}C1)" },
-                @{ Probe = "CountMixed"; Formula = "=CountMixed(R1C1:R${n}C1)" },
-                @{ Probe = "native COUNTA"; Formula = "=COUNTA(R1C1:R${n}C1)" }
+                # The same count three ways. CountArray and CountMixed over the very same numeric
+                # cells differ only in the rule; the mixed column adds text, which the host must
+                # collect, join and hand over, so that row shows the text and not the rule.
+                @{ Probe = "CountArray"; Scenario = "cells in"; Formula = "=CountArray(cells_in!R1C1:R${n}C1)" },
+                @{ Probe = "native COUNT"; Scenario = "cells in"; Formula = "=COUNT(cells_in!R1C1:R${n}C1)" },
+                @{ Probe = "CountMixed"; Scenario = "mixed: no text"; Formula = "=CountMixed(cells_in!R1C1:R${n}C1)" },
+                @{ Probe = "CountMixed"; Scenario = "cells in"; Formula = "=CountMixed(R1C1:R${n}C1)" },
+                @{ Probe = "native COUNTA"; Scenario = "cells in"; Formula = "=COUNTA(R1C1:R${n}C1)" }
             )) {
                 $range = Own $mixedIn.Range($mixedIn.Cells.Item(1, $column), $mixedIn.Cells.Item($copies, $column))
                 $range.FormulaR1C1 = $shape.Formula
-                Add-Case $shape.Probe "cells in" $copies $n 1 $range $range ($copies * $n)
+                Add-Case $shape.Probe $shape.Scenario $copies $n 1 $range $range ($copies * $n)
                 $column++
             }
         }

@@ -36,10 +36,13 @@ namespace Goosedove.Host.Measure
                 var weights = Filled(n, 1.0);
                 var total = Total(n);
                 measurements.Run("SumArray", "cells in", n, 1, () => sum(column), Equal(total), Counted("SumArray", column));
-                // The same count two ways: the numeric rule, then the mixed rule, so the record's
-                // own cost is what lies between them and nothing else does.
+                // The same count three ways. The first two differ only in the rule, over the very
+                // same cells, so what lies between them is the mixed rule alone. The third sends
+                // text as well, which the host must collect, join and hand over and Python must
+                // split, so what lies between it and the second is the text, not the rule.
                 var mixed = Mixed(n);
                 measurements.Run("CountArray", "cells in", n, 1, () => countArray(column), Equal((double)n), Counted("CountArray", column));
+                measurements.Run("CountMixed", "mixed: no text", n, 1, () => countMixed(column), Equal((double)n), Counted("CountMixed", column));
                 measurements.Run("CountMixed", "cells in", n, 1, () => countMixed(mixed), Equal((double)n), Counted("CountMixed", mixed));
                 measurements.Run("Dot", "two ranges in", 2 * n, 1, () => dot(column, weights), Equal(total), Counted("Dot", column, weights));
                 measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), ArrayOf(n, 1, total), Counted("EchoColumn", column));
