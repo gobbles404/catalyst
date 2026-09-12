@@ -15,7 +15,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `Times(x, factor=1.0)` | an omitted argument |
 | `SumArray(values)` | cells in, any shape, one number out |
 | `CountArray(values)` | cells in, counted; the numeric control under `CountMixed` |
-| `CountMixed(values)` | cells in of mixed kinds, counted; the count of text cells and the length of the text are its own knobs, turned one at a time |
+| `CountMixed(values)` | cells in of mixed kinds, counted; run over the same numeric cells as `CountArray` it isolates the rule, and over a column holding text it shows what the text costs. The count of text cells and the length of the text are its own knobs, turned one at a time |
 | `Dot(a, b)` | two ranges in one call |
 | `EchoColumn(values)` | the round trip: N in, N out |
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |
