@@ -11,12 +11,12 @@ from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import (
-    Column,
     Date,
     DateColumn,
     DateRow,
     NumberArray,
-    Row,
+    NumberColumn,
+    NumberRow,
     excel_function,
 )
 
@@ -55,13 +55,13 @@ def OutArray() -> NumberArray:
 
 
 @excel_function
-def OutColumn() -> Column:
-    return cast(Column, _returns["value"])
+def OutColumn() -> NumberColumn:
+    return cast(NumberColumn, _returns["value"])
 
 
 @excel_function
-def OutRow() -> Row:
-    return cast(Row, _returns["value"])
+def OutRow() -> NumberRow:
+    return cast(NumberRow, _returns["value"])
 
 
 @excel_function

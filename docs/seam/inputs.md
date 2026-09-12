@@ -81,8 +81,8 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 |---|---|---|---|---|
 | `Date` | one whole number from 61 to 2958465 | `=Discount(B5)` with B5 = 22-May-2026 | the date 2026-05-22 | 46164.5, `"2026-05-22"`, 60, 2958466 |
 | `NumberArray` | a range of numbers, any shape | `=Total(A2:B4)` | the grid, as on the sheet | a blank, text, or boolean cell, named |
-| `Column` | a range of numbers, one column wide | `=Strip(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
-| `Row` | a range of numbers, one row tall | `=Weights(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
+| `NumberColumn` | a range of numbers, one column wide | `=Strip(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
+| `NumberRow` | a range of numbers, one row tall | `=Weights(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
 | `DateColumn` | a range of dates, one column wide | `=Schedule(A2:A7)` | a plain list of dates | a fraction, a serial under 61, a blank |
 | `DateRow` | a range of dates, one row tall | `=Expiries(A1:F1)` | a plain list of dates | the same, or a column |
 | `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
@@ -112,9 +112,9 @@ Decided 2026-09-08, strict in every case.
 Decided 2026-09-09, for ranges and dates.
 
 9. A cell is named the way `INDEX` counts: row then column, from 1, within the range that was passed.
-10. A `Column` or `Row` hands the function a plain list. A `NumberArray` keeps its shape. Nothing is sorted or reordered.
+10. A `NumberColumn` or `NumberRow` hands the function a plain list. A `NumberArray` keeps its shape. Nothing is sorted or reordered.
 11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text.
-12. Seven range types: `NumberArray`, `Column` and `Row` hold numbers; `DateColumn` and `DateRow` hold dates; `TextColumn` and `TextRow` hold text. A `TextArray` is possible and not built.
+12. Seven range types, each named for what it holds and the shape it takes: `NumberArray` of any shape, with `NumberColumn` and `NumberRow`; `DateColumn` and `DateRow`; `TextColumn` and `TextRow`. A `TextArray` is possible and not built.
 13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
 14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the validator.
 15. Shape before cells. A wrong-shaped range is reported as such before any cell is looked at.

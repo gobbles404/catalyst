@@ -36,8 +36,10 @@ import goosedove
 
 Date = NewType("Date", np.datetime64)
 NumberArray = NewType("NumberArray", NDArray[np.float64])  # any shape, laid out as on the sheet
-Column = NewType("Column", NDArray[np.float64])  # one column, handed over as a 1-D array
-Row = NewType("Row", NDArray[np.float64])  # one row, handed over as a 1-D array
+NumberColumn = NewType(
+    "NumberColumn", NDArray[np.float64]
+)  # one column, handed over as a 1-D array
+NumberRow = NewType("NumberRow", NDArray[np.float64])  # one row, handed over as a 1-D array
 DateColumn = NewType("DateColumn", NDArray[np.datetime64])
 DateRow = NewType("DateRow", NDArray[np.datetime64])
 TextColumn = NewType("TextColumn", tuple[str, ...])
@@ -337,8 +339,8 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     bool: ("boolean", _boolean),
     Date: ("date", _date),
     NumberArray: ("array of numbers", _numbers),
-    Column: ("column of numbers", _column),
-    Row: ("row of numbers", _row),
+    NumberColumn: ("column of numbers", _column),
+    NumberRow: ("row of numbers", _row),
     DateColumn: ("column of dates", _date_column),
     DateRow: ("row of dates", _date_row),
     TextColumn: ("column of text", _text_column),
@@ -540,8 +542,8 @@ _RESULTS: Final[dict[object, Callable[[object], object]]] = {
     bool: _boolean_out,
     Date: _date_out,
     NumberArray: _array_out,
-    Column: _column_out,
-    Row: _row_out,
+    NumberColumn: _column_out,
+    NumberRow: _row_out,
     DateColumn: _date_column_out,
     DateRow: _date_row_out,
 }

@@ -14,13 +14,13 @@ Importing the bridge imports the package `goosedove.excel` first, whose `__init_
 
 ## Declaring a worksheet function
 
-A worksheet function is a plain Python function with one line written above it, `@excel_function`; that line is a decorator, and it runs when the module is imported. Registration is what that line does: it reads the function's signature, its parameters with their types and defaults and its return type, checks it, builds the prepared path, and stores it under the function's name. The signature is the whole contract. A declared type is an annotation, the type written after a parameter's colon or after the return arrow, `Column` and `float` in the example below; it decides which rule handles the value, for a parameter its accept rule, the one function for that declared type that returns the typed value or rejects it, and which words every message about it uses. Here is a function that takes a column of numbers and an optional factor and returns a column:
+A worksheet function is a plain Python function with one line written above it, `@excel_function`; that line is a decorator, and it runs when the module is imported. Registration is what that line does: it reads the function's signature, its parameters with their types and defaults and its return type, checks it, builds the prepared path, and stores it under the function's name. The signature is the whole contract. A declared type is an annotation, the type written after a parameter's colon or after the return arrow, `NumberColumn` and `float` in the example below; it decides which rule handles the value, for a parameter its accept rule, the one function for that declared type that returns the typed value or rejects it, and which words every message about it uses. Here is a function that takes a column of numbers and an optional factor and returns a column:
 
 ```python
 @excel_function
-def Scale(values: Column, factor: float = 1.0) -> Column:
+def Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
     """Every value times the factor."""
-    return Column(values * factor)
+    return NumberColumn(values * factor)
 ```
 
 `excel_function` registers a function that Excel lists in its wizard; the probes use `probe`, from the probes module, which registers hidden. Both are one call to `register`, and both run when the decorator is applied, at import. So every check in this section happens once, and a bad declaration stops the host's start-up instead of failing later in a cell: the add-in still loads, `=GoosedoveStatus()` shows the error, and no worksheet function reaches a cell.
@@ -41,7 +41,7 @@ Since a default goes through its parameter's accept rule, `None` can never be a 
 
 ## What registration resolves
 
-For each parameter, registration resolves three things and stores them in a `Parameter` record. The first is the words of the sheet: the plain names messages use for what a cell holds and for each declared type, such as "number", "whole number", "column of dates". The second is the accept rule; the rule for `float` takes 2.5 and returns 2.5, and rejects TRUE. The third is the default, or `MISSING` when the argument is required. A default is run through the accept rule at registration and stored already converted. `Scale`'s factor is stored as the float 1.0; a `Date` parameter defaulting to 46164.0 stores 2026-05-22 as a numpy day; numpy is the number library the bridge uses for arrays, and its day is a date held as a whole count of days. A `Column` defaulting to 2.0 stores a one-element array. At call time a missing argument receives that stored value, and nothing checks it again.
+For each parameter, registration resolves three things and stores them in a `Parameter` record. The first is the words of the sheet: the plain names messages use for what a cell holds and for each declared type, such as "number", "whole number", "column of dates". The second is the accept rule; the rule for `float` takes 2.5 and returns 2.5, and rejects TRUE. The third is the default, or `MISSING` when the argument is required. A default is run through the accept rule at registration and stored already converted. `Scale`'s factor is stored as the float 1.0; a `Date` parameter defaulting to 46164.0 stores 2026-05-22 as a numpy day; numpy is the number library the bridge uses for arrays, and its day is a date held as a whole count of days. A `NumberColumn` defaulting to 2.0 stores a one-element array. At call time a missing argument receives that stored value, and nothing checks it again.
 
 For the return, registration resolves the result rule: the one function for that declared result type that converts what the function returned into what the host can show, or rejects it; the rule for `Date` turns the day 2026-05-22 into 46164.0, the number Excel shows as that date. The `Registered` record holds the function, the description, the tuple of parameters, whether it is hidden, and the result rule. Its `run` method is the prepared path. For `Scale`, the path already knows the first argument must be a column of numbers, the second a number defaulting to 1.0, and the result a column.
 
@@ -110,8 +110,8 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `bool` | boolean | `_boolean` | the boolean |
 | `Date` | date | `_date` | a numpy day |
 | `NumberArray` | array of numbers | `_numbers` | the range's numbers array, in the sheet's shape |
-| `Column` | column of numbers | `_column` | a flat view of the one column |
-| `Row` | row of numbers | `_row` | a flat view of the one row |
+| `NumberColumn` | column of numbers | `_column` | a flat view of the one column |
+| `NumberRow` | row of numbers | `_row` | a flat view of the one row |
 | `DateColumn` | column of dates | `_date_column` | a flat array of numpy days |
 | `DateRow` | row of dates | `_date_row` | a flat array of numpy days |
 | `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
@@ -157,7 +157,7 @@ flowchart LR
 
 `tests/performance/test_seam_budgets.py` pins owning ten thousand cells at two views, two reshapes and two copies on the numpy ledger, with or without a text cell, and `tests/performance/test_seam_allocation.py` pins its ceiling at 9 bytes per cell plus the slack, its two copies; [baseline.md](baseline.md) records 90,752 bytes. The host counts a range in as two trips, one to own it and one for the prepared path, and three Python objects built to carry it, the rows, the columns and the summary of kinds; that table is in [baseline.md](baseline.md).
 
-After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `Column` and `Row` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
+After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `NumberColumn` and `NumberRow` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
 
 `Cells.from_rows` builds the same object from Python values, for tests. `Cells.from_rows([[1.0, "x"], [None, True]])` classifies each value, fills the kinds and the numbers, collects the texts, and sets the bits of the summary of kinds the host would have set; `tests/unit/test_bridge.py` pins that a row holding a number, a text, a blank, a boolean and a missing argument has all five bits. It rejects an empty range, since Excel never sends fewer than one cell. It is the one loop over cells in the bridge, and it is a test helper, not the host's path.
 
@@ -173,8 +173,8 @@ The result rule for a declared return type converts what the function returned i
 | `bool` | `_boolean_out` | not True or False | the boolean |
 | `Date` | `_date_out` | not a numpy day inside the calendar | the serial, as a float |
 | `NumberArray` | `_array_out` | not a plain two-dimensional array of such numbers; empty | the array, as one unbroken run of 8-byte numbers |
-| `Column` | `_column_out` | not a plain one-dimensional array of such numbers; empty | reshaped to N by 1 |
-| `Row` | `_row_out` | the same | reshaped to 1 by N |
+| `NumberColumn` | `_column_out` | not a plain one-dimensional array of such numbers; empty | reshaped to N by 1 |
+| `NumberRow` | `_row_out` | the same | reshaped to 1 by N |
 | `DateColumn` | `_date_column_out` | not a one-dimensional array of such days; empty | serials, N by 1 |
 | `DateRow` | `_date_row_out` | the same | serials, 1 by N |
 
@@ -184,7 +184,7 @@ Text length is counted the way Excel's LEN counts, in UTF-16 units: most charact
 
 A date goes out as its whole serial. Only a numpy value in days is a date; a Python date, a number, a day with a time, a month or a year are rejected as `returned <what it was>, expected date`. NaT, numpy's not-a-date, is `result is not a date`, and a day before 1900-03-01 or after 9999-12-31 is `result is a date outside 1900-03-01 to 9999-12-31`. A column or row of dates is converted the same way in one look, and the first NaT or out-of-calendar day is named as `result cell (i, 1)` or `result cell (1, i)`.
 
-Spill is how Excel lays an array result over neighbouring cells: a column spills down and a row spills across. Which way a result spills is decided by the declaration, [outputs.md](outputs.md) rule 3; here is the mechanism. A one-dimensional array of three values is reshaped to 3 by 1 when declared `Column` and to 1 by 3 when declared `Row`, and a bad second value is `result cell (2, 1)` in the one case and `result cell (1, 2)` in the other. `NumberArray` keeps the two-dimensional shape as returned. A variant of numpy's array, a masked array say, is rejected by its own name, because it could hide cells behind the memory it shows.
+Spill is how Excel lays an array result over neighbouring cells: a column spills down and a row spills across. Which way a result spills is decided by the declaration, [outputs.md](outputs.md) rule 3; here is the mechanism. A one-dimensional array of three values is reshaped to 3 by 1 when declared `NumberColumn` and to 1 by 3 when declared `NumberRow`, and a bad second value is `result cell (2, 1)` in the one case and `result cell (1, 2)` in the other. `NumberArray` keeps the two-dimensional shape as returned. A variant of numpy's array, a masked array say, is rejected by its own name, because it could hide cells behind the memory it shows.
 
 Every array leaves contiguous, in float64, numpy's ordinary 8-byte number and the one a cell holds, and in two dimensions; `tests/unit/test_result_validation.py` pins all three. Contiguous means laid out in memory in one unbroken run, row after row, so the host can copy it straight through. The finite check on an array is one look. An array of whole numbers is first checked against 2^53 from both sides, above and below, because taking absolute values would fail on the most negative number numpy holds. Then the array is made contiguous float64, a mask marks the cells that are not finite, and the first is named as INDEX counts. `tests/unit/test_result_validation.py` holds the property test: NaN at (r, c) and infinity at the last cell names (r, c).
 
@@ -216,10 +216,10 @@ The probes are the twelve hidden worksheet functions in the probes module. Each 
 | `EchoText(label)` | text in and out | text crosses both ways unchanged |
 | `EchoBoolean(flag)` | a boolean in and out | TRUE arrives as a boolean, not as the number 1, and returns as one |
 | `SumArray(values)` | a `NumberArray` in, a number out | a range of any shape arrives as cells; the sum proves every cell did |
-| `Dot(a, b)` | two `Column`s in, a number out | two ranges in one call arrive as two ranges |
-| `EchoColumn(values)` | a `Column` in and out | a column in and the same column out, spilled down |
-| `EchoRow(values)` | a `Row` in and out | the same across; a row out costs what a column out costs |
-| `RowSums(values)` | a `NumberArray` in, a `Column` out | a grid in and one number per row out: the shape of pricing every row |
+| `Dot(a, b)` | two `NumberColumn`s in, a number out | two ranges in one call arrive as two ranges |
+| `EchoColumn(values)` | a `NumberColumn` in and out | a column in and the same column out, spilled down |
+| `EchoRow(values)` | a `NumberRow` in and out | the same across; a row out costs what a column out costs |
+| `RowSums(values)` | a `NumberArray` in, a `NumberColumn` out | a grid in and one number per row out: the shape of pricing every row |
 | `Grid(rows, cols)` | two whole numbers in, a `NumberArray` out | an array out from nothing in; below one row or column it raises, and the cell shows `#ERROR Grid: ValueError: ...` |
 | `Fail()` | nothing in | an error in the body reaches the cell as `#ERROR Fail: ValueError: as asked` |
 

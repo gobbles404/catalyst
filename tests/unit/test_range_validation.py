@@ -8,12 +8,12 @@ from goosedove.excel import bridge
 from goosedove.excel.bridge import (
     MISSING,
     Cells,
-    Column,
     Date,
     DateColumn,
     DateRow,
     NumberArray,
-    Row,
+    NumberColumn,
+    NumberRow,
     TextColumn,
     TextRow,
     excel_function,
@@ -29,12 +29,12 @@ def DateText(day: Date) -> str:
 
 
 @excel_function
-def SumColumn(values: Column) -> float:
+def SumColumn(values: NumberColumn) -> float:
     return float(values.sum())
 
 
 @excel_function
-def SumRow(values: Row) -> float:
+def SumRow(values: NumberRow) -> float:
     return float(values.sum())
 
 
@@ -112,12 +112,12 @@ def test_accepted(function: str, value: object, result: object) -> None:
 
 
 @excel_function
-def Shape(values: Column) -> str:
+def Shape(values: NumberColumn) -> str:
     return str(values.shape)
 
 
 @excel_function
-def RowShape(values: Row) -> str:
+def RowShape(values: NumberRow) -> str:
     return str(values.shape)
 
 
@@ -137,12 +137,12 @@ def Names(names: TextRow) -> str:
 
 
 @excel_function
-def FirstOfColumn(values: Column) -> float:
+def FirstOfColumn(values: NumberColumn) -> float:
     return float(values[0])
 
 
 @excel_function
-def FirstOfRow(values: Row) -> float:
+def FirstOfRow(values: NumberRow) -> float:
     return float(values[0])
 
 
