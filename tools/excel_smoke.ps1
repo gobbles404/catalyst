@@ -24,6 +24,16 @@ $formulas = [ordered]@{
     "=SumArray(D1:D3)"            = "#N/A"
     "=SumArray(F1:F2)"            = "#N/A"
     "=SumArray(H1:H2)"            = "#ERROR SumArray: values cell (2, 1) is boolean TRUE, expected number"
+    "=CountArray(A1:A3)"          = "3"
+    "=CountArray(B1:B3)"          = "#ERROR CountArray: values cell (1, 1) is text 'n/a', expected number"
+    "=CountMixed(J1:J4)"          = "4"
+    "=CountMixed(A1:A3)"          = "3"
+    "=CountMixed(E1:E2)"          = "2"
+    "=CountMixed(A1)"             = "1"
+    "=CountMixed(H1:H2)"          = "2"
+    "=CountMixed(C1:C3)"          = "#ERROR CountMixed: values cell (2, 1) is blank, expected number, nonempty text or boolean"
+    "=CountMixed(I1:I2)"          = "#ERROR CountMixed: values cell (2, 1) is empty text, expected number, nonempty text or boolean"
+    "=CountMixed(D1:D3)"          = "#N/A"
     "=Dot(A1:A3,{10;20;30})"      = "140"
     "=Dot(A1:A3,{10,20,30})"      = "#ERROR Dot: b is 1x3 array, expected column of numbers"
     "=ROWS(EchoColumn(A1:A3))"    = "3"
@@ -47,6 +57,8 @@ $cells = [ordered]@{
     "F1" = "x"; "F2" = "=NA()"
     "H1" = "1"; "H2" = "TRUE"
     "I1" = "x"; "I2" = '=""'
+    # A trade's own row: a product, an expiry shown as a date, a quantity, a flag.
+    "J1" = "CL"; "J2" = "22-May-2026"; "J3" = "10"; "J4" = "TRUE"
 }
 
 # --- build the host and tell it where Python is -----------------------------

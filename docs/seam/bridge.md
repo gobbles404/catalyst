@@ -8,7 +8,7 @@ The host uses four names from the bridge and nothing else. When Excel loads the 
 
 The host keeps each prepared path beside the C# function it registers with Excel under that name; how that function is built is in [host.md](host.md). A call after that hands the prepared path the arguments and nothing else; the host never again asks Python for anything by name. A pin is a test that holds a fact still, a count or a message, so a change that moves it fails; `tests/performance/HostWorkBudgets.cs` pins that at zero name lookups per call, and [baseline.md](baseline.md) records the counts, the host's own tally of what it did on one call.
 
-Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision thirteen functions register at import: `Ping`, the bridge's own, and the twelve probes.
+Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision fifteen functions register at import: `Ping`, the bridge's own, and the fourteen probes.
 
 `function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, the list of parameter names, and whether the function is hidden. Every probe is hidden and `Ping` is not; `tests/unit/test_bridge.py` pins both.
 
@@ -29,7 +29,7 @@ Registration reads four things: the function's own name, which becomes the works
 
 - a name already registered: `Number is already registered`;
 - a parameter the host cannot pass by position, one that must be passed by name or one that takes any number of values: `Keyed: put is keyword-only, which the host cannot pass`;
-- an annotation outside the twelve declared input types: `Later: x declares list[str], which the seam cannot receive`;
+- an annotation outside the thirteen declared input types: `Later: x declares list[str], which the seam cannot receive`;
 - a parameter with no annotation, refused the same way, though the message shows Python's name for an empty annotation rather than a plain word;
 - an annotation written as text, which is what `from __future__ import annotations` makes of every annotation, so a module of worksheet functions must not use it;
 - a default the parameter's own accept rule rejects: `Wrong: x defaults to text 'x', expected number`;
@@ -54,7 +54,7 @@ flowchart TD
   Fn -->|"its return annotation"| Result["the declared result"]
   Fn -->|"its docstring"| Desc["the description"]
   Param -->|"positional or not"| Positional["positional, or refused"]
-  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the twelve declared types"]
+  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the thirteen declared types"]
   Param -->|"its default, if any"| Default["the default, through the accept rule, stored converted"]
   Result -->|"its annotation"| Convert["the result rule, from the ten declared results"]
   Positional -->|"the name"| Parameter["Parameter: the name, the words of the sheet, the accept rule, the default"]
@@ -100,7 +100,7 @@ The way in is type validation, before the function runs; the way out is the conv
 
 ## The declared input types
 
-A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. The eight range and date types are named labels: `Date` on a numpy day, the number and date ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism.
+A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Eight of the range and date types are named labels: `Date` on a numpy day, the number and date ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism.
 
 | Declared | Words of the sheet | Accept rule | Hands the function |
 |---|---|---|---|
@@ -116,6 +116,7 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `DateRow` | row of dates | `_date_row` | a flat array of numpy days |
 | `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
 | `TextRow` | row of text | `_text_row` | the host's tuple of texts, as it is |
+| `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts |
 
 The scalar accept rules match exactly. A Python bool is an int, so the number rule rejects a bool before it accepts an int or float, as [inputs.md](inputs.md) rule 1 requires. Whole means no fraction, and `tests/unit/test_type_validation.py` pins that every whole number from −2^53 to 2^53, the largest whole number a cell holds without rounding, passes. A date is a whole serial inside the calendar. What a serial and the calendar are, and why serial 60 is rejected, is [inputs.md](inputs.md) rule 6 and decision 13; here the date rule checks a number, then whole, then the calendar, in that order.
 
@@ -160,6 +161,18 @@ flowchart LR
 After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `NumberColumn` and `NumberRow` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
 
 `Cells.from_rows` builds the same object from Python values, for tests. `Cells.from_rows([[1.0, "x"], [None, True]])` classifies each value, fills the kinds and the numbers, collects the texts, and sets the bits of the summary of kinds the host would have set; `tests/unit/test_bridge.py` pins that a row holding a number, a text, a blank, a boolean and a missing argument has all five bits. It rejects an empty range, since Excel never sends fewer than one cell. It is the one loop over cells in the bridge, and it is a test helper, not the host's path.
+
+## The mixed range, and what the function receives
+
+Every other range type hands over a bare array or list, because every cell in it holds the same kind of thing. A mixed range cannot, so `MixedArray` is a record with three fields. `kinds` and `texts` are the ones `Cells` holds, and `numeric_slots` is its numbers under a name that says what it is. The three are the same objects, handed on and not copied.
+
+The name matters. `numeric_slots` is storage, not an array of numbers: a number cell's value sits there, a boolean sits there as 1.0 or 0.0, and a text cell holds NaN as a placeholder the host wrote. So the kinds say what any slot means, and summing the slots alone would count TRUE as one and poison every text cell. `shape` is the rectangle's rows and columns, read from the kinds.
+
+Accepting one is two tests and no look. The host's summary settles the kinds: a mixed range may hold number, text and boolean, so the rule asks whether any other bit is set, which is one integer test whatever the range's size. Then it looks for an empty text, which is the one thing the summary cannot answer, because the host records which kinds occurred and not whether a text has characters in it. That scan is a C-level pass over the text cells, so a range with no text pays nothing.
+
+The rule itself costs nothing measurable. The same ten thousand numeric cells cost 42.2 microseconds under the numeric rule and 42.4 under the mixed one on the host's clock, and 314 against 315 per formula in Excel. What a mixed range costs beyond a numeric one is the text it holds, and almost none of that is the scan: checking one text cell for emptiness is about seven nanoseconds, while carrying one across is about seventy on the host's clock and a hundred and twenty in Excel. The host has always paid that for text, and this rule did not add it.
+
+Rejecting one is where the work is. Blank and missing are found by one compare against the highest kind a mixed range may hold, which works because those three are the lowest codes; a test pins that, so reordering the kinds fails loudly rather than quietly admitting a blank. An empty text is flagged into the same array, by turning its place among the texts into its place among the cells. Both causes then sit in one array, so the earliest cell in sheet order wins with no comparing of positions, and the same function that names a bad cell for every other range type names this one. Locating an empty text is the most expensive rejection the seam has, about ten bytes a cell against one for a blank, which is the price of a failure and is pinned as such.
 
 ## The result rules
 
@@ -206,7 +219,7 @@ It is the only value that takes a default: `Rate(None)` is `x is blank, expected
 
 ## The probes and what each proves
 
-The probes are the twelve hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
+The probes are the fourteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
 
 | Probe | In and out | Proves |
 |---|---|---|
@@ -216,6 +229,8 @@ The probes are the twelve hidden worksheet functions in the probes module. Each 
 | `EchoText(label)` | text in and out | text crosses both ways unchanged |
 | `EchoBoolean(flag)` | a boolean in and out | TRUE arrives as a boolean, not as the number 1, and returns as one |
 | `SumArray(values)` | a `NumberArray` in, a number out | a range of any shape arrives as cells; the sum proves every cell did |
+| `CountArray(values)` | a `NumberArray` in, a whole number out | the control `CountMixed` is read against: the same count, reached by the numeric rule |
+| `CountMixed(values)` | a `MixedArray` in, a whole number out | a rectangle of three kinds arrives as one record, and its shape says how many cells |
 | `Dot(a, b)` | two `NumberColumn`s in, a number out | two ranges in one call arrive as two ranges |
 | `EchoColumn(values)` | a `NumberColumn` in and out | a column in and the same column out, spilled down |
 | `EchoRow(values)` | a `NumberRow` in and out | the same across; a row out costs what a column out costs |
@@ -225,7 +240,7 @@ The probes are the twelve hidden worksheet functions in the probes module. Each 
 
 `Ping` is not a probe. It is the bridge's own worksheet function, listed in the wizard, and returns `goosedove <version> from <path>`, with `source checkout` in place of the version when the package is not installed.
 
-The three looks, a column of numbers, of dates and of text, have no probe, because the host cannot tell those ranges from any other, so `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` live in `tests/performance/conftest.py` only to count the Python side; [history.md](history.md) lists the missing text and date probes as open.
+The three looks, a column of numbers, of dates and of text, have no probe, because the host cannot tell those ranges from any other, so `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` live in `tests/performance/conftest.py` only to count the Python side; [history.md](history.md) lists the missing text and date probes as open. `CountMixed` is the exception that made the rule worth stating: the host cannot tell a mixed range apart either, but the rule that admits one is the whole point of the type, so it earns a probe and a control to be read against.
 
 ## What is deliberately absent, and why
 

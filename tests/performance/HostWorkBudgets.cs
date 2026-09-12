@@ -34,6 +34,20 @@ namespace Goosedove.Host.Tests
             return column;
         }
 
+        // A column holding all three kinds a mixed range may, in turn: text, a number, a boolean.
+        private static object[,] Mixed(int cells)
+        {
+            var column = new object[cells, 1];
+            for (var i = 0; i < cells; i++)
+            {
+                column[i, 0] = (i % 3) switch { 0 => "n" + i, 1 => (object)(double)i, _ => i % 2 == 0 };
+            }
+            return column;
+        }
+
+        // Every third cell of Mixed holds text, counting from the first.
+        private static int MixedTexts(int cells) => (cells + 2) / 3;
+
         private static object[,] Grid(int rows, int cols)
         {
             var grid = new object[rows, cols];
@@ -117,6 +131,22 @@ namespace Goosedove.Host.Tests
             expected["text_cells"] = 1;
             expected["objects_built"] = 4;  // and the text
             Same(expected, Counted("#ERROR SumArray: values cell (10000, 1) is text 'x', expected number", "SumArray", column));
+        }
+
+        // A mixed range crosses the host exactly as a range of numbers does. The host tells the
+        // kinds apart and nothing else; which combinations a declared type allows is the bridge's
+        // rule, so the counts differ only by the text these cells happen to hold.
+        [Theory]
+        [InlineData(1)]
+        [InlineData(100)]
+        [InlineData(10000)]
+        public void a_mixed_range_in_costs_what_a_range_of_numbers_costs(int cells)
+        {
+            Same(RangeIn(cells), Counted((double)cells, "CountArray", Column(cells)));
+            var expected = RangeIn(cells);
+            expected["text_cells"] = MixedTexts(cells);
+            expected["objects_built"] = 4;  // and the text, joined once for the whole range
+            Same(expected, Counted((double)cells, "CountMixed", Mixed(cells)));
         }
 
         // The buffers are kept between calls and grown only when a larger range comes: the first

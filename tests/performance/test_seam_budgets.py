@@ -246,6 +246,67 @@ def test_a_sum_is_one_reduction_and_no_look(numpy_calls: CallProfile) -> None:
     }
 
 
+def mixed() -> Cells:
+    """A trade's shape: a name, a serial, a quantity and a flag, over and over."""
+    return Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])
+
+
+# A mixed range is the numeric call with one rule changed, and that is the whole difference:
+# the summary settles the kinds, so numpy is asked for nothing on either.
+def test_a_mixed_range_costs_the_numeric_call_with_one_rule_changed(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    numbers, cells = column(), mixed()
+    PATH["CountArray"](numbers)
+    PATH["CountMixed"](cells)
+    assert call_profile(lambda: PATH["CountArray"](numbers)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_numbers": 1,
+        "CountArray": 1,
+        "_whole_out": 1,
+        "_scalar": 1,
+    }
+    assert call_profile(lambda: PATH["CountMixed"](cells)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_mixed": 1,  # where the numeric call runs _numbers
+        "MixedArray.shape": 1,  # and the record reads its own rows and columns
+        "CountMixed": 1,
+        "_whole_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["CountArray"](numbers)) == {}
+    assert numpy_calls(lambda: PATH["CountMixed"](cells)) == {}
+
+
+# Whatever the offending cell holds, and however it fails, the same functions run once each.
+def test_a_mixed_range_names_its_first_bad_cell_the_same_way_whichever_way_it_is_bad(
+    call_profile: CallProfile,
+) -> None:
+    rejected = {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_mixed": 1,
+        "_bad_mixed": 1,
+        "_first_bad": 1,
+        "_cell": 1,
+        "_Rejected.__init__": 1,
+        "describe": 1,
+    }
+    blank: list[list[object]] = [[float(i)] for i in range(N)]
+    blank[N // 2][0] = None
+    empty: list[list[object]] = [[f"n{i}"] for i in range(N)]
+    empty[N // 2][0] = ""
+    for rows in (blank, empty):
+        values = Cells.from_rows(rows)
+        PATH["CountMixed"](values)
+        assert call_profile(lambda v=values: PATH["CountMixed"](v)) == rejected
+
+
 def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     values = column()
     PATH["EchoColumn"](values)
