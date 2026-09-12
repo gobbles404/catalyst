@@ -350,14 +350,28 @@ namespace Goosedove.Host
                 }
                 var rows = (int)buffer.Shape[0];
                 var cols = (int)buffer.Shape[1];
-                var doubles = new double[rows * cols];
-                System.Runtime.InteropServices.Marshal.Copy(buffer.Buffer, doubles, 0, doubles.Length);
+                var bytes = (long)rows * cols * sizeof(double);
+                if (buffer.Length != bytes)
+                {
+                    return "#ERROR host: " + name + " returned a buffer of " + buffer.Length + " bytes for " + rows + "x" + cols + " doubles";
+                }
+                // One copy, straight from Python's buffer into the array Excel receives; the array
+                // is pinned only for the length of the copy.
                 var array = new double[rows, cols];
-                Buffer.BlockCopy(doubles, 0, array, 0, doubles.Length * sizeof(double));
-                work?.Hit("buffers_allocated", 2);
-                work?.Hit("buffer_bytes", 16L * doubles.Length);
-                work?.Hit("result_copies", 2);
-                work?.Hit("result_cells", doubles.Length);
+                if (bytes > 0)
+                {
+                    unsafe
+                    {
+                        fixed (double* destination = array)
+                        {
+                            Buffer.MemoryCopy((void*)buffer.Buffer, destination, bytes, bytes);
+                        }
+                    }
+                    work?.Hit("result_copies");
+                }
+                work?.Hit("buffers_allocated");
+                work?.Hit("buffer_bytes", bytes);
+                work?.Hit("result_cells", rows * cols);
                 return array;
             }
         }
