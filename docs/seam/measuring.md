@@ -23,7 +23,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 
 ## Counts, as tests
 
-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. A range whose summary from the host says all numbers takes no look at its kinds, so `ndarray.any` appears only on the rejected and date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
 
 **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
 
@@ -31,13 +31,13 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 |---|---|
 | `trips` | calls into Python: the function's prepared path, and `cells_from_buffers` once per range |
 | `name_lookups` | Python attributes fetched by their text name; a prepared call makes none |
-| `objects_built` | Python objects the host made: each scalar; a range's rows, columns and kinds seen, its text when it has any, and the two buffer addresses when the buffers grow |
-| `cells_scanned` | cells visited by the range loop, the Excel error that stopped it included |
-| `text_cells` | text cells collected in that loop |
+| `objects_built` | Python objects the host made: each scalar; a range's rows, columns and summary of kinds, its text when it has any, and the two buffer addresses when the buffers grow |
+| `cells_scanned` | cells visited by the scan, the Excel error that stopped it included |
+| `text_cells` | text cells collected in that scan |
 | `buffers_allocated`, `buffer_bytes` | managed arrays made, and their payload bytes: for a range in only when the kept buffers grow to a larger range than any before, and for an array out |
 | `result_copies`, `result_cells` | copies made of an array on its way to Excel, and its cells |
 
-The same file pins three managed-allocation ceilings with `GC.GetAllocatedBytesForCurrentThread`: bytes per warm scalar call, bytes per added input cell, bytes per added output cell. Scope: the CLR heap on this thread only. Not Python, not numpy, not Excel-DNA.
+The same file pins what the host's own runtime allocates per call, four ways, with `GC.GetAllocatedBytesForCurrentThread`: a ceiling on a warm scalar call, a ceiling on a warm range in at ten thousand cells, and the bytes per added cell in and per added cell out between a thousand and ten thousand cells. Scope: the CLR heap on this thread only. Not Python, not numpy, not Excel-DNA.
 
 A seam change states its counts before and after. A change that moves no counter is not the change it claims to be.
 
@@ -82,7 +82,7 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 
 ## The baseline
 
-[baseline.md](baseline.md) holds one session's numbers at a named revision, the CSVs they were read from in `docs/baseline/`, and what they say about how the library's formulas should be shaped. A seam change is judged against those rows. A new baseline replaces the last one whole, says what moved since it, and keeps the paired rows beside its CSVs; the earlier document and CSVs stay in git history at the revision the new one names.
+[baseline.md](baseline.md) holds one session's numbers at a named revision, the CSVs they were read from in `docs/seam/baseline/`, and what they say about how the library's formulas should be shaped. A seam change is judged against those rows. A new baseline replaces the last one whole, says what moved since it, and keeps the paired rows beside its CSVs; the earlier document and CSVs stay in git history at the revision the new one names.
 
 ## Where reports land
 
