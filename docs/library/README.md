@@ -93,6 +93,14 @@ its factor rises on 2028-11-07. The owner confirmed that error; no replacement
 values were supplied. The document also contains a separate valid worked segment.
 Neither source tables nor draft test examples are a reviewed pricing golden suite.
 
+## Reviews of this snapshot
+
+[structure-review.md](structure-review.md) answers the brief below. It names two forks
+that need the owner's decision before implementation — how a date/factor table crosses
+the seam, and how the curve's date bound reaches a calculation — and one sequencing
+fact: a handle-returning constructor cannot register today, and the add-in fails to
+load rather than degrading.
+
 ## Suggested review brief
 
 Review the captured approach against the existing seam and repository principles.
