@@ -46,6 +46,14 @@ def test_a_range_of_numbers_in_makes_no_temporary() -> None:
     assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= SLACK
 
 
+# A column of text is accepted on the summary too, and the host's tuple of text cells is
+# handed over as it is. Measured 192 bytes at ten thousand cells on 2026-09-11, down from
+# 160,635 when the tuple went into an object array and came back out as a second tuple.
+def test_a_column_of_text_in_makes_no_temporary() -> None:
+    names = Cells.from_rows([[f"name{i}"] for i in range(N)])
+    assert peak_bytes(lambda: ENTRY["FirstOfNames"](names)) <= SLACK
+
+
 # A rejected range still takes the look that names the bad cell: one 1-byte mask over the
 # kinds, and a second one while the bad cell's text is found by counting the text cells before
 # it. Measured 20,640 at ten thousand cells with the bad cell last, down from 87,239 when the
