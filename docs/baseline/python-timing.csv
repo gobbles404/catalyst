@@ -1,181 +1,181 @@
 layer,probe,scenario,calls,cells_in,cells_out,batch,iterations,elapsed_ms,per_call_us
-python,Zero,scalar,1,0,1,1,65536,52.673,0.804
-python,Zero,scalar,1,0,1,2,65536,52.558,0.802
-python,Zero,scalar,1,0,1,3,65536,52.530,0.802
-python,Zero,scalar,1,0,1,4,65536,52.517,0.801
-python,Zero,scalar,1,0,1,5,65536,52.331,0.799
-python,Add,scalar,1,2,1,1,65536,84.763,1.293
-python,Add,scalar,1,2,1,2,65536,84.954,1.296
-python,Add,scalar,1,2,1,3,65536,85.284,1.301
-python,Add,scalar,1,2,1,4,65536,85.761,1.309
-python,Add,scalar,1,2,1,5,65536,84.328,1.287
-python,Times,missing,1,1,1,1,65536,74.788,1.141
-python,Times,missing,1,1,1,2,65536,75.883,1.158
-python,Times,missing,1,1,1,3,65536,75.777,1.156
-python,Times,missing,1,1,1,4,65536,74.687,1.140
-python,Times,missing,1,1,1,5,65536,74.594,1.138
-python,SumArray,cells in,1,1,1,1,16384,72.169,4.405
-python,SumArray,cells in,1,1,1,2,16384,72.335,4.415
-python,SumArray,cells in,1,1,1,3,16384,72.066,4.399
-python,SumArray,cells in,1,1,1,4,16384,71.821,4.384
-python,SumArray,cells in,1,1,1,5,16384,71.427,4.360
-python,Dot,two ranges in,1,2,1,1,8192,67.966,8.297
-python,Dot,two ranges in,1,2,1,2,8192,68.702,8.387
-python,Dot,two ranges in,1,2,1,3,8192,68.480,8.359
-python,Dot,two ranges in,1,2,1,4,8192,68.741,8.391
-python,Dot,two ranges in,1,2,1,5,8192,68.730,8.390
-python,EchoColumn,round trip,1,1,1,1,16384,99.718,6.086
-python,EchoColumn,round trip,1,1,1,2,16384,107.936,6.588
-python,EchoColumn,round trip,1,1,1,3,16384,117.890,7.195
-python,EchoColumn,round trip,1,1,1,4,16384,118.067,7.206
-python,EchoColumn,round trip,1,1,1,5,16384,109.808,6.702
-python,Grid,cells out,1,2,1,1,16384,73.630,4.494
-python,Grid,cells out,1,2,1,2,16384,67.859,4.142
-python,Grid,cells out,1,2,1,3,16384,68.178,4.161
-python,Grid,cells out,1,2,1,4,16384,69.600,4.248
-python,Grid,cells out,1,2,1,5,16384,69.108,4.218
-python,cells_block,owning a range,1,1,0,1,8192,51.364,6.270
-python,cells_block,owning a range,1,1,0,2,8192,50.383,6.150
-python,cells_block,owning a range,1,1,0,3,8192,50.335,6.144
-python,cells_block,owning a range,1,1,0,4,8192,49.582,6.052
-python,cells_block,owning a range,1,1,0,5,8192,51.375,6.271
-python,SumArray,cells in,1,100,1,1,16384,78.311,4.780
-python,SumArray,cells in,1,100,1,2,16384,77.275,4.717
-python,SumArray,cells in,1,100,1,3,16384,81.786,4.992
-python,SumArray,cells in,1,100,1,4,16384,81.840,4.995
-python,SumArray,cells in,1,100,1,5,16384,82.728,5.049
-python,Dot,two ranges in,1,200,1,1,8192,74.680,9.116
-python,Dot,two ranges in,1,200,1,2,8192,74.307,9.071
-python,Dot,two ranges in,1,200,1,3,8192,74.817,9.133
-python,Dot,two ranges in,1,200,1,4,8192,73.628,8.988
-python,Dot,two ranges in,1,200,1,5,8192,72.627,8.866
-python,EchoColumn,round trip,1,100,100,1,8192,51.498,6.286
-python,EchoColumn,round trip,1,100,100,2,8192,51.463,6.282
-python,EchoColumn,round trip,1,100,100,3,8192,50.954,6.220
-python,EchoColumn,round trip,1,100,100,4,8192,51.323,6.265
-python,EchoColumn,round trip,1,100,100,5,8192,52.006,6.348
-python,Grid,cells out,1,2,100,1,16384,71.973,4.393
-python,Grid,cells out,1,2,100,2,16384,72.128,4.402
-python,Grid,cells out,1,2,100,3,16384,73.468,4.484
-python,Grid,cells out,1,2,100,4,16384,71.910,4.389
-python,Grid,cells out,1,2,100,5,16384,71.124,4.341
-python,RowSums,one answer per row,1,100,10,1,8192,63.814,7.790
-python,RowSums,one answer per row,1,100,10,2,8192,64.478,7.871
-python,RowSums,one answer per row,1,100,10,3,8192,63.498,7.751
-python,RowSums,one answer per row,1,100,10,4,8192,63.587,7.762
-python,RowSums,one answer per row,1,100,10,5,8192,65.102,7.947
-python,cells_block,owning a range,1,100,0,1,8192,53.129,6.485
-python,cells_block,owning a range,1,100,0,2,8192,52.724,6.436
-python,cells_block,owning a range,1,100,0,3,8192,52.491,6.408
-python,cells_block,owning a range,1,100,0,4,8192,49.946,6.097
-python,cells_block,owning a range,1,100,0,5,8192,53.363,6.514
-python,SumArray,cells in,1,1000,1,1,16384,96.281,5.877
-python,SumArray,cells in,1,1000,1,2,16384,93.732,5.721
-python,SumArray,cells in,1,1000,1,3,16384,99.999,6.103
-python,SumArray,cells in,1,1000,1,4,16384,97.143,5.929
-python,SumArray,cells in,1,1000,1,5,16384,97.767,5.967
-python,Dot,two ranges in,1,2000,1,1,8192,90.942,11.101
-python,Dot,two ranges in,1,2000,1,2,8192,90.350,11.029
-python,Dot,two ranges in,1,2000,1,3,8192,89.328,10.904
-python,Dot,two ranges in,1,2000,1,4,8192,90.845,11.089
-python,Dot,two ranges in,1,2000,1,5,8192,89.224,10.892
-python,EchoColumn,round trip,1,1000,1000,1,8192,61.270,7.479
-python,EchoColumn,round trip,1,1000,1000,2,8192,59.741,7.293
-python,EchoColumn,round trip,1,1000,1000,3,8192,60.814,7.424
-python,EchoColumn,round trip,1,1000,1000,4,8192,62.047,7.574
-python,EchoColumn,round trip,1,1000,1000,5,8192,59.164,7.222
-python,Grid,cells out,1,2,1000,1,16384,86.499,5.279
-python,Grid,cells out,1,2,1000,2,16384,87.023,5.311
-python,Grid,cells out,1,2,1000,3,16384,86.255,5.265
-python,Grid,cells out,1,2,1000,4,16384,86.959,5.308
-python,Grid,cells out,1,2,1000,5,16384,85.501,5.219
-python,RowSums,one answer per row,1,1000,100,1,8192,79.876,9.750
-python,RowSums,one answer per row,1,1000,100,2,8192,78.104,9.534
-python,RowSums,one answer per row,1,1000,100,3,8192,81.334,9.928
-python,RowSums,one answer per row,1,1000,100,4,8192,82.360,10.054
-python,RowSums,one answer per row,1,1000,100,5,8192,80.690,9.850
-python,cells_block,owning a range,1,1000,0,1,8192,60.640,7.402
-python,cells_block,owning a range,1,1000,0,2,8192,61.093,7.458
-python,cells_block,owning a range,1,1000,0,3,8192,61.396,7.495
-python,cells_block,owning a range,1,1000,0,4,8192,62.540,7.634
-python,cells_block,owning a range,1,1000,0,5,8192,66.690,8.141
-python,SumArray,cells in,1,10000,1,1,4096,62.652,15.296
-python,SumArray,cells in,1,10000,1,2,4096,61.690,15.061
-python,SumArray,cells in,1,10000,1,3,4096,59.534,14.535
-python,SumArray,cells in,1,10000,1,4,4096,62.077,15.156
-python,SumArray,cells in,1,10000,1,5,4096,61.141,14.927
-python,Dot,two ranges in,1,20000,1,1,2048,53.684,26.213
-python,Dot,two ranges in,1,20000,1,2,2048,53.126,25.940
-python,Dot,two ranges in,1,20000,1,3,2048,53.091,25.923
-python,Dot,two ranges in,1,20000,1,4,2048,51.362,25.079
-python,Dot,two ranges in,1,20000,1,5,2048,52.929,25.844
-python,EchoColumn,round trip,1,10000,10000,1,4096,63.863,15.592
-python,EchoColumn,round trip,1,10000,10000,2,4096,65.218,15.922
-python,EchoColumn,round trip,1,10000,10000,3,4096,65.249,15.930
-python,EchoColumn,round trip,1,10000,10000,4,4096,62.834,15.340
-python,EchoColumn,round trip,1,10000,10000,5,4096,67.697,16.528
-python,Grid,cells out,1,2,10000,1,8192,88.519,10.806
-python,Grid,cells out,1,2,10000,2,8192,88.122,10.757
-python,Grid,cells out,1,2,10000,3,8192,87.621,10.696
-python,Grid,cells out,1,2,10000,4,8192,87.542,10.686
-python,Grid,cells out,1,2,10000,5,8192,88.388,10.790
-python,RowSums,one answer per row,1,10000,1000,1,2048,54.454,26.589
-python,RowSums,one answer per row,1,10000,1000,2,2048,56.098,27.392
-python,RowSums,one answer per row,1,10000,1000,3,2048,54.642,26.681
-python,RowSums,one answer per row,1,10000,1000,4,2048,53.727,26.234
-python,RowSums,one answer per row,1,10000,1000,5,2048,55.158,26.933
-python,cells_block,owning a range,1,10000,0,1,4096,70.513,17.215
-python,cells_block,owning a range,1,10000,0,2,4096,67.507,16.481
-python,cells_block,owning a range,1,10000,0,3,4096,69.100,16.870
-python,cells_block,owning a range,1,10000,0,4,4096,69.268,16.911
-python,cells_block,owning a range,1,10000,0,5,4096,70.591,17.234
-python,SumArray,cells in,1,100000,1,1,1024,96.188,93.933
-python,SumArray,cells in,1,100000,1,2,1024,95.622,93.381
-python,SumArray,cells in,1,100000,1,3,1024,97.642,95.353
-python,SumArray,cells in,1,100000,1,4,1024,97.068,94.793
-python,SumArray,cells in,1,100000,1,5,1024,96.412,94.152
-python,Dot,two ranges in,1,200000,1,1,256,68.166,266.273
-python,Dot,two ranges in,1,200000,1,2,256,68.266,266.665
-python,Dot,two ranges in,1,200000,1,3,256,67.040,261.876
-python,Dot,two ranges in,1,200000,1,4,256,67.103,262.121
-python,Dot,two ranges in,1,200000,1,5,256,69.688,272.220
-python,EchoColumn,round trip,1,100000,100000,1,1024,88.692,86.613
-python,EchoColumn,round trip,1,100000,100000,2,1024,89.596,87.496
-python,EchoColumn,round trip,1,100000,100000,3,1024,87.927,85.866
-python,EchoColumn,round trip,1,100000,100000,4,1024,90.804,88.676
-python,EchoColumn,round trip,1,100000,100000,5,1024,88.384,86.312
-python,Grid,cells out,1,2,100000,1,1024,64.374,62.865
-python,Grid,cells out,1,2,100000,2,1024,62.509,61.044
-python,Grid,cells out,1,2,100000,3,1024,63.615,62.124
-python,Grid,cells out,1,2,100000,4,1024,64.310,62.803
-python,Grid,cells out,1,2,100000,5,1024,65.117,63.590
-python,RowSums,one answer per row,1,100000,10000,1,512,92.590,180.839
-python,RowSums,one answer per row,1,100000,10000,2,512,94.542,184.652
-python,RowSums,one answer per row,1,100000,10000,3,512,91.854,179.402
-python,RowSums,one answer per row,1,100000,10000,4,512,92.052,179.789
-python,RowSums,one answer per row,1,100000,10000,5,512,98.851,193.069
-python,cells_block,owning a range,1,100000,0,1,1024,97.845,95.551
-python,cells_block,owning a range,1,100000,0,2,1024,94.057,91.853
-python,cells_block,owning a range,1,100000,0,3,1024,124.540,121.621
-python,cells_block,owning a range,1,100000,0,4,1024,95.816,93.570
-python,cells_block,owning a range,1,100000,0,5,1024,99.506,97.174
-python,EchoRow,rejected: shape,1,10000,0,1,32768,88.288,2.694
-python,EchoRow,rejected: shape,1,10000,0,2,32768,83.768,2.556
-python,EchoRow,rejected: shape,1,10000,0,3,32768,82.735,2.525
-python,EchoRow,rejected: shape,1,10000,0,4,32768,84.778,2.587
-python,EchoRow,rejected: shape,1,10000,0,5,32768,84.020,2.564
-python,SumArray,rejected: text first,1,10000,0,1,4096,73.429,17.927
-python,SumArray,rejected: text first,1,10000,0,2,4096,85.344,20.836
-python,SumArray,rejected: text first,1,10000,0,3,4096,98.249,23.987
-python,SumArray,rejected: text first,1,10000,0,4,4096,107.142,26.158
-python,SumArray,rejected: text first,1,10000,0,5,4096,87.467,21.354
-python,SumArray,rejected: text last,1,10000,0,1,2048,69.494,33.932
-python,SumArray,rejected: text last,1,10000,0,2,2048,74.548,36.400
-python,SumArray,rejected: text last,1,10000,0,3,2048,59.200,28.906
-python,SumArray,rejected: text last,1,10000,0,4,2048,59.125,28.870
-python,SumArray,rejected: text last,1,10000,0,5,2048,58.753,28.688
-python,SumArray,rejected: blank deep,1,10000,0,1,4096,60.574,14.789
-python,SumArray,rejected: blank deep,1,10000,0,2,4096,60.299,14.721
-python,SumArray,rejected: blank deep,1,10000,0,3,4096,62.766,15.324
-python,SumArray,rejected: blank deep,1,10000,0,4,4096,61.314,14.969
-python,SumArray,rejected: blank deep,1,10000,0,5,4096,65.346,15.954
+python,Zero,scalar,1,0,1,1,65536,50.516,0.771
+python,Zero,scalar,1,0,1,2,65536,50.860,0.776
+python,Zero,scalar,1,0,1,3,65536,50.695,0.774
+python,Zero,scalar,1,0,1,4,65536,50.860,0.776
+python,Zero,scalar,1,0,1,5,65536,50.897,0.777
+python,Add,scalar,1,2,1,1,65536,82.228,1.255
+python,Add,scalar,1,2,1,2,65536,82.038,1.252
+python,Add,scalar,1,2,1,3,65536,81.813,1.248
+python,Add,scalar,1,2,1,4,65536,82.377,1.257
+python,Add,scalar,1,2,1,5,65536,81.677,1.246
+python,Times,missing,1,1,1,1,65536,73.238,1.118
+python,Times,missing,1,1,1,2,65536,73.503,1.122
+python,Times,missing,1,1,1,3,65536,73.367,1.119
+python,Times,missing,1,1,1,4,65536,72.489,1.106
+python,Times,missing,1,1,1,5,65536,73.549,1.122
+python,SumArray,cells in,1,1,1,1,32768,58.161,1.775
+python,SumArray,cells in,1,1,1,2,32768,58.412,1.783
+python,SumArray,cells in,1,1,1,3,32768,58.725,1.792
+python,SumArray,cells in,1,1,1,4,32768,58.290,1.779
+python,SumArray,cells in,1,1,1,5,32768,58.316,1.780
+python,Dot,two ranges in,1,2,1,1,32768,96.894,2.957
+python,Dot,two ranges in,1,2,1,2,32768,96.917,2.958
+python,Dot,two ranges in,1,2,1,3,32768,96.955,2.959
+python,Dot,two ranges in,1,2,1,4,32768,96.834,2.955
+python,Dot,two ranges in,1,2,1,5,32768,96.866,2.956
+python,EchoColumn,round trip,1,1,1,1,16384,52.487,3.204
+python,EchoColumn,round trip,1,1,1,2,16384,52.980,3.234
+python,EchoColumn,round trip,1,1,1,3,16384,52.374,3.197
+python,EchoColumn,round trip,1,1,1,4,16384,53.667,3.276
+python,EchoColumn,round trip,1,1,1,5,16384,53.493,3.265
+python,Grid,cells out,1,2,1,1,16384,69.469,4.240
+python,Grid,cells out,1,2,1,2,16384,73.221,4.469
+python,Grid,cells out,1,2,1,3,16384,69.118,4.219
+python,Grid,cells out,1,2,1,4,16384,69.862,4.264
+python,Grid,cells out,1,2,1,5,16384,69.689,4.254
+python,cells_from_buffers,owning a range,1,1,0,1,16384,51.076,3.117
+python,cells_from_buffers,owning a range,1,1,0,2,16384,50.346,3.073
+python,cells_from_buffers,owning a range,1,1,0,3,16384,50.847,3.103
+python,cells_from_buffers,owning a range,1,1,0,4,16384,50.506,3.083
+python,cells_from_buffers,owning a range,1,1,0,5,16384,51.721,3.157
+python,SumArray,cells in,1,100,1,1,32768,60.665,1.851
+python,SumArray,cells in,1,100,1,2,32768,60.979,1.861
+python,SumArray,cells in,1,100,1,3,32768,60.775,1.855
+python,SumArray,cells in,1,100,1,4,32768,59.855,1.827
+python,SumArray,cells in,1,100,1,5,32768,60.662,1.851
+python,Dot,two ranges in,1,200,1,1,16384,50.200,3.064
+python,Dot,two ranges in,1,200,1,2,16384,51.619,3.151
+python,Dot,two ranges in,1,200,1,3,16384,52.438,3.201
+python,Dot,two ranges in,1,200,1,4,16384,52.760,3.220
+python,Dot,two ranges in,1,200,1,5,16384,52.483,3.203
+python,EchoColumn,round trip,1,100,100,1,16384,53.833,3.286
+python,EchoColumn,round trip,1,100,100,2,16384,59.162,3.611
+python,EchoColumn,round trip,1,100,100,3,16384,53.168,3.245
+python,EchoColumn,round trip,1,100,100,4,16384,53.236,3.249
+python,EchoColumn,round trip,1,100,100,5,16384,52.619,3.212
+python,Grid,cells out,1,2,100,1,16384,72.118,4.402
+python,Grid,cells out,1,2,100,2,16384,72.999,4.456
+python,Grid,cells out,1,2,100,3,16384,72.335,4.415
+python,Grid,cells out,1,2,100,4,16384,76.679,4.680
+python,Grid,cells out,1,2,100,5,16384,72.625,4.433
+python,RowSums,one answer per row,1,100,10,1,16384,72.938,4.452
+python,RowSums,one answer per row,1,100,10,2,16384,75.074,4.582
+python,RowSums,one answer per row,1,100,10,3,16384,72.675,4.436
+python,RowSums,one answer per row,1,100,10,4,16384,73.151,4.465
+python,RowSums,one answer per row,1,100,10,5,16384,72.140,4.403
+python,cells_from_buffers,owning a range,1,100,0,1,16384,51.780,3.160
+python,cells_from_buffers,owning a range,1,100,0,2,16384,51.175,3.123
+python,cells_from_buffers,owning a range,1,100,0,3,16384,51.637,3.152
+python,cells_from_buffers,owning a range,1,100,0,4,16384,51.264,3.129
+python,cells_from_buffers,owning a range,1,100,0,5,16384,53.374,3.258
+python,SumArray,cells in,1,1000,1,1,32768,70.607,2.155
+python,SumArray,cells in,1,1000,1,2,32768,71.787,2.191
+python,SumArray,cells in,1,1000,1,3,32768,70.774,2.160
+python,SumArray,cells in,1,1000,1,4,32768,71.312,2.176
+python,SumArray,cells in,1,1000,1,5,32768,67.987,2.075
+python,Dot,two ranges in,1,2000,1,1,16384,54.358,3.318
+python,Dot,two ranges in,1,2000,1,2,16384,54.348,3.317
+python,Dot,two ranges in,1,2000,1,3,16384,56.046,3.421
+python,Dot,two ranges in,1,2000,1,4,16384,54.422,3.322
+python,Dot,two ranges in,1,2000,1,5,16384,54.807,3.345
+python,EchoColumn,round trip,1,1000,1000,1,16384,59.325,3.621
+python,EchoColumn,round trip,1,1000,1000,2,16384,59.335,3.622
+python,EchoColumn,round trip,1,1000,1000,3,16384,59.377,3.624
+python,EchoColumn,round trip,1,1000,1000,4,16384,59.370,3.624
+python,EchoColumn,round trip,1,1000,1000,5,16384,58.813,3.590
+python,Grid,cells out,1,2,1000,1,16384,86.835,5.300
+python,Grid,cells out,1,2,1000,2,16384,85.737,5.233
+python,Grid,cells out,1,2,1000,3,16384,87.746,5.356
+python,Grid,cells out,1,2,1000,4,16384,87.896,5.365
+python,Grid,cells out,1,2,1000,5,16384,86.089,5.254
+python,RowSums,one answer per row,1,1000,100,1,16384,91.013,5.555
+python,RowSums,one answer per row,1,1000,100,2,16384,93.208,5.689
+python,RowSums,one answer per row,1,1000,100,3,16384,90.868,5.546
+python,RowSums,one answer per row,1,1000,100,4,16384,92.351,5.637
+python,RowSums,one answer per row,1,1000,100,5,16384,90.288,5.511
+python,cells_from_buffers,owning a range,1,1000,0,1,16384,60.456,3.690
+python,cells_from_buffers,owning a range,1,1000,0,2,16384,60.671,3.703
+python,cells_from_buffers,owning a range,1,1000,0,3,16384,59.321,3.621
+python,cells_from_buffers,owning a range,1,1000,0,4,16384,61.831,3.774
+python,cells_from_buffers,owning a range,1,1000,0,5,16384,61.474,3.752
+python,SumArray,cells in,1,10000,1,1,16384,68.283,4.168
+python,SumArray,cells in,1,10000,1,2,16384,67.046,4.092
+python,SumArray,cells in,1,10000,1,3,16384,69.713,4.255
+python,SumArray,cells in,1,10000,1,4,16384,73.744,4.501
+python,SumArray,cells in,1,10000,1,5,16384,67.241,4.104
+python,Dot,two ranges in,1,20000,1,1,16384,78.597,4.797
+python,Dot,two ranges in,1,20000,1,2,16384,78.762,4.807
+python,Dot,two ranges in,1,20000,1,3,16384,79.213,4.835
+python,Dot,two ranges in,1,20000,1,4,16384,80.238,4.897
+python,Dot,two ranges in,1,20000,1,5,16384,80.589,4.919
+python,EchoColumn,round trip,1,10000,10000,1,16384,83.517,5.097
+python,EchoColumn,round trip,1,10000,10000,2,16384,84.689,5.169
+python,EchoColumn,round trip,1,10000,10000,3,16384,85.722,5.232
+python,EchoColumn,round trip,1,10000,10000,4,16384,85.956,5.246
+python,EchoColumn,round trip,1,10000,10000,5,16384,83.808,5.115
+python,Grid,cells out,1,2,10000,1,8192,87.743,10.711
+python,Grid,cells out,1,2,10000,2,8192,88.484,10.801
+python,Grid,cells out,1,2,10000,3,8192,88.980,10.862
+python,Grid,cells out,1,2,10000,4,8192,88.895,10.851
+python,Grid,cells out,1,2,10000,5,8192,88.551,10.809
+python,RowSums,one answer per row,1,10000,1000,1,4096,62.644,15.294
+python,RowSums,one answer per row,1,10000,1000,2,4096,63.578,15.522
+python,RowSums,one answer per row,1,10000,1000,3,4096,62.806,15.333
+python,RowSums,one answer per row,1,10000,1000,4,4096,62.077,15.156
+python,RowSums,one answer per row,1,10000,1000,5,4096,61.190,14.939
+python,cells_from_buffers,owning a range,1,10000,0,1,16384,92.990,5.676
+python,cells_from_buffers,owning a range,1,10000,0,2,16384,92.103,5.622
+python,cells_from_buffers,owning a range,1,10000,0,3,16384,93.614,5.714
+python,cells_from_buffers,owning a range,1,10000,0,4,16384,92.115,5.622
+python,cells_from_buffers,owning a range,1,10000,0,5,16384,91.985,5.614
+python,SumArray,cells in,1,100000,1,1,4096,91.161,22.256
+python,SumArray,cells in,1,100000,1,2,4096,92.575,22.601
+python,SumArray,cells in,1,100000,1,3,4096,91.023,22.222
+python,SumArray,cells in,1,100000,1,4,4096,92.586,22.604
+python,SumArray,cells in,1,100000,1,5,4096,93.396,22.802
+python,Dot,two ranges in,1,200000,1,1,512,58.083,113.443
+python,Dot,two ranges in,1,200000,1,2,512,58.277,113.823
+python,Dot,two ranges in,1,200000,1,3,512,58.689,114.628
+python,Dot,two ranges in,1,200000,1,4,512,58.515,114.287
+python,Dot,two ranges in,1,200000,1,5,512,57.526,112.355
+python,EchoColumn,round trip,1,100000,100000,1,4096,78.405,19.142
+python,EchoColumn,round trip,1,100000,100000,2,4096,78.758,19.228
+python,EchoColumn,round trip,1,100000,100000,3,4096,77.446,18.908
+python,EchoColumn,round trip,1,100000,100000,4,4096,78.058,19.057
+python,EchoColumn,round trip,1,100000,100000,5,4096,78.756,19.228
+python,Grid,cells out,1,2,100000,1,1024,63.282,61.799
+python,Grid,cells out,1,2,100000,2,1024,63.703,62.210
+python,Grid,cells out,1,2,100000,3,1024,64.169,62.665
+python,Grid,cells out,1,2,100000,4,1024,63.473,61.985
+python,Grid,cells out,1,2,100000,5,1024,62.696,61.226
+python,RowSums,one answer per row,1,100000,10000,1,512,55.170,107.754
+python,RowSums,one answer per row,1,100000,10000,2,512,56.787,110.911
+python,RowSums,one answer per row,1,100000,10000,3,512,66.993,130.846
+python,RowSums,one answer per row,1,100000,10000,4,512,60.540,118.242
+python,RowSums,one answer per row,1,100000,10000,5,512,56.534,110.419
+python,cells_from_buffers,owning a range,1,100000,0,1,4096,98.263,23.990
+python,cells_from_buffers,owning a range,1,100000,0,2,4096,100.500,24.536
+python,cells_from_buffers,owning a range,1,100000,0,3,4096,107.198,26.171
+python,cells_from_buffers,owning a range,1,100000,0,4,4096,117.526,28.693
+python,cells_from_buffers,owning a range,1,100000,0,5,4096,106.623,26.031
+python,EchoRow,rejected: shape,1,10000,0,1,32768,82.237,2.510
+python,EchoRow,rejected: shape,1,10000,0,2,32768,81.855,2.498
+python,EchoRow,rejected: shape,1,10000,0,3,32768,82.853,2.528
+python,EchoRow,rejected: shape,1,10000,0,4,32768,83.034,2.534
+python,EchoRow,rejected: shape,1,10000,0,5,32768,82.197,2.508
+python,SumArray,rejected: text first,1,10000,0,1,8192,62.161,7.588
+python,SumArray,rejected: text first,1,10000,0,2,8192,63.041,7.695
+python,SumArray,rejected: text first,1,10000,0,3,8192,62.732,7.658
+python,SumArray,rejected: text first,1,10000,0,4,8192,64.309,7.850
+python,SumArray,rejected: text first,1,10000,0,5,8192,63.230,7.719
+python,SumArray,rejected: text last,1,10000,0,1,8192,71.621,8.743
+python,SumArray,rejected: text last,1,10000,0,2,8192,74.209,9.059
+python,SumArray,rejected: text last,1,10000,0,3,8192,75.895,9.265
+python,SumArray,rejected: text last,1,10000,0,4,8192,74.573,9.103
+python,SumArray,rejected: text last,1,10000,0,5,8192,75.601,9.229
+python,SumArray,rejected: blank deep,1,10000,0,1,16384,92.860,5.668
+python,SumArray,rejected: blank deep,1,10000,0,2,16384,91.057,5.558
+python,SumArray,rejected: blank deep,1,10000,0,3,16384,94.971,5.797
+python,SumArray,rejected: blank deep,1,10000,0,4,16384,91.068,5.558
+python,SumArray,rejected: blank deep,1,10000,0,5,16384,91.428,5.580

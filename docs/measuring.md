@@ -82,7 +82,7 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 
 ## The baseline
 
-[baseline.md](baseline.md) holds one session's numbers at a named revision, the CSVs they were read from in `docs/baseline/`, and what they say about how the library's formulas should be shaped. A seam change is judged against those rows.
+[baseline.md](baseline.md) holds one session's numbers at a named revision, the CSVs they were read from in `docs/baseline/`, and what they say about how the library's formulas should be shaped. A seam change is judged against those rows. A new baseline replaces the last one whole, says what moved since it, and keeps the paired rows beside its CSVs; the earlier document and CSVs stay in git history at the revision the new one names.
 
 ## Where reports land
 

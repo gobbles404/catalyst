@@ -1,9 +1,9 @@
 {
-  "timestamp_utc": "2026-09-11T11:04:06.3724846Z",
-  "revision": "024486f4e457f2cd3f5e322272853f5943b00a51",
-  "host_sha256": "ba32aee2e1d42b8346b240d6debe4ad33606b9dafd2bd0da357e808c8ee95de1",
-  "bridge_sha256": "d62f32d4f8f5f7e47c09ad17b83453267b7fad420219d9134d0a32be21eac645",
-  "probes_sha256": "13893651febfbf2953b3c07022088a227b18f18a11db4269d663c5213bb6b68a",
+  "timestamp_utc": "2026-09-12T00:35:57.9759897Z",
+  "revision": "aaa5259837c9f55e1a4f3aa99a5621cefcf339d9",
+  "host_sha256": "01a5f7027303457b36acbd83e7537dbbd12d1aa7553d449cb946f5e874e3d627",
+  "bridge_sha256": "50621d9519d4684167fc62436f97f86c4c892a7dc27f35e646d2d4fd49f07b6a",
+  "probes_sha256": "7a7b2d6504b4923812f877bdfe862c8842ed5b9c289c7638f0f35f469967b484",
   "configuration": "Release",
   "python": "3.13.13",
   "numpy": "2.5.2",
@@ -13,6 +13,6 @@
   "logical_processors": "16",
   "batch_target_ms": "50",
   "batches": "5",
-  "timed_scope": "The registered delegate, Excel's path minus Excel-DNA: marshaling, the trip, validation, the probe, result conversion. Stage scenarios time Marshal.Append or Marshal.FromPython alone with the GIL held outside the clock. Excludes Excel and building inputs. per_call_us is a batch mean.",
+  "timed_scope": "The registered delegate, Excel's path minus Excel-DNA: marshaling, the trip, validation, the probe, result conversion. Two stage rows, 'way in' and 'way out', time Marshal.ToPython and Marshal.FromPython alone with the GIL held outside the clock. Excludes Excel and building inputs. per_call_us is a batch mean.",
   "allocation_scope": "GC.GetAllocatedBytesForCurrentThread over the batch, divided by calls: managed bytes on this thread only, not Python, numpy, or Excel-DNA."
 }
