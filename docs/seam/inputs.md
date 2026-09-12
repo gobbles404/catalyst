@@ -87,8 +87,11 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 | `DateRow` | a range of dates, one row tall | `=Expiries(A1:F1)` | a plain list of dates | the same, or a column |
 | `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
 | `TextRow` | a range of text, one row tall | `=Headers(A1:C1)` | a plain list of text | the same, or a column |
+| `MixedArray` | a range of numbers, text and booleans in any combination, any shape | `=Value(A2:L100)` with a trade per row | one record: the shape, each cell's kind, the numbers, the text | a blank, missing or empty-text cell, named |
 
-A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one.
+A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one; a rectangle of text alone is already a `MixedArray`, which mixes rather than requires.
+
+`MixedArray` came later than the others and is the one type whose declaration is not a name for a shape numpy or Python already has. Every other range hands the function a bare array or list, because every cell in it holds the same kind of thing. A mixed range cannot: a function reading it needs each cell's kind beside the values to know which is which, so it receives a record holding both. What that record holds, and why the numbers in it are storage rather than an array of numbers, is in [bridge.md](bridge.md).
 
 Next, one at a time, each when the first function needs it. Each adds one rule to the validator and one row here.
 
@@ -114,7 +117,7 @@ Decided 2026-09-09, for ranges and dates.
 9. A cell is named the way `INDEX` counts: row then column, from 1, within the range that was passed.
 10. A `NumberColumn` or `NumberRow` hands the function a plain list. A `NumberArray` keeps its shape. Nothing is sorted or reordered.
 11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text.
-12. Seven range types, each named for what it holds and the shape it takes: `NumberArray` of any shape, with `NumberColumn` and `NumberRow`; `DateColumn` and `DateRow`; `TextColumn` and `TextRow`. A `TextArray` is possible and not built.
+12. Eight range types, each named for what it holds and the shape it takes: `NumberArray` of any shape, with `NumberColumn` and `NumberRow`; `DateColumn` and `DateRow`; `TextColumn` and `TextRow`; and `MixedArray`, which takes the three kinds that hold a value, in any combination and any shape. A `TextArray` is possible and not built.
 13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
 14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the validator.
 15. Shape before cells. A wrong-shaped range is reported as such before any cell is looked at.
@@ -127,6 +130,14 @@ Decided 2026-09-09, closing the input side.
 19. An error inside a range comes back as that error, with no cell named.
 20. Newer Excel errors such as `#SPILL!` arrive as `#VALUE!`. Known, and left alone.
 21. Every range crosses the host the same way: a kind per cell, a number per cell, the text cells in sheet order, and a summary of which kinds occurred, all from one pass into two buffers the host keeps between calls and grows only for a larger range than any before. The host never chooses a road. A range the summary shows to be all numbers, or all text, is accepted without a look at the kinds; otherwise one look names the first offending cell.
+
+Decided 2026-09-12, the mixed range.
+
+22. A range may hold numbers, nonempty text and booleans together. `MixedArray` takes any combination of those three, and a rectangle of one of them alone is a mix of one. Blank, missing and empty text are rejected as they are everywhere else: mixing is what is permitted, not what is required, and nothing about what a cell may hold is relaxed.
+23. A mixed range names the earliest offending cell in sheet order, whichever way it offends. A blank at (2, 1) and an empty text at (1, 2) are both failures, and the one nearer the top-left is named. The order the checks run in never decides the message. The types that take one kind keep the order they have: a text range still reports a wrong kind before an empty text, because with one kind there is only ever one failure to find.
+24. `MixedArray` is an input. A function may not declare it as a result, and one that does is refused when the add-in loads, as the text ranges already are. A rectangle of three kinds has no way out to a cell.
+25. Nothing is inferred from a value. A date is a number, as it is everywhere at the seam, so a mixed range takes a serial without checking a calendar; a whole number and a number with decimals are the same kind; text that looks like a date stays text. Which column means what belongs to the library, and this decision does not change rule 14.
+26. A mixed range hands the function the storage the host already sent, with nothing rebuilt. The record's numbers are slots, not an array of numbers: a boolean sits there as one or zero and a text cell as a placeholder, so the kinds say what each slot means. Reading a kind the seam has already established is not checking it again; rules 4 and 6 are about admitting a value, not about consuming one.
 
 ## Not supported
 

@@ -383,3 +383,16 @@ def test_unknown_declared_result_refuses_to_register() -> None:
 
     with pytest.raises(TypeError, match="Listed declares list\\[str\\] as its result"):
         excel_function(Listed)
+
+
+def test_a_mixed_array_may_be_taken_but_not_returned() -> None:
+    # An input-only type, as the text ranges already are: there is no way for the host to show
+    # a rectangle of three kinds, so the way out has no rule for one and registration says so.
+    def OutMixed() -> bridge.MixedArray:
+        raise AssertionError("never called")
+
+    with pytest.raises(
+        TypeError,
+        match=r"OutMixed declares <class 'goosedove\.excel\.bridge\.MixedArray'> as its result",
+    ):
+        excel_function(OutMixed)

@@ -94,6 +94,18 @@ def total(n: int) -> float:
     return float(n * (n - 1) // 2)
 
 
+def mixed(n: int, chars: int = 2) -> Cells:
+    """A column holding all three kinds a mixed range may, in turn, with text of a given length."""
+    text = "n" * chars
+    kinds: list[object] = [text, 1.0, True]
+    return Cells.from_rows([[kinds[i % 3]] for i in range(n)])
+
+
+def texts(n: int, chars: int = 2) -> Cells:
+    """A column of text alone, so the scan for an empty text is read on its own."""
+    return Cells.from_rows([["n" * chars] for _ in range(n)])
+
+
 _buffers: list[object] = []  # keeps the ctypes buffers alive for the life of the run
 
 
@@ -113,6 +125,45 @@ def scenarios() -> list[Scenario]:
             "Times", "missing", 1, 1, lambda run=ENTRY["Times"]: run(5.0, MISSING), equals(5.0)
         ),
     ]
+    for n in (10, *SIZES):  # ten cells is a trade's own row, smaller than the working size
+        cells = column(n)
+        mixed_cells = mixed(n)
+        cases.append(
+            Scenario(
+                "CountArray",
+                "cells in",
+                n,
+                1,
+                lambda run=ENTRY["CountArray"], c=cells: run(c),
+                equals(float(n)),
+            )
+        )
+        cases.append(
+            Scenario(
+                "CountMixed",
+                "cells in",
+                n,
+                1,
+                lambda run=ENTRY["CountMixed"], c=mixed_cells: run(c),
+                equals(float(n)),
+            )
+        )
+    # Text count and text length, one at a time, because only the text costs anything per cell.
+    for label, cells in (
+        ("mixed: no text", column(10_000)),
+        ("mixed: all text, 2 characters", texts(10_000, 2)),
+        ("mixed: all text, 100 characters", texts(10_000, 100)),
+    ):
+        cases.append(
+            Scenario(
+                "CountMixed",
+                label,
+                10_000,
+                1,
+                lambda run=ENTRY["CountMixed"], c=cells: run(c),
+                equals(10_000.0),
+            )
+        )
     for n in SIZES:
         cells = column(n)
         weights = Cells.from_rows([[1.0] for _ in range(n)])
@@ -229,6 +280,37 @@ def scenarios() -> list[Scenario]:
                 0,
                 lambda run=ENTRY["SumArray"]: run(deep),
                 equals("#ERROR SumArray: values cell (5001, 1) is blank, expected number"),
+            ),
+        )
+    )
+    # A mixed range can fail two ways, and naming an empty text costs more than naming a blank,
+    # because its place among the texts has to be turned into its place among the cells.
+    mixed_kinds = "number, nonempty text or boolean"
+    empty_deep: list[list[object]] = [[f"n{i}"] for i in range(n)]
+    empty_deep[5_000][0] = ""
+    blank_mixed, empty_mixed = Cells.from_rows(blank_deep), Cells.from_rows(empty_deep)
+    cases.extend(
+        (
+            Scenario(
+                "CountMixed",
+                "rejected: blank deep",
+                n,
+                0,
+                lambda run=ENTRY["CountMixed"]: run(blank_mixed),
+                equals(
+                    f"#ERROR CountMixed: values cell (5001, 1) is blank, expected {mixed_kinds}"
+                ),
+            ),
+            Scenario(
+                "CountMixed",
+                "rejected: empty text deep",
+                n,
+                0,
+                lambda run=ENTRY["CountMixed"]: run(empty_mixed),
+                equals(
+                    f"#ERROR CountMixed: values cell (5001, 1) is empty text, "
+                    f"expected {mixed_kinds}"
+                ),
             ),
         )
     )

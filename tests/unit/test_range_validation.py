@@ -1,7 +1,7 @@
 """Type validation of ranges: every shape Excel can send against every declared range type."""
 
 import pytest
-from hypothesis import given
+from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from goosedove.excel import bridge
@@ -11,6 +11,7 @@ from goosedove.excel.bridge import (
     Date,
     DateColumn,
     DateRow,
+    MixedArray,
     NumberArray,
     NumberColumn,
     NumberRow,
@@ -74,6 +75,22 @@ NAMES_ARRAY = cells([["a", "b"], ["c", "d"]])
 DATES_COLUMN = cells([[46164.0], [46165.0]])  # 22 and 23 May 2026
 DATES_ROW = cells([[46164.0, 46165.0]])
 DATES_ARRAY = cells([[46164.0, 46165.0], [46166.0, 46167.0]])
+# A trade's row: a product, an expiry serial, a whole quantity, a price, a flag.
+TRADES = cells([["CL", 46164.0, 10, 72.5, True], ["NG", 46165.0, 3, 3.25, False]])
+EMPTY_TEXT_INSIDE = cells([["a", ""]])
+
+
+@excel_function
+def CountCells(values: MixedArray) -> float:
+    return float(values.shape[0] * values.shape[1])
+
+
+@excel_function
+def Payload(values: MixedArray) -> str:
+    """Everything one mixed range handed over, so an assertion sees all of it, not a count."""
+    return (
+        f"{values.shape} {values.kinds.tolist()} {values.numeric_slots.tolist()} {values.texts!r}"
+    )
 
 
 # --- what passes, and what the function receives ---------------------------
@@ -324,6 +341,97 @@ def test_rejected(function: str, value: object, text: str) -> None:
     assert bridge.call(function, [value]) == text
 
 
+# --- the mixed range: three kinds in one rectangle, and the earliest bad cell wins ------
+
+MIXED = "number, nonempty text or boolean"
+
+
+@pytest.mark.parametrize(
+    ("value", "cells_in"),
+    [
+        (TRADES, 10.0),  # text, a serial, a whole number, a decimal and a flag together
+        (ARRAY, 4.0),  # all of one kind is a mix of one
+        (NAMES_ARRAY, 4.0),
+        (cells([[True, False]]), 2.0),
+        (ONE, 1.0),  # an explicit 1x1 range
+        (ROW, 3.0),
+        (COLUMN, 3.0),
+        (5.0, 1.0),  # a scalar becomes a 1x1 range
+        ("x", 1.0),
+        (True, 1.0),
+        (cells([[60.0]]), 1.0),  # a serial below the calendar is a number here
+        (cells([[2.5]]), 1.0),
+        (cells([[" "]]), 1.0),  # whitespace is text; only empty text is not
+        (cells([["2026-05-22"]]), 1.0),  # text that looks like a date stays text
+    ],
+)
+def test_a_mixed_range_accepts_every_kind_that_holds_a_value(
+    value: object, cells_in: float
+) -> None:
+    assert bridge.call("CountCells", [value]) == cells_in
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (BLANK_INSIDE, f"#ERROR CountCells: values cell (1, 2) is blank, expected {MIXED}"),
+        (MISSING_INSIDE, f"#ERROR CountCells: values cell (1, 2) is missing, expected {MIXED}"),
+        (
+            EMPTY_TEXT_INSIDE,
+            f"#ERROR CountCells: values cell (1, 2) is empty text, expected {MIXED}",
+        ),
+        # An empty text and a blank compete: the earlier cell wins, whichever kind of failure.
+        (
+            cells([["a", ""], [None, "b"]]),
+            f"#ERROR CountCells: values cell (1, 2) is empty text, expected {MIXED}",
+        ),
+        (
+            cells([["a", None], ["", "b"]]),
+            f"#ERROR CountCells: values cell (1, 2) is blank, expected {MIXED}",
+        ),
+        (
+            cells([["", ""]]),
+            f"#ERROR CountCells: values cell (1, 1) is empty text, expected {MIXED}",
+        ),
+        (None, "#ERROR CountCells: values is blank, expected mixed array"),
+        ("", "#ERROR CountCells: values is empty text, expected mixed array"),
+        (MISSING, "#ERROR CountCells: values is missing, expected mixed array"),
+    ],
+)
+def test_a_mixed_range_rejects_a_cell_that_holds_no_value(value: object, text: str) -> None:
+    assert bridge.call("CountCells", [value]) == text
+
+
+def test_a_mixed_range_hands_over_every_cell_as_it_arrived() -> None:
+    assert bridge.call("Payload", [TRADES]) == (
+        "(2, 5) [[1, 0, 0, 0, 2], [1, 0, 0, 0, 2]] "
+        "[[nan, 46164.0, 10.0, 72.5, 1.0], [nan, 46165.0, 3.0, 3.25, 0.0]] ('CL', 'NG')"
+    )
+
+
+def test_a_boolean_is_not_a_number_and_text_is_not_its_digits() -> None:
+    # TRUE and 1 share a slot; only the kind tells them apart. "123" never becomes a number.
+    assert bridge.call("Payload", [cells([[True, 1.0, "123"]])]) == (
+        "(1, 3) [[2, 0, 1]] [[1.0, 1.0, nan]] ('123',)"
+    )
+
+
+def test_a_promoted_scalar_is_a_one_cell_range() -> None:
+    assert bridge.call("Payload", ["CL"]) == "(1, 1) [[1]] [[nan]] ('CL',)"
+    assert bridge.call("Payload", [72.5]) == "(1, 1) [[0]] [[72.5]] ()"
+    assert bridge.call("Payload", [False]) == "(1, 1) [[2]] [[0.0]] ()"
+
+
+def test_the_three_mixed_kinds_are_the_lowest_codes() -> None:
+    # The rejection mask is one compare against the highest mixed code, which only holds while
+    # number, text and boolean are the three lowest. Reordering Kind must fail here, loudly.
+    assert {k for k in bridge.Kind if k <= bridge.Kind.BOOLEAN} == {
+        bridge.Kind.NUMBER,
+        bridge.Kind.TEXT,
+        bridge.Kind.BOOLEAN,
+    }
+
+
 # --- the general rule: the first failing cell is named as INDEX counts ------
 
 
@@ -351,4 +459,27 @@ def test_the_first_failing_cell_is_named(rows: int, cols: int, data: st.DataObje
     dates = cells([[60.0 if i in (r, rows) else 46164.0] for i in range(1, rows + 1)])
     assert bridge.call("FirstDate", [dates]) == (
         f"#ERROR FirstDate: dates cell ({r}, 1) is number 60.0, expected date"
+    )
+
+
+# A mixed range can fail two ways at once, and the earlier cell must win whichever way it is.
+# No other declared type has two causes to choose between, so this is its own property.
+@given(rows=st.integers(1, 12), cols=st.integers(1, 12), data=st.data())
+def test_the_earliest_bad_cell_wins_whichever_way_it_is_bad(
+    rows: int, cols: int, data: st.DataObject
+) -> None:
+    size = rows * cols
+    assume(size >= 2)  # two bad cells need two cells
+    first = data.draw(st.integers(0, size - 2))
+    second = data.draw(st.integers(first + 1, size - 1))
+    kinds = data.draw(st.permutations([None, ""]))
+
+    grid: list[list[object]] = [["ok"] * cols for _ in range(rows)]
+    grid[first // cols][first % cols] = kinds[0]
+    grid[second // cols][second % cols] = kinds[1]
+    expected = "blank" if kinds[0] is None else "empty text"
+
+    assert bridge.call("CountCells", [cells(grid)]) == (
+        f"#ERROR CountCells: values cell ({first // cols + 1}, {first % cols + 1}) "
+        f"is {expected}, expected {MIXED}"
     )

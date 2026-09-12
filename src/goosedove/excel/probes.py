@@ -1,7 +1,9 @@
 """The seam's probes: worksheet functions that exist only to test the host and the bridge.
 
-Each probe proves one thing the host can tell apart, on the way in or the way out,
-and does no work beyond proving it, so its counts are the seam's counts. Together
+Each probe proves one thing the host can tell apart, or one rule the bridge applies
+to what the host could not, and does no work beyond proving it, so its counts are
+the seam's counts. Where a rule needs a control to be read against, the control is a
+probe too, differing from it in the one thing being measured and nothing else. Together
 they are the knobs a capacity run turns: how many calls, how many cells in, how
 many cells out. They are registered hidden, so Excel's function wizard never lists
 them, and they ship in the build everyone loads. They stay as long as the seam does.
@@ -11,7 +13,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from goosedove.excel.bridge import NumberArray, NumberColumn, NumberRow, register
+from goosedove.excel.bridge import MixedArray, NumberArray, NumberColumn, NumberRow, register
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -53,6 +55,20 @@ def EchoBoolean(flag: bool) -> bool:
 def SumArray(values: NumberArray) -> float:
     """Probe: a range of any shape arrives as cells; the sum proves every cell did."""
     return float(values.sum())
+
+
+@probe
+def CountArray(values: NumberArray) -> int:
+    """Probe: the same count over a range of numbers, the control CountMixed is read against."""
+    rows, cols = values.shape
+    return rows * cols
+
+
+@probe
+def CountMixed(values: MixedArray) -> int:
+    """Probe: a range of numbers, text and booleans together arrives as one record of its own."""
+    rows, cols = values.shape
+    return rows * cols
 
 
 @probe
