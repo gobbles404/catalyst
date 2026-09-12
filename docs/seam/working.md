@@ -37,7 +37,7 @@ Shows `goosedove 0.1.0 from C:\...\src\goosedove\__init__.py`, with `source chec
 No pricing function exists yet. The only worksheet functions today are `Ping`, `GoosedoveStatus`, `HostAdd` and the twelve probes, whose cost is the seam's cost and nothing more. So `Ping` in `src/goosedove/excel/bridge.py` and the probes in `src/goosedove/excel/probes.py` are the only examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
 
 1. Put the module under `src/goosedove/excel/`, beside `bridge.py` and `probes.py`. It may import the pricing code; the pricing code never imports it. That one-way rule is why pricing can be tested without Excel.
-2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `Column` for a column of numbers. It must be one of the twelve the seam can receive and the ten it can send, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows.
+2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the twelve the seam can receive and the ten it can send, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows.
 3. Write the docstring as the wizard text. The whole docstring, with the surrounding spaces removed, is the description Excel shows, so keep it to one sentence a user of the sheet would read.
 4. Give an optional argument a default in the signature. The default goes through the same accept rule as a real argument at registration, once, and is stored already converted, so only a missing argument takes it and a blank cell still fails. `None` can never be a default: every accept rule calls it blank.
 5. Import the module in the catalogue, `src/goosedove/excel/__init__.py`, and add its name to the `__all__` list beside the two that are there, or the lint step reports the import as unused. The catalogue is the list of modules whose functions Excel sees, and it is the only place a new module is named.
@@ -50,13 +50,13 @@ The host needs no change. It asks the bridge for the list of functions at start-
 One function, whole:
 
 ```python
-from goosedove.excel.bridge import Column, excel_function
+from goosedove.excel.bridge import NumberColumn, excel_function
 
 
 @excel_function
-def Scale(values: Column, factor: float = 1.0) -> Column:
+def Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
     """Every value times the factor."""
-    return Column(values * factor)
+    return NumberColumn(values * factor)
 ```
 
 `=Scale(A1:A100, 2)` spills a hundred answers down. `=Scale(A1:A100)` doubles nothing and returns the column unchanged, because the omitted factor takes its default; `=Scale(A1:A100, B1)` with B1 empty fails, and says so.

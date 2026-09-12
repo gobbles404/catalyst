@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import goosedove
-from goosedove.excel.bridge import Column, DateColumn, TextColumn, excel_function
+from goosedove.excel.bridge import DateColumn, NumberColumn, TextColumn, excel_function
 
 PACKAGE_DIR = str(Path(goosedove.__file__).parent)
 
@@ -18,7 +18,7 @@ PACKAGE_DIR = str(Path(goosedove.__file__).parent)
 # here, outside the package, they are not themselves counted, and pytest registers them
 # before any budget module builds its table of prepared paths.
 @excel_function
-def FirstOfNumbers(values: Column) -> float:
+def FirstOfNumbers(values: NumberColumn) -> float:
     return float(values[0])
 
 

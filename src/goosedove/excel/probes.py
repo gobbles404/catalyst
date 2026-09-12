@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from goosedove.excel.bridge import Column, NumberArray, Row, register
+from goosedove.excel.bridge import NumberArray, NumberColumn, NumberRow, register
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -56,27 +56,27 @@ def SumArray(values: NumberArray) -> float:
 
 
 @probe
-def Dot(a: Column, b: Column) -> float:
+def Dot(a: NumberColumn, b: NumberColumn) -> float:
     """Probe: two ranges in one call arrive as two ranges."""
     return float(a @ b)
 
 
 @probe
-def EchoColumn(values: Column) -> Column:
+def EchoColumn(values: NumberColumn) -> NumberColumn:
     """Probe: a column in and the same column out, spilled down."""
-    return Column(values)
+    return NumberColumn(values)
 
 
 @probe
-def EchoRow(values: Row) -> Row:
+def EchoRow(values: NumberRow) -> NumberRow:
     """Probe: a row in and the same row out, spilled across."""
-    return Row(values)
+    return NumberRow(values)
 
 
 @probe
-def RowSums(values: NumberArray) -> Column:
+def RowSums(values: NumberArray) -> NumberColumn:
     """Probe: a grid in, one number per row out, spilled down: the shape of pricing every row."""
-    return Column(values.sum(axis=1))
+    return NumberColumn(values.sum(axis=1))
 
 
 @probe
