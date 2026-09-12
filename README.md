@@ -2,6 +2,10 @@
 
 A commodities derivatives pricing library for Excel.
 
+The [library planning review](docs/library-review.md) is the entry point for the
+draft Globals, interpolation utility, and handle research. These documents capture
+the approach before implementation and mark decisions that remain open.
+
 ## Setup
 
 Requires Python 3.13.13 and uv 0.12.9 (`py -3.13 -m pip install uv==0.12.9`).
