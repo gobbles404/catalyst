@@ -22,8 +22,10 @@ def CreateDiscountCurve(
 
 The signature describes the agreed worksheet layout. `TextRow` and `NumberArray`
 are existing seam declarations; `DiscountCurve` and its handle output are not
-implemented. The return annotation names the Python object. Handle mechanism
-and lifetime remain a deferred topic.
+implemented. The return annotation names the Python object. Consumers refer to
+the creator cell directly or through an Excel defined name referring to that
+cell, as specified in the [handle worksheet contract](../handles/README.md).
+The handle mechanism and detailed lifetime remain open.
 
 Both shown inputs are required, with no defaults. Agreed: the first table date
 defines the curve's own `as_of`, which is retained with the curve. There is no

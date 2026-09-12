@@ -1,8 +1,9 @@
-# Handles and object retention: deferred research
+# Handles and object retention: Excel-DNA research
 
-Set aside for a later discussion. These notes are preserved for reference and are
-outside the active [library planning review](../README.md). Constructor handle
-outputs remain specified; no handle mechanism or lifetime policy has been chosen.
+Read the [Excel worksheet contract](README.md) first. Cell references and names,
+Excel-driven propagation, and the protection of owned objects are now explicit.
+These notes provide implementation evidence and open questions; they do not
+select a mechanism or claim that its lifecycle has been verified in our host.
 
 Reviewed 2026-09-12 against Excel-DNA's `v1.9.0-Release` tag, commit
 `fb3c19e2def68c6c64d6fece13daa9efd36a2748`, and this repository's current host.
@@ -14,18 +15,10 @@ library's functions should receive the corresponding typed Python object after
 resolution at the seam. Handles are infrastructure shared across the library;
 they are not a Globals-specific hierarchy.
 
-## Reuse proposal set aside from the ValuationDate draft
-
-Desired reuse proposal: identical inputs share one retained object and handle;
-changing either field produces a distinct object while previously published
-records stay unchanged. The lifetime over which reuse is promised remains open.
-This is not a guarantee of permanent handle identity or current Excel-DNA
-behavior. Python tests would inspect the published records.
-
-Retaining one object does not prove the builder ran only once. Future handle work
-needs to count construction, lookup, storage, hashing, and conversion where
-performed, and establish the applicable budgets. Handle spelling, storage
-ownership, retention, reclamation, and restart behavior remain undecided.
+The [favored reuse direction](README.md#favored-direction-reuse-unchanged-objects-publish-changed-objects)
+and its limits now live in the worksheet contract. Native call reuse below is
+evidence about Excel-DNA, not proof that it satisfies every desired equality,
+ownership, or restart rule.
 
 ## What Excel-DNA 1.9 supplies
 
@@ -60,12 +53,14 @@ manual call does not itself provide construction reuse.
 
 ## Retention, identity, and memory limits
 
-**A live creator formula and a copied handle string are different.** Native lookup
-does not add a subscription or ownership count. Source inspection therefore
-indicates that pasted handle text, ordinary consumers, and downstream .NET
-references do not retain the producer's subscription. Clearing the final creator
-can remove the entry and dispose its stored object. Verify the worksheet behavior
-before promising a policy to users.
+Native lookup does not add a subscription or ownership count. Pasted text is
+outside our supported worksheet workflow. Ordinary consumers refer to creator
+cells or names, and rely on those creators' ownership; the lookup itself does not
+retain the producer's subscription. Clearing the final creator can remove the
+entry and dispose its stored object. A downstream .NET reference does not prevent
+that disposal, so retained Python dependencies need their own owned references.
+Verify this integration rather than equating Excel dependencies with Python
+reference counts.
 
 Native reuse is based on the active call's inputs, not on the contents of the
 returned record. For example, different capitalization of a header can produce a
@@ -113,6 +108,17 @@ lock while the runtime is alive. See [the pinned Python.NET implementation][pyob
 and [embedding guidance][pythonnet]. A second Python dictionary mapping handle
 strings to objects has not been shown necessary.
 
+The current [buffer input path](../../../src/goosedove/excel/bridge.py) already
+copies the host's reusable buffers into Python-owned NumPy arrays. Existing
+[ownership tests](../../../tests/unit/test_bridge.py) verify that overwriting the
+host buffers does not change those arrays, and the
+[work budget](../../../tests/performance/test_seam_budgets.py) pins two copies.
+Retention alone does not require another defensive copy. The arrays are writable,
+however: retaining a reference is not the same as establishing immutable contents.
+Final construction must establish ownership and eliminate writable aliases once.
+Views can retain larger backing arrays, so retained size is an ownership question,
+not simply the sum of every visible array's element bytes.
+
 If another retained Python record depends on that object, it needs its own strong
 Python reference. Releasing the creator owner's reference then need not destroy
 the underlying object. Holding the same disposable C# wrapper is not equivalent
@@ -124,23 +130,59 @@ does not apply the handle transformations. Any future adaptation must preserve
 our existing strict missing/blank/type behavior; enabling the extended pipeline
 is not evidence of equivalent seam behavior.
 
-## Candidate smoke coverage for later agreement
+## Removal and recalculation
 
-These are review questions for a small diagnostic experiment, not new product
-functions or committed acceptance guarantees:
+Microsoft describes recalculation through worksheet dependencies and explicit
+calculation requests. A failed lookup of text in our private object store does
+not automatically mark its creator for recalculation. The host can schedule
+Excel work, including through `ExcelAsyncUtil.QueueAsMacro`, but this is not an
+automatic missing-object recovery protocol. See [Excel recalculation][calculation]
+and [Excel-DNA scheduled work][scheduled-work].
 
-- Create and resolve a retained Python object; verify the original record and
-  NumPy arrays survive between calls without a data copy.
-- Recalculate unchanged inputs and place identical creator formulas in two cells;
-  count construction and live owners. Change a scalar and an array element.
-- Clear one creator and then the final creator; observe release counts. Exercise
-  copied-as-value handles and invalid/wrong-kind handles.
-- Fail construction and confirm that no retained entry is published and the
-  established error remains visible in Excel.
-- Retain a Python dependency from another object, remove its creator formula, and
-  establish the difference between dependency lifetime and handle lifetime.
-- Close a sheet/workbook and exit Excel; test formula reconstruction and saved
-  handle text in a fresh runtime. Observe cleanup rather than assuming it.
+There is a sharper distinction in the tagged native source. Manually calling
+`ObjectHandler.Remove` removes/disposes the object without invalidating the
+active observable call state. An unchanged creator call can follow the existing
+state shortcut and return its cached handle without invoking the factory. A full
+recalculation therefore is not a guaranteed repair while that state survives.
+Normal RTD disconnection removes the call state and key as well as unsubscribing;
+that permits a later call to construct again. See [object removal][store] and
+[the lookup/disconnection paths][observer]. This is source-derived, not a live
+recovery test in Goosedove.
+
+## Lessons considered from the other project
+
+Two engineer retrospectives were supplied during planning, including the
+[Handle System Retrospective][retrospective]. Their timing and soak figures are
+reported evidence from that project, not Goosedove measurements. The mechanisms
+they recommend are not instructions to implement them here.
+
+Their useful distinction is between object references, equivalent economic
+content, calculation reuse, and lifetime. Content-idempotent publication can
+reuse an already-live equivalent object, but recognizing it after construction
+does not avoid the preparation that already happened. Native argument-based reuse
+can happen earlier; normalization can make different raw inputs economically
+equivalent. That is a separate equality/reuse decision, not automatic proof of an
+incorrect result.
+
+Carry forward the ordinary Excel editing scenarios, visible failures, immutable
+owned data, and measurement of the whole call. Avoid importing per-publication
+store scans, duplicated size derivations, or a collector whose diagnostics create
+owners. If fingerprints become necessary, use finalized typed content and retain
+required identity/size facts; do not repeatedly traverse objects during lookup.
+Simpler publication still needs safe release of temporary Python references on
+failure. No reservation system or replacement fingerprint framework is selected.
+
+The live-object eviction warning does not rule out releasing objects proven
+unused, nor optional result-cache eviction when inputs remain available. Our
+agreed Excel workflow excludes independently managed pasted handle strings.
+It also follows this repository's existing no-reload and explicit-dependency
+rules; another project's singleton/reload machinery is not a requirement here.
+
+## Verification status
+
+The [draft acceptance scenarios](README.md#draft-acceptance-scenarios) start with
+cell and named references, ordinary Excel editing, and ownership safety. They
+still need an implementation and live Excel verification.
 
 Use deterministic counts for work and ownership assertions. Upstream Excel-DNA
 [reuse tests][reuse-tests] and [disposal tests][dispose-tests] establish intended
@@ -161,3 +203,6 @@ checks exercise the current seam; they do not cover this proposed integration.
 [pythonnet]: https://pythonnet.github.io/pythonnet/dotnet.html
 [reuse-tests]: https://github.com/Excel-DNA/ExcelDna/blob/fb3c19e2def68c6c64d6fece13daa9efd36a2748/Source/Tests/ExcelDna.RuntimeTests/Registration.cs#L314-L359
 [dispose-tests]: https://github.com/Excel-DNA/ExcelDna/blob/fb3c19e2def68c6c64d6fece13daa9efd36a2748/Source/Tests/ExcelDna.RuntimeTests/ObjectHandleOutOfProcess.cs#L34-L76
+[calculation]: https://learn.microsoft.com/en-us/office/client-developer/excel/excel-recalculation
+[scheduled-work]: https://excel-dna.net/docs/guides-advanced/performing-asynchronous-work/
+[retrospective]: https://claude.ai/code/artifact/89a095e8-a615-47bd-9073-98d78fce6358

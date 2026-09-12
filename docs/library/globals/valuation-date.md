@@ -19,6 +19,8 @@ def CreateValuationDate(as_of: Date, day_fraction_elapsed: float) -> ValuationDa
 `Date` is the existing seam type backed by `np.datetime64` with day precision.
 The function returns a `ValuationDate` object; the seam stores it and returns its
 text handle to Excel. The return annotation therefore names the object type.
+Consumers use a reference to that creator cell or a defined name referring to it,
+following the [handle worksheet contract](../handles/README.md).
 
 Both inputs are scalars: one date and one number per call. Both arguments are
 required initially. A missing or blank argument fails. A single-cell reference is
@@ -186,8 +188,10 @@ These tests establish input and record behavior. Elapsed-time arithmetic, hourly
 mapping, and pricing reference values will receive their own coverage when those
 calculations are specified.
 
-Handle mechanism, reuse, and lifetime questions are set aside in the
-[deferred research notes](../deferred/handles.md). They remain undecided.
+The [handle worksheet contract](../handles/README.md) captures the agreed Excel
+use case and favored unchanged-input reuse direction. The mechanism, precise
+reuse/equality rules, and detailed lifetime remain open; the
+[Excel-DNA research](../handles/excel-dna-research.md) supports that discussion.
 
 ## Current scope
 

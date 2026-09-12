@@ -59,6 +59,13 @@ meaning, units, allowed values, defaults, and shape in plain language. The
 [CreateValuationDate help requirement](globals/valuation-date.md#guidance-visible-in-excel)
 is the first example.
 
+Handle-valued outputs follow the [Excel worksheet contract](handles/README.md):
+creators return handles into cells; consumers use cell references or defined
+names referring to those cells. Excel maintains dependencies, and the seam
+resolves the current value to the declared object kind. Argument help for a future
+handle consumer must direct users to the creator cell or its name. No new
+consumer signature is specified by this guidance.
+
 ## NumPy default and input shapes
 
 Agreed: NumPy is the library's default for numerical arrays and calculations.

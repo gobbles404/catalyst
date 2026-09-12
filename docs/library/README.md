@@ -17,6 +17,15 @@ where type/shape validation and conversion occur. Then read the
 [function conventions](function-conventions.md) for names, scalar/array shapes,
 NumPy defaults, header matching, and Excel help.
 
+## Handles and Excel dependencies
+
+The [handle worksheet contract](handles/README.md) states the agreed use case:
+creator formulas live in cells, consumers use cell references or defined names
+referring to cells, Excel propagates their values, and the runtime protects the
+objects behind valid handles. It includes Excel examples and separates this
+settled workflow from the favored reuse direction and undecided lifecycle details.
+The [Excel-DNA research](handles/excel-dna-research.md) is supporting evidence.
+
 ## Globals
 
 The `globals/` directory holds the shared library objects discussed so far.
@@ -96,9 +105,7 @@ This snapshot contains documentation only. Proposed domain tests have not been
 implemented or run. The repository's existing checks remain the baseline for the
 built seam, not evidence that these specifications work.
 
-## Deferred research
-
-The [handle and retention notes](deferred/handles.md) are preserved under
-`deferred/` for a later discussion. They are outside the active review brief.
-Constructor handle outputs remain part of the current specifications; the
-mechanism, reuse, and lifetime policy remain undecided.
+Handle review should check the implementation candidates against that worksheet
+contract. Independent pasted-token ownership, permanent cell-slot identity, and
+automatic recovery from arbitrary object eviction are not assumed requirements.
+The implementation and detailed lifetime/recovery promises remain open.
