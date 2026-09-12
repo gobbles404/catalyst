@@ -45,7 +45,7 @@ namespace Goosedove.Host.Measure
                     measurements.Run("RowSums", "one answer per row", n, n / 10, () => rowSums(wide), ArrayOf(n / 10, 1, total), Counted("RowSums", wide));
                 }
 
-                // The way in alone: scan, pin, hand over, own. The GIL is held outside the clock.
+                // The way in alone: scan into the kept buffers, hand over, own. The GIL is held outside the clock.
                 // The stage rows are named for the stage, not the method, so a rename never splits
                 // their history.
                 using (Py.GIL())

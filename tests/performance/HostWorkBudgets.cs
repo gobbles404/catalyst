@@ -64,15 +64,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal(expected.OrderBy(pair => pair.Key).ToArray(), counts.OrderBy(pair => pair.Key).ToArray());
         }
 
+        // A warm range in: the buffers are kept from earlier calls, so nothing is allocated and
+        // only the shape and the kinds seen are built to carry it.
         private static Dictionary<string, long> RangeIn(int cells)
         {
             return new Dictionary<string, long>
             {
-                ["objects_built"] = 6,      // the six values that carry a range, the kinds seen among them
+                ["objects_built"] = 3,      // rows, cols, the kinds seen
                 ["trips"] = 2,              // cells_from_buffers, then the call
                 ["cells_scanned"] = cells,
-                ["buffers_allocated"] = 2,  // kinds and numbers
-                ["buffer_bytes"] = 9L * cells,
             };
         }
 
@@ -102,7 +102,7 @@ namespace Goosedove.Host.Tests
         [InlineData(1)]
         [InlineData(100)]
         [InlineData(10000)]
-        public void a_range_in_is_one_scan_two_buffers_and_two_trips(int cells)
+        public void a_warm_range_in_is_one_scan_three_objects_and_two_trips(int cells)
         {
             Same(RangeIn(cells), Counted((double)cells, "SumArray", Column(cells)));
         }
@@ -115,7 +115,27 @@ namespace Goosedove.Host.Tests
             column[cells - 1, 0] = "x";
             var expected = RangeIn(cells);
             expected["text_cells"] = 1;
+            expected["objects_built"] = 4;  // and the text
             Same(expected, Counted("#ERROR SumArray: values cell (10000, 1) is text 'x', expected number", "SumArray", column));
+        }
+
+        // The buffers are kept between calls and grown only when a larger range comes: the first
+        // range of a new largest size pays two buffers and the two addresses, the next does not.
+        [Fact]
+        public void a_larger_range_than_any_before_grows_the_buffers_once()
+        {
+            const int cells = 30000;  // larger than any other range in this process
+            var prepared = Bridge.Prepare("SumArray");
+            var grown = new WorkCounter();
+            Assert.Equal((double)cells, Bridge.Call(grown, prepared, Column(cells)));
+            var expected = RangeIn(cells);
+            expected["buffers_allocated"] = 2;
+            expected["buffer_bytes"] = 9L * cells;
+            expected["objects_built"] = 5;  // the two addresses, then rows, cols, the kinds seen
+            Same(expected, grown.Freeze());
+            var again = new WorkCounter();
+            Assert.Equal((double)cells, Bridge.Call(again, prepared, Column(cells)));
+            Same(RangeIn(cells), again.Freeze());
         }
 
         [Fact]
@@ -132,9 +152,7 @@ namespace Goosedove.Host.Tests
             column[4, 0] = ExcelError.ExcelErrorNA;
             Same(new Dictionary<string, long>
             {
-                ["cells_scanned"] = 5,       // nothing is built before the first argument is read
-                ["buffers_allocated"] = 2,   // allocated before the scan, and wasted
-                ["buffer_bytes"] = 90000,
+                ["cells_scanned"] = 5,       // nothing is built or allocated: the buffers are kept
             }, Counted(ExcelError.ExcelErrorNA, "SumArray", column));
         }
 
@@ -171,8 +189,8 @@ namespace Goosedove.Host.Tests
         public void one_answer_per_row_pays_a_range_in_and_an_array_out()
         {
             var expected = RangeIn(100);
-            expected["buffers_allocated"] = 4;
-            expected["buffer_bytes"] = 9L * 100 + 16L * 10;
+            expected["buffers_allocated"] = 2;  // the array out's, only
+            expected["buffer_bytes"] = 16L * 10;
             expected["result_copies"] = 2;
             expected["result_cells"] = 10;
             Same(expected, CountedArray("RowSums", 10, 1, Grid(10, 10)));
@@ -210,14 +228,30 @@ namespace Goosedove.Host.Tests
             Assert.InRange(bytes, 0, 384);
         }
 
+        // The buffers are kept, so a warm range in allocates nothing per cell; the two sizes are
+        // warmed first, so the larger has grown the buffers before either is metered.
         [Fact]
-        public void a_range_in_allocates_nine_bytes_per_cell_and_nothing_else()
+        public void a_warm_range_in_allocates_nothing_per_cell()
         {
             var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
             object small = Column(1000), large = Column(10000);
+            sum(large);
             var slope = (BytesPerCall(() => sum(large), 20) - BytesPerCall(() => sum(small), 20)) / 9000;
             output.WriteLine("managed bytes per added input cell: " + slope);
-            Assert.InRange(slope, 0, 9 + 2048.0 / 9000);
+            Assert.InRange(Math.Abs(slope), 0, 2048.0 / 9000);
+        }
+
+        // Measured 496 bytes on 2026-09-11 in Release at one, a hundred, a thousand and ten
+        // thousand cells alike: the three carriers, the Cells wrapper, the result and its box,
+        // the argument array and the pythonnet wrappers. Nothing of it grows with the range.
+        [Fact]
+        public void a_warm_range_in_allocates_under_640_managed_bytes_whatever_its_size()
+        {
+            var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
+            object large = Column(10000);
+            var bytes = BytesPerCall(() => sum(large), 1000);
+            output.WriteLine("managed bytes per warm SumArray of ten thousand cells: " + bytes);
+            Assert.InRange(bytes, 0, 640);
         }
 
         [Fact]
