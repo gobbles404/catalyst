@@ -35,7 +35,7 @@ import goosedove
 # --- what a function may declare, beyond float, int, str, and bool ----------
 
 Date = NewType("Date", np.datetime64)
-Array = NewType("Array", NDArray[np.float64])  # any shape, laid out as on the sheet
+NumberArray = NewType("NumberArray", NDArray[np.float64])  # any shape, laid out as on the sheet
 Column = NewType("Column", NDArray[np.float64])  # one column, handed over as a 1-D array
 Row = NewType("Row", NDArray[np.float64])  # one row, handed over as a 1-D array
 DateColumn = NewType("DateColumn", NDArray[np.datetime64])
@@ -336,7 +336,7 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     str: ("text", _text),
     bool: ("boolean", _boolean),
     Date: ("date", _date),
-    Array: ("array of numbers", _numbers),
+    NumberArray: ("array of numbers", _numbers),
     Column: ("column of numbers", _column),
     Row: ("row of numbers", _row),
     DateColumn: ("column of dates", _date_column),
@@ -539,7 +539,7 @@ _RESULTS: Final[dict[object, Callable[[object], object]]] = {
     str: _text_out,
     bool: _boolean_out,
     Date: _date_out,
-    Array: _array_out,
+    NumberArray: _array_out,
     Column: _column_out,
     Row: _row_out,
     DateColumn: _date_column_out,

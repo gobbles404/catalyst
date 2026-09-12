@@ -13,7 +13,7 @@ The declared return type is the contract, read at registration the way parameter
 | `str`, text | text of 1 to 32,767 characters, counted as Excel counts them | the text | empty text, longer text, a number |
 | `bool`, a boolean | True or False | TRUE or FALSE | 1, 0, `"TRUE"` |
 | `Date` | a numpy day, the same thing the seam hands in | the serial, which the sheet formats as a date | a day outside 1 March 1900 to 31 December 9999, a date with a time of day, a date in months or years, not a date |
-| `Array` | a plain two-dimensional numpy array of numbers, at least one cell | the array, spilled as returned | one-dimensional, empty, a masked array, a cell that is not a finite number, named as INDEX counts |
+| `NumberArray` | a plain two-dimensional numpy array of numbers, at least one cell | the array, spilled as returned | one-dimensional, empty, a masked array, a cell that is not a finite number, named as INDEX counts |
 | `Column`, `Row` | a one-dimensional numpy array of numbers | spilled down, or across | two-dimensional, empty, a bad cell |
 | `DateColumn`, `DateRow` | a one-dimensional array of numpy days | serials, spilled | a day outside the calendar, not a date |
 
@@ -27,7 +27,7 @@ Rules:
 
 1. Match the declared type. No coercion beyond integers as numbers: a `-> float` that returns text fails, a `-> Column` that returns a grid fails, a `-> int` that returns 2.5 fails. A whole number means the same in both directions: a number with no fraction.
 2. Nothing that looks like a number but is not reaches the sheet. A NaN or an infinity anywhere in a result fails the whole call. In an array the message names the cell: `#ERROR Prices: result cell (3, 1) is not a finite number`.
-3. Orientation comes from the declaration, never from the array. A `Column` spills down, a `Row` spills across, an `Array` spills as returned. The seam reshapes, so the host has one road out.
+3. Orientation comes from the declaration, never from the array. A `Column` spills down, a `Row` spills across, a `NumberArray` spills as returned. The seam reshapes, so the host has one road out.
 4. A date goes out as its whole serial, the meaning exception mirrored. A date with a time of day fails.
 5. Text is at most 32,767 characters as Excel counts them, in UTF-16 units the way `LEN` does, because Excel would cut longer text without a word. Empty text fails: a cell that looks blank is the quiet result tenet 2 forbids.
 6. An empty array fails. A whole number beyond 2^53, scalar or in an array, fails, because a cell would hold it inexactly.

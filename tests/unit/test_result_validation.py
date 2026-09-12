@@ -10,7 +10,15 @@ from hypothesis import strategies as st
 from numpy.typing import NDArray
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import Array, Column, Date, DateColumn, DateRow, Row, excel_function
+from goosedove.excel.bridge import (
+    Column,
+    Date,
+    DateColumn,
+    DateRow,
+    NumberArray,
+    Row,
+    excel_function,
+)
 
 # One function per declared result type. Each returns whatever the test put in _returns.
 _returns: dict[str, object] = {}
@@ -42,8 +50,8 @@ def OutDate() -> Date:
 
 
 @excel_function
-def OutArray() -> Array:
-    return cast(Array, _returns["value"])
+def OutArray() -> NumberArray:
+    return cast(NumberArray, _returns["value"])
 
 
 @excel_function
