@@ -263,16 +263,16 @@ def _dates(value: object) -> NDArray[np.datetime64]:
     return np.array([[_date(value)]])
 
 
-def _texts(value: object) -> NDArray[np.object_]:
-    """Every cell text with a character in it, kept in sheet order. A scalar is a 1x1 range."""
+def _texts(value: object) -> tuple[str, ...]:
+    """Every cell text with a character in it, kept in sheet order. A scalar is one text."""
     if isinstance(value, Cells):
         if value.seen != ONLY_TEXT:
             raise _first_bad(value, value.kinds != TEXT_CODE, "text")
         if "" in value.texts:
             r, c = divmod(value.texts.index(""), value.kinds.shape[1])
             raise _Rejected((r + 1, c + 1), "", "text")
-        return np.array(value.texts, dtype=object).reshape(value.kinds.shape)
-    return np.array([[_text(value)]], dtype=object)
+        return value.texts
+    return (_text(value),)
 
 
 # --- one column or one row: the shape is checked before any cell is --------
@@ -316,14 +316,17 @@ def _date_row(value: object) -> NDArray[np.datetime64]:
     return _dates(value)[0]
 
 
+# The host delivers a range's text cells as a tuple in sheet order, which for one column or
+# one row is the declared representation itself: once the shape is checked, it is handed over
+# as it is, with nothing built to carry it.
 def _text_column(value: object) -> tuple[str, ...]:
     _one_column(value)
-    return tuple(_texts(value)[:, 0])
+    return _texts(value)
 
 
 def _text_row(value: object) -> tuple[str, ...]:
     _one_row(value)
-    return tuple(_texts(value)[0])
+    return _texts(value)
 
 
 # Every declared type, in the words of the sheet, and the rule that accepts it.

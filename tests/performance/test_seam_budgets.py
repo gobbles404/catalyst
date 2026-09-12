@@ -6,31 +6,13 @@ from collections.abc import Callable
 import pytest
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Column, DateColumn, TextColumn, excel_function
+from goosedove.excel.bridge import MISSING, Cells
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 
-
-# The column, date, and text looks have no probe, because the host cannot tell those ranges
-# from any other; these three exist only to count the Python side of each look. Defined
-# here, outside the package, they are not themselves counted.
-@excel_function
-def FirstOfNumbers(values: Column) -> float:
-    return float(values[0])
-
-
-@excel_function
-def FirstOfDates(dates: DateColumn) -> str:
-    return str(dates[0])
-
-
-@excel_function
-def FirstOfNames(names: TextColumn) -> str:
-    return names[0]
-
-
 # Each registered function's prepared path, fetched once as the host does at registration; the
-# three test-only functions above are registered at import, so they are in it too.
+# three looks in conftest.py (FirstOfNumbers, FirstOfDates, FirstOfNames) are registered
+# when pytest loads it, so they are in it too.
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 
 
@@ -106,7 +88,9 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
     }
 
 
-def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
+def test_accepted_text_column_call_itemized(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
     names = Cells.from_rows([[f"name{i}"] for i in range(10_000)])
     PATH["FirstOfNames"](names)
     assert call_profile(lambda: PATH["FirstOfNames"](names)) == {
@@ -120,6 +104,9 @@ def test_accepted_text_column_call_itemized(call_profile: CallProfile) -> None:
         "_text_out": 1,
         "_scalar": 1,
     }
+    # The host's tuple of text cells is the column itself, handed over as it is: nothing is
+    # asked of numpy. Before, the tuple went into an object array and back out of one.
+    assert numpy_calls(lambda: PATH["FirstOfNames"](names)) == {}
 
 
 # A bad cell deep inside a range is found and named without a walk, whatever it holds.

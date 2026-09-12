@@ -8,8 +8,28 @@ from pathlib import Path
 import pytest
 
 import goosedove
+from goosedove.excel.bridge import Column, DateColumn, TextColumn, excel_function
 
 PACKAGE_DIR = str(Path(goosedove.__file__).parent)
+
+
+# The column, date, and text looks have no probe, because the host cannot tell those ranges
+# from any other; these three exist only to count the Python side of each look. Defined
+# here, outside the package, they are not themselves counted, and pytest registers them
+# before any budget module builds its table of prepared paths.
+@excel_function
+def FirstOfNumbers(values: Column) -> float:
+    return float(values[0])
+
+
+@excel_function
+def FirstOfDates(dates: DateColumn) -> str:
+    return str(dates[0])
+
+
+@excel_function
+def FirstOfNames(names: TextColumn) -> str:
+    return names[0]
 
 
 def _call_profile(fn: Callable[[], object]) -> dict[str, int]:
