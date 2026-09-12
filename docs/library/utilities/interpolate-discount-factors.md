@@ -16,7 +16,7 @@ def util_InterpolateDiscountFactors(
 ```
 
 Both arguments are required. Use the same input layout as
-[`CreateDiscountCurve`](discount-curve.md): a separate text header row and a
+[`CreateDiscountCurve`](../globals/discount-curve.md): a separate text header row and a
 two-column numeric body. Agreed headers are `date` and `df`, matched without
 regard to case. Rename source headers such as `Maturity` and `Mid`; they are not
 accepted aliases. Unknown and duplicate headers fail, including duplicates that
@@ -36,9 +36,9 @@ corresponding `date`/`df` header row. Creating the curve remains a separate call
 
 ## Input validation
 
-Apply the existing [date and numeric seam rules](seam/inputs.md), including whole
+Apply the existing [date and numeric seam rules](../../seam/inputs.md), including whole
 Excel date serials in `[61, 2958465]`, using the supported 1900 date system. The
-[combined-table date-preparation gap](discount-curve.md#dates-and-the-existing-seam)
+[combined-table date-preparation gap](../globals/discount-curve.md#dates-and-the-existing-seam)
 also applies here: `NumberArray` alone does not turn the date column into typed
 dates. Reuse that preparation design rather than introducing a second parser.
 
@@ -100,7 +100,7 @@ outside the source range repeats endpoint factors. Validate the source order and
 generate only the specified inclusive date range; do not adopt those endpoint
 defaults as permission to use out-of-range dates.
 
-The [output seam](seam/outputs.md) already supports numeric two-column arrays.
+The [output seam](../../seam/outputs.md) already supports numeric two-column arrays.
 Combining date serials and factors for the worksheet result must use the same
 date-serialization convention as the rest of the seam. Keep Excel parsing and
 serialization out of the numerical interpolation code. No mixed text/numeric

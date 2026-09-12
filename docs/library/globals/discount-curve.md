@@ -22,8 +22,8 @@ def CreateDiscountCurve(
 
 The signature describes the agreed worksheet layout. `TextRow` and `NumberArray`
 are existing seam declarations; `DiscountCurve` and its handle output are not
-implemented. The return annotation names the Python object, following the
-[shared handle research](handles.md).
+implemented. The return annotation names the Python object. Handle mechanism
+and lifetime remain a deferred topic.
 
 Both shown inputs are required, with no defaults. Agreed: the first table date
 defines the curve's own `as_of`, which is retained with the curve. There is no
@@ -103,7 +103,7 @@ whether a one-row curve containing only `as_of` is sufficient.
 Every covered whole date has an explicit factor, so there is no need to
 interpolate missing daily values. Intraday interpretation remains outside this
 draft, including any use of `day_fraction_elapsed` from a valuation-date object.
-The separately specified [interpolation utility](interpolate-discount-factors.md)
+The separately specified [interpolation utility](../utilities/interpolate-discount-factors.md)
 can prepare a daily numeric table from sparse source points before this
 constructor is called. The constructor itself continues to reject missing days.
 
@@ -158,7 +158,7 @@ Header matching:
 - Both required names must be present, with one header per body column.
 
 The header rule applies to worksheet column names. It does not change the exact,
-case-sensitive unit and category codes in [UnitConversions](unit-converter.md).
+case-sensitive unit and category codes in [UnitConversions](unit-conversions.md).
 The seam transports header text unchanged; interpreting it belongs to the library.
 
 The example order is `date, df`. Whether the columns may be reversed when their
@@ -174,12 +174,12 @@ Text dates, blanks, and booleans do not become dates or numbers. The unsupported
 1904 workbook date system remains subject to the existing seam convention.
 
 There is an implementation gap to resolve before building this function.
-[`NumberArray`](../src/goosedove/excel/bridge.py) accepts numeric cells and leaves
+[`NumberArray`](../../../src/goosedove/excel/bridge.py) accepts numeric cells and leaves
 date serials as floating-point numbers. It does not perform the validation or
 conversion provided by `DateColumn`.
 
 The existing seam checks arguments independently, and
-[header-to-column matching belongs to the library](seam/inputs.md). Input
+[header-to-column matching belongs to the library](../../seam/inputs.md). Input
 preparation therefore needs a deliberate design that connects column
 identification with the existing date-validation and conversion rules. The
 pricing code should receive typed NumPy calendar dates and numeric factors, with
@@ -191,7 +191,7 @@ this table. The date rules must remain consistent with the existing `Date` path.
 
 Specify the representation explicitly so worksheet input and retained curve data
 are not confused. NumPy is the numerical representation for this implementation.
-This follows the [shared NumPy convention](function-conventions.md#numpy-default-and-input-shapes).
+This follows the [shared NumPy convention](../function-conventions.md#numpy-default-and-input-shapes).
 
 | Stage or field | Representation |
 |---|---|

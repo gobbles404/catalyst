@@ -1,4 +1,8 @@
-# Handles and object retention: research for planning
+# Handles and object retention: deferred research
+
+Set aside for a later discussion. These notes are preserved for reference and are
+outside the active [library planning review](../README.md). Constructor handle
+outputs remain specified; no handle mechanism or lifetime policy has been chosen.
 
 Reviewed 2026-09-12 against Excel-DNA's `v1.9.0-Release` tag, commit
 `fb3c19e2def68c6c64d6fece13daa9efd36a2748`, and this repository's current host.
@@ -9,6 +13,19 @@ A handle is text in Excel that identifies an object retained in memory. The
 library's functions should receive the corresponding typed Python object after
 resolution at the seam. Handles are infrastructure shared across the library;
 they are not a Globals-specific hierarchy.
+
+## Reuse proposal set aside from the ValuationDate draft
+
+Desired reuse proposal: identical inputs share one retained object and handle;
+changing either field produces a distinct object while previously published
+records stay unchanged. The lifetime over which reuse is promised remains open.
+This is not a guarantee of permanent handle identity or current Excel-DNA
+behavior. Python tests would inspect the published records.
+
+Retaining one object does not prove the builder ran only once. Future handle work
+needs to count construction, lookup, storage, hashing, and conversion where
+performed, and establish the applicable budgets. Handle spelling, storage
+ownership, retention, reclamation, and restart behavior remain undecided.
 
 ## What Excel-DNA 1.9 supplies
 
@@ -80,8 +97,8 @@ The following are integration gaps, not implementation decisions:
 
 | Current behavior | Question to resolve |
 |---|---|
-| [Registration](../host/Goosedove.Host/AddIn.cs) builds all-`object` delegates and calls `ExcelIntegration.RegisterDelegates`. | Supply declared object argument/result metadata and apply native handle processing during prepared registration. The current low-level call does not activate it. |
-| [Bridge metadata](../src/goosedove/excel/bridge.py) exports names, descriptions, parameter names, and hidden status. Its declared inputs/results do not include retained domain objects. | Add object type information at the seam without exposing bridge types inside the numerical library. |
+| [Registration](../../../host/Goosedove.Host/AddIn.cs) builds all-`object` delegates and calls `ExcelIntegration.RegisterDelegates`. | Supply declared object argument/result metadata and apply native handle processing during prepared registration. The current low-level call does not activate it. |
+| [Bridge metadata](../../../src/goosedove/excel/bridge.py) exports names, descriptions, parameter names, and hidden status. Its declared inputs/results do not include retained domain objects. | Add object type information at the seam without exposing bridge types inside the numerical library. |
 | The host disposes the returned `PyObject` wrapper after scalar/array conversion. | An owner retained by Excel-DNA must acquire its own Python reference or explicitly receive ownership. It cannot retain the wrapper that the existing path disposes. |
 | Incoming arguments are temporary Python references released after each call. | Resolve and unwrap a retained owner to a temporary reference to the actual Python object, instead of passing a CLR proxy or disposing the owner's retained reference. |
 | Errors currently travel as visible `#ERROR ...` strings. | Failed construction must remain an error and publish no object. Blindly marking an all-`object` result as a handle could retain an error string. |

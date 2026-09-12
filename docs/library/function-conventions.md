@@ -1,15 +1,15 @@
 # Function conventions: discussion draft
 
 The current Globals discussion captures two worksheet functions,
-[`CreateValuationDate`](valuation-date.md) and
-[`CreateDiscountCurve`](discount-curve.md), and the internal library collection
-[`UnitConversions`](unit-converter.md). The collection groups `volume`, `mass`,
+[`CreateValuationDate`](globals/valuation-date.md) and
+[`CreateDiscountCurve`](globals/discount-curve.md), and the internal library collection
+[`UnitConversions`](globals/unit-conversions.md). The collection groups `volume`, `mass`,
 `energy`, and `usd` and is passed within Python as one explicit object reference.
 Unit definitions are owned by the library; `UnitConversions` has no Excel
 constructor, handle, or workbook overrides.
 
 The Utilities discussion now captures
-[`util_InterpolateDiscountFactors`](interpolate-discount-factors.md), using the
+[`util_InterpolateDiscountFactors`](utilities/interpolate-discount-factors.md), using the
 owner's working name. Its purpose is to prepare daily discount-factor data for
 the curve constructor. The `util_` prefix is not yet a general naming convention.
 
@@ -56,7 +56,7 @@ combined collection, not a worksheet function or a declared seam type.
 Every worksheet specification shows a typed signature and explicitly states
 whether each input is scalar, row, column, or array. Worksheet help describes
 meaning, units, allowed values, defaults, and shape in plain language. The
-[CreateValuationDate help requirement](valuation-date.md#guidance-visible-in-excel)
+[CreateValuationDate help requirement](globals/valuation-date.md#guidance-visible-in-excel)
 is the first example.
 
 ## NumPy default and input shapes
@@ -77,7 +77,7 @@ The current seam already supplies these representations:
 | `DateColumn` or `DateRow` | NumPy `ndarray` with dtype `datetime64[D]` | One-dimensional `(N,)`, after date and orientation validation |
 | `TextRow` or `TextColumn` | `tuple[str, ...]` | A sequence of `N` strings, after validating the declared worksheet orientation |
 
-These are existing types from [the seam](seam/inputs.md), not additional function
+These are existing types from [the seam](../seam/inputs.md), not additional function
 proposals. Retain these declarations in worksheet signatures: registration uses
 them to select its validation and conversion rules. Replacing `NumberArray` with
 an unregistered raw `np.ndarray` annotation would not preserve that contract.
@@ -89,7 +89,7 @@ arrays. Its date is already a NumPy scalar; its fraction remains the Python floa
 provided by the current seam. Numeric collections use arrays; headers and unit
 codes remain text, and retained objects remain typed records or collections.
 
-The [discount-curve representation](discount-curve.md#numpy-representation)
+The [discount-curve representation](globals/discount-curve.md#numpy-representation)
 specifies its input table and aligned internal arrays. `UnitConversions` remains
 an internal collection with NumPy numerical work; no additional callable inputs
 or array dimensions are introduced before those operations are specified.

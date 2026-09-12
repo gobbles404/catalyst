@@ -8,7 +8,7 @@ The categories are `volume`, `mass`, `energy`, and `usd`; `contract` is excluded
 Quantities remain part of conversion. The supplied factors are retained, with the
 energy meanings and lowercase `reference_unit` field agreed below. This document
 captures the definitions, ownership, and math before implementation.
-See the proposed [function conventions](function-conventions.md).
+See the proposed [function conventions](../function-conventions.md).
 
 ## Library ownership and implementation approach
 
@@ -24,7 +24,7 @@ mutable references to its contents. Use NumPy for numerical conversion; the
 concrete storage layout and helper signatures will be chosen during implementation.
 No new worksheet functions are specified.
 
-Apply the [shared NumPy convention](function-conventions.md#numpy-default-and-input-shapes)
+Apply the [shared NumPy convention](../function-conventions.md#numpy-default-and-input-shapes)
 to numerical conversion data: numerical quantity and factor arrays use NumPy,
 with `float64` as the default numeric dtype. Their exact shapes belong to the
 operations that will consume them and are not new input contracts in this draft.

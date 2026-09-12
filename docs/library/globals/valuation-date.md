@@ -35,7 +35,7 @@ calendar date and the fraction, rather than a DataFrame. The pricing library doe
 not import the Excel bridge to define that record.
 
 The date bounds are the existing `FIRST_SERIAL` and `LAST_SERIAL` constants in
-[bridge.py](../src/goosedove/excel/bridge.py), enforced by its `Date` accept rule.
+[bridge.py](../../../src/goosedove/excel/bridge.py), enforced by its `Date` accept rule.
 The builder receives the converted date and does not repeat those checks. Excel
 sends numbers as doubles, so `46276.0` is a whole serial and is accepted;
 `46276.5` is not. The lower bound excludes Excel's fictitious 1900-02-29 and the
@@ -54,7 +54,7 @@ The input shapes stay scalar, as agreed. The current seam supplies:
 The retained record keeps those two scalar fields. There is no array allocation
 just to hold one date or one fraction, and the constructor does not become a
 batch input function. This follows the
-[shared NumPy convention](function-conventions.md#numpy-default-and-input-shapes):
+[shared NumPy convention](../function-conventions.md#numpy-default-and-input-shapes):
 numerical collections and calculations use NumPy arrays, while scalar metadata
 keeps its declared shape. These annotations describe the existing seam's output;
 the library does not repeat its type checks or import the bridge types.
@@ -121,7 +121,7 @@ type, shape, and date validation; test new meaning in the library builder.
 ### Date input: existing seam rules
 
 The boundary examples below are already covered for `Date` in
-[test_range_validation.py](../tests/unit/test_range_validation.py). A constructor
+[test_range_validation.py](../../../tests/unit/test_range_validation.py). A constructor
 integration test should establish that its `as_of: Date` declaration uses that
 same conversion and rejection path, without duplicating the full seam matrix.
 
@@ -171,17 +171,11 @@ through the existing error path, and publish no object or handle.
   In particular, Friday at `1` and Saturday at `0` remain distinct records.
 - Fraction `1` preserves weekends, leap days, year ends, and the maximum supported
   date, 9999-12-31. No following date is required to represent EOD.
-- Desired reuse proposal: identical inputs share one retained object and handle;
-  changing either field produces a distinct object while previously published
-  records stay unchanged. The lifetime over which reuse is promised remains open.
-  This is not a guarantee of permanent handle identity or current Excel-DNA
-  behavior; see the [handle research](handles.md). Python tests inspect records.
 
 An Excel smoke test should call `CreateValuationDate` for Friday at fractions `0`
 and `1` and verify that each call returns a handle, then exercise an invalid date
 and an invalid fraction. Python tests verify the fields of the stored objects.
-Existing seam tests remain responsible for generic transport behavior. New handle
-work will add the applicable construction, storage, hashing, and conversion budgets.
+Existing seam tests remain responsible for generic transport behavior.
 
 Verify in Excel that typing the function shows its signature and that advancing
 between arguments displays the appropriate descriptions above, including the
@@ -192,34 +186,14 @@ These tests establish input and record behavior. Elapsed-time arithmetic, hourly
 mapping, and pricing reference values will receive their own coverage when those
 calculations are specified.
 
-## Handle support: research for review
-
-A handle is text in an Excel cell that identifies an object retained in Python
-memory. The existing seam design already calls for resolving that text to the
-declared object type on input, and storing a returned object on output.
-
-Handle implementation is a separate topic shared by functions throughout the
-library. The host already references ExcelDna.AddIn 1.9.0.
-[Excel-DNA 1.9 provides built-in object handles](https://excel-dna.net/docs/release-notes-1-9/)
-through `ExcelHandle` attributes for .NET objects. The
-[handle research note](handles.md) records the tagged implementation's storage,
-reuse, lifetime, and integration limits. A managed owner of a Python reference is
-a candidate for review, not a selected architecture. Suitability for this seam
-has not yet been established by an integration smoke test.
-
-The draft behavior tests above describe the desired reuse, stable meaning, and
-visible failures. Handle spelling, storage ownership, retention,
-reclamation, and restart behavior will be decided with that separate investigation.
-
-Retaining one object does not prove the builder ran only once. Count construction,
-lookup, storage, hashing, and conversion work where performed, and establish the
-budgets when implementing the first handle.
+Handle mechanism, reuse, and lifetime questions are set aside in the
+[deferred research notes](../deferred/handles.md). They remain undecided.
 
 ## Current scope
 
 This spec captures `CreateValuationDate` within Globals: the record, its two scalar
 inputs, validation, handle output, and guidance visible in Excel. The current
-function scope is recorded in [function conventions](function-conventions.md).
+function scope is recorded in [function conventions](../function-conventions.md).
 
 Use the draft coverage above to agree the acceptance cases before implementation.
 Run the existing checks, Excel smoke tests, and applicable work budgets. Reviewed

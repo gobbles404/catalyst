@@ -2,9 +2,10 @@
 
 A commodities derivatives pricing library for Excel.
 
-The [library planning review](docs/library-review.md) is the entry point for the
-draft Globals, interpolation utility, and handle research. These documents capture
-the approach before implementation and mark decisions that remain open.
+The [library planning review](docs/library/README.md) groups the draft Globals and
+Utilities specifications, with shared conventions and research set aside for
+later. These documents capture the approach before implementation and mark
+decisions that remain open.
 
 ## Setup
 

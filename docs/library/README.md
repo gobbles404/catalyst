@@ -10,17 +10,28 @@ futures and swaps on a variety of indices. This snapshot captures the first
 shared building blocks. It does not propose an instrument taxonomy or additional
 worksheet functions.
 
-## Read in this order
+## Shared context and conventions
+
+Start with the [existing seam](../seam/README.md) for what is already built and
+where type/shape validation and conversion occur. Then read the
+[function conventions](function-conventions.md) for names, scalar/array shapes,
+NumPy defaults, header matching, and Excel help.
+
+## Globals
+
+The `globals/` directory holds the shared library objects discussed so far.
 
 | Document | What to review |
 |---|---|
-| [Existing seam](seam/README.md) | What is already built and where type/shape validation and conversion occur. |
-| [Function conventions](function-conventions.md) | Names, scalar/array shapes, NumPy defaults, header matching, and Excel help. |
-| [CreateValuationDate](valuation-date.md) | A date and progress through that named calendar day. |
-| [UnitConversions](unit-converter.md) | The library-owned collection of fixed unit definitions and conversion math. |
-| [CreateDiscountCurve](discount-curve.md) | An explicit daily curve and its final date as a library-wide upper bound. |
-| [Interpolation utility](interpolate-discount-factors.md) | Preparing a daily numeric table from sparse source points. |
-| [Handles and retention research](handles.md) | Excel-DNA 1.9 support, fit to the existing seam, and unresolved ownership questions. |
+| [CreateValuationDate](globals/valuation-date.md) | A date and progress through that named calendar day. |
+| [UnitConversions](globals/unit-conversions.md) | The library-owned collection of fixed unit definitions and conversion math. |
+| [CreateDiscountCurve](globals/discount-curve.md) | An explicit daily curve and its final date as a library-wide upper bound. |
+
+## Utilities
+
+The `utilities/` directory holds worksheet data-preparation functions. Its first
+draft is [discount-factor interpolation](utilities/interpolate-discount-factors.md),
+which prepares a daily numeric table from sparse source points.
 
 ## Agreed direction
 
@@ -64,11 +75,7 @@ main questions a reviewer should examine are:
    supplied explicitly, and how are standalone constructors handled before a
    curve exists? Alignment with `ValuationDate` and treatment of dates before
    `as_of` remain open.
-3. **Handle lifetime and identity.** Excel-DNA is a candidate, not a selected
-   implementation. Review the distinction between live creator formulas, copied
-   text, Python object references, content identity, and restart behavior. The
-   desired reuse wording is not a claim of permanent handle identity.
-4. **Remaining worksheet details.** General naming conventions and the `util_`
+3. **Remaining worksheet details.** General naming conventions and the `util_`
    prefix, header whitespace and column reordering, minimum curve/source length,
    and the proposed two-column utility spill without headers need final decisions.
 
@@ -85,6 +92,13 @@ first implementation difficult or misleading in Excel. Distinguish flaws in the
 approach from choices that are deliberately still open. Keep the review within
 these concepts; do not implement them or add adjacent functions.
 
-This snapshot contains documentation only. Proposed domain tests and handle smoke
-cases have not been implemented or run. The repository's existing checks remain
-the baseline for the built seam, not evidence that these specifications work.
+This snapshot contains documentation only. Proposed domain tests have not been
+implemented or run. The repository's existing checks remain the baseline for the
+built seam, not evidence that these specifications work.
+
+## Deferred research
+
+The [handle and retention notes](deferred/handles.md) are preserved under
+`deferred/` for a later discussion. They are outside the active review brief.
+Constructor handle outputs remain part of the current specifications; the
+mechanism, reuse, and lifetime policy remain undecided.
