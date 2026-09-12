@@ -1,96 +1,191 @@
-# CreateValuationDate: draft specification
+# CreateValuationDate
 
-For review, before implementation. The owner confirmed that dates are calendar
-dates, including weekends, and the fraction runs from zero through one inclusive
-within the supplied date. That date is preserved. The remaining design choices
-below are proposals for review.
+**Status: specified, not buildable.** See [Blocked on](#blocked-on) — the handle return
+type does not exist at the seam, and declaring one refuses to register.
 
-## Purpose and worksheet contract
+Everything above the rule is the contract; an engineer needs only that. Everything below
+it is why, and is for a reviewer. Nothing in this document is implemented.
 
-`ValuationDate` records the date and progress through that date at which a
-calculation is evaluated. `CreateValuationDate` creates that record.
+## What it is
 
-Worksheet function:
+`ValuationDate` records the date and progress through that date at which a calculation is
+evaluated. `CreateValuationDate` creates one and returns its handle.
+
+## Worksheet contract
 
 ```python
 def CreateValuationDate(as_of: Date, day_fraction_elapsed: float) -> ValuationDate: ...
 ```
 
-`Date` is the existing seam type backed by `np.datetime64` with day precision.
-The function returns a `ValuationDate` object; the seam stores it and returns its
-text handle to Excel. The return annotation therefore names the object type.
-Consumers use a reference to that creator cell or a defined name referring to it,
-following the [handle worksheet contract](../handles/README.md).
+```excel
+Inputs!B2   =CreateValuationDate(A2, 0.5)     A2 holds 11-Sep-2026; B2 displays a handle
+```
 
-Both inputs are scalars: one date and one number per call. Both arguments are
-required initially. A missing or blank argument fails. A single-cell reference is
-accepted as a scalar; an actual array, even 1x1, fails under the existing seam rules.
+Two scalars, both required, neither with a default. A single-cell reference is a scalar;
+an array is not, even a 1×1 one. Consumers refer to the creator cell or to a defined name
+referring to it, per the [handle worksheet contract](../handles/README.md).
 
-| Input | Contract |
-|---|---|
-| `as_of` | One scalar whole Excel date serial in `[61, 2958465]`, inclusive, converted by the existing seam into a NumPy calendar date. Those bounds are 1900-03-01 and 9999-12-31, using Excel's 1900 date system. Fractional serials fail. |
-| `day_fraction_elapsed` | One scalar finite number in the inclusive interval `[0, 1]`. Zero is start of the supplied date; one is end of that same date. Values outside that interval fail without rounding, clipping, or advancing the date. |
+## The seam checks
 
-The seam checks input types and converts the date once. The library builder checks
-the fraction's meaning. The object is a small immutable record containing the
-calendar date and the fraction, rather than a DataFrame. The pricing library does
-not import the Excel bridge to define that record.
+You write none of this, and no test for any of it. The rules are
+[inputs.md](../../seam/inputs.md); the messages below are the seam's own, produced by
+running it.
 
-The date bounds are the existing `FIRST_SERIAL` and `LAST_SERIAL` constants in
-[bridge.py](../../../src/goosedove/excel/bridge.py), enforced by its `Date` accept rule.
-The builder receives the converted date and does not repeat those checks. Excel
-sends numbers as doubles, so `46276.0` is a whole serial and is accepted;
-`46276.5` is not. The lower bound excludes Excel's fictitious 1900-02-29 and the
-earlier serials. The seam does not support the 1904 workbook date system and has
-no signal with which to detect it; the builder cannot infer that setting.
+| Argument | Declared | Accepts | Rejects |
+|---|---|---|---|
+| `as_of` | `Date` | one whole Excel serial in `[61, 2958465]`, handed over as `np.datetime64[D]` | text, boolean, blank, missing, any array, a fraction, a serial outside the calendar |
+| `day_fraction_elapsed` | `float` | one number | text, boolean, blank, missing, any array |
 
-## Python representation and shape
+```text
+as_of is text '2026-09-11', expected date
+as_of is boolean TRUE, expected date
+as_of is blank, expected date
+as_of is missing, expected date
+as_of is number 46276.5, expected date
+as_of is number 60.0, expected date
+as_of is number 2958466.0, expected date
+as_of is 1x1 array, expected date
+day_fraction_elapsed is text 'half', expected number
+day_fraction_elapsed is boolean TRUE, expected number
+day_fraction_elapsed is blank, expected number
+day_fraction_elapsed is missing, expected number
+day_fraction_elapsed is 1x1 array, expected number
+```
 
-The input shapes stay scalar, as agreed. The current seam supplies:
+Each reaches the cell prefixed `#ERROR CreateValuationDate: `. The builder never runs.
 
-| Input | Python representation | Shape |
+## The library checks
+
+You write all of this, and one test for each row. The seam hands the builder a converted
+date and a float and has already stopped everything in the table above.
+
+| Rule | Message | Why the seam cannot |
 |---|---|---|
-| `as_of` | `np.datetime64` scalar with day precision | Scalar; not an ndarray |
-| `day_fraction_elapsed` | Python `float` | Scalar; not an ndarray |
+| `0 <= f <= 1` | `day_fraction_elapsed is number 1.5, expected a number from 0 to 1` | the seam checks type and shape, never a value against a bound — [inputs.md](../../seam/inputs.md) rule 6 |
+| `f` is finite | `day_fraction_elapsed is number nan, expected a number from 0 to 1` | same; and see the note below on reachability |
 
-The retained record keeps those two scalar fields. There is no array allocation
-just to hold one date or one fraction, and the constructor does not become a
-batch input function. This follows the
-[shared NumPy convention](../function-conventions.md#numpy-default-and-input-shapes):
-numerical collections and calculations use NumPy arrays, while scalar metadata
-keeps its declared shape. These annotations describe the existing seam's output;
-the library does not repeat its type checks or import the bridge types.
+No rounding, no clamping, no advancing the date. A value just outside the interval fails
+like any other.
 
-## Guidance visible in Excel
+Match the seam's message grammar — `{argument} is {what arrived}, expected {what was
+wanted}` — but **do not import `describe` from the bridge**: the pricing library does not
+depend on the Excel-facing code. For a float the rendering is `number {value!r}`.
 
-Each Globals function should explain its use while the user enters the formula,
-following the supplied screenshot: show the signature, highlight the active
-argument, and show that argument's description. Include the meaning, expected
-type or shape, allowed bounds, and any default in concise worksheet language.
-The same descriptions should be available in Excel's Function Arguments dialog.
+## In memory
 
-Draft wording for this function:
+| Field | Type | Shape |
+|---|---|---|
+| `as_of` | `np.datetime64` with day precision | scalar, not an ndarray |
+| `day_fraction_elapsed` | Python `float` | scalar, not an ndarray |
 
-| Help item | Text |
+A small frozen record. No array is allocated to hold one date and one fraction, and the
+constructor does not become a batch function. Both fields belong to the object's identity.
+This follows the [shared NumPy convention](../function-conventions.md#numpy-default-and-input-shapes):
+numerical collections use arrays, scalar metadata keeps its declared shape.
+
+## Counted work
+
+**None, and that is the answer.** The builder converts nothing — the seam already
+converted the date — allocates one frozen record, and does no numeric work. It takes no
+`WorkCounter`.
+
+The call still costs what any two-scalar call costs, which the host already pins:
+`objects_built 2`, `trips 1`. Publishing the handle will cost more, and cannot be
+measured until handles exist.
+
+## Excel help
+
+Each string must fit Excel's argument-help limit of about 255 characters. These are 109
+and 112.
+
+| Item | Text |
 |---|---|
 | Function | Creates a valuation-date handle from a date and the fraction of that day elapsed. |
 | `as_of` | One date: whole Excel date serial from 61 to 2958465 inclusive (1-Mar-1900 to 31-Dec-9999). Scalar; required. |
 | `day_fraction_elapsed` | One number from 0 to 1 inclusive: 0 = start of as_of; 1 = EOD of as_of. The date is preserved. Scalar; required. |
 
-The current bridge exports a function description and parameter names. The host
-registers those names but does not yet supply parameter descriptions. Capture
-argument guidance with the worksheet function declaration and pass it through
-registration, so its wording has one maintained source.
-[Excel-DNA IntelliSense](https://excel-dna.net/docs/guides-basic/Intellisense/)
-provides the in-sheet help mechanism to investigate when implementing this
-requirement; it is not currently referenced by the host project.
+There is nowhere to put these yet — see [Blocked on](#blocked-on).
+
+## Tests
+
+| Case | Kind | Where |
+|---|---|---|
+| `61` → 1900-03-01, `2958465` → 9999-12-31, `46164` → 2026-05-22, `75` → 1900-03-15 | example | **passes today** — `test_accepted`, `test_range_validation.py` |
+| `46164.5`, `60`, `2958466`, `1e19`, text, a 1×1 array all rejected as `Date` | example | **passes today** — `test_rejected`, `test_range_validation.py` |
+| text, boolean, blank, missing, array rejected in a `float` slot | example | **passes today** — `test_scalar_matrix`, `test_type_validation.py` |
+| a library exception reaches the cell as `#ERROR Fn: ValueError: message` | example | **passes today** — `test_library_failure_names_function_type_and_message` |
+| `0`, `0.5`, `1` accepted; both fields preserved exactly | example | new |
+| `-1`, `2`, `nextafter(0, -inf)`, `nextafter(1, +inf)` rejected, unclamped | example | new |
+| NaN, `+inf`, `-inf` rejected | example | new |
+| for any valid date and any `f` in `[0, 1]`, construction preserves both values | property | new |
+| for any finite `f` outside `[0, 1]`, construction fails | property | new |
+| fraction `1` preserves weekends, leap days, year ends, and 9999-12-31 | example | new |
+| `(2026-09-11, 1)` and `(2026-09-12, 0)` remain distinct records | example | new |
+| a failed construction publishes no object and no handle | example | new, blocked on handles |
+| Friday at `0` and at `1` each return a handle; an invalid date and an invalid fraction each fail | Excel smoke | new, blocked on handles |
+| typing the formula shows the signature, and stepping between arguments shows each description; same in the Function Arguments dialog | Excel smoke | new, blocked on help plumbing |
+
+**Eleven of the fifteen rows are new; four already pass.** Write no test that duplicates
+one of those four — the seam's matrix is complete and is not this function's to restate.
+
+For the Python boundary tests use `np.nextafter(0.0, -np.inf)` and
+`np.nextafter(1.0, np.inf)`. Non-finite fractions are Python-side tests only: Excel sends
+"always a finite double" ([inputs.md](../../seam/inputs.md)), so a cell cannot produce one.
+The rule still belongs in the code, because the builder is reachable from Python.
+
+Metadata tests do not establish that a user can see the guidance. Check it in Excel.
+
+## Blocked on
+
+| Decision | Who decides | What unblocks it |
+|---|---|---|
+| **The handle return type.** `_RESULTS` in [bridge.py](../../../src/goosedove/excel/bridge.py) carries ten declared results and no handle. Declaring one is refused by `_result` at **registration**, which runs at import, so `AutoOpen` catches it and *no* function registers — not this one, not `Ping`, not a probe. The add-in does not degrade; it fails to load. | seam | a `_RESULTS` entry that stores an object and returns its text, a `_DECLARED` entry that resolves text back, and a home for the registration that does not make the library import the bridge |
+| **Which exception the builder raises**, since the type is part of what the cell shows: `#ERROR CreateValuationDate: {Type}: {message}`. `ValueError` reads as noise. | owner | pick a type whose name reads well in a cell |
+| **Argument help has nowhere to go.** `function_specs()` exports name, description, parameter names and hidden; the host builds `ExcelArgumentAttribute { Name = p }` with no `Description`. | seam and host together | widen `function_specs()` and set the description; both sides move in one change |
+
+Open, but not blocking:
+
+- **`day_fraction_elapsed` has no consumer yet.** It is retained now so later
+  specifications can use it.
+- **Ordering is undefined, and there is a tie waiting.** `(2026-09-11, 1.0)` and
+  `(2026-09-12, 0.0)` are the same instant and different records, both agreed. The first
+  function that orders two valuation dates, or measures elapsed time between them, meets a
+  pair that sorts strictly but is zero apart. Deciding the ordering key now costs nothing;
+  deciding it after two callers exist does not.
+
+## PR plan
+
+Two pull requests, in this order. This document specifies only the second.
+
+1. **The handle type at the seam.** One object kind, in and out, with its store. Does not
+   add a worksheet function, does not decide release timing, does not touch the library.
+2. **`CreateValuationDate`.** The record, the fraction rule, the tests marked new above.
+   Does not add elapsed-time arithmetic, hourly mapping, curves, or any second object.
+
+Argument help can land in either, or its own; nothing here depends on it except the last
+test row.
+
+---
+
+# Notes
+
+Reviewer's context. None of this is contract.
+
+## What was agreed, and what is proposed
+
+The owner confirmed that dates are calendar dates, weekends included, and that the
+fraction runs from zero through one inclusive within the supplied date, which is
+preserved. The two-scalar shape and the `[0, 1]` interval follow from that. The message
+wording, the exception type, and the test list are proposals.
+
+`Date` is the existing seam type backed by `np.datetime64` with day precision. The return
+annotation names the Python object, and the seam stores it and returns its text handle.
 
 ## Date and fraction semantics
 
-The two fields remain separate. `as_of` identifies the valuation date, and
-`day_fraction_elapsed` records progress within that date. Both fields belong to
-the object's identity. The constructor preserves the supplied date at every
-accepted fraction, including exactly one.
+The two fields stay separate. `as_of` identifies the valuation date; the fraction records
+progress within it. The constructor preserves the supplied date at every accepted
+fraction, including exactly one.
 
 | `as_of` | Fraction | Interpretation | Stored date |
 |---|---:|---|---|
@@ -99,111 +194,58 @@ accepted fraction, including exactly one.
 | 2026-09-11 | 1 | End of Friday | 2026-09-11 |
 | 2026-09-12 | 0 | Start of Saturday | 2026-09-12 |
 
-`(2026-09-11, 1)` is EOD Friday. It is not normalized to Saturday, relabeled, or
-merged with `(2026-09-12, 0)`. No business-day adjustment is performed.
+`(2026-09-11, 1)` is EOD Friday. It is not normalized to Saturday, relabeled, or merged
+with `(2026-09-12, 0)`. No business-day adjustment is performed.
 
-EOD Friday and start of Saturday describe the same calendar-time boundary: no
-additional calendar time passes between them. They remain different
-date-and-fraction records because they describe progress through different named
-dates. This distinction is agreed; recognizing the shared boundary does not
-require adding the fields together or changing the supplied date.
+EOD Friday and start of Saturday describe the same calendar-time boundary: no additional
+calendar time passes between them. They remain different records because they describe
+progress through different named dates. Recognizing the shared boundary does not require
+adding the fields together or changing the supplied date. It does mean the ordering
+question above is real.
 
-This slice does not add the date and fraction into a timestamp or define elapsed
-time between two records. Mapping fractions to hours, time zones, exchange
-sessions, day-count arithmetic, and fixing or payment cutoffs will be specified
-when the corresponding calculations are introduced. The fraction is retained
-now so those later specifications can use it.
+This slice does not add the date and fraction into a timestamp or define elapsed time
+between two records. Mapping fractions to hours, time zones, exchange sessions, day-count
+arithmetic, and fixing or payment cutoffs will be specified when the corresponding
+calculations are introduced.
 
-## Draft test coverage
+## Why the date bounds are the seam's and not the builder's
 
-This is a coverage proposal for review, not implemented tests. Start with the
-input contract and preservation of the two fields. Reuse the seam's existing
-type, shape, and date validation; test new meaning in the library builder.
+The bounds are the existing `FIRST_SERIAL` and `LAST_SERIAL` constants in
+[bridge.py](../../../src/goosedove/excel/bridge.py), enforced by its `Date` accept rule.
+The builder receives the converted date and does not repeat those checks. Excel sends
+numbers as doubles, so `46276.0` is a whole serial and is accepted; `46276.5` is not. The
+lower bound excludes Excel's fictitious 1900-02-29 and the earlier serials.
 
-### Date input: existing seam rules
+The seam does not support the 1904 workbook date system and has no signal with which to
+detect it, so the builder cannot infer that setting either. That is the seam's policy and
+is recorded in [inputs.md](../../seam/inputs.md), not restated as a rule of this function.
 
-The boundary examples below are already covered for `Date` in
-[test_range_validation.py](../../../tests/unit/test_range_validation.py). A constructor
-integration test should establish that its `as_of: Date` declaration uses that
-same conversion and rejection path, without duplicating the full seam matrix.
+## Why a record and not a DataFrame
 
-| Input | Expected behavior |
-|---|---|
-| `61` | Accept; stored date is 1900-03-01. |
-| `2958465` | Accept; stored date is 9999-12-31. |
-| `46276` or `46276.0` | Accept; stored date is 2026-09-11. |
-| `60` or `2958466` | Reject: outside the allowed date range. |
-| `46276.5` | Reject: date serial is not whole; do not truncate. |
+Two scalar fields, read far more often than they are built, and never iterated. A frozen
+record is the smaller thing that works, and it keeps the pricing library free of any
+import from the Excel bridge.
 
-Inherited seam rules also reject text, booleans, blanks, missing required
-arguments, and arrays in either scalar input. Cover representative constructor
-wiring, such as text in `as_of` and a boolean in `day_fraction_elapsed`, and rely
-on existing seam tests for the complete combinations. An Excel error is returned
-unchanged by the host before the builder runs.
+## Where the Excel help mechanism stands
 
-### Fraction input: new library rules
+The current bridge exports a function description and parameter names; the host registers
+those names but supplies no parameter descriptions. Capture argument guidance with the
+worksheet function declaration and pass it through registration, so its wording has one
+maintained source.
 
-Use a valid converted date for these builder tests, so a date failure cannot
-hide a fraction failure.
+[Excel-DNA IntelliSense](https://excel-dna.net/docs/guides-basic/Intellisense/) provides
+the in-sheet help mechanism to investigate when implementing this. It is not currently
+referenced by the host project, and the host registers through
+`ExcelIntegration.RegisterDelegates`, which is not the pipeline IntelliSense hooks.
 
-| Fraction | Expected behavior |
-|---|---|
-| `0` | Accept; start of the supplied date. |
-| `0.5` | Accept; preserve the supplied fraction. |
-| `1` | Accept; EOD of the supplied date, with that date preserved. |
-| A representable number just below `0` | Reject; do not clamp to zero. |
-| A representable number just above `1` | Reject; do not clamp to one or roll the date. |
-| `-1` or `2` | Reject: outside `[0, 1]`. |
-| NaN, positive infinity, or negative infinity | Reject: fraction must be finite. |
+## Not done
 
-For Python boundary tests, use `np.nextafter(0.0, -np.inf)` and
-`np.nextafter(1.0, np.inf)` for the immediate outside neighbors. Non-finite values
-are Python-side tests, not claims that ordinary Excel cells can supply them.
-Failures should identify the function, the argument, and the allowed values
-through the existing error path, and publish no object or handle.
+No curves, conversion rules, instruments, market calendars, pricing, hourly resolution,
+elapsed-time arithmetic, handle infrastructure, or general handle reclamation. No
+executable tests. The [handle worksheet contract](../handles/README.md) captures the
+agreed Excel use case and the favored unchanged-input reuse direction; the mechanism,
+precise reuse and equality rules, and detailed lifetime remain open, with the
+[Excel-DNA research](../handles/excel-dna-research.md) supporting that discussion.
 
-### Record behavior and general properties
-
-- For valid dates and finite fractions in `[0, 1]`, construction preserves both
-  values. Python tests inspect the created record and generate dates and fractions
-  to cover this general rule.
-- For finite fractions outside `[0, 1]`, construction fails. Generate values on
-  both sides; keep the explicit endpoint and non-finite examples above.
-- The created records match the example table in Date and fraction semantics.
-  In particular, Friday at `1` and Saturday at `0` remain distinct records.
-- Fraction `1` preserves weekends, leap days, year ends, and the maximum supported
-  date, 9999-12-31. No following date is required to represent EOD.
-
-An Excel smoke test should call `CreateValuationDate` for Friday at fractions `0`
-and `1` and verify that each call returns a handle, then exercise an invalid date
-and an invalid fraction. Python tests verify the fields of the stored objects.
-Existing seam tests remain responsible for generic transport behavior.
-
-Verify in Excel that typing the function shows its signature and that advancing
-between arguments displays the appropriate descriptions above, including the
-inclusive fraction bounds and EOD meaning. Check the Function Arguments dialog
-as well. Metadata tests alone do not establish that the user can see the guidance.
-
-These tests establish input and record behavior. Elapsed-time arithmetic, hourly
-mapping, and pricing reference values will receive their own coverage when those
-calculations are specified.
-
-The [handle worksheet contract](../handles/README.md) captures the agreed Excel
-use case and favored unchanged-input reuse direction. The mechanism, precise
-reuse/equality rules, and detailed lifetime remain open; the
-[Excel-DNA research](../handles/excel-dna-research.md) supports that discussion.
-
-## Current scope
-
-This spec captures `CreateValuationDate` within Globals: the record, its two scalar
-inputs, validation, handle output, and guidance visible in Excel. The current
-function scope is recorded in [function conventions](../function-conventions.md).
-
-Use the draft coverage above to agree the acceptance cases before implementation.
-Run the existing checks, Excel smoke tests, and applicable work budgets. Reviewed
-pricing reference outputs come separately from changes to pricing code, under the
-repository's golden-output rule.
-
-This draft does not implement curves, conversion rules, instruments, market
-calendars, pricing, hourly resolution, elapsed-time arithmetic, or general handle
-reclamation.
+Reviewed pricing reference outputs come separately from changes to pricing code, under
+the repository's golden-output rule.
