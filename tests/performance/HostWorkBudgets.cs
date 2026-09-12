@@ -172,15 +172,15 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void an_array_out_from_nothing_in_is_two_buffers_and_two_copies()
+        public void an_array_out_from_nothing_in_is_one_buffer_and_one_copy()
         {
             Same(new Dictionary<string, long>
             {
                 ["objects_built"] = 2,       // two numbers
                 ["trips"] = 1,
-                ["buffers_allocated"] = 2,   // doubles[], then double[,]
-                ["buffer_bytes"] = 160000,   // 8 bytes per cell, twice
-                ["result_copies"] = 2,
+                ["buffers_allocated"] = 1,   // the double[,] Excel receives, and nothing between
+                ["buffer_bytes"] = 80000,    // 8 bytes per cell, once
+                ["result_copies"] = 1,
                 ["result_cells"] = 10000,
             }, CountedArray("Grid", 100, 100, 100.0, 100.0));
         }
@@ -189,9 +189,9 @@ namespace Goosedove.Host.Tests
         public void one_answer_per_row_pays_a_range_in_and_an_array_out()
         {
             var expected = RangeIn(100);
-            expected["buffers_allocated"] = 2;  // the array out's, only
-            expected["buffer_bytes"] = 16L * 10;
-            expected["result_copies"] = 2;
+            expected["buffers_allocated"] = 1;  // the array out, only
+            expected["buffer_bytes"] = 8L * 10;
+            expected["result_copies"] = 1;
             expected["result_cells"] = 10;
             Same(expected, CountedArray("RowSums", 10, 1, Grid(10, 10)));
         }
@@ -255,13 +255,13 @@ namespace Goosedove.Host.Tests
         }
 
         [Fact]
-        public void an_array_out_allocates_sixteen_bytes_per_cell_and_nothing_else()
+        public void an_array_out_allocates_eight_bytes_per_cell_and_nothing_else()
         {
             var grid = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Grid"), 2);
             object one = 1.0, small = 1000.0, large = 10000.0;
             var slope = (BytesPerCall(() => grid(large, one), 20) - BytesPerCall(() => grid(small, one), 20)) / 9000;
             output.WriteLine("managed bytes per added output cell: " + slope);
-            Assert.InRange(slope, 0, 16 + 2048.0 / 9000);
+            Assert.InRange(slope, 0, 8 + 2048.0 / 9000);
         }
     }
 }

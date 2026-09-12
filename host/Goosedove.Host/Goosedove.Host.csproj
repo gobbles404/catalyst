@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>10.0</LangVersion>
+    <!-- One place uses a pointer: the copy of an array out of Python's buffer into the array Excel receives. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Only [ExcelFunction] methods and the functions registered from Python reach the sheet. -->
     <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
   </PropertyGroup>
