@@ -58,6 +58,34 @@ def test_a_column_of_text_in_makes_no_temporary() -> None:
 # kinds, and a second one while the bad cell's text is found by counting the text cells before
 # it. Measured 20,640 at ten thousand cells with the bad cell last, down from 87,239 when the
 # compare against an IntEnum cast the kinds through numpy's 8-byte scratch buffer.
+# A mixed range is accepted on the host's summary too, and the record holds the storage the
+# range already had, so nothing is made per cell. Measured 248 bytes at ten thousand cells on
+# 2026-09-12: the record, its shape, and the small objects any call makes.
+def test_a_mixed_range_in_makes_no_temporary() -> None:
+    cells = Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])
+    assert peak_bytes(lambda: ENTRY["CountMixed"](cells)) <= SLACK
+
+
+# A scalar becomes a one-cell range, which is the only mixed input that allocates storage of
+# its own: two one-element arrays. Measured 473 bytes on 2026-09-12.
+def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
+    assert peak_bytes(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
+
+
+# Naming the bad cell is the rejection path's work. A blank is one mask over the kinds, measured
+# 13,008 at ten thousand cells. An empty text costs more, because its place among the texts has
+# to be turned into its place among the cells: measured 103,372, about 10 bytes per cell.
+def test_a_rejected_mixed_range_pays_to_locate_the_cell_it_names() -> None:
+    rows: list[list[object]] = [[float(i)] for i in range(N)]
+    rows[N // 2][0] = None
+    blank = Cells.from_rows(rows)
+    assert peak_bytes(lambda: ENTRY["CountMixed"](blank)) <= 2 * N + SLACK
+    texts: list[list[object]] = [[f"n{i}"] for i in range(N)]
+    texts[N // 2][0] = ""
+    empty = Cells.from_rows(texts)
+    assert peak_bytes(lambda: ENTRY["CountMixed"](empty)) <= 11 * N + SLACK
+
+
 def test_a_rejected_range_pays_one_look_and_its_two_masks() -> None:
     rows: list[list[object]] = [[float(i)] for i in range(N)]
     rows[-1][0] = "x"

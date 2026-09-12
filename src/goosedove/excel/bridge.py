@@ -46,6 +46,39 @@ TextColumn = NewType("TextColumn", tuple[str, ...])
 TextRow = NewType("TextRow", tuple[str, ...])
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class MixedArray:
+    """A range whose cells may be numbers, nonempty text and booleans together, in any shape.
+
+    The others above are names for a shape numpy or Python already has, so a function receives a
+    bare array or tuple. This one is a record, because a mixed range needs its kinds beside its
+    values to be read at all. The three fields are the storage the host already sent, handed over
+    and not copied.
+
+    numeric_slots is storage, not an array of numbers. It holds the number where a cell holds a
+    number, 1.0 or 0.0 where a cell holds a boolean, and NaN where a cell holds text: that NaN is
+    a placeholder the host wrote, not a value anyone sent. So kinds says what each slot means, and
+    summing numeric_slots on its own would count TRUE as one and poison every text cell. texts
+    holds the text cells in sheet order, so the k-th TEXT in kinds is the k-th entry of texts.
+
+    A date is a number here, as it is everywhere at the seam: Excel sends the serial and the
+    formatting never travels, so 22 May 2026 arrives as 46164.0 and nothing checks a calendar.
+
+    Nothing may replace a field, but the arrays a field points at can still be written to, so two
+    of these are never compared and none is ever used as a key.
+    """
+
+    kinds: NDArray[np.uint8]
+    numeric_slots: NDArray[np.float64]
+    texts: tuple[str, ...]
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Rows and columns of the rectangle, which is the kinds array's own shape."""
+        rows, cols = self.kinds.shape
+        return rows, cols
+
+
 class Missing:
     """An argument the formula left out. Not a blank cell, which is None."""
 
@@ -135,6 +168,14 @@ ONLY_TEXT: Final = 1 << Kind.TEXT
 # and is compared in place: 1.5 us and the 1-byte mask alone.
 NUMBER_CODE: Final = int(Kind.NUMBER)
 TEXT_CODE: Final = int(Kind.TEXT)
+BOOLEAN_CODE: Final = int(Kind.BOOLEAN)
+
+# The kinds a mixed range may hold, as bits of the host's summary: number, text and boolean.
+# NOT_MIXED is every other bit, which today is blank and missing, so seen & NOT_MIXED is set
+# exactly when some cell holds no value at all. Written as the complement, so a kind added
+# later is refused by the mixed rule until someone allows it here.
+MIXED_KINDS: Final = (1 << Kind.NUMBER) | (1 << Kind.TEXT) | (1 << Kind.BOOLEAN)
+NOT_MIXED: Final = ~MIXED_KINDS
 
 
 def _classify(cell: object) -> tuple[Kind, float]:
@@ -277,6 +318,52 @@ def _texts(value: object) -> tuple[str, ...]:
     return (_text(value),)
 
 
+# --- every cell one of three kinds: the mixed range, which mixes rather than requires ------
+
+
+def _mixed(value: object) -> MixedArray:
+    """Every cell a number, nonempty text or boolean, kept in sheet order. A scalar is a 1x1 range.
+
+    The host's summary settles the kinds in one test. Only an empty text has to be looked for,
+    because the summary records which kinds occurred and not whether a text has characters in it.
+    """
+    if isinstance(value, Cells):
+        empty = value.texts.index("") if "" in value.texts else -1
+        if value.seen & NOT_MIXED or empty >= 0:
+            raise _first_bad(value, _bad_mixed(value, empty), "number, nonempty text or boolean")
+        return MixedArray(value.kinds, value.numbers, value.texts)
+    return _mixed_scalar(value)
+
+
+def _bad_mixed(value: Cells, empty: int) -> NDArray[np.bool_]:
+    """Every cell a mixed range may not hold, flagged in one array so the earliest one wins.
+
+    The three mixed kinds are the three lowest codes, so one compare flags every other kind.
+    An empty text is not a kind, so its cell is flagged here too: its place among the texts is
+    turned into its place among the cells, which is what _cell does in reverse to read it back.
+    """
+    bad = value.kinds > BOOLEAN_CODE
+    if empty >= 0:
+        bad.flat[np.flatnonzero(value.kinds.ravel() == TEXT_CODE)[empty]] = True
+    return bad
+
+
+def _mixed_scalar(value: object) -> MixedArray:
+    """One value as the 1x1 range the host would have sent. A blank or empty text is not one."""
+    if isinstance(value, bool):
+        return _one_cell(BOOLEAN_CODE, 1.0 if value else 0.0, ())
+    if isinstance(value, int | float):
+        return _one_cell(NUMBER_CODE, float(value), ())
+    if isinstance(value, str) and value:
+        return _one_cell(TEXT_CODE, np.nan, (value,))
+    raise _Rejected
+
+
+def _one_cell(code: int, number: float, texts: tuple[str, ...]) -> MixedArray:
+    """The one-cell storage a promoted scalar needs, laid out as the host lays out a range."""
+    return MixedArray(np.array([[code]], dtype=np.uint8), np.array([[number]]), texts)
+
+
 # --- one column or one row: the shape is checked before any cell is --------
 
 
@@ -345,6 +432,7 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     DateRow: ("row of dates", _date_row),
     TextColumn: ("column of text", _text_column),
     TextRow: ("row of text", _text_row),
+    MixedArray: ("mixed array", _mixed),
 }
 
 

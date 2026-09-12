@@ -27,6 +27,59 @@ def test_specs_carry_name_description_parameters_and_hidden() -> None:
     assert specs["Ping"] == ("Confirm which goosedove Excel is running.", [], False)
 
 
+_kept: dict[str, bridge.MixedArray] = {}
+
+
+@bridge.excel_function
+def KeepMixed(values: bridge.MixedArray) -> float:
+    """Keep what arrived, so a test can hold it while later calls reuse the host's buffers."""
+    _kept["values"] = values
+    return 1.0
+
+
+def test_a_mixed_range_hands_over_the_storage_the_transport_owns() -> None:
+    # No copy: the record's three fields are the objects the range already held. NumberArray and
+    # TextColumn do the same; this says it of a record rather than of a bare array.
+    arrived = bridge.Cells.from_rows([["a", 1.0], [True, 2.0]])
+    bridge.call("KeepMixed", [arrived])
+    record = _kept["values"]
+    assert record.kinds is arrived.kinds
+    assert record.numeric_slots is arrived.numbers
+    assert record.texts is arrived.texts
+    assert record.shape == arrived.kinds.shape
+
+
+def test_a_kept_mixed_range_survives_the_host_refilling_and_growing_its_buffers() -> None:
+    # Python owns its copy of the buffers, so a record a function kept is still what it was
+    # after the host writes the next range over the same memory and then grows it for a larger.
+    kinds = (ctypes.c_uint8 * 2)(1, 0)
+    numbers = (ctypes.c_double * 2)(float("nan"), 7.0)
+    arrived = bridge.cells_from_buffers(
+        ctypes.addressof(kinds), ctypes.addressof(numbers), 1, 2, "keep", 0b11
+    )
+    bridge.call("KeepMixed", [arrived])
+    record = _kept["values"]
+    column = record.numeric_slots[:, 1]  # a view, which retains the whole buffer
+
+    kinds[0], kinds[1] = 3, 3  # the host refills the same buffers for the next range
+    numbers[0], numbers[1] = 99.0, 99.0
+    bigger = (ctypes.c_double * 4)(1.0, 2.0, 3.0, 4.0)  # and grows them for a larger one
+    wider = (ctypes.c_uint8 * 4)(0, 0, 0, 0)
+    bridge.call(
+        "SumArray",
+        [
+            bridge.cells_from_buffers(
+                ctypes.addressof(wider), ctypes.addressof(bigger), 2, 2, "", 0b1
+            )
+        ],
+    )
+
+    assert record.shape == (1, 2)
+    assert record.kinds.tolist() == [[1, 0]]
+    assert record.texts == ("keep",)
+    assert column.tolist() == [7.0]
+
+
 def test_every_probe_is_hidden_and_ping_is_not() -> None:
     hidden = {name for name, _, _, hidden in bridge.function_specs() if hidden}
     assert hidden >= {
@@ -36,6 +89,8 @@ def test_every_probe_is_hidden_and_ping_is_not() -> None:
         "EchoText",
         "EchoBoolean",
         "SumArray",
+        "CountArray",
+        "CountMixed",
         "Dot",
         "EchoColumn",
         "EchoRow",

@@ -49,6 +49,10 @@ def workloads() -> dict[str, Callable[[], object]]:
         "EchoText": lambda: ENTRY["EchoText"]("WTI"),
         "EchoBoolean": lambda: ENTRY["EchoBoolean"](True),
         "SumArray": lambda: ENTRY["SumArray"](grid),
+        "CountArray": lambda: ENTRY["CountArray"](grid),
+        "CountMixed": lambda: ENTRY["CountMixed"](
+            Cells.from_rows([[["nn", 1.0, True][i % 3]] for i in range(n)])
+        ),
         "Dot": lambda: ENTRY["Dot"](column, weights),
         "EchoColumn": lambda: ENTRY["EchoColumn"](column),
         "EchoRow": lambda: ENTRY["EchoRow"](row),

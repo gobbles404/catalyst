@@ -17,6 +17,8 @@ namespace Goosedove.Host.Measure
             var times = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Times"), 2);
             var dot = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Dot"), 2);
             var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
+            var countArray = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("CountArray"), 1);
+            var countMixed = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("CountMixed"), 1);
             var echoColumn = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoColumn"), 1);
             var echoRow = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoRow"), 1);
             var rowSums = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("RowSums"), 1);
@@ -34,6 +36,11 @@ namespace Goosedove.Host.Measure
                 var weights = Filled(n, 1.0);
                 var total = Total(n);
                 measurements.Run("SumArray", "cells in", n, 1, () => sum(column), Equal(total), Counted("SumArray", column));
+                // The same count two ways: the numeric rule, then the mixed rule, so the record's
+                // own cost is what lies between them and nothing else does.
+                var mixed = Mixed(n);
+                measurements.Run("CountArray", "cells in", n, 1, () => countArray(column), Equal((double)n), Counted("CountArray", column));
+                measurements.Run("CountMixed", "cells in", n, 1, () => countMixed(mixed), Equal((double)n), Counted("CountMixed", mixed));
                 measurements.Run("Dot", "two ranges in", 2 * n, 1, () => dot(column, weights), Equal(total), Counted("Dot", column, weights));
                 measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), ArrayOf(n, 1, total), Counted("EchoColumn", column));
                 object rows = (double)n;
@@ -113,6 +120,17 @@ namespace Goosedove.Host.Measure
             for (var i = 0; i < cells; i++)
             {
                 column[i, 0] = (double)i;
+            }
+            return column;
+        }
+
+        // A column holding all three kinds a mixed range may, in turn: text, a number, a boolean.
+        private static object[,] Mixed(int cells)
+        {
+            var column = new object[cells, 1];
+            for (var i = 0; i < cells; i++)
+            {
+                column[i, 0] = (i % 3) switch { 0 => "n" + i, 1 => (object)(double)i, _ => i % 2 == 0 };
             }
             return column;
         }

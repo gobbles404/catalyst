@@ -6,7 +6,7 @@ The rule from CLAUDE.md holds throughout: work is measured by counts, and counts
 
 ## The probes
 
-Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden worksheet functions, one per thing the host can tell apart, each doing no work beyond proving its fact, so its cost is the seam's cost. The knobs are how many calls, how many cells in, and how many cells out.
+Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden worksheet functions, one per thing the host can tell apart or one rule the bridge applies to what it cannot, each doing no work beyond proving its fact, so its cost is the seam's cost. Where a rule needs a control to be read against, the control is a probe too. The knobs are how many calls, how many cells in, and how many cells out.
 
 | Probe | Knob |
 |---|---|
@@ -14,6 +14,8 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `Add(a, b)` | a scalar call with two arguments |
 | `Times(x, factor=1.0)` | an omitted argument |
 | `SumArray(values)` | cells in, any shape, one number out |
+| `CountArray(values)` | cells in, counted; the numeric control under `CountMixed` |
+| `CountMixed(values)` | cells in of mixed kinds, counted; the count of text cells and the length of the text are its own knobs, turned one at a time |
 | `Dot(a, b)` | two ranges in one call |
 | `EchoColumn(values)` | the round trip: N in, N out |
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |

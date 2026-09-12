@@ -190,6 +190,29 @@ try {
                 $column++
             }
         }
+        # 2b. the same count two ways, over numbers and over a mixed column, with Excel's own
+        # counts beside each: what accepting three kinds instead of one costs a user.
+        $mixedIn = Own $book.Worksheets.Add()
+        $mixedIn.Name = "mixed_in"
+        $values = [object[,]]::new(10000, 1)
+        for ($r = 0; $r -lt 10000; $r++) {
+            $values[$r, 0] = switch ($r % 3) { 0 { "n$r" } 1 { [double]$r } default { $r % 2 -eq 0 } }
+        }
+        (Own $mixedIn.Range($mixedIn.Cells.Item(1, 1), $mixedIn.Cells.Item(10000, 1))).Value2 = $values
+        $column = 3
+        foreach ($n in 100, 1000, 10000) {
+            foreach ($shape in @(
+                @{ Probe = "CountArray"; Formula = "=CountArray(cells_in!R1C1:R${n}C1)" },
+                @{ Probe = "native COUNT"; Formula = "=COUNT(cells_in!R1C1:R${n}C1)" },
+                @{ Probe = "CountMixed"; Formula = "=CountMixed(R1C1:R${n}C1)" },
+                @{ Probe = "native COUNTA"; Formula = "=COUNTA(R1C1:R${n}C1)" }
+            )) {
+                $range = Own $mixedIn.Range($mixedIn.Cells.Item(1, $column), $mixedIn.Cells.Item($copies, $column))
+                $range.FormulaR1C1 = $shape.Formula
+                Add-Case $shape.Probe "cells in" $copies $n 1 $range $range ($copies * $n)
+                $column++
+            }
+        }
         # 3. cells out: a hundred copies of one formula spilling a growing column
         $cellsOut = Own $book.Worksheets.Add()
         $cellsOut.Name = "cells_out"
