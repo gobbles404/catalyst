@@ -87,7 +87,7 @@ The record asks for two next, and until they exist no runner has a row for a tex
 6. Add a row to `tools/excel_smoke.ps1`, so the probe is checked in a real Excel with the exact text it must show, and the same row to `host/Goosedove.Host.Tests/CallTests.cs`, which replays the smoke rows without Excel. Add the name to the set of hidden probes in `tests/unit/test_bridge.py`: that test asks only that the set contains them, so a missing name never fails, which is why it has to be done on purpose.
 7. Give it a ledger in `tests/performance/test_seam_budgets.py`, both lists where numpy is asked anything, and a ceiling in `tests/performance/test_seam_allocation.py`.
 8. Add a counts test to `tests/performance/HostWorkBudgets.cs`, which is compiled into the host's test project: what the host did for one warm call, as an exact table of counters.
-9. Add it to the probe tables in [measuring.md](measuring.md), with its knob, and [bridge.md](bridge.md), with what it proves. Then correct every count of probes the pages state: section 2 of this page, [README.md](README.md), [host.md](host.md), [bridge.md](bridge.md) twice, and the row in [history.md](history.md) that says there are twelve and none of them takes a text or a date range.
+9. Add it to the probe tables in [measuring.md](measuring.md), with its knob, and [bridge.md](bridge.md), with what it proves. Then correct every count of probes the pages state: section 2 of this page, [README.md](README.md), [host.md](host.md), [bridge.md](bridge.md) twice, and the row in [history.md](history.md) that gives their number and says none of them takes a text or a date range.
 
 ## 5. Changing the seam and measuring it
 
