@@ -13,6 +13,7 @@ These pages are for two readers: the owner, an Excel power user who is not a pro
 | What happens between typing a formula and seeing the answer? | [walk.md](walk.md): one call from the cell to the answer, in order, with diagrams of the layers it crosses and of what is copied and what is only pointed at |
 | What may I send a function, and what happens when I send the wrong thing? | [inputs.md](inputs.md): what Excel sends, the rules, and the decisions taken |
 | What may a function return, and what does the cell show? | [outputs.md](outputs.md): the result rules and the decisions taken |
+| What is a handle, and what would a creator, its consumers and the store do? | [handles.md](handles.md): the spec, open, with the evidence for its store in [excel-dna-handles.md](excel-dna-handles.md) |
 | How do I add a function, a type or a probe, run the checks, load the add-in by hand, measure a change, or make a baseline? | [working.md](working.md): the recipes, and what a cell can show when something is wrong |
 | How does the C# side work? | [host.md](host.md): start-up, registration, the scan of a range, the kept buffers, the way out, the errors, the counter |
 | How does the Python side work? | [bridge.md](bridge.md): declaring a function, what registration resolves, the accept rules and the result rules, `Cells`, `MISSING`, the probes, and what is deliberately absent |
@@ -33,6 +34,7 @@ Each page defines these where it first uses them; here they are once, so the pag
 - **A scalar**: one value. **An array**: a rectangle of values, always two-dimensional, even one row or one column. It is Excel's own word, and the earlier name for it was cut everywhere rather than kept beside it. **A range**: an array as it arrives from the sheet, cell by cell, before the seam has checked it.
 - **A cell's kind**: which of five things a cell holds: number, text, boolean, blank, or missing. An Excel error is the sixth thing Excel can send, and it never crosses; the host returns it before Python runs.
 - **A table**: a header row and a body, crossing as two arguments and bound by name into typed columns. **A schema**: the function's declaration of a table, one line per column, the header name and its column type; a header is to a column what a parameter name is to an argument. **Binding**: matching each header to its column of the schema. **Refinement**: checking a body column against its column type and converting what that type converts.
+- **A handle**: text in a cell that stands for a live object such as a curve, held by the add-in; specified in [handles.md](handles.md) and not yet in the code.
 - **Blank and missing**: a blank is an empty cell the formula referred to; missing is an argument the formula left out. `=Times(5, C2)` with C2 empty fails; `=Times(5)` takes the default.
 - **A trip**: one crossing from the host into Python and back. A scalar call makes one; a range makes two, one to hand the cells over and one to run the function.
 - **A look**: one pass over a whole range at once, in one operation. **A walk**: visiting cells one by one, which the seam avoids.
