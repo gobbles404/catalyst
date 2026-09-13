@@ -20,7 +20,7 @@ Requires Python 3.13.13 and uv 0.12.9 (`py -3.13 -m pip install uv==0.12.9`).
     .\measure.ps1               profile and time every probe on the Python side; reports land in profiles/
     .\tools\excel_dev.ps1       build the add-in and open it in a fresh Excel
 
-How the seam is measured, what is counted and what is timed, is in [docs/seam/measuring.md](docs/seam/measuring.md).
+How the seam is measured, what is counted and what is timed, is in [docs/seam/measuring.md](docs/seam/measuring.md). Everything written about the seam, the one place Excel and Python talk, starts at [docs/seam/README.md](docs/seam/README.md); the library's worksheet functions, one page each that is the spec until the function is built, start at [docs/library/README.md](docs/library/README.md).
 
 ## The add-in
 

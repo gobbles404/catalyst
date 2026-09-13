@@ -52,4 +52,4 @@ Decided 2026-09-13.
 
 ## Parked
 
-Handles, in both directions. When the first builder function exists, its object kind joins both tables as a type: on the way in, text that must name a live object of that kind, handed to the function as the object; on the way out, the object, stored by the seam, with its handle text in the cell. The text's format and the store are designed then.
+Handles, in both directions. When the first builder function exists, its object kind joins both tables as a type: on the way in, text that must name a live object of that kind, handed to the function as the object; on the way out, the object, stored by the seam, with its handle text in the cell. The text's format and the store are designed then. The spec is [handles.md](handles.md).

@@ -181,6 +181,6 @@ Decided 2026-09-13, tables.
 
 ## Parked
 
-Handles: text that stands for a live object such as a curve. The seam's part is one rule per object kind, the text must name a live object of that kind, checked before the library sees it. The text's format, the store, and columns of handles are designed when the first builder function exists.
+Handles: text that stands for a live object such as a curve. The seam's part is one rule per object kind, the text must name a live object of that kind, checked before the library sees it. The text's format, the store, and columns of handles are designed when the first builder function exists. The spec is [handles.md](handles.md).
 
 The way out, results returning to the sheet, is [outputs.md](outputs.md).
