@@ -1,6 +1,6 @@
 # Conventions
 
-The rules every function page follows, and the skeleton to copy for a new one. Why these choices, and what they cost, is in [decisions.md](decisions.md): D18 to D20 for the names and shapes, D28 for the pages themselves.
+How a function page is written, and the skeleton to copy for a new one. Why these choices, and what they cost, is in [decisions.md](decisions.md): D18 to D20 for the names and shapes, D28 for the pages themselves.
 
 ## Names
 
@@ -26,7 +26,7 @@ Each declared type and what it hands the function is the table in [bridge.md](..
 
 ## Errors
 
-A library rejection reaches the cell as `#ERROR {function}: {ExceptionType}: {message}`. The exception type is part of what the user sees, so it is chosen, not defaulted (D29). Messages follow the seam's grammar, `{argument} is {what arrived}, expected {what was wanted}`, with cells and rows counted as `INDEX` counts within the range that was passed: [inputs.md](../seam/inputs.md) rule 8 and [outputs.md](../seam/outputs.md) rule 7 are the pattern, and `describe` is not imported from the bridge to build one. A failed call publishes nothing: no partial result, no object, no handle.
+A library rejection reaches the cell as `#ERROR {function}: {ExceptionType}: {message}`. The type is `ValueError` for every business rule (D29), so the message is the part a page writes. Messages follow the seam's grammar, `{argument} is {what arrived}, expected {what was wanted}`, with cells and rows counted as `INDEX` counts within the range that was passed: [inputs.md](../seam/inputs.md) rule 8 and [outputs.md](../seam/outputs.md) rule 7 are the pattern, and `describe` is not imported from the bridge to build one. A failed call publishes nothing: no partial result, no object, no handle.
 
 ## Excel help
 
@@ -40,13 +40,7 @@ The function description crosses today; argument descriptions do not, because th
 
 ## A function page, section by section
 
-Five rules, then the skeleton.
-
-1. **Only what is new.** The seam checks every argument's type and shape and converts every result; a page writes none of that, and no test for it.
-2. **Cite the seam, never restate it.** The serial bounds, blank against missing, the message grammar and the rest live in [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md); restating them means the pages drift when one rule moves.
-3. **A page describes nothing that is neither built nor specified.** No history of the page, no earlier drafts, no planned mechanisms: the record holds why, and the code holds what.
-4. **The status line moves with the code**, in the same pull request, and is read off the page's own Open section.
-5. **Tests are new tests only.** The seam's matrix is complete and is not this function's to restate.
+A page holds only what is new to its function. The seam already checks every argument's type and shape and converts every result, so a page cites [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md) rather than restating them, describes nothing that is neither built nor specified, and lists only its own tests. Its first line is its state, read off its own Open section, and it moves with the code in the same pull request.
 
 The sections, in this order:
 

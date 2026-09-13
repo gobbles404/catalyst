@@ -1,8 +1,8 @@
 # CreateDiscountCurve
 
-Open: D6, D12, D21, D26, D27, D29, D30.
+Open: D6, D12, D21, D26, D27.
 
-A daily discount curve, retained and reached by handle. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D6 to D12 and D30.
+A daily discount curve, retained and reached by handle. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D6 to D12.
 
 ## Worksheet contract
 
@@ -90,10 +90,8 @@ The daily-coverage and anchor rules are tested independently of generic date acc
 | The input layout, and so the signature and the formula | D21 |
 | How the bound reaches a calculation, which curve governs when there are several, and dates before the start | D12 |
 | Whether `start_date` keeps a name that collides with the valuation date's `as_of` | D6 |
-| The smallest table: whether a one-row curve is meaningful | D30 |
 | The handle return type, which blocks the whole function | D26 |
 | How a work counter reaches this code | D27 |
-| The exception type the builder raises | D29 |
 
 ## Not here
 

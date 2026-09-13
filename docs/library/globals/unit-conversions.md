@@ -1,6 +1,6 @@
 # UnitConversions
 
-Open: D27, D29.
+Open: D27.
 
 The library's fixed unit definitions and the conversion between them. Why these choices,
 and what they cost, is [decisions.md](../decisions.md#units), D13 to D17. It has no
@@ -175,7 +175,6 @@ last place (D15). Display rounding must never change a stored factor.
 | | |
 |---|---|
 | How a work counter reaches this code | D27 |
-| The exception type a rejection raises | D29 |
 
 ## Not here
 

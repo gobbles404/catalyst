@@ -183,15 +183,6 @@ collision noted in D6. Behaviour for dates *before* the start date is separately
 **What would decide it:** the object that carries the valuation date and the curve or
 curves as one explicit argument, designed with the first pricing function.
 
-### D30 · The smallest table — **open**
-
-Whether a one-row curve is meaningful, and whether a single supplied point interpolates to
-one unchanged row. As the rules stand a one-row curve passes: a start, a bound, and a factor
-of exactly one.
-
-**What would decide it:** the owner; the rules accept it today, so deciding no adds a rule
-and deciding yes adds a test.
-
 ---
 
 ## Units
@@ -344,13 +335,17 @@ and 27.
 **What would decide it:** the owner, in the workbook ([golden rule 8](../golden-rules.md)),
 for both functions at once.
 
-### D29 · The exception type a library rejection raises — **open**
+### D29 · A library rejection raises `ValueError`
 
-The cell shows `#ERROR {function}: {ExceptionType}: {message}`, so the type is part of what
-a user sees and is chosen, not defaulted. Every library check on every page waits on it.
+**Decided.** Every business rule a page lists raises `ValueError` with the page's message,
+so the cell shows `#ERROR {function}: ValueError: {message}`. Decided 2026-09-13.
 
-**What would decide it:** the owner, one word; the seam's own example in
-[outputs.md](../seam/outputs.md) rule 7 is `ValueError`.
+**Because** the type is part of what the desk sees, and one family name for every rejection
+means the message is the thing to read; it is also the seam's own example in
+[outputs.md](../seam/outputs.md) rule 7.
+
+**Costs** nothing. An invented type would be a longer word in the cell that says nothing
+the message does not.
 
 ---
 
@@ -485,8 +480,8 @@ supplies the counter, and the worksheet path passes none.
 **Decided.** Each worksheet function has one page, which starts as the spec and becomes
 the reference when the function ships. Its first line is its state, `Open: D21, D26.`,
 `Ready.` or `Built in #NN.`, read off its own Open section and moved with the code in the
-same pull request. The rules and the skeleton are [conventions.md](conventions.md); this
-record holds why. The desk reads Excel's own help text as it types, so a page's Excel help
+same pull request. How a page is written, and the skeleton to copy, are
+[conventions.md](conventions.md); this record holds why. The desk reads Excel's own help text as it types, so a page's Excel help
 section is the one product-facing text; `docs/library/` is for engineers and the owner as
 reviewer, and does not ship. A spec for something the seam must do lives with the seam and
 is absorbed into the seam's pages when built. Decided 2026-09-13.

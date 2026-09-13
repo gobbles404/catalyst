@@ -8,7 +8,7 @@ These pages are for an engineer building a function and for the owner reviewing 
 
 | Page | What it holds |
 |---|---|
-| [conventions.md](conventions.md) | the rules every function page follows, and the skeleton to copy for a new one |
+| [conventions.md](conventions.md) | how a function page is written, and the skeleton to copy for a new one |
 | [decisions.md](decisions.md) | the record: every choice, what decided it, what it costs, and for an open one what would decide it |
 | [globals/valuation-date.md](globals/valuation-date.md) | `CreateValuationDate`, a date and progress through that day |
 | [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, an explicit daily curve and its upper date bound |
@@ -25,20 +25,14 @@ A function page starts as the spec and becomes the reference when the function s
 - `Ready.` Nothing is open; it can be built.
 - `Built in #51.` It exists, and the page describes what exists.
 
-The state is read off the page's own Open section, and it moves with the code, in the same pull request. Five steps take a function from an idea to a built one:
-
-1. Draft the page from the skeleton in [conventions.md](conventions.md), writing only what is new: the seam already checks types and shapes, and the page cites it.
-2. Every open question becomes a numbered entry in [decisions.md](decisions.md), marked open, ending with what would decide it. The page's Open section lists the numbers and nothing else.
-3. Review closes them, one decision at a time, with the reason and the cost recorded. A page with an empty Open section is `Ready.`
-4. Build it in one pull request, following [working.md](../seam/working.md#2-adding-a-worksheet-function) for the code, the pins, the smoke row and the help text; the same pull request sets the page to `Built in #NN` and names the pins under Tests.
-5. The record catches up: anything tried and declined, or found and parked on the way, goes in [decisions.md](decisions.md), so it is not proposed again from memory.
+The state is read off the page's own Open section and moves with the code, in the same pull request. A page is drafted from the skeleton in [conventions.md](conventions.md); each open question becomes a numbered entry in [decisions.md](decisions.md) that ends with what would decide it, and the page's Open section lists the numbers; the pull request that builds the function follows [working.md](../seam/working.md#2-adding-a-worksheet-function) for the code, the pins, the smoke row and the help text, and sets the page to `Built in #NN`. Anything tried and declined on the way goes in the record, so it is not proposed again from memory.
 
 A spec for something the seam must do, such as [handles.md](../seam/handles.md), is written the same way and lives with the seam, but it is transitional: when it is built, its content moves into the seam's pages, [inputs.md](../seam/inputs.md), [outputs.md](../seam/outputs.md) and [bridge.md](../seam/bridge.md), and the page goes, as the page for tables went in #51.
 
 ## Where it stands
 
-Four functions are specified and none is built. Each page's first line says what it waits on. Two decisions are library-wide and gate every page: D27, how a work counter reaches library code, and D29, the exception type a library rejection raises. `UnitConversions` waits on nothing else and needs nothing from the seam; the two constructors also wait on handles, D26; the curve and the utility wait on their input layout, D21.
+Four functions are specified and none is built. Each page's first line says what it waits on. One decision is library-wide and gates every page: D27, how a work counter reaches library code. `UnitConversions` waits on nothing else and needs nothing from the seam; the two constructors also wait on handles, D26; the curve and the utility wait on their input layout, D21.
 
 ## Reading it as a reviewer
 
-Start with [conventions.md](conventions.md), which says what a page contains and why every rule names who checks it. Then any one function page. Then [decisions.md](decisions.md) for anything you want to argue with: a decision recorded there is not reopened from memory, and an open one says what it is waiting for.
+Start with [conventions.md](conventions.md), which says what a page contains. Then any one function page. Then [decisions.md](decisions.md) for anything you want to argue with: a decision recorded there is not reopened from memory, and an open one says what it is waiting for.

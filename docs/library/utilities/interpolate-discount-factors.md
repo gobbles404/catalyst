@@ -1,8 +1,8 @@
 # InterpolateDiscountFactors
 
-Open: D18, D21, D27, D29, D30.
+Open: D18, D21, D27.
 
-Turns sparse date/discount-factor points into an explicit daily table. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D7, D9, D10, D21 and D30. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
+Turns sparse date/discount-factor points into an explicit daily table. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D7, D9, D10 and D21. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
 
 ## Worksheet contract
 
@@ -114,9 +114,7 @@ Prefer the properties over more examples: they survive a regenerated golden and 
 |---|---|
 | The input layout, and so the signature and the formula, and whether the output carries its date column | D21 |
 | The final name, and whether `util_` becomes a convention or a category | D18 |
-| The smallest input: whether a single supplied point returns one unchanged row | D30 |
 | How a work counter reaches this code | D27 |
-| The exception type a rejection raises | D29 |
 
 ## Not here
 

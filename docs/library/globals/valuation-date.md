@@ -1,6 +1,6 @@
 # CreateValuationDate
 
-Open: D3, D4, D26, D29.
+Open: D3, D4, D26.
 
 The date and progress through that date at which a calculation is evaluated. Why these choices, and what they cost, is [decisions.md](../decisions.md#dates-and-the-valuation-date), D1 to D5.
 
@@ -31,7 +31,7 @@ Two scalars, both required, neither with a default. A single-cell reference is a
 | `0 <= f <= 1` | `day_fraction_elapsed is number 1.5, expected a number from 0 to 1` |
 | `f` is finite | `day_fraction_elapsed is number nan, expected a number from 0 to 1` |
 
-No rounding, no clamping, no advancing the date. A value just outside the interval fails like any other. The exception type is D29. For a float the rendering is `number {value!r}`.
+No rounding, no clamping, no advancing the date. A value just outside the interval fails like any other. A rejection raises `ValueError`. For a float the rendering is `number {value!r}`.
 
 ## In memory
 
@@ -74,7 +74,6 @@ Use `np.nextafter(0.0, -np.inf)` and `np.nextafter(1.0, np.inf)` for the boundar
 |---|---|
 | The ordering key, and whether the fraction stays | D3, D4 |
 | The handle return type, which blocks the whole function | D26 |
-| The exception type the builder raises | D29 |
 
 ## Not here
 
