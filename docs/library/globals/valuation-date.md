@@ -25,10 +25,13 @@ referring to it ([handles.md](../handles.md)).
 Write no code and no test for anything in this section. The rules are
 [inputs.md](../../seam/inputs.md).
 
-| Argument | Declared | Accepts | Rejects |
-|---|---|---|---|
-| `as_of` | `Date` | one whole Excel serial in `[61, 2958465]`, handed over as `np.datetime64[D]` | text, boolean, blank, missing, any array, a fraction, a serial outside the calendar |
-| `day_fraction_elapsed` | `float` | one number | text, boolean, blank, missing, any array |
+| Argument | Declared | Accepts | Rejects | Python receives |
+|---|---|---|---|---|
+| `as_of` | `Date` | one whole Excel serial in `[61, 2958465]` | text, boolean, blank, missing, any array, a fraction, a serial outside the calendar | **`np.datetime64[D]`** — the seam converts the serial |
+| `day_fraction_elapsed` | `float` | one number | text, boolean, blank, missing, any array | the number as it arrived |
+
+Only `as_of` is worth a note: the seam turns one thing into another, so an engineer has to
+know what comes out the far side. `day_fraction_elapsed` arrives as what it already was.
 
 The messages, produced by running the seam:
 
@@ -68,13 +71,11 @@ not depend on the Excel-facing code. For a float the rendering is `number {value
 
 ## In memory
 
-| Field | Type | Shape |
-|---|---|---|
-| `as_of` | `np.datetime64` with day precision | scalar, not an ndarray |
-| `day_fraction_elapsed` | Python `float` | scalar, not an ndarray |
+A frozen record of the two values above, unchanged from what the seam handed over. No array
+is allocated for either, and the constructor does not become a batch function.
 
-Frozen after construction. Both fields belong to the object's identity. The date is
-preserved at every accepted fraction, including exactly one.
+Both fields belong to the object's identity. The date is preserved at every accepted
+fraction, including exactly one.
 
 | `as_of` | Fraction | Stored date |
 |---|---:|---|
