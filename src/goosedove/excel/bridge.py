@@ -1006,6 +1006,11 @@ def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
             f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
         )
     if _is_schema(spec.annotation):
+        # A table is two arguments that mean something only together, and its columns are checked
+        # against the schema on the call, so a default could not be checked at registration as
+        # every other default is. None is allowed, and none is wanted.
+        if spec.default is not inspect.Parameter.empty:
+            raise TypeError(f"{function}: {spec.name} declares a table, which takes no default")
         declared: tuple[str, Callable[[object], object]] | None = ("table", _mixed)
     else:
         declared = _DECLARED.get(spec.annotation)

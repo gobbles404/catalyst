@@ -34,6 +34,7 @@ Registration reads four things: the function's own name, which becomes the works
 - an annotation written as text, which is what `from __future__ import annotations` makes of every annotation, so a module of worksheet functions must not use it;
 - a default the parameter's own accept rule rejects: `Wrong: x defaults to text 'x', expected number`;
 - a table with no row of text before it to hold its headers: `Bare: trades declares a table with no row of text before it to hold its headers`;
+- a default on a table: `Defaulted: table declares a table, which takes no default`. A table's columns are checked against its schema on the call, so a default could not be checked at registration as every other default is, and a header row before a table cannot have a default of its own, since a parameter with a default must come last;
 - a schema whose column is not a column type, whose columns are one header without regard to case, or which has no columns: `Grid2: wide column values declares goosedove.excel.bridge.NumberArray, which is not a column type`;
 - no return annotation, `-> None`, or a return annotation outside the ten declared result types.
 

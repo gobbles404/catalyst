@@ -1,5 +1,7 @@
 """Type validation of tables: a header row and a mixed body, bound by name into typed columns."""
 
+from typing import Any
+
 import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
@@ -401,6 +403,29 @@ def test_a_schema_with_no_columns_refuses_to_register() -> None:
 
     with pytest.raises(TypeError, match="Hollow: table declares a table with no columns"):
         excel_function(Hollow)
+
+
+A_GOOD_BODY: Any = True  # a one-cell body the mixed rule admits and the schema would accept
+A_BAD_BODY: Any = "bad"  # one the mixed rule admits and the schema would reject, on the call
+
+
+def test_a_table_takes_no_default() -> None:
+    # A default body is admitted by the mixed rule at registration but bound to the schema only
+    # on the call, so a bad one would reach a cell; and a header row before a table cannot have a
+    # default of its own, since a parameter with a default must come last. So neither may.
+    def Defaulted(header_row: TextRow, table: Flag = A_GOOD_BODY) -> float:
+        return 0.0
+
+    with pytest.raises(
+        TypeError, match="Defaulted: table declares a table, which takes no default"
+    ):
+        excel_function(Defaulted)
+
+    def Misfit(header_row: TextRow, table: Flag = A_BAD_BODY) -> float:
+        return 0.0
+
+    with pytest.raises(TypeError, match="Misfit: table declares a table, which takes no default"):
+        excel_function(Misfit)
 
 
 def test_the_bare_table_class_is_not_a_declared_type() -> None:
