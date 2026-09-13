@@ -28,6 +28,31 @@ namespace Goosedove.Host.Tests
             return grid;
         }
 
+        // The toy table: a date, a text, a number and a flag per trade, three trades, with the
+        // second quantity replaceable so one cell can be wrong.
+        private static object[,] Trades(object secondQuantity = null)
+        {
+            return new object[,]
+            {
+                { 46276.0, "CL", 10.0, true },
+                { 46277.0, "NG", secondQuantity ?? (object)3.5, false },
+                { 46280.0, "CL", 7.0, true },
+            };
+        }
+
+        private static object[,] FirstColumns(object[,] grid, int cols)
+        {
+            var narrow = new object[grid.GetLength(0), cols];
+            for (var r = 0; r < grid.GetLength(0); r++)
+            {
+                for (var c = 0; c < cols; c++)
+                {
+                    narrow[r, c] = grid[r, c];
+                }
+            }
+            return narrow;
+        }
+
         // The rows of tools\excel_smoke.ps1, without Excel; the spilled ones are the tests below.
         public static IEnumerable<object[]> SmokeRows()
         {
@@ -59,6 +84,12 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountMixed", new object[] { Column("CL", "") }, "#ERROR CountMixed: values cell (2, 1) is empty text, expected number, nonempty text or boolean" };
             // An Excel error anywhere still wins, before the mixed rule ever runs.
             yield return new object[] { "CountMixed", new object[] { Column("CL", ExcelError.ExcelErrorNA) }, ExcelError.ExcelErrorNA };
+            // A table: a header row and a mixed body, bound by name into typed columns.
+            yield return new object[] { "SumQuantity", new object[] { Row("date", "product", "quantity", "cleared"), Trades() }, 20.5 };
+            yield return new object[] { "SumQuantity", new object[] { Row("DATE", "PRODUCT", "QUANTITY", "CLEARED"), Trades() }, 20.5 };
+            yield return new object[] { "SumQuantity", new object[] { Row("date", "ticker", "quantity", "cleared"), Trades() }, "#ERROR SumQuantity: header_row cell (1, 2) is text 'ticker', expected one of date, product, quantity or cleared" };
+            yield return new object[] { "SumQuantity", new object[] { Row("date", "product", "quantity", "cleared"), FirstColumns(Trades(), 3) }, "#ERROR SumQuantity: header_row has 4 headers, expected 3, one per column of trades" };
+            yield return new object[] { "SumQuantity", new object[] { Row("date", "product", "quantity", "cleared"), Trades("seven") }, "#ERROR SumQuantity: trades cell (2, 3) is text 'seven', expected number" };
             yield return new object[] { "Dot", new object[] { Column(1.0, 2.0, 3.0), Column(10.0, 20.0, 30.0) }, 140.0 };
             yield return new object[] { "Dot", new object[] { Column(1.0, 2.0, 3.0), Row(10.0, 20.0, 30.0) }, "#ERROR Dot: b is 1x3 array, expected column of numbers" };
             yield return new object[] { "Grid", new object[] { 2.5, 3.0 }, "#ERROR Grid: rows is number 2.5, expected whole number" };

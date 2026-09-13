@@ -46,6 +46,10 @@ Decided 2026-09-10.
 7. Text bounded at 32,767 characters as Excel counts them, and never empty.
 8. This file is the map for results, beside `inputs.md` for arguments.
 
+Decided 2026-09-13.
+
+9. A table's schema and a column of booleans are inputs. A function declaring either as its result is refused at registration, as the text ranges are, because no function returns one.
+
 ## Parked
 
 Handles, in both directions. When the first builder function exists, its object kind joins both tables as a type: on the way in, text that must name a live object of that kind, handed to the function as the object; on the way out, the object, stored by the seam, with its handle text in the cell. The text's format and the store are designed then.

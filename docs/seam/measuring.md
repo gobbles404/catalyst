@@ -16,6 +16,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `SumArray(values)` | cells in, any shape, one number out |
 | `CountArray(values)` | cells in, counted; the numeric control under `CountMixed` |
 | `CountMixed(values)` | cells in of mixed kinds, counted; run over the same numeric cells as `CountArray` it isolates the rule, and over a column holding text it shows what the text costs. The count of text cells and the length of the text are its own knobs, turned one at a time |
+| `SumQuantity(header_row, trades)` | a table in: a header row and a body of four columns, a date, a text, a number and a boolean, with as many rows as make the cells; what binding the headers and refining the columns costs beyond `CountMixed` over the same cells |
 | `Dot(a, b)` | two ranges in one call |
 | `EchoColumn(values)` | the round trip: N in, N out |
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |
@@ -81,6 +82,7 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 - **An edit is mostly Excel.** Writing one cell over COM and asking Excel to recalculate costs about a millisecond before any formula runs; the `no formula` row measures it. What the arrangements add on top of that row is the formula work one change reaches: one row's call, one array, or the whole sheet.
 - **Counts before time.** When a timing moves, the counters say what moved; when the counters move, the timing says whether it mattered.
 - **Variation is part of the answer.** Large outputs vary several-fold between batches under garbage collection; the min and max beside the median carry that, and `batches.csv` records collection counts per batch.
+- **A row that moved alone may be the instrument.** The host runner doubles a row's iterations until a batch takes about 50 ms, so a row whose per-call time sits near that threshold can be measured with batches of different lengths on the two sides, and a few percent of drift then reads as ten or twenty. `batches.csv` records the iterations per batch; read them before reading such a row. And a new scenario runs after every existing one, because what it allocates changes where the next scenario's input lies in memory; [history.md](history.md) records both.
 
 ## The baseline
 

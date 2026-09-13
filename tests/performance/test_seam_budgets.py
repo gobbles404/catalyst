@@ -83,6 +83,8 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
         "_one_column": 1,
         "_shape": 1,
         "_dates": 1,
+        "_not_dates": 1,  # the two helpers the date rule shares with a table's column of dates
+        "_as_days": 1,
         "_text_out": 1,
         "_scalar": 1,
     }
@@ -305,6 +307,98 @@ def test_a_mixed_range_names_its_first_bad_cell_the_same_way_whichever_way_it_is
         values = Cells.from_rows(rows)
         PATH["CountMixed"](values)
         assert call_profile(lambda v=values: PATH["CountMixed"](v)) == rejected
+
+
+HEADERS = Cells.from_rows([["date", "product", "quantity", "cleared"]])
+
+
+def trades() -> Cells:
+    """A table's body at N cells: a date, a text, a number and a flag per row."""
+    return Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)])
+
+
+# A table is the mixed call with the binding and one rule per column on top: every bridge
+# function runs once, and numpy takes one look per column, one conversion per date or boolean
+# column, and one gather for the column of text, whatever the number of rows.
+def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
+    body = trades()
+    PATH["SumQuantity"](HEADERS, body)
+    assert call_profile(lambda: PATH["SumQuantity"](HEADERS, body)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_row": 1,  # the header row, as any row of text
+        "_one_row": 1,
+        "_shape": 1,
+        "_texts": 1,
+        "_mixed": 1,  # the body, admitted as any mixed range
+        "MixedArray.shape": 1,
+        "_refine": 1,  # then bound and refined
+        "_bind": 1,
+        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
+        "_text_places": 1,
+        "_dates_of": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_texts_of": 1,
+        "_numbers_of": 1,
+        "_booleans_of": 1,
+        "SumQuantity": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["SumQuantity"](HEADERS, body)) == {
+        "ndarray.any": 4,  # one look per column
+        "ndarray.astype": 3,  # the date column twice on its way to days, the boolean column once
+        "numpy.array": 1,  # the texts as an array, for the gather
+        "ndarray.cumsum": 1,  # the text cells above each row
+        "ndarray.sum": 3,  # text cells per row, text cells to the left, and the probe's own sum
+        "ufunc.reduce": 7,
+    }
+
+
+# A bad cell deep in a column is found by that column's look and named without a walk, and
+# the columns after it are never looked at.
+def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    rows: list[list[object]] = [[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)]
+    rows[N // 8][2] = "x"
+    body = Cells.from_rows(rows)
+    PATH["SumQuantity"](HEADERS, body)
+    assert call_profile(lambda: PATH["SumQuantity"](HEADERS, body)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_row": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_texts": 1,
+        "_mixed": 1,
+        "MixedArray.shape": 1,
+        "_refine": 1,
+        "_bind": 1,
+        "_refine.<locals>.<lambda>": 1,
+        "_text_places": 1,
+        "_dates_of": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_texts_of": 1,
+        "_numbers_of": 1,  # the third column fails here, and the fourth is never reached
+        "_bad_cell": 1,
+        "_cell": 1,
+        "describe": 1,
+    }
+    assert numpy_calls(lambda: PATH["SumQuantity"](HEADERS, body)) == {
+        "ndarray.any": 3,
+        "ndarray.argmax": 1,  # the first bad cell of the column
+        "ndarray.ravel": 1,  # and its text, by counting the text codes before it
+        "ndarray.astype": 2,
+        "numpy.array": 1,
+        "ndarray.cumsum": 1,
+        "ndarray.sum": 2,
+        "ufunc.reduce": 5,
+    }
 
 
 def test_a_column_out_copies_nothing(call_profile: CallProfile, numpy_calls: CallProfile) -> None:

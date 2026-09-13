@@ -12,7 +12,10 @@ the host's summary of which kinds occurred, which cells_from_buffers builds
 from the host's buffers. Excel errors never
 arrive; the host returns them before calling. The prepared path validates the
 type of every argument against the function's own signature, once, by type
-and shape and never by meaning; past it nothing checks. On the way back it
+and shape and never by meaning; past it nothing checks. A table crosses as two
+arguments, a row of text for its headers and a mixed range for its body, and
+the prepared path binds the headers to the function's declared schema and
+hands the function typed columns. On the way back it
 converts the result by the function's declared return type, once, into the
 four things the host can show: a number, text, a boolean, or an array of
 numbers. docs/seam/inputs.md and docs/seam/outputs.md are the map.
@@ -22,10 +25,11 @@ import ctypes
 import inspect
 import math
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import IntEnum
+from functools import cache
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Final, NewType, assert_never, cast
+from typing import Any, Final, NewType, assert_never, cast, dataclass_transform
 
 import numpy as np
 from numpy.typing import NDArray
@@ -44,6 +48,7 @@ DateColumn = NewType("DateColumn", NDArray[np.datetime64])
 DateRow = NewType("DateRow", NDArray[np.datetime64])
 TextColumn = NewType("TextColumn", tuple[str, ...])
 TextRow = NewType("TextRow", tuple[str, ...])
+BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, handed over 1-D
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -77,6 +82,32 @@ class MixedArray:
         """Rows and columns of the rectangle, which is the kinds array's own shape."""
         rows, cols = self.kinds.shape
         return rows, cols
+
+
+@dataclass_transform(frozen_default=True, eq_default=False)
+class Table:
+    """The schema of a table argument, and the record its function receives.
+
+    A table crosses as two arguments: a row of text holding the headers, then the body as a
+    mixed range. A subclass names the columns, one line each, the header name and the column
+    type, so the schema is part of the signature and is read once at registration:
+
+        class Trades(Table):
+            date: DateColumn
+            product: TextColumn
+            quantity: NumberColumn
+            cleared: BooleanColumn
+
+    A header is to a column what a parameter name is to an argument. On each call the prepared
+    path binds every header to its column by name, in any order and without regard to case,
+    checks each body column against its declared column type, converts what that type converts,
+    and hands the function one of these: a frozen record with one typed attribute per column,
+    aligned by row. The headers are consumed by the binding and are not carried.
+    """
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        dataclass(frozen=True, eq=False)(cls)
 
 
 class Missing:
@@ -161,6 +192,7 @@ class Cells:
 # is ONLY_NUMBERS; anything else needs a look at the kinds to name the first bad cell.
 ONLY_NUMBERS: Final = 1 << Kind.NUMBER
 ONLY_TEXT: Final = 1 << Kind.TEXT
+ONLY_BOOLEANS: Final = 1 << Kind.BOOLEAN
 
 # The codes as plain integers, for comparing a whole array of kinds. numpy takes an IntEnum
 # member as a strong 64-bit integer and casts the uint8 kinds through a scratch buffer to
@@ -210,16 +242,18 @@ def cells_from_buffers(
     return Cells(kinds.reshape(rows, cols).copy(), numbers.reshape(rows, cols).copy(), texts, seen)
 
 
-def _cell(cells: Cells, i: int) -> object:
-    """The value at flat index i, as it arrived."""
-    kind = Kind(int(cells.kinds.flat[i]))
+def _cell(
+    kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
+) -> object:
+    """The value at flat index i of a range's storage, as it arrived."""
+    kind = Kind(int(kinds.flat[i]))
     match kind:
         case Kind.NUMBER:
-            return float(cells.numbers.flat[i])
+            return float(numbers.flat[i])
         case Kind.TEXT:
-            return cells.texts[int(np.count_nonzero(cells.kinds.ravel()[:i] == TEXT_CODE))]
+            return texts[int(np.count_nonzero(kinds.ravel()[:i] == TEXT_CODE))]
         case Kind.BOOLEAN:
-            return bool(cells.numbers.flat[i])
+            return bool(numbers.flat[i])
         case Kind.BLANK:
             return None
         case Kind.MISSING:
@@ -232,7 +266,7 @@ def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected
     """The rejection for the first flagged cell, named as INDEX counts."""
     i = int(bad.argmax())
     r, c = divmod(i, cells.kinds.shape[1])
-    return _Rejected((r + 1, c + 1), _cell(cells, i), expected)
+    return _Rejected((r + 1, c + 1), _cell(cells.kinds, cells.numbers, cells.texts, i), expected)
 
 
 # --- one cell ---------------------------------------------------------------
@@ -293,16 +327,29 @@ def _numbers(value: object) -> NDArray[np.float64]:
     return np.array([[_number(value)]])
 
 
+def _not_dates(slots: NDArray[np.float64]) -> NDArray[np.bool_]:
+    """Flags every slot that is not a whole serial inside the calendar, in one look.
+
+    A text or blank slot holds NaN and fails the first test; a boolean holds 1.0 or 0.0 and
+    fails the second. So the slots alone find every cell that is not a date.
+    """
+    return (slots != np.floor(slots)) | (slots < FIRST_SERIAL) | (slots > LAST_SERIAL)
+
+
+def _as_days(serials: NDArray[np.float64]) -> NDArray[np.datetime64]:
+    """Whole serials as numpy days, converted once."""
+    return EXCEL_EPOCH + serials.astype(np.int64).astype("timedelta64[D]")
+
+
 def _dates(value: object) -> NDArray[np.datetime64]:
     """Every cell a date, kept in sheet order. A scalar is a 1x1 range."""
     if isinstance(value, Cells):
-        array = value.numbers
-        bad = (array != np.floor(array)) | (array < FIRST_SERIAL) | (array > LAST_SERIAL)
+        bad = _not_dates(value.numbers)
         if value.seen != ONLY_NUMBERS:
             bad |= value.kinds != NUMBER_CODE
         if bad.any():
             raise _first_bad(value, bad, "date")
-        return EXCEL_EPOCH + array.astype(np.int64).astype("timedelta64[D]")
+        return _as_days(value.numbers)
     return np.array([[_date(value)]])
 
 
@@ -316,6 +363,15 @@ def _texts(value: object) -> tuple[str, ...]:
             raise _Rejected((r + 1, c + 1), "", "text")
         return value.texts
     return (_text(value),)
+
+
+def _booleans(value: object) -> NDArray[np.bool_]:
+    """Every cell a boolean, kept in sheet order. A scalar is a 1x1 range."""
+    if isinstance(value, Cells):
+        if value.seen != ONLY_BOOLEANS:
+            raise _first_bad(value, value.kinds != BOOLEAN_CODE, "boolean")
+        return value.numbers.astype(bool)
+    return np.array([[_boolean(value)]])
 
 
 # --- every cell one of three kinds: the mixed range, which mixes rather than requires ------
@@ -418,6 +474,11 @@ def _text_row(value: object) -> tuple[str, ...]:
     return _texts(value)
 
 
+def _boolean_column(value: object) -> NDArray[np.bool_]:
+    _one_column(value)
+    return _booleans(value)[:, 0]
+
+
 # Every declared type, in the words of the sheet, and the rule that accepts it.
 _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     float: ("number", _number),
@@ -432,8 +493,166 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     DateRow: ("row of dates", _date_row),
     TextColumn: ("column of text", _text_column),
     TextRow: ("row of text", _text_row),
+    BooleanColumn: ("column of booleans", _boolean_column),
     MixedArray: ("mixed array", _mixed),
 }
+
+
+# --- a table: a header row and a body, bound by name into typed columns -------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _TextPlaces:
+    """Where the body's text cells sit among its texts, found once per table when a column of
+    text is bound: the mask of text cells, how many text cells the rows above each row hold, and
+    the texts as an array, so a column's texts are gathered by index with nothing built per row.
+    """
+
+    is_text: NDArray[np.bool_]
+    above: NDArray[np.int64]
+    texts: NDArray[np.object_]
+
+
+def _text_places(body: MixedArray) -> _TextPlaces:
+    is_text = body.kinds == TEXT_CODE
+    per_row = is_text.sum(axis=1)
+    return _TextPlaces(is_text, np.cumsum(per_row) - per_row, np.array(body.texts, dtype=object))
+
+
+@dataclass(frozen=True, slots=True)
+class _Body:
+    """One body under refinement: its storage, the table argument's name for messages, and the
+    text places, made on first use, so a table with no column of text never pays for them."""
+
+    mixed: MixedArray
+    argument: str
+    places: Callable[[], _TextPlaces]
+
+
+def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> TypeValidationError:
+    """The failure for the first flagged cell of column j, named within the whole body."""
+    r = int(bad.argmax())
+    mixed = body.mixed
+    value = _cell(mixed.kinds, mixed.numeric_slots, mixed.texts, r * mixed.kinds.shape[1] + j)
+    return TypeValidationError(
+        f"{body.argument} cell ({r + 1}, {j + 1}) is {describe(value)}, expected {expected}"
+    )
+
+
+# One rule per column type. Each takes one look at its column: the kinds settle number, text
+# and boolean, and the slots settle a date, as the whole-range rules do. Number columns are
+# views of the mixed storage; dates and booleans are converted once; text is gathered once.
+def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
+    bad = body.mixed.kinds[:, j] != NUMBER_CODE
+    if bad.any():
+        raise _bad_cell(body, j, bad, "number")
+    return body.mixed.numeric_slots[:, j]
+
+
+def _dates_of(body: _Body, j: int) -> NDArray[np.datetime64]:
+    slots = body.mixed.numeric_slots[:, j]
+    bad = _not_dates(slots)
+    if bad.any():
+        raise _bad_cell(body, j, bad, "date")
+    return _as_days(slots)
+
+
+def _texts_of(body: _Body, j: int) -> tuple[str, ...]:
+    bad = body.mixed.kinds[:, j] != TEXT_CODE
+    if bad.any():
+        raise _bad_cell(body, j, bad, "text")
+    places = body.places()
+    ranks = places.above + places.is_text[:, :j].sum(axis=1)  # text cells before each, in order
+    return tuple(places.texts[ranks])
+
+
+def _booleans_of(body: _Body, j: int) -> NDArray[np.bool_]:
+    bad = body.mixed.kinds[:, j] != BOOLEAN_CODE
+    if bad.any():
+        raise _bad_cell(body, j, bad, "boolean")
+    return body.mixed.numeric_slots[:, j].astype(bool)
+
+
+# Every column type a schema may declare, in the words of the sheet, and the rule for a column.
+_COLUMNS: Final[dict[object, tuple[str, Callable[[_Body, int], object]]]] = {
+    NumberColumn: ("number", _numbers_of),
+    DateColumn: ("date", _dates_of),
+    TextColumn: ("text", _texts_of),
+    BooleanColumn: ("boolean", _booleans_of),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Column:
+    """One column of a schema: its header name, the name as headers are matched, without regard
+    to case, the words of the sheet for its cells, and its rule."""
+
+    name: str
+    key: str
+    expected: str
+    refine: Callable[[_Body, int], object]
+
+
+@dataclass(frozen=True, slots=True)
+class Schema:
+    """A table parameter as registration resolved it: the record to build, the names of the
+    header-row and table parameters for messages, and the columns, by position and by key."""
+
+    record: type[Table]
+    header_row: str
+    table: str
+    columns: tuple[Column, ...]
+    by_key: dict[str, Column]
+
+
+def _names(columns: tuple[Column, ...], last: str) -> str:
+    """The columns' names in declaration order: "date, product, quantity or cleared"."""
+    names = [column.name for column in columns]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} {last} {names[-1]}"
+
+
+def _bind(schema: Schema, headers: tuple[str, ...], cols: int) -> tuple[Column, ...]:
+    """The schema's column for each header, in header order.
+
+    The count comes first, then each header in order, unknown or already given, then any name
+    of the schema the headers left out; so the earliest offending header wins.
+    """
+    if len(headers) != cols:
+        raise TypeValidationError(
+            f"{schema.header_row} has {len(headers)} headers, expected {cols}, "
+            f"one per column of {schema.table}"
+        )
+    found: dict[str, int] = {}
+    bound: list[Column] = []
+    for j, header in enumerate(headers):
+        key = header.casefold()
+        column = schema.by_key.get(key)
+        if column is None:
+            raise TypeValidationError(
+                f"{schema.header_row} cell (1, {j + 1}) is {describe(header)}, "
+                f"expected one of {_names(schema.columns, 'or')}"
+            )
+        if key in found:
+            raise TypeValidationError(
+                f"{schema.header_row} cell (1, {j + 1}) is {describe(header)}, "
+                f"already given at cell (1, {found[key] + 1})"
+            )
+        found[key] = j
+        bound.append(column)
+    for column in schema.columns:
+        if column.key not in found:
+            raise TypeValidationError(
+                f"{schema.header_row} has no {column.name}, "
+                f"expected {_names(schema.columns, 'and')}"
+            )
+    return tuple(bound)
+
+
+def _refine(schema: Schema, headers: tuple[str, ...], body: MixedArray) -> Table:
+    """Bind the headers, check each column against its type in sheet order, build the record."""
+    bound = _bind(schema, headers, body.shape[1])
+    under = _Body(body, schema.table, cache(lambda: _text_places(body)))
+    return schema.record(**{column.name: column.refine(under, j) for j, column in enumerate(bound)})
 
 
 # --- the way out: every declared result, in the words of the sheet, and the rule that sends it
@@ -655,6 +874,7 @@ class Registered:
     parameters: tuple[Parameter, ...]
     hidden: bool  # absent from Excel's function wizard, still callable by name
     convert: Callable[[object], object]  # the declared result's rule, from _RESULTS
+    tables: tuple[tuple[int, Schema], ...]  # each table parameter's position and its schema
 
     def run(self, *args: object) -> object:
         """The prepared path: validate the arguments, run the function, convert the result.
@@ -737,12 +957,63 @@ def _describe_array(array: NDArray[Any]) -> str:
 _POSITIONAL: Final = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
 
 
+def _is_schema(annotation: object) -> bool:
+    """Whether an annotation is a table's schema: a subclass of Table, never Table itself."""
+    return (
+        isinstance(annotation, type) and issubclass(annotation, Table) and annotation is not Table
+    )
+
+
+def _schema(function: str, specs: Sequence[inspect.Parameter], i: int) -> Schema:
+    """A table parameter's schema, resolved once: its columns, and the header row before it."""
+    spec = specs[i]
+    if i == 0 or specs[i - 1].annotation is not TextRow:
+        raise TypeError(
+            f"{function}: {spec.name} declares a table with no row of text before it "
+            "to hold its headers"
+        )
+    columns: list[Column] = []
+    keys: dict[str, str] = {}
+    for field in fields(spec.annotation):
+        column = _COLUMNS.get(field.type)
+        if column is None:
+            raise TypeError(
+                f"{function}: {spec.name} column {field.name} declares {field.type!r}, "
+                "which is not a column type"
+            )
+        key = field.name.casefold()
+        if key in keys:
+            raise TypeError(
+                f"{function}: {spec.name} declares columns {keys[key]} and {field.name}, "
+                "which are one header"
+            )
+        keys[key] = field.name
+        columns.append(Column(field.name, key, *column))
+    if not columns:
+        raise TypeError(f"{function}: {spec.name} declares a table with no columns")
+    return Schema(
+        spec.annotation,
+        specs[i - 1].name,
+        spec.name,
+        tuple(columns),
+        {column.key: column for column in columns},
+    )
+
+
 def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
     if spec.kind not in _POSITIONAL:
         raise TypeError(
             f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
         )
-    declared = _DECLARED.get(spec.annotation)
+    if _is_schema(spec.annotation):
+        # A table is two arguments that mean something only together, and its columns are checked
+        # against the schema on the call, so a default could not be checked at registration as
+        # every other default is. None is allowed, and none is wanted.
+        if spec.default is not inspect.Parameter.empty:
+            raise TypeError(f"{function}: {spec.name} declares a table, which takes no default")
+        declared: tuple[str, Callable[[object], object]] | None = ("table", _mixed)
+    else:
+        declared = _DECLARED.get(spec.annotation)
     if declared is None:
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r}, which the seam cannot receive"
@@ -781,9 +1052,15 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     if name in _FUNCTIONS:
         raise TypeError(f"{name} is already registered")
     signature = inspect.signature(fn)
-    parameters = tuple(_parameter(name, spec) for spec in signature.parameters.values())
+    specs = tuple(signature.parameters.values())
+    parameters = tuple(_parameter(name, spec) for spec in specs)
+    tables = tuple(
+        (i, _schema(name, specs, i)) for i, spec in enumerate(specs) if _is_schema(spec.annotation)
+    )
     convert = _result(name, signature.return_annotation)
-    _FUNCTIONS[name] = Registered(fn, (fn.__doc__ or "").strip(), parameters, hidden, convert)
+    _FUNCTIONS[name] = Registered(
+        fn, (fn.__doc__ or "").strip(), parameters, hidden, convert, tables
+    )
     return fn
 
 
@@ -821,11 +1098,16 @@ def _validate(parameter: Parameter, value: object) -> object:
 
 
 def _arguments(registered: Registered, args: Sequence[object]) -> list[object]:
+    """Every argument checked alone, left to right; then each table bound to its header row."""
     if len(args) != len(registered.parameters):
         raise TypeValidationError(
             f"expected {len(registered.parameters)} arguments, got {len(args)}"
         )
-    return [_validate(p, value) for p, value in zip(registered.parameters, args, strict=True)]
+    values = [_validate(p, value) for p, value in zip(registered.parameters, args, strict=True)]
+    for i, schema in registered.tables:
+        headers, body = cast(tuple[str, ...], values[i - 1]), cast(MixedArray, values[i])
+        values[i] = _refine(schema, headers, body)
+    return values
 
 
 def entry(name: str) -> Callable[..., object]:

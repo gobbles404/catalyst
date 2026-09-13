@@ -34,6 +34,11 @@ $formulas = [ordered]@{
     "=CountMixed(C1:C3)"          = "#ERROR CountMixed: values cell (2, 1) is blank, expected number, nonempty text or boolean"
     "=CountMixed(I1:I2)"          = "#ERROR CountMixed: values cell (2, 1) is empty text, expected number, nonempty text or boolean"
     "=CountMixed(D1:D3)"          = "#N/A"
+    "=SumQuantity(L1:O1,L2:O4)"   = "20.5"
+    "=SumQuantity(P1:S1,L2:O4)"   = "20.5"
+    "=SumQuantity(T1:W1,L2:O4)"   = "#ERROR SumQuantity: header_row cell (1, 2) is text 'ticker', expected one of date, product, quantity or cleared"
+    "=SumQuantity(L1:O1,L2:N4)"   = "#ERROR SumQuantity: header_row has 4 headers, expected 3, one per column of trades"
+    "=SumQuantity(L1:O1,L6:O8)"   = "#ERROR SumQuantity: trades cell (2, 3) is text 'seven', expected number"
     "=Dot(A1:A3,{10;20;30})"      = "140"
     "=Dot(A1:A3,{10,20,30})"      = "#ERROR Dot: b is 1x3 array, expected column of numbers"
     "=ROWS(EchoColumn(A1:A3))"    = "3"
@@ -59,6 +64,17 @@ $cells = [ordered]@{
     "I1" = "x"; "I2" = '=""'
     # A trade's own row: a product, an expiry shown as a date, a quantity, a flag.
     "J1" = "CL"; "J2" = "22-May-2026"; "J3" = "10"; "J4" = "TRUE"
+    # A table: its header row and three trades; the same headers in capitals; one header
+    # unknown; and a second body with text where a quantity should be.
+    "L1" = "date"; "M1" = "product"; "N1" = "quantity"; "O1" = "cleared"
+    "L2" = "11-Sep-2026"; "M2" = "CL"; "N2" = "10"; "O2" = "TRUE"
+    "L3" = "12-Sep-2026"; "M3" = "NG"; "N3" = "3.5"; "O3" = "FALSE"
+    "L4" = "15-Sep-2026"; "M4" = "CL"; "N4" = "7"; "O4" = "TRUE"
+    "P1" = "DATE"; "Q1" = "PRODUCT"; "R1" = "QUANTITY"; "S1" = "CLEARED"
+    "T1" = "date"; "U1" = "ticker"; "V1" = "quantity"; "W1" = "cleared"
+    "L6" = "11-Sep-2026"; "M6" = "CL"; "N6" = "10"; "O6" = "TRUE"
+    "L7" = "12-Sep-2026"; "M7" = "NG"; "N7" = "seven"; "O7" = "FALSE"
+    "L8" = "15-Sep-2026"; "M8" = "CL"; "N8" = "7"; "O8" = "TRUE"
 }
 
 # --- build the host and tell it where Python is -----------------------------

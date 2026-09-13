@@ -48,6 +48,28 @@ namespace Goosedove.Host.Tests
         // Every third cell of Mixed holds text, counting from the first.
         private static int MixedTexts(int cells) => (cells + 2) / 3;
 
+        // The table probe's header row, and a body with a date, a text, a number and a boolean per
+        // row: one column of each type a table may declare. The quantity column sums to Total(rows).
+        private static object[,] Headers()
+        {
+            return new object[,] { { "date", "product", "quantity", "cleared" } };
+        }
+
+        private static object[,] Trades(int rows)
+        {
+            var trades = new object[rows, 4];
+            for (var i = 0; i < rows; i++)
+            {
+                trades[i, 0] = 46276.0 + i;
+                trades[i, 1] = "p" + i;
+                trades[i, 2] = (double)i;
+                trades[i, 3] = i % 2 == 0;
+            }
+            return trades;
+        }
+
+        private static double Total(int rows) => (double)rows * (rows - 1) / 2;
+
         private static object[,] Grid(int rows, int cols)
         {
             var grid = new object[rows, cols];
@@ -147,6 +169,25 @@ namespace Goosedove.Host.Tests
             expected["text_cells"] = MixedTexts(cells);
             expected["objects_built"] = 4;  // and the text, joined once for the whole range
             Same(expected, Counted((double)cells, "CountMixed", Mixed(cells)));
+        }
+
+        // A table is two ranges in, the header row and the body, each scanned and handed over as
+        // any range is. The binding and the refining are the bridge's, so the host counts nothing
+        // new: two hand-overs and the call, three integers and the text for each range, and the
+        // cells and text cells of both.
+        [Theory]
+        [InlineData(1)]
+        [InlineData(25)]
+        [InlineData(2500)]
+        public void a_table_in_costs_two_ranges(int rows)
+        {
+            Same(new Dictionary<string, long>
+            {
+                ["trips"] = 3,
+                ["objects_built"] = 8,
+                ["cells_scanned"] = 4 + 4L * rows,
+                ["text_cells"] = 4 + rows,
+            }, Counted(Total(rows), "SumQuantity", Headers(), Trades(rows)));
         }
 
         // The buffers are kept between calls and grown only when a larger range comes: the first

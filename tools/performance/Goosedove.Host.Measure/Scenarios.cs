@@ -19,6 +19,7 @@ namespace Goosedove.Host.Measure
             var sum = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("SumArray"), 1);
             var countArray = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("CountArray"), 1);
             var countMixed = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("CountMixed"), 1);
+            var sumQuantity = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("SumQuantity"), 2);
             var echoColumn = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoColumn"), 1);
             var echoRow = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoRow"), 1);
             var rowSums = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("RowSums"), 1);
@@ -104,6 +105,20 @@ namespace Goosedove.Host.Measure
             errorLast[size - 1, 0] = ExcelError.ExcelErrorNA;
             measurements.Run("SumArray", "excel error last", size, 0, () => sum(errorLast),
                 Equal(ExcelError.ExcelErrorNA), Counted("SumArray", errorLast));
+
+            // A table in: the header row and a body of four columns, one of each column type, with
+            // as many rows as make n cells. The host carries two ranges as it always has; the
+            // binding and the refining are the bridge's, and these rows time them. They run after
+            // every other row, so the rows above meet the heap they met before the table existed:
+            // what a scenario allocates changes where the next scenario's input lies in memory, and
+            // that moved the ten-thousand-cell rows by a few percent when the table ran among them.
+            foreach (var n in Sizes)
+            {
+                var tableRows = Math.Max(1, n / 4);
+                var headers = Headers();
+                var trades = Trades(tableRows);
+                measurements.Run("SumQuantity", "cells in", 4 * tableRows, 1, () => sumQuantity(headers, trades), Equal(Total(tableRows)), Counted("SumQuantity", headers, trades));
+            }
         }
 
         private static Func<IReadOnlyDictionary<string, long>> Counted(string name, params object[] args)
@@ -136,6 +151,26 @@ namespace Goosedove.Host.Measure
                 column[i, 0] = (i % 3) switch { 0 => "n" + i, 1 => (object)(double)i, _ => i % 2 == 0 };
             }
             return column;
+        }
+
+        // The table probe's header row, and a body with a date, a text, a number and a boolean per
+        // row: one column of each type a table may declare. The quantity column sums to Total(rows).
+        private static object[,] Headers()
+        {
+            return new object[,] { { "date", "product", "quantity", "cleared" } };
+        }
+
+        private static object[,] Trades(int rows)
+        {
+            var trades = new object[rows, 4];
+            for (var i = 0; i < rows; i++)
+            {
+                trades[i, 0] = 46276.0 + i;
+                trades[i, 1] = "p" + i;
+                trades[i, 2] = (double)i;
+                trades[i, 3] = i % 2 == 0;
+            }
+            return trades;
         }
 
         private static object[,] Filled(int cells, double value)

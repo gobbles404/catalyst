@@ -106,6 +106,14 @@ def texts(n: int, chars: int = 2) -> Cells:
     return Cells.from_rows([["n" * chars] for _ in range(n)])
 
 
+HEADERS = Cells.from_rows([["date", "product", "quantity", "cleared"]])
+
+
+def trades(rows: int) -> Cells:
+    """A table's body: a date, a text, a number and a flag per row, one column of each type."""
+    return Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(rows)])
+
+
 _buffers: list[object] = []  # keeps the ctypes buffers alive for the life of the run
 
 
@@ -175,6 +183,20 @@ def scenarios() -> list[Scenario]:
                 1,
                 lambda run=ENTRY["SumArray"], c=cells: run(c),
                 equals(total(n)),
+            )
+        )
+        # A table in: as many rows of four columns as make n cells, bound and refined in the
+        # bridge, so what lies between this row and CountMixed's is the binding and the refining.
+        rows = max(1, n // 4)
+        body = trades(rows)
+        cases.append(
+            Scenario(
+                "SumQuantity",
+                "cells in",
+                4 * rows,
+                1,
+                lambda run=ENTRY["SumQuantity"], b=body: run(HEADERS, b),
+                equals(total(rows)),
             )
         )
         cases.append(
@@ -311,6 +333,24 @@ def scenarios() -> list[Scenario]:
                     f"#ERROR CountMixed: values cell (5001, 1) is empty text, "
                     f"expected {mixed_kinds}"
                 ),
+            ),
+        )
+    )
+    # A table rejected on a cell deep in one column: the column's look, then the naming.
+    text_in_quantity: list[list[object]] = [
+        [46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(n // 4)
+    ]
+    text_in_quantity[n // 8][2] = "x"
+    bad_table = Cells.from_rows(text_in_quantity)
+    cases.append(
+        Scenario(
+            "SumQuantity",
+            "rejected: text deep in a column",
+            n,
+            0,
+            lambda run=ENTRY["SumQuantity"]: run(HEADERS, bad_table),
+            equals(
+                f"#ERROR SumQuantity: trades cell ({n // 8 + 1}, 3) is text 'x', expected number"
             ),
         )
     )

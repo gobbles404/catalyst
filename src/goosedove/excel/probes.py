@@ -13,7 +13,18 @@ from collections.abc import Callable
 
 import numpy as np
 
-from goosedove.excel.bridge import MixedArray, NumberArray, NumberColumn, NumberRow, register
+from goosedove.excel.bridge import (
+    BooleanColumn,
+    DateColumn,
+    MixedArray,
+    NumberArray,
+    NumberColumn,
+    NumberRow,
+    Table,
+    TextColumn,
+    TextRow,
+    register,
+)
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -69,6 +80,21 @@ def CountMixed(values: MixedArray) -> int:
     """Probe: a range of numbers, text and booleans together arrives as one record of its own."""
     rows, cols = values.shape
     return rows * cols
+
+
+class Trades(Table):
+    """The probe's schema: one column of each type a table may declare, laid out as a trade is."""
+
+    date: DateColumn
+    product: TextColumn
+    quantity: NumberColumn
+    cleared: BooleanColumn
+
+
+@probe
+def SumQuantity(header_row: TextRow, trades: Trades) -> float:
+    """Probe: a header row and a body arrive as one table of typed columns; one sum proves it."""
+    return float(trades.quantity.sum())
 
 
 @probe
