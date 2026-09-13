@@ -45,13 +45,6 @@ namespace Goosedove.Host.Measure
                 measurements.Run("CountArray", "cells in", n, 1, () => countArray(column), Equal((double)n), Counted("CountArray", column));
                 measurements.Run("CountMixed", "mixed: no text", n, 1, () => countMixed(column), Equal((double)n), Counted("CountMixed", column));
                 measurements.Run("CountMixed", "cells in", n, 1, () => countMixed(mixed), Equal((double)n), Counted("CountMixed", mixed));
-                // A table in: the header row and a body of four columns, one of each column type,
-                // with as many rows as make n cells. The host carries two ranges as it always
-                // has; the binding and the refining are the bridge's, and this row times them.
-                var tableRows = Math.Max(1, n / 4);
-                var headers = Headers();
-                var trades = Trades(tableRows);
-                measurements.Run("SumQuantity", "cells in", 4 * tableRows, 1, () => sumQuantity(headers, trades), Equal(Total(tableRows)), Counted("SumQuantity", headers, trades));
                 measurements.Run("Dot", "two ranges in", 2 * n, 1, () => dot(column, weights), Equal(total), Counted("Dot", column, weights));
                 measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), ArrayOf(n, 1, total), Counted("EchoColumn", column));
                 object rows = (double)n;
@@ -112,6 +105,20 @@ namespace Goosedove.Host.Measure
             errorLast[size - 1, 0] = ExcelError.ExcelErrorNA;
             measurements.Run("SumArray", "excel error last", size, 0, () => sum(errorLast),
                 Equal(ExcelError.ExcelErrorNA), Counted("SumArray", errorLast));
+
+            // A table in: the header row and a body of four columns, one of each column type, with
+            // as many rows as make n cells. The host carries two ranges as it always has; the
+            // binding and the refining are the bridge's, and these rows time them. They run after
+            // every other row, so the rows above meet the heap they met before the table existed:
+            // what a scenario allocates changes where the next scenario's input lies in memory, and
+            // that moved the ten-thousand-cell rows by a few percent when the table ran among them.
+            foreach (var n in Sizes)
+            {
+                var tableRows = Math.Max(1, n / 4);
+                var headers = Headers();
+                var trades = Trades(tableRows);
+                measurements.Run("SumQuantity", "cells in", 4 * tableRows, 1, () => sumQuantity(headers, trades), Equal(Total(tableRows)), Counted("SumQuantity", headers, trades));
+            }
         }
 
         private static Func<IReadOnlyDictionary<string, long>> Counted(string name, params object[] args)

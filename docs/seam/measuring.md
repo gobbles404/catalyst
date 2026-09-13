@@ -82,6 +82,7 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 - **An edit is mostly Excel.** Writing one cell over COM and asking Excel to recalculate costs about a millisecond before any formula runs; the `no formula` row measures it. What the arrangements add on top of that row is the formula work one change reaches: one row's call, one array, or the whole sheet.
 - **Counts before time.** When a timing moves, the counters say what moved; when the counters move, the timing says whether it mattered.
 - **Variation is part of the answer.** Large outputs vary several-fold between batches under garbage collection; the min and max beside the median carry that, and `batches.csv` records collection counts per batch.
+- **A row that moved alone may be the instrument.** The host runner doubles a row's iterations until a batch takes about 50 ms, so a row whose per-call time sits near that threshold can be measured with batches of different lengths on the two sides, and a few percent of drift then reads as ten or twenty. `batches.csv` records the iterations per batch; read them before reading such a row. And a new scenario runs after every existing one, because what it allocates changes where the next scenario's input lies in memory; [history.md](history.md) records both.
 
 ## The baseline
 
