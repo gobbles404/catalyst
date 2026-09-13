@@ -1,6 +1,10 @@
 # Handles and object retention: Excel-DNA research
 
-Read the [Excel worksheet contract](README.md) first. Cell references and names,
+**Informative.** Evidence gathered about Excel-DNA 1.9. It selects no mechanism and binds
+no implementation. The contract is [handles.md](../handles.md); the choices and their costs
+are in [decisions.md](../decisions.md#handles).
+
+Read the [Excel worksheet contract](../handles.md) first. Cell references and names,
 Excel-driven propagation, and the protection of owned objects are now explicit.
 These notes provide implementation evidence and open questions; they do not
 select a mechanism or claim that its lifecycle has been verified in our host.
@@ -15,7 +19,7 @@ library's functions should receive the corresponding typed Python object after
 resolution at the seam. Handles are infrastructure shared across the library;
 they are not a Globals-specific hierarchy.
 
-The [favored reuse direction](README.md#favored-direction-reuse-unchanged-objects-publish-changed-objects)
+The [favored reuse direction](../handles.md#favored-direction-reuse-unchanged-publish-changed)
 and its limits now live in the worksheet contract. Native call reuse below is
 evidence about Excel-DNA, not proof that it satisfies every desired equality,
 ownership, or restart rule.
@@ -180,7 +184,7 @@ rules; another project's singleton/reload machinery is not a requirement here.
 
 ## Verification status
 
-The [draft acceptance scenarios](README.md#draft-acceptance-scenarios) start with
+The [acceptance scenarios](../handles.md#acceptance-scenarios) start with
 cell and named references, ordinary Excel editing, and ownership safety. They
 still need an implementation and live Excel verification.
 

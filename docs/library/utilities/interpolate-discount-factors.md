@@ -1,173 +1,151 @@
-# util_InterpolateDiscountFactors: draft specification
+# InterpolateDiscountFactors
 
-The first worksheet utility: turn sparse date/discount-factor points into an
-explicit daily table using linear interpolation. This captures the owner's
-requested behavior before implementation. `util_InterpolateDiscountFactors` is
-the working name supplied by the owner; the utility naming convention remains
-to be finalized.
+**Normative.** Turns sparse date/discount-factor points into an explicit daily table. Why
+these choices, and what they cost, is in [decisions.md](../decisions.md#the-discount-curve)
+— D7, D9, D10, D21.
+
+Not implemented. **The only specified worksheet function the seam can carry today** — it
+returns a `NumberArray`, not a handle. It still waits on D21, which decides how its input
+table crosses.
+
+The name is provisional. The owner's working name is `util_InterpolateDiscountFactors`;
+the prefix is not a convention (D18).
 
 ## Worksheet contract
 
+The shape below is the one currently written down. **D21 is open and may change it.** It
+shares the input shape with [CreateDiscountCurve](../globals/discount-curve.md) and should
+keep sharing it.
+
 ```python
-def util_InterpolateDiscountFactors(
-    header_row: TextRow,
-    values: NumberArray,
-) -> NumberArray: ...
+def InterpolateDiscountFactors(header_row: TextRow, values: NumberArray) -> NumberArray: ...
 ```
 
-Both arguments are required. Use the same input layout as
-[`CreateDiscountCurve`](../globals/discount-curve.md): a separate text header row and a
-two-column numeric body. Agreed headers are `date` and `df`, matched without
-regard to case. Rename source headers such as `Maturity` and `Mid`; they are not
-accepted aliases. Unknown and duplicate headers fail, including duplicates that
-differ only in case. Whitespace and column-reordering choices follow the shared
-curve specification and remain open. Examples use `date` followed by `df`.
+```excel
+=InterpolateDiscountFactors(A1:B1, A2:B35)
+```
 
-Unlike the curve constructor, this utility accepts gaps between source dates.
-The first supplied date defines `as_of`; the final supplied date defines the end
-of the generated table. No separate start date, end date, or valuation-date handle
-is an input.
+Both arguments required, no defaults. Unlike the curve constructor, gaps between source
+dates are expected. The first supplied date defines the start of the generated table and
+the last defines its end; there is no separate start date, end date, or valuation-date
+input.
 
-Proposed worksheet output: a numeric array that spills in two columns, `date`
-then `df`, with no header row. The first column contains whole Excel date serials;
-format those cells as dates in Excel. The utility returns data, not a curve handle.
-The output can become the numeric body passed to `CreateDiscountCurve` with the
-corresponding `date`/`df` header row. Creating the curve remains a separate call.
+**Output.** A numeric array spilling in two columns, `date` then `df`, with no header row.
+The first column holds whole Excel date serials — format those cells as dates in Excel.
+This returns data, not a curve handle; its body can be fed to `CreateDiscountCurve` with a
+matching header row, as a separate call.
 
-## Input validation
+## The seam checks
 
-Apply the existing [date and numeric seam rules](../../seam/inputs.md), including whole
-Excel date serials in `[61, 2958465]`, using the supported 1900 date system. The
-[combined-table date-preparation gap](../globals/discount-curve.md#dates-and-the-existing-seam)
-also applies here: `NumberArray` alone does not turn the date column into typed
-dates. Reuse that preparation design rather than introducing a second parser.
+Write no code and no test for anything in this section. Identical to
+[CreateDiscountCurve's](../globals/discount-curve.md#the-seam-checks), including what the
+seam lets through by design. The rules are [inputs.md](../../seam/inputs.md).
 
-The source dates must be unique and strictly increasing. Gaps are expected;
-duplicate, reversed, or otherwise unordered dates fail. Do not sort the input.
+On the way out, [outputs.md](../../seam/outputs.md) already carries a two-dimensional
+numeric array: the seam rejects a non-finite cell, an empty array, or a one-dimensional
+result, naming the cell as `INDEX` counts. Keep Excel serialization out of the numerical
+code; the seam converts.
 
-Agreed: reject increasing discount factors in this utility. Source factors must
-be finite, in `(0, 1]`, begin at exactly `1`, and be non-increasing in date order.
-Equal factors are allowed. These are the same factor constraints as the curve
-constructor, including its intentional upper limit of `1`. Do not repair,
-rescale, smooth, or discard an invalid source point.
+## The library checks
 
-Validation failures identify the argument and offending source row or adjacent
-pair. For an increase, report both dates and factors. A failure returns no partial
-daily table. Whether a single supplied point returns one unchanged row remains
-an edge-case decision; ordinary interpolation examples use at least two points.
+Write all of this, and one test for each row. Messages are proposed and follow the seam's
+grammar.
 
-## Linear interpolation on calendar days
+**Headers** — the same three rules as the curve constructor (D19).
 
-For adjacent supplied points `(date_left, df_left)` and `(date_right, df_right)`,
-and each whole date `d` between them:
+**Source dates**
+
+| Rule | Message |
+|---|---|
+| every date a whole serial inside Excel's calendar | `values cell (4, 1) is 46164.5, expected a whole date serial` |
+| strictly increasing | `values row 12 is 2027-01-17, expected a date after row 11's 2027-02-16` |
+
+Gaps are expected and accepted. Duplicate, reversed or otherwise unordered dates fail. The
+input is not sorted.
+
+**Source factors** — the same rules as the curve constructor (D8, D9), so the same three
+checks: `df[0] == 1` exactly, non-increasing, `df[-1] > 0`.
+
+| Rule | Message |
+|---|---|
+| `df[0] == 1` exactly | `values cell (1, 2) is 0.98, expected exactly 1 at the first date` |
+| non-increasing | `factor rises between values rows 21 and 22, from 0.91318 on 2028-08-09 to 0.92254 on 2028-11-07` |
+| `df[-1] > 0` | `values cell (34, 2) is 0, expected greater than 0` |
+
+An increase names both dates and both factors. Nothing is repaired, rescaled, smoothed or
+discarded. A failure returns no partial table.
+
+## The interpolation
+
+For adjacent supplied points `(date_left, df_left)` and `(date_right, df_right)`, and each
+whole date `d` between them:
 
 ```text
 weight = calendar_days(d - date_left) / calendar_days(date_right - date_left)
-df(d) = df_left + weight * (df_right - df_left)
+df(d)  = df_left + weight * (df_right - df_left)
 ```
 
-Interpolate the discount factors directly. The weights count calendar days,
-including weekends, holidays, and leap days. Every original point retains its
-supplied factor. There is one output row per calendar day from `as_of` through
-the final source date, including both endpoints:
+Weights count calendar days, weekends and leap days included. Every supplied point keeps
+its own factor exactly. One output row per calendar day from the first source date through
+the last, inclusive:
 
 ```text
 output_rows = calendar_days(last_source_date - first_source_date) + 1
 ```
 
-Generate no dates before the first source date or after the last. There is no
-endpoint extension or extrapolation. Filling gaps is explicit work performed by
-this utility; `CreateDiscountCurve` continues to reject a sparse table passed
-directly to it. This utility does not establish an exception to the agreed
-library-wide date-bound rule; propagation of an authoritative bound remains the
-shared integration question recorded in the curve specification.
+No dates are generated before the first source date or after the last. No endpoint
+extension, no extrapolation.
 
-## NumPy representation and implementation direction
+Interpolating on `df` rather than on `log df` is a model choice, not data preparation
+(D10).
+
+## In memory
 
 | Stage | Representation |
 |---|---|
-| Headers | `TextRow`, backed by a tuple of two strings |
-| Source numeric body | `NumberArray`: NumPy `float64`, shape `(K, 2)` |
-| Prepared source data | Aligned one-dimensional `datetime64[D]` dates and `float64` factors, each shape `(K,)` |
-| Interpolation coordinates | Calendar-day offsets from the first source date, as numeric arrays |
-| Generated daily data | Aligned daily date and factor arrays, each shape `(N,)` |
-| Worksheet result | `NumberArray`: NumPy `float64`, shape `(N, 2)`, containing Excel serial dates and factors |
+| headers at the seam | `tuple[str, ...]`, two entries |
+| source body at the seam | `NDArray[np.float64]`, shape `(K, 2)`; dates still serials |
+| prepared source | aligned `datetime64[D]` and `float64`, each shape `(K,)` |
+| interpolation coordinates | calendar-day offsets from the first source date, numeric |
+| generated daily data | aligned date and factor arrays, each shape `(N,)` |
+| worksheet result | `NDArray[np.float64]`, shape `(N, 2)`: serials and factors |
 
-Use vectorized NumPy operations. [`np.interp`](https://numpy.org/doc/stable/reference/generated/numpy.interp.html)
-provides piecewise-linear interpolation and is the initial implementation choice.
-It does not enforce increasing source coordinates, and its default behavior
-outside the source range repeats endpoint factors. Validate the source order and
-generate only the specified inclusive date range; do not adopt those endpoint
-defaults as permission to use out-of-range dates.
+[`np.interp`](https://numpy.org/doc/stable/reference/generated/numpy.interp.html) is the
+implementation choice. It does not enforce increasing source coordinates, and outside the
+source range it repeats endpoint values — validate the order yourself, and generate only
+the inclusive range above. Its endpoint behaviour is not permission to accept out-of-range
+dates. Vectorized throughout; no per-row Python loops.
 
-The [output seam](../../seam/outputs.md) already supports numeric two-column arrays.
-Combining date serials and factors for the worksheet result must use the same
-date-serialization convention as the rest of the seam. Keep Excel parsing and
-serialization out of the numerical interpolation code. No mixed text/numeric
-output type is required because headers are not included in the returned body.
+## Counted work
 
-## Supplied source example and validation finding
+Preparation, interpolation and output construction all count. Names and expected values are
+not yet fixed; D27 is open on how a counter reaches library code.
 
-The owner supplied these 34 points under the headings `Maturity` and `Mid`.
-The table below uses the agreed `date` and `df` headers and preserves every
-supplied date and factor. The date span is 3,631 calendar days, from 2026-05-22
-through 2036-04-29 inclusive; a valid source over that span would produce 3,631
-rows.
+A ten-year daily result is 3,631 rows: about 7,262 result cells and 58,096 result bytes out,
+one result copy, against a source of 34 rows in. Within the seam's existing measured range.
 
-**This full sample must fail validation:** the factor increases from `0.91318`
-on 2028-08-09 to `0.92254` on 2028-11-07. The owner confirmed this is bad input
-data and that increases must be rejected. No replacement values have been
-supplied; do not infer a correction.
+## Excel help
 
-| date | df |
-|---|---:|
-| 2026-05-22 | 1 |
-| 2026-05-23 | 0.9999 |
-| 2026-05-24 | 0.9998 |
-| 2026-05-29 | 0.99929 |
-| 2026-06-05 | 0.99858 |
-| 2026-06-21 | 0.99685 |
-| 2026-08-20 | 0.99374 |
-| 2026-09-19 | 0.99049 |
-| 2026-10-19 | 0.9873 |
-| 2026-11-18 | 0.98063 |
-| 2026-12-18 | 0.97761 |
-| 2027-01-17 | 0.97424 |
-| 2027-02-16 | 0.97098 |
-| 2027-03-18 | 0.9676 |
-| 2027-04-17 | 0.96433 |
-| 2027-05-17 | 0.96098 |
-| 2027-08-15 | 0.9511 |
-| 2027-11-13 | 0.94133 |
-| 2028-02-11 | 0.93199 |
-| 2028-05-11 | 0.92254 |
-| 2028-08-09 | 0.91318 |
-| 2028-11-07 | 0.92254 |
-| 2029-02-05 | 0.91318 |
-| 2029-05-06 | 0.90393 |
-| 2029-08-04 | 0.89506 |
-| 2029-11-02 | 0.88598 |
-| 2030-01-31 | 0.87694 |
-| 2030-05-01 | 0.86799 |
-| 2031-05-01 | 0.85942 |
-| 2032-04-30 | 0.85064 |
-| 2033-04-30 | 0.81612 |
-| 2034-04-30 | 0.78196 |
-| 2035-04-30 | 0.74854 |
-| 2036-04-29 | 0.71587 |
+Each string must fit Excel's argument-help limit of about 255 characters. These are 149 and
+185.
 
-## Worked valid segment
+| Item | Text |
+|---|---|
+| Function | Linearly interpolates supplied discount factors to every calendar day from the first date through the last. Returns two numeric columns: date and df. |
+| `header_row` | One row containing date and df. Matching ignores case; unknown or duplicate names fail. Required. |
+| `values` | Numeric date/df pairs in strictly increasing date order; gaps are allowed. Start with df 1. All factors must be greater than 0, at most 1, and non-increasing. Exclude headers. Required. |
 
-Use just the first four source rows, through 2026-05-29. With headers in `A1:B1`
-and those rows in `A2:B5`, the working worksheet call is:
+## Worked example
+
+The first four rows of the owner's sample, through 2026-05-29, with headers in `A1:B1` and
+the rows in `A2:B5`:
 
 ```excel
-=util_InterpolateDiscountFactors(A1:B1, A2:B5)
+=InterpolateDiscountFactors(A1:B1, A2:B5)
 ```
 
-The output has eight rows, 2026-05-22 through 2026-05-29. The gap from May 24 to
-May 29 covers five calendar-day intervals. Its factor change is
-`0.99929 - 0.9998 = -0.00051`, or `-0.000102` per day.
+Eight rows out. The gap from May 24 to May 29 spans five calendar-day intervals; the factor
+change is `0.99929 − 0.9998 = −0.00051`, or `−0.000102` per day.
 
 | date | df |
 |---|---:|
@@ -180,38 +158,54 @@ May 29 covers five calendar-day intervals. Its factor change is
 | 2026-05-28 | 0.999392 |
 | 2026-05-29 | 0.99929 |
 
-These are mathematical targets for direct linear interpolation; compare generated
-values with a stated float64 tolerance. Preserve supplied knot values exactly as
-received. The earlier daily input example in the curve specification is separate
-source data and is not an expected output for this utility.
+These are mathematical targets; compare with a stated `float64` tolerance. Supplied knots
+are preserved exactly. This is a reviewed reference output — it lands as a golden file in
+its own change, not alongside the implementation.
 
-## Draft acceptance coverage and Excel guidance
+The daily example in the [curve specification](../globals/discount-curve.md) is separate
+source data and is not this function's expected output.
 
-Test the worked segment; inclusion of first/last dates; preservation of all source
-points; one-day spacing throughout; and the exact output row count. Include
-weekend and leap-day gaps, equal adjacent factors, already-daily input, and
-general properties that interpolated values stay within their bracketing factors
-and that the result remains non-increasing. Input arrays remain unchanged.
+## Tests
 
-Rejection cases cover unknown/duplicate headers, `Maturity`/`Mid` headers,
-invalid date serials, repeated or unordered dates, invalid factor ranges, a first
-factor other than `1`, and any factor increase. Retain the supplied 2028 increase
-as a concrete rejection case. Verify no partial result is returned on failure.
-Reuse generic seam tests and the shared date-preparation path rather than adding
-duplicate type-validation logic. Follow the repository's work-count requirements
-for numeric preparation, interpolation, and output construction.
+| Case | Kind | Where |
+|---|---|---|
+| the seam's type, shape and cell-naming matrix for a text row and a numeric array | example | passes today — `test_range_validation.py` |
+| a two-dimensional numeric result spills as returned; a non-finite cell fails, named | example | passes today — `test_result_validation.py` |
+| the worked example above, to tolerance | golden | new, own change |
+| first and last source dates both appear in the output | example | new |
+| every supplied point keeps its factor exactly | property | new |
+| output rows are exactly one calendar day apart throughout | property | new |
+| output row count equals `days(last − first) + 1` | property | new |
+| every interpolated value lies between its bracketing knots | property | new |
+| the output is non-increasing given non-increasing input | property | new |
+| already-daily input is returned unchanged | example | new |
+| gaps spanning weekends and leap days | example | new |
+| equal adjacent factors are preserved, not perturbed | example | new |
+| input arrays are unchanged by the call | example | new |
+| unknown, duplicate, or `Maturity`/`Mid` headers rejected | example | new |
+| invalid date serials, repeated or unordered dates rejected | example | new |
+| a first factor other than `1` rejected | example | new |
+| the supplied 2028 increase rejected, naming both dates and both factors | example | new |
+| a failure returns no partial table | example | new |
+| the eight-row spill appears in a real workbook, and its body feeds `CreateDiscountCurve` | Excel smoke | new |
 
-Draft Excel descriptions:
+Two already pass. Prefer the properties over more examples — they survive a regenerated
+golden and the eight-row table does not.
 
-| Help item | Text |
+**A note on the owner's full 34-point sample.** It is preserved as supplied and **must fail
+validation**: the factor rises from `0.91318` on 2028-08-09 to `0.92254` on 2028-11-07. The
+owner confirmed that is bad input data. No replacement values exist; do not infer a
+correction. Keep it as the concrete rejection case.
+
+## Open
+
+| | |
 |---|---|
-| Function | Linearly interpolates supplied discount factors to every calendar day from the first date through the last. Returns two numeric columns: date and df. |
-| `header_row` | One row containing date and df. Matching ignores case; unknown or duplicate names fail. Required. |
-| `values` | Numeric date/df pairs in strictly increasing date order; gaps are allowed. Start with df 1. All factors must be greater than 0, at most 1, and non-increasing. Exclude headers. Required. |
+| How the input table crosses the seam, which decides the signature and the date rules | D21 |
+| The final name, and whether `util_` becomes a convention or a category | D18 |
+| Header whitespace, and whether columns may be reordered | D19 |
+| Whether a single supplied point returns one unchanged row | — |
+| Whether the output should carry its date column at all, given the date-formatting cost of a spill whose size changes | D21 |
 
-Show these in formula-entry help and the Function Arguments dialog. An Excel
-smoke case should verify the eight-row numeric spill for the valid segment and
-that its body can be supplied to `CreateDiscountCurve`. Finalize the utility name,
-output proposal, single-point behavior, and outstanding shared table-preparation
-choices before implementation. This draft adds no executable implementation,
-other utilities, or companion worksheet functions.
+Not covered by this specification: extrapolation, any curve construction, any other
+interpolation basis, other utilities.
