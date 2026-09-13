@@ -396,3 +396,14 @@ def test_a_mixed_array_may_be_taken_but_not_returned() -> None:
         match=r"OutMixed declares <class 'goosedove\.excel\.bridge\.MixedArray'> as its result",
     ):
         excel_function(OutMixed)
+
+
+def test_a_column_of_booleans_may_be_taken_but_not_returned() -> None:
+    # No function returns one, so the way out has no rule for it, as for the text ranges.
+    def OutFlags() -> bridge.BooleanColumn:
+        raise AssertionError("never called")
+
+    with pytest.raises(
+        TypeError, match=r"OutFlags declares goosedove\.excel\.bridge\.BooleanColumn as its result"
+    ):
+        excel_function(OutFlags)

@@ -8,7 +8,7 @@ The host uses four names from the bridge and nothing else. When Excel loads the 
 
 The host keeps each prepared path beside the C# function it registers with Excel under that name; how that function is built is in [host.md](host.md). A call after that hands the prepared path the arguments and nothing else; the host never again asks Python for anything by name. A pin is a test that holds a fact still, a count or a message, so a change that moves it fails; `tests/performance/HostWorkBudgets.cs` pins that at zero name lookups per call, and [baseline.md](baseline.md) records the counts, the host's own tally of what it did on one call.
 
-Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision fifteen functions register at import: `Ping`, the bridge's own, and the fourteen probes.
+Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision sixteen functions register at import: `Ping`, the bridge's own, and the fifteen probes.
 
 `function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, the list of parameter names, and whether the function is hidden. Every probe is hidden and `Ping` is not; `tests/unit/test_bridge.py` pins both.
 
@@ -29,13 +29,15 @@ Registration reads four things: the function's own name, which becomes the works
 
 - a name already registered: `Number is already registered`;
 - a parameter the host cannot pass by position, one that must be passed by name or one that takes any number of values: `Keyed: put is keyword-only, which the host cannot pass`;
-- an annotation outside the thirteen declared input types: `Later: x declares list[str], which the seam cannot receive`;
+- an annotation outside the fourteen declared input types and the table schemas: `Later: x declares list[str], which the seam cannot receive`;
 - a parameter with no annotation, refused the same way, though the message shows Python's name for an empty annotation rather than a plain word;
 - an annotation written as text, which is what `from __future__ import annotations` makes of every annotation, so a module of worksheet functions must not use it;
 - a default the parameter's own accept rule rejects: `Wrong: x defaults to text 'x', expected number`;
+- a table with no row of text before it to hold its headers: `Bare: trades declares a table with no row of text before it to hold its headers`;
+- a schema whose column is not a column type, whose columns are one header without regard to case, or which has no columns: `Grid2: wide column values declares goosedove.excel.bridge.NumberArray, which is not a column type`;
 - no return annotation, `-> None`, or a return annotation outside the ten declared result types.
 
-`tests/unit/test_type_validation.py` and `tests/unit/test_result_validation.py` pin those texts, except three. The unannotated parameter has no test, nor does an annotation written as text, nor a text-array return: `TextColumn` and `TextRow` can be taken but not returned, and a function declaring one as its result is refused with `declares goosedove.excel.bridge.TextColumn as its result, which the seam cannot send`.
+`tests/unit/test_type_validation.py`, `tests/unit/test_table_validation.py` and `tests/unit/test_result_validation.py` pin those texts, except three. The unannotated parameter has no test, nor does an annotation written as text, nor a text-array return: `TextColumn` and `TextRow` can be taken but not returned, and a function declaring one as its result is refused with `declares goosedove.excel.bridge.TextColumn as its result, which the seam cannot send`.
 
 Since a default goes through its parameter's accept rule, `None` can never be a default: every accept rule calls it blank. Blank and missing are different facts: a blank is a cell with nothing in it and arrives as `None`, missing is an argument the formula left out and arrives as `MISSING`, so `=Times(5, A1)` with A1 empty fails and `=Times(5)` takes the default factor of 1.
 
@@ -54,7 +56,7 @@ flowchart TD
   Fn -->|"its return annotation"| Result["the declared result"]
   Fn -->|"its docstring"| Desc["the description"]
   Param -->|"positional or not"| Positional["positional, or refused"]
-  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the thirteen declared types"]
+  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the fourteen declared types, or a table schema"]
   Param -->|"its default, if any"| Default["the default, through the accept rule, stored converted"]
   Result -->|"its annotation"| Convert["the result rule, from the ten declared results"]
   Positional -->|"the name"| Parameter["Parameter: the name, the words of the sheet, the accept rule, the default"]
@@ -100,7 +102,7 @@ The way in is type validation, before the function runs; the way out is the conv
 
 ## The declared input types
 
-A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Eight of the range and date types are named labels: `Date` on a numpy day, the number and date ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism.
+A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Nine of the range and date types are named labels: `Date` on a numpy day, the number, date and boolean ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism. A table's schema is the one declaration that is not in this table: it is a class, and its columns name their column types from it, as the section on tables says.
 
 | Declared | Words of the sheet | Accept rule | Hands the function |
 |---|---|---|---|
@@ -116,7 +118,9 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `DateRow` | row of dates | `_date_row` | a flat array of numpy days |
 | `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
 | `TextRow` | row of text | `_text_row` | the host's tuple of texts, as it is |
+| `BooleanColumn` | column of booleans | `_boolean_column` | a flat array of booleans, converted from the 1.0 and 0.0 the host wrote |
 | `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts |
+| a subclass of `Table` | table | `_mixed`, then `_refine` | the schema's record, one typed column per header |
 
 The scalar accept rules match exactly. A Python bool is an int, so the number rule rejects a bool before it accepts an int or float, as [inputs.md](inputs.md) rule 1 requires. Whole means no fraction, and `tests/unit/test_type_validation.py` pins that every whole number from −2^53 to 2^53, the largest whole number a cell holds without rounding, passes. A date is a whole serial inside the calendar. What a serial and the calendar are, and why serial 60 is rejected, is [inputs.md](inputs.md) rule 6 and decision 13; here the date rule checks a number, then whole, then the calendar, in that order.
 
@@ -126,7 +130,7 @@ A scalar into a range slot becomes a 1×1 range, and text into a text row or col
 
 Shape before cells. The column and row types check the shape first, and a wrong shape rejects the whole argument by its shape before any cell is looked at: a 1×2 range holding a blank into a column slot fails as `values is 1x2 array, expected column of numbers`, not on the blank. A column or row that passes is handed over flat, a one-dimensional array or a tuple, while `NumberArray` keeps the sheet's shape. Nothing is reordered: the first value of a column holding 3, 1, 2 is 3.
 
-Kind next. The summary of kinds is one number from the host with one bit per kind it saw in the range, so for a range of only numbers it is 1 and for a range with one text cell among numbers it is 3. A look is one pass over a whole range at once, one numpy operation; a walk is visiting cells one by one in Python, which the bridge never does on the host's path. The summary of kinds settles the kind check when it can: when it is exactly "only numbers", the numbers rule hands over the range's numbers array with no look; when it is exactly "only text", the text rule hands over the host's tuple with no look.
+Kind next. The summary of kinds is one number from the host with one bit per kind it saw in the range, so for a range of only numbers it is 1 and for a range with one text cell among numbers it is 3. A look is one pass over a whole range at once, one numpy operation; a walk is visiting cells one by one in Python, which the bridge never does on the host's path. The summary of kinds settles the kind check when it can: when it is exactly "only numbers", the numbers rule hands over the range's numbers array with no look; when it is exactly "only text", the text rule hands over the host's tuple with no look; when it is exactly "only booleans", the boolean rule converts the 1.0 and 0.0 the host wrote into booleans in one conversion and no look.
 
 Otherwise one look names the cell. A mask is an array of yes-or-no flags, one per cell, made in one look; here it is yes wherever the kind code is not the one wanted. The position of the first yes is the bad cell's place counting across then down. Dividing that by the column count gives a row and a column, counted the way INDEX counts: from 1, within the range, so the second cell of the first row is cell (1, 2). The cell's own value is then read by its kind for the message, `values cell (2, 2) is text 'x', expected number`; a text cell's text is found by counting the text codes before it, one more look. `tests/unit/test_range_validation.py` holds a property test, one that tries many random ranges rather than a chosen few: for any range up to 12 by 12 with a blank or a text at (r, c) among numbers and another at the last cell, the message names (r, c); and over a column of up to 12 rows, a number among text or a serial 60 among dates at row r is named (r, 1).
 
@@ -174,6 +178,34 @@ The rule itself costs nothing measurable. The same ten thousand numeric cells co
 
 Rejecting one is where the work is. Blank and missing are found by one compare against the highest kind a mixed range may hold, which works because those three are the lowest codes; a test pins that, so reordering the kinds fails loudly rather than quietly admitting a blank. An empty text is flagged into the same array, by turning its place among the texts into its place among the cells. Both causes then sit in one array, so the earliest cell in sheet order wins with no comparing of positions, and the same function that names a bad cell for every other range type names this one. Locating an empty text is the most expensive rejection the seam has, about ten bytes a cell against one for a blank, which is the price of a failure and is pinned as such.
 
+## A table: a header row and a schema
+
+A table is what a person lays out on a sheet: a header row naming the columns, and a body with one kind of thing per column. It crosses as two arguments, the header row as a `TextRow` and the body as a mixed range, and the function declares a schema: a class deriving from `Table`, one line per column, the header name and its column type, which is any of `NumberColumn`, `DateColumn`, `TextColumn` and `BooleanColumn`. The schema is part of the signature. A header is to a column what a parameter name is to an argument.
+
+```python
+class Trades(Table):
+    date: DateColumn
+    product: TextColumn
+    quantity: NumberColumn
+    cleared: BooleanColumn
+
+
+@excel_function
+def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
+    """Sum of quantity over a table of trades."""
+    return float(trades.quantity.sum())
+```
+
+Registration reads the schema once, as it reads a signature: each column's name and column type, matched without regard to case, and the parameter before the table, which must be a row of text, because that is where the headers come from. It refuses a table with no row of text before it, a column whose type is not a column type, two columns that are one header without regard to case, and a schema with no columns, each with the function's name, so a bad schema stops the add-in's start-up as a bad annotation does. What it keeps is the schema: the record class to build, the two parameter names for messages, and the columns by position and by name.
+
+On each call the prepared path does what it always did first: every argument alone, left to right, the header row as a row of text and the body as a mixed range, so a blank in the body is the mixed rule's failure with the mixed rule's words. Then, for each table, it binds and refines. Binding matches the headers to the schema: the count against the body's width, then each header in order, either unknown or already given, then any name the headers left out; the earliest offending header wins. Four headers cost four lookups, and nothing is done per row. Refinement then takes the columns in sheet order and checks each against its column type with one look: the kinds settle a column of numbers, text or booleans, one compare of that column's kind codes, and the slots settle a column of dates, the same three tests the date rule makes over a whole range, because a text slot is NaN and a boolean slot is 1.0 or 0.0, and neither is a whole serial inside the calendar. The first flagged cell is named as INDEX counts within the whole body, with the column's own position, so `trades cell (2, 1) is number 46277.5, expected date` says which column and which row.
+
+What the function receives is the schema's record, a frozen object with one typed attribute per column, aligned by row: `trades.date` is an array of numpy days, `trades.product` a tuple of texts, `trades.quantity` an array of numbers and `trades.cleared` an array of booleans. Nothing is rebuilt. A column of numbers is a view of the mixed storage. A column of dates is converted once, by the same two steps the date rule uses. A column of booleans is one conversion of its slots. A column of text is gathered once: the k-th text cell of the body is the k-th text, so each cell's place among the texts is the count of text cells above its row plus the count to its left, found for the whole body in one mask and one cumulative sum the first time a column of text is bound, and the texts are then picked out by those places from an array of them, with nothing made per row. The headers were consumed by the binding; the record does not carry them, and the header-row parameter receives the tuple it always did, which the function has no use for.
+
+What that costs is pinned. `tests/performance/test_seam_budgets.py` pins a table of ten thousand cells, 2,500 rows of the four columns above, at every bridge function once, and on the numpy ledger at one look per column, three conversions, one array of the texts, one cumulative sum and three sums, whatever the number of rows. `tests/performance/test_seam_allocation.py` pins its peak at 14 bytes per cell plus the slack, measured 135,266 bytes on 2026-09-13: the conversions of the date column, the placing and gathering of the text column, the boolean column, and one 1-byte mask per column. A bad cell deep in a column is found by that column's look and named without a walk, and the columns after it are never looked at. On the host a table is two ranges in, the header row and the body, and `tests/performance/HostWorkBudgets.cs` pins it at three trips, eight objects and the cells and text cells of both; the host carries a table as it carries any two ranges, and knows nothing of schemas.
+
+`MixedArray` stays for a function that wants the raw record, as `CountMixed` does. Reordered columns bind by name and work; a header with a space in it does not, and the message quotes the space.
+
 ## The result rules
 
 The result rule for a declared return type converts what the function returned into one of the four things the host can show: a number, text, a boolean, or an array of numbers. The rules and decisions, and the full list of what fails, are [outputs.md](outputs.md)'s; this table is the mechanism, with the shortest phrase for what each rule rejects.
@@ -219,7 +251,7 @@ It is the only value that takes a default: `Rate(None)` is `x is blank, expected
 
 ## The probes and what each proves
 
-The probes are the fourteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
+The probes are the fifteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
 
 | Probe | In and out | Proves |
 |---|---|---|
@@ -231,6 +263,7 @@ The probes are the fourteen hidden worksheet functions in the probes module. Eac
 | `SumArray(values)` | a `NumberArray` in, a number out | a range of any shape arrives as cells; the sum proves every cell did |
 | `CountArray(values)` | a `NumberArray` in, a whole number out | the control `CountMixed` is read against: the same count, reached by the numeric rule |
 | `CountMixed(values)` | a `MixedArray` in, a whole number out | a rectangle of three kinds arrives as one record, and its shape says how many cells |
+| `SumQuantity(header_row, trades)` | a `TextRow` and a table of a date, a text, a number and a boolean column in, a number out | a header row and a body bind by name into typed columns, one of each column type; the sum of one column proves the binding |
 | `Dot(a, b)` | two `NumberColumn`s in, a number out | two ranges in one call arrive as two ranges |
 | `EchoColumn(values)` | a `NumberColumn` in and out | a column in and the same column out, spilled down |
 | `EchoRow(values)` | a `NumberRow` in and out | the same across; a row out costs what a column out costs |
@@ -265,6 +298,7 @@ No parameter that may be `None`, and no keyword arguments. The first follows fro
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | the exact text of every scalar rejection, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
+| every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |
 | every result rejection, what registration refuses on a return, and what the host is handed | `tests/unit/test_result_validation.py` |
 | the four names, owning a range, `entry` and `call` | `tests/unit/test_bridge.py` |
 | the ledgers, per probe | `tests/performance/test_seam_budgets.py` |

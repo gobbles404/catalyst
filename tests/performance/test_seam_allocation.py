@@ -72,6 +72,17 @@ def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
     assert peak_bytes(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
 
 
+# A table pays for what it converts and gathers, and nothing per row beyond that. Measured
+# 135,266 bytes at ten thousand cells, 2,500 rows of four columns, on 2026-09-13: the date
+# column's masks and its three arrays on the way to days, the text mask and the counts that place
+# each text, the texts as an array and the gathered tuple, the boolean column, and a 1-byte mask
+# per column. About 54 bytes per row, and one mask per column beyond that.
+def test_a_table_in_pays_for_its_conversions_and_nothing_per_row_beyond() -> None:
+    headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
+    body = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)])
+    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 14 * N + SLACK
+
+
 # Naming the bad cell is the rejection path's work. A blank is one mask over the kinds, measured
 # 13,008 at ten thousand cells. An empty text costs more, because its place among the texts has
 # to be turned into its place among the cells: measured 103,372, about 10 bytes per cell.

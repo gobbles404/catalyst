@@ -34,10 +34,10 @@ Shows `goosedove 0.1.0 from C:\...\src\goosedove\__init__.py`, with `source chec
 
 ## 2. Adding a worksheet function
 
-No pricing function exists yet. The only worksheet functions today are `Ping`, `GoosedoveStatus`, `HostAdd` and the fourteen probes, whose cost is the seam's cost and nothing more. So `Ping` in `src/goosedove/excel/bridge.py` and the probes in `src/goosedove/excel/probes.py` are the only examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
+No pricing function exists yet. The only worksheet functions today are `Ping`, `GoosedoveStatus`, `HostAdd` and the fifteen probes, whose cost is the seam's cost and nothing more. So `Ping` in `src/goosedove/excel/bridge.py` and the probes in `src/goosedove/excel/probes.py` are the only examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
 
 1. Put the module under `src/goosedove/excel/`, beside `bridge.py` and `probes.py`. It may import the pricing code; the pricing code never imports it. That one-way rule is why pricing can be tested without Excel.
-2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the thirteen the seam can receive and the ten it can send, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows.
+2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the fourteen the seam can receive, or a table schema, and one of the ten it can send, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows.
 3. Write the docstring as the wizard text. The whole docstring, with the surrounding spaces removed, is the description Excel shows, so keep it to one sentence a user of the sheet would read.
 4. Give an optional argument a default in the signature. The default goes through the same accept rule as a real argument at registration, once, and is stored already converted, so only a missing argument takes it and a blank cell still fails. `None` can never be a default: every accept rule calls it blank.
 5. Import the module in the catalogue, `src/goosedove/excel/__init__.py`, and add its name to the `__all__` list beside the two that are there, or the lint step reports the import as unused. The catalogue is the list of modules whose functions Excel sees, and it is the only place a new module is named.
@@ -61,13 +61,42 @@ def Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
 
 `=Scale(A1:A100, 2)` spills a hundred answers down. `=Scale(A1:A100)` doubles nothing and returns the column unchanged, because the omitted factor takes its default; `=Scale(A1:A100, B1)` with B1 empty fails, and says so.
 
+A function that takes a table, a header row and a body, declares a schema beside it: a class deriving from `Table`, one line per column, the header name and its column type, and takes the header row as a `TextRow` in the parameter just before the table. Nothing else changes: the schema is read at registration as the signature is, the columns bind by name whatever their order, and the function receives one record with a typed attribute per column.
+
+```python
+from goosedove.excel.bridge import (
+    BooleanColumn,
+    DateColumn,
+    NumberColumn,
+    Table,
+    TextColumn,
+    TextRow,
+    excel_function,
+)
+
+
+class Trades(Table):
+    date: DateColumn
+    product: TextColumn
+    quantity: NumberColumn
+    cleared: BooleanColumn
+
+
+@excel_function
+def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
+    """Sum of quantity over a table of trades."""
+    return float(trades.quantity.sum())
+```
+
+With `date`, `product`, `quantity` and `cleared` across A1:D1 and a trade per row below, `=TotalQuantity(A1:D1, A2:D4)` sums the quantity column, and a sheet that puts `cleared` first still works. The rules and every message are in [inputs.md](inputs.md), the mechanism in [bridge.md](bridge.md), and `SumQuantity` in `probes.py` is the example to copy.
+
 ## 3. Adding a declared type
 
 Registration refuses a function whose annotation is not one of the declared types, so the type comes first and the function second. [inputs.md](inputs.md) names one that is wanted and not built, `ContractMonth`, a whole serial falling on the first of a month; the steps below use a month type as the example.
 
 1. Add the label in `src/goosedove/excel/bridge.py`, beside the others: `Month = NewType("Month", np.datetime64)`. `NewType` gives a name to a shape that already exists, so the seam can tell a month from a plain date though both are numpy days.
 2. Write the accept rule beside the rules of its kind: one function that takes what arrived and returns the typed value, or raises `_Rejected`. For a scalar, one value such as the number in `B2`, build on `_number`, `_whole` and `_date`, which already reject in the right order. For a range, one look and no walk: a look is one pass over every cell at once, the way `=SUM` reads a range; a walk is visiting cells one at a time, which the seam avoids. `_first_bad` turns the look's first flag into the cell a message can name.
-3. Add its row to `_DECLARED`: the label is the key, and the row holds two things, the plain name every message uses and the rule. Pick a name a user of the sheet would say, in the words of the sheet: `"month"` for `Month`, `"column of months"` for `MonthColumn`.
+3. Add its row to `_DECLARED`: the label is the key, and the row holds two things, the plain name every message uses and the rule. Pick a name a user of the sheet would say, in the words of the sheet: `"month"` for `Month`, `"column of months"` for `MonthColumn`. A column type also gets a row in `_COLUMNS`, with the rule for one column of a table, so a schema may name it.
 4. Add a rule to `_RESULTS` if a function may return the type. If it may not, a function declaring it as a result is refused at registration, which is what happens today for a column of text.
 5. Teach `describe` the new words only if a new shape of value can now arrive or come back. It already names numbers, text, booleans, blanks, missing arguments, ranges, numpy days by their unit, and numpy arrays by their dimensions and kind; a month held as a numpy day needs nothing.
 6. Add a row to [inputs.md](inputs.md)'s table of declared types, and to [outputs.md](outputs.md)'s if it can be returned; strike it from inputs.md's table of what is wanted next. If a question was decided on the way, add it to the numbered decisions there, dated. Then the two tables in [bridge.md](bridge.md), which name the rule behind each type.

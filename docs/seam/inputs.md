@@ -48,7 +48,7 @@ Rules:
 3. An array into a scalar slot fails, even a 1×1 one. `=Add(SEQUENCE(1), 2)` fails where Excel's own functions would take the one cell. A scalar into a range slot becomes a 1×1 range.
 4. Every cell of a range is checked as a scalar would be, and the range keeps its order. A blank inside a range of numbers fails, so `A:A` fails on its first unused row.
 5. A one-row-or-column type declares its orientation. A column type fails on a row.
-6. The boundary checks each argument alone, by type and shape, never by meaning. Which name goes with which column, whether a column is sorted, whether two arguments agree: all of that belongs to the library. The one documented exception is that a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999.
+6. The boundary checks each argument by type and shape, never by meaning. A table's header row is bound to its body, the one place two arguments are read together, and binding a header to a column is type, not meaning: the schema is part of the declaration, and a header is to a column what a parameter name is to an argument. Whether a column is sorted, whether two arguments agree, what a column means: all of that belongs to the library. The one documented exception is that a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999.
 7. Shape is checked before cells. A range of the wrong shape is reported as a shape failure even when it also holds a bad cell.
 8. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside a range the message names the cell the way `INDEX` counts, row then column from 1 within the range, because no sheet address crosses: `#ERROR Strip: values cell (3, 1) is blank, expected number`.
 
@@ -88,10 +88,35 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 | `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
 | `TextRow` | a range of text, one row tall | `=Headers(A1:C1)` | a plain list of text | the same, or a column |
 | `MixedArray` | a range of numbers, text and booleans in any combination, any shape | `=Value(A2:L100)` with a trade per row | one record: the shape, each cell's kind, the numbers, the text | a blank, missing or empty-text cell, named |
+| `BooleanColumn` | a range of booleans, one column wide | `=Settle(A2:A4)` | a plain list of TRUE and FALSE | a number, text or blank cell, a row |
 
-A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one; a rectangle of text alone is already a `MixedArray`, which mixes rather than requires.
+A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one; a rectangle of text alone is already a `MixedArray`, which mixes rather than requires. A row of booleans is not built either.
 
 `MixedArray` came later than the others and is the one type whose declaration is not a name for a shape numpy or Python already has. Every other range hands the function a bare array or list, because every cell in it holds the same kind of thing. A mixed range cannot: a function reading it needs each cell's kind beside the values to know which is which, so it receives a record holding both. What that record holds, and why the numbers in it are storage rather than an array of numbers, is in [bridge.md](bridge.md).
+
+Built in the table pull request. A table is two arguments: a row of text holding the headers, then the body as a mixed range, and the function declares a schema naming each column and its column type. A header is to a column what a parameter name is to an argument.
+
+| Declared | Accepts | Example | Hands over | Fails on |
+|---|---|---|---|---|
+| a schema, a subclass of `Table` with one line per column, after a `TextRow` | a body of exactly the schema's columns, in any order, every cell of a column what its column type takes | `=TotalQuantity(A1:D1, A2:D4)` | one record with one typed column per header, dates as dates, numbers as numbers, text as a plain list, booleans as TRUE and FALSE, aligned by row | a header unknown, missing or given twice, a header count that is not the body's width, a cell that fails its column's type, named |
+
+The schema is declared beside the function:
+
+```python
+class Trades(Table):
+    date: DateColumn
+    product: TextColumn
+    quantity: NumberColumn
+    cleared: BooleanColumn
+
+
+@excel_function
+def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
+    """Sum of quantity over a table of trades."""
+    return float(trades.quantity.sum())
+```
+
+With `date`, `product`, `quantity` and `cleared` in A1:D1 and three trades in A2:D4, `=TotalQuantity(A1:D1, A2:D4)` shows the sum of the quantity column. `=TotalQuantity(A1:D1, A2:C4)` fails as `header_row has 4 headers, expected 3, one per column of trades`; a header `ticker` fails as `header_row cell (1, 2) is text 'ticker', expected one of date, product, quantity or cleared`; a time in the date column fails as `trades cell (2, 1) is number 46277.5, expected date`. How the headers bind and the columns are checked is in [bridge.md](bridge.md).
 
 Next, one at a time, each when the first function needs it. Each adds one rule to the validator and one row here.
 
@@ -119,7 +144,7 @@ Decided 2026-09-09, for ranges and dates.
 11. Headers never sit inside a range of numbers. They cross as their own argument, a row of text.
 12. Eight range types, each named for what it holds and the shape it takes: `NumberArray` of any shape, with `NumberColumn` and `NumberRow`; `DateColumn` and `DateRow`; `TextColumn` and `TextRow`; and `MixedArray`, which takes the three kinds that hold a value, in any combination and any shape. A `TextArray` is possible and not built.
 13. A date is a whole serial inside Excel's own calendar, 61 to 2958465. A fraction fails. There is no time-of-day type.
-14. The boundary never checks meaning. Matching header names to columns and checking that a column is sorted belong to the library, not the validator.
+14. The boundary never checks meaning. Whether a column is sorted, and what a column means, belong to the library, not the validator. Matching a header to its column is binding by name against the declaration, which decision 28 places at the seam as type.
 15. Shape before cells. A wrong-shaped range is reported as such before any cell is looked at.
 
 Decided 2026-09-09, closing the input side.
@@ -138,6 +163,16 @@ Decided 2026-09-12, the mixed range.
 24. `MixedArray` is an input. A function may not declare it as a result, and one that does is refused when the add-in loads, as the text ranges already are. A rectangle of three kinds has no way out to a cell.
 25. Nothing is inferred from a value. A date is a number, as it is everywhere at the seam, so a mixed range takes a serial without checking a calendar; a whole number and a number with decimals are the same kind; text that looks like a date stays text. Which column means what belongs to the library, and this decision does not change rule 14.
 26. A mixed range hands the function the storage the host already sent, with nothing rebuilt. The record's numbers are slots, not an array of numbers: a boolean sits there as one or zero and a text cell as a placeholder, so the kinds say what each slot means. Reading a kind the seam has already established is not checking it again; rules 4 and 6 are about admitting a value, not about consuming one.
+
+Decided 2026-09-13, tables.
+
+27. A table crosses as two arguments: a row of text holding the headers, then the body as a mixed range. The function declares a schema, one line per column, the header name and its column type, so the schema is part of the signature and is read once at registration; a bad one refuses to register, as a bad annotation does. Decision 11 stands: the headers never sit inside the body.
+28. A header is to a column what a parameter name is to an argument. Binding a header to its column is type validation, not meaning: the seam checks each body column against the declared column type and hands the function the typed column. What the column means still belongs to the library, so decision 14 stands.
+29. Headers bind by name, in any order, and case is ignored: `Date` and `DATE` are `date`. Nothing else is forgiven. A name with a space in it, or spelt another way, is unknown, and the message quotes it as typed, so `' date'` shows its space. The seam never coerces, and a header is text as typed.
+30. A table has exactly the schema's columns, each once: one header per body column, no name unknown, none missing, none twice.
+31. Precedence, in three steps. Each argument alone, left to right, as before, so a blank in the body is the mixed rule's failure and is reported before any header is read. Then the headers: the count against the body's width, then each header in order, unknown or already given, then any name the headers left out. Then the columns in sheet order, and within a column the earliest cell, named as INDEX counts within the whole body.
+32. A column of booleans, `BooleanColumn`, joins the declared types, so a table can hold a flag and a function can take one alone. It takes TRUE and FALSE only. A row of booleans is not built.
+33. The function receives the schema's record, one typed attribute per column, aligned by row. The headers are consumed by the binding: the record does not carry them, and the header-row parameter receives the tuple it always did. Nothing in the record is rebuilt: a column of numbers is a view of the mixed storage, dates and booleans are converted once, text is gathered once, and nothing runs per row. `MixedArray` stays for a function that wants the raw record.
 
 ## Not supported
 

@@ -7,6 +7,7 @@ from hypothesis import strategies as st
 from goosedove.excel import bridge
 from goosedove.excel.bridge import (
     MISSING,
+    BooleanColumn,
     Cells,
     Date,
     DateColumn,
@@ -57,6 +58,16 @@ def JoinColumn(names: TextColumn) -> str:
 @excel_function
 def JoinRow(names: TextRow) -> str:
     return ", ".join(names)
+
+
+@excel_function
+def AnyTrue(flags: BooleanColumn) -> bool:
+    return bool(flags.any())
+
+
+@excel_function
+def FlagKind(flags: BooleanColumn) -> str:
+    return str(flags.dtype)
 
 
 # Every range arrives as Cells, whatever it holds. from_rows builds what the host would send.
@@ -122,6 +133,10 @@ def Payload(values: MixedArray) -> str:
         ("FirstDate", 46164.0, "2026-05-22"),
         ("LastDate", DATES_ROW, "2026-05-23"),
         ("LastDate", cells([[46165.0, 46164.0]]), "2026-05-22"),
+        ("AnyTrue", cells([[False], [True]]), True),
+        ("AnyTrue", cells([[False], [False]]), False),
+        ("AnyTrue", True, True),
+        ("AnyTrue", False, False),
     ],
 )
 def test_accepted(function: str, value: object, result: object) -> None:
@@ -190,6 +205,10 @@ def test_dates_are_real_dates() -> None:
 
 def test_text_is_handed_over_as_a_tuple() -> None:
     assert bridge.call("Names", [NAMES_ROW]) == "('x', 'y')"
+
+
+def test_booleans_are_real_booleans() -> None:
+    assert bridge.call("FlagKind", [cells([[True], [False]])]) == "bool"
 
 
 # --- messages, exactly: the cell as INDEX counts, or the whole argument -----
@@ -335,6 +354,28 @@ def test_text_is_handed_over_as_a_tuple() -> None:
             cells([[46164.0, 1e19]]),
             "#ERROR LastDate: dates cell (1, 2) is number 1e+19, expected date",
         ),
+        (
+            "AnyTrue",
+            cells([[True], [1.0]]),
+            "#ERROR AnyTrue: flags cell (2, 1) is number 1.0, expected boolean",
+        ),
+        (
+            "AnyTrue",
+            cells([[True], ["TRUE"]]),
+            "#ERROR AnyTrue: flags cell (2, 1) is text 'TRUE', expected boolean",
+        ),
+        (
+            "AnyTrue",
+            cells([[None]]),
+            "#ERROR AnyTrue: flags cell (1, 1) is blank, expected boolean",
+        ),
+        (
+            "AnyTrue",
+            cells([[True, False]]),
+            "#ERROR AnyTrue: flags is 1x2 array, expected column of booleans",
+        ),
+        ("AnyTrue", 1.0, "#ERROR AnyTrue: flags is number 1.0, expected column of booleans"),
+        ("AnyTrue", None, "#ERROR AnyTrue: flags is blank, expected column of booleans"),
     ],
 )
 def test_rejected(function: str, value: object, text: str) -> None:

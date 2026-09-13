@@ -2,7 +2,7 @@
 
 The seam is the one place Excel and Python talk. When a cell holds `=Add(A1, B1)`, the seam carries the two cells into Python, checks that both are numbers, runs the function, and carries the answer back; nothing else in the code checks a type. It has two sides. The host is the C# add-in that Excel loads, one file, which reads the cells off the sheet, hands them over, and shows what comes back. The bridge is the Python side, one module, which checks every argument against the function's own signature once, runs the function, and converts every result once. Blank and missing are different facts, nothing is coerced, and a failure is text in the cell that names the function and what went wrong.
 
-Where it stands: built, measured, and changed one step at a time, with a baseline at revision aaa5259 and one change on top of it, ahead of the first pricing function. Today the only worksheet functions are `Ping`, `GoosedoveStatus`, `HostAdd` and fourteen probes, hidden functions that do no work beyond crossing the seam. The standing recommendation from the measurements is to declare pricing functions over arrays and never to read a range once per row.
+Where it stands: built, measured, and changed one step at a time, with a baseline at revision aaa5259 and one change on top of it, ahead of the first pricing function. Today the only worksheet functions are `Ping`, `GoosedoveStatus`, `HostAdd` and fifteen probes, hidden functions that do no work beyond crossing the seam. The standing recommendation from the measurements is to declare pricing functions over arrays and never to read a range once per row.
 
 These pages are for two readers: the owner, an Excel power user who is not a programmer, coming back after months and needing to find the way without memory; and an engineer maintaining the seam. Every term of art is defined the first time it appears on each page, and once more here under The words.
 
@@ -32,6 +32,7 @@ Each page defines these where it first uses them; here they are once, so the pag
 - **A probe**: a hidden worksheet function that does no work beyond crossing the seam, so its cost is the seam's cost. `Add`, `SumArray` and `Grid` are probes.
 - **A scalar**: one value. **An array**: a rectangle of values, always two-dimensional, even one row or one column. It is Excel's own word, and the earlier name for it was cut everywhere rather than kept beside it. **A range**: an array as it arrives from the sheet, cell by cell, before the seam has checked it.
 - **A cell's kind**: which of five things a cell holds: number, text, boolean, blank, or missing. An Excel error is the sixth thing Excel can send, and it never crosses; the host returns it before Python runs.
+- **A table**: a header row and a body, crossing as two arguments and bound by name into typed columns. **A schema**: the function's declaration of a table, one line per column, the header name and its column type; a header is to a column what a parameter name is to an argument. **Binding**: matching each header to its column of the schema. **Refinement**: checking a body column against its column type and converting what that type converts.
 - **Blank and missing**: a blank is an empty cell the formula referred to; missing is an argument the formula left out. `=Times(5, C2)` with C2 empty fails; `=Times(5)` takes the default.
 - **A trip**: one crossing from the host into Python and back. A scalar call makes one; a range makes two, one to hand the cells over and one to run the function.
 - **A look**: one pass over a whole range at once, in one operation. **A walk**: visiting cells one by one, which the seam avoids.
@@ -51,7 +52,7 @@ Each page defines these where it first uses them; here they are once, so the pag
 | the host: start-up, registration, the scan, the way out, `HostAdd`, `GoosedoveStatus` | `host/Goosedove.Host/AddIn.cs`, with the counter in `WorkCounter.cs` and the settings in `Goosedove.Host.csproj` |
 | the host's tests, started without Excel | `host/Goosedove.Host.Tests/` |
 | the bridge, the probes, and the catalogue that imports every module of worksheet functions | `src/goosedove/excel/bridge.py`, `probes.py`, `__init__.py` |
-| the messages, pinned | `tests/unit/test_type_validation.py`, `test_range_validation.py`, `test_result_validation.py`, `test_bridge.py` |
+| the messages, pinned | `tests/unit/test_type_validation.py`, `test_range_validation.py`, `test_table_validation.py`, `test_result_validation.py`, `test_bridge.py` |
 | the pins | `tests/performance/test_seam_budgets.py`, `test_seam_allocation.py`, `conftest.py`, `HostWorkBudgets.cs` |
 | the runners, the summary, the before-and-after tool | `tools/performance/` |
 | the smoke test in a hidden Excel, Excel by hand, the build | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/host_build.ps1` |
