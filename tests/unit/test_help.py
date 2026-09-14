@@ -20,15 +20,16 @@ SPECS = {
 def test_the_valuation_date_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["CreateValuationDate"]
     assert not hidden
+    # A docstring may wrap in the code; its lines are joined into one for the sheet.
     assert description == (
-        "Creates a valuation-date handle from a date and the fraction of that day elapsed."
+        "Creates a valuation date and shows its handle, the text other formulas take as the "
+        "valuation date."
     )
     assert arguments == [
-        ("as_of", "One date, from 1-Mar-1900 to 31-Dec-9999, with no time of day."),
+        ("as_of", "The valuation date, a date cell such as 11-Sep-2026, with no time of day."),
         (
             "day_fraction_elapsed",
-            "One number from 0 to 1: 0 is the start of as_of, 1 its end. "
-            "The date is kept as given.",
+            "How far through as_of: 0 at the start of the day, 0.5 at midday, 1 at the end.",
         ),
     ]
 
@@ -37,19 +38,19 @@ def test_the_curve_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["CreateDiscountCurve"]
     assert not hidden
     assert description == (
-        "Creates a daily discount-curve handle. Its last date is the latest the library prices."
+        "Creates a discount curve from a daily table and shows its handle, the text other "
+        "formulas take as the curve."
     )
     assert arguments == [
         (
             "header_row",
-            "One row holding the two headers, date and discount_factor, in either order; capitals "
-            "do not matter.",
+            "The header cells of your curve table, such as A1:B1, reading date and "
+            "discount_factor in either order.",
         ),
         (
             "table",
-            "The body under the headers: one row per calendar day, the date and its discount "
-            "factor, no day missing. The first factor is 1, and factors never rise and stay "
-            "above 0.",
+            "The rows under the headers, such as A2:B400: one calendar day per row with its "
+            "discount factor, starting at 1 and never rising.",
         ),
     ]
 
@@ -57,10 +58,14 @@ def test_the_curve_creator_explains_itself() -> None:
 def test_the_reader_explains_itself() -> None:
     description, arguments, hidden = SPECS["util_ReadDiscountFactor"]
     assert not hidden
-    assert description == "Reads the discount factor for one day from a discount-curve handle."
+    assert description == "Reads the discount factor for one day from a discount curve."
     assert arguments == [
-        ("curve", "The cell holding a discount-curve handle, or a name for that cell."),
-        ("date", "One date between the curve's first and last dates, inclusive."),
+        (
+            "curve",
+            "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, "
+            "or a name for it.",
+        ),
+        ("date", "The day to read, such as 12-Sep-2026, between the curve's first and last dates."),
     ]
 
 
@@ -138,6 +143,19 @@ def test_a_listed_argument_without_help_refuses_to_register() -> None:
     assert register(Quiet, hidden=True) is Quiet
 
 
+# What registration adds for an optional argument follows the authored sentence, so the
+# sentence ends with a period, listed or hidden.
+def test_help_that_does_not_end_with_a_period_refuses_to_register() -> None:
+    def Trailing(x: Annotated[float, "One number"]) -> float:
+        """Says something of x, unfinished."""
+        return x
+
+    with pytest.raises(TypeError, match="Trailing: x's help does not end with a period"):
+        excel_function(Trailing)
+    with pytest.raises(TypeError, match="Trailing: x's help does not end with a period"):
+        register(Trailing, hidden=True)
+
+
 def test_anything_but_one_text_beside_the_type_refuses_to_register() -> None:
     def Loud(x: Annotated[float, "a", "b"]) -> float:
         """Two texts."""
@@ -154,7 +172,7 @@ def test_anything_but_one_text_beside_the_type_refuses_to_register() -> None:
 
 
 def test_help_longer_than_excel_shows_refuses_to_register() -> None:
-    def Long(x: Annotated[float, "a" * 254]) -> float:
+    def Long(x: Annotated[float, "a" * 253 + "."]) -> float:
         """Too much to say of x."""
         return x
 

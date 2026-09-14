@@ -56,7 +56,7 @@ namespace Goosedove.Host.Tests
             Assert.False(((ExcelFunctionAttribute)attributes[curve]).IsHidden);
             var table = (ExcelArgumentAttribute)argumentAttributes[curve][1];
             Assert.Equal("table", table.Name);
-            Assert.StartsWith("The body under the headers", table.Description);
+            Assert.StartsWith("The rows under the headers", table.Description);
         }
     }
 }
