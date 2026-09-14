@@ -21,7 +21,7 @@ def test_specs_carry_name_description_parameters_and_hidden() -> None:
     specs = {name: (doc, params, hidden) for name, doc, params, hidden in bridge.function_specs()}
     assert specs["Add"] == (
         "Probe: a number in and a number out; the reference for the cost of one call.",
-        ["a", "b"],
+        [("a", ""), ("b", "")],  # a hidden probe says nothing of its arguments
         True,
     )
     assert specs["Ping"] == ("Confirm which goosedove Excel is running.", [], False)

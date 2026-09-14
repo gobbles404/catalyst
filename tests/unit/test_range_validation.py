@@ -20,55 +20,55 @@ from goosedove.excel.bridge import (
     NumberRow,
     TextColumn,
     TextRow,
-    excel_function,
     register,
 )
+from goosedove.excel.probes import probe
 
 # --- one function per declared range type and Date, the fixtures of this matrix --------
 # SumArray is a probe and needs no fixture here.
 
 
-@excel_function
+@probe
 def DateText(day: Date) -> str:
     return str(day)
 
 
-@excel_function
+@probe
 def SumColumn(values: NumberColumn) -> float:
     return float(values.sum())
 
 
-@excel_function
+@probe
 def SumRow(values: NumberRow) -> float:
     return float(values.sum())
 
 
-@excel_function
+@probe
 def FirstDate(dates: DateColumn) -> str:
     return str(dates[0])
 
 
-@excel_function
+@probe
 def LastDate(dates: DateRow) -> str:
     return str(dates[-1])
 
 
-@excel_function
+@probe
 def JoinColumn(names: TextColumn) -> str:
     return ", ".join(names)
 
 
-@excel_function
+@probe
 def JoinRow(names: TextRow) -> str:
     return ", ".join(names)
 
 
-@excel_function
+@probe
 def AnyTrue(flags: BooleanColumn) -> bool:
     return bool(flags.any())
 
 
-@excel_function
+@probe
 def FlagKind(flags: BooleanColumn) -> str:
     return str(flags.dtype)
 
@@ -151,42 +151,42 @@ def test_accepted(function: str, value: object, result: object) -> None:
     assert bridge.call(function, [value]) == result
 
 
-@excel_function
+@probe
 def Shape(values: NumberColumn) -> str:
     return str(values.shape)
 
 
-@excel_function
+@probe
 def RowShape(values: NumberRow) -> str:
     return str(values.shape)
 
 
-@excel_function
+@probe
 def ArrayShape(values: NumberArray) -> str:
     return str(values.shape)
 
 
-@excel_function
+@probe
 def Kind(dates: DateColumn) -> str:
     return str(dates.dtype)
 
 
-@excel_function
+@probe
 def Names(names: TextRow) -> str:
     return repr(names)
 
 
-@excel_function
+@probe
 def FirstOfColumn(values: NumberColumn) -> float:
     return float(values[0])
 
 
-@excel_function
+@probe
 def FirstOfRow(values: NumberRow) -> float:
     return float(values[0])
 
 
-@excel_function
+@probe
 def TopLeft(values: NumberArray) -> float:
     return float(values[0, 0])
 

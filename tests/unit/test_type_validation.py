@@ -8,34 +8,35 @@ from hypothesis import strategies as st
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, excel_function
+from goosedove.excel.probes import probe
 
 
-@excel_function
+@probe
 def Number(x: float) -> float:
     return x
 
 
-@excel_function
+@probe
 def Text(x: str) -> str:
     return x
 
 
-@excel_function
+@probe
 def Boolean(x: bool) -> bool:
     return x
 
 
-@excel_function
+@probe
 def Whole(x: int) -> str:
     return f"{type(x).__name__} {x}"
 
 
-@excel_function
+@probe
 def Rate(x: float = 0.05) -> float:
     return x
 
 
-@excel_function
+@probe
 def Boom(x: float) -> float:
     raise ValueError("no curve for that date")
 

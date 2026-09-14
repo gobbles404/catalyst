@@ -31,13 +31,11 @@ A library rejection reaches the cell as `#ERROR {function}: {ExceptionType}: {me
 
 ## Excel help
 
-This is the desk's documentation. Every worksheet function explains itself while the user types the formula: the signature, the active argument, and that argument's description, and the same wording appears in the Function Arguments dialog. So it is written for the desk, in the desk's words, and kept in one place: with the function declaration, passed through registration.
+This is the desk's documentation. Every function Excel lists explains itself while a person types the formula: the signature, the argument they are on, and one line about it, and the same words appear in the Function Arguments dialog. It is written for the desk, in the desk's words, once, in the declaration: the docstring is the function's line, and the words beside each parameter, `as_of: Annotated[Date, "One date, ..."]`, are that argument's line. Registration reads both, refuses a function Excel lists that leaves either out or runs past the 253 characters Excel shows, and adds what the signature already says: an optional argument's name in brackets, `[factor]`, and what it takes when omitted, `1 when omitted.` Nothing about an argument is written twice. The mechanism is [bridge.md](../seam/bridge.md#declaring-a-worksheet-function), and [host.md](../seam/host.md#at-registration) says how the words reach Excel and the display that shows them while typing.
 
-- Each argument description fits about 255 characters; longer text is truncated by Excel.
-- Say the meaning, the shape, the allowed values, and whether it is required.
+- Say the shape, the allowed values and the meaning. The brackets say what is optional, so the text does not.
 - Where an argument takes a unit code, its help lists the accepted codes.
-
-The function description crosses today; argument descriptions do not, because the host registers each parameter's name only. That is the seam's open item, recorded in [history.md](../seam/history.md#open-and-parked), and it lands with the first library function.
+- A page quotes the declaration under Excel help, as it quotes the messages that tests pin, so a reviewer reads it in one place per function; a change to one changes both in the same pull request.
 
 ## A function page, section by section
 
@@ -49,7 +47,7 @@ The sections, in this order:
 |---|---|
 | Title, then the status line alone | `Open: D21, D26.`, `Ready.` or `Built in #NN.`, then one sentence saying what the function is and the D-range behind it |
 | Worksheet contract | the Python declaration, the formula a user types, what the cell shows, and one line that the seam checks the declared types |
-| Excel help | the function line and one line per argument, the desk-facing text |
+| Excel help | the function line and one line per argument, quoted from the declaration: the desk-facing text |
 | The library checks | one row per business rule, with its exact message in the seam's grammar; every row is a rule of meaning |
 | What it computes | the calculation, under a heading that names it, such as The interpolation or The definitions, where there is one |
 | In memory | what is received, by citing bridge.md, and what is retained, with dtype and shape |

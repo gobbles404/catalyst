@@ -1,4 +1,5 @@
 using System.IO;
+using ExcelDna.Integration;
 using Xunit;
 
 namespace Goosedove.Host.Tests
@@ -37,6 +38,25 @@ namespace Goosedove.Host.Tests
         {
             Assert.Equal(2, Registration.MakeDelegate(Bridge.Prepare("Add"), 2).GetType().GetMethod("Invoke").GetParameters().Length);
             Assert.Empty(Registration.MakeDelegate(Bridge.Prepare("Ping"), 0).GetType().GetMethod("Invoke").GetParameters());
+        }
+
+        // The help beside each parameter reaches the argument's registration attribute, with an
+        // optional argument's label in brackets and its default in the words of the sheet; the
+        // function's description and hidden flag travel beside them.
+        [Fact]
+        public void the_help_beside_each_argument_reaches_its_registration_attribute()
+        {
+            var (delegates, attributes, argumentAttributes) = Registration.Describe();
+            Assert.Equal(attributes.Count, delegates.Count);
+            var times = attributes.FindIndex(a => ((ExcelFunctionAttribute)a).Name == "Times");
+            var factor = (ExcelArgumentAttribute)argumentAttributes[times][1];
+            Assert.Equal("[factor]", factor.Name);
+            Assert.Equal("One multiplier. 1 when omitted.", factor.Description);
+            var curve = attributes.FindIndex(a => ((ExcelFunctionAttribute)a).Name == "CreateDiscountCurve");
+            Assert.False(((ExcelFunctionAttribute)attributes[curve]).IsHidden);
+            var table = (ExcelArgumentAttribute)argumentAttributes[curve][1];
+            Assert.Equal("table", table.Name);
+            Assert.StartsWith("The body under the headers", table.Description);
         }
     }
 }

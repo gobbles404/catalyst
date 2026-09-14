@@ -495,8 +495,9 @@ the reference when the function ships. Its first line is its state, `Open: D21, 
 `Ready.` or `Built in #NN.`, read off its own Open section and moved with the code in the
 same pull request. How a page is written, and the skeleton to copy, are
 [conventions.md](conventions.md); this record holds why. The desk reads Excel's own help text as it types, so a page's Excel help
-section is the one product-facing text; `docs/library/` is for engineers and the owner as
-reviewer, and does not ship. A spec for something the seam must do lives with the seam and
+section is the one product-facing text; since #55 the declaration carries that text, the
+docstring and the words beside each parameter, and the page quotes it. `docs/library/` is for
+engineers and the owner as reviewer, and does not ship. A spec for something the seam must do lives with the seam and
 is absorbed into the seam's pages when built. Decided 2026-09-13.
 
 **Because** a page with one job cannot go stale in a second copy, and the seam's own pages

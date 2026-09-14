@@ -19,57 +19,58 @@ from goosedove.excel.bridge import (
     NumberRow,
     excel_function,
 )
+from goosedove.excel.probes import probe
 
 # One function per declared result type. Each returns whatever the test put in _returns.
 _returns: dict[str, object] = {}
 
 
-@excel_function
+@probe
 def OutNumber() -> float:
     return cast(float, _returns["value"])
 
 
-@excel_function
+@probe
 def OutWhole() -> int:
     return cast(int, _returns["value"])
 
 
-@excel_function
+@probe
 def OutText() -> str:
     return cast(str, _returns["value"])
 
 
-@excel_function
+@probe
 def OutBoolean() -> bool:
     return cast(bool, _returns["value"])
 
 
-@excel_function
+@probe
 def OutDate() -> Date:
     return cast(Date, _returns["value"])
 
 
-@excel_function
+@probe
 def OutArray() -> NumberArray:
     return cast(NumberArray, _returns["value"])
 
 
-@excel_function
+@probe
 def OutColumn() -> NumberColumn:
     return cast(NumberColumn, _returns["value"])
 
 
-@excel_function
+@probe
 def OutRow() -> NumberRow:
     return cast(NumberRow, _returns["value"])
 
 
-@excel_function
+@probe
 def OutDateColumn() -> DateColumn:
     return cast(DateColumn, _returns["value"])
 
 
-@excel_function
+@probe
 def OutDateRow() -> DateRow:
     return cast(DateRow, _returns["value"])
 

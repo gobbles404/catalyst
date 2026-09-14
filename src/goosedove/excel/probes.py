@@ -10,6 +10,7 @@ them, and they ship in the build everyone loads. They stay as long as the seam d
 """
 
 from collections.abc import Callable
+from typing import Annotated
 
 import numpy as np
 
@@ -44,8 +45,13 @@ def Add(a: float, b: float) -> float:
     return a + b
 
 
+# The one probe with help beside its parameters: it shows what Excel says of an optional
+# argument, [factor] and "1 when omitted", derived from the default and never written twice.
 @probe
-def Times(x: float, factor: float = 1.0) -> float:
+def Times(
+    x: Annotated[float, "One number to multiply."],
+    factor: Annotated[float, "One multiplier."] = 1.0,
+) -> float:
     """Probe: only a missing argument takes the default; a blank cell fails."""
     return x * factor
 
