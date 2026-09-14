@@ -109,6 +109,9 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
             yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
             yield return new object[] { "util_ReadDiscountFactor", new object[] { "x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is text 'x' naming no live object, expected discount curve handle" };
+            // A creator's failure is relayed whole, and a relay of a relay shows the same text.
+            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
         }
 
         // A handle: the creator's text stands for the curve, the reader gets a factor back through it,

@@ -128,9 +128,9 @@ def test_a_valuation_date_handle_is_not_a_curve() -> None:
         (
             "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, "
             "expected exactly 1 at the curve's first date",
-            "#ERROR util_ReadDiscountFactor: curve is the creator's failure \"#ERROR "
-            "CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 "
-            "at the curve's first date\", expected discount curve handle",
+            "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount "
+            "curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is "
+            "0.98, expected exactly 1 at the curve's first date",
         ),
         (
             "discount_curve:000000:000001",

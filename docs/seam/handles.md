@@ -97,7 +97,7 @@ The old object is never mutated or retargeted; there is no retained version hist
 
 ## Errors are text
 
-The seam returns failures as text beginning `#ERROR `, not as Excel error values. A failed creator's cell holds that text, and a consumer referring to it receives the text as its handle argument. The resolver recognises the prefix and fails as *the creator failed*, quoting its message, `curve is the creator's failure '#ERROR CreateDiscountCurve: ...', expected discount curve handle`, not as an unknown handle, which would send the user looking for a store problem that does not exist. Built.
+The seam returns failures as text beginning `#ERROR `, not as Excel error values. A failed creator's cell holds that text, and a consumer referring to it receives the text as its handle argument. The resolver recognises the prefix and fails as *the creator failed*, carrying the creator's own text whole at the end, `curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ...`, not as an unknown handle, which would send the user looking for a store problem that does not exist. A consumer of that consumer relays the same text: the creator's failure is taken out of the relay and carried on unchanged, never quoted again, so a chain of any length shows one message. Built.
 
 ## The seam's part
 

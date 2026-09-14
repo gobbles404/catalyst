@@ -929,16 +929,26 @@ def _publish(kind: type[object], tag: str, words: str, value: object) -> str:
     return text
 
 
+# A relayed failure: what a consumer's cell shows when the creator it refers to failed. The
+# creator's own text comes last, whole, so a consumer of that consumer finds it here and relays
+# it unchanged, and a chain of any length shows one text. Quoting the previous text instead
+# compounded its escaping, and Excel cut the creator's words after a dozen relays.
+_RELAY: Final = re.compile(r"#ERROR \w+: \w+ is the creator's failure, expected [^:]+: (.+)", re.S)
+
+
 def _resolve(kind: type[object], expected: str, name: str, value: object) -> object:
     """The object a handle stands for, or the failure.
 
     The text's own faults come first, through the text rule, so a number, a blank, a missing
     argument or an empty text fail in the seam's usual words. Then a creator's failure relayed
-    by a reference to its cell, then text naming no live object, then an object of another kind.
+    by a reference to its cell, carried whole; then text naming no live object; then an object
+    of another kind.
     """
     text = _text(value)
     if text.startswith("#ERROR "):
-        raise TypeValidationError(f"{name} is the creator's failure {text!r}, expected {expected}")
+        relayed = _RELAY.fullmatch(text)
+        root = relayed.group(1) if relayed else text
+        raise TypeValidationError(f"{name} is the creator's failure, expected {expected}: {root}")
     held = _HANDLES.get(text)
     if held is None:
         raise TypeValidationError(

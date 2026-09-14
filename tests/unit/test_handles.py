@@ -155,13 +155,29 @@ def test_a_handle_resolves_to_the_same_object_every_time() -> None:
         ),
         (
             "#ERROR MakeCurve: ValueError: it's bad",
-            "#ERROR ReadCurve: curve is the creator's failure "
-            '"#ERROR MakeCurve: ValueError: it\'s bad", expected curve handle',
+            "#ERROR ReadCurve: curve is the creator's failure, expected curve handle: "
+            "#ERROR MakeCurve: ValueError: it's bad",
         ),
     ],
 )
 def test_rejected(value: object, text: str) -> None:
     assert bridge.call("ReadCurve", [value]) == text
+
+
+# A consumer may refer to a cell that is itself a consumer of a failed creator. Each relay used
+# to quote the whole text before it, so the quoting compounded and Excel cut the creator's own
+# words after a dozen relays. Every relay now carries the creator's failure whole, and a chain
+# of any length shows one text.
+def test_a_chain_of_relays_shows_the_creators_failure_once() -> None:
+    root = "#ERROR MakeCurve: ValueError: it's bad"
+    first = bridge.call("ReadCurve", [root])
+    assert first == (
+        f"#ERROR ReadCurve: curve is the creator's failure, expected curve handle: {root}"
+    )
+    text = first
+    for _ in range(20):
+        text = bridge.call("ReadCurve", [text])
+        assert text == first
 
 
 def test_a_handle_of_another_kind_is_named_and_refused() -> None:

@@ -58,7 +58,8 @@ $formulas = [ordered]@{
     "=util_ReadDiscountFactor(AA1,Y3)" = "0.9999"
     "=util_ReadDiscountFactor(AA1,DATE(2026,9,20))" = "#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last"
     "=LEFT(util_ReadDiscountFactor(AA2,Y3),64)" = "#ERROR util_ReadDiscountFactor: curve is valuation date handle '"
-    "=util_ReadDiscountFactor(AA3,Y3)" = '#ERROR util_ReadDiscountFactor: curve is the creator''s failure "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve''s first date", expected discount curve handle'
+    "=util_ReadDiscountFactor(AA3,Y3)" = "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=util_ReadDiscountFactor(AA4,Y3)" = "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     '=util_ReadDiscountFactor("discount_curve:000000:000001",Y3)' = "#ERROR util_ReadDiscountFactor: curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle"
     "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
     "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
@@ -90,7 +91,8 @@ $cells = [ordered]@{
     "L8" = "15-Sep-2026"; "M8" = "CL"; "N8" = "7"; "O8" = "TRUE"
     # A curve's table: its header row and three days; a second body whose first factor is not 1;
     # then three creator cells, a curve, a valuation date and a curve that fails, so the reader
-    # rows above can refer to a creator cell the way a sheet does.
+    # rows above can refer to a creator cell the way a sheet does, and a reader of the failed
+    # curve, so a row can relay a relay.
     "Y1" = "date"; "Z1" = "discount_factor"
     "Y2" = "11-Sep-2026"; "Z2" = "1"
     "Y3" = "12-Sep-2026"; "Z3" = "0.9999"
@@ -101,6 +103,7 @@ $cells = [ordered]@{
     "AA1" = "=CreateDiscountCurve(Y1:Z1,Y2:Z4)"
     "AA2" = "=CreateValuationDate(Y2,0.5)"
     "AA3" = "=CreateDiscountCurve(Y1:Z1,AB2:AC4)"
+    "AA4" = "=util_ReadDiscountFactor(AA3,Y3)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
