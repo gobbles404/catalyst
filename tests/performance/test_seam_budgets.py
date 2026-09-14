@@ -499,6 +499,108 @@ def test_an_array_out_from_nothing_in_itemized(
     }
 
 
+# --- handles: a creator publishes, a reader resolves, itemized --------------
+# A creator is the call for its inputs with the library's builder and one publication on top;
+# a reader is a text call with one lookup on top. The store is asked one question per call.
+
+CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
+
+
+def curve_body(rows: int) -> Cells:
+    """A curve's table: one calendar day and its factor per row, from 11 September 2026."""
+    return Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(rows)])
+
+
+def test_a_valuation_date_is_two_scalars_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["CreateValuationDate"](46276.0, 0.5)
+    assert call_profile(lambda: PATH["CreateValuationDate"](46276.0, 0.5)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_date": 1,  # the date, through the whole-number and number rules it builds on
+        "_whole": 1,
+        "_number": 2,
+        "CreateValuationDate": 1,
+        "valuation_date": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateValuationDate"](46276.0, 0.5)) == {}
+
+
+# A ten-year curve: the table path, then the builder's own looks and the two copies it keeps.
+def test_a_discount_curve_is_a_table_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    body = curve_body(3_631)
+    PATH["CreateDiscountCurve"](CURVE_HEADERS, body)
+    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_row": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_texts": 1,
+        "_mixed": 1,
+        "MixedArray.shape": 1,
+        "_refine": 1,
+        "_bind": 1,
+        "_dates_of": 1,  # no column of text, so no text places are made
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_numbers_of": 1,
+        "CreateDiscountCurve": 1,
+        "discount_curve": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == {
+        "ndarray.any": 5,  # one look per column, then finite, rising and gapped, one look each
+        "ndarray.astype": 2,  # the date column on its way to days
+        "numpy.array": 2,  # the two copies the curve keeps
+        "ndarray.setflags": 2,  # frozen
+        "generic.astype": 1,  # the start date as a day count, kept for the reader
+        "ufunc.reduce": 5,
+    }
+
+
+def test_a_reader_is_a_text_call_with_one_lookup(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    handle = PATH["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3))
+    PATH["util_ReadDiscountFactor"](handle, 46277.0)
+    assert call_profile(lambda: PATH["util_ReadDiscountFactor"](handle, 46277.0)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_resolve": 1,  # the handle: the text rule, then one dictionary lookup
+        "_text": 1,
+        "_date": 1,
+        "_whole": 1,
+        "_number": 1,
+        "util_ReadDiscountFactor": 1,
+        "factor_on": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+    # The day becomes an index in one subtraction from the start the curve kept as a day count.
+    assert numpy_calls(lambda: PATH["util_ReadDiscountFactor"](handle, 46277.0)) == {
+        "generic.astype": 1,
+    }
+
+
+def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) -> None:
+    dead = "discount_curve:000000:000001"
+    assert call_profile(lambda: PATH["util_ReadDiscountFactor"](dead, 46277.0)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_resolve": 1,
+        "_text": 1,
+    }
+
+
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))

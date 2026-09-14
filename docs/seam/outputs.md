@@ -16,6 +16,7 @@ The declared return type is the contract, read at registration the way parameter
 | `NumberArray` | a plain two-dimensional numpy array of numbers, at least one cell | the array, spilled as returned | one-dimensional, empty, a masked array, a cell that is not a finite number, named as INDEX counts |
 | `NumberColumn`, `NumberRow` | a one-dimensional numpy array of numbers | spilled down, or across | two-dimensional, empty, a bad cell |
 | `DateColumn`, `DateRow` | a one-dimensional array of numpy days | serials, spilled | a day outside the calendar, not a date |
+| `Handle[Kind]`, a class the library defines inside the brackets | an object of exactly that class, which the seam keeps | the handle: text such as `discount_curve:3f9a1c:000002`, which a later formula hands back through a reference to this cell | another type returned, a subclass, nothing |
 
 Integers count as numbers, scalar or array, converted exactly. That is not coercion of meaning the way TRUE-as-1 would be: on the sheet a whole number and a number are one kind.
 
@@ -32,6 +33,7 @@ Rules:
 5. Text is at most 32,767 characters as Excel counts them, in UTF-16 units the way `LEN` does, because Excel would cut longer text without a word. Empty text fails: a cell that looks blank is the quiet result tenet 2 forbids.
 6. An empty array fails. A whole number beyond 2^53, scalar or in an array, fails, because a cell would hold it inexactly.
 7. A failure names the function, what was returned, and what was expected: `#ERROR Forward: returned text 'x', expected number`. Something the sheet has no word for is named by its own: `returned a Python list`, `returned a numpy MaskedArray`. An error raised inside the function keeps its type and message: `#ERROR Forward: ValueError: no curve for that date`.
+8. An object a creator returns is kept in the seam's one store, and its handle goes to the cell as text: `discount_curve:3f9a1c:000002`, the kind's tag, six characters chosen when Python starts, and a running number shared by every kind. A creator that returns the wrong thing fails as any result does, `#ERROR CreateDiscountCurve: returned a Python list, expected discount curve`, and a creator that raises fails as any function does; neither publishes, and neither moves the number.
 
 ## Decided
 
@@ -50,6 +52,12 @@ Decided 2026-09-13.
 
 9. A table's schema and a column of booleans are inputs. A function declaring either as its result is refused at registration, as the text ranges are, because no function returns one.
 
+Decided 2026-09-14, handles.
+
+10. A creator declares `Handle[Kind]` around a class the library defines and returns the object; the seam keeps it and the cell shows its handle. The object must be of exactly that class: a subclass, another type or nothing is refused as any result is, and the failure names the kind in lowercase words, `expected discount curve`.
+11. The handle's text is three parts, lowercase, joined by colons: the kind's tag from its class name, `discount_curve`; six hex characters chosen once when Python starts, so text saved in a workbook never names an object of a later session; and a running number shared by every kind, six digits at least, that never repeats within a session. The readable label the spec carried was dropped by the owner: nothing supplies one.
+12. Every creator call publishes. Two creator cells with equal inputs hold two objects and show two handles, and a recalculated creator publishes anew. Reuse of the same handle on an unchanged recalculation, and release when a creator is deleted or its workbook closes, are open in [handles.md](handles.md); until then the store grows until Excel closes.
+
 ## Parked
 
-Handles, in both directions. When the first builder function exists, its object kind joins both tables as a type: on the way in, text that must name a live object of that kind, handed to the function as the object; on the way out, the object, stored by the seam, with its handle text in the cell. The text's format and the store are designed then. The spec is [handles.md](handles.md).
+Handles, built in part by #53: the way out is decisions 10 to 12 above, the way in is [inputs.md](inputs.md), and the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text). Release, reuse on an unchanged recalculation, and columns of handles are open; the spec is [handles.md](handles.md).

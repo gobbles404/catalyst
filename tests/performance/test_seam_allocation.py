@@ -114,6 +114,41 @@ def test_an_array_out_peaks_at_the_array_and_its_finite_mask() -> None:
     assert peak_bytes(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
 
 
+# --- handles ------------------------------------------------------------------
+# A creator keeps what it makes: the record, its entry in the store and its text; a reader
+# keeps nothing, and its numpy scalars are the small objects. Each is the least of three warm
+# calls, so that a resize of the store's dictionary, which lands on one call in many, never
+# lands on the pin.
+
+CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
+
+
+def curve_body(rows: int) -> Cells:
+    return Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(rows)])
+
+
+def least_peak(fn: Callable[[], object]) -> int:
+    return min(peak_bytes(fn) for _ in range(3))
+
+
+# Measured 1,176 bytes for the valuation date and 1,208 for the reader on 2026-09-14.
+def test_a_creator_of_a_small_object_and_a_reader_stay_small() -> None:
+    assert least_peak(lambda: ENTRY["CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
+    handle = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3))
+    assert least_peak(lambda: ENTRY["util_ReadDiscountFactor"](handle, 46277.0)) <= 2 * SLACK
+
+
+# A ten-year curve keeps its two arrays, 16 bytes per day, and on the way pays the table path's
+# conversion of the date column and its own five looks: measured 129,027 bytes at 3,631 days on
+# 2026-09-14, about 36 bytes per day.
+def test_a_discount_curve_keeps_two_arrays_and_pays_its_looks_once() -> None:
+    days = 3_631
+    body = curve_body(days)
+    assert (
+        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 36 * days + SLACK
+    )
+
+
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])

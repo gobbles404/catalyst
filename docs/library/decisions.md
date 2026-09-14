@@ -178,7 +178,10 @@ place — where dates are produced. Excel then tracks the dependency through the
 handle contract, and with several curves the bound is the minimum of theirs.
 
 This also has to absorb a second and third curve, which a swap needs, and the naming
-collision noted in D6. Behaviour for dates *before* the start date is separately open.
+collision noted in D6. Behaviour for dates *before* the start date is separately open. The
+temporary reader built in #53, `util_ReadDiscountFactor`, fails for a day before the curve's
+start as it does for one after it, because it has no data there; that is the reader's own
+rule, not a decision of this question.
 
 **What would decide it:** the object that carries the valuation date and the curve or
 curves as one explicit argument, designed with the first pricing function.
@@ -297,7 +300,7 @@ declarations keep their seam types, because registration selects its validation 
 **Costs** nothing here. Mixed text-and-numeric records stay as typed records; they are not
 forced into an object-dtype array to make the collection "a NumPy thing".
 
-### D21 · A table crosses as a header row and a schema-bound body; the layout of the curve's table is **open**
+### D21 · A table crosses as a header row and a schema-bound body, and the curve's table is that table
 
 **Decided.** A table crosses as two arguments, a `TextRow` of headers then a mixed body,
 and the function declares a schema, one line per column, the header name and its column
@@ -316,24 +319,25 @@ boundary, as [tenet 1](../../PRINCIPLES.md) requires.
 and a one-row table costs what about thirty-five scalar calls cost, so a function that takes
 one trade at a time takes scalars.
 
-**Open:** which layout `CreateDiscountCurve` and `InterpolateDiscountFactors` take, resolved
-together since they share the date/factor table, and whether the utility returns its date
-column. The candidates, each of which the seam as it is can carry:
+**Decided 2026-09-13** for the curve, by the owner in conversation, and built in #53:
+`CreateDiscountCurve` takes the table, a header row `date` and `discount_factor` over a
+welded body of dates and factors, `=CreateDiscountCurve(A1:B1, A2:B4)`. `df` was rejected as
+a header, to keep clear of "dataframe". `InterpolateDiscountFactors` takes the same table
+when it is built and returns `date` and `discount_factor` columns. The table won because the
+sheet keeps the pairing and the headers say which column is which; its cost is two ranges to
+select instead of one. The candidates weighed, each of which the seam could carry:
 
 | Layout | Formula | What it costs |
 |---|---|---|
-| a table: a header row and a body, schema `date: DateColumn`, `df: NumberColumn` | `=CreateDiscountCurve(A1:B1, A2:B4)` | the sheet keeps the pairing; two ranges to select instead of one |
+| a table: a header row and a body, schema `date: DateColumn`, `discount_factor: NumberColumn` | `=CreateDiscountCurve(A1:B1, A2:B4)` | the sheet keeps the pairing; two ranges to select instead of one |
 | separate typed columns, no headers | `=CreateDiscountCurve(A2:A4, B2:B4)` | two ranges can be selected one row out of step, `A2:A10` beside `B3:B11`, and equal lengths cannot catch it |
 | a numeric body with fixed positions, no headers | `=CreateDiscountCurve(A2:B4)` | meaning by position alone; swapped columns are silent until the rules catch them |
 | a start date and factors, the dates generated | `=CreateDiscountCurve(A2, B2:B4)` | one row per factor from the start; the supplied dates are gone, so a missing source observation shifts every factor after it with nothing to say so |
 
-Two earlier candidates are no longer live: a header row over a `NumberArray` body,
+Two earlier candidates were no longer live: a header row over a `NumberArray` body,
 superseded by the table type, which binds and converts the columns that layout would have
 needed; and headers inside the body, against [inputs.md](../seam/inputs.md) decisions 11
 and 27.
-
-**What would decide it:** the owner, in the workbook ([golden rule 8](../golden-rules.md)),
-for both functions at once.
 
 ### D29 · A library rejection raises `ValueError`
 
@@ -413,45 +417,54 @@ ordinary Python references handle continued use of the underlying objects.
 
 **Decided:** an unchanged creator reuses its existing objects and handles and consumes no
 new publication numbers; this includes an entirely unchanged batch, and it never merges
-separate creators or trade occurrences. What that reuse needs, and every other open handle
-question, is D26.
+separate creators or trade occurrences. Not yet built: since #53 a recalculated creator
+publishes anew, and D26 holds the reuse with release, because both need the same creator
+tracking.
 
-**Naming direction agreed:** lowercase `object_type:readable_label:session_id:counter`,
-with underscores for multiword type tags. One decimal counter starts at 1 across all object
-types and workbooks in the store; at least six digits are displayed, growing without wrapping
-or recycling. It identifies a publication, not a version or array position. Closing a workbook
-does not reset a continuing runtime's sequence. A reset requires a changed session identifier.
-The full exact token identifies the entry; labels may repeat. Label source and exact slug
-rules, and session-token generation/spelling/length, are open under D26. Python type and
-function names do not change. The [handle's text](../seam/handles.md#the-handles-text)
-holds examples. No label parameter is added to a constructor by this decision.
+**Naming direction agreed**, and amended on 2026-09-13 by the owner, who dropped the readable
+label because nothing supplies one: the text is `kind:session:number`, built in #53 as
+[outputs.md](../seam/outputs.md) decision 11. The kind's tag is lowercase with underscores
+between words. One decimal number starts at 1 across all kinds and workbooks in the store; at
+least six digits are displayed, growing without wrapping or recycling. It identifies a
+publication, not a version or array position. Closing a workbook does not reset a continuing
+runtime's sequence; a reset comes with a new session part, six hex characters drawn when
+Python starts. The full exact text identifies the entry. Python type and function names do
+not change. The [handle's text](../seam/handles.md#the-handles-text) holds examples. No label
+parameter is added to a constructor.
 
 ### D26 · What the seam needs before any of this exists — **open**
 
-Nothing in the seam's result rules retains an object today, so a constructor returning one
-refuses to register. The pieces are a declared result rule that retains a verified object and
-returns its text, an argument rule that resolves text to the expected object kind, one
-store, and host lifecycle integration; registration keeps all of it out of the pricing
-library. The spec is [handles.md](../seam/handles.md), which is absorbed into the seam's
-pages when built.
+**Built in #53:** the declaration `Handle[Kind]`, the seam's one alias around a class the
+library defines, so a creator returns the object and its cell shows the handle, and a
+consumer receives the object; one store in the bridge, a dictionary from the handle's text to
+the verified kind and a strong Python reference; the three-part text; publishing as a result
+rule and resolving as an accept rule, with every failure as text in the cell.
+[inputs.md](../seam/inputs.md) decisions 34 to 37, [outputs.md](../seam/outputs.md)
+decisions 10 to 12, [bridge.md](../seam/bridge.md#a-handle-one-store-and-the-text).
+Registration keeps all of it out of the pricing library, and adding a kind adds no code of
+its own. Every creator call publishes, so two equal creator cells hold two objects, as D25
+asks; a recalculated creator publishes anew, which D25's reuse rule forbids, and this entry
+holds that with release. The store grows until Excel closes.
 
-The recommended first candidate is one Python store with Excel-DNA lifecycle notifications;
-a C# store over Excel-DNA's own object handler, holding owned Python references, is the
-alternative. Neither is selected. Native tracked publication shares one object between equal
-calls, which D25 forbids, so either needs adapting for separate creators; the evidence is
-[excel-dna-handles.md](../seam/excel-dna-handles.md).
+**Open:** release and reuse, which need the same creator tracking, and the host hooks no
+Excel event today. Two ways were researched. Excel-DNA's own object handler, in the version
+the host references, tracks a creator through Excel's live-data subscription and disposes
+the object when the formula goes away; but it shares one object between creator cells with
+equal inputs, against D25, pays a caller lookup, a hash of the whole input and one extra
+Excel call on every recalculation of a creator, and is documented as unreliable inside array
+formulas. Shipped add-ins with handles, xlOil, PyXLL's earlier cache and QuantLibXL, remember
+which cell made each object, replace that cell's previous object on its next recalculation,
+purge on workbook close, and let a deleted creator's object wait for the close. The evidence
+is [excel-dna-handles.md](../seam/excel-dna-handles.md). Open with it: creator tracking and
+callback timing, including safe shutdown; the batch spill's declaration, row errors, blocked
+spill, resizing and partial reuse of unchanged rows when others change; the equality key and
+the preparation work for unchanged-creator reuse; whether moving a creator may rebuild its
+objects or must keep their handles; reopen calculation timing, interrupted calculation, undo
+and unexpected loss.
 
-Open with it, each waiting on the first proof: the store, creator tracking and callback
-timing, including safe shutdown; the return declaration, and the batch spill's declaration,
-row errors, blocked spill, resizing and partial reuse of unchanged rows when others change;
-the label's source and normalization, and the session token's generation and spelling; the
-equality key and the preparation work for unchanged-creator reuse; whether moving a creator
-may rebuild its objects or must keep their handles; reopen calculation timing, interrupted
-calculation, undo and unexpected loss.
-
-**What would decide it:** the first proof, `CreateValuationDate`, in the order
-[handles.md](../seam/handles.md#the-first-proof) gives: distinct objects and independent
-cleanup demonstrated, not a dictionary chosen.
+**What would decide it:** the next pull request, with counts: correct worksheet behaviour
+first, then the work per creator recalculation, then retained memory, measured on whole
+calls. The store and the text stay as built under either way.
 
 ---
 

@@ -45,7 +45,14 @@ def workloads() -> dict[str, Callable[[], object]]:
     mixed = Cells.from_rows([[["nn", 1.0, True][i % 3]] for i in range(n)])
     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
     trades = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(n // 4)])
+    # The reader's handle: a ten-year curve created once here, since a creator under the
+    # profiler would retain a curve per call.
+    curve = ENTRY["CreateDiscountCurve"](
+        Cells.from_rows([["date", "discount_factor"]]),
+        Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(3_631)]),
+    )
     return {
+        "util_ReadDiscountFactor": lambda: ENTRY["util_ReadDiscountFactor"](curve, 46277.0),
         "Zero": lambda: ENTRY["Zero"](),
         "Add": lambda: ENTRY["Add"](1.0, 2.0),
         "Times": lambda: ENTRY["Times"](5.0, MISSING),

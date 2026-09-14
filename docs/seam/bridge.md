@@ -8,9 +8,9 @@ The host uses four names from the bridge and nothing else. When Excel loads the 
 
 The host keeps each prepared path beside the C# function it registers with Excel under that name; how that function is built is in [host.md](host.md). A call after that hands the prepared path the arguments and nothing else; the host never again asks Python for anything by name. A pin is a test that holds a fact still, a count or a message, so a change that moves it fails; `tests/performance/HostWorkBudgets.cs` pins that at zero name lookups per call, and [baseline.md](baseline.md) records the counts, the host's own tally of what it did on one call.
 
-Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision sixteen functions register at import: `Ping`, the bridge's own, and the fifteen probes.
+Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge, the globals and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision nineteen functions register at import: `Ping`, the bridge's own; the fifteen probes; and the three of the globals module, `CreateValuationDate` and `CreateDiscountCurve`, which return handles, and `util_ReadDiscountFactor`, which takes one.
 
-`function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, the list of parameter names, and whether the function is hidden. Every probe is hidden and `Ping` is not; `tests/unit/test_bridge.py` pins both.
+`function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, the list of parameter names, and whether the function is hidden. Every probe is hidden; `Ping` and the three of the globals module are not; `tests/unit/test_bridge.py` pins both.
 
 ## Declaring a worksheet function
 
@@ -29,16 +29,17 @@ Registration reads four things: the function's own name, which becomes the works
 
 - a name already registered: `Number is already registered`;
 - a parameter the host cannot pass by position, one that must be passed by name or one that takes any number of values: `Keyed: put is keyword-only, which the host cannot pass`;
-- an annotation outside the fourteen declared input types and the table schemas: `Later: x declares list[str], which the seam cannot receive`;
+- an annotation outside the fourteen declared input types, the table schemas, and `Handle[Kind]` around a class the library defines: `Later: x declares list[str], which the seam cannot receive`; a handle around one of the seam's own types, or around a table, is refused the same way, `Read: x declares Handle[str], which the seam cannot receive`;
 - a parameter with no annotation, refused the same way, though the message shows Python's name for an empty annotation rather than a plain word;
 - an annotation written as text, which is what `from __future__ import annotations` makes of every annotation, so a module of worksheet functions must not use it;
 - a default the parameter's own accept rule rejects: `Wrong: x defaults to text 'x', expected number`;
 - a table with no row of text before it to hold its headers: `Bare: trades declares a table with no row of text before it to hold its headers`;
 - a default on a table: `Defaulted: table declares a table, which takes no default`. A table's columns are checked against its schema on the call, so a default could not be checked at registration as every other default is, and a header row before a table cannot have a default of its own, since a parameter with a default must come last;
 - a schema whose column is not a column type, whose columns are one header without regard to case, or which has no columns: `Grid2: wide column values declares goosedove.excel.bridge.NumberArray, which is not a column type`;
-- no return annotation, `-> None`, or a return annotation outside the ten declared result types.
+- a default on a handle: `ReadWithDefault: curve declares a handle, which takes no default`. The store holds nothing at registration, so there is nothing a default could name;
+- no return annotation, `-> None`, or a return annotation outside the ten declared result types and `Handle[Kind]`: `Boxed declares Handle[float] as its result, which the seam cannot send`.
 
-`tests/unit/test_type_validation.py`, `tests/unit/test_table_validation.py` and `tests/unit/test_result_validation.py` pin those texts, except three. The unannotated parameter has no test, nor does an annotation written as text, nor a text-array return: `TextColumn` and `TextRow` can be taken but not returned, and a function declaring one as its result is refused with `declares goosedove.excel.bridge.TextColumn as its result, which the seam cannot send`.
+`tests/unit/test_type_validation.py`, `tests/unit/test_table_validation.py`, `tests/unit/test_result_validation.py` and `tests/unit/test_handles.py` pin those texts, except three. The unannotated parameter has no test, nor does an annotation written as text, nor a text-array return: `TextColumn` and `TextRow` can be taken but not returned, and a function declaring one as its result is refused with `declares goosedove.excel.bridge.TextColumn as its result, which the seam cannot send`.
 
 Since a default goes through its parameter's accept rule, `None` can never be a default: every accept rule calls it blank. Blank and missing are different facts: a blank is a cell with nothing in it and arrives as `None`, missing is an argument the formula left out and arrives as `MISSING`, so `=Times(5, A1)` with A1 empty fails and `=Times(5)` takes the default factor of 1.
 
@@ -57,9 +58,9 @@ flowchart TD
   Fn -->|"its return annotation"| Result["the declared result"]
   Fn -->|"its docstring"| Desc["the description"]
   Param -->|"positional or not"| Positional["positional, or refused"]
-  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the fourteen declared types, or a table schema"]
+  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the fourteen declared types, a table schema, or a handle"]
   Param -->|"its default, if any"| Default["the default, through the accept rule, stored converted"]
-  Result -->|"its annotation"| Convert["the result rule, from the ten declared results"]
+  Result -->|"its annotation"| Convert["the result rule, from the ten declared results, or a handle"]
   Positional -->|"the name"| Parameter["Parameter: the name, the words of the sheet, the accept rule, the default"]
   Accept -->|"the rule and its words"| Parameter
   Default -->|"the stored default"| Parameter
@@ -103,7 +104,7 @@ The way in is type validation, before the function runs; the way out is the conv
 
 ## The declared input types
 
-A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Nine of the range and date types are named labels: `Date` on a numpy day, the number, date and boolean ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism. A table's schema is the one declaration that is not in this table: it is a class, and its columns name their column types from it, as the section on tables says.
+A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Nine of the range and date types are named labels: `Date` on a numpy day, the number, date and boolean ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism. Two declarations are not labels: a table's schema is a class of its own, whose columns name their column types, as the section on tables says; and a handle is the seam's alias `Handle` around a class the library defines, as the section on handles says.
 
 | Declared | Words of the sheet | Accept rule | Hands the function |
 |---|---|---|---|
@@ -122,6 +123,7 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `BooleanColumn` | column of booleans | `_boolean_column` | a flat array of booleans, converted from the 1.0 and 0.0 the host wrote |
 | `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts |
 | a subclass of `Table` | table | `_mixed`, then `_refine` | the schema's record, one typed column per header |
+| `Handle[Kind]` | the kind's words, then handle: `discount curve handle` | `_resolve` | the object the handle stands for |
 
 The scalar accept rules match exactly. A Python bool is an int, so the number rule rejects a bool before it accepts an int or float, as [inputs.md](inputs.md) rule 1 requires. Whole means no fraction, and `tests/unit/test_type_validation.py` pins that every whole number from −2^53 to 2^53, the largest whole number a cell holds without rounding, passes. A date is a whole serial inside the calendar. What a serial and the calendar are, and why serial 60 is rejected, is [inputs.md](inputs.md) rule 6 and decision 13; here the date rule checks a number, then whole, then the calendar, in that order.
 
@@ -207,9 +209,34 @@ What that costs is pinned. `tests/performance/test_seam_budgets.py` pins a table
 
 `MixedArray` stays for a function that wants the raw record, as `CountMixed` does. Reordered columns bind by name and work; a header with a space in it does not, and the message quotes the space.
 
+## A handle: one store, and the text
+
+A handle is text in a cell that stands for an object the seam holds, such as a curve. The declaration is one alias, `Handle`, written around a class the library defines: `-> Handle[DiscountCurve]` on a creator, `curve: Handle[DiscountCurve]` on a consumer. To the type checker the alias is the class itself, so a function body needs no cast; to registration it is the mark that selects publishing on the way out and resolving on the way in. The kind is the class inside the brackets, and its words on the sheet are its name in lowercase words, `discount curve`; its tag in the text is the same with underscores. A class of the seam's own inside the brackets, a table, or a bare `Handle` refuses to register as an unknown annotation does, and a handle parameter takes no default, because the store holds nothing at registration.
+
+```python
+@excel_function
+def CreateDiscountCurve(header_row: TextRow, table: DiscountCurveTable) -> Handle[DiscountCurve]:
+    """Creates a daily discount-curve handle. Its last date is the latest the library prices."""
+    return discount_curve(table.date, table.discount_factor)
+
+
+@excel_function
+def util_ReadDiscountFactor(curve: Handle[DiscountCurve], date: Date) -> float:
+    """Reads the discount factor for one day from a discount-curve handle."""
+    return factor_on(curve, date)
+```
+
+The store is one dictionary in the bridge, from a handle's text to the kind the seam verified and a strong reference to the object. Nothing else holds an object, and the library never sees the text. Publishing, `_publish`, runs as a result rule: the object must be of exactly the declared class, or it is refused as any result is, `returned a Python list, expected discount curve`; then the text is made, the entry stored, and the text returned. The text is `kind:session:number`: the tag, six hex characters drawn once when Python starts, and a running number shared by every kind, six digits at least, `discount_curve:3f9a1c:000002`. The session part is what keeps text saved in a workbook from naming an object of a later session; the number never repeats within one. A creator that raises never reaches the rule, so a failure is never published and the number does not move.
+
+Resolving, `_resolve`, runs as an accept rule, and its faults come in the order [inputs.md](inputs.md) decision 35 gives: the text rule first, so a number, a blank, a missing argument, an empty text or an array fail in the seam's usual words; then text beginning `#ERROR `, a creator's failure relayed by a reference to its cell, `curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ...`, the creator's own text carried whole at the end, and when the text relayed is itself such a relay the creator's text is taken out of it and carried on unchanged, so a chain of consumers of any length shows one message and quoting never compounds; then one dictionary lookup, which finds nothing, `curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle`, or an entry of another kind, `curve is valuation date handle 'valuation_date:3f9a1c:000001', expected discount curve handle`; otherwise the function receives the object itself. The kind is compared by identity against what the store recorded; the text's own prefix proves nothing, and nothing in the text is parsed.
+
+What that costs is pinned. `tests/performance/test_seam_budgets.py` pins `CreateValuationDate` at the two-scalar call, the library's builder and one publication; `CreateDiscountCurve` at 3,631 rows at the table path, the builder and one publication, with five looks, two conversions, the two copies the curve keeps and one scalar conversion on the numpy ledger; `util_ReadDiscountFactor` at a text call, one lookup and the reader; and a dead handle at one lookup and nothing else. `tests/performance/test_seam_allocation.py` pins a small creator and the reader under twice the slack, measured 1,176 and 1,208 bytes on 2026-09-14, and the ten-year curve at 36 bytes per day plus the slack, measured 129,027: its two arrays at 16 bytes per day, and the table path's conversion of the date column and the builder's looks on the way. `tests/unit/test_handles.py` pins every text above with two kinds of its own, and `tests/unit/test_globals.py` the three functions through the seam.
+
+Every creator call publishes: two creator cells with equal inputs hold two objects, and a recalculated creator publishes anew, so the store grows until Excel closes. Release when a creator is deleted or its workbook closes, and reuse of the same handle on an unchanged recalculation, are open, specified in [handles.md](handles.md), with the evidence for the two ways of building them in [excel-dna-handles.md](excel-dna-handles.md).
+
 ## The result rules
 
-The result rule for a declared return type converts what the function returned into one of the four things the host can show: a number, text, a boolean, or an array of numbers. The rules and decisions, and the full list of what fails, are [outputs.md](outputs.md)'s; this table is the mechanism, with the shortest phrase for what each rule rejects.
+The result rule for a declared return type converts what the function returned into one of the four things the host can show: a number, text, a boolean, or an array of numbers; for a handle it keeps the object and sends its text. The rules and decisions, and the full list of what fails, are [outputs.md](outputs.md)'s; this table is the mechanism, with the shortest phrase for what each rule rejects.
 
 | Declared | Result rule | Rejects | Sends |
 |---|---|---|---|
@@ -223,6 +250,7 @@ The result rule for a declared return type converts what the function returned i
 | `NumberRow` | `_row_out` | the same | reshaped to 1 by N |
 | `DateColumn` | `_date_column_out` | not a one-dimensional array of such days; empty | serials, N by 1 |
 | `DateRow` | `_date_row_out` | the same | serials, 1 by N |
+| `Handle[Kind]` | `_publish` | not an object of exactly that class; nothing | the handle, text, after keeping the object |
 
 A numpy scalar is unwrapped first, so `np.float64(1.5)` is 1.5 and `np.bool_(False)` is False; a numpy value that cannot be unwrapped to a Python one, a longdouble say, is rejected by name. Integers are numbers: 3 goes out as 3.0, and a whole number out is a float too, because a whole number and a number are one kind on the sheet. 9007199254740993 is one past 2^53 and is rejected as `beyond what a cell holds exactly`. The finite check comes last for a number and second for a whole number, before its fraction check: NaN or infinity is `result is not a finite number` either way.
 
@@ -294,9 +322,13 @@ No parameter that may be `None`, and no keyword arguments. The first follows fro
 
 | To find | Look in |
 |---|---|
-| the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
+| the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, the handle store and its two rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
 | the probes | `src/goosedove/excel/probes.py` |
+| the creators and the temporary reader | `src/goosedove/excel/globals.py` |
+| the library's first objects, a valuation date and a discount curve, and their builders | `src/goosedove/globals/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
+| every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
+| the three library functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_valuation_date.py`, `test_discount_curve.py` |
 | the exact text of every scalar rejection, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
 | every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |

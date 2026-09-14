@@ -40,6 +40,17 @@ namespace Goosedove.Host.Tests
             };
         }
 
+        // A curve's table: 11 to 13 September 2026 and a factor per day, the first replaceable.
+        private static object[,] Curve(double first = 1.0)
+        {
+            return new object[,]
+            {
+                { 46276.0, first },
+                { 46277.0, 0.9999 },
+                { 46278.0, 0.9998 },
+            };
+        }
+
         private static object[,] FirstColumns(object[,] grid, int cols)
         {
             var narrow = new object[grid.GetLength(0), cols];
@@ -94,6 +105,27 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "Dot", new object[] { Column(1.0, 2.0, 3.0), Row(10.0, 20.0, 30.0) }, "#ERROR Dot: b is 1x3 array, expected column of numbers" };
             yield return new object[] { "Grid", new object[] { 2.5, 3.0 }, "#ERROR Grid: rows is number 2.5, expected whole number" };
             yield return new object[] { "Fail", new object[] { }, "#ERROR Fail: ValueError: as asked" };
+            // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
+            yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
+            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
+            yield return new object[] { "util_ReadDiscountFactor", new object[] { "x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is text 'x' naming no live object, expected discount curve handle" };
+            // A creator's failure is relayed whole, and a relay of a relay shows the same text.
+            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
+        }
+
+        // A handle: the creator's text stands for the curve, the reader gets a factor back through it,
+        // and the headers bind by name in either order.
+        [Fact]
+        public void a_curve_is_created_as_a_handle_and_read_back_through_it()
+        {
+            var handle = (string)Seam.Call("CreateDiscountCurve", Row("date", "discount_factor"), Curve());
+            Assert.StartsWith("discount_curve:", handle);
+            Assert.Equal(0.9999, Seam.Call("util_ReadDiscountFactor", handle, 46277.0));
+            var swapped = new object[,] { { 1.0, 46276.0 }, { 0.9999, 46277.0 }, { 0.9998, 46278.0 } };
+            var reversed = (string)Seam.Call("CreateDiscountCurve", Row("discount_factor", "date"), swapped);
+            Assert.NotEqual(handle, reversed);
+            Assert.Equal(0.9998, Seam.Call("util_ReadDiscountFactor", reversed, 46278.0));
         }
 
         [Theory]

@@ -1,6 +1,9 @@
-# Builds the add-in and opens it in a fresh, visible Excel for trying formulas by hand.
-# Run it again after a change: it closes the Excel it opened last time, through that window
-# so Excel can offer to save, and never touches any other Excel.
+# Builds the add-in and opens it in a fresh, visible Excel for trying formulas by hand, on a new
+# workbook, or on the one named: .\tools\excel_dev.ps1 workbooks\handles.xlsx. A named workbook
+# is fully recalculated on opening, so every handle in it belongs to this session, not to the
+# one that saved it. Run it again after a change: it closes the Excel it opened last time,
+# through that window so Excel can offer to save, and never touches any other Excel.
+param([string]$Workbook)
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot "host_build.ps1")
@@ -26,6 +29,12 @@ if (Test-Path $pidFile) {
 }
 
 $xll = Build-HostAddIn -Root $root
+$open = if ($Workbook) {
+    $path = (Resolve-Path $Workbook).Path
+    "[void]`$excel.Workbooks.Open('$path'); `$excel.CalculateFullRebuild()"
+} else {
+    "[void]`$excel.Workbooks.Add()"
+}
 
 # Start Excel from a throwaway process. While any automation client holds an Excel, that
 # Excel ignores asks to close, so the client must be gone before the person has it.
@@ -33,7 +42,7 @@ $start = @"
 `$excel = New-Object -ComObject Excel.Application
 try {
     if (-not `$excel.RegisterXLL('$xll')) { throw 'Excel refused to load $xll' }
-    [void]`$excel.Workbooks.Add()
+    $open
     `$excel.Visible = `$true
     `$excel.UserControl = `$true
 }

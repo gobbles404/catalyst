@@ -124,13 +124,32 @@ def host_buffers(n: int) -> tuple[int, int]:
     return ctypes.addressof(kinds), ctypes.addressof(numbers)
 
 
+CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
+
+
+def curve_body(rows: int) -> Cells:
+    """A curve's table: one calendar day and its factor per row, from 11 September 2026."""
+    return Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(rows)])
+
+
 def scenarios() -> list[Scenario]:
     """Every timed case, with its inputs built here, before any clock starts."""
+    # A ten-year curve, created once here: the reader's handle. The creators themselves have no
+    # row, because each call would retain a curve for the life of the run.
+    curve = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
     cases = [
         Scenario("Zero", "scalar", 0, 1, lambda run=ENTRY["Zero"]: run(), equals(0.0)),
         Scenario("Add", "scalar", 2, 1, lambda run=ENTRY["Add"]: run(1.0, 2.0), equals(3.0)),
         Scenario(
             "Times", "missing", 1, 1, lambda run=ENTRY["Times"]: run(5.0, MISSING), equals(5.0)
+        ),
+        Scenario(
+            "util_ReadDiscountFactor",
+            "a handle in",
+            2,
+            1,
+            lambda run=ENTRY["util_ReadDiscountFactor"], h=curve: run(h, 46277.0),
+            equals(1.0 - 1e-5),
         ),
     ]
     for n in (10, *SIZES):  # ten cells is a trade's own row, smaller than the working size
