@@ -7,6 +7,7 @@ import pytest
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle, Table, TextRow, excel_function
+from goosedove.excel.probes import probe
 
 
 class Curve:
@@ -28,27 +29,27 @@ _returns: dict[str, object] = {}
 _seen: dict[str, object] = {}
 
 
-@excel_function
+@probe
 def MakeCurve(level: float) -> Handle[Curve]:
     return Curve(level)
 
 
-@excel_function
+@probe
 def MakeOther() -> Handle[Other]:
     return Other()
 
 
-@excel_function
+@probe
 def MakeWhatever() -> Handle[Curve]:
     return cast(Curve, _returns["value"])
 
 
-@excel_function
+@probe
 def FailToMake() -> Handle[Curve]:
     raise ValueError("as asked")
 
 
-@excel_function
+@probe
 def ReadCurve(curve: Handle[Curve]) -> float:
     _seen["curve"] = curve
     return curve.level

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using ExcelDna.Integration;
+using ExcelDna.IntelliSense;
 using Python.Runtime;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -14,6 +15,8 @@ namespace Goosedove.Host
     /// <summary>Runs once when Excel loads the add-in: read config, start Python, import the bridge.</summary>
     public class AddIn : IExcelAddIn
     {
+        private static bool helpShown;
+
         public void AutoOpen()
         {
             try
@@ -21,6 +24,10 @@ namespace Goosedove.Host
                 var config = Config.Load(Path.Combine(Path.GetDirectoryName(ExcelDnaUtil.XllPath), "goosedove.cfg"));
                 Bridge.Start(config["pythondll"], config["pythonpath"].Split(';'));
                 Registration.RegisterAll();
+                // The help beside the formula as a person types it, from what was just registered. Excel's
+                // own fx dialog reads the same registration and needs nothing more.
+                IntelliSenseServer.Install();
+                helpShown = true;
             }
             catch (Exception ex)
             {
@@ -30,7 +37,12 @@ namespace Goosedove.Host
 
         public void AutoClose()
         {
-            // Excel is exiting; the process ends and takes Python with it.
+            // Excel is exiting, or the add-in is being unloaded: the help's hooks come out; the
+            // process end takes Python with it.
+            if (helpShown)
+            {
+                IntelliSenseServer.Uninstall();
+            }
         }
     }
 
@@ -404,6 +416,17 @@ namespace Goosedove.Host
     {
         public static void RegisterAll()
         {
+            var (delegates, attributes, argumentAttributes) = Describe();
+            ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
+        }
+
+        /// <summary>
+        /// What Excel is told about each function: one delegate, its name, description and hidden flag, and
+        /// one attribute per argument carrying the label Excel shows, [factor] for an optional argument, and
+        /// its help. The bridge prepared all of it once at import; nothing here is read again per call.
+        /// </summary>
+        internal static (List<Delegate> Delegates, List<object> Attributes, List<List<object>> ArgumentAttributes) Describe()
+        {
             var delegates = new List<Delegate>();
             var attributes = new List<object>();
             var argumentAttributes = new List<List<object>>();
@@ -415,25 +438,20 @@ namespace Goosedove.Host
                 {
                     var name = spec[0].As<string>();
                     var description = spec[1].As<string>();
-                    var parameters = new List<string>();
-                    foreach (PyObject p in new PyList(spec[2]))
+                    var arguments = new List<object>();
+                    foreach (PyObject argument in new PyList(spec[2]))
                     {
-                        parameters.Add(p.As<string>());
+                        arguments.Add(new ExcelArgumentAttribute { Name = argument[0].As<string>(), Description = argument[1].As<string>() });
                     }
                     var hidden = spec[3].As<bool>();
 
-                    delegates.Add(MakeDelegate(Bridge.Prepare(name), parameters.Count));
+                    delegates.Add(MakeDelegate(Bridge.Prepare(name), arguments.Count));
                     attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description, IsHidden = hidden });
-                    var args = new List<object>();
-                    foreach (var p in parameters)
-                    {
-                        args.Add(new ExcelArgumentAttribute { Name = p });
-                    }
-                    argumentAttributes.Add(args);
+                    argumentAttributes.Add(arguments);
                 }
             }
 
-            ExcelIntegration.RegisterDelegates(delegates, attributes, argumentAttributes);
+            return (delegates, attributes, argumentAttributes);
         }
 
         // Excel-DNA needs a delegate with one typed parameter per argument. Build one that packs

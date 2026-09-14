@@ -21,6 +21,7 @@ from goosedove.excel.bridge import (
     excel_function,
     register,
 )
+from goosedove.excel.probes import probe
 
 cells = Cells.from_rows
 
@@ -35,12 +36,12 @@ class Trades(Table):
     cleared: BooleanColumn
 
 
-@excel_function
+@probe
 def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
     return float(trades.quantity.sum())
 
 
-@excel_function
+@probe
 def TradePayload(header_row: TextRow, trades: Trades) -> str:
     """Everything the record holds, so an assertion sees all of it, not a sum."""
     return (
@@ -49,7 +50,7 @@ def TradePayload(header_row: TextRow, trades: Trades) -> str:
     )
 
 
-@excel_function
+@probe
 def HeadersAsTyped(header_row: TextRow, trades: Trades) -> str:
     """The header row reaches the function as the tuple it is; the record does not carry it."""
     return ", ".join(header_row)
@@ -59,7 +60,7 @@ class Flag(Table):
     cleared: BooleanColumn
 
 
-@excel_function
+@probe
 def AnyCleared(header_row: TextRow, flags: Flag) -> bool:
     return bool(flags.cleared.any())
 
@@ -69,7 +70,7 @@ class Pair(Table):
     b: NumberColumn
 
 
-@excel_function
+@probe
 def SumPair(header_row: TextRow, pair: Pair) -> float:
     return float(pair.a.sum() + pair.b.sum())
 
@@ -80,7 +81,7 @@ class Labels(Table):
     right: TextColumn
 
 
-@excel_function
+@probe
 def JoinLabels(header_row: TextRow, labels: Labels) -> str:
     return " ".join(labels.left) + " | " + " ".join(labels.right)
 

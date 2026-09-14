@@ -30,11 +30,12 @@ import math
 import re
 import secrets
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from enum import IntEnum
 from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
 from typing import (
+    Annotated,
     Any,
     Final,
     NewType,
@@ -970,6 +971,8 @@ class Parameter:
     expected: str
     accept: Callable[[object], object]
     default: object  # MISSING when the argument is required
+    label: str  # the name as Excel shows it: in brackets when the argument is optional
+    help: str  # what Excel says about it: the words beside the declaration, then the default
 
 
 @dataclass(frozen=True, slots=True)
@@ -1060,6 +1063,88 @@ def _describe_array(array: NDArray[Any]) -> str:
 
 
 _POSITIONAL: Final = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+
+# The most Excel shows of a function's or an argument's help. Excel-DNA cuts longer text without
+# a word, so registration refuses it instead.
+HELP_LIMIT: Final = 253
+
+
+def _units(text: str) -> int:
+    """Characters as Excel counts them, in UTF-16 units, the way LEN does."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _authored(function: str, spec: inspect.Parameter) -> tuple[inspect.Parameter, str]:
+    """A parameter with its declared type alone, and the help written beside it.
+
+    Annotated[Date, "One date."] declares a date and says so to Excel: the type checker reads
+    the type and ignores the words, and registration reads both. Nothing else may sit there.
+    """
+    if get_origin(spec.annotation) is not Annotated:
+        return spec, ""
+    parts = cast(tuple[object, ...], get_args(spec.annotation))
+    if len(parts) != 2 or not isinstance(parts[1], str):
+        raise TypeError(
+            f"{function}: {spec.name} declares {spec.annotation!r}, "
+            "expected one text beside the type, the argument's help"
+        )
+    return spec.replace(annotation=parts[0]), parts[1]
+
+
+def _shown(function: str, name: str, default: object) -> str:
+    """A stored default in the words of the sheet: 1 for 1.0, "WTI", TRUE, 2026-05-22."""
+    if isinstance(default, np.datetime64):
+        return str(cast(Any, default))
+    value = _scalar(default)
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, int | float):
+        return str(int(value)) if float(value).is_integer() and abs(value) < EXACT else repr(value)
+    if isinstance(value, str):
+        return f'"{value}"'
+    if isinstance(value, np.ndarray) and value.size == 1:
+        return _shown(function, name, cast(NDArray[Any], value).flat[0])
+    if isinstance(value, tuple):
+        texts = cast(tuple[object, ...], value)  # a one-cell range of text, handed over as a tuple
+        if len(texts) == 1:
+            return _shown(function, name, texts[0])
+    raise TypeError(
+        f"{function}: {name} defaults to {describe(default)}, which the help cannot show"
+    )
+
+
+def _help(function: str, name: str, authored: str, default: object, hidden: bool) -> str:
+    """What Excel says about an argument: the words beside the declaration and, for an optional
+    argument, what it takes when omitted. A function Excel lists explains every argument; a
+    hidden one may say nothing."""
+    if not authored:
+        if hidden:
+            return ""
+        raise TypeError(
+            f"{function}: {name} has no help; a function Excel lists says what each argument takes"
+        )
+    text = (
+        authored
+        if default is MISSING
+        else f"{authored} {_shown(function, name, default)} when omitted."
+    )
+    if _units(text) > HELP_LIMIT:
+        raise TypeError(
+            f"{function}: {name}'s help is {_units(text)} characters, expected at most {HELP_LIMIT}"
+        )
+    return text
+
+
+def _description(function: str, fn: Callable[..., object], hidden: bool) -> str:
+    """The docstring, as Excel shows it: the whole text with the surrounding spaces removed."""
+    text = (fn.__doc__ or "").strip()
+    if not text and not hidden:
+        raise TypeError(f"{function} has no docstring; a function Excel lists says what it does")
+    if _units(text) > HELP_LIMIT:
+        raise TypeError(
+            f"{function}'s description is {_units(text)} characters, expected at most {HELP_LIMIT}"
+        )
+    return text
 
 
 def _is_schema(annotation: object) -> bool:
@@ -1154,7 +1239,8 @@ def _parameter(function: str, spec: inspect.Parameter, hidden: bool) -> Paramete
             raise TypeError(
                 f"{function}: {spec.name} defaults to {describe(spec.default)}, expected {expected}"
             ) from None
-    return Parameter(spec.name, expected, accept, default)
+    label = spec.name if default is MISSING else f"[{spec.name}]"
+    return Parameter(spec.name, expected, accept, default, label, "")  # the help is added last
 
 
 def _result(function: str, annotation: object) -> Callable[[object], object]:
@@ -1184,15 +1270,20 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     if name in _FUNCTIONS:
         raise TypeError(f"{name} is already registered")
     signature = inspect.signature(fn)
-    specs = tuple(signature.parameters.values())
+    declared = tuple(_authored(name, spec) for spec in signature.parameters.values())
+    specs = tuple(spec for spec, _ in declared)
     parameters = tuple(_parameter(name, spec, hidden) for spec in specs)
     tables = tuple(
         (i, _schema(name, specs, i)) for i, spec in enumerate(specs) if _is_schema(spec.annotation)
     )
     convert = _result(name, signature.return_annotation)
-    _FUNCTIONS[name] = Registered(
-        fn, (fn.__doc__ or "").strip(), parameters, hidden, convert, tables
+    # What Excel is told comes last, once the declaration itself has passed.
+    parameters = tuple(
+        replace(p, help=_help(name, p.name, authored, p.default, hidden))
+        for p, (_, authored) in zip(parameters, declared, strict=True)
     )
+    description = _description(name, fn, hidden)
+    _FUNCTIONS[name] = Registered(fn, description, parameters, hidden, convert, tables)
     return fn
 
 
@@ -1201,10 +1292,16 @@ def excel_function[F: Callable[..., object]](fn: F) -> F:
     return register(fn, hidden=False)
 
 
-def function_specs() -> list[tuple[str, str, list[str], bool]]:
-    """Name, description, parameter names, and whether hidden, for every registered function."""
+def function_specs() -> list[tuple[str, str, list[tuple[str, str]], bool]]:
+    """Name, description, each argument's label and help, and whether hidden, for every
+    registered function: what the host registers with Excel."""
     return [
-        (name, registered.description, [p.name for p in registered.parameters], registered.hidden)
+        (
+            name,
+            registered.description,
+            [(p.label, p.help) for p in registered.parameters],
+            registered.hidden,
+        )
         for name, registered in _FUNCTIONS.items()
     ]
 
