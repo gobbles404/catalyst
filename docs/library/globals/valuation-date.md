@@ -1,20 +1,20 @@
 # CreateValuationDate
 
-Open: D3, D4, D26.
+Built in #53.
 
-The date and progress through that date at which a calculation is evaluated. Why these choices, and what they cost, is [decisions.md](../decisions.md#dates-and-the-valuation-date), D1 to D5.
+The date and progress through that date at which a calculation is evaluated. Why these choices, and what they cost, is [decisions.md](../decisions.md#dates-and-the-valuation-date), D1 to D5. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
 ```python
-def CreateValuationDate(as_of: Date, day_fraction_elapsed: float) -> ValuationDate: ...
+def CreateValuationDate(as_of: Date, day_fraction_elapsed: float) -> Handle[ValuationDate]: ...
 ```
 
 ```excel
-Inputs!B2   =CreateValuationDate(A2, 0.5)     A2 holds 11-Sep-2026; B2 displays a handle
+Inputs!B2   =CreateValuationDate(A2, 0.5)     A2 holds 11-Sep-2026; B2 shows valuation_date:3f9a1c:000001
 ```
 
-Two scalars, both required, neither with a default. A single-cell reference is a scalar; an array is not, even a 1×1 one. The seam checks both against their declared types and hands over a numpy day and a float; nothing here restates that. `ValuationDate` is a handle, text in the cell that stands for the object held in memory, and the declaration `-> ValuationDate` is what D26 makes registrable: the seam's spec for it is [handles.md](../../seam/handles.md). Consumers refer to the creator cell or to a defined name referring to it.
+Two scalars, both required, neither with a default. A single-cell reference is a scalar; an array is not, even a 1×1 one. The seam checks both against their declared types and hands over a numpy day and a float; nothing here restates that. The result is a handle: text in the cell that stands for the object the seam keeps, declared `Handle[ValuationDate]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the object. What is still open about handles, release above all, is [handles.md](../../seam/handles.md) and D26.
 
 ## Excel help
 
@@ -35,7 +35,7 @@ No rounding, no clamping, no advancing the date. A value just outside the interv
 
 ## In memory
 
-Received: `as_of` as a numpy day and `day_fraction_elapsed` as a Python float, as [bridge.md](../../seam/bridge.md#the-declared-input-types) says. Retained: a frozen record of the two values, unchanged. No array is allocated for either, and the constructor does not become a batch function.
+Received: `as_of` as a numpy day and `day_fraction_elapsed` as a Python float, as [bridge.md](../../seam/bridge.md#the-declared-input-types) says. Retained: a frozen record of the two values, unchanged, held in the seam's store until Excel closes; release is D26. No array is allocated for either, and the constructor does not become a batch function.
 
 Both fields belong to the object's identity. The date is preserved at every accepted fraction, including exactly one.
 
@@ -50,9 +50,11 @@ Both fields belong to the object's identity. The date is preserved at every acce
 
 ## Counted work
 
-None. The builder converts nothing, the seam converted the date, allocates one frozen record, and does no numeric work. It takes no `WorkCounter`. The call is a two-scalar call, which the host already pins; publishing the handle is D26's to count.
+None. The builder converts nothing, the seam converted the date, allocates one frozen record, and does no numeric work. It takes no `WorkCounter` (D27, deferred by the owner). The call is a two-scalar call, which the host already pins; on the Python side `tests/performance/test_seam_budgets.py` pins it at the two-scalar call plus the builder and one publication, and `tests/performance/test_seam_allocation.py` pins its peak under twice the slack, measured 1,176 bytes on 2026-09-14: the record, its entry in the store and its text.
 
 ## Tests
+
+The examples and properties below are `tests/unit/test_valuation_date.py`; the seam's texts and the handle are `tests/unit/test_globals.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`.
 
 | Case | Kind |
 |---|---|
@@ -73,7 +75,6 @@ Use `np.nextafter(0.0, -np.inf)` and `np.nextafter(1.0, np.inf)` for the boundar
 | | |
 |---|---|
 | The ordering key, and whether the fraction stays | D3, D4 |
-| The handle return type, which blocks the whole function | D26 |
 
 ## Not here
 

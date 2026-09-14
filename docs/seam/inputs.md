@@ -118,6 +118,14 @@ def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
 
 With `date`, `product`, `quantity` and `cleared` in A1:D1 and three trades in A2:D4, `=TotalQuantity(A1:D1, A2:D4)` shows the sum of the quantity column. `=TotalQuantity(A1:D1, A2:C4)` fails as `header_row has 4 headers, expected 3, one per column of trades`; a header `ticker` fails as `header_row cell (1, 2) is text 'ticker', expected one of date, product, quantity or cleared`; a time in the date column fails as `trades cell (2, 1) is number 46277.5, expected date`. How the headers bind and the columns are checked is in [bridge.md](bridge.md).
 
+Built in the handles pull request. A handle is text in a cell that stands for an object the seam holds, such as a curve. The desk never types one: a creator's formula shows it, and a consumer's formula refers to the creator's cell.
+
+| Declared | Accepts | Example | Hands over | Fails on |
+|---|---|---|---|---|
+| `Handle[Kind]`, a class the library defines inside the brackets | text that is the handle of a live object of that kind | `=util_ReadDiscountFactor(B5, A3)` with B5 a creator's cell | the object itself | a number, boolean, blank, missing or empty text, any array; text naming no live object; a handle of another kind; a creator's `#ERROR` text, relayed by a reference to its cell |
+
+A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
+
 Next, one at a time, each when the first function needs it. Each adds one rule to the validator and one row here.
 
 | Declared | Would accept | Example | The trap it must handle |
@@ -174,6 +182,13 @@ Decided 2026-09-13, tables.
 32. A column of booleans, `BooleanColumn`, joins the declared types, so a table can hold a flag and a function can take one alone. It takes TRUE and FALSE only. A row of booleans is not built.
 33. The function receives the schema's record, one typed attribute per column, aligned by row. The headers are consumed by the binding: the record does not carry them, and the header-row parameter receives the tuple it always did. Nothing in the record is rebuilt: a column of numbers is a view of the mixed storage, dates and booleans are converted once, text is gathered once, and nothing runs per row. `MixedArray` stays for a function that wants the raw record.
 
+Decided 2026-09-14, handles.
+
+34. A handle is declared as `Handle[Kind]`, the seam's one alias around a class the library defines. On the way in the function receives the object the handle stands for; on the way out, [outputs.md](outputs.md) decision 10, the cell shows the handle. A class of the seam's own inside the brackets, a table, or a bare `Handle` refuses to register, as an unknown annotation does.
+35. A handle's faults come in this order: the text rule first, so a number, a blank, a missing argument, an empty text or an array fail in the seam's usual words, `curve is number 3.0, expected discount curve handle`; then text beginning `#ERROR `, which is a creator's failure relayed by a reference to its cell, `curve is the creator's failure '#ERROR CreateDiscountCurve: ...', expected discount curve handle`; then text naming no live object, `curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle`; then a handle of another kind, `curve is valuation date handle 'valuation_date:3f9a1c:000001', expected discount curve handle`. The words of a kind are its class name in lowercase words.
+36. A handle takes no default, as a table takes none: the store holds nothing at registration.
+37. Resolving a handle is one dictionary lookup and one identity check of the kind the store recorded when it published. The text's own prefix proves nothing, and nothing in the text is parsed.
+
 ## Not supported
 
 - References to other workbooks. The seam sees values only, so this is policy, not a check.
@@ -181,6 +196,6 @@ Decided 2026-09-13, tables.
 
 ## Parked
 
-Handles: text that stands for a live object such as a curve. The seam's part is one rule per object kind, the text must name a live object of that kind, checked before the library sees it. The text's format, the store, and columns of handles are designed when the first builder function exists. The spec is [handles.md](handles.md).
+Handles, built in part by #53: the way in, `Handle[Kind]`, is decisions 34 to 37 above, the way out is [outputs.md](outputs.md), and the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text). Release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and columns of handles are open; the spec is [handles.md](handles.md).
 
 The way out, results returning to the sheet, is [outputs.md](outputs.md).
