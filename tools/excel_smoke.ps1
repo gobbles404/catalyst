@@ -50,6 +50,19 @@ $formulas = [ordered]@{
     "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
     "=RegisterAll()"              = "#NAME?"
+    # Handles. A creator cell shows its handle, whose session part changes every start, so LEFT
+    # pins the kind; the reader rows refer to creator cells the way a sheet does.
+    "=LEFT(AA1,15)"               = "discount_curve:"
+    "=LEFT(AA2,15)"               = "valuation_date:"
+    "=util_ReadDiscountFactor(AA1,Y2)" = "1"
+    "=util_ReadDiscountFactor(AA1,Y3)" = "0.9999"
+    "=util_ReadDiscountFactor(AA1,DATE(2026,9,20))" = "#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last"
+    "=LEFT(util_ReadDiscountFactor(AA2,Y3),64)" = "#ERROR util_ReadDiscountFactor: curve is valuation date handle '"
+    "=util_ReadDiscountFactor(AA3,Y3)" = '#ERROR util_ReadDiscountFactor: curve is the creator''s failure "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve''s first date", expected discount curve handle'
+    '=util_ReadDiscountFactor("discount_curve:000000:000001",Y3)' = "#ERROR util_ReadDiscountFactor: curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle"
+    "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
+    "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -75,6 +88,19 @@ $cells = [ordered]@{
     "L6" = "11-Sep-2026"; "M6" = "CL"; "N6" = "10"; "O6" = "TRUE"
     "L7" = "12-Sep-2026"; "M7" = "NG"; "N7" = "seven"; "O7" = "FALSE"
     "L8" = "15-Sep-2026"; "M8" = "CL"; "N8" = "7"; "O8" = "TRUE"
+    # A curve's table: its header row and three days; a second body whose first factor is not 1;
+    # then three creator cells, a curve, a valuation date and a curve that fails, so the reader
+    # rows above can refer to a creator cell the way a sheet does.
+    "Y1" = "date"; "Z1" = "discount_factor"
+    "Y2" = "11-Sep-2026"; "Z2" = "1"
+    "Y3" = "12-Sep-2026"; "Z3" = "0.9999"
+    "Y4" = "13-Sep-2026"; "Z4" = "0.9998"
+    "AB2" = "11-Sep-2026"; "AC2" = "0.98"
+    "AB3" = "12-Sep-2026"; "AC3" = "0.9"
+    "AB4" = "13-Sep-2026"; "AC4" = "0.8"
+    "AA1" = "=CreateDiscountCurve(Y1:Z1,Y2:Z4)"
+    "AA2" = "=CreateValuationDate(Y2,0.5)"
+    "AA3" = "=CreateDiscountCurve(Y1:Z1,AB2:AC4)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

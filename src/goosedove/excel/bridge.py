@@ -18,18 +18,32 @@ the prepared path binds the headers to the function's declared schema and
 hands the function typed columns. On the way back it
 converts the result by the function's declared return type, once, into the
 four things the host can show: a number, text, a boolean, or an array of
-numbers. docs/seam/inputs.md and docs/seam/outputs.md are the map.
+numbers. An object a creator returns is kept here, in one store, and crosses
+as its handle: text that a later call hands back to receive the object.
+docs/seam/inputs.md and docs/seam/outputs.md are the map.
 """
 
 import ctypes
 import inspect
+import itertools
 import math
+import re
+import secrets
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields
 from enum import IntEnum
-from functools import cache
+from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Final, NewType, assert_never, cast, dataclass_transform
+from typing import (
+    Any,
+    Final,
+    NewType,
+    assert_never,
+    cast,
+    dataclass_transform,
+    get_args,
+    get_origin,
+)
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,6 +63,13 @@ DateRow = NewType("DateRow", NDArray[np.datetime64])
 TextColumn = NewType("TextColumn", tuple[str, ...])
 TextRow = NewType("TextRow", tuple[str, ...])
 BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, handed over 1-D
+
+# A handle: text in a cell that stands for an object the seam holds. Declared around a class the
+# library defines, `-> Handle[DiscountCurve]` returns the object and the cell shows its handle,
+# and `curve: Handle[DiscountCurve]` receives the object the handle stands for. To the type
+# checker it is the class itself, so a function body needs no cast; to registration it is the
+# mark that selects publishing on the way out and resolving on the way in.
+type Handle[T] = T
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -856,6 +877,80 @@ _RESULTS: Final[dict[object, Callable[[object], object]]] = {
 }
 
 
+# --- a handle: one store, the text, and the two rules that publish and resolve -------------
+
+
+@dataclass(frozen=True, slots=True)
+class _Held:
+    """One entry of the store: the kind the seam verified, and a strong reference to the object."""
+
+    kind: type[object]
+    value: object
+
+
+_HANDLES: Final[dict[str, _Held]] = {}
+_SESSION: Final = secrets.token_hex(3)  # six hex characters, new at every Python start
+_PUBLICATIONS: Final = itertools.count(1)  # one running number, shared by every kind
+
+
+def _is_handle(annotation: object) -> bool:
+    return get_origin(annotation) is Handle
+
+
+def _handle_kind(annotation: object) -> type[object] | None:
+    """The class inside Handle[...]: any class but the seam's own, or None when it is not one."""
+    kind = get_args(annotation)[0]
+    if (
+        not isinstance(kind, type)
+        or kind in _DECLARED
+        or kind in _RESULTS
+        or kind is Cells
+        or issubclass(kind, Table)
+    ):
+        return None
+    return cast(type[object], kind)
+
+
+def _words(kind: type[object]) -> str:
+    """A kind in the words of the sheet: DiscountCurve is "discount curve"."""
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", kind.__name__).lower()
+
+
+def _publish(kind: type[object], tag: str, words: str, value: object) -> str:
+    """Retain the object a creator returned and hand back the text that stands for it.
+
+    A creator that raised never reaches here, so a failure is never published and the number
+    does not move. The tag names the kind for a reader of the sheet; the entry's kind proves it.
+    """
+    if type(value) is not kind:
+        raise _returned(value, words)
+    text = f"{tag}:{_SESSION}:{next(_PUBLICATIONS):06d}"
+    _HANDLES[text] = _Held(kind, value)
+    return text
+
+
+def _resolve(kind: type[object], expected: str, name: str, value: object) -> object:
+    """The object a handle stands for, or the failure.
+
+    The text's own faults come first, through the text rule, so a number, a blank, a missing
+    argument or an empty text fail in the seam's usual words. Then a creator's failure relayed
+    by a reference to its cell, then text naming no live object, then an object of another kind.
+    """
+    text = _text(value)
+    if text.startswith("#ERROR "):
+        raise TypeValidationError(f"{name} is the creator's failure {text!r}, expected {expected}")
+    held = _HANDLES.get(text)
+    if held is None:
+        raise TypeValidationError(
+            f"{name} is text {text!r} naming no live object, expected {expected}"
+        )
+    if held.kind is not kind:
+        raise TypeValidationError(
+            f"{name} is {_words(held.kind)} handle {text!r}, expected {expected}"
+        )
+    return held.value
+
+
 # --- registration -----------------------------------------------------------
 
 
@@ -1000,20 +1095,35 @@ def _schema(function: str, specs: Sequence[inspect.Parameter], i: int) -> Schema
     )
 
 
-def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
-    if spec.kind not in _POSITIONAL:
-        raise TypeError(
-            f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
-        )
+def _declared(
+    function: str, spec: inspect.Parameter
+) -> tuple[str, Callable[[object], object]] | None:
+    """The words and the accept rule an annotation selects, or None when the seam has none."""
     if _is_schema(spec.annotation):
         # A table is two arguments that mean something only together, and its columns are checked
         # against the schema on the call, so a default could not be checked at registration as
         # every other default is. None is allowed, and none is wanted.
         if spec.default is not inspect.Parameter.empty:
             raise TypeError(f"{function}: {spec.name} declares a table, which takes no default")
-        declared: tuple[str, Callable[[object], object]] | None = ("table", _mixed)
-    else:
-        declared = _DECLARED.get(spec.annotation)
+        return "table", _mixed
+    if _is_handle(spec.annotation):
+        kind = _handle_kind(spec.annotation)
+        if kind is None:
+            return None
+        # A handle resolves against the store, which holds nothing at registration.
+        if spec.default is not inspect.Parameter.empty:
+            raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
+        expected = f"{_words(kind)} handle"
+        return expected, partial(_resolve, kind, expected, spec.name)
+    return _DECLARED.get(spec.annotation)
+
+
+def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
+    if spec.kind not in _POSITIONAL:
+        raise TypeError(
+            f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
+        )
+    declared = _declared(function, spec)
     if declared is None:
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r}, which the seam cannot receive"
@@ -1039,6 +1149,11 @@ def _result(function: str, annotation: object) -> Callable[[object], object]:
             "a worksheet function returns something or fails"
         )
     convert = _RESULTS.get(annotation)
+    if convert is None and _is_handle(annotation):
+        kind = _handle_kind(annotation)
+        if kind is not None:
+            words = _words(kind)
+            return partial(_publish, kind, words.replace(" ", "_"), words)
     if convert is None:
         raise TypeError(
             f"{function} declares {annotation!r} as its result, which the seam cannot send"
