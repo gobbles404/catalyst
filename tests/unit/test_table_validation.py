@@ -12,12 +12,14 @@ from goosedove.excel.bridge import (
     BooleanColumn,
     Cells,
     DateColumn,
+    MixedArray,
     NumberArray,
     NumberColumn,
     Table,
     TextColumn,
     TextRow,
     excel_function,
+    register,
 )
 
 cells = Cells.from_rows
@@ -446,3 +448,18 @@ def test_a_table_may_be_taken_but_not_returned() -> None:
         TypeError, match=r"OutTable declares <class '.*Trades'> as its result, which the seam"
     ):
         excel_function(OutTable)
+
+
+# A listed function takes a mixed range only as a table, a row of text and a schema: without
+# headers the columns of a mixed range mean nothing. A hidden probe may still take one, as the
+# seam's own instrument.
+def test_a_listed_function_takes_a_mixed_range_only_as_a_table() -> None:
+    def Value(values: MixedArray) -> float:
+        raise AssertionError("never called")
+
+    with pytest.raises(
+        TypeError,
+        match=r"Value: values declares MixedArray, which a function Excel lists takes only as a",
+    ):
+        excel_function(Value)
+    assert register(Value, hidden=True) is Value

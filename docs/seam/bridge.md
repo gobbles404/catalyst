@@ -37,6 +37,7 @@ Registration reads four things: the function's own name, which becomes the works
 - a default on a table: `Defaulted: table declares a table, which takes no default`. A table's columns are checked against its schema on the call, so a default could not be checked at registration as every other default is, and a header row before a table cannot have a default of its own, since a parameter with a default must come last;
 - a schema whose column is not a column type, whose columns are one header without regard to case, or which has no columns: `Grid2: wide column values declares goosedove.excel.bridge.NumberArray, which is not a column type`;
 - a default on a handle: `ReadWithDefault: curve declares a handle, which takes no default`. The store holds nothing at registration, so there is nothing a default could name;
+- a mixed range on its own, on a function Excel lists: `Value: values declares MixedArray, which a function Excel lists takes only as a table, a row of text and a schema`, [inputs.md](inputs.md) decision 38; a hidden probe may still take one, as the seam's instrument;
 - no return annotation, `-> None`, or a return annotation outside the ten declared result types and `Handle[Kind]`: `Boxed declares Handle[float] as its result, which the seam cannot send`.
 
 `tests/unit/test_type_validation.py`, `tests/unit/test_table_validation.py`, `tests/unit/test_result_validation.py` and `tests/unit/test_handles.py` pin those texts, except three. The unannotated parameter has no test, nor does an annotation written as text, nor a text-array return: `TextColumn` and `TextRow` can be taken but not returned, and a function declaring one as its result is refused with `declares goosedove.excel.bridge.TextColumn as its result, which the seam cannot send`.
@@ -121,7 +122,7 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
 | `TextRow` | row of text | `_text_row` | the host's tuple of texts, as it is |
 | `BooleanColumn` | column of booleans | `_boolean_column` | a flat array of booleans, converted from the 1.0 and 0.0 the host wrote |
-| `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts |
+| `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts; for a hidden probe, and as the body under a table's schema |
 | a subclass of `Table` | table | `_mixed`, then `_refine` | the schema's record, one typed column per header |
 | `Handle[Kind]` | the kind's words, then handle: `discount curve handle` | `_resolve` | the object the handle stands for |
 

@@ -1,5 +1,7 @@
 """Type validation of ranges: every shape Excel can send against every declared range type."""
 
+from collections.abc import Callable
+
 import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
@@ -19,6 +21,7 @@ from goosedove.excel.bridge import (
     TextColumn,
     TextRow,
     excel_function,
+    register,
 )
 
 # --- one function per declared range type and Date, the fixtures of this matrix --------
@@ -91,12 +94,17 @@ TRADES = cells([["CL", 46164.0, 10, 72.5, True], ["NG", 46165.0, 3, 3.25, False]
 EMPTY_TEXT_INSIDE = cells([["a", ""]])
 
 
-@excel_function
+def hidden[F: Callable[..., object]](fn: F) -> F:
+    """A mixed range on its own is the seam's instrument, which only a hidden function may take."""
+    return register(fn, hidden=True)
+
+
+@hidden
 def CountCells(values: MixedArray) -> float:
     return float(values.shape[0] * values.shape[1])
 
 
-@excel_function
+@hidden
 def Payload(values: MixedArray) -> str:
     """Everything one mixed range handed over, so an assertion sees all of it, not a count."""
     return (
