@@ -1106,9 +1106,16 @@ def _schema(function: str, specs: Sequence[inspect.Parameter], i: int) -> Schema
 
 
 def _declared(
-    function: str, spec: inspect.Parameter
+    function: str, spec: inspect.Parameter, hidden: bool
 ) -> tuple[str, Callable[[object], object]] | None:
     """The words and the accept rule an annotation selects, or None when the seam has none."""
+    if spec.annotation is MixedArray and not hidden:
+        # Without headers the columns of a mixed range mean nothing, and a function would have to
+        # guess by position. A hidden probe keeps the bare range as the seam's own instrument.
+        raise TypeError(
+            f"{function}: {spec.name} declares MixedArray, which a function Excel lists takes "
+            "only as a table, a row of text and a schema"
+        )
     if _is_schema(spec.annotation):
         # A table is two arguments that mean something only together, and its columns are checked
         # against the schema on the call, so a default could not be checked at registration as
@@ -1128,12 +1135,12 @@ def _declared(
     return _DECLARED.get(spec.annotation)
 
 
-def _parameter(function: str, spec: inspect.Parameter) -> Parameter:
+def _parameter(function: str, spec: inspect.Parameter, hidden: bool) -> Parameter:
     if spec.kind not in _POSITIONAL:
         raise TypeError(
             f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
         )
-    declared = _declared(function, spec)
+    declared = _declared(function, spec, hidden)
     if declared is None:
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r}, which the seam cannot receive"
@@ -1178,7 +1185,7 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
         raise TypeError(f"{name} is already registered")
     signature = inspect.signature(fn)
     specs = tuple(signature.parameters.values())
-    parameters = tuple(_parameter(name, spec) for spec in specs)
+    parameters = tuple(_parameter(name, spec, hidden) for spec in specs)
     tables = tuple(
         (i, _schema(name, specs, i)) for i, spec in enumerate(specs) if _is_schema(spec.annotation)
     )

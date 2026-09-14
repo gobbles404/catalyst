@@ -87,7 +87,7 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 | `DateRow` | a range of dates, one row tall | `=Expiries(A1:F1)` | a plain list of dates | the same, or a column |
 | `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
 | `TextRow` | a range of text, one row tall | `=Headers(A1:C1)` | a plain list of text | the same, or a column |
-| `MixedArray` | a range of numbers, text and booleans in any combination, any shape | `=Value(A2:L100)` with a trade per row | one record: the shape, each cell's kind, the numbers, the text | a blank, missing or empty-text cell, named |
+| `MixedArray` | a range of numbers, text and booleans in any combination, any shape; on its own only for a hidden probe, since a listed function takes a mixed range only as a table's body (decision 38) | `=CountMixed(A2:L100)` with a trade per row | one record: the shape, each cell's kind, the numbers, the text | a blank, missing or empty-text cell, named |
 | `BooleanColumn` | a range of booleans, one column wide | `=Settle(A2:A4)` | a plain list of TRUE and FALSE | a number, text or blank cell, a row |
 
 A single cell fits any range type as a 1×1. A `TextArray`, text of any shape, is possible under the same rules and is not built, because no function needs one; a rectangle of text alone is already a `MixedArray`, which mixes rather than requires. A row of booleans is not built either.
@@ -188,6 +188,10 @@ Decided 2026-09-14, handles.
 35. A handle's faults come in this order: the text rule first, so a number, a blank, a missing argument, an empty text or an array fail in the seam's usual words, `curve is number 3.0, expected discount curve handle`; then text beginning `#ERROR `, which is a creator's failure relayed by a reference to its cell, `curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ...`, the creator's own text carried whole at the end, never quoted, so that a consumer of that consumer relays the same text and a chain of any length shows one message; then text naming no live object, `curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle`; then a handle of another kind, `curve is valuation date handle 'valuation_date:3f9a1c:000001', expected discount curve handle`. The words of a kind are its class name in lowercase words.
 36. A handle takes no default, as a table takes none: the store holds nothing at registration.
 37. Resolving a handle is one dictionary lookup and one identity check of the kind the store recorded when it published. The text's own prefix proves nothing, and nothing in the text is parsed.
+
+Decided 2026-09-14, a mixed range and its headers, by the owner.
+
+38. A range of mixed kinds crosses only as a table, a row of text holding the headers and a schema, for any function Excel lists. Without headers the columns of a mixed range mean nothing, and a function would have to guess by position; so registration refuses a listed function that declares `MixedArray` on its own, and the hidden probes keep the bare range as the seam's own instrument. Whether a range of one kind, a column of numbers say, needs headers too is not decided; the next few functions will show, and this decision will say.
 
 ## Not supported
 

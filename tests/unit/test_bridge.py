@@ -30,11 +30,15 @@ def test_specs_carry_name_description_parameters_and_hidden() -> None:
 _kept: dict[str, bridge.MixedArray] = {}
 
 
-@bridge.excel_function
 def KeepMixed(values: bridge.MixedArray) -> float:
     """Keep what arrived, so a test can hold it while later calls reuse the host's buffers."""
     _kept["values"] = values
     return 1.0
+
+
+# Registered hidden: a mixed range on its own is the seam's instrument, which a listed function
+# may not take.
+bridge.register(KeepMixed, hidden=True)
 
 
 def test_a_mixed_range_hands_over_the_storage_the_transport_owns() -> None:
