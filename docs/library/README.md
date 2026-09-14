@@ -14,6 +14,7 @@ These pages are for an engineer building a function and for the owner reviewing 
 | [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, an explicit daily curve and its upper date bound, with `util_ReadDiscountFactor`, a temporary reader |
 | [globals/unit-conversions.md](globals/unit-conversions.md) | `UnitConversions`, the shipped unit definitions and the conversion between them |
 | [utilities/interpolate-discount-factors.md](utilities/interpolate-discount-factors.md) | `InterpolateDiscountFactors`, sparse points to a daily table |
+| [market-definitions/expiry-schedule.md](market-definitions/expiry-schedule.md) | `CreateExpirySchedule`, the contract months of one index and their expiry dates |
 
 The handle that the two constructors return, text in a cell that stands for a live object, is the seam's: its spec is [handles.md](../seam/handles.md), with the evidence for its store in [excel-dna-handles.md](../seam/excel-dna-handles.md).
 
@@ -31,7 +32,7 @@ A spec for something the seam must do, such as [handles.md](../seam/handles.md),
 
 ## Where it stands
 
-Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; two are specified, `UnitConversions` and `InterpolateDiscountFactors`. Each page's first line says where it stands. One decision is library-wide and gates the unbuilt pages: D27, how a work counter reaches library code; the two built functions take no counter, and their work is pinned at the seam. Handles are published and resolved, and their release is D26. The utility takes the curve's table, decided in D21, and waits on its name, D18, and on D27.
+Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; three are specified, `UnitConversions`, `InterpolateDiscountFactors` and `CreateExpirySchedule`. Each page's first line says where it stands. One decision is library-wide and gates the unbuilt pages: D27, how a work counter reaches library code; the two built functions take no counter, and their work is pinned at the seam. Handles are published and resolved, and their release is D26. The utility takes the curve's table, decided in D21, and waits on its name, D18, and on D27. The expiry schedule is the first market definition, the first function to take columns of one kind without headers (D30), and waits on one seam item before it can be built: an argument that may be left out with nothing in its place, D33, wanted in [inputs.md](../seam/inputs.md).
 
 ## Reading it as a reviewer
 
