@@ -18,11 +18,13 @@ Two scalars, both required, neither with a default. A single-cell reference is a
 
 ## Excel help
 
+Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
+
 | Item | Text |
 |---|---|
 | Function | Creates a valuation-date handle from a date and the fraction of that day elapsed. |
-| `as_of` | One date: whole Excel date serial from 61 to 2958465 inclusive (1-Mar-1900 to 31-Dec-9999). Scalar; required. |
-| `day_fraction_elapsed` | One number from 0 to 1 inclusive: 0 = start of as_of; 1 = EOD of as_of. The date is preserved. Scalar; required. |
+| `as_of` | One date, from 1-Mar-1900 to 31-Dec-9999, with no time of day. |
+| `day_fraction_elapsed` | One number from 0 to 1: 0 is the start of as_of, 1 its end. The date is kept as given. |
 
 ## The library checks
 
