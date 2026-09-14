@@ -58,7 +58,8 @@ Each page defines these where it first uses them; here they are once, so the pag
 | the messages, pinned | `tests/unit/test_type_validation.py`, `test_range_validation.py`, `test_table_validation.py`, `test_result_validation.py`, `test_handles.py`, `test_globals.py`, `test_bridge.py` |
 | the pins | `tests/performance/test_seam_budgets.py`, `test_seam_allocation.py`, `conftest.py`, `HostWorkBudgets.cs` |
 | the runners, the summary, the before-and-after tool | `tools/performance/` |
-| the smoke test in a hidden Excel, Excel by hand, the build | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/host_build.ps1` |
+| the smoke test in a hidden Excel, Excel by hand, a workbook printed as its cells show, the build | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/excel_show.ps1`, `tools/host_build.ps1` |
+| the workbooks we keep, one per topic, for talking about a function on a real sheet | `workbooks/handles.xlsx` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
 
@@ -74,7 +75,7 @@ After pulling. Then the whole check, which runs format, lint, types, the Python 
 .\check.ps1
 ```
 
-The runners, one per clock: `.\measure.ps1` for the Python side, `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` for the host, and `.\tools\performance\measure_excel.ps1` for Excel, with `-Rows 10000` for the control. A seam change runs `.\tools\performance\before_after.ps1` on an idle machine and pastes its report whole. To try formulas by hand, `.\tools\excel_dev.ps1` builds the add-in and opens it in a fresh Excel. Each command and what its clock includes is in [measuring.md](measuring.md); the recipes are in [working.md](working.md).
+The runners, one per clock: `.\measure.ps1` for the Python side, `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` for the host, and `.\tools\performance\measure_excel.ps1` for Excel, with `-Rows 10000` for the control. A seam change runs `.\tools\performance\before_after.ps1` on an idle machine and pastes its report whole. To try formulas by hand, `.\tools\excel_dev.ps1` builds the add-in and opens it in a fresh Excel, on a new workbook or on a saved one named after it, such as `workbooks\handles.xlsx`; `.\tools\excel_show.ps1` prints such a workbook as its cells show. Each command and what its clock includes is in [measuring.md](measuring.md); the recipes are in [working.md](working.md).
 
 The rule behind all of it: work is counted, and the counts are tests; time is a record, and no timing gates a merge. The pins move with the source in the same pull request, because they are the claim a change makes; a baseline document lands in a pull request of its own, because it is the record.
 

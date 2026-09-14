@@ -220,7 +220,7 @@ uv sync --locked
 
 ## 8. Loading the add-in in Excel by hand
 
-`.\tools\excel_dev.ps1` does all of this for you and is the way to try formulas day to day. Do it by hand when the add-in must live somewhere else, or run against a Python that is not the project's.
+`.\tools\excel_dev.ps1` does all of this for you and is the way to try formulas day to day, on a new workbook; `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens a saved one instead, fully recalculated so that every handle in it belongs to this session and not to the one that saved it. `workbooks/` holds the workbooks we keep, one per topic, the shared object for talking about a function on a real sheet: open it, try things, write a line in its `notes` column, save, commit. `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints a workbook as its cells show, in a hidden Excel with the add-in loaded, one line per cell with its formula and its text, so two people read the same thing and a review can quote it. Do the steps below by hand when the add-in must live somewhere else, or run against a Python that is not the project's.
 
 1. Build it. Either `dotnet build host\Goosedove.Host -c Release`, or dot-source `tools\host_build.ps1` and call `Build-HostAddIn -Root <the repository>`, which builds Release, writes the config beside the result, and returns the path.
 2. Load `host\Goosedove.Host\bin\Release\net48\Goosedove.Host-AddIn64.xll`. 64-bit Excel only: the add-in loads Python's own DLL into Excel's process, and the project's Python is 64-bit, which `tests\test_smoke.py` checks. The `Goosedove.Host-AddIn.xll` beside it is the 32-bit build and cannot load that Python.
