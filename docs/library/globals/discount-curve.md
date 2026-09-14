@@ -33,9 +33,9 @@ Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/un
 
 | Item | Text |
 |---|---|
-| Function | Creates a daily discount-curve handle. Its last date is the latest the library prices. |
-| `header_row` | One row holding the two headers, date and discount_factor, in either order; capitals do not matter. |
-| `table` | The body under the headers: one row per calendar day, the date and its discount factor, no day missing. The first factor is 1, and factors never rise and stay above 0. |
+| Function | Creates a discount curve from a daily table and shows its handle, the text other formulas take as the curve. |
+| `header_row` | The header cells of your curve table, such as A1:B1, reading date and discount_factor in either order. |
+| `table` | The rows under the headers, such as A2:B400: one calendar day per row with its discount factor, starting at 1 and never rising. |
 
 ## The library checks
 
@@ -70,7 +70,7 @@ The builder takes no `WorkCounter` (D27, deferred by the owner); its work is pin
 
 ## A temporary reader
 
-`util_ReadDiscountFactor(curve, date)` returns the factor for one calendar day the curve covers, `=util_ReadDiscountFactor(B5, A3)` showing `0.9999` in the sheet above. It exists to prove that a handle resolves to its curve on a real sheet, and it goes when a real consumer of a curve exists; `util_` leads the name at the owner's word. A day outside the curve's dates, before the start or after the end alike, fails, `#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last`, which is the hard upper bound (D11) and, for a day before the start, the reader's own rule, noted under D12. The seam's own failures come first, in the order [inputs.md](../../seam/inputs.md) decision 35 gives: a number or a blank where the handle should be, text naming no live object, a handle of another kind, or a creator's failure relayed by the reference. The reader is a text call plus one lookup, pinned in the same two files, measured 1,208 bytes; on the Python clock it takes about 5 microseconds. Its Excel help, quoted from the declaration: `curve`, "The cell holding a discount-curve handle, or a name for that cell."; `date`, "One date between the curve's first and last dates, inclusive."
+`util_ReadDiscountFactor(curve, date)` returns the factor for one calendar day the curve covers, `=util_ReadDiscountFactor(B5, A3)` showing `0.9999` in the sheet above. It exists to prove that a handle resolves to its curve on a real sheet, and it goes when a real consumer of a curve exists; `util_` leads the name at the owner's word. A day outside the curve's dates, before the start or after the end alike, fails, `#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last`, which is the hard upper bound (D11) and, for a day before the start, the reader's own rule, noted under D12. The seam's own failures come first, in the order [inputs.md](../../seam/inputs.md) decision 35 gives: a number or a blank where the handle should be, text naming no live object, a handle of another kind, or a creator's failure relayed by the reference. The reader is a text call plus one lookup, pinned in the same two files, measured 1,208 bytes; on the Python clock it takes about 5 microseconds. Its Excel help, quoted from the declaration: the function line "Reads the discount factor for one day from a discount curve."; `curve`, "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it."; `date`, "The day to read, such as 12-Sep-2026, between the curve's first and last dates."
 
 ## Tests
 

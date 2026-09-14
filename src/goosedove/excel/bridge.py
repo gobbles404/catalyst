@@ -1123,6 +1123,9 @@ def _help(function: str, name: str, authored: str, default: object, hidden: bool
         raise TypeError(
             f"{function}: {name} has no help; a function Excel lists says what each argument takes"
         )
+    if not authored.endswith("."):
+        # What registration adds for an optional argument follows this sentence.
+        raise TypeError(f"{function}: {name}'s help does not end with a period")
     text = (
         authored
         if default is MISSING
@@ -1136,8 +1139,9 @@ def _help(function: str, name: str, authored: str, default: object, hidden: bool
 
 
 def _description(function: str, fn: Callable[..., object], hidden: bool) -> str:
-    """The docstring, as Excel shows it: the whole text with the surrounding spaces removed."""
-    text = (fn.__doc__ or "").strip()
+    """The docstring, as Excel shows it: its lines joined into one, so a long line may wrap in
+    the code without a line break reaching the sheet."""
+    text = " ".join((fn.__doc__ or "").split())
     if not text and not hidden:
         raise TypeError(f"{function} has no docstring; a function Excel lists says what it does")
     if _units(text) > HELP_LIMIT:

@@ -22,9 +22,9 @@ Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/un
 
 | Item | Text |
 |---|---|
-| Function | Creates a valuation-date handle from a date and the fraction of that day elapsed. |
-| `as_of` | One date, from 1-Mar-1900 to 31-Dec-9999, with no time of day. |
-| `day_fraction_elapsed` | One number from 0 to 1: 0 is the start of as_of, 1 its end. The date is kept as given. |
+| Function | Creates a valuation date and shows its handle, the text other formulas take as the valuation date. |
+| `as_of` | The valuation date, a date cell such as 11-Sep-2026, with no time of day. |
+| `day_fraction_elapsed` | How far through as_of: 0 at the start of the day, 0.5 at midday, 1 at the end. |
 
 ## The library checks
 

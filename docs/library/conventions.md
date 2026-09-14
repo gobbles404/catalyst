@@ -33,9 +33,31 @@ A library rejection reaches the cell as `#ERROR {function}: {ExceptionType}: {me
 
 This is the desk's documentation. Every function Excel lists explains itself while a person types the formula: the signature, the argument they are on, and one line about it, and the same words appear in the Function Arguments dialog. It is written for the desk, in the desk's words, once, in the declaration: the docstring is the function's line, and the words beside each parameter, `as_of: Annotated[Date, "One date, ..."]`, are that argument's line. Registration reads both, refuses a function Excel lists that leaves either out or runs past the 253 characters Excel shows, and adds what the signature already says: an optional argument's name in brackets, `[factor]`, and what it takes when omitted, `1 when omitted.` Nothing about an argument is written twice. The mechanism is [bridge.md](../seam/bridge.md#declaring-a-worksheet-function), and [host.md](../seam/host.md#at-registration) says how the words reach Excel and the display that shows them while typing.
 
-- Say the shape, the allowed values and the meaning. The brackets say what is optional, so the text does not.
+An argument's line is one sentence with three parts, in this order: what to select, in the desk's words; an example, or where it comes from; and at most one thing that must hold. It ends with a period, which registration checks, because what it adds follows that period.
+
+```text
+name: What to select, such as an example, and the one thing that must hold.
+
+header_row: The header cells of your curve table, such as A1:B1, reading date and discount_factor in either order.
+curve:      A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it.
+```
+
+- Write the line as if the argument were required. For an optional one registration adds the brackets and the default, `[factor]` and `One multiplier. 1 when omitted.`, from the signature; never write "optional" or the default yourself.
+- The function's line says what the function makes. For a creator it explains the handle once, `shows its handle, the text other formulas take as the curve`, because that is where the desk first meets the word.
+- Rules stay out of the help. A line says what to pick; the page and the error message say what must hold and what went wrong. No seam words: nothing about serials, ranges, schemas or types.
 - Where an argument takes a unit code, its help lists the accepted codes.
 - A page quotes the declaration under Excel help, as it quotes the messages that tests pin, so a reviewer reads it in one place per function; a change to one changes both in the same pull request.
+
+The optional form, written once, as the `Times` probe declares it:
+
+```python
+def Times(
+    x: Annotated[float, "One number to multiply."],
+    factor: Annotated[float, "One multiplier."] = 1.0,
+) -> float:
+```
+
+Excel shows `Times(x, [factor])`, and on the second argument `[factor]: One multiplier. 1 when omitted.`
 
 ## A function page, section by section
 
