@@ -606,6 +606,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
         "ReadHandle": 1,
         "discount_curve_table": 1,  # the kind's own table, reached by dispatch, not by a check
         "MixedArray.table": 1,
+        "_table_column": 2,  # each array column checked before its copy: the dates, the factors
         "_unit": 1,
         "_serials": 1,
         "_mixed_out": 1,
