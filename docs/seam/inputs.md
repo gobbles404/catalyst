@@ -139,6 +139,7 @@ Next, one at a time, each when the first function needs it. Each adds one rule t
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
+| A handle of any kind; the recommended form is `handle: Handle[object]`, the function receiving the object whatever its kind. Wanted by `util_Inspect`. | text that is the handle of any live object | `=util_Inspect(B5)` with B5 any creator's cell | The failures keep decision 35's order and words with no kind to name, `expected a handle`; the identity check of the kind is the one step that is skipped, and nothing in the text is parsed, as now. A bare `Handle` still refuses to register, as decision 34 says: a function names what it takes, and `object` is that name for any kind. |
 
 ## Decided
 
