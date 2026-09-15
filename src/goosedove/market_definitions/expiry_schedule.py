@@ -10,19 +10,19 @@ from numpy.typing import NDArray
 
 @dataclass(frozen=True, slots=True)
 class ExpirySchedule:
-    """Codes and dates aligned by position, the dates read-only: codes[i], futures_expiry[i] and
-    options_expiry[i] describe one contract. The codes are as the desk typed them, in the order
-    given; options_expiry is None for an index that has no options."""
+    """Codes and dates aligned by position, the dates read-only: codes[i], future_expiry[i] and
+    option_expiry[i] describe one contract. The codes are as the desk typed them, in the order
+    given; option_expiry is None for an index that has no options."""
 
     codes: tuple[str, ...]
-    futures_expiry: NDArray[np.datetime64]
-    options_expiry: NDArray[np.datetime64] | None
+    future_expiry: NDArray[np.datetime64]
+    option_expiry: NDArray[np.datetime64] | None
 
 
 def expiry_schedule(
     codes: tuple[str, ...],
-    futures_expiry: NDArray[np.datetime64],
-    options_expiry: NDArray[np.datetime64] | None,
+    future_expiry: NDArray[np.datetime64],
+    option_expiry: NDArray[np.datetime64] | None,
 ) -> ExpirySchedule:
     """The one way to make an ExpirySchedule: its one rule of meaning, that the columns line up,
     checked once.
@@ -34,8 +34,8 @@ def expiry_schedule(
     count = len(codes)
     return ExpirySchedule(
         codes,
-        _one_per_code("futures_expiry", futures_expiry, count),
-        None if options_expiry is None else _one_per_code("options_expiry", options_expiry, count),
+        _one_per_code("future_expiry", future_expiry, count),
+        None if option_expiry is None else _one_per_code("option_expiry", option_expiry, count),
     )
 
 

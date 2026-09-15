@@ -68,8 +68,8 @@ $formulas = [ordered]@{
     # row short, and a blank in the options column.
     "=LEFT(AI1,16)"               = "expiry_schedule:"
     "=LEFT(AI2,16)"               = "expiry_schedule:"
-    "=CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR CreateExpirySchedule: ValueError: futures_expiry has 5 dates, expected 6, one per future_code"
-    "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR CreateExpirySchedule: options_expiry cell (3, 1) is blank, expected date"
+    "=CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
+    "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
