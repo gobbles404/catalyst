@@ -20,6 +20,12 @@ The declared return type is the contract, read at registration the way parameter
 
 Integers count as numbers, scalar or array, converted exactly. That is not coercion of meaning the way TRUE-as-1 would be: on the sheet a whole number and a number are one kind.
 
+Next, one at a time, each when the first function needs it, as [inputs.md](inputs.md) keeps its own list. Each adds one result rule, a road out of the host where none carries it, and one row here.
+
+| Declared | The function would return | The cell would show | The trap it must handle |
+|---|---|---|---|
+| `MixedArray` as a result, the mirror of the way in; wanted by `ReadHandle`, which spills a header row of text, a row of types and columns of dates, numbers and text | a record of kinds, numbers and texts in the sheet's shape, at least one cell, the same record the way in hands a function | the rectangle, spilled as returned: text as text, dates as serials, numbers as numbers | The host has one road out for an array today, a run of numbers; a rectangle of three kinds needs a second, laid out cell by cell from the kinds. A blank, a missing or an empty-text cell inside it fails the whole call with the cell named, as it does on the way in; decision 24 stands until this row is built. |
+
 ## Result validation
 
 One place converts: the prepared path, `Registered.run` in `bridge.py`, after the function runs. It converts the result by the declared return type into one of the four things the host can show, a number, text, a boolean, or an array of numbers, and fails with the function's name when it cannot. The host reads the type it is handed and never asks Python a question about it.
