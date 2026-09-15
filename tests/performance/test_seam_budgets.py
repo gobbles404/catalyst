@@ -586,39 +586,45 @@ def test_a_discount_curve_is_a_table_in_and_one_publication_out(
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the curve keeps
         "ndarray.setflags": 2,  # frozen
-        "generic.astype": 1,  # the start date as a day count, kept for the reader
         "ufunc.reduce": 5,
     }
 
 
-def test_a_reader_is_a_text_call_with_one_lookup(
+# The reader of any handle: the text rule and one lookup, the kind's table built a column at a
+# time, dates to serials, and the mixed road out with its three looks.
+def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    handle = PATH["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3))
-    PATH["util_ReadDiscountFactor"](handle, 46277.0)
-    assert call_profile(lambda: PATH["util_ReadDiscountFactor"](handle, 46277.0)) == {
+    handle = PATH["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    PATH["ReadHandle"](handle)
+    assert call_profile(lambda: PATH["ReadHandle"](handle)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,
+        "_validate": 1,
         "_resolve": 1,  # the handle: the text rule, then one dictionary lookup
         "_text": 1,
-        "_date": 1,
-        "_whole": 1,
-        "_number": 1,
-        "util_ReadDiscountFactor": 1,
-        "factor_on": 1,
-        "_number_out": 1,
-        "_scalar": 1,
+        "ReadHandle": 1,
+        "discount_curve_table": 1,  # the kind's own table, reached by dispatch, not by a check
+        "MixedArray.table": 1,
+        "_table_column": 2,  # each array column checked before its copy: the dates, the factors
+        "_unit": 1,
+        "_serials": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
     }
-    # The day becomes an index in one subtraction from the start the curve kept as a day count.
-    assert numpy_calls(lambda: PATH["util_ReadDiscountFactor"](handle, 46277.0)) == {
-        "generic.astype": 1,
+    assert numpy_calls(lambda: PATH["ReadHandle"](handle)) == {
+        "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
+        "numpy.asarray": 1,
+        "numpy.datetime_data": 1,  # the unit of the date column
+        "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
     }
 
 
 def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) -> None:
     dead = "discount_curve:000000:000001"
-    assert call_profile(lambda: PATH["util_ReadDiscountFactor"](dead, 46277.0)) == {
+    assert call_profile(lambda: PATH["ReadHandle"](dead)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,

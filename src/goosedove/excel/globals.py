@@ -18,7 +18,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.discount_curve import DiscountCurve, discount_curve, factor_on
+from goosedove.globals.discount_curve import DiscountCurve, discount_curve
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
 
 
@@ -59,20 +59,3 @@ def CreateDiscountCurve(
     """Creates a discount curve from a daily table and shows its handle, the text other
     formulas take as the curve."""
     return discount_curve(table.date, table.discount_factor)
-
-
-# Temporary: the reader that proves a handle resolves to its curve. It goes when a real
-# consumer of a curve exists.
-@excel_function
-def util_ReadDiscountFactor(
-    curve: Annotated[
-        Handle[DiscountCurve],
-        "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, "
-        "or a name for it.",
-    ],
-    date: Annotated[
-        Date, "The day to read, such as 12-Sep-2026, between the curve's first and last dates."
-    ],
-) -> float:
-    """Reads the discount factor for one day from a discount curve."""
-    return factor_on(curve, date)

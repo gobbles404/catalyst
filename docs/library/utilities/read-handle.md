@@ -1,8 +1,8 @@
 # ReadHandle
 
-Waiting on the seam: a mixed array out.
+Built in #66.
 
-Reads the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. When it is built, `util_ReadDiscountFactor` goes: its page says it exists only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it.
+Reads the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. `util_ReadDiscountFactor` went with it: it existed only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it. The code is `src/goosedove/excel/utilities.py`, the function and the table each kind shows.
 
 ## Worksheet contract
 
@@ -10,7 +10,7 @@ Reads the object a handle stands for onto the sheet as the table its creator too
 def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 ```
 
-`Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result, the mirror of the way in, is the one seam item this waits on, in the recommended form, engineering's to settle.
+`Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result is the mirror of the way in, built in #65 ([outputs.md](../../seam/outputs.md) decision 13): the rectangle spills one tagged value per cell, and `MixedArray.table` builds it from the headings and the object's columns.
 
 | | A | B |
 |---|---|---|
@@ -33,7 +33,7 @@ One argument, required: any live handle, the cell showing a creator's result or 
 
 ## Excel help
 
-The lines go beside the parameter in the declaration when the function is built, as [conventions.md](../conventions.md#excel-help) says, and `tests/unit/test_help.py` pins them.
+Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -75,9 +75,11 @@ What each kind shows:
 | V26 | 22-Sep-2026 | 17-Sep-2026 |
 | X26 | 20-Oct-2026 | 15-Oct-2026 |
 
-A new kind adds its row to this table on the pull request that builds its creator.
+A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/goosedove/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
 
 ## Tests
+
+The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1`, reading each spill with `INDEX`, and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|
@@ -87,6 +89,7 @@ A new kind adds its row to this table on the pull request that builds its creato
 | a curve's spill, headers and body, fed back to `CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
+| a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |
 | each of the three kinds inspected on a real sheet, and a schedule without options | Excel smoke |
 
 ## Not here

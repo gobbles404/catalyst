@@ -2,7 +2,7 @@
 
 Built in #53.
 
-A daily discount curve, retained and reached by handle. What the first pricing function must settle, how a calculation with several curves stays inside their dates, is under Not here. The code is `src/goosedove/globals/discount_curve.py`, the record, its builder and the reader's lookup, and `src/goosedove/excel/globals.py`, the worksheet functions.
+A daily discount curve, retained and reached by handle. What the first pricing function must settle, how a calculation with several curves stays inside their dates, is under Not here. The code is `src/goosedove/globals/discount_curve.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function; [ReadHandle](../utilities/read-handle.md) spills a curve back onto the sheet.
 
 ## Worksheet contract
 
@@ -51,13 +51,9 @@ The checks consume typed columns; header interpretation, cell kinds and date con
 
 Those cover the stated rules: the first factor at 1 with non-increasing already implies every factor is at most 1, which rules out a curve for negative rates and the owner accepts that, and the minimum of a non-increasing array is its last element. No sorting, no gap filling, no generated factors; nothing is clipped, smoothed or rounded.
 
-## A temporary reader
-
-`util_ReadDiscountFactor(curve, date)` returns the factor for one calendar day the curve covers, `=util_ReadDiscountFactor(B5, A3)` showing `0.9999` in the sheet above. It exists to prove that a handle resolves to its curve on a real sheet, and it goes when a real consumer of a curve exists; `util_` leads the name at the owner's word. A day outside the curve's dates, before the start or after the end alike, fails, `#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last`, which is the curve's hard stop and, for a day before the start, the reader's own rule. The seam's own failures come first, in the order [inputs.md](../../seam/inputs.md) decision 35 gives: a number or a blank where the handle should be, text naming no live object, a handle of another kind, or a creator's failure relayed by the reference. Its Excel help, quoted from the declaration: the function line "Reads the discount factor for one day from a discount curve."; `curve`, "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it."; `date`, "The day to read, such as 12-Sep-2026, between the curve's first and last dates."
-
 ## Tests
 
-The examples and properties below are `tests/unit/test_discount_curve.py`; the seam's texts, the handle and the reader are `tests/unit/test_globals.py` and `tests/unit/test_handles.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`.
+The examples and properties below are `tests/unit/test_discount_curve.py`; the seam's texts and the handle are `tests/unit/test_globals.py` and `tests/unit/test_handles.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`.
 
 | Case | Kind |
 |---|---|
@@ -74,8 +70,8 @@ The examples and properties below are `tests/unit/test_discount_curve.py`; the s
 | an input changed after construction leaves the curve unchanged, and the curve's arrays refuse writes | example |
 | the headers bind in either order and either case | example, through the seam |
 | validation failure publishes no object and no handle | example, with handles |
-| a read on `max_date` passes; one day after, and one day before the start, is rejected naming both dates | example |
-| the creator's handle, its failures, and the reader in a real workbook | Excel smoke |
+| a one-row curve starts and ends on its one day | example |
+| the creator's handle and its failures in a real workbook, read back through `ReadHandle` | Excel smoke |
 
 The daily-coverage and anchor rules are tested independently of generic date acceptance, which is the seam's.
 

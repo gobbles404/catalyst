@@ -52,7 +52,7 @@ def workloads() -> dict[str, Callable[[], object]]:
         Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(3_631)]),
     )
     return {
-        "util_ReadDiscountFactor": lambda: ENTRY["util_ReadDiscountFactor"](curve, 46277.0),
+        "ReadHandle": lambda: ENTRY["ReadHandle"](curve),
         "Zero": lambda: ENTRY["Zero"](),
         "Add": lambda: ENTRY["Add"](1.0, 2.0),
         "Times": lambda: ENTRY["Times"](5.0, MISSING),

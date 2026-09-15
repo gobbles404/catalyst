@@ -18,7 +18,6 @@ class DiscountCurve:
 
     dates: NDArray[np.datetime64]
     factors: NDArray[np.float64]
-    start_ordinal: int  # the start date as numpy counts days, so a day is an index in one step
 
     @property
     def start_date(self) -> np.datetime64:
@@ -69,15 +68,4 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) 
         )
     days.setflags(write=False)
     values.setflags(write=False)
-    return DiscountCurve(days, values, int(days[0].astype(np.int64)))
-
-
-def factor_on(curve: DiscountCurve, day: np.datetime64) -> float:
-    """The factor for one calendar day the curve covers; a day outside its dates is a failure."""
-    i = int(day.astype(np.int64)) - curve.start_ordinal
-    if not 0 <= i < curve.factors.size:
-        raise ValueError(
-            f"date is {day}, expected a date from {curve.dates[0]} to {curve.dates[-1]}, "
-            "the curve's first and last"
-        )
-    return float(curve.factors[i])
+    return DiscountCurve(days, values)

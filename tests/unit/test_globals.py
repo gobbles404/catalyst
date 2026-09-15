@@ -3,13 +3,15 @@
 import re
 from typing import cast
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells
 
-# Serials for 11, 12 and 13 September 2026, and one a week later.
-SEP_11, SEP_12, SEP_13, SEP_20 = 46276.0, 46277.0, 46278.0, 46285.0
+# Serials for 11, 12 and 13 September 2026.
+SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
 
 HEADERS = Cells.from_rows([["date", "discount_factor"]])
 BODY = Cells.from_rows([[SEP_11, 1.0], [SEP_12, 0.9999], [SEP_13, 0.9998]])
@@ -61,7 +63,11 @@ def test_the_headers_bind_in_either_order() -> None:
     headers = Cells.from_rows([["Discount_Factor", "DATE"]])
     body = Cells.from_rows([[1.0, SEP_11], [0.9999, SEP_12], [0.9998, SEP_13]])
     text = cast(str, bridge.call("CreateDiscountCurve", [headers, body]))
-    assert bridge.call("util_ReadDiscountFactor", [text, SEP_12]) == 0.9999
+    # Read back through the seam: the curve's own columns, dates first, whatever the sheet's order.
+    spill = bridge.call("ReadHandle", [text])
+    assert isinstance(spill, tuple)
+    _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
+    assert slots[2:].tolist() == [[SEP_11, 1.0], [SEP_12, 0.9999], [SEP_13, 0.9998]]
 
 
 @pytest.mark.parametrize(
@@ -95,59 +101,3 @@ def test_the_headers_bind_in_either_order() -> None:
 )
 def test_a_curve_that_cannot_be_made_says_why(headers: Cells, body: Cells, text: str) -> None:
     assert bridge.call("CreateDiscountCurve", [headers, body]) == text
-
-
-# --- util_ReadDiscountFactor -----------------------------------------------
-
-
-def test_a_factor_is_read_back_from_the_curve_the_handle_stands_for() -> None:
-    curve = a_curve()
-    assert bridge.call("util_ReadDiscountFactor", [curve, SEP_11]) == 1.0
-    assert bridge.call("util_ReadDiscountFactor", [curve, SEP_12]) == 0.9999
-    assert bridge.call("util_ReadDiscountFactor", [curve, SEP_13]) == 0.9998
-
-
-def test_a_day_the_curve_does_not_cover_fails_naming_both_ends() -> None:
-    assert bridge.call("util_ReadDiscountFactor", [a_curve(), SEP_20]) == (
-        "#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, "
-        "expected a date from 2026-09-11 to 2026-09-13, the curve's first and last"
-    )
-
-
-def test_a_valuation_date_handle_is_not_a_curve() -> None:
-    other = cast(str, bridge.call("CreateValuationDate", [SEP_11, 0.5]))
-    assert bridge.call("util_ReadDiscountFactor", [other, SEP_12]) == (
-        f"#ERROR util_ReadDiscountFactor: curve is valuation date handle {other!r}, "
-        "expected discount curve handle"
-    )
-
-
-@pytest.mark.parametrize(
-    ("value", "text"),
-    [
-        (
-            "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, "
-            "expected exactly 1 at the curve's first date",
-            "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount "
-            "curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is "
-            "0.98, expected exactly 1 at the curve's first date",
-        ),
-        (
-            "discount_curve:000000:000001",
-            "#ERROR util_ReadDiscountFactor: curve is text 'discount_curve:000000:000001' "
-            "naming no live object, expected discount curve handle",
-        ),
-        (
-            "x",
-            "#ERROR util_ReadDiscountFactor: curve is text 'x' naming no live object, "
-            "expected discount curve handle",
-        ),
-        (
-            3.0,
-            "#ERROR util_ReadDiscountFactor: curve is number 3.0, expected discount curve handle",
-        ),
-    ],
-    ids=["a creator that failed", "a handle from another session", "any other text", "a number"],
-)
-def test_text_that_is_not_a_live_curve_fails(value: object, text: str) -> None:
-    assert bridge.call("util_ReadDiscountFactor", [value, SEP_12]) == text

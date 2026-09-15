@@ -141,11 +141,22 @@ def least_peak(fn: Callable[[], object]) -> int:
     return min(peak_bytes(fn) for _ in range(3))
 
 
-# Measured 1,176 bytes for the valuation date and 1,208 for the reader on 2026-09-14.
-def test_a_creator_of_a_small_object_and_a_reader_stay_small() -> None:
+# Measured 1,176 bytes for the valuation date on 2026-09-14, and 1,671 for reading it back as a
+# three-row table on 2026-09-15: the record and its entry, then the kinds, the slots and the
+# masks of six cells.
+def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
     assert least_peak(lambda: ENTRY["CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
-    handle = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3))
-    assert least_peak(lambda: ENTRY["util_ReadDiscountFactor"](handle, 46277.0)) <= 2 * SLACK
+    handle = ENTRY["CreateValuationDate"](46276.0, 0.5)
+    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+
+
+# Reading a ten-year curve back builds its table, the kinds and the slots of 3,633 rows by two,
+# the serials on the way, and the mixed road's masks: measured 128,381 bytes on 2026-09-15,
+# about 18 bytes per cell out.
+def test_reading_a_curve_back_peaks_at_its_table_and_the_roads_masks() -> None:
+    handle = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    cells = 3_633 * 2
+    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 18 * cells + SLACK
 
 
 # A ten-year curve keeps its two arrays, 16 bytes per day, and on the way pays the table path's

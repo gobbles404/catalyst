@@ -108,10 +108,11 @@ namespace Goosedove.Host.Tests
             // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
             yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
             yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
-            yield return new object[] { "util_ReadDiscountFactor", new object[] { "x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is text 'x' naming no live object, expected discount curve handle" };
+            yield return new object[] { "ReadHandle", new object[] { "x" }, "#ERROR ReadHandle: handle is text 'x' naming no live object, expected a handle" };
+            yield return new object[] { "ReadHandle", new object[] { 46276.0 }, "#ERROR ReadHandle: handle is number 46276.0, expected a handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
-            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
-            yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "ReadHandle", new object[] { "#ERROR CreateDiscountCurve: ValueError: x" }, "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "ReadHandle", new object[] { "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" }, "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" };
             // The expiry schedule: a column of codes and two of dates, one row per code, the third column optional.
             yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
             yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
@@ -144,18 +145,26 @@ namespace Goosedove.Host.Tests
             Assert.Equal(2.5, array[1, 1]);
         }
 
-        // A handle: the creator's text stands for the curve, the reader gets a factor back through it,
-        // and the headers bind by name in either order.
+        // A handle: the creator's text stands for the curve, ReadHandle spills the curve's table
+        // back through it, headers, types, then a row per day, and the headers bind by name in
+        // either order.
         [Fact]
         public void a_curve_is_created_as_a_handle_and_read_back_through_it()
         {
             var handle = (string)Seam.Call("CreateDiscountCurve", Row("date", "discount_factor"), Curve());
             Assert.StartsWith("discount_curve:", handle);
-            Assert.Equal(0.9999, Seam.Call("util_ReadDiscountFactor", handle, 46277.0));
+            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("date", spill[0, 0]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal(46277.0, spill[3, 0]);
+            Assert.Equal(0.9999, spill[3, 1]);
             var swapped = new object[,] { { 1.0, 46276.0 }, { 0.9999, 46277.0 }, { 0.9998, 46278.0 } };
             var reversed = (string)Seam.Call("CreateDiscountCurve", Row("discount_factor", "date"), swapped);
             Assert.NotEqual(handle, reversed);
-            Assert.Equal(0.9998, Seam.Call("util_ReadDiscountFactor", reversed, 46278.0));
+            var again = (object[,])Seam.Call("ReadHandle", reversed);
+            Assert.Equal(0.9998, again[4, 1]);
         }
 
         [Theory]

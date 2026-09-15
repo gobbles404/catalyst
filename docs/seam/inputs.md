@@ -122,7 +122,7 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| `Handle[Kind]`, a class the library defines inside the brackets | text that is the handle of a live object of that kind | `=util_ReadDiscountFactor(B5, A3)` with B5 a creator's cell | the object itself | a number, boolean, blank, missing or empty text, any array; text naming no live object; a handle of another kind; a creator's `#ERROR` text, relayed by a reference to its cell |
+| `Handle[Kind]`, a class the library defines inside the brackets | text that is the handle of a live object of that kind | a parameter `curve: Handle[DiscountCurve]` handed B5, a creator's cell | the object itself | a number, boolean, blank, missing or empty text, any array; text naming no live object; a handle of another kind; a creator's `#ERROR` text, relayed by a reference to its cell |
 | `Handle[object]`, any kind | text that is the handle of any live object | `=ReadHandle(B5)` with B5 any creator's cell | the object itself, whatever its kind | the same, less a handle of another kind, since there is none |
 
 A handle of any kind is a parameter's declaration only: a creator names what it makes, so `Handle[object]` as a result refuses to register, as a bare `Handle` does. A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
