@@ -64,6 +64,12 @@ $formulas = [ordered]@{
     "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
     "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
+    # The expiry schedule: a creator with three columns and one with two, a futures column one
+    # row short, and a blank in the options column.
+    "=LEFT(AI1,16)"               = "expiry_schedule:"
+    "=LEFT(AI2,16)"               = "expiry_schedule:"
+    "=CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR CreateExpirySchedule: ValueError: futures_expiry has 5 dates, expected 6, one per future_code"
+    "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR CreateExpirySchedule: options_expiry cell (3, 1) is blank, expected date"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -104,6 +110,17 @@ $cells = [ordered]@{
     "AA2" = "=CreateValuationDate(Y2,0.5)"
     "AA3" = "=CreateDiscountCurve(Y1:Z1,AB2:AC4)"
     "AA4" = "=util_ReadDiscountFactor(AA3,Y3)"
+    # An expiry schedule: six contract codes as the desk types them, the futures and options
+    # expiry beside each, a copy of the options column with a blank, and two creator cells, one
+    # with the options column and one without.
+    "AE2" = "m26"; "AF2" = "19-May-2026"; "AG2" = "14-May-2026"; "AH2" = "14-May-2026"
+    "AE3" = "n26"; "AF3" = "22-Jun-2026"; "AG3" = "16-Jun-2026"; "AH3" = "16-Jun-2026"
+    "AE4" = "q26"; "AF4" = "21-Jul-2026"; "AG4" = "16-Jul-2026"
+    "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"
+    "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"
+    "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"
+    "AI1" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
+    "AI2" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

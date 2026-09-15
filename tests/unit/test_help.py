@@ -21,7 +21,7 @@ SPECS = {
 }
 
 
-# --- the three listed functions, exactly: this is the text the desk reads ----------------
+# --- the listed functions, exactly: this is the text the desk reads ----------------------
 
 
 def test_the_valuation_date_creator_explains_itself() -> None:
@@ -73,6 +73,30 @@ def test_the_reader_explains_itself() -> None:
             "or a name for it.",
         ),
         ("date", "The day to read, such as 12-Sep-2026, between the curve's first and last dates."),
+    ]
+
+
+def test_the_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["CreateExpirySchedule"]
+    assert not hidden
+    assert description == (
+        "Creates an expiry schedule from the contract codes of one index and their expiry dates, "
+        "and shows its handle, the text other formulas take as the schedule."
+    )
+    # The third argument may be left out with nothing in its place: brackets, and its line alone.
+    assert arguments == [
+        (
+            "future_code",
+            "The column of contract codes, such as A2:A7 holding m26 to X26, one per contract.",
+        ),
+        (
+            "futures_expiry",
+            "The column of futures expiry dates beside the codes, such as B2:B7, one per code.",
+        ),
+        (
+            "[options_expiry]",
+            "The column of options expiry dates beside the codes, such as C2:C7, one per code.",
+        ),
     ]
 
 

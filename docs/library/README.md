@@ -34,7 +34,7 @@ Three things not to do:
 
 ## Where it stands
 
-Built in #53: `CreateValuationDate` and `CreateDiscountCurve`, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves. Ready to ship: `UnitConversions`, `InterpolateDiscountFactors`, and `CreateExpirySchedule`, the first market definition, since #59 gave the seam an argument that may be left out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39).
+Built in #53: `CreateValuationDate` and `CreateDiscountCurve`, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves. Built in #60: `CreateExpirySchedule`, the first market definition, the first function to take columns of one kind without headers, and the first to leave an argument out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Ready to ship: `UnitConversions` and `InterpolateDiscountFactors`.
 
 Open across the library, gating nothing: release of a handle when its creator is deleted or its workbook closes, and reuse on an unchanged recalculation, specified in [handles.md](../seam/handles.md) and built by the next handle pull request; and whether library code takes a work counter, parked for the measurement session (issue #10), the functions built so far taking none, their work pinned at the seam. What the first pricing function must settle is under Not here on the pages it touches: how a calculation with several curves stays inside their dates, and the ordering of two valuation dates.
 
