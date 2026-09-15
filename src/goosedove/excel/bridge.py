@@ -945,7 +945,8 @@ def _resolve(kind: type[object], expected: str, name: str, value: object) -> obj
     The text's own faults come first, through the text rule, so a number, a blank, a missing
     argument or an empty text fail in the seam's usual words. Then a creator's failure relayed
     by a reference to its cell, carried whole; then text naming no live object; then an object
-    of another kind.
+    of another kind. A declaration of `object` takes any kind, so that last comparison is the
+    one step it skips: whatever the key finds is handed over.
     """
     text = _text(value)
     if text.startswith("#ERROR "):
@@ -957,7 +958,7 @@ def _resolve(kind: type[object], expected: str, name: str, value: object) -> obj
         raise TypeValidationError(
             f"{name} is text {text!r} naming no live object, expected {expected}"
         )
-    if held.kind is not kind:
+    if kind is not object and held.kind is not kind:
         raise TypeValidationError(
             f"{name} is {_words(held.kind)} handle {text!r}, expected {expected}"
         )
@@ -1225,7 +1226,8 @@ def _declared(
         # A handle resolves against the store, which holds nothing at registration.
         if spec.default is not inspect.Parameter.empty:
             raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
-        expected = f"{_words(kind)} handle"
+        # Handle[object] takes the object behind any handle, so its words name no kind.
+        expected = "a handle" if kind is object else f"{_words(kind)} handle"
         return expected, partial(_resolve, kind, expected, spec.name)
     return _DECLARED.get(spec.annotation)
 
@@ -1291,6 +1293,12 @@ def _result(function: str, annotation: object) -> Callable[[object], object]:
     convert = _RESULTS.get(annotation)
     if convert is None and _is_handle(annotation):
         kind = _handle_kind(annotation)
+        if kind is object:
+            # A store entry of kind "any" could never be told apart, and no typed consumer
+            # could take it: Handle[object] is a parameter's declaration only.
+            raise TypeError(
+                f"{function} declares Handle[object] as its result; a creator names what it makes"
+            )
         if kind is not None:
             words = _words(kind)
             return partial(_publish, kind, words.replace(" ", "_"), words)

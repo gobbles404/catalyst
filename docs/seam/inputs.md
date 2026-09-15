@@ -123,8 +123,9 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
 | `Handle[Kind]`, a class the library defines inside the brackets | text that is the handle of a live object of that kind | `=util_ReadDiscountFactor(B5, A3)` with B5 a creator's cell | the object itself | a number, boolean, blank, missing or empty text, any array; text naming no live object; a handle of another kind; a creator's `#ERROR` text, relayed by a reference to its cell |
+| `Handle[object]`, any kind | text that is the handle of any live object | `=ReadHandle(B5)` with B5 any creator's cell | the object itself, whatever its kind | the same, less a handle of another kind, since there is none |
 
-A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
+A handle of any kind is a parameter's declaration only: a creator names what it makes, so `Handle[object]` as a result refuses to register, as a bare `Handle` does. A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
 
 Built in the left-out pull request. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `option_expiry: DateColumn | None = None`. It is not a new type but a form of declaration over the fourteen above, and the desk sees only the name in brackets.
 
@@ -139,7 +140,6 @@ Next, one at a time, each when the first function needs it. Each adds one rule t
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
-| A handle of any kind; the recommended form is `handle: Handle[object]`, the function receiving the object whatever its kind. Wanted by `ReadHandle`. | text that is the handle of any live object | `=ReadHandle(B5)` with B5 any creator's cell | The failures keep decision 35's order and words with no kind to name, `expected a handle`; the identity check of the kind is the one step that is skipped, and nothing in the text is parsed, as now. A bare `Handle` still refuses to register, as decision 34 says: a function names what it takes, and `object` is that name for any kind. |
 
 ## Decided
 
@@ -205,6 +205,10 @@ Decided 2026-09-14, a mixed range and its headers, by the owner.
 Decided 2026-09-14, an argument left out with nothing in its place.
 
 39. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `option_expiry: DateColumn | None = None`, and the function receives `None` only for an argument the formula left out. Decision 4 stands: a blank cell in that slot is a blank and fails in the type's own words, because blank arrives as `None` from the host and left out as `MISSING`, and only `MISSING` takes a default. `X` is one of the fourteen declared types; a table, a handle and a bare mixed range take no default and may not be left out. Registration refuses the form with any default but `None`, or with none. Excel shows the name in brackets, `[option_expiry]`, and nothing after the argument's help, because there is nothing to name and the brackets say it; the help's sentence is written as if the argument were required, as every line is. First wanted by `CreateExpirySchedule`, for an index that has no options.
+
+Decided 2026-09-15, a handle of any kind.
+
+40. A function that takes the object behind any handle declares `handle: Handle[object]`, `object` being Python's name for any class, and receives whatever the key finds. Decision 35's order and words stand, with no kind to name, `expected a handle`; the one step skipped is the comparison of the store's kind with the declared kind, and nothing in the text is parsed. A creator still names what it makes: `Handle[object]` as a result refuses to register, and so does a bare `Handle`, as decision 34 says. First wanted by `ReadHandle`.
 
 ## Not supported
 

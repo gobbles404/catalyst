@@ -1,6 +1,6 @@
 # ReadHandle
 
-Waiting on the seam: a handle of any kind, and a mixed array out.
+Waiting on the seam: a mixed array out.
 
 Reads the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. When it is built, `util_ReadDiscountFactor` goes: its page says it exists only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it.
 
@@ -10,7 +10,7 @@ Reads the object a handle stands for onto the sheet as the table its creator too
 def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 ```
 
-Both names are the recommended forms of the two seam items, engineering's to settle: `Handle[object]` for a handle of any kind, and `MixedArray` as a result, the mirror of the way in.
+`Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result, the mirror of the way in, is the one seam item this waits on, in the recommended form, engineering's to settle.
 
 | | A | B |
 |---|---|---|

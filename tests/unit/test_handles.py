@@ -229,3 +229,64 @@ def test_a_handle_around_a_table_or_its_schema_refuses_to_register() -> None:
         excel_function(Keep)
     with pytest.raises(TypeError, match=r"Bare declares Handle\["):
         excel_function(Bare)
+
+
+# --- a handle of any kind ----------------------------------------------------
+
+
+@probe
+def ReadAny(handle: Handle[object]) -> str:
+    """Names the class of whatever object a handle stands for."""
+    _seen["any"] = handle
+    return type(handle).__name__
+
+
+def test_a_handle_of_any_kind_resolves_whatever_the_key_finds() -> None:
+    curve = cast(str, bridge.call("MakeCurve", [1.0]))
+    other = cast(str, bridge.call("MakeOther", []))
+    assert bridge.call("ReadAny", [curve]) == "Curve"
+    assert _seen["any"] is read(curve)
+    assert bridge.call("ReadAny", [other]) == "Other"
+
+
+# Decision 35's order and words, with no kind to name.
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (3.0, "#ERROR ReadAny: handle is number 3.0, expected a handle"),
+        (None, "#ERROR ReadAny: handle is blank, expected a handle"),
+        (MISSING, "#ERROR ReadAny: handle is missing, expected a handle"),
+        ("", "#ERROR ReadAny: handle is empty text, expected a handle"),
+        (Cells.from_rows([["x"]]), "#ERROR ReadAny: handle is 1x1 array, expected a handle"),
+        (
+            "curve:000000:000001",
+            "#ERROR ReadAny: handle is text 'curve:000000:000001' naming no live object, "
+            "expected a handle",
+        ),
+        (
+            "#ERROR MakeCurve: ValueError: it's bad",
+            "#ERROR ReadAny: handle is the creator's failure, expected a handle: "
+            "#ERROR MakeCurve: ValueError: it's bad",
+        ),
+    ],
+)
+def test_a_handle_of_any_kind_keeps_every_other_failure(value: object, text: str) -> None:
+    assert bridge.call("ReadAny", [value]) == text
+
+
+# A creator names what it makes: any kind is a parameter's declaration only, and a bare Handle
+# names nothing at all.
+def test_a_creator_of_any_kind_and_a_bare_handle_refuse_to_register() -> None:
+    def MakeAny() -> Handle[object]:
+        raise AssertionError("never called")
+
+    def ReadBare(handle: object) -> float:
+        return 1.0
+
+    ReadBare.__annotations__["handle"] = Handle
+    with pytest.raises(
+        TypeError, match=r"MakeAny declares Handle\[object\] as its result; a creator names what"
+    ):
+        excel_function(MakeAny)
+    with pytest.raises(TypeError, match="ReadBare: handle declares Handle, which the seam cannot"):
+        excel_function(ReadBare)
