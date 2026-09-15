@@ -351,9 +351,10 @@ namespace Goosedove.Host
             return CellsFromBuffers(rows, cols, texts.Count == 0 ? null : string.Join("\0", texts), seen, work);
         }
 
-        // The seam sends one of four things: a number, text, a boolean, or a two-dimensional array
-        // of doubles. Each is read by its type at the C level, with no trip into Python. Anything
-        // else is the seam's promise broken, and says so in the cell.
+        // The seam sends one of five things: a number, text, a boolean, a two-dimensional array of
+        // doubles, or a tuple carrying a rectangle of numbers, text and booleans. Each is read by
+        // its type at the C level, with no trip into Python. Anything else is the seam's promise
+        // broken, and says so in the cell.
         public static object FromPython(PyObject value, string name, WorkCounter work = null)
         {
             if (PyFloat.IsFloatType(value))
@@ -367,6 +368,10 @@ namespace Goosedove.Host
             if (value.IsInstance(Bridge.BoolType))
             {
                 return value.As<bool>();
+            }
+            if (PyTuple.IsTupleType(value))
+            {
+                return MixedOut(value, name, work);
             }
             PyBuffer buffer;
             try
@@ -410,6 +415,105 @@ namespace Goosedove.Host
                 work?.Hit("buffer_bytes", bytes);
                 work?.Hit("result_cells", rows * cols);
                 return array;
+            }
+        }
+
+        private static readonly object TrueBox = true, FalseBox = false;  // shared, never made per cell
+
+        // The mixed road out: a rectangle of numbers, text and booleans, laid out cell by cell from
+        // the kinds, the mirror of the way in. The seam sends three things by position: the kinds,
+        // one byte per cell; the numbers, eight bytes per cell, 1.0 or 0.0 for a boolean and a
+        // placeholder where a cell holds text; and the text cells joined with NUL in sheet order.
+        // Every number cell is boxed and every text cell is its own string, because Excel receives
+        // an array as one tagged value per cell and there is no block of mixed cells to copy in one
+        // move; a boolean cell is one of two boxes made once.
+        private static object MixedOut(PyObject tuple, string name, WorkCounter work)
+        {
+            using (var kindsObject = tuple[0])
+            using (var numbersObject = tuple[1])
+            using (var textObject = tuple[2])
+            {
+                PyBuffer kinds;
+                try
+                {
+                    kinds = kindsObject.GetBuffer(PyBUF.CONTIG_RO);
+                }
+                catch (PythonException)
+                {
+                    return "#ERROR host: " + name + " returned a mixed array whose kinds give no buffer";
+                }
+                using (kinds)
+                {
+                    if (kinds.Dimensions != 2 || kinds.ItemSize != sizeof(byte))
+                    {
+                        return "#ERROR host: " + name + " returned a mixed array whose kinds are not bytes in two dimensions";
+                    }
+                    var rows = (int)kinds.Shape[0];
+                    var cols = (int)kinds.Shape[1];
+                    var cells = (long)rows * cols;
+                    PyBuffer numbers;
+                    try
+                    {
+                        numbers = numbersObject.GetBuffer(PyBUF.CONTIG_RO);
+                    }
+                    catch (PythonException)
+                    {
+                        return "#ERROR host: " + name + " returned a mixed array whose numbers give no buffer";
+                    }
+                    using (numbers)
+                    {
+                        if (numbers.Dimensions != 2 || numbers.ItemSize != sizeof(double) || numbers.Length != cells * sizeof(double))
+                        {
+                            return "#ERROR host: " + name + " returned a mixed array whose numbers are not " + rows + "x" + cols + " doubles";
+                        }
+                        var joined = textObject.As<string>();
+                        var texts = joined.Length == 0 ? Array.Empty<string>() : joined.Split('\0');
+                        var array = new object[rows, cols];
+                        var text = 0;
+                        long boxed = 0;
+                        unsafe
+                        {
+                            var kind = (byte*)kinds.Buffer;
+                            var number = (double*)numbers.Buffer;
+                            var i = 0;
+                            for (var r = 0; r < rows; r++)
+                            {
+                                for (var c = 0; c < cols; c++, i++)
+                                {
+                                    switch (kind[i])
+                                    {
+                                        case Number:
+                                            array[r, c] = number[i];
+                                            boxed++;
+                                            break;
+                                        case Text:
+                                            if (text == texts.Length)
+                                            {
+                                                return "#ERROR host: " + name + " returned a mixed array with " + texts.Length + " texts for more text cells";
+                                            }
+                                            array[r, c] = texts[text++];
+                                            break;
+                                        case Boolean:
+                                            array[r, c] = number[i] != 0.0 ? TrueBox : FalseBox;
+                                            break;
+                                        default:
+                                            return "#ERROR host: " + name + " returned a mixed array with kind " + kind[i] + " at cell (" + (r + 1) + ", " + (c + 1) + ")";
+                                    }
+                                }
+                            }
+                        }
+                        if (text != texts.Length)
+                        {
+                            return "#ERROR host: " + name + " returned a mixed array with " + texts.Length + " texts for " + text + " text cells";
+                        }
+                        work?.Hit("buffers_allocated");
+                        work?.Hit("buffer_bytes", 8 * cells);  // the array of references, one slot per cell
+                        work?.Hit("result_cells", cells);
+                        work?.Hit("result_texts", text);
+                        work?.Hit("result_boxes", boxed);
+                        return array;
+                    }
+                }
             }
         }
 

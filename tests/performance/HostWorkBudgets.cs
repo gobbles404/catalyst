@@ -267,6 +267,46 @@ namespace Goosedove.Host.Tests
             Same(expected, CountedArray("RowSums", 10, 1, Grid(10, 10)));
         }
 
+        // The mixed road out is checked by its cells; a fresh object[,] never satisfies Assert.Equal.
+        private IReadOnlyDictionary<string, long> CountedObjects(string name, int rows, int cols, params object[] args)
+        {
+            var prepared = Bridge.Prepare(name);
+            Bridge.Call(prepared, args);
+            var work = new WorkCounter();
+            var array = Assert.IsType<object[,]>(Bridge.Call(work, prepared, args));
+            Assert.Equal(rows, array.GetLength(0));
+            Assert.Equal(cols, array.GetLength(1));
+            var counts = work.Freeze();
+            output.WriteLine(name + ": " + string.Join(", ", counts.OrderBy(pair => pair.Key).Select(pair => pair.Key + "=" + pair.Value)));
+            return counts;
+        }
+
+        // Every third cell of Mixed holds a number, counting from the second.
+        private static int MixedNumbers(int cells) => (cells + 1) / 3;
+
+        // A mixed array out is one array of references, a box per number cell and a string per
+        // text cell, and no copy: Excel takes an array one tagged value per cell, so there is no
+        // block of mixed cells to copy in one move. The booleans share two boxes made once.
+        [Theory]
+        [InlineData(1)]
+        [InlineData(100)]
+        [InlineData(10000)]
+        public void a_mixed_array_out_is_one_array_a_box_per_number_and_a_string_per_text(int cells)
+        {
+            var expected = RangeIn(cells);
+            expected["text_cells"] = MixedTexts(cells);
+            expected["objects_built"] = 4;  // and the text, joined once for the whole range
+            expected["buffers_allocated"] = 1;
+            expected["buffer_bytes"] = 8L * cells;
+            expected["result_cells"] = cells;
+            expected["result_texts"] = MixedTexts(cells);
+            if (MixedNumbers(cells) > 0)
+            {
+                expected["result_boxes"] = MixedNumbers(cells);
+            }
+            Same(expected, CountedObjects("EchoMixed", cells, 1, Mixed(cells)));
+        }
+
         // --- managed allocation, the CLR heap only: not Python, not numpy, not Excel-DNA ---------
 
         private static double BytesPerCall(Func<object> call, int calls)
@@ -333,6 +373,22 @@ namespace Goosedove.Host.Tests
             var slope = (BytesPerCall(() => grid(large, one), 20) - BytesPerCall(() => grid(small, one), 20)) / 9000;
             output.WriteLine("managed bytes per added output cell: " + slope);
             Assert.InRange(slope, 0, 8 + 2048.0 / 9000);
+        }
+
+        // The mixed road pays per cell what its cells are: the reference slot for every cell, a
+        // 24-byte box for every third cell, a string for every third, and the split that made the
+        // strings. Measured 53 bytes per added cell on 2026-09-15 in Release over the mixed
+        // column, against 8 on the numbers road; the ceiling holds the slope, not the small
+        // objects of a call.
+        [Fact]
+        public void a_mixed_array_out_allocates_per_cell_what_its_cells_are()
+        {
+            var echo = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoMixed"), 1);
+            object small = Mixed(1000), large = Mixed(10000);
+            echo(large);
+            var slope = (BytesPerCall(() => echo(large), 20) - BytesPerCall(() => echo(small), 20)) / 9000;
+            output.WriteLine("managed bytes per added mixed cell out: " + slope);
+            Assert.InRange(slope, 0, 64 + 2048.0 / 9000);
         }
     }
 }

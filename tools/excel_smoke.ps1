@@ -47,6 +47,13 @@ $formulas = [ordered]@{
     "=ROWS(RowSums({1,2;3,4;5,6}))" = "3"
     "=INDEX(RowSums({1,2;3,4;5,6}),2,1)" = "7"
     "=INDEX(Grid(2,3),2,1)"       = "4"
+    # The mixed road out: a trade's own row, text, a date, a number and a flag, echoed back one
+    # tagged value per cell, and a row of headers echoed across.
+    "=INDEX(EchoMixed(J1:J4),1,1)" = "CL"
+    "=INDEX(EchoMixed(J1:J4),2,1)" = "46164"
+    "=INDEX(EchoMixed(J1:J4),3,1)" = "10"
+    "=INDEX(EchoMixed(J1:J4),4,1)" = "TRUE"
+    "=COLUMNS(EchoMixed(L1:O1))"  = "4"
     "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
     "=RegisterAll()"              = "#NAME?"

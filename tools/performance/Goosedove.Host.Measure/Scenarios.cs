@@ -25,6 +25,8 @@ namespace Goosedove.Host.Measure
             var rowSums = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("RowSums"), 1);
             var grid = (Func<object, object, object>)Registration.MakeDelegate(Bridge.Prepare("Grid"), 2);
             var gridPath = Bridge.Prepare("Grid");
+            var echoMixed = (Func<object, object>)Registration.MakeDelegate(Bridge.Prepare("EchoMixed"), 1);
+            var echoMixedPath = Bridge.Prepare("EchoMixed");
             object one = 1.0, two = 2.0, five = 5.0, missing = ExcelMissing.Value;
 
             measurements.Run("Zero", "scalar", 0, 1, () => zero(), Equal(0.0), Counted("Zero"));
@@ -47,6 +49,11 @@ namespace Goosedove.Host.Measure
                 measurements.Run("CountMixed", "cells in", n, 1, () => countMixed(mixed), Equal((double)n), Counted("CountMixed", mixed));
                 measurements.Run("Dot", "two ranges in", 2 * n, 1, () => dot(column, weights), Equal(total), Counted("Dot", column, weights));
                 measurements.Run("EchoColumn", "round trip", n, n, () => echoColumn(column), ArrayOf(n, 1, total), Counted("EchoColumn", column));
+                // The mixed road out, twice: over the numbers alone, so what lies between this row
+                // and EchoColumn's is the road, a box per cell instead of one copy; and over the
+                // mixed column, so what lies between the two is the text, a string per text cell.
+                measurements.Run("EchoMixed", "round trip, numbers", n, n, () => echoMixed(column), MixedOf(n), Counted("EchoMixed", column));
+                measurements.Run("EchoMixed", "round trip, mixed", n, n, () => echoMixed(mixed), MixedOf(n), Counted("EchoMixed", mixed));
                 object rows = (double)n;
                 var counted = (double)n * (n + 1) / 2;  // 1 + 2 + ... + n, in doubles before it overflows an int
                 measurements.Run("Grid", "cells out", 2, n, () => grid(rows, one), ArrayOf(n, 1, counted), Counted("Grid", rows, one));
@@ -77,6 +84,25 @@ namespace Goosedove.Host.Measure
                                 ArrayOf(n, 1, counted),
                                 () => { var work = new WorkCounter(); Marshal.FromPython(array, "Grid", work); return work.Freeze(); });
                         }
+                    }
+
+                    // The way out alone on the mixed road: the tuple Python already holds for the mixed
+                    // column, laid out cell by cell into the array Excel receives.
+                    object mixedError;
+                    var pyMixed = Marshal.ToPython(mixed, out mixedError);
+                    try
+                    {
+                        using (var record = echoMixedPath.Entry.Invoke(pyMixed))
+                        {
+                            measurements.Run("way out", "mixed", 0, n,
+                                () => Marshal.FromPython(record, "EchoMixed"),
+                                MixedOf(n),
+                                () => { var work = new WorkCounter(); Marshal.FromPython(record, "EchoMixed", work); return work.Freeze(); });
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.Release(pyMixed);
                     }
                 }
             }
@@ -208,6 +234,17 @@ namespace Goosedove.Host.Measure
                 if (!Equals(expected, actual))
                 {
                     throw new InvalidOperationException("got " + (actual ?? "null") + ", expected " + (expected ?? "null"));
+                }
+            };
+        }
+
+        private static Action<object> MixedOf(int rows)
+        {
+            return actual =>
+            {
+                if (!(actual is object[,] array) || array.GetLength(0) != rows || array.GetLength(1) != 1)
+                {
+                    throw new InvalidOperationException("got " + (actual ?? "null") + ", expected a " + rows + "x1 mixed array");
                 }
             };
         }

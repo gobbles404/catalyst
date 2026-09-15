@@ -131,6 +131,19 @@ namespace Goosedove.Host.Tests
             Assert.NotEqual(withOptions, withoutOptions);
         }
 
+        // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.
+        [Fact]
+        public void a_mixed_array_out_keeps_each_cell_as_it_was()
+        {
+            var array = (object[,])Seam.Call("EchoMixed", new object[,] { { "CL", 46164.0 }, { true, 2.5 } });
+            Assert.Equal(2, array.GetLength(0));
+            Assert.Equal(2, array.GetLength(1));
+            Assert.Equal("CL", array[0, 0]);
+            Assert.Equal(46164.0, array[0, 1]);
+            Assert.Equal(true, array[1, 0]);
+            Assert.Equal(2.5, array[1, 1]);
+        }
+
         // A handle: the creator's text stands for the curve, the reader gets a factor back through it,
         // and the headers bind by name in either order.
         [Fact]

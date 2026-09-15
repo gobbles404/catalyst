@@ -122,6 +122,13 @@ def EchoRow(values: NumberRow) -> NumberRow:
 
 
 @probe
+def EchoMixed(values: MixedArray) -> MixedArray:
+    """Probe: a rectangle of numbers, text and booleans in and the same rectangle out, laid out
+    cell by cell on the way back: the mixed road out of the host."""
+    return values
+
+
+@probe
 def RowSums(values: NumberArray) -> NumberColumn:
     """Probe: a grid in, one number per row out, spilled down: the shape of pricing every row."""
     return NumberColumn(values.sum(axis=1))

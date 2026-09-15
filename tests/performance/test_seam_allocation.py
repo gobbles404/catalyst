@@ -114,6 +114,16 @@ def test_an_array_out_peaks_at_the_array_and_its_finite_mask() -> None:
     assert peak_bytes(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
 
 
+# The mixed road out pays its three looks, a 1-byte mask each and the compares behind them, and
+# over text the joined string and its encoding in Excel's units. Measured 50,536 bytes over ten
+# thousand numbers and 72,213 over the mixed column, a text in every fourth cell, on 2026-09-15.
+def test_a_mixed_array_out_peaks_at_its_masks_and_its_joined_text() -> None:
+    numbers = Cells.from_rows([[float(i)] for i in range(N)])
+    assert peak_bytes(lambda: ENTRY["EchoMixed"](numbers)) <= 6 * N + SLACK
+    mixed = Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])
+    assert peak_bytes(lambda: ENTRY["EchoMixed"](mixed)) <= 8 * N + SLACK
+
+
 # --- handles ------------------------------------------------------------------
 # A creator keeps what it makes: the record, its entry in the store and its text; a reader
 # keeps nothing, and its numpy scalars are the small objects. Each is the least of three warm

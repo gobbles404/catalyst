@@ -16,10 +16,12 @@ namespace Goosedove.Host
     ///   cells_scanned      cells visited by the range loop, the Excel error that stopped it included
     ///   text_cells         text cells collected in that loop
     ///   buffers_allocated  managed arrays made: for a range in only when the kept buffers grow,
-    ///                      and for an array out
+    ///                      and for an array out, of doubles or of mixed cells
     ///   buffer_bytes       their payload bytes
-    ///   result_copies      copies made of an array on its way to Excel
-    ///   result_cells       cells in that array
+    ///   result_copies      copies made of an array of doubles on its way to Excel
+    ///   result_cells       cells in the array out
+    ///   result_texts       text cells of a mixed array out, one string each
+    ///   result_boxes       number cells of a mixed array out, one box each
     /// </summary>
     internal sealed class WorkCounter
     {
