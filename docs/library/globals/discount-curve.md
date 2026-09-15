@@ -2,7 +2,7 @@
 
 Built in #53.
 
-A daily discount curve, retained and reached by handle. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D6 to D12, and D21 for its table. The code is `src/goosedove/globals/discount_curve.py`, the record, its builder and the reader's lookup, and `src/goosedove/excel/globals.py`, the worksheet functions.
+A daily discount curve, retained and reached by handle. The choice of a table, and what it cost, is [decisions.md](../decisions.md), D21; what is still open about the curve is D12. The code is `src/goosedove/globals/discount_curve.py`, the record, its builder and the reader's lookup, and `src/goosedove/excel/globals.py`, the worksheet functions.
 
 ## Worksheet contract
 
@@ -25,7 +25,7 @@ def CreateDiscountCurve(
 | 4 | 13-Sep-2026 | 0.9998 |
 | 5 | `=CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:3f9a1c:000002` |
 
-The input is a table (D21): a header row, then a body with one row per calendar day, the date and its discount factor, the first row the curve's start (D6), every day through the last supplied (D7). The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first date in the body is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the curve. What is still open about handles, release above all, is [handles.md](../../seam/handles.md) and D26.
+The input is a table (D21): a header row, then a body with one row per calendar day, the date and its discount factor, the first row the curve's start, every day through the last supplied. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first date in the body is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the curve. What is still open about handles, release above all, is [handles.md](../../seam/handles.md) and D26.
 
 ## Excel help
 
@@ -39,17 +39,17 @@ Quoted from the declaration in `src/goosedove/excel/globals.py`, which `tests/un
 
 ## The library checks
 
-The checks consume typed columns; header interpretation, cell kinds and date conversion are the seam's and are not repeated here. Rows count as the sheet counts them, the first row of the body being row 1, and each message names the column by its header, because the headers bind in either order and the library cannot count a sheet column. Every rejection raises `ValueError` (D29). The checks run in this order, and the first failure is the message.
+The checks consume typed columns; header interpretation, cell kinds and date conversion are the seam's and are not repeated here. Rows count as the sheet counts them, the first row of the body being row 1, and each message names the column by its header, because the headers bind in either order and the library cannot count a sheet column. Every rejection raises `ValueError`. The checks run in this order, and the first failure is the message.
 
 | Rule | Message |
 |---|---|
 | every factor is finite, checked before any arithmetic; a cell cannot send one that is not, so this is for Python callers | `discount_factor row 7 is nan, expected a finite number` |
-| `discount_factor[0] == 1` exactly (D8) | `discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date` |
-| non-increasing (D9); the row named is the one that rose | `discount_factor rises at row 412, from 0.91318 to 0.92254` |
-| the last factor is above zero (D9) | `discount_factor row 3631 is 0.0, expected greater than 0` |
-| each date exactly one calendar day after the row above (D7); the first date is the start by definition | `date row 118 is 2026-09-18, expected 2026-09-17, one day after the row above` |
+| `discount_factor[0] == 1` exactly | `discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date` |
+| non-increasing; the row named is the one that rose | `discount_factor rises at row 412, from 0.91318 to 0.92254` |
+| the last factor is above zero | `discount_factor row 3631 is 0.0, expected greater than 0` |
+| each date exactly one calendar day after the row above; the first date is the start by definition | `date row 118 is 2026-09-18, expected 2026-09-17, one day after the row above` |
 
-Those cover the stated rules: the first factor at 1 with non-increasing already implies every factor is at most 1, and the minimum of a non-increasing array is its last element. No sorting, no gap filling, no generated factors; nothing is clipped, smoothed or rounded.
+Those cover the stated rules: the first factor at 1 with non-increasing already implies every factor is at most 1, which rules out a curve for negative rates and the owner accepts that, and the minimum of a non-increasing array is its last element. No sorting, no gap filling, no generated factors; nothing is clipped, smoothed or rounded.
 
 ## In memory
 
@@ -60,17 +60,17 @@ Received: the schema's record, one typed column per header, per [bridge.md](../.
 | `dates` | `NDArray[np.datetime64]`, dtype `datetime64[D]`, shape `(N,)`, a copy, read-only |
 | `factors` | `NDArray[np.float64]`, shape `(N,)`, a copy, read-only |
 | `start_ordinal` | the start date as numpy counts days, an `int`, so a day becomes an index in one subtraction |
-| `start_date`, `max_date` | properties over `dates[0]` and `dates[-1]`, the latter inclusive (D11); the start's name is D6 |
+| `start_date`, `max_date` | properties over `dates[0]` and `dates[-1]`, the latter inclusive, the curve's hard stop; the start's name is open in D12 |
 
 The two arrays align by position: `dates[i]` and `factors[i]` describe the same calendar day. Both are copied, because the seam's factors column is a view of the whole two-column table and a Python caller keeps whatever it passed, and both are frozen, so a later change to an input never changes a curve. Numeric validation is vectorized; no per-row Python loops. The curve is held in the seam's store until Excel closes; release is D26.
 
 ## Counted work
 
-The builder takes no `WorkCounter` (D27, deferred by the owner); its work is pinned at the seam. `tests/performance/test_seam_budgets.py` pins a ten-year curve, 3,631 rows, at the table path plus the builder and one publication, and on the numpy ledger at five looks, one per column and one per rule, the date column's two conversions, the two copies the curve keeps, and the start's one scalar conversion. `tests/performance/test_seam_allocation.py` pins its peak at 36 bytes per day plus the slack, measured 129,027 bytes on 2026-09-14: the two arrays at 16 bytes per day, and the table path's conversion of the date column and the builder's masks on the way. On the Python clock a ten-year curve takes about 90 microseconds to build. The transport of 7,262 cells is inside the seam's measured range ([baseline.md](../../seam/baseline.md)).
+The builder takes no `WorkCounter` (D27); its work is pinned at the seam. `tests/performance/test_seam_budgets.py` pins a ten-year curve, 3,631 rows, at the table path plus the builder and one publication, and on the numpy ledger at five looks, one per column and one per rule, the date column's two conversions, the two copies the curve keeps, and the start's one scalar conversion. `tests/performance/test_seam_allocation.py` pins its peak at 36 bytes per day plus the slack, measured 129,027 bytes on 2026-09-14: the two arrays at 16 bytes per day, and the table path's conversion of the date column and the builder's masks on the way. On the Python clock a ten-year curve takes about 90 microseconds to build. The transport of 7,262 cells is inside the seam's measured range ([baseline.md](../../seam/baseline.md)).
 
 ## A temporary reader
 
-`util_ReadDiscountFactor(curve, date)` returns the factor for one calendar day the curve covers, `=util_ReadDiscountFactor(B5, A3)` showing `0.9999` in the sheet above. It exists to prove that a handle resolves to its curve on a real sheet, and it goes when a real consumer of a curve exists; `util_` leads the name at the owner's word. A day outside the curve's dates, before the start or after the end alike, fails, `#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last`, which is the hard upper bound (D11) and, for a day before the start, the reader's own rule, noted under D12. The seam's own failures come first, in the order [inputs.md](../../seam/inputs.md) decision 35 gives: a number or a blank where the handle should be, text naming no live object, a handle of another kind, or a creator's failure relayed by the reference. The reader is a text call plus one lookup, pinned in the same two files, measured 1,208 bytes; on the Python clock it takes about 5 microseconds. Its Excel help, quoted from the declaration: the function line "Reads the discount factor for one day from a discount curve."; `curve`, "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it."; `date`, "The day to read, such as 12-Sep-2026, between the curve's first and last dates."
+`util_ReadDiscountFactor(curve, date)` returns the factor for one calendar day the curve covers, `=util_ReadDiscountFactor(B5, A3)` showing `0.9999` in the sheet above. It exists to prove that a handle resolves to its curve on a real sheet, and it goes when a real consumer of a curve exists; `util_` leads the name at the owner's word. A day outside the curve's dates, before the start or after the end alike, fails, `#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last`, which is the curve's hard stop and, for a day before the start, the reader's own rule; what a day before the start means for a calculation is open in D12. The seam's own failures come first, in the order [inputs.md](../../seam/inputs.md) decision 35 gives: a number or a blank where the handle should be, text naming no live object, a handle of another kind, or a creator's failure relayed by the reference. The reader is a text call plus one lookup, pinned in the same two files, measured 1,208 bytes; on the Python clock it takes about 5 microseconds. Its Excel help, quoted from the declaration: the function line "Reads the discount factor for one day from a discount curve."; `curve`, "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it."; `date`, "The day to read, such as 12-Sep-2026, between the curve's first and last dates."
 
 ## Tests
 
@@ -100,10 +100,7 @@ The daily-coverage and anchor rules are tested independently of generic date acc
 
 | | |
 |---|---|
-| How the bound reaches a calculation, which curve governs when there are several, and dates before the start | D12 |
-| Whether `start_date` keeps a name that collides with the valuation date's `as_of` | D6 |
-| Release of the curve when its creator is deleted or its workbook closes, and reuse on an unchanged recalculation | D26 |
-| How a work counter reaches this code | D27 |
+| How the bound reaches a calculation, which curve governs when there are several, dates before the start, and the start date's name | D12 |
 
 ## Not here
 

@@ -1,6 +1,6 @@
 # CreateExpirySchedule
 
-Open: D26, D27, D30.
+Open: D30.
 
 The contract months of one index: each contract's code, the day its future expires and, for an index that has options, the day its option expires, kept as given and reached by handle. It waits on one seam item, D30. Nothing reads the schedule yet; the first consumer, the function that says which contract is prompt on a given date, is not specified.
 
@@ -43,7 +43,7 @@ Registration shows the third as `[options_expiry]`. What it adds after that sent
 
 ## The library checks
 
-One rule: the columns have one row per code, because the seam never compares two arguments and a schedule is rows. Every rejection raises `ValueError` (D29).
+One rule: the columns have one row per code, because the seam never compares two arguments and a schedule is rows. Every rejection raises `ValueError`.
 
 | Rule | Message |
 |---|---|
@@ -86,9 +86,7 @@ None. The builder converts nothing and copies two small arrays. It takes no `Wor
 | | |
 |---|---|
 | An argument that may be left out, with nothing in its place: what the seam needs before this is built | D30 |
-| Release of the schedule when its creator is deleted or its workbook closes | D26 |
-| How a work counter reaches this code | D27 |
 
 ## Not here
 
-Which contract is prompt on a given date, and the roll rule that says whether a contract is still prompt on its own expiry day: the first consumer's job, with whatever it needs a schedule to hold true. Business-day adjustment (D1). What a code means: `m26` is text, never read as a month and a year. The index's name, its exchange, its units, tick size, first notice, last delivery, settlement. A temporary reader: the handle path is proven, and a second kind adds no seam code. Market data, pricing.
+Which contract is prompt on a given date, and the roll rule that says whether a contract is still prompt on its own expiry day: the first consumer's job, with whatever it needs a schedule to hold true. Business-day adjustment: every date in the library is a calendar day. What a code means: `m26` is text, never read as a month and a year. The index's name, its exchange, its units, tick size, first notice, last delivery, settlement. A temporary reader: the handle path is proven, and a second kind adds no seam code. Market data, pricing.

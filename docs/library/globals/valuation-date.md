@@ -2,7 +2,7 @@
 
 Built in #53.
 
-The date and progress through that date at which a calculation is evaluated. Why these choices, and what they cost, is [decisions.md](../decisions.md#dates-and-the-valuation-date), D1 to D5. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
+The date and progress through that date at which a calculation is evaluated. What is still open about it, the fraction nothing uses yet, is [decisions.md](../decisions.md), D3. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -52,7 +52,7 @@ Both fields belong to the object's identity. The date is preserved at every acce
 
 ## Counted work
 
-None. The builder converts nothing, the seam converted the date, allocates one frozen record, and does no numeric work. It takes no `WorkCounter` (D27, deferred by the owner). The call is a two-scalar call, which the host already pins; on the Python side `tests/performance/test_seam_budgets.py` pins it at the two-scalar call plus the builder and one publication, and `tests/performance/test_seam_allocation.py` pins its peak under twice the slack, measured 1,176 bytes on 2026-09-14: the record, its entry in the store and its text.
+None. The builder converts nothing, the seam converted the date, allocates one frozen record, and does no numeric work. It takes no `WorkCounter` (D27). The call is a two-scalar call, which the host already pins; on the Python side `tests/performance/test_seam_budgets.py` pins it at the two-scalar call plus the builder and one publication, and `tests/performance/test_seam_allocation.py` pins its peak under twice the slack, measured 1,176 bytes on 2026-09-14: the record, its entry in the store and its text.
 
 ## Tests
 
@@ -76,7 +76,7 @@ Use `np.nextafter(0.0, -np.inf)` and `np.nextafter(1.0, np.inf)` for the boundar
 
 | | |
 |---|---|
-| The ordering key, and whether the fraction stays | D3, D4 |
+| The ordering key, and whether the fraction stays | D3 |
 
 ## Not here
 

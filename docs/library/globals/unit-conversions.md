@@ -1,9 +1,9 @@
 # UnitConversions
 
-Open: D27.
+Ready.
 
 The library's fixed unit definitions and the conversion between them. Why these choices,
-and what they cost, is [decisions.md](../decisions.md#units), D13 to D17. It has no
+and what they cost, is [decisions.md](../decisions.md), D13. It has no
 worksheet surface and needs nothing from the seam.
 
 ## Not a worksheet function
@@ -42,8 +42,9 @@ conversion. Calculations consume the typed definitions without repeating these c
 | both units exist in that category | `unknown unit 'GALLON' in volume; units are GAL, BBL, L, M3` |
 | both units are in the same category | `cannot convert MWH to BBL; energy and volume are different categories` |
 
-Codes are never trimmed or re-cased on the way in (D17). Category matching is
-case-sensitive and is a separate rule from worksheet header matching (D19), which is not.
+Codes are never trimmed or re-cased on the way in: a code is an identifier, not prose.
+Category matching is case-sensitive and is a separate rule from worksheet header matching
+([inputs.md](../../seam/inputs.md) decision 29), which is not.
 
 ## The definitions
 
@@ -99,7 +100,7 @@ names must accompany the codes in library documentation.
 | MWH | MMBTU | 3.4121416331279417 |
 
 `BTU` is the International Table Btu, exactly 1055.05585262 joules. `MMBTU` is one million
-of them. `THERM` is exactly 100,000 Btu_IT. `GJ` is 1e9 joules, `MWH` is 3.6e9 joules (D16).
+of them. `THERM` is exactly 100,000 Btu_IT. `GJ` is 1e9 joules, `MWH` is 3.6e9 joules.
 These exact meanings must stay written down beside the codes.
 
 ### usd
@@ -121,7 +122,7 @@ quantity_to = quantity_from * size_from / size_to
 
 Quantities may be zero or negative; the factors stay positive and the sign is preserved.
 Grouping the four categories in one collection does not permit conversion between them
-(D14).
+(D13).
 
 ## In memory
 
@@ -135,15 +136,13 @@ Grouping the four categories in one collection does not permit conversion betwee
 Immutability covers the collection and every definition in it. The collection is not
 rebuilt per workbook or per recalculation, and no mutable reference to its contents is
 handed out. Mixed text-and-numeric records stay as records; they are not packed into an
-object-dtype array to make the collection "a NumPy thing" (D20).
+object-dtype array to make the collection "a NumPy thing".
 
 ## Counted work
 
-Conversion is numeric work over arrays and counts. Names and expected values are not yet
-fixed; D27 is open on how a counter reaches library code.
-
-Building the collection happens once and should be observable as such — a test that
-converts twice and sees one build is worth having.
+Conversion is numeric work over arrays. It takes no `WorkCounter` (D27, as every function
+built so far). Building the collection happens once and should be observable as such: a test
+that converts twice and sees one build is the one count worth pinning.
 
 ## Tests
 
@@ -168,18 +167,12 @@ All new; nothing here touches the seam.
 
 The numeric rows state mathematical targets. Compare with a stated tolerance, not equality:
 the relations are exact in decimal and not in binary, and the error is about one unit in the
-last place (D15). Display rounding must never change a stored factor.
-
-## Open
-
-| | |
-|---|---|
-| How a work counter reaches this code | D27 |
+last place. Display rounding must never change a stored factor.
 
 ## Not here
 
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
 USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
-category, all excluded by D14. The concrete storage layout and helper signatures are chosen
+category, all excluded by D13. The concrete storage layout and helper signatures are chosen
 at implementation.

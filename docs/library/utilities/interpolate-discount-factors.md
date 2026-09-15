@@ -1,8 +1,8 @@
 # InterpolateDiscountFactors
 
-Open: D18, D27.
+Open: D18.
 
-Turns sparse date/discount-factor points into an explicit daily table. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D7, D9, D10 and D21. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
+Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves, and what it costs, is [decisions.md](../decisions.md), D10; the table is D21. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
 
 ## Worksheet contract
 
@@ -28,7 +28,7 @@ The result is data, not a handle: a numeric array spilling in two columns, `date
 
 ## The library checks
 
-The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1. Every rejection raises `ValueError` (D29).
+The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1. Every rejection raises `ValueError`.
 
 **Source dates**
 
@@ -38,7 +38,7 @@ The checks consume typed columns; headers, cell kinds and serials are the seam's
 
 Gaps are expected and accepted. Duplicate, reversed or otherwise unordered dates fail. The input is not sorted.
 
-**Source factors**, the curve constructor's rules (D8, D9):
+**Source factors**, the curve constructor's rules:
 
 | Rule | Message |
 |---|---|
@@ -88,7 +88,7 @@ Received: the schema's record, one typed column per header, per [bridge.md](../.
 
 ## Counted work
 
-Preparation, interpolation and output construction all count. Names and expected values are not yet fixed; D27 is open on how a counter reaches library code. A ten-year daily result is 3,631 rows, about 7,262 cells out against a source of 34 rows in, inside the seam's measured range.
+It takes no `WorkCounter` (D27, as every function built so far); preparation, interpolation and output construction are pinned at the seam when built, a ledger and a ceiling as the creators have. A ten-year daily result is 3,631 rows, about 7,262 cells out against a source of 34 rows in, inside the seam's measured range.
 
 ## Tests
 
@@ -118,7 +118,6 @@ Prefer the properties over more examples: they survive a regenerated golden and 
 | | |
 |---|---|
 | The final name, and whether `util_` becomes a convention or a category | D18 |
-| How a work counter reaches this code | D27 |
 
 ## Not here
 
