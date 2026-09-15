@@ -24,7 +24,7 @@ Next, one at a time, each when the first function needs it, as [inputs.md](input
 
 | Declared | The function would return | The cell would show | The trap it must handle |
 |---|---|---|---|
-| `MixedArray` as a result, the mirror of the way in; wanted by `util_Inspect`, which spills a header row of text, a row of types and columns of dates, numbers and text | a record of kinds, numbers and texts in the sheet's shape, at least one cell, the same record the way in hands a function | the rectangle, spilled as returned: text as text, dates as serials, numbers as numbers | The host has one road out for an array today, a run of numbers; a rectangle of three kinds needs a second, laid out cell by cell from the kinds. A blank, a missing or an empty-text cell inside it fails the whole call with the cell named, as it does on the way in; decision 24 stands until this row is built. |
+| `MixedArray` as a result, the mirror of the way in; wanted by `ReadHandle`, which spills a header row of text, a row of types and columns of dates, numbers and text | a record of kinds, numbers and texts in the sheet's shape, at least one cell, the same record the way in hands a function | the rectangle, spilled as returned: text as text, dates as serials, numbers as numbers | The host has one road out for an array today, a run of numbers; a rectangle of three kinds needs a second, laid out cell by cell from the kinds. A blank, a missing or an empty-text cell inside it fails the whole call with the cell named, as it does on the way in; decision 24 stands until this row is built. |
 
 ## Result validation
 

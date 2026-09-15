@@ -1,13 +1,13 @@
-# util_Inspect
+# ReadHandle
 
 Waiting on the seam: a handle of any kind, and a mixed array out.
 
-Spills the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. When it is built, `util_ReadDiscountFactor` goes: its page says it exists only to prove that a handle resolves, and inspecting a curve proves that whole.
+Reads the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. When it is built, `util_ReadDiscountFactor` goes: its page says it exists only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it.
 
 ## Worksheet contract
 
 ```python
-def util_Inspect(handle: Handle[object]) -> MixedArray: ...
+def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 ```
 
 Both names are the recommended forms of the two seam items, engineering's to settle: `Handle[object]` for a handle of any kind, and `MixedArray` as a result, the mirror of the way in.
@@ -19,7 +19,7 @@ Both names are the recommended forms of the two seam items, engineering's to set
 | 3 | 12-Sep-2026 | 0.9999 |
 | 4 | 13-Sep-2026 | 0.9998 |
 | 5 | `=CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:3f9a1c:000002` |
-| 7 | `=util_Inspect(B5)` | spills A7:B11, below |
+| 7 | `=ReadHandle(B5)` | spills A7:B11, below |
 
 | | A | B |
 |---|---|---|
@@ -37,7 +37,7 @@ The lines go beside the parameter in the declaration when the function is built,
 
 | Item | Text |
 |---|---|
-| Function | Spills the object behind a handle as a table: its headers, a row of types, then one row per element. |
+| Function | Reads the object behind a handle and spills it as a table: its headers, a row of types, then one row per element. |
 | `handle` | The cell showing any creator's result, such as B5, or a name for it. |
 
 ## The library checks
@@ -54,18 +54,18 @@ What each kind shows:
 |---|---|---|---|
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day |
-| `expiry_schedule` | `future_code`, `futures_expiry`, and `options_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
+| `expiry_schedule` | `future_code`, `future_expiry`, and `option_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
 
-`=util_Inspect(B2)` on `=CreateValuationDate(A2, 0.5)`:
+`=ReadHandle(B2)` on `=CreateValuationDate(A2, 0.5)`:
 
 | as_of | day_fraction_elapsed |
 |---|---|
 | datetime64[D] | float |
 | 11-Sep-2026 | 0.5 |
 
-`=util_Inspect(A8)` on the six-contract schedule of [expiry-schedule.md](../market-definitions/expiry-schedule.md), and the same schedule built without options shows the first two columns alone:
+`=ReadHandle(A8)` on the six-contract schedule of [expiry-schedule.md](../market-definitions/expiry-schedule.md), and the same schedule built without options shows the first two columns alone:
 
-| future_code | futures_expiry | options_expiry |
+| future_code | future_expiry | option_expiry |
 |---|---|---|
 | str | datetime64[D] | datetime64[D] |
 | m26 | 19-May-2026 | 14-May-2026 |
