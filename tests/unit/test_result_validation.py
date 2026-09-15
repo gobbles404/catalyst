@@ -263,6 +263,11 @@ def test_accepted_array(function: str, value: object, sent: list[list[float]]) -
         ),
         (
             "OutArray",
+            np.array([[2**53 + 1]], dtype=np.uint64),
+            "#ERROR OutArray: result cell (1, 1) is beyond what a cell holds exactly",
+        ),
+        (
+            "OutArray",
             np.ma.masked_array([[1.0, 2.0]], mask=[[False, True]]),
             "#ERROR OutArray: returned a numpy MaskedArray, expected array of numbers",
         ),
@@ -507,11 +512,53 @@ def test_a_table_whose_pieces_do_not_line_up_is_a_programming_error(
             "column 1 is list of 1 date with a time, which a table cannot hold",
         ),
         (np.array(["x"]), "column 1 is list of 1 text, which a table cannot hold"),
+        # A masked array is an ndarray underneath: copying it would drop the mask and spill the
+        # value it hides, so it is refused as the array results refuse it.
+        (
+            np.ma.array([1.0, 999.0], mask=[False, True]),
+            "column 1 is a numpy MaskedArray, which a table cannot hold",
+        ),
     ],
 )
 def test_a_column_a_table_cannot_hold_is_refused(column: NDArray[Any], text: str) -> None:
     with pytest.raises(TypeError, match=re.escape(text)):
         MixedArray.table([], column)
+
+
+def test_a_masked_column_fails_the_call_rather_than_spilling_the_value_it_hides() -> None:
+    assert out(
+        "OutBuiltTable", ([("value",)], [np.ma.array([1.0, 999.0], mask=[False, True])])
+    ) == (
+        "#ERROR OutBuiltTable: TypeError: "
+        "column 1 is a numpy MaskedArray, which a table cannot hold"
+    )
+
+
+# A whole number beyond 2^53 would round on its way into the slots, where the rule could no
+# longer see it, so the bound is checked before the copy, as the array results check it.
+@pytest.mark.parametrize(
+    "column",
+    [
+        np.array([1, 2**53 + 1], dtype=np.int64),
+        np.array([1, np.iinfo(np.int64).min], dtype=np.int64),
+        np.array([1, 2**53 + 1], dtype=np.uint64),
+    ],
+    ids=["int64 above", "int64 below", "uint64 above"],
+)
+def test_a_whole_number_beyond_what_a_cell_holds_exactly_names_its_cell(
+    column: NDArray[Any],
+) -> None:
+    assert out("OutBuiltTable", ([("value",)], [column])) == (
+        "#ERROR OutBuiltTable: result cell (3, 1) is beyond what a cell holds exactly"
+    )
+
+
+def test_whole_numbers_at_the_bound_go_out_exactly() -> None:
+    signed = np.array([2**53, -(2**53)], dtype=np.int64)
+    unsigned = np.array([2**53, 2**53], dtype=np.uint64)
+    kinds, slots, _ = mixed_out(MixedArray.table([], signed, unsigned))
+    assert kinds == [[0, 0], [0, 0]]
+    assert slots == [[2.0**53, 2.0**53], [-(2.0**53), 2.0**53]]
 
 
 @pytest.mark.parametrize(

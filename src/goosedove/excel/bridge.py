@@ -141,22 +141,11 @@ class MixedArray:
                 kinds[top:, j] = TEXT_CODE
                 text_columns.append(column)
                 continue
-            if column.ndim != 1 or (column.dtype.kind == "M" and _unit(column) != "D"):
+            # Exactly a plain one-dimensional array: a subclass, a masked array say, could hide
+            # cells behind the storage the copy below would take, as the array results refuse.
+            if type(column) is not np.ndarray or column.ndim != 1:
                 raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
-            if column.dtype.kind == "M":
-                serials, bad, reason = _serials(column)
-                if bad is not None:
-                    raise _BadResult(f"result cell ({top + bad + 1}, {j + 1}) {reason}")
-                kinds[top:, j] = NUMBER_CODE
-                slots[top:, j] = serials
-            elif column.dtype.kind == "b":
-                kinds[top:, j] = BOOLEAN_CODE
-                slots[top:, j] = column
-            elif column.dtype.kind in "fiu":
-                kinds[top:, j] = NUMBER_CODE
-                slots[top:, j] = column
-            else:
-                raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
+            kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
         # Sheet order: the heading rows, then each body row's texts left to right, which is the
         # transpose of the text columns laid side by side.
         texts = tuple(itertools.chain.from_iterable(headings))
@@ -864,6 +853,37 @@ def _dimensions(value: object, ndim: int, expected: str) -> NDArray[Any]:
     return value
 
 
+def _beyond_exact(array: NDArray[Any]) -> NDArray[np.bool_]:
+    """Flags every whole number a cell would hold inexactly, beyond 2^53 either side. Two-sided,
+    because taking absolute values overflows on the int64 minimum."""
+    return (array > EXACT) | (array < -EXACT)
+
+
+def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArray[Any]]:
+    """A table column's kind code and what fills its slots, checked before the copy into the
+    slots would hide what the rule could no longer see, as the array results check before their
+    conversion; a bad cell is named as INDEX counts it, `row` being the first body row."""
+    kind = column.dtype.kind
+    if kind == "M" and _unit(column) == "D":
+        serials, bad, reason = _serials(column)
+        if bad is not None:
+            raise _BadResult(f"result cell ({row + bad}, {col}) {reason}")
+        return NUMBER_CODE, serials
+    if kind == "b":
+        return BOOLEAN_CODE, column
+    if kind in "iu":
+        big = _beyond_exact(column)
+        if big.any():
+            raise _BadResult(
+                f"result cell ({row + int(big.argmax())}, {col}) "
+                "is beyond what a cell holds exactly"
+            )
+        return NUMBER_CODE, column
+    if kind == "f":
+        return NUMBER_CODE, column
+    raise TypeError(f"column {col} is {describe(column)}, which a table cannot hold")
+
+
 def _finite(array: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[np.float64]:
     """Finite numbers as contiguous float64, or the first bad cell as INDEX counts it."""
     if array.size == 0:
@@ -871,7 +891,7 @@ def _finite(array: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[
     if array.dtype.kind not in "fiu":
         raise _returned(value, expected)
     if array.dtype.kind in "iu":
-        big = (array > EXACT) | (array < -EXACT)  # two-sided: abs overflows on the int64 minimum
+        big = _beyond_exact(array)
         if big.any():
             r, c = divmod(int(big.argmax()), array.shape[1])
             raise _BadResult(f"result cell ({r + 1}, {c + 1}) is beyond what a cell holds exactly")
