@@ -1,8 +1,8 @@
 # Handles
 
-Open: D26.
+Open: release and reuse, below.
 
-A handle is text in a cell that stands for an object the add-in holds in memory, such as a curve. Excel owns the worksheet's dependency graph; the seam owns the retained objects and resolves the current handle value to the Python object; the library builds and consumes objects and never sees the text. Built in #53: the declaration `Handle[Kind]`, one store, the three-part text, publishing on the way out and resolving on the way in, with every failure as text in the cell. Those parts now live where the seam's built things live, [inputs.md](inputs.md) decisions 34 to 37, [outputs.md](outputs.md) decisions 10 to 12 and [bridge.md](bridge.md#a-handle-one-store-and-the-text), and this page keeps what a workbook author may rely on and what is still open: release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and batches of one handle per row. Today every creator call publishes a new object, and the store holds it until Excel closes. Why these choices and what they cost is [decisions.md](../library/decisions.md), D26; the evidence behind the ways of building release is [excel-dna-handles.md](excel-dna-handles.md). When release is built, the rest of this page moves the same way and the page goes.
+A handle is text in a cell that stands for an object the add-in holds in memory, such as a curve. Excel owns the worksheet's dependency graph; the seam owns the retained objects and resolves the current handle value to the Python object; the library builds and consumes objects and never sees the text. Built in #53: the declaration `Handle[Kind]`, one store, the three-part text, publishing on the way out and resolving on the way in, with every failure as text in the cell. Those parts now live where the seam's built things live, [inputs.md](inputs.md) decisions 34 to 37, [outputs.md](outputs.md) decisions 10 to 12 and [bridge.md](bridge.md#a-handle-one-store-and-the-text), and this page keeps what a workbook author may rely on and what is still open: release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and batches of one handle per row. Today every creator call publishes a new object, and the store holds it until Excel closes. The evidence behind the ways of building release is [excel-dna-handles.md](excel-dna-handles.md). When release is built, the rest of this page moves the same way and the page goes.
 
 ## A small object first
 
@@ -62,7 +62,7 @@ A creator may own several published objects. The working proposal for a creator 
 | row 1, trade details X | `trade:17` | trade object A |
 | row 2, identical details X | `trade:18` | trade object B |
 
-One creator formula owns the batch; a successful replacement releases the previous batch, deleting the creator releases its batch, and the duplicate rows never collapse into one object. Row positions describe input-to-output pairing, not persistent identity. The declaration, the row-error policy, blocked-spill behaviour, resizing, and partial reuse of unchanged rows when others change are open under D26; one handle per row is a proposal, not a supported result today, and no public trade function is specified here.
+One creator formula owns the batch; a successful replacement releases the previous batch, deleting the creator releases its batch, and the duplicate rows never collapse into one object. Row positions describe input-to-output pairing, not persistent identity. The declaration, the row-error policy, blocked-spill behaviour, resizing, and partial reuse of unchanged rows when others change are open below; one handle per row is a proposal, not a supported result today, and no public trade function is specified here.
 
 ## Who owns what
 
@@ -138,4 +138,4 @@ Concurrent calls must not multiply ownership, and no publication scans the store
 
 ## Open
 
-Every open question here is D26, which says what would decide it: release, creator tracking and callback timing, including safe shutdown; the batch spill's declaration, row errors, blocked spill, resizing and partial reuse; the equality key and the preparation work for unchanged-creator reuse; whether moving a creator may rebuild its objects or must keep their handles; reopen calculation timing, interrupted calculation, undo and unexpected loss.
+Every open question here is release, decided by the next handle pull request with counts: creator tracking and callback timing, including safe shutdown; the batch spill's declaration, row errors, blocked spill, resizing and partial reuse; the equality key and the preparation work for unchanged-creator reuse; whether moving a creator may rebuild its objects or must keep their handles; reopen calculation timing, interrupted calculation, undo and unexpected loss.

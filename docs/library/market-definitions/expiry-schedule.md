@@ -1,6 +1,6 @@
 # CreateExpirySchedule
 
-Ready.
+Ready to ship.
 
 The contract months of one index: each contract's code, the day its future expires and, for an index that has options, the day its option expires, kept as given and reached by handle. Nothing reads the schedule yet; the first consumer, the function that says which contract is prompt on a given date, is not specified.
 
@@ -43,29 +43,13 @@ Registration shows the third as `[options_expiry]` with its line alone: there is
 
 ## The library checks
 
-One rule: the columns have one row per code, because the seam never compares two arguments and a schedule is rows. Every rejection raises `ValueError`.
+One rule: the columns have one row per code, because the seam never compares two arguments and a schedule is rows.
 
 | Rule | Message |
 |---|---|
 | every column given has one row per code | `futures_expiry has 5 dates, expected 6, one per future_code` |
 
 Nothing else is checked. The codes are kept as typed, `m26` and `V26` alike, the dates as given, in the order given. What a schedule must look like for a reader to use it, whether codes repeat, whether dates increase, how an option's expiry sits against its future's, is that reader's rule, written when the reader is. A one-row schedule is a schedule. A failed call publishes nothing.
-
-## In memory
-
-Received, per [bridge.md](../../seam/bridge.md#the-declared-input-types): `future_code` as the host's tuple of texts, `futures_expiry` and `options_expiry` as flat arrays of numpy days, and `options_expiry` as `None` when the argument was left out. Retained:
-
-| Field | Representation |
-|---|---|
-| `codes` | `tuple[str, ...]`, length `N`, as typed |
-| `futures_expiry` | `NDArray[np.datetime64]`, dtype `datetime64[D]`, shape `(N,)`, a copy, read-only |
-| `options_expiry` | the same, or `None` for an index with no options |
-
-The three align by position: `codes[i]`, `futures_expiry[i]` and `options_expiry[i]` describe one contract. The date arrays are copied, because a Python caller keeps whatever it passed, and frozen, so a later change to an input never changes a schedule. The schedule is held in the seam's store until Excel closes.
-
-## Counted work
-
-None. The builder converts nothing and copies two small arrays. It takes no `WorkCounter` (D27); its work is pinned at the seam as the creators' is, a ledger in `tests/performance/test_seam_budgets.py` and a ceiling in `tests/performance/test_seam_allocation.py`, both measured when built.
 
 ## Tests
 

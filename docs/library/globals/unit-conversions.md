@@ -1,6 +1,6 @@
 # UnitConversions
 
-Ready.
+Ready to ship.
 
 The library's fixed unit definitions and the conversion between them. Why these choices,
 and what they cost, are on this page. It has no
@@ -122,26 +122,6 @@ quantity_to = quantity_from * size_from / size_to
 
 Quantities may be zero or negative; the factors stay positive and the sign is preserved.
 Grouping the four categories in one collection does not permit conversion between them.
-
-## In memory
-
-| Thing | Representation |
-|---|---|
-| a definition | a typed frozen record: `str`, `str`, `float` |
-| a category | its definitions and its reference unit |
-| the collection | all four categories, frozen, built once |
-| quantities and factors under conversion | NumPy, `float64` |
-
-Immutability covers the collection and every definition in it. The collection is not
-rebuilt per workbook or per recalculation, and no mutable reference to its contents is
-handed out. Mixed text-and-numeric records stay as records; they are not packed into an
-object-dtype array to make the collection "a NumPy thing".
-
-## Counted work
-
-Conversion is numeric work over arrays. It takes no `WorkCounter` (D27, as every function
-built so far). Building the collection happens once and should be observable as such: a test
-that converts twice and sees one build is the one count worth pinning.
 
 ## Tests
 

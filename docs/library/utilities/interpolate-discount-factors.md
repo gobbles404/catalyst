@@ -1,8 +1,8 @@
 # InterpolateDiscountFactors
 
-Ready.
+Ready to ship.
 
-Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves is the library's rule for interpolation, [decisions.md](../decisions.md), D10.
+Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves is the library's rule for interpolation ([conventions.md](../conventions.md#what-holds-everywhere)).
 
 ## Worksheet contract
 
@@ -28,7 +28,7 @@ The result is data, not a handle: a numeric array spilling in two columns, `date
 
 ## The library checks
 
-The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1. Every rejection raises `ValueError`.
+The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1.
 
 **Source dates**
 
@@ -63,7 +63,7 @@ Weights count calendar days, weekends and leap days included. Every supplied poi
 output_rows = calendar_days(last_source_date - first_source_date) + 1
 ```
 
-No dates are generated before the first source date or after the last. No endpoint extension, no extrapolation. Interpolating on `df` rather than on `log df` is a model choice, not data preparation (D10).
+No dates are generated before the first source date or after the last. No endpoint extension, no extrapolation. Interpolating on `df` rather than on `log df` is a model choice, not data preparation: the implied forward rate ramps inside each gap and steps at each knot, about one basis point over a one-year gap in the owner's sample.
 
 [`np.interp`](https://numpy.org/doc/stable/reference/generated/numpy.interp.html) is the implementation choice. It does not enforce increasing source coordinates, and outside the source range it repeats endpoint values: validate the order yourself, and generate only the inclusive range above. Its endpoint behaviour is not permission to accept out-of-range dates. Vectorized throughout; no per-row Python loops.
 
@@ -81,14 +81,6 @@ The first four rows of the owner's sample, through 2026-05-29, give eight rows o
 | 2026-05-29 | 0.99929 |
 
 These are mathematical targets; compare with a stated `float64` tolerance. Supplied knots are preserved exactly. This is a reviewed reference output: it lands as a golden file in its own change, never beside the implementation, and this table goes when it does.
-
-## In memory
-
-Received: the schema's record, one typed column per header, per [bridge.md](../../seam/bridge.md#the-declared-input-types). Interpolation coordinates: calendar-day offsets from the first source date, numeric. Generated: aligned date and factor arrays, each shape `(N,)`. Result: `NDArray[np.float64]`, shape `(N, 2)`, serials and factors, which the seam checks and sends.
-
-## Counted work
-
-It takes no `WorkCounter` (D27, as every function built so far); preparation, interpolation and output construction are pinned at the seam when built, a ledger and a ceiling as the creators have. A ten-year daily result is 3,631 rows, about 7,262 cells out against a source of 34 rows in, inside the seam's measured range.
 
 ## Tests
 
