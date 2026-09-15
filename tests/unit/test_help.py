@@ -5,7 +5,14 @@ from typing import Annotated, cast
 import pytest
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import Date, MixedArray, NumberColumn, excel_function, register
+from goosedove.excel.bridge import (
+    Date,
+    DateColumn,
+    MixedArray,
+    NumberColumn,
+    excel_function,
+    register,
+)
 from goosedove.excel.probes import probe
 
 SPECS = {
@@ -119,6 +126,24 @@ def test_a_default_is_shown_in_the_words_of_the_sheet() -> None:
         ("[day]", "A date. 2026-05-22 when omitted."),
         ("[weights]", "Weights. 2 when omitted."),
     ]
+
+
+# An argument that may be left out with nothing in its place has nothing to name after its
+# sentence: the sentence stands alone, and the brackets say it may be left out.
+@probe
+def LeftOut(
+    x: Annotated[float, "A number."],
+    dates: Annotated[DateColumn | None, "A column of dates."] = None,
+) -> float:
+    return x
+
+
+def test_an_argument_that_may_be_left_out_shows_its_sentence_alone() -> None:
+    _, arguments, _ = {
+        name: (description, arguments, hidden)
+        for name, description, arguments, hidden in bridge.function_specs()
+    }["LeftOut"]
+    assert arguments == [("x", "A number."), ("[dates]", "A column of dates.")]
 
 
 # --- what registration refuses, on a function Excel lists ----------------------------------

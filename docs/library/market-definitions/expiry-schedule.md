@@ -1,6 +1,6 @@
 # CreateExpirySchedule
 
-Waiting on the seam: an argument that may be left out, with nothing in its place.
+Ready to ship.
 
 The contract months of one index: each contract's code, the day its future expires and, for an index that has options, the day its option expires, kept as given and reached by handle. Nothing reads the schedule yet; the first consumer, the function that says which contract is prompt on a given date, is not specified.
 
@@ -26,7 +26,7 @@ def CreateExpirySchedule(
 | 8 | `=CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | shows `expiry_schedule:3f9a1c:000004` |
 | 9 | `=CreateExpirySchedule(A2:A7, B2:B7)` | shows `expiry_schedule:3f9a1c:000005`, an index with no options |
 
-Three columns of one kind each, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The owner chose columns over a table to put the typed columns through a real function, and the third column can be left out, which a table cannot do; the cost is that two columns can be selected one row out of step and equal lengths cannot catch it. This is the first function to take columns of one kind without headers, the case [inputs.md](../../seam/inputs.md) decision 38 left to the next few functions. The third argument is left out for an index that has no options, and that is what the seam cannot yet declare: an optional argument today takes a default value of its type, and this one takes nothing. The item is in [inputs.md](../../seam/inputs.md) under what comes next, with the recommended form. The seam checks each column alone, text one column wide, dates one column wide, no blank cells, and hands over a tuple of texts and arrays of days; nothing here restates that. The result is a handle: text in the cell that stands for the schedule the seam keeps, declared `Handle[ExpirySchedule]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the schedule.
+Three columns of one kind each, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The owner chose columns over a table to put the typed columns through a real function, and the third column can be left out, which a table cannot do; the cost is that two columns can be selected one row out of step and equal lengths cannot catch it. This is the first function to take columns of one kind without headers, the case [inputs.md](../../seam/inputs.md) decision 38 left to the next few functions. The third argument is left out for an index that has no options, declared `DateColumn | None = None`, the seam's form for an argument that may be left out with nothing in its place ([inputs.md](../../seam/inputs.md) decision 39): the function receives `None` only when the argument is left out, and a blank cell in that slot fails as a blank. The seam checks each column alone, text one column wide, dates one column wide, no blank cells, and hands over a tuple of texts and arrays of days; nothing here restates that. The result is a handle: text in the cell that stands for the schedule the seam keeps, declared `Handle[ExpirySchedule]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the schedule.
 
 ## Excel help
 
@@ -39,7 +39,7 @@ The lines go beside each parameter in the declaration when the function is built
 | `futures_expiry` | The column of futures expiry dates beside the codes, such as B2:B7, one per code. |
 | `options_expiry` | The column of options expiry dates beside the codes, such as C2:C7, one per code. |
 
-Registration shows the third as `[options_expiry]`. What it adds after that sentence for an argument that takes nothing when left out is the seam's to decide with that item; the line is written as if the argument were required, as every line is.
+Registration shows the third as `[options_expiry]` with its line alone: there is nothing to name after the sentence, and the brackets say it may be left out. The line is written as if the argument were required, as every line is.
 
 ## The library checks
 

@@ -34,11 +34,13 @@ from dataclasses import dataclass, fields, replace
 from enum import IntEnum
 from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
+from types import NoneType, UnionType
 from typing import (
     Annotated,
     Any,
     Final,
     NewType,
+    Union,
     assert_never,
     cast,
     dataclass_transform,
@@ -970,7 +972,10 @@ class Parameter:
     name: str
     expected: str
     accept: Callable[[object], object]
-    default: object  # MISSING when the argument is required
+    # MISSING when the argument is required; None when it may be left out with nothing in its
+    # place, which is then what the function receives for a left-out argument and never for a
+    # blank cell, since only MISSING takes a default.
+    default: object
     label: str  # the name as Excel shows it: in brackets when the argument is optional
     help: str  # what Excel says about it: the words beside the declaration, then the default
 
@@ -1115,8 +1120,9 @@ def _shown(function: str, name: str, default: object) -> str:
 
 def _help(function: str, name: str, authored: str, default: object, hidden: bool) -> str:
     """What Excel says about an argument: the words beside the declaration and, for an optional
-    argument, what it takes when omitted. A function Excel lists explains every argument; a
-    hidden one may say nothing."""
+    argument, what it takes when omitted. An argument that may be left out with nothing in its
+    place has nothing to name, so its sentence stands alone and the brackets on its label say
+    it. A function Excel lists explains every argument; a hidden one may say nothing."""
     if not authored:
         if hidden:
             return ""
@@ -1128,7 +1134,7 @@ def _help(function: str, name: str, authored: str, default: object, hidden: bool
         raise TypeError(f"{function}: {name}'s help does not end with a period")
     text = (
         authored
-        if default is MISSING
+        if default is MISSING or default is None
         else f"{authored} {_shown(function, name, default)} when omitted."
     )
     if _units(text) > HELP_LIMIT:
@@ -1224,19 +1230,46 @@ def _declared(
     return _DECLARED.get(spec.annotation)
 
 
+def _left_out(annotation: object) -> object | None:
+    """The declared type inside `X | None`, the form of an argument that may be left out with
+    nothing in its place; None for any other annotation."""
+    args = get_args(annotation)
+    if get_origin(annotation) not in (Union, UnionType) or len(args) != 2 or NoneType not in args:
+        return None
+    return args[0] if args[1] is NoneType else args[1]
+
+
 def _parameter(function: str, spec: inspect.Parameter, hidden: bool) -> Parameter:
     if spec.kind not in _POSITIONAL:
         raise TypeError(
             f"{function}: {spec.name} is {spec.kind.description}, which the host cannot pass"
         )
-    declared = _declared(function, spec, hidden)
+    inner = _left_out(spec.annotation)
+    if inner is not None and spec.default is not None:
+        # The form says the argument may be left out with nothing in its place, and None is
+        # that nothing: any other default, or no default, contradicts it.
+        what = (
+            "no default"
+            if spec.default is inspect.Parameter.empty
+            else f"defaults to {describe(spec.default)}"
+        )
+        raise TypeError(
+            f"{function}: {spec.name} declares {spec.annotation!r} and {what}, expected None"
+        )
+    # The type inside the form selects the rule and the words; a table, a handle or a bare mixed
+    # range inside it is refused as it is on its own, since none of those takes a default.
+    declared = _declared(
+        function, spec if inner is None else spec.replace(annotation=inner), hidden
+    )
     if declared is None:
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r}, which the seam cannot receive"
         )
     expected, accept = declared
     default: object = MISSING
-    if spec.default is not inspect.Parameter.empty:
+    if inner is not None:
+        default = None  # never run through the rule, which would call it blank
+    elif spec.default is not inspect.Parameter.empty:
         try:
             default = accept(spec.default)
         except _Rejected:
