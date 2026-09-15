@@ -2,8 +2,7 @@
 
 What Excel-DNA 1.9 supplies for holding an object behind text in a cell, read from its
 source at the `v1.9.0-Release` tag, commit `fb3c19e2def68c6c64d6fece13daa9efd36a2748`, on
-2026-09-12. It selects nothing: the spec is [handles.md](handles.md), and the choices and
-their costs are [decisions.md](../library/decisions.md#handles). Native call reuse below is
+2026-09-12. It selects nothing: the spec is [handles.md](handles.md). Native call reuse below is
 evidence about Excel-DNA, not proof that it meets every ownership rule the spec asks for.
 
 ## What Excel-DNA 1.9 supplies
