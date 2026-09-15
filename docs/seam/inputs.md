@@ -199,7 +199,7 @@ Decided 2026-09-14, handles.
 
 Decided 2026-09-14, a mixed range and its headers, by the owner.
 
-38. A range of mixed kinds crosses only as a table, a row of text holding the headers and a schema, for any function Excel lists. Without headers the columns of a mixed range mean nothing, and a function would have to guess by position; so registration refuses a listed function that declares `MixedArray` on its own, and the hidden probes keep the bare range as the seam's own instrument. Whether a range of one kind, a column of numbers say, needs headers too is not decided; the next few functions will show, and this decision will say.
+38. A range of mixed kinds crosses only as a table, a row of text holding the headers and a schema, for any function Excel lists. Without headers the columns of a mixed range mean nothing, and a function would have to guess by position; so registration refuses a listed function that declares `MixedArray` on its own, and the hidden probes keep the bare range as the seam's own instrument. Whether a range of one kind, a column of numbers say, needs headers too is not decided; the next few functions will show, and this decision will say. The first, `CreateExpirySchedule` (#60), takes three columns of one kind without headers, selected without the header row, the third left out for an index without options; its page states the cost, that two columns can be selected one row out of step and equal lengths cannot catch it.
 
 Decided 2026-09-14, an argument left out with nothing in its place.
 

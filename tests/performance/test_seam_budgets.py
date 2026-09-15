@@ -601,6 +601,82 @@ def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) ->
     }
 
 
+# --- the first market definition: three columns in, one publication out -----------------
+
+
+def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and two date columns for that many monthly contracts, as the sheet sends them."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
+    futures = Cells.from_rows([[46161.0 + 30 * i] for i in range(contracts)])
+    options = Cells.from_rows([[46156.0 + 30 * i] for i in range(contracts)])
+    return codes, futures, options
+
+
+# Ten years of monthly contracts: the text column handed over as it is, one look and two
+# conversions per date column, the builder's two copies, and one publication.
+def test_an_expiry_schedule_is_three_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, futures, options = schedule_columns(120)
+    PATH["CreateExpirySchedule"](codes, futures, options)
+    assert call_profile(lambda: PATH["CreateExpirySchedule"](codes, futures, options)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text_column": 1,
+        "_date_column": 2,
+        "_one_column": 3,
+        "_shape": 3,
+        "_texts": 1,
+        "_dates": 2,
+        "_not_dates": 2,
+        "_as_days": 2,
+        "CreateExpirySchedule": 1,
+        "expiry_schedule": 1,
+        "_one_per_code": 2,  # the one rule, once per date column
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateExpirySchedule"](codes, futures, options)) == {
+        "ndarray.any": 2,  # one look per date column, for the calendar
+        "ndarray.astype": 4,  # each date column on its way to days
+        "numpy.array": 2,  # the two copies the schedule keeps
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 2,
+    }
+
+
+# The third column left out: the stored default is handed over, and nothing runs for it.
+def test_an_expiry_schedule_without_options_pays_for_two_columns(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, futures, _ = schedule_columns(120)
+    PATH["CreateExpirySchedule"](codes, futures, MISSING)
+    assert call_profile(lambda: PATH["CreateExpirySchedule"](codes, futures, MISSING)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text_column": 1,
+        "_date_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_texts": 1,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "CreateExpirySchedule": 1,
+        "expiry_schedule": 1,
+        "_one_per_code": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateExpirySchedule"](codes, futures, MISSING)) == {
+        "ndarray.any": 1,
+        "ndarray.astype": 2,
+        "numpy.array": 1,
+        "ndarray.setflags": 1,
+        "ufunc.reduce": 1,
+    }
+
+
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))

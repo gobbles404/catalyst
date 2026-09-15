@@ -8,9 +8,9 @@ The host uses four names from the bridge and nothing else. When Excel loads the 
 
 The host keeps each prepared path beside the C# function it registers with Excel under that name; how that function is built is in [host.md](host.md). A call after that hands the prepared path the arguments and nothing else; the host never again asks Python for anything by name. A pin is a test that holds a fact still, a count or a message, so a change that moves it fails; `tests/performance/HostWorkBudgets.cs` pins that at zero name lookups per call, and [baseline.md](baseline.md) records the counts, the host's own tally of what it did on one call.
 
-Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge, the globals and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. At this revision nineteen functions register at import: `Ping`, the bridge's own; the fifteen probes; and the three of the globals module, `CreateValuationDate` and `CreateDiscountCurve`, which return handles, and `util_ReadDiscountFactor`, which takes one.
+Importing the bridge imports the package `goosedove.excel` first, whose `__init__.py` is the catalogue: the module that imports every module of worksheet functions, the bridge, the globals and then the probes. A probe is a hidden worksheet function, one absent from Excel's function wizard but still callable by name in a formula, that does no work beyond crossing the seam, so its cost is the seam's own cost; `Add(1, 2)` is one. So every module of worksheet functions has run, and every function is registered, before the host asks for the list. A new module of worksheet functions is added to the catalogue and nowhere else. What registers at import is `Ping`, the bridge's own; the fifteen probes; and the library's functions, one module per group, the globals and the market definitions today, each of which the library's pages describe.
 
-`function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, one pair per argument holding the label Excel shows and its help, and whether the function is hidden. Every probe is hidden; `Ping` and the three of the globals module are not; `tests/unit/test_bridge.py` pins both.
+`function_specs()` returns one tuple per function, a fixed list Python cannot change, in registration order, and the host reads each by position: the name, the description, one pair per argument holding the label Excel shows and its help, and whether the function is hidden. Every probe is hidden; `Ping` and the library's functions are not; `tests/unit/test_bridge.py` pins both.
 
 ## Declaring a worksheet function
 
@@ -329,11 +329,13 @@ No keyword arguments, because the host passes every argument by position. No `No
 |---|---|
 | the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, the handle store and its two rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
 | the probes | `src/goosedove/excel/probes.py` |
-| the creators and the temporary reader | `src/goosedove/excel/globals.py` |
+| the globals' creators and the temporary reader | `src/goosedove/excel/globals.py` |
+| the market definitions' creator | `src/goosedove/excel/market_definitions.py` |
 | the library's first objects, a valuation date and a discount curve, and their builders | `src/goosedove/globals/` |
+| the first market definition, an expiry schedule, and its builder | `src/goosedove/market_definitions/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
-| the three library functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_valuation_date.py`, `test_discount_curve.py` |
+| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_market_definitions.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py` |
 | the exact text of every scalar rejection, the form of an argument that may be left out, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
 | every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |

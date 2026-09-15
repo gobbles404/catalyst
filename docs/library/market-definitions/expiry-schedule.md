@@ -1,8 +1,8 @@
 # CreateExpirySchedule
 
-Ready to ship.
+Built in #60.
 
-The contract months of one index: each contract's code, the day its future expires and, for an index that has options, the day its option expires, kept as given and reached by handle. Nothing reads the schedule yet; the first consumer, the function that says which contract is prompt on a given date, is not specified.
+The contract months of one index: each contract's code, the day its future expires and, for an index that has options, the day its option expires, kept as given and reached by handle. Nothing reads the schedule yet; the first consumer, the function that says which contract is prompt on a given date, is not specified. The code is `src/goosedove/market_definitions/expiry_schedule.py`, the record and its builder, and `src/goosedove/excel/market_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -30,7 +30,7 @@ Three columns of one kind each, selected without the header row: row 1 is for th
 
 ## Excel help
 
-The lines go beside each parameter in the declaration when the function is built, as [conventions.md](../conventions.md#excel-help) says, and `tests/unit/test_help.py` pins them.
+Quoted from the declaration in `src/goosedove/excel/market_definitions.py`, which `tests/unit/test_help.py` pins; Excel shows it while typing and in the `fx` dialog.
 
 | Item | Text |
 |---|---|
@@ -49,15 +49,18 @@ One rule: the columns have one row per code, because the seam never compares two
 |---|---|
 | every column given has one row per code | `futures_expiry has 5 dates, expected 6, one per future_code` |
 
-Nothing else is checked. The codes are kept as typed, `m26` and `V26` alike, the dates as given, in the order given. What a schedule must look like for a reader to use it, whether codes repeat, whether dates increase, how an option's expiry sits against its future's, is that reader's rule, written when the reader is. A one-row schedule is a schedule. A failed call publishes nothing.
+A count of one reads `1 date`. The futures column is checked before the options column, so when both are wrong the futures column is named. Nothing else is checked. The codes are kept as typed, `m26` and `V26` alike, the dates as given, in the order given. What a schedule must look like for a reader to use it, whether codes repeat, whether dates increase, how an option's expiry sits against its future's, is that reader's rule, written when the reader is. A one-row schedule is a schedule. A failed call publishes nothing.
 
 ## Tests
+
+The examples and properties below are `tests/unit/test_expiry_schedule.py`; the seam's texts and the handle are `tests/unit/test_market_definitions.py`, whose hidden reader proves the handle resolves to the schedule; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`.
 
 | Case | Kind |
 |---|---|
 | the six-row sample above: every code and both dates preserved, aligned, as typed | example |
 | the same with `options_expiry` left out: the other two preserved, options retained as none | example |
 | a one-row schedule accepted | example |
+| repeated codes, dates out of order and an option after its future are kept as given: nothing else is checked | example |
 | a futures column one row short, and an options column one row long: rejected, naming the count | example |
 | for any `N` codes and any two columns of `N` dates, everything is preserved and aligned | property |
 | an input changed after construction leaves the schedule unchanged, and its arrays refuse writes | example |

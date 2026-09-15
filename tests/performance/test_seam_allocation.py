@@ -11,7 +11,7 @@ import tracemalloc
 from collections.abc import Callable
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import Cells
+from goosedove.excel.bridge import MISSING, Cells
 
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
@@ -147,6 +147,27 @@ def test_a_discount_curve_keeps_two_arrays_and_pays_its_looks_once() -> None:
     assert (
         least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 36 * days + SLACK
     )
+
+
+def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and two date columns for that many monthly contracts, as the sheet sends them."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
+    futures = Cells.from_rows([[46161.0 + 30 * i] for i in range(contracts)])
+    options = Cells.from_rows([[46156.0 + 30 * i] for i in range(contracts)])
+    return codes, futures, options
+
+
+# A schedule keeps a copy of each date column, 8 bytes per contract each, and on the way pays
+# each column's conversion to days and its look: measured 4,928 bytes with options and 3,280
+# without at 120 contracts on 2026-09-14, about 32 and 17 bytes per contract on top of a
+# creator's small objects, which twice the slack covers; 39,516 and 21,640 at 1,200 contracts.
+def test_an_expiry_schedule_keeps_a_copy_of_each_date_column() -> None:
+    contracts = 120
+    codes, futures, options = schedule_columns(contracts)
+    with_options = least_peak(lambda: ENTRY["CreateExpirySchedule"](codes, futures, options))
+    assert with_options <= 32 * contracts + 2 * SLACK
+    without = least_peak(lambda: ENTRY["CreateExpirySchedule"](codes, futures, MISSING))
+    assert without <= 17 * contracts + 2 * SLACK
 
 
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
