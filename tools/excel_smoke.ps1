@@ -109,31 +109,39 @@ $cells = [ordered]@{
 # --- build the host and tell it where Python is -----------------------------
 
 . (Join-Path $PSScriptRoot "host_build.ps1")
+. (Join-Path $PSScriptRoot "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
 
 # --- a hidden Excel of our own; nothing the user has open is touched --------
 
 try {
-    $excel = New-Object -ComObject Excel.Application
+    $session = Start-HiddenExcel
 }
 catch {
-    Write-Host "Excel is not installed here, so the host is unchecked. Install Excel or run this elsewhere."
+    Write-Host "Could not start hidden Excel, so the host is unchecked: $_"
     exit 2
 }
-$excel.Visible = $false
-$excel.DisplayAlerts = $false
+$excel = $session.Excel
+$owned = [Collections.Generic.List[object]]::new()
+function Own($object) { $owned.Add($object); Write-Output -NoEnumerate $object }
+$loaded = $false
+$scriptError = $null
+$book = $null
 $failures = 0
 try {
     if (-not $excel.RegisterXLL($xll)) { throw "Excel refused to load $xll" }
-    $book = $excel.Workbooks.Add()
-    $sheet = $book.Worksheets.Item(1)
+    $loaded = $true
+    $books = Own $excel.Workbooks
+    $book = Own $books.Add()
+    $sheets = Own $book.Worksheets
+    $sheet = Own $sheets.Item(1)
     # Formula takes text for everything and lets Excel parse it, as typing into the cell would.
     foreach ($address in $cells.Keys) {
-        $sheet.Range($address).Formula = $cells[$address]
+        (Own $sheet.Range($address)).Formula = $cells[$address]
     }
     $row = 1
     foreach ($formula in $formulas.Keys) {
-        $cell = $sheet.Range("K$row")
+        $cell = Own $sheet.Range("K$row")
         $cell.Formula = $formula
         $shown = $cell.Text
         $ok = ($shown -eq $formulas[$formula])
@@ -142,16 +150,10 @@ try {
         if (-not $ok) { Write-Host ("     expected                    {0}" -f $formulas[$formula]) }
         $row++
     }
-    $book.Close($false)
 }
+catch { $scriptError = $_; throw }
 finally {
-    # Quit is not enough: Excel stays alive while any COM object of it is still referenced.
-    $excel.Quit()
-    foreach ($object in @($cell, $sheet, $book, $excel)) {
-        if ($object) { [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($object) }
-    }
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
+    Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
 }
 Write-Host "excel smoke: $($formulas.Count) formulas, $failures failed"
 exit $failures
