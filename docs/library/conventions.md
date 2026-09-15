@@ -1,6 +1,6 @@
 # Conventions
 
-How a function page is written, and the skeleton to copy for a new one. What is here is convention; the choices that could have gone another way are in [decisions.md](decisions.md).
+How a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere. The process a page moves through is in [README.md](README.md#the-process-for-fifty-functions).
 
 ## Names
 
@@ -21,6 +21,10 @@ The bridge exports the declared function name verbatim, so the Python name *is* 
 ## Tables
 
 A function that takes a table, a header row and a body, declares a schema, a class deriving from the seam's `Table` with one line per column, and takes the header row as a `TextRow` in the parameter just before the table. How the headers bind, what each column type accepts, and every message are the seam's: [inputs.md](../seam/inputs.md) decisions 27 to 33 and [bridge.md](../seam/bridge.md#a-table-a-header-row-and-a-schema). A page shows its schema and restates nothing about binding. A mixed range crosses only as a table: a function never declares a bare `MixedArray`, because without headers its columns mean nothing ([inputs.md](../seam/inputs.md) decision 38). Whether a range of one kind needs headers too is not decided; the next few functions will show, and `CreateExpirySchedule` is the first, taking three columns without headers.
+
+## What holds everywhere
+
+Every date is a calendar day, weekends and holidays included; no business-day adjustment happens anywhere. Interpolation is a straight line on the thing itself, weighted by calendar days, wherever the library fills gaps; a spline, or another basis, is a discussion, not a default. A rejection is a `ValueError` with the page's message, and a failed call publishes nothing.
 
 ## What the library receives
 
@@ -62,19 +66,16 @@ Excel shows `Times(x, [factor])`, and on the second argument `[factor]: One mult
 
 ## A function page, section by section
 
-A page holds only what is new to its function, and our functions are well defined: most pages are short. The seam already checks every argument's type and shape and converts every result, so a page cites [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md) rather than restating them, describes nothing that is neither built nor specified, and lists only its own tests. A rule on a page is one a consumer needs today; a rule for a reader that is not built yet is a guess, and belongs to that reader when it is written. Its first line is its state, read off its own Open section, and it moves with the code in the same pull request.
+A page says what the desk types, sees and is told, and what must hold; how it crosses and what it costs belongs to the build, its pull request and its pins. Our functions are well defined, so most pages are short. The seam already checks every argument's type and shape and converts every result, so a page cites [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md) rather than restating them, describes nothing that is neither built nor specified, and lists only its own tests. A rule on a page is one a consumer needs today; a rule for a reader that is not built yet is a guess, and belongs to that reader when it is written. Its first line is its state, in words, and it moves with the code in the same pull request.
 
 The sections, in this order:
 
 | Section | Holds |
 |---|---|
-| Title, then the status line alone | `Open: D30.`, `Ready.` or `Built in #NN.`, then one sentence saying what the function is, naming a decision only where one was made |
+| Title, then the state alone | `Ready to ship.`, `Waiting on the seam: ...` naming the one item in words, or `Built in #NN.`; then one sentence saying what the function is |
 | Worksheet contract | the Python declaration, the formula a user types, what the cell shows, and one line that the seam checks the declared types |
 | Excel help | the function line and one line per argument, quoted from the declaration: the desk-facing text |
 | The library checks | the rules of meaning a consumer needs today, usually one or two, each with its exact message in the seam's grammar |
 | What it computes | the calculation, under a heading that names it, such as The interpolation or The definitions, where there is one |
-| In memory | what is received, by citing bridge.md, and what is retained, with dtype and shape |
-| Counted work | the counters and their expected values, or none and why |
 | Tests | one row per test to write: the case and its kind, example, property or golden; when built, where each is pinned |
-| Open | what gates this page: the number of a record entry, or a sentence when the question is the function's own; the two library-wide items, release and the counter, are listed once in the README and gate nothing |
-| Not here | what a reader might expect and will not find |
+| Not here | what a reader might expect and will not find, and who decides it when that is known: a question only a later function can settle is a sentence here, not a rule |
