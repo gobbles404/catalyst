@@ -3,7 +3,7 @@
 Ready.
 
 The library's fixed unit definitions and the conversion between them. Why these choices,
-and what they cost, is [decisions.md](../decisions.md), D13. It has no
+and what they cost, are on this page. It has no
 worksheet surface and needs nothing from the seam.
 
 ## Not a worksheet function
@@ -121,8 +121,7 @@ quantity_to = quantity_from * size_from / size_to
 ```
 
 Quantities may be zero or negative; the factors stay positive and the sign is preserved.
-Grouping the four categories in one collection does not permit conversion between them
-(D13).
+Grouping the four categories in one collection does not permit conversion between them.
 
 ## In memory
 
@@ -174,5 +173,5 @@ last place. Display rounding must never change a stored factor.
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
 USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
-category, all excluded by D13. The concrete storage layout and helper signatures are chosen
+category, all excluded above. The concrete storage layout and helper signatures are chosen
 at implementation.

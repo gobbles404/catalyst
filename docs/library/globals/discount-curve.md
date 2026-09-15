@@ -2,7 +2,7 @@
 
 Built in #53.
 
-A daily discount curve, retained and reached by handle. The choice of a table, and what it cost, is [decisions.md](../decisions.md), D21; what is still open about the curve is D12. The code is `src/goosedove/globals/discount_curve.py`, the record, its builder and the reader's lookup, and `src/goosedove/excel/globals.py`, the worksheet functions.
+A daily discount curve, retained and reached by handle. What is open above the function, how a calculation with several curves stays inside their dates, is [decisions.md](../decisions.md), D12. The code is `src/goosedove/globals/discount_curve.py`, the record, its builder and the reader's lookup, and `src/goosedove/excel/globals.py`, the worksheet functions.
 
 ## Worksheet contract
 
@@ -25,7 +25,7 @@ def CreateDiscountCurve(
 | 4 | 13-Sep-2026 | 0.9998 |
 | 5 | `=CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:3f9a1c:000002` |
 
-The input is a table (D21): a header row, then a body with one row per calendar day, the date and its discount factor, the first row the curve's start, every day through the last supplied. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first date in the body is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the curve. What is still open about handles, release above all, is [handles.md](../../seam/handles.md) and D26.
+The input is a table: a header row, then a body with one row per calendar day, the date and its discount factor, the first row the curve's start, every day through the last supplied. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first date in the body is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the curve. What is still open about handles, release above all, is [handles.md](../../seam/handles.md) and D26.
 
 ## Excel help
 
@@ -100,7 +100,9 @@ The daily-coverage and anchor rules are tested independently of generic date acc
 
 | | |
 |---|---|
-| How the bound reaches a calculation, which curve governs when there are several, dates before the start, and the start date's name | D12 |
+| How a calculation with several curves knows which dates it must stay inside, and how it is told | D12 |
+
+The function's own: the start date's field is named `as_of`, the same word the valuation date uses for a different thing; the first consumer of both names it.
 
 ## Not here
 

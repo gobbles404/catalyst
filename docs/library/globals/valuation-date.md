@@ -2,7 +2,7 @@
 
 Built in #53.
 
-The date and progress through that date at which a calculation is evaluated. What is still open about it, the fraction nothing uses yet, is [decisions.md](../decisions.md), D3. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
+The date and progress through that date at which a calculation is evaluated. Nothing about it is decided above the function; what is still open, the fraction nothing uses yet, is under Open. The code is `src/goosedove/globals/valuation_date.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -74,9 +74,7 @@ Use `np.nextafter(0.0, -np.inf)` and `np.nextafter(1.0, np.inf)` for the boundar
 
 ## Open
 
-| | |
-|---|---|
-| The ordering key, and whether the fraction stays | D3 |
+The fraction has no consumer yet, and `(2026-09-11, 1)` and `(2026-09-12, 0)` are two records that describe one moment, so how two valuation dates order is undefined. The first function that orders two valuation dates, or measures the time between them, decides whether the fraction stays and how such a pair sorts.
 
 ## Not here
 

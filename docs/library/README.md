@@ -32,7 +32,7 @@ A spec for something the seam must do, such as [handles.md](../seam/handles.md),
 
 ## Where it stands
 
-Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; three are specified. `UnitConversions` is ready. `InterpolateDiscountFactors` takes the curve's table (D21) and waits on its name, D18. `CreateExpirySchedule`, the first market definition, waits on one seam item: an argument that may be left out with nothing in its place, D30, wanted in [inputs.md](../seam/inputs.md). Open across the library and gating nothing: release of handles, D26, and the work counter, D27.
+Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; three are specified. `UnitConversions` and `InterpolateDiscountFactors` are ready. `CreateExpirySchedule`, the first market definition, waits on one seam item: an argument that may be left out with nothing in its place, D30, wanted in [inputs.md](../seam/inputs.md). Open across the library and gating nothing: release of handles, D26, and the work counter, D27.
 
 ## Reading it as a reviewer
 

@@ -1,8 +1,8 @@
 # InterpolateDiscountFactors
 
-Open: D18.
+Ready.
 
-Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves, and what it costs, is [decisions.md](../decisions.md), D10; the table is D21. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
+Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves is the library's rule for interpolation, [decisions.md](../decisions.md), D10.
 
 ## Worksheet contract
 
@@ -10,7 +10,7 @@ Turns sparse date/discount-factor points into an explicit daily table. Interpola
 def InterpolateDiscountFactors(header_row: TextRow, table: DiscountCurveTable) -> NumberArray: ...
 ```
 
-The input is the table the curve takes (D21): a header row `date` and `discount_factor`, in either order, over a body of supplied points, but gaps between source dates are expected: the first supplied date starts the generated table and the last ends it, and there is no separate start, end or valuation-date input. The seam binds the headers and checks the columns, and the library receives dates as numpy days and factors as numbers, aligned by row.
+The input is the table the curve takes: a header row `date` and `discount_factor`, in either order, over a body of supplied points, but gaps between source dates are expected: the first supplied date starts the generated table and the last ends it, and there is no separate start, end or valuation-date input. The seam binds the headers and checks the columns, and the library receives dates as numpy days and factors as numbers, aligned by row.
 
 The result is data, not a handle: a numeric array spilling in two columns, `date` then `discount_factor`, with no header row, the dates as whole Excel serials to be formatted as dates on the sheet, which [outputs.md](../../seam/outputs.md) carries as a `NumberArray`. The body can be fed to `CreateDiscountCurve` as a separate call, under the same headers.
 
@@ -22,9 +22,9 @@ The result is data, not a handle: a numeric array spilling in two columns, `date
 
 | Item | Text |
 |---|---|
-| Function | Linearly interpolates supplied discount factors to every calendar day from the first date through the last. Returns two numeric columns: date and discount_factor. |
-| `header_row` | The two headers, date and discount_factor, in either order. One row; required. |
-| `table` | The body under the headers: one supplied point per row, the date and its discount factor, dates increasing, gaps allowed. Required. |
+| Function | Interpolates your discount factors to every calendar day from the first date to the last, and spills two columns, date and discount_factor. |
+| `header_row` | The header cells of your points, such as A1:B1, reading date and discount_factor in either order. |
+| `table` | The rows under the headers, such as A2:B35: one supplied point per row, the date and its discount factor, with gaps between dates allowed. |
 
 ## The library checks
 
@@ -112,12 +112,6 @@ It takes no `WorkCounter` (D27, as every function built so far); preparation, in
 | the eight-row spill appears in a real workbook, and its body feeds `CreateDiscountCurve` | Excel smoke |
 
 Prefer the properties over more examples: they survive a regenerated golden and the eight-row table does not. The owner's full 34-point sample is preserved as supplied and must fail validation: the factor rises from `0.91318` on 2028-08-09 to `0.92254` on 2028-11-07, which the owner confirmed is bad input data, with no replacement values, so it is the concrete rejection case. It is not in the repository yet; it lands as a file with that test.
-
-## Open
-
-| | |
-|---|---|
-| The final name, and whether `util_` becomes a convention or a category | D18 |
 
 ## Not here
 
