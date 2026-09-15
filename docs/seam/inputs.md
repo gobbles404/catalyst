@@ -126,11 +126,12 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 
 A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
 
-Next, one at a time, each when the first function needs it. Each adds one rule to the validator and one row here.
+Next, one at a time, each when the first function needs it. Each adds one rule to the validator, or one form of declaration, and one row here.
 
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
+| An argument that may be left out, with nothing in its place; the recommended form is `options_expiry: DateColumn \| None = None`, the function receiving `None` only for an argument left out. Wanted by `CreateExpirySchedule`. | the argument missing; a supplied value goes through the type's own rule as it always did | `=CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options, beside `=CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | `None` is the host's word for a blank cell, so a blank in the slot must still fail, and the function must never receive `None` for anything but an argument left out. The help has no default to show after `[options_expiry]`, so what registration adds after the line is new. |
 
 ## Decided
 

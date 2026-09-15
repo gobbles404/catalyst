@@ -1,8 +1,8 @@
 # InterpolateDiscountFactors
 
-Open: D18, D27.
+Ready to ship.
 
-Turns sparse date/discount-factor points into an explicit daily table. Why these choices, and what they cost, is [decisions.md](../decisions.md#the-discount-curve), D7, D9, D10 and D21. The name is the owner's working name; whether `util_` becomes a convention or an Excel category is D18.
+Turns sparse date/discount-factor points into an explicit daily table. Interpolating on the factors themselves is the library's rule for interpolation ([conventions.md](../conventions.md#what-holds-everywhere)).
 
 ## Worksheet contract
 
@@ -10,7 +10,7 @@ Turns sparse date/discount-factor points into an explicit daily table. Why these
 def InterpolateDiscountFactors(header_row: TextRow, table: DiscountCurveTable) -> NumberArray: ...
 ```
 
-The input is the table the curve takes (D21): a header row `date` and `discount_factor`, in either order, over a body of supplied points, but gaps between source dates are expected: the first supplied date starts the generated table and the last ends it, and there is no separate start, end or valuation-date input. The seam binds the headers and checks the columns, and the library receives dates as numpy days and factors as numbers, aligned by row.
+The input is the table the curve takes: a header row `date` and `discount_factor`, in either order, over a body of supplied points, but gaps between source dates are expected: the first supplied date starts the generated table and the last ends it, and there is no separate start, end or valuation-date input. The seam binds the headers and checks the columns, and the library receives dates as numpy days and factors as numbers, aligned by row.
 
 The result is data, not a handle: a numeric array spilling in two columns, `date` then `discount_factor`, with no header row, the dates as whole Excel serials to be formatted as dates on the sheet, which [outputs.md](../../seam/outputs.md) carries as a `NumberArray`. The body can be fed to `CreateDiscountCurve` as a separate call, under the same headers.
 
@@ -22,13 +22,13 @@ The result is data, not a handle: a numeric array spilling in two columns, `date
 
 | Item | Text |
 |---|---|
-| Function | Linearly interpolates supplied discount factors to every calendar day from the first date through the last. Returns two numeric columns: date and discount_factor. |
-| `header_row` | The two headers, date and discount_factor, in either order. One row; required. |
-| `table` | The body under the headers: one supplied point per row, the date and its discount factor, dates increasing, gaps allowed. Required. |
+| Function | Interpolates your discount factors to every calendar day from the first date to the last, and spills two columns, date and discount_factor. |
+| `header_row` | The header cells of your points, such as A1:B1, reading date and discount_factor in either order. |
+| `table` | The rows under the headers, such as A2:B35: one supplied point per row, the date and its discount factor, with gaps between dates allowed. |
 
 ## The library checks
 
-The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1. Every rejection raises `ValueError` (D29).
+The checks consume typed columns; headers, cell kinds and serials are the seam's. Messages follow the seam's grammar and name a column by its header, as the curve's do; rows count as the sheet counts them, the first row of the body being row 1.
 
 **Source dates**
 
@@ -38,7 +38,7 @@ The checks consume typed columns; headers, cell kinds and serials are the seam's
 
 Gaps are expected and accepted. Duplicate, reversed or otherwise unordered dates fail. The input is not sorted.
 
-**Source factors**, the curve constructor's rules (D8, D9):
+**Source factors**, the curve constructor's rules:
 
 | Rule | Message |
 |---|---|
@@ -63,7 +63,7 @@ Weights count calendar days, weekends and leap days included. Every supplied poi
 output_rows = calendar_days(last_source_date - first_source_date) + 1
 ```
 
-No dates are generated before the first source date or after the last. No endpoint extension, no extrapolation. Interpolating on `df` rather than on `log df` is a model choice, not data preparation (D10).
+No dates are generated before the first source date or after the last. No endpoint extension, no extrapolation. Interpolating on `df` rather than on `log df` is a model choice, not data preparation: the implied forward rate ramps inside each gap and steps at each knot, about one basis point over a one-year gap in the owner's sample.
 
 [`np.interp`](https://numpy.org/doc/stable/reference/generated/numpy.interp.html) is the implementation choice. It does not enforce increasing source coordinates, and outside the source range it repeats endpoint values: validate the order yourself, and generate only the inclusive range above. Its endpoint behaviour is not permission to accept out-of-range dates. Vectorized throughout; no per-row Python loops.
 
@@ -81,14 +81,6 @@ The first four rows of the owner's sample, through 2026-05-29, give eight rows o
 | 2026-05-29 | 0.99929 |
 
 These are mathematical targets; compare with a stated `float64` tolerance. Supplied knots are preserved exactly. This is a reviewed reference output: it lands as a golden file in its own change, never beside the implementation, and this table goes when it does.
-
-## In memory
-
-Received: the schema's record, one typed column per header, per [bridge.md](../../seam/bridge.md#the-declared-input-types). Interpolation coordinates: calendar-day offsets from the first source date, numeric. Generated: aligned date and factor arrays, each shape `(N,)`. Result: `NDArray[np.float64]`, shape `(N, 2)`, serials and factors, which the seam checks and sends.
-
-## Counted work
-
-Preparation, interpolation and output construction all count. Names and expected values are not yet fixed; D27 is open on how a counter reaches library code. A ten-year daily result is 3,631 rows, about 7,262 cells out against a source of 34 rows in, inside the seam's measured range.
 
 ## Tests
 
@@ -112,13 +104,6 @@ Preparation, interpolation and output construction all count. Names and expected
 | the eight-row spill appears in a real workbook, and its body feeds `CreateDiscountCurve` | Excel smoke |
 
 Prefer the properties over more examples: they survive a regenerated golden and the eight-row table does not. The owner's full 34-point sample is preserved as supplied and must fail validation: the factor rises from `0.91318` on 2028-08-09 to `0.92254` on 2028-11-07, which the owner confirmed is bad input data, with no replacement values, so it is the concrete rejection case. It is not in the repository yet; it lands as a file with that test.
-
-## Open
-
-| | |
-|---|---|
-| The final name, and whether `util_` becomes a convention or a category | D18 |
-| How a work counter reaches this code | D27 |
 
 ## Not here
 
