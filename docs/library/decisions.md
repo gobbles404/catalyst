@@ -9,7 +9,7 @@ from memory, and an open one is not a licence to guess.
 
 The numbers are stable, so pages can cite them; the gaps are entries that belonged to one
 function, cut in #57, and D30, the argument left out with nothing in its place, which the seam
-decided in #58 ([inputs.md](../seam/inputs.md) decision 39). Two open items gate no page and
+decided in #59 ([inputs.md](../seam/inputs.md) decision 39). Two open items gate no page and
 are listed once in [README.md](README.md): release of handles (D26) and the work counter (D27).
 
 ## D10 · Interpolation is a straight line on the thing itself
