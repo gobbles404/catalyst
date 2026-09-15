@@ -11,7 +11,7 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 | Data fields | snake_case | `unit`, `reference_unit`, `size_in_reference_unit` |
 | Object and seam types | PascalCase, reusing the seam's spelling where one exists | `ValuationDate`, `DiscountCurve`, `Date`, `NumberArray` |
 | Worksheet headers | lowercase snake_case, as declared in the function's schema; bound by name in any order, case ignored ([inputs.md](../seam/inputs.md) decision 29) | `date`, `discount_factor` |
-| Utility functions | `util_` before the name, when the owner states it; a product decision | `util_ReadDiscountFactor` |
+| Utility functions | `util_` before the name, when the owner states it; a product decision | none today; `util_ReadDiscountFactor` was one until #66 |
 | Handles | `Handle[Kind]` around the library's own class, as a creator's result and as a consumer's parameter; the cell shows `kind:session:number` | `Handle[DiscountCurve]`, `discount_curve:3f9a1c:000002` |
 | Category values | exact lowercase codes, matched case-sensitively | `volume`, `mass`, `energy`, `usd` |
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |

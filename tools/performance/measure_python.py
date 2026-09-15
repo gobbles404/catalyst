@@ -86,12 +86,12 @@ def array(rows: int, cols: int, total: float) -> Callable[[object], None]:
     return check
 
 
-def mixed_out(rows: int) -> Callable[[object], None]:
+def mixed_out(rows: int, cols: int = 1) -> Callable[[object], None]:
     """What the mixed road hands the host: the kinds, the numbers and the texts joined."""
 
     def check(result: object) -> None:
-        if not isinstance(result, tuple) or cast(Any, result[0]).shape != (rows, 1):
-            raise AssertionError(f"got {result!r}, expected a {rows}x1 mixed array")
+        if not isinstance(result, tuple) or cast(Any, result[0]).shape != (rows, cols):
+            raise AssertionError(f"got {result!r}, expected a {rows}x{cols} mixed array")
 
     return check
 
@@ -144,8 +144,10 @@ def curve_body(rows: int) -> Cells:
 
 def scenarios() -> list[Scenario]:
     """Every timed case, with its inputs built here, before any clock starts."""
-    # A ten-year curve, created once here: the reader's handle. The creators themselves have no
-    # row, because each call would retain a curve for the life of the run.
+    # A valuation date and a ten-year curve, created once here: the reader's handles. The
+    # creators themselves have no row, because each call would retain an object for the life of
+    # the run.
+    valuation = ENTRY["CreateValuationDate"](46276.0, 0.5)
     curve = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
     cases = [
         Scenario("Zero", "scalar", 0, 1, lambda run=ENTRY["Zero"]: run(), equals(0.0)),
@@ -153,13 +155,23 @@ def scenarios() -> list[Scenario]:
         Scenario(
             "Times", "missing", 1, 1, lambda run=ENTRY["Times"]: run(5.0, MISSING), equals(5.0)
         ),
+        # A handle in: the resolver, then the object's table out. The valuation date's spill is
+        # six cells, so the row is the handle's cost; the ten-year curve's is 7,266 cells out.
         Scenario(
-            "util_ReadDiscountFactor",
+            "ReadHandle",
             "a handle in",
-            2,
             1,
-            lambda run=ENTRY["util_ReadDiscountFactor"], h=curve: run(h, 46277.0),
-            equals(1.0 - 1e-5),
+            6,
+            lambda run=ENTRY["ReadHandle"], h=valuation: run(h),
+            mixed_out(3, 2),
+        ),
+        Scenario(
+            "ReadHandle",
+            "a ten-year curve out",
+            1,
+            7_266,
+            lambda run=ENTRY["ReadHandle"], h=curve: run(h),
+            mixed_out(3_633, 2),
         ),
     ]
     for n in (10, *SIZES):  # ten cells is a trade's own row, smaller than the working size

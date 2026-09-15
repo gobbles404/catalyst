@@ -1,4 +1,4 @@
-"""The discount curve: the rules of meaning, the retained arrays, and the reader."""
+"""The discount curve: the rules of meaning and the retained arrays."""
 
 import numpy as np
 import pytest
@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.globals.discount_curve import discount_curve, factor_on
+from goosedove.globals.discount_curve import discount_curve
 
 EPOCH = np.datetime64("1899-12-30")
 
@@ -152,29 +152,6 @@ def test_the_curve_owns_its_arrays() -> None:
         curve.factors[0] = 0.5
 
 
-# --- the reader -------------------------------------------------------------
-
-
-def test_the_reader_answers_for_each_day_the_curve_covers() -> None:
-    curve = discount_curve(THREE_DAYS, THREE_FACTORS)
-    assert factor_on(curve, np.datetime64("2026-09-11")) == 1.0
-    assert factor_on(curve, np.datetime64("2026-09-12")) == 0.9999
-    assert factor_on(curve, curve.max_date) == 0.9998
-
-
-@pytest.mark.parametrize("day", ["2026-09-14", "2026-09-10", "2030-01-01"])
-def test_the_reader_fails_outside_the_curve_naming_both_ends(day: str) -> None:
-    curve = discount_curve(THREE_DAYS, THREE_FACTORS)
-    with pytest.raises(ValueError) as failure:
-        factor_on(curve, np.datetime64(day))
-    assert str(failure.value) == (
-        f"date is {day}, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last"
-    )
-
-
-def test_a_one_row_curve_answers_for_its_start_alone() -> None:
+def test_a_one_row_curve_starts_and_ends_on_its_one_day() -> None:
     curve = discount_curve(days("2026-09-11", 1), factors(1.0))
-    assert curve.start_date == curve.max_date
-    assert factor_on(curve, curve.start_date) == 1.0
-    with pytest.raises(ValueError):
-        factor_on(curve, np.datetime64("2026-09-12"))
+    assert curve.start_date == curve.max_date == np.datetime64("2026-09-11")

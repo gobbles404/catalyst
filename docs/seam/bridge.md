@@ -227,16 +227,16 @@ def CreateDiscountCurve(header_row: TextRow, table: DiscountCurveTable) -> Handl
 
 
 @excel_function
-def util_ReadDiscountFactor(curve: Handle[DiscountCurve], date: Date) -> float:
-    """Reads the discount factor for one day from a discount-curve handle."""
-    return factor_on(curve, date)
+def ReadHandle(handle: Handle[object]) -> MixedArray:
+    """Reads the object behind a handle and spills it as a table."""
+    return shown(handle)
 ```
 
 The store is one dictionary in the bridge, from a handle's text to the kind the seam verified and a strong reference to the object. Nothing else holds an object, and the library never sees the text. Publishing, `_publish`, runs as a result rule: the object must be of exactly the declared class, or it is refused as any result is, `returned a Python list, expected discount curve`; then the text is made, the entry stored, and the text returned. The text is `kind:session:number`: the tag, six hex characters drawn once when Python starts, and a running number shared by every kind, six digits at least, `discount_curve:3f9a1c:000002`. The session part is what keeps text saved in a workbook from naming an object of a later session; the number never repeats within one. A creator that raises never reaches the rule, so a failure is never published and the number does not move.
 
 Resolving, `_resolve`, runs as an accept rule, and its faults come in the order [inputs.md](inputs.md) decision 35 gives: the text rule first, so a number, a blank, a missing argument, an empty text or an array fail in the seam's usual words; then text beginning `#ERROR `, a creator's failure relayed by a reference to its cell, `curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ...`, the creator's own text carried whole at the end, and when the text relayed is itself such a relay the creator's text is taken out of it and carried on unchanged, so a chain of consumers of any length shows one message and quoting never compounds; then one dictionary lookup, which finds nothing, `curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle`, or an entry of another kind, `curve is valuation date handle 'valuation_date:3f9a1c:000001', expected discount curve handle`; otherwise the function receives the object itself. The kind is compared by identity against what the store recorded; the text's own prefix proves nothing, and nothing in the text is parsed. A parameter declared `Handle[object]` takes the object behind any handle: the same rule runs with that one comparison skipped, and its words name no kind, `handle is number 3.0, expected a handle` ([inputs.md](inputs.md) decision 40). Only a parameter may say so; a creator names what it makes, and `Handle[object]` as a result refuses to register.
 
-What that costs is pinned. `tests/performance/test_seam_budgets.py` pins `CreateValuationDate` at the two-scalar call, the library's builder and one publication; `CreateDiscountCurve` at 3,631 rows at the table path, the builder and one publication, with five looks, two conversions, the two copies the curve keeps and one scalar conversion on the numpy ledger; `util_ReadDiscountFactor` at a text call, one lookup and the reader; and a dead handle at one lookup and nothing else. `tests/performance/test_seam_allocation.py` pins a small creator and the reader under twice the slack, measured 1,176 and 1,208 bytes on 2026-09-14, and the ten-year curve at 36 bytes per day plus the slack, measured 129,027: its two arrays at 16 bytes per day, and the table path's conversion of the date column and the builder's looks on the way. `tests/unit/test_handles.py` pins every text above with two kinds of its own, and `tests/unit/test_globals.py` the three functions through the seam.
+What that costs is pinned. `tests/performance/test_seam_budgets.py` pins `CreateValuationDate` at the two-scalar call, the library's builder and one publication; `CreateDiscountCurve` at 3,631 rows at the table path, the builder and one publication, with five looks, two conversions, the two copies the curve keeps and one scalar conversion on the numpy ledger; `ReadHandle` at a text call, one lookup, the kind's table built a column at a time and the mixed road out; and a dead handle at one lookup and nothing else. `tests/performance/test_seam_allocation.py` pins a small creator under twice the slack, measured 1,176 bytes on 2026-09-14, reading it back under four times the slack, the ten-year curve at 36 bytes per day plus the slack, measured 129,027: its two arrays at 16 bytes per day, and the table path's conversion of the date column and the builder's looks on the way, and reading that curve back at its table and the road's masks. `tests/unit/test_handles.py` pins every text above with two kinds of its own, `tests/unit/test_globals.py` the creators through the seam and `tests/unit/test_utilities.py` the reader.
 
 Every creator call publishes: two creator cells with equal inputs hold two objects, and a recalculated creator publishes anew, so the store grows until Excel closes. Release when a creator is deleted or its workbook closes, and reuse of the same handle on an unchanged recalculation, are open, specified in [handles.md](handles.md), with the evidence for the two ways of building them in [excel-dna-handles.md](excel-dna-handles.md).
 
@@ -334,13 +334,14 @@ No keyword arguments, because the host passes every argument by position. No `No
 |---|---|
 | the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, the handle store and its two rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
 | the probes | `src/goosedove/excel/probes.py` |
-| the globals' creators and the temporary reader | `src/goosedove/excel/globals.py` |
+| the globals' creators | `src/goosedove/excel/globals.py` |
 | the market definitions' creator | `src/goosedove/excel/market_definitions.py` |
+| `ReadHandle`, and the table each kind shows | `src/goosedove/excel/utilities.py` |
 | the library's first objects, a valuation date and a discount curve, and their builders | `src/goosedove/globals/` |
 | the first market definition, an expiry schedule, and its builder | `src/goosedove/market_definitions/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
-| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_market_definitions.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py` |
+| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_market_definitions.py`, `test_utilities.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py` |
 | the exact text of every scalar rejection, the form of an argument that may be left out, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
 | every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |

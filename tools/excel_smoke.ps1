@@ -58,16 +58,23 @@ $formulas = [ordered]@{
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
     "=RegisterAll()"              = "#NAME?"
     # Handles. A creator cell shows its handle, whose session part changes every start, so LEFT
-    # pins the kind; the reader rows refer to creator cells the way a sheet does.
+    # pins the kind; the reader rows refer to creator cells the way a sheet does, and read the
+    # spill one cell at a time with INDEX.
     "=LEFT(AA1,15)"               = "discount_curve:"
     "=LEFT(AA2,15)"               = "valuation_date:"
-    "=util_ReadDiscountFactor(AA1,Y2)" = "1"
-    "=util_ReadDiscountFactor(AA1,Y3)" = "0.9999"
-    "=util_ReadDiscountFactor(AA1,DATE(2026,9,20))" = "#ERROR util_ReadDiscountFactor: ValueError: date is 2026-09-20, expected a date from 2026-09-11 to 2026-09-13, the curve's first and last"
-    "=LEFT(util_ReadDiscountFactor(AA2,Y3),64)" = "#ERROR util_ReadDiscountFactor: curve is valuation date handle '"
-    "=util_ReadDiscountFactor(AA3,Y3)" = "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    "=util_ReadDiscountFactor(AA4,Y3)" = "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    '=util_ReadDiscountFactor("discount_curve:000000:000001",Y3)' = "#ERROR util_ReadDiscountFactor: curve is text 'discount_curve:000000:000001' naming no live object, expected discount curve handle"
+    "=INDEX(ReadHandle(AA1),1,1)" = "date"
+    "=INDEX(ReadHandle(AA1),2,2)" = "float64"
+    "=INDEX(ReadHandle(AA1),3,1)" = "46276"
+    "=INDEX(ReadHandle(AA1),4,2)" = "0.9999"
+    "=ROWS(ReadHandle(AA1))"      = "5"
+    "=INDEX(ReadHandle(AA2),3,2)" = "0.5"
+    "=INDEX(ReadHandle(AI1),3,1)" = "m26"
+    "=INDEX(ReadHandle(AI1),8,3)" = "46310"
+    "=COLUMNS(ReadHandle(AI2))"   = "2"
+    "=ReadHandle(Y2)"             = "#ERROR ReadHandle: handle is number 46276.0, expected a handle"
+    "=ReadHandle(AA3)"            = "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=ReadHandle(AA4)"            = "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    '=ReadHandle("discount_curve:000000:000001")' = "#ERROR ReadHandle: handle is text 'discount_curve:000000:000001' naming no live object, expected a handle"
     "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
     "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
@@ -116,7 +123,7 @@ $cells = [ordered]@{
     "AA1" = "=CreateDiscountCurve(Y1:Z1,Y2:Z4)"
     "AA2" = "=CreateValuationDate(Y2,0.5)"
     "AA3" = "=CreateDiscountCurve(Y1:Z1,AB2:AC4)"
-    "AA4" = "=util_ReadDiscountFactor(AA3,Y3)"
+    "AA4" = "=ReadHandle(AA3)"
     # An expiry schedule: six contract codes as the desk types them, the futures and options
     # expiry beside each, a copy of the options column with a blank, and two creator cells, one
     # with the options column and one without.

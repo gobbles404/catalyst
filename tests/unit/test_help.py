@@ -62,17 +62,15 @@ def test_the_curve_creator_explains_itself() -> None:
     ]
 
 
-def test_the_reader_explains_itself() -> None:
-    description, arguments, hidden = SPECS["util_ReadDiscountFactor"]
+def test_the_handle_reader_explains_itself() -> None:
+    description, arguments, hidden = SPECS["ReadHandle"]
     assert not hidden
-    assert description == "Reads the discount factor for one day from a discount curve."
+    assert description == (
+        "Reads the object behind a handle and spills it as a table: its headers, a row of "
+        "types, then one row per element."
+    )
     assert arguments == [
-        (
-            "curve",
-            "A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, "
-            "or a name for it.",
-        ),
-        ("date", "The day to read, such as 12-Sep-2026, between the curve's first and last dates."),
+        ("handle", "The cell showing any creator's result, such as B5, or a name for it."),
     ]
 
 

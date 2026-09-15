@@ -10,7 +10,7 @@ These pages are for an engineer building a function and for the owner reviewing 
 |---|---|
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [globals/valuation-date.md](globals/valuation-date.md) | `CreateValuationDate`, a date and progress through that day |
-| [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, an explicit daily curve and its upper date bound, with `util_ReadDiscountFactor`, a temporary reader |
+| [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, an explicit daily curve and its upper date bound |
 | [globals/unit-conversions.md](globals/unit-conversions.md) | `UnitConversions`, the shipped unit definitions and the conversion between them |
 | [utilities/interpolate-discount-factors.md](utilities/interpolate-discount-factors.md) | `InterpolateDiscountFactors`, sparse points to a daily table |
 | [market-definitions/expiry-schedule.md](market-definitions/expiry-schedule.md) | `CreateExpirySchedule`, the contract months of one index and their expiry dates |
@@ -35,7 +35,7 @@ Three things not to do:
 
 ## Where it stands
 
-Built in #53: `CreateValuationDate` and `CreateDiscountCurve`, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves. Built in #60: `CreateExpirySchedule`, the first market definition, the first function to take columns of one kind without headers, and the first to leave an argument out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Ready to ship: `UnitConversions` and `InterpolateDiscountFactors`. Waiting on the seam: `ReadHandle`, for a mixed array out, wanted in [outputs.md](../seam/outputs.md); the handle of any kind it also needed came in #64 ([inputs.md](../seam/inputs.md) decision 40). When it is built, `util_ReadDiscountFactor` goes.
+Built in #53: `CreateValuationDate` and `CreateDiscountCurve`. Built in #60: `CreateExpirySchedule`, the first market definition, the first function to take columns of one kind without headers, and the first to leave an argument out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Built in #66: `ReadHandle`, the object behind any handle spilled as the table its creator took, on the two seam items of #64 and #65; `util_ReadDiscountFactor`, the temporary reader of #53, went with it. Ready to ship: `UnitConversions` and `InterpolateDiscountFactors`.
 
 Open across the library, gating nothing: release of a handle when its creator is deleted or its workbook closes, and reuse on an unchanged recalculation, specified in [handles.md](../seam/handles.md) and built by the next handle pull request; and whether library code takes a work counter, parked for the measurement session (issue #10), the functions built so far taking none, their work pinned at the seam. What the first pricing function must settle is under Not here on the pages it touches: how a calculation with several curves stays inside their dates, and the ordering of two valuation dates.
 
