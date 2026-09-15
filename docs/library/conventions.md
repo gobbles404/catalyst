@@ -6,7 +6,7 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 
 | Item | Convention | Example |
 |---|---|---|
-| Worksheet functions | PascalCase | `CreateValuationDate`, `CreateDiscountCurve` |
+| Worksheet functions | PascalCase, leading with one of the verbs below | `CreateValuationDate`, `ReadHandle` |
 | Parameters | snake_case, matching the wording used in Excel help | `as_of`, `day_fraction_elapsed`, `header_row`, `values` |
 | Data fields | snake_case | `unit`, `reference_unit`, `size_in_reference_unit` |
 | Object and seam types | PascalCase, reusing the seam's spelling where one exists | `ValuationDate`, `DiscountCurve`, `Date`, `NumberArray` |
@@ -17,6 +17,16 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name.
+
+## Verbs
+
+A worksheet function leads with a verb that says what it does, and the verbs stay few, so the language stays simple: each means one thing, and a new one is added only when none of these fits, as a row here in the pull request that first uses it. Before adding one, ask whether the function is really a Create or a Read under another name.
+
+| Verb | Means | Such as |
+|---|---|---|
+| Create | makes an object from what the sheet supplies and shows its handle | `CreateDiscountCurve` |
+| Read | shows what an object holds, and changes nothing | `ReadHandle` |
+| Interpolate | fills the gaps between supplied points | `InterpolateDiscountFactors` |
 
 ## Tables
 
