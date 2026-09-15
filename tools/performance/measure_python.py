@@ -86,6 +86,16 @@ def array(rows: int, cols: int, total: float) -> Callable[[object], None]:
     return check
 
 
+def mixed_out(rows: int) -> Callable[[object], None]:
+    """What the mixed road hands the host: the kinds, the numbers and the texts joined."""
+
+    def check(result: object) -> None:
+        if not isinstance(result, tuple) or cast(Any, result[0]).shape != (rows, 1):
+            raise AssertionError(f"got {result!r}, expected a {rows}x1 mixed array")
+
+    return check
+
+
 def column(n: int) -> Cells:
     return Cells.from_rows([[float(i)] for i in range(n)])
 
@@ -236,6 +246,29 @@ def scenarios() -> list[Scenario]:
                 n,
                 lambda run=ENTRY["EchoColumn"], c=cells: run(c),
                 array(n, 1, total(n)),
+            )
+        )
+        # The mixed road out, over the numbers alone and over the mixed column: what lies between
+        # the first and EchoColumn is the road, and between the two is the text.
+        echoed = mixed(n)
+        cases.append(
+            Scenario(
+                "EchoMixed",
+                "round trip, numbers",
+                n,
+                n,
+                lambda run=ENTRY["EchoMixed"], c=cells: run(c),
+                mixed_out(n),
+            )
+        )
+        cases.append(
+            Scenario(
+                "EchoMixed",
+                "round trip, mixed",
+                n,
+                n,
+                lambda run=ENTRY["EchoMixed"], c=echoed: run(c),
+                mixed_out(n),
             )
         )
         cases.append(

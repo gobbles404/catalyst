@@ -19,6 +19,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `SumQuantity(header_row, trades)` | a table in: a header row and a body of four columns, a date, a text, a number and a boolean, with as many rows as make the cells; what binding the headers and refining the columns costs beyond `CountMixed` over the same cells |
 | `Dot(a, b)` | two ranges in one call |
 | `EchoColumn(values)` | the round trip: N in, N out |
+| `EchoMixed(values)` | the round trip on the mixed road out, laid out cell by cell: over the numeric column beside `EchoColumn` it shows the road, and over the mixed column it shows the text |
 | `RowSums(values)` | one answer per input row, the shape of pricing every row |
 | `Grid(rows, cols)` | cells out from two numbers in |
 | `EchoText`, `EchoBoolean`, `EchoRow`, `Fail` | correctness rows; not run for capacity |
@@ -37,8 +38,9 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `objects_built` | Python objects the host made: each scalar; a range's rows, columns and summary of kinds, its text when it has any, and the two buffer addresses when the buffers grow |
 | `cells_scanned` | cells visited by the scan, the Excel error that stopped it included |
 | `text_cells` | text cells collected in that scan |
-| `buffers_allocated`, `buffer_bytes` | managed arrays made, and their payload bytes: for a range in only when the kept buffers grow to a larger range than any before, and for an array out |
-| `result_copies`, `result_cells` | copies made of an array on its way to Excel, and its cells |
+| `buffers_allocated`, `buffer_bytes` | managed arrays made, and their payload bytes: for a range in only when the kept buffers grow to a larger range than any before, and for an array out, of doubles or of mixed cells |
+| `result_copies`, `result_cells` | copies made of an array of doubles on its way to Excel, and the cells of any array out |
+| `result_texts`, `result_boxes` | on the mixed road out, the text cells, one string each, and the number cells, one box each |
 
 The same file pins what the host's own runtime allocates per call, four ways, with `GC.GetAllocatedBytesForCurrentThread`: a ceiling on a warm scalar call, a ceiling on a warm range in at ten thousand cells, and the bytes per added cell in and per added cell out between a thousand and ten thousand cells. Scope: the CLR heap on this thread only. Not Python, not numpy, not Excel-DNA.
 

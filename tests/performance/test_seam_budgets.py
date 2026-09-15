@@ -248,6 +248,32 @@ def test_a_sum_is_one_reduction_and_no_look(numpy_calls: CallProfile) -> None:
     }
 
 
+# The mixed road out runs the same functions and takes the same three looks whatever the
+# rectangle holds: one for a cell holding no value, one for a number that is not finite, one
+# for a boolean slot that is not 0 or 1. The texts are joined and encoded once, off the ledger,
+# and split per text only when the total runs past what a cell holds.
+@pytest.mark.parametrize("rectangle", ["numbers", "mixed"])
+def test_a_mixed_array_out_takes_three_looks_whatever_it_holds(
+    rectangle: str, call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    cells = column() if rectangle == "numbers" else mixed()
+    PATH["EchoMixed"](cells)
+    assert call_profile(lambda: PATH["EchoMixed"](cells)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_mixed": 1,
+        "EchoMixed": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,  # the cells holding no value, flagged in one array
+    }
+    assert numpy_calls(lambda: PATH["EchoMixed"](cells)) == {
+        "ndarray.any": 3,
+        "numpy.ascontiguousarray": 2,  # the kinds and the numbers, already contiguous: no copy
+        "ufunc.reduce": 3,
+    }
+
+
 def mixed() -> Cells:
     """A trade's shape: a name, a serial, a quantity and a flag, over and over."""
     return Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])

@@ -17,9 +17,10 @@ arguments, a row of text for its headers and a mixed range for its body, and
 the prepared path binds the headers to the function's declared schema and
 hands the function typed columns. On the way back it
 converts the result by the function's declared return type, once, into the
-four things the host can show: a number, text, a boolean, or an array of
-numbers. An object a creator returns is kept here, in one store, and crosses
-as its handle: text that a later call hands back to receive the object.
+five things the host can show: a number, text, a boolean, an array of
+numbers, or a rectangle of numbers, text and booleans that the host lays out
+cell by cell. An object a creator returns is kept here, in one store, and
+crosses as its handle: text that a later call hands back to receive the object.
 docs/seam/inputs.md and docs/seam/outputs.md are the map.
 """
 
@@ -106,6 +107,62 @@ class MixedArray:
         """Rows and columns of the rectangle, which is the kinds array's own shape."""
         rows, cols = self.kinds.shape
         return rows, cols
+
+    @classmethod
+    def table(
+        cls, headings: Sequence[Sequence[str]], *columns: NDArray[Any] | tuple[str, ...]
+    ) -> "MixedArray":
+        """A rectangle for the way out: rows of text over columns of one kind each.
+
+        Each heading row holds one text per column. Each column is a tuple of texts, an array
+        of numbers, an array of numpy days, which go out as the serials the sheet formats, or an
+        array of booleans, all of one length. The kinds and the slots are filled a column at a
+        time and the texts gathered in sheet order, so nothing runs per cell. A day outside the
+        calendar fails as a date result fails, naming the cell.
+        """
+        width = len(columns)
+        rows = len(columns[0]) if columns else 0
+        top = len(headings)
+        for r, row in enumerate(headings):
+            if len(row) != width:
+                raise ValueError(
+                    f"heading row {r + 1} holds {len(row)} texts, expected {width}, one per column"
+                )
+        kinds = np.empty((top + rows, width), dtype=np.uint8)
+        slots = np.full((top + rows, width), np.nan)
+        kinds[:top] = TEXT_CODE
+        text_columns: list[tuple[str, ...]] = []
+        for j, column in enumerate(columns):
+            if len(column) != rows:
+                raise ValueError(
+                    f"column {j + 1} holds {len(column)} rows, expected {rows}, as column 1 does"
+                )
+            if isinstance(column, tuple):
+                kinds[top:, j] = TEXT_CODE
+                text_columns.append(column)
+                continue
+            if column.ndim != 1 or (column.dtype.kind == "M" and _unit(column) != "D"):
+                raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
+            if column.dtype.kind == "M":
+                serials, bad, reason = _serials(column)
+                if bad is not None:
+                    raise _BadResult(f"result cell ({top + bad + 1}, {j + 1}) {reason}")
+                kinds[top:, j] = NUMBER_CODE
+                slots[top:, j] = serials
+            elif column.dtype.kind == "b":
+                kinds[top:, j] = BOOLEAN_CODE
+                slots[top:, j] = column
+            elif column.dtype.kind in "fiu":
+                kinds[top:, j] = NUMBER_CODE
+                slots[top:, j] = column
+            else:
+                raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
+        # Sheet order: the heading rows, then each body row's texts left to right, which is the
+        # transpose of the text columns laid side by side.
+        texts = tuple(itertools.chain.from_iterable(headings))
+        if text_columns:
+            texts += tuple(np.array(text_columns, dtype=object).T.ravel())
+        return cls(kinds, slots, texts)
 
 
 @dataclass_transform(frozen_default=True, eq_default=False)
@@ -410,21 +467,23 @@ def _mixed(value: object) -> MixedArray:
     if isinstance(value, Cells):
         empty = value.texts.index("") if "" in value.texts else -1
         if value.seen & NOT_MIXED or empty >= 0:
-            raise _first_bad(value, _bad_mixed(value, empty), "number, nonempty text or boolean")
+            raise _first_bad(
+                value, _bad_mixed(value.kinds, empty), "number, nonempty text or boolean"
+            )
         return MixedArray(value.kinds, value.numbers, value.texts)
     return _mixed_scalar(value)
 
 
-def _bad_mixed(value: Cells, empty: int) -> NDArray[np.bool_]:
+def _bad_mixed(kinds: NDArray[np.uint8], empty: int) -> NDArray[np.bool_]:
     """Every cell a mixed range may not hold, flagged in one array so the earliest one wins.
 
     The three mixed kinds are the three lowest codes, so one compare flags every other kind.
     An empty text is not a kind, so its cell is flagged here too: its place among the texts is
     turned into its place among the cells, which is what _cell does in reverse to read it back.
     """
-    bad = value.kinds > BOOLEAN_CODE
+    bad = kinds > BOOLEAN_CODE
     if empty >= 0:
-        bad.flat[np.flatnonzero(value.kinds.ravel() == TEXT_CODE)[empty]] = True
+        bad.flat[np.flatnonzero(kinds.ravel() == TEXT_CODE)[empty]] = True
     return bad
 
 
@@ -865,6 +924,86 @@ def _date_row_out(value: object) -> NDArray[np.float64]:
     return np.ascontiguousarray(serials.reshape(1, -1))
 
 
+def _place(kinds: NDArray[np.uint8], bad: NDArray[np.bool_]) -> tuple[int, int, int]:
+    """The first flagged cell of a rectangle, as INDEX counts, and its flat index."""
+    i = int(bad.argmax())
+    r, c = divmod(i, kinds.shape[1])
+    return r + 1, c + 1, i
+
+
+def _text_place(kinds: NDArray[np.uint8], k: int) -> tuple[int, int]:
+    """The cell of the k-th text, as INDEX counts: its place among the texts turned into its
+    place among the cells."""
+    i = int(np.flatnonzero(kinds.ravel() == TEXT_CODE)[k])
+    r, c = divmod(i, kinds.shape[1])
+    return r + 1, c + 1
+
+
+def _mixed_out(value: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], str]:
+    """A rectangle of numbers, text and booleans, checked as the way in checks one and handed
+    to the host as the way in hands one over: the kinds, the numbers, and the texts joined
+    with NUL, for the host to lay out cell by cell.
+
+    The earliest cell holding no value, a blank, a missing or an empty text, is named as on the
+    way in. Then a number cell must hold a finite number and a boolean cell 1.0 or 0.0; no text
+    may hold a NUL, since NUL separates the texts on their way across; and every text is at
+    most what a cell holds, counted as Excel counts, checked on the joined text in one encode
+    and split per text only when the total runs past the limit.
+    """
+    if type(value) is not MixedArray:
+        raise _returned(value, "mixed array")
+    kinds, slots, texts = value.kinds, value.numeric_slots, value.texts
+    if kinds.size == 0:
+        raise _BadResult(f"returned {describe(value)}, expected mixed array with at least one cell")
+    text_cells = int(np.count_nonzero(kinds == TEXT_CODE))
+    if len(texts) != text_cells:
+        raise _BadResult(f"result holds {len(texts)} texts for {text_cells} text cells")
+    empty = texts.index("") if "" in texts else -1
+    bad = _bad_mixed(kinds, empty)
+    if bad.any():
+        r, c, i = _place(kinds, bad)
+        raise _BadResult(
+            f"result cell ({r}, {c}) is {describe(_cell(kinds, slots, texts, i))}, "
+            "expected number, nonempty text or boolean"
+        )
+    unfinished = (kinds == NUMBER_CODE) & ~np.isfinite(slots)
+    if unfinished.any():
+        r, c, _ = _place(kinds, unfinished)
+        raise _BadResult(f"result cell ({r}, {c}) is not a finite number")
+    not_flags = (kinds == BOOLEAN_CODE) & (slots != 0.0) & (slots != 1.0)
+    if not_flags.any():
+        r, c, i = _place(kinds, not_flags)
+        raise _BadResult(
+            f"result cell ({r}, {c}) is {describe(float(slots.flat[i]))}, expected boolean"
+        )
+    joined = "\0".join(texts)
+    if texts and joined.count("\0") != len(texts) - 1:
+        k = next(k for k, text in enumerate(texts) if "\0" in text)  # the price of a failure
+        r, c = _text_place(kinds, k)
+        raise _BadResult(
+            f"result cell ({r}, {c}) is text {texts[k]!r}, expected text with no NUL character"
+        )
+    encoded = joined.encode("utf-16-le")
+    if len(encoded) // 2 - max(len(texts) - 1, 0) > MAX_TEXT:
+        # Only now can any one text be too long: split the units at the separators, one look.
+        units = np.frombuffer(encoded, dtype=np.uint16)
+        separators = np.flatnonzero(units == 0)
+        lengths = np.concatenate((separators, [units.size])) - np.concatenate(([0], separators + 1))
+        over = lengths > MAX_TEXT
+        if over.any():
+            k = int(over.argmax())
+            r, c = _text_place(kinds, k)
+            raise _BadResult(
+                f"result cell ({r}, {c}) is text of {int(lengths[k])} characters, "
+                f"expected at most {MAX_TEXT}"
+            )
+    return (
+        np.ascontiguousarray(kinds, dtype=np.uint8),
+        np.ascontiguousarray(slots, dtype=np.float64),
+        joined,
+    )
+
+
 # Every declared result and the rule that converts it; each rule knows the words of the sheet.
 _RESULTS: Final[dict[object, Callable[[object], object]]] = {
     float: _number_out,
@@ -877,6 +1016,7 @@ _RESULTS: Final[dict[object, Callable[[object], object]]] = {
     NumberRow: _row_out,
     DateColumn: _date_column_out,
     DateRow: _date_row_out,
+    MixedArray: _mixed_out,
 }
 
 
@@ -1031,21 +1171,29 @@ def describe(value: object) -> str:
     if isinstance(value, Cells):
         rows, cols = value.kinds.shape
         return f"{rows}x{cols} array"
+    if isinstance(value, MixedArray):
+        rows, cols = value.shape
+        return f"{rows}x{cols} mixed array"
     if isinstance(value, np.datetime64):
         day = cast(Any, value)
         return f"{_date_word(_unit(day))} {day}"
+    if isinstance(value, np.ndarray | np.generic):
+        return _describe_numpy(cast(Any, value))
+    return f"a Python {type(value).__name__}"
+
+
+def _describe_numpy(value: np.ndarray[Any, Any] | np.generic) -> str:
+    """A numpy array by its dimensions and kind, or a numpy scalar by the value it holds."""
     if isinstance(value, np.ndarray):
         array = cast(NDArray[Any], value)
         if type(array) is not np.ndarray:
             return f"a numpy {type(array).__name__}"
         return _describe_array(array)
-    if isinstance(value, np.generic):
-        scalar = cast(Any, value)
-        held = _scalar(scalar)  # a numpy boolean or integer, in the words above
-        if isinstance(held, np.generic):
-            return f"a numpy {type(scalar).__name__}"  # one that .item() cannot unwrap
-        return describe(held)
-    return f"a Python {type(value).__name__}"
+    scalar = cast(Any, value)
+    held = _scalar(scalar)  # a numpy boolean or integer, in the words above
+    if isinstance(held, np.generic):
+        return f"a numpy {type(scalar).__name__}"  # one that .item() cannot unwrap
+    return describe(held)
 
 
 def _plural(word: str) -> str:

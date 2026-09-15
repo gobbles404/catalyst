@@ -120,7 +120,8 @@ namespace Goosedove.Host.Tests
             }
         }
 
-        // The seam promises a number, text, a boolean, or an array; the host says so if it gets anything else.
+        // The seam promises a number, text, a boolean, an array, or a mixed rectangle as a tuple;
+        // the host says so if it gets anything else.
         [Fact]
         public void a_result_the_host_cannot_show_fails_loudly()
         {
@@ -129,6 +130,21 @@ namespace Goosedove.Host.Tests
             {
                 var shown = Assert.IsType<string>(Marshal.FromPython(missing, "Fn"));
                 Assert.Equal("#ERROR host: Fn returned a Missing, which the host cannot show", shown);
+            }
+        }
+
+        // The mixed road reads the tuple by position and checks the seam's promise on each part.
+        [Fact]
+        public void a_mixed_result_whose_kinds_are_not_bytes_fails_loudly()
+        {
+            using (Py.GIL())
+            using (var kinds = new PyFloat(1.0))
+            using (var numbers = new PyFloat(2.0))
+            using (var text = new PyString(""))
+            using (var tuple = new PyTuple(new PyObject[] { kinds, numbers, text }))
+            {
+                var shown = Assert.IsType<string>(Marshal.FromPython(tuple, "Fn"));
+                Assert.Equal("#ERROR host: Fn returned a mixed array whose kinds give no buffer", shown);
             }
         }
     }

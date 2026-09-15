@@ -17,24 +17,21 @@ The declared return type is the contract, read at registration the way parameter
 | `NumberColumn`, `NumberRow` | a one-dimensional numpy array of numbers | spilled down, or across | two-dimensional, empty, a bad cell |
 | `DateColumn`, `DateRow` | a one-dimensional array of numpy days | serials, spilled | a day outside the calendar, not a date |
 | `Handle[Kind]`, a class the library defines inside the brackets | an object of exactly that class, which the seam keeps | the handle: text such as `discount_curve:3f9a1c:000002`, which a later formula hands back through a reference to this cell | another type returned, a subclass, nothing |
+| `MixedArray`, the mirror of the way in | the same record the way in hands a function, kinds, numbers and texts in the sheet's shape, at least one cell; `MixedArray.table` builds one from rows of headings over columns of one kind each, dates going out as serials | the rectangle, spilled as returned, one tagged value per cell: text as text, numbers as numbers, dates as serials the sheet formats, booleans as TRUE and FALSE | a blank, a missing or an empty-text cell, named as INDEX counts; a number cell that is not finite; a text holding a NUL, or longer than a cell holds; a boolean slot that is not 0 or 1; no cells |
 
 Integers count as numbers, scalar or array, converted exactly. That is not coercion of meaning the way TRUE-as-1 would be: on the sheet a whole number and a number are one kind.
 
-Next, one at a time, each when the first function needs it, as [inputs.md](inputs.md) keeps its own list. Each adds one result rule, a road out of the host where none carries it, and one row here.
-
-| Declared | The function would return | The cell would show | The trap it must handle |
-|---|---|---|---|
-| `MixedArray` as a result, the mirror of the way in; wanted by `ReadHandle`, which spills a header row of text, a row of types and columns of dates, numbers and text | a record of kinds, numbers and texts in the sheet's shape, at least one cell, the same record the way in hands a function | the rectangle, spilled as returned: text as text, dates as serials, numbers as numbers | The host has one road out for an array today, a run of numbers; a rectangle of three kinds needs a second, laid out cell by cell from the kinds. A blank, a missing or an empty-text cell inside it fails the whole call with the cell named, as it does on the way in; decision 24 stands until this row is built. |
+Next, one at a time, each when the first function needs it, as [inputs.md](inputs.md) keeps its own list. Each adds one result rule, a road out of the host where none carries it, and one row here. Nothing is wanted today.
 
 ## Result validation
 
-One place converts: the prepared path, `Registered.run` in `bridge.py`, after the function runs. It converts the result by the declared return type into one of the four things the host can show, a number, text, a boolean, or an array of numbers, and fails with the function's name when it cannot. The host reads the type it is handed and never asks Python a question about it.
+One place converts: the prepared path, `Registered.run` in `bridge.py`, after the function runs. It converts the result by the declared return type into one of the five things the host can show, a number, text, a boolean, an array of numbers, or a rectangle of numbers, text and booleans, and fails with the function's name when it cannot. The host reads the type it is handed and never asks Python a question about it.
 
 Rules:
 
 1. Match the declared type. No coercion beyond integers as numbers: a `-> float` that returns text fails, a `-> NumberColumn` that returns a grid fails, a `-> int` that returns 2.5 fails. A whole number means the same in both directions: a number with no fraction.
 2. Nothing that looks like a number but is not reaches the sheet. A NaN or an infinity anywhere in a result fails the whole call. In an array the message names the cell: `#ERROR Prices: result cell (3, 1) is not a finite number`.
-3. Orientation comes from the declaration, never from the array. A `NumberColumn` spills down, a `NumberRow` spills across, a `NumberArray` spills as returned. The seam reshapes, so the host has one road out.
+3. Orientation comes from the declaration, never from the array. A `NumberColumn` spills down, a `NumberRow` spills across, a `NumberArray` spills as returned. The seam reshapes, so the host has one road out for numbers, one block copied in one move, and one for a mixed rectangle, laid out cell by cell.
 4. A date goes out as its whole serial, the meaning exception mirrored. A date with a time of day fails.
 5. Text is at most 32,767 characters as Excel counts them, in UTF-16 units the way `LEN` does, because Excel would cut longer text without a word. Empty text fails: a cell that looks blank is the quiet result tenet 2 forbids.
 6. An empty array fails. A whole number beyond 2^53, scalar or in an array, fails, because a cell would hold it inexactly.
@@ -63,6 +60,10 @@ Decided 2026-09-14, handles.
 10. A creator declares `Handle[Kind]` around a class the library defines and returns the object; the seam keeps it and the cell shows its handle. The object must be of exactly that class: a subclass, another type or nothing is refused as any result is, and the failure names the kind in lowercase words, `expected discount curve`.
 11. The handle's text is three parts, lowercase, joined by colons: the kind's tag from its class name, `discount_curve`; six hex characters chosen once when Python starts, so text saved in a workbook never names an object of a later session; and a running number shared by every kind, six digits at least, that never repeats within a session. The readable label the spec carried was dropped by the owner: nothing supplies one.
 12. Every creator call publishes. Two creator cells with equal inputs hold two objects and show two handles, and a recalculated creator publishes anew. Reuse of the same handle on an unchanged recalculation, and release when a creator is deleted or its workbook closes, are open in [handles.md](handles.md); until then the store grows until Excel closes.
+
+Decided 2026-09-15, the mixed road out.
+
+13. `MixedArray` is a result as well as an input, the mirror of the way in: a function returns the same record the way in hands one, and the rectangle spills as returned, one tagged value per cell. The rule checks it as the way in checks one, the earliest cell holding no value named as INDEX counts, then what the way in never has to ask: a number cell holds a finite number, a boolean slot 0 or 1, no text holds a NUL, since NUL separates the texts on their way to the host, and every text is within what a cell holds, counted as Excel counts, checked on the joined text in one encode and split per text only when the total runs past the limit. The host receives the kinds, the numbers and the texts joined with NUL, by position, and lays the array out cell by cell: a box per number cell, a string per text cell, two shared boxes for the booleans; there is no block of mixed cells to copy in one move, so this road is per cell where the numbers road is one copy. `MixedArray.table` builds a rectangle from rows of headings over columns of one kind each, dates to serials, so no function writes kinds by hand. Reverses [inputs.md](inputs.md) decision 24. First wanted by `ReadHandle`.
 
 ## Parked
 

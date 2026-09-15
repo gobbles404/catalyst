@@ -76,10 +76,10 @@ function New-InputSheet([string]$name, [int]$rows, [int]$cols) {
 # A case is data: what to recalculate, what to read back, and the sum it must show. An edit
 # case changes one input before Application.Calculate; its Flip is shared with the full case
 # of the same sheet, so both checks know the sheet's current state.
-function Add-Case([string]$probe, [string]$scenario, [int]$calls, [int]$in, [int]$out, $target, $check, [double]$want, $state = $null, $edit = $null) {
+function Add-Case([string]$probe, [string]$scenario, [int]$calls, [int]$in, [int]$out, $target, $check, [double]$want, $state = $null, $edit = $null, [long]$count = 0) {
     $cases.Add(@{
         Probe = $probe; Scenario = $scenario; Calls = $calls; CellsIn = $in; CellsOut = $out
-        Target = $target; Check = $check; Want = $want; State = $state; Edit = $edit
+        Target = $target; Check = $check; Want = $want; State = $state; Edit = $edit; Count = $count
     })
 }
 
@@ -105,6 +105,12 @@ function Invoke-Batch([hashtable]$case, [int]$iterations) {
 }
 
 function Test-Case([hashtable]$case) {
+    # A spill of mixed cells has no sum; it is checked by how many cells hold a value.
+    if ($case.Count) {
+        $filled = $functions.CountA($case.Check)
+        if ($filled -ne $case.Count) { throw "$($case.Probe), $($case.Scenario): $filled cells hold a value, expected $($case.Count)" }
+        return
+    }
     $shown = Sum-Values $case.Check.Value2
     $want = $case.Want
     if ($case.State) { $want += $case.State.Flip }
@@ -166,6 +172,7 @@ try {
     $excel.EnableEvents = $false
     if (-not $excel.RegisterXLL($xll)) { throw "Excel refused to load $xll" }
     $loaded = $true
+    $functions = Own $excel.WorksheetFunction
     $books = Own $excel.Workbooks
     $book = Own $books.Add()
     $excel.Calculation = -4135   # xlCalculationManual, for every workbook this Excel opens
@@ -248,6 +255,25 @@ try {
             $spills = Block $cellsOut 1 $column $n ($column + $copies - 1)
             Add-Case "Grid" "cells out" $copies 2 $n $anchors $spills ($copies * (Triangle $n))
             $column += $copies
+        }
+        # 3b. cells out on the mixed road: the same spill over numbers alone, beside Grid above, and
+        # over the mixed column, so what lies between the two is the text.
+        $mixedOut = Own $sheets.Add()
+        $mixedOut.Name = "mixed_out"
+        $column = 1
+        foreach ($n in 100, 1000, 10000) {
+            foreach ($shape in @(
+                @{ Scenario = "cells out, mixed road, numbers"; Formula = "=EchoMixed(cells_in!A1:A$n)"; Want = ($copies * (Triangle $n)); Count = 0 },
+                @{ Scenario = "cells out, mixed road, mixed"; Formula = "=EchoMixed(mixed_in!A1:A$n)"; Want = 0; Count = ($copies * $n) }
+            )) {
+                for ($c = 0; $c -lt $copies; $c++) {
+                    (Cell $mixedOut 1 ($column + $c)).Formula2 = $shape.Formula
+                }
+                $anchors = Block $mixedOut 1 $column 1 ($column + $copies - 1)
+                $spills = Block $mixedOut 1 $column $n ($column + $copies - 1)
+                Add-Case "EchoMixed" $shape.Scenario $copies $n $n $anchors $spills $shape.Want -count $shape.Count
+                $column += $copies
+            }
         }
     }
 

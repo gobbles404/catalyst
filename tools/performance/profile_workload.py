@@ -65,6 +65,7 @@ def workloads() -> dict[str, Callable[[], object]]:
         "Dot": lambda: ENTRY["Dot"](column, weights),
         "EchoColumn": lambda: ENTRY["EchoColumn"](column),
         "EchoRow": lambda: ENTRY["EchoRow"](row),
+        "EchoMixed": lambda: ENTRY["EchoMixed"](mixed),
         "RowSums": lambda: ENTRY["RowSums"](grid),
         "Grid": lambda: ENTRY["Grid"](5000, 2),
         "Fail": lambda: ENTRY["Fail"](),

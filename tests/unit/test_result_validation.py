@@ -1,6 +1,8 @@
 """Result validation: what a function returns against what it declared, and what the host gets."""
 
 import datetime
+import re
+from collections.abc import Callable
 from typing import Any, cast
 
 import numpy as np
@@ -11,9 +13,11 @@ from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import (
+    Cells,
     Date,
     DateColumn,
     DateRow,
+    MixedArray,
     NumberArray,
     NumberColumn,
     NumberRow,
@@ -73,6 +77,17 @@ def OutDateColumn() -> DateColumn:
 @probe
 def OutDateRow() -> DateRow:
     return cast(DateRow, _returns["value"])
+
+
+@probe
+def OutMixed() -> MixedArray:
+    return cast(MixedArray, _returns["value"])
+
+
+@probe
+def OutBuiltTable() -> MixedArray:
+    headings, columns = cast(tuple[Any, Any], _returns["value"])
+    return MixedArray.table(headings, *columns)
 
 
 def out(function: str, value: object) -> object:
@@ -386,19 +401,6 @@ def test_unknown_declared_result_refuses_to_register() -> None:
         excel_function(Listed)
 
 
-def test_a_mixed_array_may_be_taken_but_not_returned() -> None:
-    # An input-only type, as the text ranges already are: there is no way for the host to show
-    # a rectangle of three kinds, so the way out has no rule for one and registration says so.
-    def OutMixed() -> bridge.MixedArray:
-        raise AssertionError("never called")
-
-    with pytest.raises(
-        TypeError,
-        match=r"OutMixed declares <class 'goosedove\.excel\.bridge\.MixedArray'> as its result",
-    ):
-        excel_function(OutMixed)
-
-
 def test_a_column_of_booleans_may_be_taken_but_not_returned() -> None:
     # No function returns one, so the way out has no rule for it, as for the text ranges.
     def OutFlags() -> bridge.BooleanColumn:
@@ -408,3 +410,199 @@ def test_a_column_of_booleans_may_be_taken_but_not_returned() -> None:
         TypeError, match=r"OutFlags declares goosedove\.excel\.bridge\.BooleanColumn as its result"
     ):
         excel_function(OutFlags)
+
+
+# --- the mixed road out: a rectangle of three kinds, laid out cell by cell by the host --------
+
+
+def mixed_out(value: object) -> tuple[list[list[int]], list[list[float]], str]:
+    """What the host is handed for a mixed array: the kinds, the numbers, the texts joined."""
+    result = out("OutMixed", value)
+    assert isinstance(result, tuple), result
+    kinds, slots, joined = cast(tuple[NDArray[np.uint8], NDArray[np.float64], str], result)
+    assert kinds.dtype == np.uint8 and kinds.flags.c_contiguous and kinds.ndim == 2
+    assert slots.dtype == np.float64 and slots.flags.c_contiguous and slots.shape == kinds.shape
+    assert isinstance(joined, str)
+    return kinds.tolist(), slots.tolist(), joined
+
+
+def test_a_rectangle_goes_out_as_kinds_numbers_and_joined_text() -> None:
+    kinds, slots, joined = mixed_out(
+        MixedArray(
+            np.array([[1, 0], [2, 0]], dtype=np.uint8),
+            np.array([[np.nan, 46164.0], [1.0, 2.5]]),
+            ("CL",),
+        )
+    )
+    assert kinds == [[1, 0], [2, 0]]
+    assert np.isnan(slots[0][0])  # the placeholder under a text cell crosses as it is
+    assert slots[0][1] == 46164.0 and slots[1] == [1.0, 2.5]
+    assert joined == "CL"
+
+
+def test_the_echo_probe_sends_a_mixed_range_back_as_it_came() -> None:
+    cells = Cells.from_rows([["CL", 46164.0], [True, 2.5], ["NG", 1.0]])
+    result = bridge.call("EchoMixed", [cells])
+    assert isinstance(result, tuple)
+    kinds, slots, joined = cast(tuple[NDArray[np.uint8], NDArray[np.float64], str], result)
+    assert kinds.tolist() == cells.kinds.tolist()
+    assert slots[1].tolist() == [1.0, 2.5]
+    assert joined == "CL\0NG"
+    # What the way in refuses never reaches the way out.
+    assert bridge.call("EchoMixed", [Cells.from_rows([["CL"], [""]])]) == (
+        "#ERROR EchoMixed: values cell (2, 1) is empty text, "
+        "expected number, nonempty text or boolean"
+    )
+
+
+def test_a_table_is_built_from_headings_and_columns_of_one_kind_each() -> None:
+    table = MixedArray.table(
+        [("code", "expiry", "size", "cleared"), ("str", "datetime64[D]", "float64", "bool")],
+        ("m26", "n26"),
+        days("2026-05-19", "2026-06-22"),
+        np.array([1000.0, 250.5]),
+        np.array([True, False]),
+    )
+    kinds, slots, joined = mixed_out(table)
+    assert kinds == [[1, 1, 1, 1], [1, 1, 1, 1], [1, 0, 0, 2], [1, 0, 0, 2]]
+    assert slots[2][1:] == [46161.0, 1000.0, 1.0]
+    assert slots[3][1:] == [46195.0, 250.5, 0.0]
+    # Sheet order: the two heading rows, then each body row's texts left to right.
+    assert joined == "code\0expiry\0size\0cleared\0str\0datetime64[D]\0float64\0bool\0m26\0n26"
+
+
+def test_a_table_of_headings_alone_and_one_of_a_single_number() -> None:
+    kinds, _, joined = mixed_out(MixedArray.table([("only",)], ()))
+    assert kinds == [[1]] and joined == "only"
+    kinds, slots, joined = mixed_out(MixedArray.table([], np.array([7])))
+    assert kinds == [[0]] and slots == [[7.0]] and joined == ""
+
+
+@pytest.mark.parametrize(
+    ("build", "text"),
+    [
+        (
+            lambda: MixedArray.table([("a",)], ("x",), np.array([1.0])),
+            "heading row 1 holds 1 texts, expected 2, one per column",
+        ),
+        (
+            lambda: MixedArray.table([], ("x", "y"), np.array([1.0])),
+            "column 2 holds 1 rows, expected 2, as column 1 does",
+        ),
+    ],
+)
+def test_a_table_whose_pieces_do_not_line_up_is_a_programming_error(
+    build: Callable[[], MixedArray], text: str
+) -> None:
+    with pytest.raises(ValueError, match=text):
+        build()
+
+
+@pytest.mark.parametrize(
+    ("column", "text"),
+    [
+        (np.array([[1.0], [2.0]]), "column 1 is 2x1 array of numbers, which a table cannot hold"),
+        (
+            np.array(["2026-05-22T12:00"], dtype="datetime64[m]"),
+            "column 1 is list of 1 date with a time, which a table cannot hold",
+        ),
+        (np.array(["x"]), "column 1 is list of 1 text, which a table cannot hold"),
+    ],
+)
+def test_a_column_a_table_cannot_hold_is_refused(column: NDArray[Any], text: str) -> None:
+    with pytest.raises(TypeError, match=re.escape(text)):
+        MixedArray.table([], column)
+
+
+@pytest.mark.parametrize(
+    ("dates", "text"),
+    [
+        (days("2026-05-22", "NaT"), "#ERROR OutBuiltTable: result cell (3, 1) is not a date"),
+        (
+            days("2026-05-22", "1900-02-28"),
+            "#ERROR OutBuiltTable: result cell (3, 1) is a date outside 1900-03-01 to 9999-12-31",
+        ),
+    ],
+)
+def test_a_day_outside_the_calendar_in_a_table_names_its_cell_below_the_headings(
+    dates: NDArray[np.datetime64], text: str
+) -> None:
+    assert out("OutBuiltTable", ([("d",)], [dates])) == text
+
+
+def built_from(rows: list[list[object]]) -> MixedArray:
+    """A record built by hand from cells, so a kind the way out refuses can be planted."""
+    cells = Cells.from_rows(rows)
+    return MixedArray(cells.kinds, cells.numbers, cells.texts)
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        ([[1.0]], "#ERROR OutMixed: returned a Python list, expected mixed array"),
+        (1.0, "#ERROR OutMixed: returned number 1.0, expected mixed array"),
+        (
+            MixedArray(np.zeros((0, 2), dtype=np.uint8), np.zeros((0, 2)), ()),
+            "#ERROR OutMixed: returned 0x2 mixed array, "
+            "expected mixed array with at least one cell",
+        ),
+        (
+            MixedArray(np.array([[1, 1]], dtype=np.uint8), np.array([[np.nan, np.nan]]), ("a",)),
+            "#ERROR OutMixed: result holds 1 texts for 2 text cells",
+        ),
+        (
+            built_from([[1.0, None], ["x", 2.0]]),
+            "#ERROR OutMixed: result cell (1, 2) is blank, "
+            "expected number, nonempty text or boolean",
+        ),
+        (
+            built_from([[1.0, bridge.MISSING]]),
+            "#ERROR OutMixed: result cell (1, 2) is missing, "
+            "expected number, nonempty text or boolean",
+        ),
+        (
+            built_from([["a", ""], [None, "b"]]),
+            "#ERROR OutMixed: result cell (1, 2) is empty text, "
+            "expected number, nonempty text or boolean",
+        ),
+        (
+            MixedArray(np.array([[0, 0]], dtype=np.uint8), np.array([[1.0, np.inf]]), ()),
+            "#ERROR OutMixed: result cell (1, 2) is not a finite number",
+        ),
+        (
+            MixedArray(np.array([[2], [2]], dtype=np.uint8), np.array([[1.0], [2.0]]), ()),
+            "#ERROR OutMixed: result cell (2, 1) is number 2.0, expected boolean",
+        ),
+        (
+            MixedArray(
+                np.array([[1, 1]], dtype=np.uint8), np.array([[np.nan, np.nan]]), ("a", "b\0c")
+            ),
+            "#ERROR OutMixed: result cell (1, 2) is text 'b\\x00c', "
+            "expected text with no NUL character",
+        ),
+    ],
+)
+def test_a_rectangle_the_cell_cannot_show_is_refused_naming_the_cell(
+    value: object, text: str
+) -> None:
+    assert out("OutMixed", value) == text
+
+
+def test_a_text_in_a_rectangle_is_bounded_as_a_text_result_is() -> None:
+    kinds = np.array([[1], [1]], dtype=np.uint8)
+    slots = np.full((2, 1), np.nan)
+    longest = "a" * 32767
+    assert mixed_out(MixedArray(kinds, slots, (longest, "b")))[2] == longest + "\0b"
+    assert out("OutMixed", MixedArray(kinds, slots, ("b", longest + "a"))) == (
+        "#ERROR OutMixed: result cell (2, 1) is text of 32768 characters, expected at most 32767"
+    )
+    wide = "\U0001f600"  # two units, as LEN counts
+    assert out("OutMixed", MixedArray(kinds, slots, (wide * 16384, "b"))) == (
+        "#ERROR OutMixed: result cell (1, 1) is text of 32768 characters, expected at most 32767"
+    )
+    # Many short texts whose total runs past the limit: none is too long, so all go out.
+    many = tuple("t" * 10 for _ in range(4000))
+    joined = mixed_out(
+        MixedArray(np.ones((4000, 1), dtype=np.uint8), np.full((4000, 1), np.nan), many)
+    )[2]
+    assert joined.count("\0") == 3999
