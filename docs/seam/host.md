@@ -55,6 +55,12 @@ HostAdd is the floor: a C# worksheet function with the host's argument shape and
 
 The registration says nothing about threads, so Excel calls these functions on one thread, its main calculation thread. The test suite and the host runner each call on one thread of their own.
 
+## When a hidden Excel quits
+
+The hidden Excel tools close their workbooks, run the command `GoosedovePrepareToQuit`, then call Excel's `Quit`. The command uninstalls IntelliSense, releases the Application COM reference Excel-DNA cached for it, and collects the detached event sinks inside Excel's CLR. Releasing the script's own COM references cannot release that in-process reference: without this step a hidden Excel stays alive after `Quit` and holds the `.xll` against the next build. The command is terminal and may be called again harmlessly; after it, the script must quit Excel and make no further calls to the add-in. Ordinary add-in removal only uninstalls the help, because Excel may continue running.
+
+`AutoClose` handles explicit add-in removal; [Excel-DNA does not call it when Excel quits](https://excel-dna.net/docs/guides-advanced/detecting-excel-shutdown-and-autoclose/). The hidden tools therefore request cleanup explicitly and verify that the exact Excel process they created has exited before reporting success. Process exit is part of the smoke check, alongside the formula results. Their shared helper is `tools/hidden_excel.ps1`. It also enables events while closing each workbook: IntelliSense drops its workbook references on `WorkbookBeforeClose`, and the timing runner's disabled events would otherwise retain closed workbooks. Those closes run outside the measured batches.
+
 ## On each call
 
 Every delegate calls the same C# method with the function's prepared path and the arguments. The call takes the GIL and holds it for its whole length: converting each argument, the trip, which is one crossing from the host into Python and back, reading the result, and releasing the arguments all sit inside the one lock. `=Add(1,2)` makes one trip. The method has one more branch, for a bridge module that is not there, which returns `#ERROR python did not start:` and the startup error; no formula reaches it, because when Python never started no delegate was registered, and only the host's tests, which can call the method before Python starts, could see that text.

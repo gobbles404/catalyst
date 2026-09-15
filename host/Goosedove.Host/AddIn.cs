@@ -16,6 +16,7 @@ namespace Goosedove.Host
     public class AddIn : IExcelAddIn
     {
         private static bool helpShown;
+        private static bool preparedToQuit;
 
         public void AutoOpen()
         {
@@ -37,12 +38,36 @@ namespace Goosedove.Host
 
         public void AutoClose()
         {
-            // Excel is exiting, or the add-in is being unloaded: the help's hooks come out; the
-            // process end takes Python with it.
+            // Excel-DNA calls this on explicit add-in removal, not when Excel quits.
+            StopHelp();
+        }
+
+        private static void StopHelp()
+        {
             if (helpShown)
             {
                 IntelliSenseServer.Uninstall();
+                helpShown = false;
             }
+        }
+
+        /// <summary>
+        /// Terminal cleanup for a hidden automation session. Its owner calls this after closing
+        /// its workbooks, then quits Excel; it must make no further calls to the add-in.
+        /// </summary>
+        [ExcelCommand(Description = "Prepares this Excel process to quit after a hidden automation run.")]
+        public static void GoosedovePrepareToQuit()
+        {
+            if (preparedToQuit) return;
+            StopHelp();
+            // IntelliSense obtained Excel-DNA's cached Application wrapper. Releasing the script's
+            // COM objects cannot release this in-process reference, which keeps automated Excel
+            // alive after Quit. Release it only on this terminal path, never on ordinary removal.
+            System.Runtime.InteropServices.Marshal.ReleaseComObject(ExcelDnaUtil.Application);
+            preparedToQuit = true;
+            // Collect the event sinks detached by Uninstall inside Excel's own CLR.
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
     }
 

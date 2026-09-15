@@ -196,7 +196,7 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 5. `dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q`
 6. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1`
 
-The last step needs Excel installed: it builds the add-in, opens a hidden Excel of its own, types the input cells, places one formula per row and compares each cell's displayed text with the text expected. Without Excel it stops and says so, and the check fails. It never touches an Excel you have open.
+The last step needs Excel installed: it builds the add-in, opens a hidden Excel of its own, types the input cells, places one formula per row and compares each cell's displayed text with the text expected. It then closes the workbook, asks the add-in to prepare for quitting, and verifies that its Excel process exits, releasing the add-in file for the next build. A process that remains is stopped and the check fails. The process is identified from that Excel's window handle, never by selecting all Excel processes. Without Excel it stops and says so, and the check fails. It never touches an Excel you have open. The workbook reader and Excel timing runner use the same cleanup; [host.md](host.md#when-a-hidden-excel-quits) explains why it is needed.
 
 CI runs everything but that step, on a Windows runner, in three jobs. One runs format, lint, types and the Python tests, with `ruff format --check .` so CI never rewrites a file. One builds the host, runs the host's tests, and builds the host runner so that it keeps compiling. The third runs `.\measure.ps1` and uploads `profiles\`, and gates nothing.
 
