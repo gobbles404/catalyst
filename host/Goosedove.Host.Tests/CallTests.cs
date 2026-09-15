@@ -113,8 +113,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadDiscountFactor", new object[] { "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x", 46276.0 }, "#ERROR util_ReadDiscountFactor: curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ValueError: x" };
             // The expiry schedule: a column of codes and two of dates, one row per code, the third column optional.
-            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR CreateExpirySchedule: ValueError: futures_expiry has 2 dates, expected 3, one per future_code" };
-            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR CreateExpirySchedule: options_expiry cell (2, 1) is blank, expected date" };
+            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
+            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,

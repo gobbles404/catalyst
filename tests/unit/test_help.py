@@ -90,12 +90,12 @@ def test_the_schedule_creator_explains_itself() -> None:
             "The column of contract codes, such as A2:A7 holding m26 to X26, one per contract.",
         ),
         (
-            "futures_expiry",
-            "The column of futures expiry dates beside the codes, such as B2:B7, one per code.",
+            "future_expiry",
+            "The column of future expiry dates beside the codes, such as B2:B7, one per code.",
         ),
         (
-            "[options_expiry]",
-            "The column of options expiry dates beside the codes, such as C2:C7, one per code.",
+            "[option_expiry]",
+            "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
         ),
     ]
 

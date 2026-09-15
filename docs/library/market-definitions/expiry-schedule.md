@@ -9,14 +9,14 @@ The contract months of one index: each contract's code, the day its future expir
 ```python
 def CreateExpirySchedule(
     future_code: TextColumn,
-    futures_expiry: DateColumn,
-    options_expiry: DateColumn | None = None,
+    future_expiry: DateColumn,
+    option_expiry: DateColumn | None = None,
 ) -> Handle[ExpirySchedule]: ...
 ```
 
 | | A | B | C |
 |---|---|---|---|
-| 1 | future_code | futures_expiry | options_expiry |
+| 1 | future_code | future_expiry | option_expiry |
 | 2 | m26 | 19-May-2026 | 14-May-2026 |
 | 3 | n26 | 22-Jun-2026 | 16-Jun-2026 |
 | 4 | q26 | 21-Jul-2026 | 16-Jul-2026 |
@@ -36,10 +36,10 @@ Quoted from the declaration in `src/goosedove/excel/market_definitions.py`, whic
 |---|---|
 | Function | Creates an expiry schedule from the contract codes of one index and their expiry dates, and shows its handle, the text other formulas take as the schedule. |
 | `future_code` | The column of contract codes, such as A2:A7 holding m26 to X26, one per contract. |
-| `futures_expiry` | The column of futures expiry dates beside the codes, such as B2:B7, one per code. |
-| `options_expiry` | The column of options expiry dates beside the codes, such as C2:C7, one per code. |
+| `future_expiry` | The column of future expiry dates beside the codes, such as B2:B7, one per code. |
+| `option_expiry` | The column of option expiry dates beside the codes, such as C2:C7, one per code. |
 
-Registration shows the third as `[options_expiry]` with its line alone: there is nothing to name after the sentence, and the brackets say it may be left out. The line is written as if the argument were required, as every line is.
+Registration shows the third as `[option_expiry]` with its line alone: there is nothing to name after the sentence, and the brackets say it may be left out. The line is written as if the argument were required, as every line is.
 
 ## The library checks
 
@@ -47,7 +47,7 @@ One rule: the columns have one row per code, because the seam never compares two
 
 | Rule | Message |
 |---|---|
-| every column given has one row per code | `futures_expiry has 5 dates, expected 6, one per future_code` |
+| every column given has one row per code | `future_expiry has 5 dates, expected 6, one per future_code` |
 
 A count of one reads `1 date`. The futures column is checked before the options column, so when both are wrong the futures column is named. Nothing else is checked. The codes are kept as typed, `m26` and `V26` alike, the dates as given, in the order given. What a schedule must look like for a reader to use it, whether codes repeat, whether dates increase, how an option's expiry sits against its future's, is that reader's rule, written when the reader is. A one-row schedule is a schedule. A failed call publishes nothing.
 
@@ -58,7 +58,7 @@ The examples and properties below are `tests/unit/test_expiry_schedule.py`; the 
 | Case | Kind |
 |---|---|
 | the six-row sample above: every code and both dates preserved, aligned, as typed | example |
-| the same with `options_expiry` left out: the other two preserved, options retained as none | example |
+| the same with `option_expiry` left out: the other two preserved, options retained as none | example |
 | a one-row schedule accepted | example |
 | repeated codes, dates out of order and an option after its future are kept as given: nothing else is checked | example |
 | a futures column one row short, and an options column one row long: rejected, naming the count | example |

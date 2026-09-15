@@ -19,15 +19,15 @@ def CreateExpirySchedule(
         TextColumn,
         "The column of contract codes, such as A2:A7 holding m26 to X26, one per contract.",
     ],
-    futures_expiry: Annotated[
+    future_expiry: Annotated[
         DateColumn,
-        "The column of futures expiry dates beside the codes, such as B2:B7, one per code.",
+        "The column of future expiry dates beside the codes, such as B2:B7, one per code.",
     ],
-    options_expiry: Annotated[
+    option_expiry: Annotated[
         DateColumn | None,
-        "The column of options expiry dates beside the codes, such as C2:C7, one per code.",
+        "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
     ] = None,
 ) -> Handle[ExpirySchedule]:
     """Creates an expiry schedule from the contract codes of one index and their expiry dates,
     and shows its handle, the text other formulas take as the schedule."""
-    return expiry_schedule(future_code, futures_expiry, options_expiry)
+    return expiry_schedule(future_code, future_expiry, option_expiry)

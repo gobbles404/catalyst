@@ -23,11 +23,11 @@ HANDLE = re.compile(r"expiry_schedule:[0-9a-f]{6}:([0-9]{6})")
 # resolves to the schedule the seam kept, with its columns as they arrived.
 @probe
 def ReadExpirySchedule(schedule: Handle[ExpirySchedule]) -> str:
-    futures = " ".join(str(day) for day in schedule.futures_expiry)
+    futures = " ".join(str(day) for day in schedule.future_expiry)
     options = (
         "none"
-        if schedule.options_expiry is None
-        else " ".join(str(day) for day in schedule.options_expiry)
+        if schedule.option_expiry is None
+        else " ".join(str(day) for day in schedule.option_expiry)
     )
     return f"{' '.join(schedule.codes)} | {futures} | {options}"
 
@@ -61,16 +61,16 @@ def test_the_third_column_left_out_is_an_index_without_options() -> None:
     [
         (
             [CODES, Cells.from_rows([[46161.0], [46195.0]]), OPTIONS],
-            "#ERROR CreateExpirySchedule: ValueError: futures_expiry has 2 dates, expected 3, "
+            "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
             "one per future_code",
         ),
         (
             [CODES, FUTURES, Cells.from_rows([[46156.0], [None], [46219.0]])],
-            "#ERROR CreateExpirySchedule: options_expiry cell (2, 1) is blank, expected date",
+            "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date",
         ),
         (
             [CODES, FUTURES, None],
-            "#ERROR CreateExpirySchedule: options_expiry is blank, expected column of dates",
+            "#ERROR CreateExpirySchedule: option_expiry is blank, expected column of dates",
         ),
         (
             [Cells.from_rows([["m26"], [46161.0], ["q26"]]), FUTURES, MISSING],
@@ -78,11 +78,11 @@ def test_the_third_column_left_out_is_an_index_without_options() -> None:
         ),
         (
             [CODES, Cells.from_rows([[46161.0, 46195.0, 46224.0]]), MISSING],
-            "#ERROR CreateExpirySchedule: futures_expiry is 1x3 array, expected column of dates",
+            "#ERROR CreateExpirySchedule: future_expiry is 1x3 array, expected column of dates",
         ),
         (
             [CODES, MISSING, MISSING],
-            "#ERROR CreateExpirySchedule: futures_expiry is missing, expected column of dates",
+            "#ERROR CreateExpirySchedule: future_expiry is missing, expected column of dates",
         ),
     ],
     ids=[
@@ -103,7 +103,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     before = number(a_schedule(CODES, FUTURES, MISSING))
     short = Cells.from_rows([[46161.0], [46195.0]])
     assert bridge.call("CreateExpirySchedule", [CODES, short, OPTIONS]) == (
-        "#ERROR CreateExpirySchedule: ValueError: futures_expiry has 2 dates, expected 3, "
+        "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
         "one per future_code"
     )
     assert number(a_schedule(CODES, FUTURES, MISSING)) == before + 1

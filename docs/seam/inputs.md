@@ -126,7 +126,7 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 
 A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
 
-Built in the left-out pull request. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `options_expiry: DateColumn | None = None`. It is not a new type but a form of declaration over the fourteen above, and the desk sees only the name in brackets.
+Built in the left-out pull request. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `option_expiry: DateColumn | None = None`. It is not a new type but a form of declaration over the fourteen above, and the desk sees only the name in brackets.
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
@@ -203,7 +203,7 @@ Decided 2026-09-14, a mixed range and its headers, by the owner.
 
 Decided 2026-09-14, an argument left out with nothing in its place.
 
-39. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `options_expiry: DateColumn | None = None`, and the function receives `None` only for an argument the formula left out. Decision 4 stands: a blank cell in that slot is a blank and fails in the type's own words, because blank arrives as `None` from the host and left out as `MISSING`, and only `MISSING` takes a default. `X` is one of the fourteen declared types; a table, a handle and a bare mixed range take no default and may not be left out. Registration refuses the form with any default but `None`, or with none. Excel shows the name in brackets, `[options_expiry]`, and nothing after the argument's help, because there is nothing to name and the brackets say it; the help's sentence is written as if the argument were required, as every line is. First wanted by `CreateExpirySchedule`, for an index that has no options.
+39. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `option_expiry: DateColumn | None = None`, and the function receives `None` only for an argument the formula left out. Decision 4 stands: a blank cell in that slot is a blank and fails in the type's own words, because blank arrives as `None` from the host and left out as `MISSING`, and only `MISSING` takes a default. `X` is one of the fourteen declared types; a table, a handle and a bare mixed range take no default and may not be left out. Registration refuses the form with any default but `None`, or with none. Excel shows the name in brackets, `[option_expiry]`, and nothing after the argument's help, because there is nothing to name and the brackets say it; the help's sentence is written as if the argument were required, as every line is. First wanted by `CreateExpirySchedule`, for an index that has no options.
 
 ## Not supported
 
