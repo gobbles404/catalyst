@@ -8,8 +8,9 @@ what it costs; an open one says what would decide it. A choice recorded here is 
 from memory, and an open one is not a licence to guess.
 
 The numbers are stable, so pages can cite them; the gaps are entries that belonged to one
-function, cut in #57. Two open items gate no page and are listed once in
-[README.md](README.md): release of handles (D26) and the work counter (D27).
+function, cut in #57, and D30, the argument left out with nothing in its place, which the seam
+decided in #58 ([inputs.md](../seam/inputs.md) decision 39). Two open items gate no page and
+are listed once in [README.md](README.md): release of handles (D26) and the work counter (D27).
 
 ## D10 · Interpolation is a straight line on the thing itself
 
@@ -52,18 +53,3 @@ retained memory.
 a function reached through the seam can do neither, since its signature is the seam's. The
 functions built so far take no counter and their work is pinned at the seam, at the owner's
 word. Decided by: the owner, in one line, in the measurement session (issue #10).
-
-## D30 · An argument left out, with nothing in its place — open
-
-The seam's optional argument is a default: a missing argument takes a stored value of the
-declared type, checked once at registration, and `None` is the host's word for a blank cell,
-so no declaration today says "may be left out, and then there is nothing"
-([inputs.md](../seam/inputs.md) decision 4, and what
-[bridge.md](../seam/bridge.md#what-is-deliberately-absent-and-why) lists as deliberately
-absent). The library needs exactly that, first for `CreateExpirySchedule`'s `options_expiry`:
-an index without options has no column to pass, and a stand-in column would be a value that
-looks right, which [tenet 2](../../PRINCIPLES.md) forbids. The owner's word, 2026-09-14:
-optional means it may be left out. The item is in [inputs.md](../seam/inputs.md) under what
-comes next, with the recommended form beside it; its design is the seam's, and a blank cell in
-the slot must still fail, because blank and left out are different facts. Decided by: the seam
-pull request that builds it, before the function is built.

@@ -126,12 +126,19 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 
 A handle takes no default: the store holds nothing at registration. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
 
+Built in the left-out pull request. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `options_expiry: DateColumn | None = None`. It is not a new type but a form of declaration over the fourteen above, and the desk sees only the name in brackets.
+
+| Declared | Accepts | Example | Hands over | Fails on |
+|---|---|---|---|---|
+| any of the fourteen written `X \| None = None` | the argument left out, or whatever `X` accepts | `=CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options, beside `=CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | `None` for an argument left out, and otherwise what `X` hands over | a blank cell, in the type's own words, and whatever `X` fails on |
+
+A table, a handle and a bare mixed range are not an `X` here: they take no default on their own, and they may not be left out either. Registration refuses the form without `None` as its default, or with another, and adds nothing after the argument's help, because there is nothing to name; the brackets say it.
+
 Next, one at a time, each when the first function needs it. Each adds one rule to the validator, or one form of declaration, and one row here.
 
 | Declared | Would accept | Example | The trap it must handle |
 |---|---|---|---|
 | ContractMonth | a whole serial on the first of a month | B5 = 01-Dec-2027, shown as Dec-27 | Typing Dec-27 into a cell stores the 27th of December this year. |
-| An argument that may be left out, with nothing in its place; the recommended form is `options_expiry: DateColumn \| None = None`, the function receiving `None` only for an argument left out. Wanted by `CreateExpirySchedule`, the library's D30. | the argument missing; a supplied value goes through the type's own rule as it always did | `=CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options, beside `=CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | `None` is the host's word for a blank cell, so a blank in the slot must still fail, and the function must never receive `None` for anything but an argument left out. The help has no default to show after `[options_expiry]`, so what registration adds after the line is new. |
 
 ## Decided
 
@@ -193,6 +200,10 @@ Decided 2026-09-14, handles.
 Decided 2026-09-14, a mixed range and its headers, by the owner.
 
 38. A range of mixed kinds crosses only as a table, a row of text holding the headers and a schema, for any function Excel lists. Without headers the columns of a mixed range mean nothing, and a function would have to guess by position; so registration refuses a listed function that declares `MixedArray` on its own, and the hidden probes keep the bare range as the seam's own instrument. Whether a range of one kind, a column of numbers say, needs headers too is not decided; the next few functions will show, and this decision will say.
+
+Decided 2026-09-14, an argument left out with nothing in its place.
+
+39. An argument that may be left out with nothing in its place is declared as its type written `X | None` with `None` as its default, `options_expiry: DateColumn | None = None`, and the function receives `None` only for an argument the formula left out. Decision 4 stands: a blank cell in that slot is a blank and fails in the type's own words, because blank arrives as `None` from the host and left out as `MISSING`, and only `MISSING` takes a default. `X` is one of the fourteen declared types; a table, a handle and a bare mixed range take no default and may not be left out. Registration refuses the form with any default but `None`, or with none. Excel shows the name in brackets, `[options_expiry]`, and nothing after the argument's help, because there is nothing to name and the brackets say it; the help's sentence is written as if the argument were required, as every line is. First wanted by `CreateExpirySchedule`, for an index that has no options.
 
 ## Not supported
 

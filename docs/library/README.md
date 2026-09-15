@@ -22,7 +22,7 @@ The handle that the two constructors return, text in a cell that stands for a li
 
 A function page starts as the spec and becomes the reference when the function ships, so nothing is written twice and nothing goes stale in a second copy. The first line after its title is its state, exactly one of three:
 
-- `Open: D30.` Something that gates this function is undecided, and those are the decisions.
+- `Open: D12.` Something that gates this function is undecided, and those are the decisions.
 - `Ready.` Nothing gates it; it can be built.
 - `Built in #53.` It exists, and the page describes what exists; anything still open about it stays in its Open section.
 
@@ -32,7 +32,7 @@ A spec for something the seam must do, such as [handles.md](../seam/handles.md),
 
 ## Where it stands
 
-Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; three are specified. `UnitConversions` and `InterpolateDiscountFactors` are ready. `CreateExpirySchedule`, the first market definition, waits on one seam item: an argument that may be left out with nothing in its place, D30, wanted in [inputs.md](../seam/inputs.md). Open across the library and gating nothing: release of handles, D26, and the work counter, D27.
+Two functions are built, `CreateValuationDate` and `CreateDiscountCurve`, in #53, with `util_ReadDiscountFactor` beside them as a temporary reader that proves a handle resolves; three are specified and ready: `UnitConversions`, `InterpolateDiscountFactors`, and `CreateExpirySchedule`, the first market definition, since #58 gave the seam an argument that may be left out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Open across the library and gating nothing: release of handles, D26, and the work counter, D27.
 
 ## Reading it as a reviewer
 

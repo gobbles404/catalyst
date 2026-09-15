@@ -43,7 +43,7 @@ header_row: The header cells of your curve table, such as A1:B1, reading date an
 curve:      A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it.
 ```
 
-- Write the line as if the argument were required. For an optional one registration adds the brackets and the default, `[factor]` and `One multiplier. 1 when omitted.`, from the signature; never write "optional" or the default yourself.
+- Write the line as if the argument were required. For an optional one registration adds the brackets and the default, `[factor]` and `One multiplier. 1 when omitted.`, from the signature; for one that may be left out with nothing in its place, `options_expiry: DateColumn | None = None`, it adds the brackets alone. Never write "optional" or the default yourself.
 - The function's line says what the function makes. For a creator it explains the handle once, `shows its handle, the text other formulas take as the curve`, because that is where the desk first meets the word.
 - Rules stay out of the help. A line says what to pick; the page and the error message say what must hold and what went wrong. No seam words: nothing about serials, ranges, schemas or types.
 - Where an argument takes a unit code, its help lists the accepted codes.
@@ -68,7 +68,7 @@ The sections, in this order:
 
 | Section | Holds |
 |---|---|
-| Title, then the status line alone | `Open: D30.`, `Ready.` or `Built in #NN.`, then one sentence saying what the function is, naming a decision only where one was made |
+| Title, then the status line alone | `Open: D12.`, `Ready.` or `Built in #NN.`, then one sentence saying what the function is, naming a decision only where one was made |
 | Worksheet contract | the Python declaration, the formula a user types, what the cell shows, and one line that the seam checks the declared types |
 | Excel help | the function line and one line per argument, quoted from the declaration: the desk-facing text |
 | The library checks | the rules of meaning a consumer needs today, usually one or two, each with its exact message in the seam's grammar |
