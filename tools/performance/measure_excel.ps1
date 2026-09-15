@@ -32,6 +32,7 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $reports = Join-Path $root "profiles"
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "host_build.ps1")
+. (Join-Path (Split-Path $PSScriptRoot -Parent) "hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
 $copies = 100   # how many times a single-formula case is placed
 $suffix = if ($Rows -eq 1000) { "" } else { "-rows$Rows" }   # the working workload keeps the plain name
@@ -39,6 +40,17 @@ $suffix = if ($Rows -eq 1000) { "" } else { "-rows$Rows" }   # the working workl
 # Every COM object taken is kept here and released at the end, so Excel can quit.
 $owned = [Collections.Generic.List[object]]::new()
 function Own($object) { $owned.Add($object); Write-Output -NoEnumerate $object }   # a Range enumerates its cells if returned plainly
+
+# Retain the intermediate COM objects too; a chained Cells.Item leaves references behind.
+function Cell($sheet, [int]$row, [int]$column) {
+    $sheetCells = Own $sheet.Cells
+    Write-Output -NoEnumerate (Own $sheetCells.Item($row, $column))
+}
+function Block($sheet, [int]$firstRow, [int]$firstColumn, [int]$lastRow, [int]$lastColumn) {
+    $first = Cell $sheet $firstRow $firstColumn
+    $last = Cell $sheet $lastRow $lastColumn
+    Write-Output -NoEnumerate (Own $sheet.Range($first, $last))
+}
 
 function Triangle([long]$n) { return [double]$n * ($n + 1) / 2 }   # 1 + 2 + ... + n
 
@@ -51,14 +63,14 @@ function Sum-Values($values) {
 # A sheet whose inputs are 1, 2, 3, ... across then down over A1 to the last column, so every
 # sum below has a closed form to check against.
 function New-InputSheet([string]$name, [int]$rows, [int]$cols) {
-    $sheet = Own $book.Worksheets.Add()
+    $sheet = Own $sheets.Add()
     $sheet.Name = $name
     $values = [object[,]]::new($rows, $cols)
     for ($r = 0; $r -lt $rows; $r++) {
         for ($c = 0; $c -lt $cols; $c++) { $values[$r, $c] = [double]($r * $cols + $c + 1) }
     }
-    (Own $sheet.Range($sheet.Cells.Item(1, 1), $sheet.Cells.Item($rows, $cols))).Value2 = $values
-    return $sheet
+    (Block $sheet 1 1 $rows $cols).Value2 = $values
+    Write-Output -NoEnumerate $sheet
 }
 
 # A case is data: what to recalculate, what to read back, and the sum it must show. An edit
@@ -104,7 +116,8 @@ $results = [Collections.Generic.List[object]]::new()
 # A group is one workbook: build its sheets and cases, warm and check each case, calibrate its
 # iterations, time the cases in rotated batches, then close the workbook.
 function Measure-Group([scriptblock]$build) {
-    $script:book = Own $excel.Workbooks.Add()
+    $script:book = Own $books.Add()
+    $script:sheets = Own $book.Worksheets
     $script:cases = [Collections.Generic.List[hashtable]]::new()
     & $build
     foreach ($case in $cases) {
@@ -139,24 +152,30 @@ function Measure-Group([scriptblock]$build) {
         $means = @($results | Where-Object { $_.probe -eq $case.Probe -and $_.scenario -eq $case.Scenario -and $_.cells_in -eq $case.CellsIn -and $_.cells_out -eq $case.CellsOut } | ForEach-Object { $_.per_recalc_us } | Sort-Object)
         Write-Host ("{0,-11} {1,-34} {2,5} calls {3,6} in {4,5} out  median {5,11:N1} us/recalc  ({6:N1}..{7:N1})" -f $case.Probe, $case.Scenario, $case.Calls, $case.CellsIn, $case.CellsOut, $means[[int]($means.Count / 2)], $means[0], $means[-1])
     }
-    $book.Close($false)
+    Close-HiddenExcelWorkbook $excel $book
     $script:book = $null
 }
 
-$excel = New-Object -ComObject Excel.Application
+$session = Start-HiddenExcel
+$excel = $session.Excel
+$loaded = $false
+$scriptError = $null
+$book = $null
 try {
-    $excel.Visible = $false
-    $excel.DisplayAlerts = $false
     $excel.ScreenUpdating = $false
     $excel.EnableEvents = $false
     if (-not $excel.RegisterXLL($xll)) { throw "Excel refused to load $xll" }
-    $book = Own $excel.Workbooks.Add()
+    $loaded = $true
+    $books = Own $excel.Workbooks
+    $book = Own $books.Add()
     $excel.Calculation = -4135   # xlCalculationManual, for every workbook this Excel opens
-    $status = Own $book.Worksheets.Item(1).Range("A1")
+    $sheets = Own $book.Worksheets
+    $sheet = Own $sheets.Item(1)
+    $status = Own $sheet.Range("A1")
     $status.Formula = "=GoosedoveStatus()"
     [void]$status.Calculate()
     if ($status.Value2 -ne "ok: python started and functions registered") { throw $status.Text }
-    $book.Close($false)
+    Close-HiddenExcelWorkbook $excel $book
     $book = $null
 
     # --- 1 to 3: size curves, all Range.Calculate, one workbook -------------------------------
@@ -170,7 +189,7 @@ try {
                 @{ Probe = "HostAdd"; Formula = "=HostAdd(RC1,RC2)" },
                 @{ Probe = "native +"; Formula = "=RC1+RC2" }
             )) {
-                $range = Own $calls.Range($calls.Cells.Item(1, $column), $calls.Cells.Item($n, $column))
+                $range = Block $calls 1 $column $n $column
                 $range.FormulaR1C1 = $shape.Formula
                 Add-Case $shape.Probe "call count" $n (2 * $n) $n $range $range (Triangle (2 * $n))
                 $column++
@@ -184,7 +203,7 @@ try {
                 @{ Probe = "SumArray"; Formula = "=SumArray(R1C1:R${n}C1)" },
                 @{ Probe = "native SUM"; Formula = "=SUM(R1C1:R${n}C1)" }
             )) {
-                $range = Own $cellsIn.Range($cellsIn.Cells.Item(1, $column), $cellsIn.Cells.Item($copies, $column))
+                $range = Block $cellsIn 1 $column $copies $column
                 $range.FormulaR1C1 = $shape.Formula
                 Add-Case $shape.Probe "cells in" $copies $n 1 $range $range ($copies * (Triangle $n))
                 $column++
@@ -192,13 +211,13 @@ try {
         }
         # 2b. the same count two ways, over numbers and over a mixed column, with Excel's own
         # counts beside each: what accepting three kinds instead of one costs a user.
-        $mixedIn = Own $book.Worksheets.Add()
+        $mixedIn = Own $sheets.Add()
         $mixedIn.Name = "mixed_in"
         $values = [object[,]]::new(10000, 1)
         for ($r = 0; $r -lt 10000; $r++) {
             $values[$r, 0] = switch ($r % 3) { 0 { "n$r" } 1 { [double]$r } default { $r % 2 -eq 0 } }
         }
-        (Own $mixedIn.Range($mixedIn.Cells.Item(1, 1), $mixedIn.Cells.Item(10000, 1))).Value2 = $values
+        (Block $mixedIn 1 1 10000 1).Value2 = $values
         $column = 3
         foreach ($n in 100, 1000, 10000) {
             foreach ($shape in @(
@@ -211,22 +230,22 @@ try {
                 @{ Probe = "CountMixed"; Scenario = "cells in"; Formula = "=CountMixed(R1C1:R${n}C1)" },
                 @{ Probe = "native COUNTA"; Scenario = "cells in"; Formula = "=COUNTA(R1C1:R${n}C1)" }
             )) {
-                $range = Own $mixedIn.Range($mixedIn.Cells.Item(1, $column), $mixedIn.Cells.Item($copies, $column))
+                $range = Block $mixedIn 1 $column $copies $column
                 $range.FormulaR1C1 = $shape.Formula
                 Add-Case $shape.Probe $shape.Scenario $copies $n 1 $range $range ($copies * $n)
                 $column++
             }
         }
         # 3. cells out: a hundred copies of one formula spilling a growing column
-        $cellsOut = Own $book.Worksheets.Add()
+        $cellsOut = Own $sheets.Add()
         $cellsOut.Name = "cells_out"
         $column = 1
         foreach ($n in 100, 1000, 10000) {
             for ($c = 0; $c -lt $copies; $c++) {
-                $cellsOut.Cells.Item(1, $column + $c).Formula2 = "=Grid($n,1)"
+                (Cell $cellsOut 1 ($column + $c)).Formula2 = "=Grid($n,1)"
             }
-            $anchors = Own $cellsOut.Range($cellsOut.Cells.Item(1, $column), $cellsOut.Cells.Item(1, $column + $copies - 1))
-            $spills = Own $cellsOut.Range($cellsOut.Cells.Item(1, $column), $cellsOut.Cells.Item($n, $column + $copies - 1))
+            $anchors = Block $cellsOut 1 $column 1 ($column + $copies - 1)
+            $spills = Block $cellsOut 1 $column $n ($column + $copies - 1)
             Add-Case "Grid" "cells out" $copies 2 $n $anchors $spills ($copies * (Triangle $n))
             $column += $copies
         }
@@ -249,21 +268,21 @@ try {
         Measure-Group {
             $cols = $arrangement.Cols
             $sheet = New-InputSheet $arrangement.Name.Replace(" ", "_") $Rows $cols
-            $out = Own $sheet.Range($sheet.Cells.Item(1, 12), $sheet.Cells.Item($Rows, 12))   # column L, clear of every input
+            $out = Block $sheet 1 12 $Rows 12   # column L, clear of every input
             switch ($arrangement.Kind) {
                 "rows" { $out.FormulaR1C1 = $arrangement.Formula }
                 "arrays" {
                     for ($b = 0; $b -lt 10; $b++) {
                         $top = $b * $each + 1
-                        $sheet.Cells.Item($top, 12).Formula2 = ($arrangement.Formula -f $top, ($top + $each - 1))
+                        (Cell $sheet $top 12).Formula2 = ($arrangement.Formula -f $top, ($top + $each - 1))
                     }
                 }
-                "one" { $sheet.Cells.Item(1, 12).Formula2 = $arrangement.Formula }
+                "one" { (Cell $sheet 1 12).Formula2 = $arrangement.Formula }
             }
             $reach = $Rows / $arrangement.Calls   # rows one formula answers, so what one edit reaches
             $edit = Own $sheet.Range("A$middle")
             $state = @{ Flip = 0; Base = [double]$edit.Value2 }
-            $answer = Own $sheet.Cells.Item($middle, 12)
+            $answer = Cell $sheet $middle 12
             # Row r holds (r-1)*cols+1 ... r*cols; its sum is cols*(r-1)*cols + cols*(cols+1)/2.
             $middleSum = $cols * ($middle - 1) * $cols + (Triangle $cols)
             Add-Case $arrangement.Probe "$($arrangement.Name): full" $arrangement.Calls ($Rows * $cols) $Rows $out $out (Triangle ($Rows * $cols)) $state
@@ -272,7 +291,8 @@ try {
     }
     # The floor under every edit: the same COM write and Application.Calculate, nothing dependent.
     Measure-Group {
-        $floor = Own $book.Worksheets.Item(1).Range("A1")
+        $sheet = Own $sheets.Item(1)
+        $floor = Own $sheet.Range("A1")
         $floor.Value2 = 0.0
         Add-Case "no formula" "edit one input" 0 0 0 $null $floor 0.0 @{ Flip = 0; Base = 0.0 } $floor
     }
@@ -298,13 +318,9 @@ try {
         timed_scope = "Range.Calculate or Application.Calculate over COM from a PowerShell loop: Excel, Excel-DNA, the host, Python, and the COM round trips. Excludes startup, building the sheets, and checking answers. per_call_us is a batch mean per formula the recalculation reaches; per_recalc_us per recalculation. Calls are counted from the formulas placed, never observed. Single-formula cases are placed a hundred times and timed as one range. The size curves share one workbook; each batching arrangement and the edit floor have a workbook of their own."
         edit_scope = "One input cell written over COM, then Application.Calculate in manual mode: Excel recalculates that cell's dependents and nothing else. The workbook is cleaned by one Application.Calculate off the clock first, because Range.Calculate leaves cells dirty. The full case of the same arrangement is Range.Calculate over every formula it placed. The 'no formula' row is the same write and calculate with nothing dependent, in an otherwise empty workbook."
     } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $reports "excel-timing$suffix-environment.json") -Encoding utf8
-    Write-Host "Results: profiles/excel-timing$suffix.csv"
 }
+catch { $scriptError = $_; throw }
 finally {
-    if ($book) { $book.Close($false) }
-    $excel.Quit()
-    for ($i = $owned.Count - 1; $i -ge 0; $i--) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($owned[$i]) }
-    [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
-    [GC]::Collect()
-    [GC]::WaitForPendingFinalizers()
+    Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
 }
+Write-Host "Results: profiles/excel-timing$suffix.csv"
