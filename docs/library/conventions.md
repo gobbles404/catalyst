@@ -14,13 +14,12 @@ How a function page is written, and the skeleton to copy for a new one. Why thes
 | Handles | `Handle[Kind]` around the library's own class, as a creator's result and as a consumer's parameter; the cell shows `kind:session:number` | `Handle[DiscountCurve]`, `discount_curve:3f9a1c:000002` |
 | Category values | exact lowercase codes, matched case-sensitively | `volume`, `mass`, `energy`, `usd` |
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |
-| Codes the desk types, such as contract codes | kept exactly as typed; two that differ only in case are one code (D31) | `m26`, `V26` |
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. `util_` on the interpolation utility is a working name, not a convention (D18).
 
 ## Tables
 
-A function that takes a table, a header row and a body, declares a schema, a class deriving from the seam's `Table` with one line per column, and takes the header row as a `TextRow` in the parameter just before the table. How the headers bind, what each column type accepts, and every message are the seam's: [inputs.md](../seam/inputs.md) decisions 27 to 33 and [bridge.md](../seam/bridge.md#a-table-a-header-row-and-a-schema). A page shows its schema and restates nothing about binding. A mixed range crosses only as a table: a function never declares a bare `MixedArray`, because without headers its columns mean nothing ([inputs.md](../seam/inputs.md) decision 38). Whether a range of one kind needs headers too is not decided; the next few functions will show, and `CreateExpirySchedule` is the first, taking three columns without headers (D30).
+A function that takes a table, a header row and a body, declares a schema, a class deriving from the seam's `Table` with one line per column, and takes the header row as a `TextRow` in the parameter just before the table. How the headers bind, what each column type accepts, and every message are the seam's: [inputs.md](../seam/inputs.md) decisions 27 to 33 and [bridge.md](../seam/bridge.md#a-table-a-header-row-and-a-schema). A page shows its schema and restates nothing about binding. A mixed range crosses only as a table: a function never declares a bare `MixedArray`, because without headers its columns mean nothing ([inputs.md](../seam/inputs.md) decision 38). Whether a range of one kind needs headers too is not decided; the next few functions will show, and `CreateExpirySchedule` is the first, taking three columns without headers.
 
 ## What the library receives
 

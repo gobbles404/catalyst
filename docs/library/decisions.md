@@ -512,74 +512,18 @@ live in a table on a page rather than in a document of their own.
 
 ## Market definitions
 
-### D30 · An expiry schedule is three columns of one kind each, with no header row
-
-**Decided.** `CreateExpirySchedule` takes `future_code` as a column of text and
-`futures_expiry` and `options_expiry` as columns of dates, selected without the header row a
-sheet shows above them: `=CreateExpirySchedule(A2:A7, B2:B7, C2:C7)`, and
-`=CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options. Decided 2026-09-14 by the
-owner.
-
-**Because** the owner chose it, to put the typed columns through a real function; and because
-the third column is left out for an index with no options, which a table cannot express: a
-table has exactly its schema's columns, each once ([inputs.md](../seam/inputs.md) decision
-30).
-
-**Costs** what D21 recorded for this layout: two columns can be selected one row out of step,
-`A2:A7` beside `B3:B8`, and equal lengths cannot catch it. On most sheets the cell past the
-table's edge is blank and a blank fails, and the two date columns passed in each other's
-place fail D32's last rule. And meaning by position: which column is which is the argument's
-place, not a header. This is the first function to take columns of one kind without headers,
-the case [inputs.md](../seam/inputs.md) decision 38 left to the next few functions; the pull
-request that builds it adds this function there as the first.
-
-### D31 · A code is kept as typed, and two that differ only in case are one code
-
-**Decided.** `future_code` is retained exactly as typed, `m26` and `V26` alike; nothing is
-trimmed or re-cased. Two rows whose codes differ only in case are one code given twice, and
-the schedule is rejected naming both rows. Decided 2026-09-14.
-
-**Because** case is how the desk typed a code, not which contract it is, the reasoning D19
-gives for headers; a schedule that admitted `m26` and `M26` as two contracts would let a later
-lookup pick one without a word, the quiet result [tenet 2](../../PRINCIPLES.md) forbids; and
-the owner has said that matching by code elsewhere in the library will ignore case, so this
-is the rule every consumer of a schedule inherits. D17 stands for unit codes, which the
-library ships with one documented spelling each; the codes here are the desk's own, and
-their spelling is whatever the desk typed.
-
-**Costs** a consumer that looks a code up must ignore case too, and the text it gets back may
-differ in case from what a formula typed.
-
-### D32 · Expiries increase down the sheet, and an option expires on or before its future
-
-**Decided.** `futures_expiry` and `options_expiry` each strictly increase from one row to the
-next, and each options expiry is on or before the futures expiry of its own row, the same day
-allowed. A schedule that breaks any of these is rejected naming the row; nothing is sorted,
-and no row is dropped. Decided 2026-09-14.
-
-**Because** the schedule exists to say which contract is prompt, the one nearest to expiry,
-and two contracts expiring on one day would leave that without an answer; the sheet's order
-is the contract order and is kept, as nothing at the seam is sorted or reordered
-([inputs.md](../seam/inputs.md) decision 10); and an option on a future settles into that
-future before the future expires, so a later date is bad input, and the same rule catches
-the two date columns passed in each other's place.
-
-**Costs** a market whose option outlives its future, if one exists, cannot be described; and
-a schedule typed out of order has to be sorted on the sheet, not by the library.
-
-### D33 · An argument left out, with nothing in its place: what the seam needs first — **open**
+### D30 · An argument left out, with nothing in its place: what the seam needs first — **open**
 
 **Wanted, not built.** The seam's optional argument is a default: a missing argument takes a
 stored value of the declared type, checked once at registration, and `None` is the host's
 word for a blank cell, so no declaration today says "may be left out, and then there is
 nothing" ([inputs.md](../seam/inputs.md) decision 4, and what
 [bridge.md](../seam/bridge.md#what-is-deliberately-absent-and-why) lists as deliberately
-absent). `options_expiry` needs exactly that: an index without options has no column to pass,
-and a stand-in column would be a value that looks right, which [tenet 2](../../PRINCIPLES.md)
-forbids. The owner's word, 2026-09-14: optional means it may be left out. The item is in
-[inputs.md](../seam/inputs.md) under what comes next, with the recommended form beside it;
-its design is the seam's, and a blank cell in the slot must still fail, because blank and
-left out are different facts.
+absent). `CreateExpirySchedule`'s `options_expiry` needs exactly that: an index without
+options has no column to pass, and a stand-in column would be a value that looks right,
+which [tenet 2](../../PRINCIPLES.md) forbids. The owner's word, 2026-09-14: optional means it
+may be left out. The item is in [inputs.md](../seam/inputs.md) under what comes next, with the
+recommended form beside it; its design is the seam's, and a blank cell in the slot must still
+fail, because blank and left out are different facts.
 
-**What would decide it:** the seam pull request that builds it, before this function is
-built.
+**What would decide it:** the seam pull request that builds it, before the function is built.
