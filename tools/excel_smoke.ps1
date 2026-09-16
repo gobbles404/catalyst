@@ -94,6 +94,15 @@ $formulas = [ordered]@{
     "=ROWS(ReadHandle(AM2))"      = "3"
     "=CreateHolidayCalendar(AL2:AL4)" = "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
     "=CreateHolidayCalendar(AK2:AL2)" = "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
+    # The market conventions: a creator over five text cells, read back through ReadHandle, a
+    # blank and a number where a code is expected, and a code left out.
+    "=LEFT(AP1,19)"               = "market_conventions:"
+    "=INDEX(ReadHandle(AP1),1,4)" = "quantity_type"
+    "=INDEX(ReadHandle(AP1),3,4)" = "VOLUME"
+    "=COLUMNS(ReadHandle(AP1))"   = "5"
+    "=CreateMarketConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR CreateMarketConventions: quantity_unit is blank, expected text"
+    "=CreateMarketConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text"
+    "=CreateMarketConventions(AO2,AO3,AO4,AO5)" = "#ERROR CreateMarketConventions: quantity_unit is missing, expected text"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -152,6 +161,9 @@ $cells = [ordered]@{
     "AK4" = "16-Feb-2026"; "AL4" = "16-Feb-2026"
     "AM1" = "=CreateHolidayCalendar(AK2:AK4)"
     "AM2" = "=CreateHolidayCalendar(AK2)"
+    # The market conventions: five codes as the desk types them, and one creator cell.
+    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "VOLUME"; "AO6" = "BBL"
+    "AP1" = "=CreateMarketConventions(AO2,AO3,AO4,AO5,AO6)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

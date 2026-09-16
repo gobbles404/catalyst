@@ -56,6 +56,7 @@ What each kind shows:
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day |
 | `expiry_schedule` | `future_code`, `future_expiry`, and `option_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
+| `market_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 
 `=ReadHandle(B2)` on `=CreateValuationDate(A2, 0.5)`:
 
@@ -90,6 +91,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | the three-day curve: the two headers, the two types, three rows, dates as serials, factors exactly | example |
 | the six-contract schedule with options: three columns; without options: two | example |
 | a three-day calendar: one column of dates under its two heading rows | example |
+| market conventions: one row of five texts under its two heading rows | example |
 | a curve's spill, headers and body, fed back to `CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |

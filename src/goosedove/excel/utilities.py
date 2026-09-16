@@ -16,6 +16,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar
+from goosedove.market_definitions.market_conventions import MarketConventions
 
 
 @singledispatch
@@ -64,6 +65,27 @@ def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
 @shown.register
 def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
     return MixedArray.table([("holiday",), ("datetime64[D]",)], obj.holiday)
+
+
+@shown.register
+def market_conventions_table(obj: MarketConventions) -> MixedArray:
+    return MixedArray.table(
+        [
+            (
+                "quote_currency_unit",
+                "quote_quantity_unit",
+                "currency_unit",
+                "quantity_type",
+                "quantity_unit",
+            ),
+            ("str", "str", "str", "str", "str"),
+        ],
+        (obj.quote_currency_unit,),
+        (obj.quote_quantity_unit,),
+        (obj.currency_unit,),
+        (obj.quantity_type,),
+        (obj.quantity_unit,),
+    )
 
 
 @excel_function

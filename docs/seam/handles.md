@@ -12,7 +12,7 @@ B2   0.5
 C2   =CreateValuationDate(A2, B2)      displays valuation_date:3f9a1c:000001
 ```
 
-The shared workbook `workbooks/handles.xlsx` holds this sheet and the curve's, with a `notes` column for whoever is looking at it: `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens it with the add-in, and `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints it as its cells show.
+The shared workbook `workbooks/handles.xlsx` holds this sheet, the curve's, and a block for each creator built since, its inputs and creator on the left and `ReadHandle` spilling the object on the right, with a `notes` column for whoever is looking at it: `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens it with the add-in, and `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints it as its cells show.
 
 The creator builds a Python object holding a numpy day and a float. The seam retains that object and displays its handle in `C2`. Another formula refers to `C2`, or to a defined name referring to it; the seam resolves the handle once and hands the library the object. Reading it does not rebuild it. One valuation-date creator per workbook is the expected case, not an enforced singleton: the store holds many independent objects.
 

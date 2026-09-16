@@ -119,6 +119,10 @@ namespace Goosedove.Host.Tests
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
             yield return new object[] { "CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
             yield return new object[] { "CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
+            // The market conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -151,6 +155,22 @@ namespace Goosedove.Host.Tests
             var oneDay = (string)Seam.Call("CreateHolidayCalendar", 46023.0);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("ReadHandle", oneDay)).GetLength(0));
+        }
+
+        // Market conventions: five codes make one, and ReadHandle spills them back, the five
+        // headers, five types, then the codes as typed in one row.
+        [Fact]
+        public void market_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
+        {
+            var handle = (string)Seam.Call("CreateMarketConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            Assert.StartsWith("market_conventions:", handle);
+            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            Assert.Equal(3, spill.GetLength(0));
+            Assert.Equal(5, spill.GetLength(1));
+            Assert.Equal("quantity_type", spill[0, 3]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("VOLUME", spill[2, 3]);
+            Assert.Equal("BBL", spill[2, 4]);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

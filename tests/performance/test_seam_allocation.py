@@ -206,6 +206,15 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     assert least_peak(lambda: ENTRY["CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
 
 
+# Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
+# and 1,162 for reading them back as a three-row table of fifteen text cells.
+def test_a_creator_of_market_conventions_and_its_reader_stay_small() -> None:
+    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
+    assert least_peak(lambda: ENTRY["CreateMarketConventions"](*codes)) <= 2 * SLACK
+    handle = ENTRY["CreateMarketConventions"](*codes)
+    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+
+
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
