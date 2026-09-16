@@ -12,6 +12,7 @@ from typing import Annotated
 from goosedove.excel.bridge import DateColumn, Handle, TextColumn, excel_function
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.market_definitions.market_conventions import MarketConventions, market_conventions
 
 
 @excel_function
@@ -44,3 +45,23 @@ def CreateHolidayCalendar(
     """Creates a holiday calendar from the days one market is closed and shows its handle, the
     text other formulas take as the calendar."""
     return holiday_calendar(holiday)
+
+
+@excel_function
+def CreateMarketConventions(
+    quote_currency_unit: Annotated[
+        str, "The currency unit a price of the index is quoted in, such as USD."
+    ],
+    quote_quantity_unit: Annotated[
+        str, "The quantity unit a price of the index is quoted per, such as BBL for USD per barrel."
+    ],
+    currency_unit: Annotated[str, "The currency unit the index settles in, such as USD."],
+    quantity_type: Annotated[str, "What a quantity of the index measures, such as VOLUME."],
+    quantity_unit: Annotated[str, "The unit a quantity of the index is stated in, such as BBL."],
+) -> Handle[MarketConventions]:
+    """Creates the market conventions of one index, the units it is quoted, settled and measured
+    in, and shows its handle, the text other formulas take as the conventions."""
+    # The five codes are not checked yet: which are allowed is a later task, noted in the builder.
+    return market_conventions(
+        quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
+    )

@@ -11,6 +11,7 @@ from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar
+from goosedove.market_definitions.market_conventions import MarketConventions
 
 # The first three contracts of the page's sample as the sheet sends them: codes as text, dates as
 # serials, 19 May, 22 June and 21 July 2026 for the futures and a few days earlier for the options.
@@ -23,6 +24,11 @@ HANDLE = re.compile(r"expiry_schedule:[0-9a-f]{6}:([0-9]{6})")
 # 1 January, 19 January and 16 February 2026.
 HOLIDAYS = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
 CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
+
+# The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
+# barrel, settled in dollars, its quantity a volume stated in barrels.
+UNITS = ["USD", "BBL", "USD", "VOLUME", "BBL"]
+CONVENTIONS = re.compile(r"market_conventions:[0-9a-f]{6}:([0-9]{6})")
 
 
 # The library has no consumer of a schedule yet, so this hidden reader proves that a handle
@@ -200,4 +206,84 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
     assert bridge.call("ReadHolidayCalendar", [other]) == (
         f"#ERROR ReadHolidayCalendar: calendar is expiry schedule handle {other!r}, "
         "expected holiday calendar handle"
+    )
+
+
+# --- CreateMarketConventions ----------------------------------------------------
+
+
+# The library has no consumer of the conventions yet, so this hidden reader proves that a handle
+# resolves to the conventions the seam kept, the five codes in their fields.
+@probe
+def ReadMarketConventions(conventions: Handle[MarketConventions]) -> str:
+    return " ".join(
+        (
+            conventions.quote_currency_unit,
+            conventions.quote_quantity_unit,
+            conventions.currency_unit,
+            conventions.quantity_type,
+            conventions.quantity_unit,
+        )
+    )
+
+
+def the_conventions(*codes: object) -> str:
+    text = bridge.call("CreateMarketConventions", list(codes))
+    assert isinstance(text, str) and CONVENTIONS.fullmatch(text), text
+    return text
+
+
+def test_market_conventions_are_created_from_five_codes_and_read_back_in_order() -> None:
+    assert bridge.call("ReadMarketConventions", [the_conventions(*UNITS)]) == (
+        "USD BBL USD VOLUME BBL"
+    )
+
+
+# Each argument alone, left to right: the first bad one is named, in the seam's words.
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            ["USD", "BBL", "USD", "VOLUME", None],
+            "#ERROR CreateMarketConventions: quantity_unit is blank, expected text",
+        ),
+        (
+            ["USD", "BBL", 1.0, "VOLUME", "BBL"],
+            "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text",
+        ),
+        (
+            ["", "BBL", "USD", "VOLUME", "BBL"],
+            "#ERROR CreateMarketConventions: quote_currency_unit is empty text, expected text",
+        ),
+        (
+            ["USD", Cells.from_rows([["BBL"]]), "USD", "VOLUME", "BBL"],
+            "#ERROR CreateMarketConventions: quote_quantity_unit is 1x1 array, expected text",
+        ),
+        (
+            ["USD", "BBL", "USD", "VOLUME", MISSING],
+            "#ERROR CreateMarketConventions: quantity_unit is missing, expected text",
+        ),
+        (
+            ["USD", "BBL", True, None, "BBL"],
+            "#ERROR CreateMarketConventions: currency_unit is boolean TRUE, expected text",
+        ),
+    ],
+    ids=[
+        "a blank where a code is expected",
+        "a number where a code is expected",
+        "empty text",
+        "a one-cell range",
+        "a code left out",
+        "two wrong, the earlier named",
+    ],
+)
+def test_market_conventions_that_cannot_be_made_say_why(args: list[object], text: str) -> None:
+    assert bridge.call("CreateMarketConventions", args) == text
+
+
+def test_a_handle_of_another_kind_is_not_market_conventions() -> None:
+    other = a_calendar(HOLIDAYS)
+    assert bridge.call("ReadMarketConventions", [other]) == (
+        f"#ERROR ReadMarketConventions: conventions is holiday calendar handle {other!r}, "
+        "expected market conventions handle"
     )

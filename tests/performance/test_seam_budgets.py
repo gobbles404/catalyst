@@ -747,6 +747,28 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     }
 
 
+# --- the third market definition: five texts in, one publication out ------------------
+
+
+# Five scalars, each through the text rule, the builder and one publication: nothing is asked of
+# numpy, and the builder has no rule of its own to run.
+def test_market_conventions_are_five_texts_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
+    PATH["CreateMarketConventions"](*codes)
+    assert call_profile(lambda: PATH["CreateMarketConventions"](*codes)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 5,
+        "_text": 5,
+        "CreateMarketConventions": 1,
+        "market_conventions": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateMarketConventions"](*codes)) == {}
+
+
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))

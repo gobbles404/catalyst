@@ -17,6 +17,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar
+from goosedove.market_definitions.market_conventions import MarketConventions
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -104,6 +105,21 @@ def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
     ]
 
 
+def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
+    handle = bridge.call("CreateMarketConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
+    assert rows(read(handle)) == [
+        [
+            "quote_currency_unit",
+            "quote_quantity_unit",
+            "currency_unit",
+            "quantity_type",
+            "quantity_unit",
+        ],
+        ["str", "str", "str", "str", "str"],
+        ["USD", "BBL", "USD", "VOLUME", "BBL"],
+    ]
+
+
 # --- a spill is the table its creator took ----------------------------------
 
 
@@ -173,4 +189,10 @@ def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None
 
 
 def test_every_kind_a_creator_publishes_has_a_table() -> None:
-    assert {ValuationDate, DiscountCurve, ExpirySchedule, HolidayCalendar} <= set(shown.registry)
+    assert {
+        ValuationDate,
+        DiscountCurve,
+        ExpirySchedule,
+        HolidayCalendar,
+        MarketConventions,
+    } <= set(shown.registry)

@@ -113,6 +113,28 @@ def test_the_calendar_creator_explains_itself() -> None:
     ]
 
 
+def test_the_conventions_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["CreateMarketConventions"]
+    assert not hidden
+    assert description == (
+        "Creates the market conventions of one index, the units it is quoted, settled and "
+        "measured in, and shows its handle, the text other formulas take as the conventions."
+    )
+    assert arguments == [
+        (
+            "quote_currency_unit",
+            "The currency unit a price of the index is quoted in, such as USD.",
+        ),
+        (
+            "quote_quantity_unit",
+            "The quantity unit a price of the index is quoted per, such as BBL for USD per barrel.",
+        ),
+        ("currency_unit", "The currency unit the index settles in, such as USD."),
+        ("quantity_type", "What a quantity of the index measures, such as VOLUME."),
+        ("quantity_unit", "The unit a quantity of the index is stated in, such as BBL."),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 
