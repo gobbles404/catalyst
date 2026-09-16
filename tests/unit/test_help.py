@@ -98,6 +98,21 @@ def test_the_schedule_creator_explains_itself() -> None:
     ]
 
 
+def test_the_calendar_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["CreateHolidayCalendar"]
+    assert not hidden
+    assert description == (
+        "Creates a holiday calendar from the days one market is closed and shows its handle, "
+        "the text other formulas take as the calendar."
+    )
+    assert arguments == [
+        (
+            "holiday",
+            "The column of dates the market is closed, such as A2:A11, one holiday per row.",
+        ),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

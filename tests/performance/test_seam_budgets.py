@@ -709,6 +709,44 @@ def test_an_expiry_schedule_without_options_pays_for_two_columns(
     }
 
 
+# --- the second market definition: one column in, one publication out ------------------
+
+
+def holiday_column(days: int) -> Cells:
+    """That many holidays as the sheet sends them, one serial per row, a week apart."""
+    return Cells.from_rows([[46023.0 + 7 * i] for i in range(days)])
+
+
+# Ten years of one market's holidays: one look and two conversions for the column, the builder's
+# one copy and one publication. The builder has no rule of its own, so nothing else runs.
+def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    holidays = holiday_column(100)
+    PATH["CreateHolidayCalendar"](holidays)
+    assert call_profile(lambda: PATH["CreateHolidayCalendar"](holidays)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_date_column": 1,
+        "_one_column": 1,
+        "_shape": 1,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "CreateHolidayCalendar": 1,
+        "holiday_calendar": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateHolidayCalendar"](holidays)) == {
+        "ndarray.any": 1,  # one look, for the calendar
+        "ndarray.astype": 2,  # the column on its way to days
+        "numpy.array": 1,  # the one copy the calendar keeps
+        "ndarray.setflags": 1,  # frozen
+        "ufunc.reduce": 1,
+    }
+
+
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))

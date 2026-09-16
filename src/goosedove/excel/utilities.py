@@ -15,6 +15,7 @@ from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
+from goosedove.market_definitions.holiday_calendar import HolidayCalendar
 
 
 @singledispatch
@@ -58,6 +59,11 @@ def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
         obj.future_expiry,
         obj.option_expiry,
     )
+
+
+@shown.register
+def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
+    return MixedArray.table([("holiday",), ("datetime64[D]",)], obj.holiday)
 
 
 @excel_function

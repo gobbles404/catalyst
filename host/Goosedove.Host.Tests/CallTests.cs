@@ -116,6 +116,9 @@ namespace Goosedove.Host.Tests
             // The expiry schedule: a column of codes and two of dates, one row per code, the third column optional.
             yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
             yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
+            // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
+            yield return new object[] { "CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
+            yield return new object[] { "CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -130,6 +133,24 @@ namespace Goosedove.Host.Tests
             Assert.StartsWith("expiry_schedule:", withOptions);
             Assert.StartsWith("expiry_schedule:", withoutOptions);
             Assert.NotEqual(withOptions, withoutOptions);
+        }
+
+        // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
+        // ReadHandle spills it back, the header, the type, then a row per holiday.
+        [Fact]
+        public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
+            Assert.StartsWith("holiday_calendar:", handle);
+            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(1, spill.GetLength(1));
+            Assert.Equal("holiday", spill[0, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 0]);
+            Assert.Equal(46041.0, spill[3, 0]);
+            var oneDay = (string)Seam.Call("CreateHolidayCalendar", 46023.0);
+            Assert.NotEqual(handle, oneDay);
+            Assert.Equal(3, ((object[,])Seam.Call("ReadHandle", oneDay)).GetLength(0));
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.
