@@ -1,5 +1,5 @@
-"""The worksheet functions of the market definitions: what an index or a market is, as opposed
-to the globals every calculation starts from, each created once and reached by handle.
+"""The worksheet functions of the market definitions: what an index, a market or a contract is,
+as opposed to the globals every calculation starts from, each created once and reached by handle.
 docs/library/market-definitions/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
@@ -10,6 +10,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 from typing import Annotated
 
 from goosedove.excel.bridge import DateColumn, Handle, TextColumn, excel_function
+from goosedove.market_definitions.contract_spec import ContractSpec, contract_spec
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market_definitions.market_conventions import MarketConventions, market_conventions
@@ -65,3 +66,16 @@ def CreateMarketConventions(
     return market_conventions(
         quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
     )
+
+
+@excel_function
+def CreateContractSpec(
+    name: Annotated[str, "The contract's name as the desk calls it, such as WTI."],
+    lot_size: Annotated[int, "The quantity in one lot, a whole number such as 1000."],
+    brokerage_rate_per_lot: Annotated[float, "The brokerage charged per lot, such as 3.00."],
+    clearing_rate_per_lot: Annotated[float, "The clearing fee charged per lot, such as 2.00."],
+) -> Handle[ContractSpec]:
+    """Creates a contract spec, the name, lot size and fees per lot of one contract, and shows
+    its handle, the text other formulas take as the spec."""
+    # The four facts are not checked yet: what must hold is a later task, noted in the builder.
+    return contract_spec(name, lot_size, brokerage_rate_per_lot, clearing_rate_per_lot)

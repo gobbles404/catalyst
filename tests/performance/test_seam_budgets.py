@@ -769,6 +769,30 @@ def test_market_conventions_are_five_texts_in_and_one_publication_out(
     assert numpy_calls(lambda: PATH["CreateMarketConventions"](*codes)) == {}
 
 
+# --- the fourth market definition: four scalars in, one publication out -----------------
+
+
+# A text, a whole number and two numbers, each through its rule, the whole number through the
+# number rule on its way; the builder and one publication, nothing asked of numpy.
+def test_a_contract_spec_is_four_scalars_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    facts = ("WTI", 1000.0, 3.0, 2.0)
+    PATH["CreateContractSpec"](*facts)
+    assert call_profile(lambda: PATH["CreateContractSpec"](*facts)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 4,
+        "_text": 1,
+        "_whole": 1,
+        "_number": 3,  # the lot size on its way to whole, then the two fees
+        "CreateContractSpec": 1,
+        "contract_spec": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["CreateContractSpec"](*facts)) == {}
+
+
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.
 def host_buffers(text_cell: bool) -> tuple[int, int, str, int]:
     kinds = (ctypes.c_uint8 * N)(*([0] * (N - 1) + [1 if text_cell else 0]))

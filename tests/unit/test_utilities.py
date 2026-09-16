@@ -15,6 +15,7 @@ from goosedove.excel.probes import probe
 from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
+from goosedove.market_definitions.contract_spec import ContractSpec
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_definitions.market_conventions import MarketConventions
@@ -120,6 +121,16 @@ def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows()
     ]
 
 
+# The lot size goes out as a number, as every whole number does on the sheet.
+def test_a_contract_spec_spills_its_four_fields_under_two_heading_rows() -> None:
+    handle = bridge.call("CreateContractSpec", ["WTI", 1000.0, 3.0, 2.0])
+    assert rows(read(handle)) == [
+        ["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"],
+        ["str", "int", "float", "float"],
+        ["WTI", 1000.0, 3.0, 2.0],
+    ]
+
+
 # --- a spill is the table its creator took ----------------------------------
 
 
@@ -195,4 +206,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         ExpirySchedule,
         HolidayCalendar,
         MarketConventions,
+        ContractSpec,
     } <= set(shown.registry)
