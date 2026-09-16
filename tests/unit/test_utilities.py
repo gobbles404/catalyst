@@ -16,6 +16,7 @@ from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
+from goosedove.market_definitions.holiday_calendar import HolidayCalendar
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -90,6 +91,19 @@ def test_a_schedule_spills_three_columns_with_options_and_two_without() -> None:
     ]
 
 
+# Serials for 1 January, 19 January and 16 February 2026.
+def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
+    holidays = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
+    handle = bridge.call("CreateHolidayCalendar", [holidays])
+    assert rows(read(handle)) == [
+        ["holiday"],
+        ["datetime64[D]"],
+        [46023.0],
+        [46041.0],
+        [46069.0],
+    ]
+
+
 # --- a spill is the table its creator took ----------------------------------
 
 
@@ -159,4 +173,4 @@ def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None
 
 
 def test_every_kind_a_creator_publishes_has_a_table() -> None:
-    assert {ValuationDate, DiscountCurve, ExpirySchedule} <= set(shown.registry)
+    assert {ValuationDate, DiscountCurve, ExpirySchedule, HolidayCalendar} <= set(shown.registry)

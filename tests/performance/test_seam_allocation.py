@@ -191,6 +191,21 @@ def test_an_expiry_schedule_keeps_a_copy_of_each_date_column() -> None:
     assert without <= 17 * contracts + 2 * SLACK
 
 
+def holiday_column(days: int) -> Cells:
+    """That many holidays as the sheet sends them, one serial per row, a week apart."""
+    return Cells.from_rows([[46023.0 + 7 * i] for i in range(days)])
+
+
+# A calendar keeps a copy of its column, 8 bytes per holiday, and on the way pays the column's
+# conversion to days and its look, as a schedule without options does: measured 2,908 bytes at
+# 100 holidays on 2026-09-16, about 17 bytes per holiday on top of a creator's small objects,
+# which twice the slack covers; 18,208 at 1,000 holidays and 171,208 at 10,000.
+def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
+    days = 100
+    holidays = holiday_column(days)
+    assert least_peak(lambda: ENTRY["CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
+
+
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])

@@ -1,5 +1,5 @@
-"""The worksheet functions of the market definitions: what an index is, as opposed to the globals
-every calculation starts from, each created once and reached by handle.
+"""The worksheet functions of the market definitions: what an index or a market is, as opposed
+to the globals every calculation starts from, each created once and reached by handle.
 docs/library/market-definitions/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
@@ -11,6 +11,7 @@ from typing import Annotated
 
 from goosedove.excel.bridge import DateColumn, Handle, TextColumn, excel_function
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.market_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 
 
 @excel_function
@@ -31,3 +32,15 @@ def CreateExpirySchedule(
     """Creates an expiry schedule from the contract codes of one index and their expiry dates,
     and shows its handle, the text other formulas take as the schedule."""
     return expiry_schedule(future_code, future_expiry, option_expiry)
+
+
+@excel_function
+def CreateHolidayCalendar(
+    holiday: Annotated[
+        DateColumn,
+        "The column of dates the market is closed, such as A2:A11, one holiday per row.",
+    ],
+) -> Handle[HolidayCalendar]:
+    """Creates a holiday calendar from the days one market is closed and shows its handle, the
+    text other formulas take as the calendar."""
+    return holiday_calendar(holiday)

@@ -84,6 +84,16 @@ $formulas = [ordered]@{
     "=LEFT(AI2,16)"               = "expiry_schedule:"
     "=CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
     "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
+    # The holiday calendar: a creator over three days and one over a single cell, the first read
+    # back through ReadHandle, a blank in the column, and a row where a column is expected.
+    "=LEFT(AM1,17)"               = "holiday_calendar:"
+    "=LEFT(AM2,17)"               = "holiday_calendar:"
+    "=INDEX(ReadHandle(AM1),1,1)" = "holiday"
+    "=INDEX(ReadHandle(AM1),2,1)" = "datetime64[D]"
+    "=INDEX(ReadHandle(AM1),4,1)" = "46041"
+    "=ROWS(ReadHandle(AM2))"      = "3"
+    "=CreateHolidayCalendar(AL2:AL4)" = "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    "=CreateHolidayCalendar(AK2:AL2)" = "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -135,6 +145,13 @@ $cells = [ordered]@{
     "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"
     "AI1" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
     "AI2" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7)"
+    # A holiday calendar: three days one market is closed, a copy of the column with a blank, and
+    # two creator cells, one over the column and one over a single cell.
+    "AK2" = "1-Jan-2026"; "AL2" = "1-Jan-2026"
+    "AK3" = "19-Jan-2026"
+    "AK4" = "16-Feb-2026"; "AL4" = "16-Feb-2026"
+    "AM1" = "=CreateHolidayCalendar(AK2:AK4)"
+    "AM2" = "=CreateHolidayCalendar(AK2)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

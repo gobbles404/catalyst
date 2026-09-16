@@ -335,13 +335,13 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the bridge itself: the declared types, `Cells` and `cells_from_buffers`, `MISSING`, the accept and result rules, the handle store and its two rules, registration, the prepared path and the three failures it catches, `describe`, `Ping` | `src/goosedove/excel/bridge.py` |
 | the probes | `src/goosedove/excel/probes.py` |
 | the globals' creators | `src/goosedove/excel/globals.py` |
-| the market definitions' creator | `src/goosedove/excel/market_definitions.py` |
+| the market definitions' creators | `src/goosedove/excel/market_definitions.py` |
 | `ReadHandle`, and the table each kind shows | `src/goosedove/excel/utilities.py` |
 | the library's first objects, a valuation date and a discount curve, and their builders | `src/goosedove/globals/` |
-| the first market definition, an expiry schedule, and its builder | `src/goosedove/market_definitions/` |
+| the market definitions, an expiry schedule and a holiday calendar, and their builders | `src/goosedove/market_definitions/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
-| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_market_definitions.py`, `test_utilities.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py` |
+| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_market_definitions.py`, `test_utilities.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py`, `test_holiday_calendar.py` |
 | the exact text of every scalar rejection, the form of an argument that may be left out, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
 | every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |

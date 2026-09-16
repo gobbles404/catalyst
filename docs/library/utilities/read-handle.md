@@ -55,6 +55,7 @@ What each kind shows:
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day |
 | `expiry_schedule` | `future_code`, `future_expiry`, and `option_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
+| `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
 
 `=ReadHandle(B2)` on `=CreateValuationDate(A2, 0.5)`:
 
@@ -75,6 +76,8 @@ What each kind shows:
 | V26 | 22-Sep-2026 | 17-Sep-2026 |
 | X26 | 20-Oct-2026 | 15-Oct-2026 |
 
+`=ReadHandle(A12)` on the ten-day calendar of [holiday-calendar.md](../market-definitions/holiday-calendar.md) shows one column, `holiday` over `datetime64[D]`, then the ten days as given.
+
 A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/goosedove/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
 
 ## Tests
@@ -86,11 +89,12 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | a valuation date: the two headers, the two types, one row, the date and the fraction exactly | example |
 | the three-day curve: the two headers, the two types, three rows, dates as serials, factors exactly | example |
 | the six-contract schedule with options: three columns; without options: two | example |
+| a three-day calendar: one column of dates under its two heading rows | example |
 | a curve's spill, headers and body, fed back to `CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
 | a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |
-| each of the three kinds inspected on a real sheet, and a schedule without options | Excel smoke |
+| each kind inspected on a real sheet, with a schedule without options and a calendar of one day | Excel smoke |
 
 ## Not here
 
