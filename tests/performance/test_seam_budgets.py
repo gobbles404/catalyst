@@ -859,8 +859,9 @@ def curve_columns(contracts: int) -> tuple[Cells, Cells]:
 # Ten years of monthly contracts: the text column handed over as it is, after one pass over the
 # tuple for an empty text, and the number column accepted on the host's summary alone, no look at
 # the kinds of either, the builder's one copy and one publication: fifteen calls across twelve
-# functions, the shape and kind rules once per column. What a welded table of the same two columns would add is in
-# test_a_table_in_itemized: the header row, one look per column and the gathers.
+# functions, the shape and kind rules once per column. What a welded table of the same two
+# columns would add is in test_a_table_in_itemized: the header row, one look per column and the
+# gathers.
 def test_a_futures_curve_is_two_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
