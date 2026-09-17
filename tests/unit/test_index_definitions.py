@@ -1,4 +1,4 @@
-"""The market definitions through the seam: what each creator shows for a right and a wrong
+"""The index definitions through the seam: what each creator shows for a right and a wrong
 call, and that its handle resolves to the object the seam kept."""
 
 import re
@@ -13,10 +13,10 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
-from goosedove.market_definitions.contract_spec import ContractSpec
-from goosedove.market_definitions.expiry_schedule import ExpirySchedule
-from goosedove.market_definitions.holiday_calendar import HolidayCalendar
-from goosedove.market_definitions.market_conventions import MarketConventions
+from goosedove.index_definitions.contract_spec import ContractSpec
+from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.index_conventions import IndexConventions
 
 # The first three contracts of the page's sample as the sheet sends them: codes as text, dates as
 # serials, 19 May, 22 June and 21 July 2026 for the futures and a few days earlier for the options.
@@ -33,7 +33,7 @@ CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
 # The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
 # barrel, settled in dollars, its quantity a volume stated in barrels.
 UNITS = ["USD", "BBL", "USD", "volume", "BBL"]
-CONVENTIONS = re.compile(r"market_conventions:[0-9a-f]{6}:([0-9]{6})")
+CONVENTIONS = re.compile(r"index_conventions:[0-9a-f]{6}:([0-9]{6})")
 
 # The spec page's sample as the sheet sends it: a name, and three numbers, the lot size whole.
 FACTS = ["WTI", 1000.0, 3.0, 2.0]
@@ -54,7 +54,7 @@ def ReadExpirySchedule(schedule: Handle[ExpirySchedule]) -> str:
 
 
 def a_schedule(*columns: object) -> str:
-    text = bridge.call("CreateExpirySchedule", list(columns))
+    text = bridge.call("_CreateExpirySchedule", list(columns))
     assert isinstance(text, str) and HANDLE.fullmatch(text), text
     return text
 
@@ -82,28 +82,29 @@ def test_the_third_column_left_out_is_an_index_without_options() -> None:
     [
         (
             [CODES, Cells.from_rows([[46161.0], [46195.0]]), OPTIONS],
-            "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
+            "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
             "one per future_code",
         ),
         (
             [CODES, FUTURES, Cells.from_rows([[46156.0], [None], [46219.0]])],
-            "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date",
+            "#ERROR _CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date",
         ),
         (
             [CODES, FUTURES, None],
-            "#ERROR CreateExpirySchedule: option_expiry is blank, expected column of dates",
+            "#ERROR _CreateExpirySchedule: option_expiry is blank, expected column of dates",
         ),
         (
             [Cells.from_rows([["m26"], [46161.0], ["q26"]]), FUTURES, MISSING],
-            "#ERROR CreateExpirySchedule: future_code cell (2, 1) is number 46161.0, expected text",
+            "#ERROR _CreateExpirySchedule: future_code cell (2, 1) is number 46161.0, "
+            "expected text",
         ),
         (
             [CODES, Cells.from_rows([[46161.0, 46195.0, 46224.0]]), MISSING],
-            "#ERROR CreateExpirySchedule: future_expiry is 1x3 array, expected column of dates",
+            "#ERROR _CreateExpirySchedule: future_expiry is 1x3 array, expected column of dates",
         ),
         (
             [CODES, MISSING, MISSING],
-            "#ERROR CreateExpirySchedule: future_expiry is missing, expected column of dates",
+            "#ERROR _CreateExpirySchedule: future_expiry is missing, expected column of dates",
         ),
     ],
     ids=[
@@ -116,29 +117,29 @@ def test_the_third_column_left_out_is_an_index_without_options() -> None:
     ],
 )
 def test_a_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
-    assert bridge.call("CreateExpirySchedule", args) == text
+    assert bridge.call("_CreateExpirySchedule", args) == text
 
 
 # The publication number moves only when an object is stored, so a failed creator leaves no gap.
 def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     before = number(a_schedule(CODES, FUTURES, MISSING))
     short = Cells.from_rows([[46161.0], [46195.0]])
-    assert bridge.call("CreateExpirySchedule", [CODES, short, OPTIONS]) == (
-        "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
+    assert bridge.call("_CreateExpirySchedule", [CODES, short, OPTIONS]) == (
+        "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, "
         "one per future_code"
     )
     assert number(a_schedule(CODES, FUTURES, MISSING)) == before + 1
 
 
 def test_a_handle_of_another_kind_is_not_a_schedule() -> None:
-    other = cast(str, bridge.call("CreateValuationDate", [46161.0, 0.5]))
+    other = cast(str, bridge.call("_CreateValuationDate", [46161.0, 0.5]))
     assert bridge.call("ReadExpirySchedule", [other]) == (
         f"#ERROR ReadExpirySchedule: schedule is valuation date handle {other!r}, "
         "expected expiry schedule handle"
     )
 
 
-# --- CreateHolidayCalendar ------------------------------------------------------
+# --- _CreateHolidayCalendar ------------------------------------------------------
 
 
 # The library has no consumer of a calendar yet, so this hidden reader proves that a handle
@@ -149,7 +150,7 @@ def ReadHolidayCalendar(calendar: Handle[HolidayCalendar]) -> str:
 
 
 def a_calendar(column: object) -> str:
-    text = bridge.call("CreateHolidayCalendar", [column])
+    text = bridge.call("_CreateHolidayCalendar", [column])
     assert isinstance(text, str) and CALENDAR.fullmatch(text), text
     return text
 
@@ -170,22 +171,22 @@ def test_a_single_cell_is_a_calendar_of_one_day() -> None:
     [
         (
             Cells.from_rows([[46023.0], [None], [46069.0]]),
-            "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date",
+            "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date",
         ),
         (
             Cells.from_rows([[46023.0], ["Christmas"], [46069.0]]),
-            "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is text 'Christmas', expected date",
+            "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is text 'Christmas', expected date",
         ),
         (
             Cells.from_rows([[46023.0], [46041.5], [46069.0]]),
-            "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is number 46041.5, expected date",
+            "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is number 46041.5, expected date",
         ),
         (
             Cells.from_rows([[46023.0, 46041.0, 46069.0]]),
-            "#ERROR CreateHolidayCalendar: holiday is 1x3 array, expected column of dates",
+            "#ERROR _CreateHolidayCalendar: holiday is 1x3 array, expected column of dates",
         ),
-        (None, "#ERROR CreateHolidayCalendar: holiday is blank, expected column of dates"),
-        (MISSING, "#ERROR CreateHolidayCalendar: holiday is missing, expected column of dates"),
+        (None, "#ERROR _CreateHolidayCalendar: holiday is blank, expected column of dates"),
+        (MISSING, "#ERROR _CreateHolidayCalendar: holiday is missing, expected column of dates"),
     ],
     ids=[
         "a blank in the column",
@@ -197,15 +198,15 @@ def test_a_single_cell_is_a_calendar_of_one_day() -> None:
     ],
 )
 def test_a_calendar_that_cannot_be_made_says_why(column: object, text: str) -> None:
-    assert bridge.call("CreateHolidayCalendar", [column]) == text
+    assert bridge.call("_CreateHolidayCalendar", [column]) == text
 
 
 # A rejected column stops the call before the function runs, so nothing is published and the
 # publication number does not move.
 def test_a_rejected_column_publishes_no_object_and_no_handle() -> None:
     before = number(a_calendar(HOLIDAYS), CALENDAR)
-    assert bridge.call("CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]])]) == (
-        "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    assert bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]])]) == (
+        "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
     )
     assert number(a_calendar(HOLIDAYS), CALENDAR) == before + 1
 
@@ -218,13 +219,13 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
     )
 
 
-# --- CreateMarketConventions ----------------------------------------------------
+# --- _CreateIndexConventions ----------------------------------------------------
 
 
 # The library has no consumer of the conventions yet, so this hidden reader proves that a handle
 # resolves to the conventions the seam kept, the five codes in their fields.
 @probe
-def ReadMarketConventions(conventions: Handle[MarketConventions]) -> str:
+def ReadIndexConventions(conventions: Handle[IndexConventions]) -> str:
     return " ".join(
         (
             conventions.quote_currency_unit,
@@ -237,13 +238,13 @@ def ReadMarketConventions(conventions: Handle[MarketConventions]) -> str:
 
 
 def the_conventions(*codes: object) -> str:
-    text = bridge.call("CreateMarketConventions", list(codes))
+    text = bridge.call("_CreateIndexConventions", list(codes))
     assert isinstance(text, str) and CONVENTIONS.fullmatch(text), text
     return text
 
 
-def test_market_conventions_are_created_from_five_codes_and_read_back_in_order() -> None:
-    assert bridge.call("ReadMarketConventions", [the_conventions(*UNITS)]) == (
+def test_index_conventions_are_created_from_five_codes_and_read_back_in_order() -> None:
+    assert bridge.call("ReadIndexConventions", [the_conventions(*UNITS)]) == (
         "USD BBL USD volume BBL"
     )
 
@@ -254,27 +255,27 @@ def test_market_conventions_are_created_from_five_codes_and_read_back_in_order()
     [
         (
             ["USD", "BBL", "USD", "volume", None],
-            "#ERROR CreateMarketConventions: quantity_unit is blank, expected text",
+            "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text",
         ),
         (
             ["USD", "BBL", 1.0, "volume", "BBL"],
-            "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text",
+            "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text",
         ),
         (
             ["", "BBL", "USD", "volume", "BBL"],
-            "#ERROR CreateMarketConventions: quote_currency_unit is empty text, expected text",
+            "#ERROR _CreateIndexConventions: quote_currency_unit is empty text, expected text",
         ),
         (
             ["USD", Cells.from_rows([["BBL"]]), "USD", "volume", "BBL"],
-            "#ERROR CreateMarketConventions: quote_quantity_unit is 1x1 array, expected text",
+            "#ERROR _CreateIndexConventions: quote_quantity_unit is 1x1 array, expected text",
         ),
         (
             ["USD", "BBL", "USD", "volume", MISSING],
-            "#ERROR CreateMarketConventions: quantity_unit is missing, expected text",
+            "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text",
         ),
         (
             ["USD", "BBL", True, None, "BBL"],
-            "#ERROR CreateMarketConventions: currency_unit is boolean TRUE, expected text",
+            "#ERROR _CreateIndexConventions: currency_unit is boolean TRUE, expected text",
         ),
     ],
     ids=[
@@ -286,19 +287,19 @@ def test_market_conventions_are_created_from_five_codes_and_read_back_in_order()
         "two wrong, the earlier named",
     ],
 )
-def test_market_conventions_that_cannot_be_made_say_why(args: list[object], text: str) -> None:
-    assert bridge.call("CreateMarketConventions", args) == text
+def test_index_conventions_that_cannot_be_made_say_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreateIndexConventions", args) == text
 
 
-def test_a_handle_of_another_kind_is_not_market_conventions() -> None:
+def test_a_handle_of_another_kind_is_not_index_conventions() -> None:
     other = a_calendar(HOLIDAYS)
-    assert bridge.call("ReadMarketConventions", [other]) == (
-        f"#ERROR ReadMarketConventions: conventions is holiday calendar handle {other!r}, "
-        "expected market conventions handle"
+    assert bridge.call("ReadIndexConventions", [other]) == (
+        f"#ERROR ReadIndexConventions: conventions is holiday calendar handle {other!r}, "
+        "expected index conventions handle"
     )
 
 
-# --- CreateContractSpec -----------------------------------------------------------
+# --- _CreateContractSpec -----------------------------------------------------------
 
 
 # The library has no consumer of a spec yet, so this hidden reader proves that a handle resolves
@@ -309,7 +310,7 @@ def ReadContractSpec(spec: Handle[ContractSpec]) -> str:
 
 
 def a_spec(*facts: object) -> str:
-    text = bridge.call("CreateContractSpec", list(facts))
+    text = bridge.call("_CreateContractSpec", list(facts))
     assert isinstance(text, str) and SPEC.fullmatch(text), text
     return text
 
@@ -324,26 +325,26 @@ def test_a_contract_spec_is_created_from_four_facts_and_read_back_typed() -> Non
     [
         (
             ["WTI", 2.5, 3.0, 2.0],
-            "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number",
+            "#ERROR _CreateContractSpec: lot_size is number 2.5, expected whole number",
         ),
         (
             ["WTI", True, 3.0, 2.0],
-            "#ERROR CreateContractSpec: lot_size is boolean TRUE, expected whole number",
+            "#ERROR _CreateContractSpec: lot_size is boolean TRUE, expected whole number",
         ),
-        ([None, 1000.0, 3.0, 2.0], "#ERROR CreateContractSpec: name is blank, expected text"),
+        ([None, 1000.0, 3.0, 2.0], "#ERROR _CreateContractSpec: name is blank, expected text"),
         (
             ["WTI", 1000.0, "three", 2.0],
-            "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'three', expected number",
+            "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'three', expected number",
         ),
         (
             ["WTI", 1000.0, 3.0, MISSING],
-            "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number",
+            "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number",
         ),
         (
             ["WTI", Cells.from_rows([[1000.0]]), 3.0, 2.0],
-            "#ERROR CreateContractSpec: lot_size is 1x1 array, expected whole number",
+            "#ERROR _CreateContractSpec: lot_size is 1x1 array, expected whole number",
         ),
-        ([1.0, 2.5, 3.0, 2.0], "#ERROR CreateContractSpec: name is number 1.0, expected text"),
+        ([1.0, 2.5, 3.0, 2.0], "#ERROR _CreateContractSpec: name is number 1.0, expected text"),
     ],
     ids=[
         "a lot size with a fraction",
@@ -356,23 +357,23 @@ def test_a_contract_spec_is_created_from_four_facts_and_read_back_typed() -> Non
     ],
 )
 def test_a_contract_spec_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
-    assert bridge.call("CreateContractSpec", args) == text
+    assert bridge.call("_CreateContractSpec", args) == text
 
 
 def test_a_handle_of_another_kind_is_not_a_contract_spec() -> None:
     other = the_conventions(*UNITS)
     assert bridge.call("ReadContractSpec", [other]) == (
-        f"#ERROR ReadContractSpec: spec is market conventions handle {other!r}, "
+        f"#ERROR ReadContractSpec: spec is index conventions handle {other!r}, "
         "expected contract spec handle"
     )
 
 
 # The seam holds one line on both sides of a lot size: every whole number a cell holds exactly is
-# created and read back through ReadHandle as it was, and one beyond it is refused on creation,
+# created and read back through util_ReadHandle as it was, and one beyond it is refused on creation,
 # in the way out's words, rather than making a spec the reader cannot show.
 @given(lot_size=st.integers(-(2**53), 2**53))
 def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
-    spill = bridge.call("ReadHandle", [a_spec("WTI", float(lot_size), 3.0, 2.0)])
+    spill = bridge.call("util_ReadHandle", [a_spec("WTI", float(lot_size), 3.0, 2.0)])
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
     assert slots[2, 1] == float(lot_size)
@@ -382,7 +383,7 @@ def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: in
 def test_a_lot_size_beyond_what_a_cell_holds_exactly_is_refused_on_creation(
     lot_size: float,
 ) -> None:
-    assert bridge.call("CreateContractSpec", ["WTI", lot_size, 3.0, 2.0]) == (
-        f"#ERROR CreateContractSpec: lot_size is number {lot_size!r}, "
+    assert bridge.call("_CreateContractSpec", ["WTI", lot_size, 3.0, 2.0]) == (
+        f"#ERROR _CreateContractSpec: lot_size is number {lot_size!r}, "
         "beyond what a cell holds exactly"
     )

@@ -1,5 +1,5 @@
 """A holiday calendar: the days one market is closed, listed one by one as the desk keeps them.
-docs/library/market-definitions/holiday-calendar.md is the page."""
+docs/library/index-definitions/holiday-calendar.md is the page."""
 
 from dataclasses import dataclass
 

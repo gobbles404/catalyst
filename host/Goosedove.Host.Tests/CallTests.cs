@@ -106,31 +106,31 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "Grid", new object[] { 2.5, 3.0 }, "#ERROR Grid: rows is number 2.5, expected whole number" };
             yield return new object[] { "Fail", new object[] { }, "#ERROR Fail: ValueError: as asked" };
             // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
-            yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
-            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
+            yield return new object[] { "_CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
             // The curve from anchors: dates that run backwards are never sorted, and a span no sheet could show is refused.
-            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
-            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
-            yield return new object[] { "ReadHandle", new object[] { "x" }, "#ERROR ReadHandle: handle is text 'x' naming no live object, expected a handle" };
-            yield return new object[] { "ReadHandle", new object[] { 46276.0 }, "#ERROR ReadHandle: handle is number 46276.0, expected a handle" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
+            yield return new object[] { "util_ReadHandle", new object[] { "x" }, "#ERROR util_ReadHandle: handle is text 'x' naming no live object, expected a handle" };
+            yield return new object[] { "util_ReadHandle", new object[] { 46276.0 }, "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
-            yield return new object[] { "ReadHandle", new object[] { "#ERROR CreateDiscountCurve: ValueError: x" }, "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" };
-            yield return new object[] { "ReadHandle", new object[] { "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" }, "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
+            yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             // The expiry schedule: a column of codes and two of dates, one row per code, the third column optional.
-            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
-            yield return new object[] { "CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR _CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
-            yield return new object[] { "CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
-            yield return new object[] { "CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
-            // The market conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
+            yield return new object[] { "_CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
+            // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
             // The contract spec: a text, a whole number and two numbers; a lot size with a fraction and one beyond what a cell holds exactly, text where a fee is expected, and a fee left out.
-            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 2.5, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number" };
-            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
-            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, "x", 2.0 }, "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number" };
-            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, 3.0, ExcelMissing.Value }, "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number" };
+            yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 2.5, 3.0, 2.0 }, "#ERROR _CreateContractSpec: lot_size is number 2.5, expected whole number" };
+            yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR _CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
+            yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1000.0, "x", 2.0 }, "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number" };
+            yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1000.0, 3.0, ExcelMissing.Value }, "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -140,39 +140,39 @@ namespace Goosedove.Host.Tests
         {
             var codes = Column("m26", "n26", "q26");
             var futures = Column(46161.0, 46195.0, 46224.0);
-            var withOptions = (string)Seam.Call("CreateExpirySchedule", codes, futures, Column(46156.0, 46189.0, 46219.0));
-            var withoutOptions = (string)Seam.Call("CreateExpirySchedule", codes, futures, ExcelMissing.Value);
+            var withOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, Column(46156.0, 46189.0, 46219.0));
+            var withoutOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value);
             Assert.StartsWith("expiry_schedule:", withOptions);
             Assert.StartsWith("expiry_schedule:", withoutOptions);
             Assert.NotEqual(withOptions, withoutOptions);
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
-        // ReadHandle spills it back, the header, the type, then a row per holiday.
+        // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
         public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()
         {
-            var handle = (string)Seam.Call("CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
+            var handle = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
             Assert.StartsWith("holiday_calendar:", handle);
-            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(5, spill.GetLength(0));
             Assert.Equal(1, spill.GetLength(1));
             Assert.Equal("holiday", spill[0, 0]);
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal(46041.0, spill[3, 0]);
-            var oneDay = (string)Seam.Call("CreateHolidayCalendar", 46023.0);
+            var oneDay = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
             Assert.NotEqual(handle, oneDay);
-            Assert.Equal(3, ((object[,])Seam.Call("ReadHandle", oneDay)).GetLength(0));
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
         }
 
-        // Market conventions: five codes make one, and ReadHandle spills them back, the five
+        // Index conventions: five codes make one, and util_ReadHandle spills them back, the five
         // headers, five types, then the codes as typed in one row.
         [Fact]
-        public void market_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
+        public void index_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("CreateMarketConventions", "USD", "BBL", "USD", "volume", "BBL");
-            Assert.StartsWith("market_conventions:", handle);
-            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            var handle = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "volume", "BBL");
+            Assert.StartsWith("index_conventions:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
             Assert.Equal("quantity_type", spill[0, 3]);
@@ -181,14 +181,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal("BBL", spill[2, 4]);
         }
 
-        // A contract spec: four facts make one, and ReadHandle spills them back, the four headers,
+        // A contract spec: four facts make one, and util_ReadHandle spills them back, the four headers,
         // four types, then the name as text and the three numbers as numbers in one row.
         [Fact]
         public void a_contract_spec_is_created_from_four_facts_and_read_back_through_its_handle()
         {
-            var handle = (string)Seam.Call("CreateContractSpec", "WTI", 1000.0, 3.0, 2.0);
+            var handle = (string)Seam.Call("_CreateContractSpec", "WTI", 1000.0, 3.0, 2.0);
             Assert.StartsWith("contract_spec:", handle);
-            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(4, spill.GetLength(1));
             Assert.Equal("lot_size", spill[0, 1]);
@@ -211,14 +211,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal(2.5, array[1, 1]);
         }
 
-        // A curve from anchors: three anchors over eleven days make eleven days, and ReadHandle
+        // A curve from anchors: three anchors over eleven days make eleven days, and util_ReadHandle
         // spills them all, the anchors exactly and a day between on the straight line.
         [Fact]
         public void a_curve_from_anchors_spills_every_day_between_them()
         {
             var anchors = new object[,] { { 46276.0, 1.0 }, { 46279.0, 0.9997 }, { 46286.0, 0.999 } };
-            var handle = (string)Seam.Call("CreateDiscountCurve", Row("date", "discount_factor"), anchors);
-            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            var handle = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), anchors);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(13, spill.GetLength(0));
             Assert.Equal(46276.0, spill[2, 0]);
             Assert.Equal(1.0, spill[2, 1]);
@@ -228,15 +228,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.9998, (double)spill[4, 1], 12);
         }
 
-        // A handle: the creator's text stands for the curve, ReadHandle spills the curve's table
+        // A handle: the creator's text stands for the curve, util_ReadHandle spills the curve's table
         // back through it, headers, types, then a row per day, and the headers bind by name in
         // either order.
         [Fact]
         public void a_curve_is_created_as_a_handle_and_read_back_through_it()
         {
-            var handle = (string)Seam.Call("CreateDiscountCurve", Row("date", "discount_factor"), Curve());
+            var handle = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), Curve());
             Assert.StartsWith("discount_curve:", handle);
-            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(5, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
             Assert.Equal("date", spill[0, 0]);
@@ -244,9 +244,9 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46277.0, spill[3, 0]);
             Assert.Equal(0.9999, spill[3, 1]);
             var swapped = new object[,] { { 1.0, 46276.0 }, { 0.9999, 46277.0 }, { 0.9998, 46278.0 } };
-            var reversed = (string)Seam.Call("CreateDiscountCurve", Row("discount_factor", "date"), swapped);
+            var reversed = (string)Seam.Call("_CreateDiscountCurve", Row("discount_factor", "date"), swapped);
             Assert.NotEqual(handle, reversed);
-            var again = (object[,])Seam.Call("ReadHandle", reversed);
+            var again = (object[,])Seam.Call("util_ReadHandle", reversed);
             Assert.Equal(0.9998, again[4, 1]);
         }
 

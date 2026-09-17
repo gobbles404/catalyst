@@ -47,7 +47,7 @@ flowchart TD
     Error -->|"nothing registered"| Name["Python functions are names Excel does not know, and GoosedoveStatus shows the error"]
 ```
 
-Every probe is hidden: `=Zero()` works, and the wizard never lists Zero. `=Add(1,2)` returns 3 and proves a number goes in and out, at the seam's cost alone. There are sixteen in `probes.py`; Ping and the library's functions, in `globals.py` and `market_definitions.py`, are the Python functions registered visibly. Because the description Excel-DNA is given is the docstring, a probe's "Probe: ..." line is what the wizard would show if it were not hidden.
+Every probe is hidden: `=Zero()` works, and the wizard never lists Zero. `=Add(1,2)` returns 3 and proves a number goes in and out, at the seam's cost alone. There are sixteen in `probes.py`; Ping and the library's functions, in `globals.py` and `index_definitions.py`, are the Python functions registered visibly. Because the description Excel-DNA is given is the docstring, a probe's "Probe: ..." line is what the wizard would show if it were not hidden.
 
 Explicit exports is a setting in the project file under which only methods marked as worksheet functions reach the sheet by themselves; everything else the sheet can call is registered on purpose. Two C# methods are marked, GoosedoveStatus and HostAdd. The Python functions arrive through the lists above. A public C# method that is not marked is not a worksheet function: `=RegisterAll()` shows `#NAME?`, and the smoke test, the one test that runs in a real Excel, checks that it does.
 

@@ -5,6 +5,6 @@ is complete by the time the host asks for it. A new module of worksheet function
 added here and nowhere else.
 """
 
-from goosedove.excel import bridge, globals, market_definitions, probes, utilities
+from goosedove.excel import bridge, globals, index_definitions, probes, utilities
 
-__all__ = ["bridge", "globals", "market_definitions", "probes", "utilities"]
+__all__ = ["bridge", "globals", "index_definitions", "probes", "utilities"]

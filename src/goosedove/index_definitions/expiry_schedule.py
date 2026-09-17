@@ -1,6 +1,6 @@
 """An expiry schedule: the contract months of one index, each contract's code, the day its future
 expires and, for an index that has options, the day its option expires.
-docs/library/market-definitions/expiry-schedule.md is the page."""
+docs/library/index-definitions/expiry-schedule.md is the page."""
 
 from dataclasses import dataclass
 

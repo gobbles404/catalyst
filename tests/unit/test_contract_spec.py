@@ -5,7 +5,7 @@ import dataclasses
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.market_definitions.contract_spec import contract_spec
+from goosedove.index_definitions.contract_spec import contract_spec
 
 # The page's sample: a contract of a thousand units a lot, with its two fees per lot.
 SAMPLE = ("WTI", 1000, 3.0, 2.0)

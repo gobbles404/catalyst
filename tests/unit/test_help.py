@@ -25,7 +25,7 @@ SPECS = {
 
 
 def test_the_valuation_date_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateValuationDate"]
+    description, arguments, hidden = SPECS["_CreateValuationDate"]
     assert not hidden
     # A docstring may wrap in the code; its lines are joined into one for the sheet.
     assert description == (
@@ -42,7 +42,7 @@ def test_the_valuation_date_creator_explains_itself() -> None:
 
 
 def test_the_curve_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateDiscountCurve"]
+    description, arguments, hidden = SPECS["_CreateDiscountCurve"]
     assert not hidden
     assert description == (
         "Creates a discount curve from anchor dates and their discount factors, every day "
@@ -64,7 +64,7 @@ def test_the_curve_creator_explains_itself() -> None:
 
 
 def test_the_handle_reader_explains_itself() -> None:
-    description, arguments, hidden = SPECS["ReadHandle"]
+    description, arguments, hidden = SPECS["util_ReadHandle"]
     assert not hidden
     assert description == (
         "Reads the object behind a handle and spills it as a table: its headers, a row of "
@@ -76,7 +76,7 @@ def test_the_handle_reader_explains_itself() -> None:
 
 
 def test_the_schedule_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateExpirySchedule"]
+    description, arguments, hidden = SPECS["_CreateExpirySchedule"]
     assert not hidden
     assert description == (
         "Creates an expiry schedule from the contract codes of one index and their expiry dates, "
@@ -100,7 +100,7 @@ def test_the_schedule_creator_explains_itself() -> None:
 
 
 def test_the_calendar_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateHolidayCalendar"]
+    description, arguments, hidden = SPECS["_CreateHolidayCalendar"]
     assert not hidden
     assert description == (
         "Creates a holiday calendar from the days one market is closed and shows its handle, "
@@ -115,10 +115,10 @@ def test_the_calendar_creator_explains_itself() -> None:
 
 
 def test_the_conventions_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateMarketConventions"]
+    description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden
     assert description == (
-        "Creates the market conventions of one index, the units it is quoted, settled and "
+        "Creates the index conventions of one index, the units it is quoted, settled and "
         "measured in, and shows its handle, the text other formulas take as the conventions."
     )
     assert arguments == [
@@ -137,7 +137,7 @@ def test_the_conventions_creator_explains_itself() -> None:
 
 
 def test_the_spec_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["CreateContractSpec"]
+    description, arguments, hidden = SPECS["_CreateContractSpec"]
     assert not hidden
     assert description == (
         "Creates a contract spec, the name, lot size and fees per lot of one contract, and "

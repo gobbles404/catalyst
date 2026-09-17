@@ -10,7 +10,7 @@ A contract month is a unit of its own, as a day is: `datetime64[M]` in the libra
 
 ## Codes
 
-One spelling: a month letter and two digits, `M26`, matched exactly, never trimmed or re-cased, as unit codes are ([conventions.md](conventions.md)). The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. `CreateExpirySchedule`'s sample, `m26` beside `V26`, moves to `M26` in the pull request whose builder first reads codes.
+One spelling: a month letter and two digits, `M26`, matched exactly, never trimmed or re-cased, as unit codes are ([conventions.md](conventions.md)). The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. `_CreateExpirySchedule`'s sample, `m26` beside `V26`, moves to `M26` in the pull request whose builder first reads codes.
 
 | Letter | F | G | H | J | K | M | N | Q | U | V | X | Z |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|

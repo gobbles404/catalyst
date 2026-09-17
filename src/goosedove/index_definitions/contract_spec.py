@@ -1,5 +1,5 @@
 """A contract spec: the name of one contract, the quantity in one lot of it, and the brokerage
-and clearing charged per lot. docs/library/market-definitions/contract-spec.md is the page."""
+and clearing charged per lot. docs/library/index-definitions/contract-spec.md is the page."""
 
 from dataclasses import dataclass
 

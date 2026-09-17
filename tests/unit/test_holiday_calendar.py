@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.market_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.holiday_calendar import holiday_calendar
 
 EPOCH = np.datetime64("1899-12-30")
 

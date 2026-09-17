@@ -9,10 +9,10 @@ A handle is text in a cell that stands for an object the add-in holds in memory,
 ```excel
 A2   11-Sep-2026
 B2   0.5
-C2   =CreateValuationDate(A2, B2)      displays valuation_date:3f9a1c:000001
+C2   =_CreateValuationDate(A2, B2)      displays valuation_date:3f9a1c:000001
 ```
 
-The shared workbook `workbooks/handles.xlsx` holds this sheet, the curve's, and a block for each creator built since, its inputs and creator on the left and `ReadHandle` spilling the object on the right, with a `notes` column for whoever is looking at it: `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens it with the add-in, and `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints it as its cells show.
+The shared workbook `workbooks/handles.xlsx` holds this sheet, the curve's, and a block for each creator built since, its inputs and creator on the left and `util_ReadHandle` spilling the object on the right, with a `notes` column for whoever is looking at it: `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens it with the add-in, and `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints it as its cells show.
 
 The creator builds a Python object holding a numpy day and a float. The seam retains that object and displays its handle in `C2`. Another formula refers to `C2`, or to a defined name referring to it; the seam resolves the handle once and hands the library the object. Reading it does not rebuild it. One valuation-date creator per workbook is the expected case, not an enforced singleton: the store holds many independent objects.
 
@@ -24,7 +24,7 @@ A creator formula returns a handle into its cell. A consumer refers to that cell
 Data!A1:B1    date / discount_factor headers
 Data!A2:B15   the daily table
 
-Inputs!B2     =CreateDiscountCurve(Data!A1:B1, Data!A2:B15)
+Inputs!B2     =_CreateDiscountCurve(Data!A1:B1, Data!A2:B15)
               displays discount_curve:3f9a1c:000017
 
 Defined name  DeskCurve refers to =Inputs!$B$2
@@ -97,7 +97,7 @@ The old object is never mutated or retargeted; there is no retained version hist
 
 ## Errors are text
 
-The seam returns failures as text beginning `#ERROR `, not as Excel error values. A failed creator's cell holds that text, and a consumer referring to it receives the text as its handle argument. The resolver recognises the prefix and fails as *the creator failed*, carrying the creator's own text whole at the end, `curve is the creator's failure, expected discount curve handle: #ERROR CreateDiscountCurve: ...`, not as an unknown handle, which would send the user looking for a store problem that does not exist. A consumer of that consumer relays the same text: the creator's failure is taken out of the relay and carried on unchanged, never quoted again, so a chain of any length shows one message. Built.
+The seam returns failures as text beginning `#ERROR `, not as Excel error values. A failed creator's cell holds that text, and a consumer referring to it receives the text as its handle argument. The resolver recognises the prefix and fails as *the creator failed*, carrying the creator's own text whole at the end, `curve is the creator's failure, expected discount curve handle: #ERROR _CreateDiscountCurve: ...`, not as an unknown handle, which would send the user looking for a store problem that does not exist. A consumer of that consumer relays the same text: the creator's failure is taken out of the relay and carried on unchanged, never quoted again, so a chain of any length shows one message. Built.
 
 ## The seam's part
 
@@ -129,9 +129,9 @@ Held by tests today: a direct reference supplies the current handle and resolves
 
 ## The first proof
 
-1. `CreateValuationDate`: create, retain, return a handle, resolve in a consumer. Done in #53, with distinct objects for two identical creators and a failed creator publishing nothing; independent cleanup and unchanged-creator reuse wait for release.
+1. `_CreateValuationDate`: create, retain, return a handle, resolve in a consumer. Done in #53, with distinct objects for two identical creators and a failed creator publishing nothing; independent cleanup and unchanged-creator reuse wait for release.
 2. Worksheet lifetime and memory: replacement, deletion, moves, closing one of several books, fresh reopen, manual calculation, failures, retained dependencies; repeated edits accumulate no unowned objects; store entries and retained objects counted, shared data once; process memory alone is not an object-lifetime measurement. Open.
-3. `CreateDiscountCurve`: the same path with numpy arrays, done in #53 for construction, with the curve's two arrays copied and frozen; its release waits with step 2.
+3. `_CreateDiscountCurve`: the same path with numpy arrays, done in #53 for construction, with the curve's two arrays copied and frozen; its release waits with step 2.
 4. Batch returns: duplicate-row separation, row-to-handle pairing, replacement and release of the owned batch, resizing and failure cleanup, after the return and error rules are agreed. Open.
 
 Concurrent calls must not multiply ownership, and no publication scans the store.

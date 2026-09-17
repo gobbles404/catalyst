@@ -10,9 +10,9 @@ from numpy.typing import NDArray
 
 from goosedove.globals.interpolation import interpolate_discount_factors
 
-# The most days a curve holds: a sheet's rows less the two heading rows ReadHandle spills first,
-# so that whatever a creator keeps can be read back. A curve two thousand years long that no
-# cell could show was a finding of the review of #70; the seam's own bound on a result's size
+# The most days a curve holds: a sheet's rows less the two heading rows util_ReadHandle spills
+# first, so that whatever a creator keeps can be read back. A curve two thousand years long that
+# no cell could show was a finding of the review of #70; the seam's own bound on a result's size
 # is open in docs/seam/history.md.
 MAX_DAYS: Final = 1_048_574
 

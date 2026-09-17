@@ -1,4 +1,4 @@
-# ReadHandle
+# util_ReadHandle
 
 Built in #66.
 
@@ -7,7 +7,7 @@ Reads the object a handle stands for onto the sheet as a table, a header row, a 
 ## Worksheet contract
 
 ```python
-def ReadHandle(handle: Handle[object]) -> MixedArray: ...
+def util_ReadHandle(handle: Handle[object]) -> MixedArray: ...
 ```
 
 `Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result is the mirror of the way in, built in #65 ([outputs.md](../../seam/outputs.md) decision 13): the rectangle spills one tagged value per cell, and `MixedArray.table` builds it from the headings and the object's columns.
@@ -18,8 +18,8 @@ def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 | 2 | 11-Sep-2026 | 1 |
 | 3 | 12-Sep-2026 | 0.9999 |
 | 4 | 13-Sep-2026 | 0.9998 |
-| 5 | `=CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:3f9a1c:000002` |
-| 7 | `=ReadHandle(B5)` | spills A7:B11, below |
+| 5 | `=_CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:3f9a1c:000002` |
+| 7 | `=util_ReadHandle(B5)` | spills A7:B11, below |
 
 | | A | B |
 |---|---|---|
@@ -29,7 +29,7 @@ def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 | 10 | 12-Sep-2026 | 0.9999 |
 | 11 | 13-Sep-2026 | 0.9998 |
 
-One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the daily table `CreateDiscountCurve` built, which as anchors with no gaps is one it takes, so `=CreateDiscountCurve(A7:B7, A9:B11)` makes an equal curve: a spill can be fed back to a creator. A curve built from sparse anchors spills its days, not its anchors, since #70.
+One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the daily table `_CreateDiscountCurve` built, which as anchors with no gaps is one it takes, so `=_CreateDiscountCurve(A7:B7, A9:B11)` makes an equal curve: a spill can be fed back to a creator. A curve built from sparse anchors spills its days, not its anchors, since #70.
 
 ## Excel help
 
@@ -56,17 +56,17 @@ What each kind shows:
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
 | `expiry_schedule` | `future_code`, `future_expiry`, and `option_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
-| `market_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
+| `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_spec` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `int`, `float`, `float` | one |
 
-`=ReadHandle(B2)` on `=CreateValuationDate(A2, 0.5)`:
+`=util_ReadHandle(B2)` on `=_CreateValuationDate(A2, 0.5)`:
 
 | as_of | day_fraction_elapsed |
 |---|---|
 | datetime64[D] | float |
 | 11-Sep-2026 | 0.5 |
 
-`=ReadHandle(A8)` on the six-contract schedule of [expiry-schedule.md](../market-definitions/expiry-schedule.md), and the same schedule built without options shows the first two columns alone:
+`=util_ReadHandle(A8)` on the six-contract schedule of [expiry-schedule.md](../index-definitions/expiry-schedule.md), and the same schedule built without options shows the first two columns alone:
 
 | future_code | future_expiry | option_expiry |
 |---|---|---|
@@ -78,9 +78,9 @@ What each kind shows:
 | V26 | 22-Sep-2026 | 17-Sep-2026 |
 | X26 | 20-Oct-2026 | 15-Oct-2026 |
 
-`=ReadHandle(A12)` on the ten-day calendar of [holiday-calendar.md](../market-definitions/holiday-calendar.md) shows one column, `holiday` over `datetime64[D]`, then the ten days as given.
+`=util_ReadHandle(A12)` on the ten-day calendar of [holiday-calendar.md](../index-definitions/holiday-calendar.md) shows one column, `holiday` over `datetime64[D]`, then the ten days as given.
 
-A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/goosedove/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
+A new kind adds its row to this table on the pull request that builds its creator, and the same row in code: each kind registers how it shows in `src/goosedove/excel/utilities.py`, and a kind nobody registered fails in the cell, `#ERROR util_ReadHandle: TypeError: no table for a Widget`, rather than guessing its columns.
 
 ## Tests
 
@@ -92,9 +92,9 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | the three-day curve: the two headers, the two types, three rows, dates as serials, factors exactly | example |
 | the six-contract schedule with options: three columns; without options: two | example |
 | a three-day calendar: one column of dates under its two heading rows | example |
-| market conventions: one row of five texts under its two heading rows | example |
+| index conventions: one row of five texts under its two heading rows | example |
 | a contract spec: one row, the name as text and the lot size and fees as numbers, under its two heading rows | example |
-| a curve's spill, headers and body, fed back to `CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
+| a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
 | a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |

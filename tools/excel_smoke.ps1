@@ -62,68 +62,68 @@ $formulas = [ordered]@{
     # spill one cell at a time with INDEX.
     "=LEFT(AA1,15)"               = "discount_curve:"
     "=LEFT(AA2,15)"               = "valuation_date:"
-    "=INDEX(ReadHandle(AA1),1,1)" = "date"
-    "=INDEX(ReadHandle(AA1),2,2)" = "float64"
-    "=INDEX(ReadHandle(AA1),3,1)" = "46276"
-    "=INDEX(ReadHandle(AA1),4,2)" = "0.9999"
-    "=ROWS(ReadHandle(AA1))"      = "5"
-    "=INDEX(ReadHandle(AA2),3,2)" = "0.5"
-    "=INDEX(ReadHandle(AI1),3,1)" = "m26"
-    "=INDEX(ReadHandle(AI1),8,3)" = "46310"
-    "=COLUMNS(ReadHandle(AI2))"   = "2"
-    "=ReadHandle(Y2)"             = "#ERROR ReadHandle: handle is number 46276.0, expected a handle"
-    "=ReadHandle(AA3)"            = "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    "=ReadHandle(AA4)"            = "#ERROR ReadHandle: handle is the creator's failure, expected a handle: #ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    '=ReadHandle("discount_curve:000000:000001")' = "#ERROR ReadHandle: handle is text 'discount_curve:000000:000001' naming no live object, expected a handle"
-    "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
-    "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
+    "=INDEX(util_ReadHandle(AA1),1,1)" = "date"
+    "=INDEX(util_ReadHandle(AA1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(AA1),3,1)" = "46276"
+    "=INDEX(util_ReadHandle(AA1),4,2)" = "0.9999"
+    "=ROWS(util_ReadHandle(AA1))"      = "5"
+    "=INDEX(util_ReadHandle(AA2),3,2)" = "0.5"
+    "=INDEX(util_ReadHandle(AI1),3,1)" = "m26"
+    "=INDEX(util_ReadHandle(AI1),8,3)" = "46310"
+    "=COLUMNS(util_ReadHandle(AI2))"   = "2"
+    "=util_ReadHandle(Y2)"             = "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle"
+    "=util_ReadHandle(AA3)"            = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=util_ReadHandle(AA4)"            = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    '=util_ReadHandle("discount_curve:000000:000001")' = "#ERROR util_ReadHandle: handle is text 'discount_curve:000000:000001' naming no live object, expected a handle"
+    "=_CreateValuationDate(Y2,1.5)" = "#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
+    "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=_CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR _CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
     # The curve from anchors: three anchors over eleven days, read back day by day through
-    # ReadHandle, an anchor exact and a day between on the straight line; dates that run
+    # util_ReadHandle, an anchor exact and a day between on the straight line; dates that run
     # backwards; and a span no sheet could show.
-    "=ROWS(ReadHandle(AW1))"      = "13"
-    "=INDEX(ReadHandle(AW1),5,2)" = "0.9998"
-    "=INDEX(ReadHandle(AW1),6,2)" = "0.9997"
-    "=INDEX(ReadHandle(AW1),13,1)" = "46286"
-    "=CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
-    "=CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
+    "=ROWS(util_ReadHandle(AW1))"      = "13"
+    "=INDEX(util_ReadHandle(AW1),5,2)" = "0.9998"
+    "=INDEX(util_ReadHandle(AW1),6,2)" = "0.9997"
+    "=INDEX(util_ReadHandle(AW1),13,1)" = "46286"
+    "=_CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
+    "=_CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
     # The expiry schedule: a creator with three columns and one with two, a futures column one
     # row short, and a blank in the options column.
     "=LEFT(AI1,16)"               = "expiry_schedule:"
     "=LEFT(AI2,16)"               = "expiry_schedule:"
-    "=CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
-    "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
+    "=_CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
+    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR _CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
     # The holiday calendar: a creator over three days and one over a single cell, the first read
-    # back through ReadHandle, a blank in the column, and a row where a column is expected.
+    # back through util_ReadHandle, a blank in the column, and a row where a column is expected.
     "=LEFT(AM1,17)"               = "holiday_calendar:"
     "=LEFT(AM2,17)"               = "holiday_calendar:"
-    "=INDEX(ReadHandle(AM1),1,1)" = "holiday"
-    "=INDEX(ReadHandle(AM1),2,1)" = "datetime64[D]"
-    "=INDEX(ReadHandle(AM1),4,1)" = "46041"
-    "=ROWS(ReadHandle(AM2))"      = "3"
-    "=CreateHolidayCalendar(AL2:AL4)" = "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
-    "=CreateHolidayCalendar(AK2:AL2)" = "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
-    # The market conventions: a creator over five text cells, read back through ReadHandle, a
+    "=INDEX(util_ReadHandle(AM1),1,1)" = "holiday"
+    "=INDEX(util_ReadHandle(AM1),2,1)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(AM1),4,1)" = "46041"
+    "=ROWS(util_ReadHandle(AM2))"      = "3"
+    "=_CreateHolidayCalendar(AL2:AL4)" = "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    "=_CreateHolidayCalendar(AK2:AL2)" = "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
+    # The index conventions: a creator over five text cells, read back through util_ReadHandle, a
     # blank and a number where a code is expected, and a code left out.
-    "=LEFT(AP1,19)"               = "market_conventions:"
-    "=INDEX(ReadHandle(AP1),1,4)" = "quantity_type"
-    "=INDEX(ReadHandle(AP1),3,4)" = "volume"
-    "=COLUMNS(ReadHandle(AP1))"   = "5"
-    "=CreateMarketConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR CreateMarketConventions: quantity_unit is blank, expected text"
-    "=CreateMarketConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text"
-    "=CreateMarketConventions(AO2,AO3,AO4,AO5)" = "#ERROR CreateMarketConventions: quantity_unit is missing, expected text"
-    # The contract spec: a creator over a name and three numbers, read back through ReadHandle, a
+    "=LEFT(AP1,18)"               = "index_conventions:"
+    "=INDEX(util_ReadHandle(AP1),1,4)" = "quantity_type"
+    "=INDEX(util_ReadHandle(AP1),3,4)" = "volume"
+    "=COLUMNS(util_ReadHandle(AP1))"   = "5"
+    "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
+    "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
+    "=_CreateIndexConventions(AO2,AO3,AO4,AO5)" = "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text"
+    # The contract spec: a creator over a name and three numbers, read back through util_ReadHandle, a
     # lot size with a fraction and one beyond what a cell holds exactly, text where a fee is
     # expected, and a fee left out.
     "=LEFT(AS1,14)"               = "contract_spec:"
-    "=INDEX(ReadHandle(AS1),1,3)" = "brokerage_rate_per_lot"
-    "=INDEX(ReadHandle(AS1),2,2)" = "int"
-    "=INDEX(ReadHandle(AS1),3,2)" = "1000"
-    "=COLUMNS(ReadHandle(AS1))"   = "4"
-    "=CreateContractSpec(AR2,2.5,AR4,AR5)" = "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number"
-    "=CreateContractSpec(AR2,1E16,AR4,AR5)" = "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly"
-    "=CreateContractSpec(AR2,AR3,E1,AR5)" = "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number"
-    "=CreateContractSpec(AR2,AR3,AR4)" = "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number"
+    "=INDEX(util_ReadHandle(AS1),1,3)" = "brokerage_rate_per_lot"
+    "=INDEX(util_ReadHandle(AS1),2,2)" = "int"
+    "=INDEX(util_ReadHandle(AS1),3,2)" = "1000"
+    "=COLUMNS(util_ReadHandle(AS1))"   = "4"
+    "=_CreateContractSpec(AR2,2.5,AR4,AR5)" = "#ERROR _CreateContractSpec: lot_size is number 2.5, expected whole number"
+    "=_CreateContractSpec(AR2,1E16,AR4,AR5)" = "#ERROR _CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly"
+    "=_CreateContractSpec(AR2,AR3,E1,AR5)" = "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number"
+    "=_CreateContractSpec(AR2,AR3,AR4)" = "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -160,10 +160,10 @@ $cells = [ordered]@{
     "AB2" = "11-Sep-2026"; "AC2" = "0.98"
     "AB3" = "12-Sep-2026"; "AC3" = "0.9"
     "AB4" = "13-Sep-2026"; "AC4" = "0.8"
-    "AA1" = "=CreateDiscountCurve(Y1:Z1,Y2:Z4)"
-    "AA2" = "=CreateValuationDate(Y2,0.5)"
-    "AA3" = "=CreateDiscountCurve(Y1:Z1,AB2:AC4)"
-    "AA4" = "=ReadHandle(AA3)"
+    "AA1" = "=_CreateDiscountCurve(Y1:Z1,Y2:Z4)"
+    "AA2" = "=_CreateValuationDate(Y2,0.5)"
+    "AA3" = "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)"
+    "AA4" = "=util_ReadHandle(AA3)"
     # An expiry schedule: six contract codes as the desk types them, the futures and options
     # expiry beside each, a copy of the options column with a blank, and two creator cells, one
     # with the options column and one without.
@@ -173,21 +173,21 @@ $cells = [ordered]@{
     "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"
     "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"
     "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"
-    "AI1" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
-    "AI2" = "=CreateExpirySchedule(AE2:AE7,AF2:AF7)"
+    "AI1" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
+    "AI2" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7)"
     # A holiday calendar: three days one market is closed, a copy of the column with a blank, and
     # two creator cells, one over the column and one over a single cell.
     "AK2" = "1-Jan-2026"; "AL2" = "1-Jan-2026"
     "AK3" = "19-Jan-2026"
     "AK4" = "16-Feb-2026"; "AL4" = "16-Feb-2026"
-    "AM1" = "=CreateHolidayCalendar(AK2:AK4)"
-    "AM2" = "=CreateHolidayCalendar(AK2)"
-    # The market conventions: five codes as the desk types them, and one creator cell.
+    "AM1" = "=_CreateHolidayCalendar(AK2:AK4)"
+    "AM2" = "=_CreateHolidayCalendar(AK2)"
+    # The index conventions: five codes as the desk types them, and one creator cell.
     "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
-    "AP1" = "=CreateMarketConventions(AO2,AO3,AO4,AO5,AO6)"
+    "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
     # The contract spec: a name, a lot size and two fees as the desk types them, and one creator cell.
     "AR2" = "WTI"; "AR3" = "1000"; "AR4" = "3"; "AR5" = "2"
-    "AS1" = "=CreateContractSpec(AR2,AR3,AR4,AR5)"
+    "AS1" = "=_CreateContractSpec(AR2,AR3,AR4,AR5)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
@@ -195,7 +195,7 @@ $cells = [ordered]@{
     "AU4" = "21-Sep-2026"; "AV4" = "0.999"
     "AX2" = "14-Sep-2026"; "AY2" = "1"
     "AX3" = "11-Sep-2026"; "AY3" = "0.9997"
-    "AW1" = "=CreateDiscountCurve(Y1:Z1,AU2:AV4)"
+    "AW1" = "=_CreateDiscountCurve(Y1:Z1,AU2:AV4)"
     # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"

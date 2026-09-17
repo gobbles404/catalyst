@@ -14,10 +14,10 @@ import numpy as np
 from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.market_definitions.contract_spec import ContractSpec
-from goosedove.market_definitions.expiry_schedule import ExpirySchedule
-from goosedove.market_definitions.holiday_calendar import HolidayCalendar
-from goosedove.market_definitions.market_conventions import MarketConventions
+from goosedove.index_definitions.contract_spec import ContractSpec
+from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.index_conventions import IndexConventions
 
 
 @singledispatch
@@ -69,7 +69,7 @@ def holiday_calendar_table(obj: HolidayCalendar) -> MixedArray:
 
 
 @shown.register
-def market_conventions_table(obj: MarketConventions) -> MixedArray:
+def index_conventions_table(obj: IndexConventions) -> MixedArray:
     return MixedArray.table(
         [
             (
@@ -104,7 +104,7 @@ def contract_spec_table(obj: ContractSpec) -> MixedArray:
 
 
 @excel_function
-def ReadHandle(
+def util_ReadHandle(
     handle: Annotated[
         Handle[object], "The cell showing any creator's result, such as B5, or a name for it."
     ],

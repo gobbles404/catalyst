@@ -52,7 +52,7 @@ namespace Goosedove.Host.Tests
             var factor = (ExcelArgumentAttribute)argumentAttributes[times][1];
             Assert.Equal("[factor]", factor.Name);
             Assert.Equal("One multiplier. 1 when omitted.", factor.Description);
-            var curve = attributes.FindIndex(a => ((ExcelFunctionAttribute)a).Name == "CreateDiscountCurve");
+            var curve = attributes.FindIndex(a => ((ExcelFunctionAttribute)a).Name == "_CreateDiscountCurve");
             Assert.False(((ExcelFunctionAttribute)attributes[curve]).IsHidden);
             var table = (ExcelArgumentAttribute)argumentAttributes[curve][1];
             Assert.Equal("table", table.Name);
