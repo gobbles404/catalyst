@@ -136,18 +136,24 @@ $formulas = [ordered]@{
     "=_CreateFuturesCurve(BD2:BD7,BE2:BE6)" = "#ERROR _CreateFuturesCurve: ValueError: price has 5 prices, expected 6, one per future_code"
     "=_CreateFuturesCurve(BD2:BD7,BF2:BF7)" = "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number"
     "=_CreateFuturesCurve(BD2:BD7)" = "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers"
-    # The daily fixings: a creator over a header row and a welded body, read back through
-    # util_ReadHandle, the days newest first, the headers where the body should be, and a header
-    # the table does not have.
+    # The daily fixings: a creator over a header row, a welded body and the calendar in AM1, read
+    # back through util_ReadHandle; the days newest first, a business day without a fixing, a
+    # Saturday and a listed holiday, the library's words; the headers where the body should be, a
+    # header the table does not have, the calendar left out and a number in its place, the seam's.
     "=LEFT(BK1,14)"               = "daily_fixings:"
     "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
     "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(BK1),3,1)" = "46143"
     "=INDEX(util_ReadHandle(BK1),6,2)" = "95.08"
     "=ROWS(util_ReadHandle(BK1))"      = "6"
-    "=_CreateDailyFixings(BI1:BJ1,BL2:BM3)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
-    "=_CreateDailyFixings(BI1:BJ1,BI1:BJ3)" = "#ERROR _CreateDailyFixings: table cell (1, 1) is text 'date', expected date"
-    "=_CreateDailyFixings(L1:M1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
+    "=_CreateDailyFixings(BI1:BJ1,BL2:BM3,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
+    "=_CreateDailyFixings(BI1:BJ1,BL4:BM5,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01"
+    "=_CreateDailyFixings(BI1:BJ1,BL6:BM6,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day"
+    "=_CreateDailyFixings(BI1:BJ1,BL7:BM7,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day"
+    "=_CreateDailyFixings(BI1:BJ1,BI1:BJ3,AM1)" = "#ERROR _CreateDailyFixings: table cell (1, 1) is text 'date', expected date"
+    "=_CreateDailyFixings(L1:M1,BI2:BJ5,AM1)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
+    "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle"
+    "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,BJ2)" = "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle"
     # The monthly fixings: a creator over a column of months, each its first day, and a column of
     # prices, read back through util_ReadHandle as first days under the month type; a day that is
     # not the first, months backwards, and codes where prices are expected.
@@ -253,7 +259,9 @@ $cells = [ordered]@{
     "BD7" = "X26"; "BE7" = "70.4"; "BF7" = "70.4"
     "BG1" = "=_CreateFuturesCurve(BD2:BD7,BE2:BE7)"
     # Daily fixings: a header row and four rows, a date and a settle each, 1, 4, 5 and 6 May
-    # 2026; a second body with the days newest first; and one creator cell.
+    # 2026, every business day of that stretch; a second body with the days newest first, one
+    # missing the Monday, one of a Saturday and one of a holiday AM1 lists; and one creator cell,
+    # which takes the calendar in AM1.
     "BI1" = "date"; "BJ1" = "settle"
     "BI2" = "1-May-2026"; "BJ2" = "101.94"
     "BI3" = "4-May-2026"; "BJ3" = "106.42"
@@ -261,7 +269,11 @@ $cells = [ordered]@{
     "BI5" = "6-May-2026"; "BJ5" = "95.08"
     "BL2" = "6-May-2026"; "BM2" = "95.08"
     "BL3" = "5-May-2026"; "BM3" = "102.27"
-    "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)"
+    "BL4" = "1-May-2026"; "BM4" = "101.94"
+    "BL5" = "5-May-2026"; "BM5" = "102.27"
+    "BL6" = "2-May-2026"; "BM6" = "100"
+    "BL7" = "19-Jan-2026"; "BM7" = "100"
+    "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,AM1)"
     # Monthly fixings: four months typed as their first days, May to August 2026, and a price
     # beside each; a pair with a day that is not the first; a pair with the months backwards;
     # and one creator cell.

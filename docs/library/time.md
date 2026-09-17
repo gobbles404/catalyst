@@ -72,9 +72,9 @@ From the braindump, each with the rule it met and what stands instead:
 | contracts in order and none skipped | decided as the rule; relaxed for a market listing only some months when one arrives |
 | an option's expiry on or before its future's | proposed above; the owner decides with the schedule's rules |
 | prompt on the expiry day | open: the owner decides when the nearby reader is written; one flag on the lookup |
-| the week mask | open: Monday to Friday until a market trading weekends arrives |
+| the week mask | decided in #79 with the daily fixings: Monday to Friday, numpy's default, until a market trading weekends arrives with its own |
 | the horizon | decided: 2000 to 2099, fixed |
 
 ## When it is time
 
-Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first. Business days enter with the first contract whose terms need them, and Gas Daily daily is the first daily-settled shape to build for. Nothing from the declined table returns.
+Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first. Business days entered in #79 with the daily fixings, checked through `np.is_busday` and `np.busday_offset` over the calendar's list, a fixing refused on a closed day and a business day without one; a contract's terms will bring the counting, and Gas Daily daily is the first daily-settled shape to build for. Nothing from the declined table returns.

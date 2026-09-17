@@ -11,6 +11,8 @@ import tracemalloc
 from collections.abc import Callable
 from datetime import date
 
+import numpy as np
+
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
 
@@ -286,20 +288,30 @@ def test_a_futures_curve_keeps_a_copy_of_its_price_column() -> None:
 FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
 
 
-def fixings_body(rows: int) -> Cells:
-    """That many daily fixings as the sheet sends them, a serial and a settle per row."""
-    return Cells.from_rows([[46143.0 + i, 100.0 + i % 7] for i in range(rows)])
+def fixings_body(rows: int, holidays: int) -> Cells:
+    """That many daily fixings as the sheet sends them, a serial and a settle per row, one per
+    business day from Friday 1 May 2026 under a calendar of that many Thursdays a week apart,
+    the calendar holiday_column makes."""
+    epoch = np.datetime64("1899-12-30")
+    closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
+    days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
+    serials = (days - epoch).astype(np.int64)
+    return Cells.from_rows([[float(serials[i]), 100.0 + i % 7] for i in range(rows)])
 
 
 # Daily fixings keep a copy of each column, 16 bytes per row, and on the way pay the table path,
-# the date column's masks and its arrays on the way to days, and the builder's look at the order:
-# measured 7,563 bytes at 260 rows on 2026-09-17, about 29 bytes per row; 65,887 at 2,600 and
-# 650,831 at 26,000, 25 bytes per row.
+# the date column's masks and its arrays on the way to days, and the builder's three looks, the
+# order, the days closed and the gaps, the last over the business day after each date, a
+# full-size temporary: measured 11,482 bytes at 260 rows on 2026-09-17, about 44 bytes per row,
+# up from 7,563 before the calendar was checked; 93,326 at 2,600 and 912,278 at 26,000, 35
+# bytes per row.
 def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
-    body = fixings_body(rows)
+    calendar = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    body = fixings_body(rows, 100)
     assert (
-        least_peak(lambda: ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, body)) <= 30 * rows + SLACK
+        least_peak(lambda: ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar))
+        <= 45 * rows + SLACK
     )
 
 

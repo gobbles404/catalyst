@@ -33,7 +33,7 @@ A function that takes a table, a header row and a body, declares a schema, a cla
 
 ## What holds everywhere
 
-Every date is a calendar day, weekends and holidays included; no business-day adjustment happens anywhere, and `_CreateHolidayCalendar` only lists the days a market is closed; where a contract's terms will first need business days, and how, is decided in [time.md](time.md), and this sentence changes in that pull request. Interpolation is a straight line on the thing itself, weighted by calendar days, wherever the library fills gaps; a spline, or another basis, is a discussion, not a default. A rejection is a `ValueError` with the page's message, and a failed call publishes nothing.
+Every date is a calendar day, weekends and holidays included; no business-day adjustment happens anywhere; `_CreateHolidayCalendar` lists the days a market is closed, and `_CreateDailyFixings` reads the list to refuse a fixing on a closed day or a business day without one, never to move a date; where a contract's terms will first need business days, and how, is decided in [time.md](time.md), and this sentence changes in that pull request. Interpolation is a straight line on the thing itself, weighted by calendar days, wherever the library fills gaps; a spline, or another basis, is a discussion, not a default. A rejection is a `ValueError` with the page's message, and a failed call publishes nothing.
 
 ## What the library receives
 
