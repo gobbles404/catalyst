@@ -12,8 +12,8 @@ from goosedove.excel.bridge import MISSING, Cells
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 
 # Each registered function's prepared path, fetched once as the host does at registration; the
-# three looks in conftest.py (FirstOfNumbers, FirstOfDates, FirstOfNames) are registered
-# when pytest loads it, so they are in it too.
+# four looks in conftest.py (FirstOfNumbers, FirstOfWholes, FirstOfDates, FirstOfNames) are
+# registered when pytest loads it, so they are in it too.
 PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 
 
@@ -70,6 +70,31 @@ def test_accepted_column_call_itemized(call_profile: CallProfile) -> None:
         "_numbers": 1,
         "_number_out": 1,
         "_scalar": 1,
+    }
+
+
+# A column of whole numbers: the column rule's shape, then one look that settles the fraction,
+# the line at 2^53 and the kinds together, and one conversion to int64.
+def test_accepted_whole_column_call_itemized(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    column = Cells.from_rows([[float(i)] for i in range(10_000)])
+    PATH["FirstOfWholes"](column)
+    assert call_profile(lambda: PATH["FirstOfWholes"](column)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_whole_column": 1,
+        "_one_column": 1,
+        "_shape": 1,
+        "_wholes": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["FirstOfWholes"](column)) == {
+        "ndarray.any": 1,  # the one look
+        "ndarray.astype": 1,  # the conversion to int64
+        "ufunc.reduce": 1,
     }
 
 

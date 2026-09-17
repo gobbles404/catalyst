@@ -29,7 +29,7 @@ Registration reads four things: the function's own name, which becomes the works
 
 - a name already registered: `Number is already registered`;
 - a parameter the host cannot pass by position, one that must be passed by name or one that takes any number of values: `Keyed: put is keyword-only, which the host cannot pass`;
-- an annotation outside the fourteen declared input types, the table schemas, and `Handle[Kind]` around a class the library defines: `Later: x declares list[str], which the seam cannot receive`; a handle around one of the seam's own types, or around a table, is refused the same way, `Read: x declares Handle[str], which the seam cannot receive`;
+- an annotation outside the fifteen declared input types, the table schemas, and `Handle[Kind]` around a class the library defines: `Later: x declares list[str], which the seam cannot receive`; a handle around one of the seam's own types, or around a table, is refused the same way, `Read: x declares Handle[str], which the seam cannot receive`;
 - a parameter with no annotation, refused the same way, though the message shows Python's name for an empty annotation rather than a plain word;
 - an annotation written as text, which is what `from __future__ import annotations` makes of every annotation, so a module of worksheet functions must not use it;
 - a default the parameter's own accept rule rejects: `Wrong: x defaults to text 'x', expected number`;
@@ -62,7 +62,7 @@ flowchart TD
   Fn -->|"its return annotation"| Result["the declared result"]
   Fn -->|"its docstring"| Desc["the description"]
   Param -->|"positional or not"| Positional["positional, or refused"]
-  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the fourteen declared types, a table schema, or a handle"]
+  Param -->|"its annotation"| Accept["the accept rule and the words of the sheet, from the fifteen declared types, a table schema, or a handle"]
   Param -->|"its default, if any"| Default["the default, through the accept rule, stored converted"]
   Param -->|"the words beside its type"| Help["the help: those words, then for an optional argument what it takes when omitted; the label, in brackets when optional"]
   Result -->|"its annotation"| Convert["the result rule, from the eleven declared results, or a handle"]
@@ -122,6 +122,7 @@ A scalar is one value on its own: a number, text, a boolean, a blank cell, or a 
 | `NumberArray` | array of numbers | `_numbers` | the range's numbers array, in the sheet's shape |
 | `NumberColumn` | column of numbers | `_column` | a flat view of the one column |
 | `NumberRow` | row of numbers | `_row` | a flat view of the one row |
+| `WholeNumberColumn` | column of whole numbers | `_whole_column` | a flat int64 array, converted once after the one look that settles the fraction, the line at 2^53 and the kinds together |
 | `DateColumn` | column of dates | `_date_column` | a flat array of numpy days |
 | `DateRow` | row of dates | `_date_row` | a flat array of numpy days |
 | `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
@@ -171,7 +172,7 @@ flowchart LR
 
 `tests/performance/test_seam_budgets.py` pins owning ten thousand cells at two views, two reshapes and two copies on the numpy ledger, with or without a text cell, and `tests/performance/test_seam_allocation.py` pins its ceiling at 9 bytes per cell plus the slack, its two copies; [baseline.md](baseline.md) records 90,752 bytes. The host counts a range in as two trips, one to own it and one for the prepared path, and three Python objects built to carry it, the rows, the columns and the summary of kinds; that table is in [baseline.md](baseline.md).
 
-After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `NumberColumn` and `NumberRow` hand over a view of its first column or row. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
+After the accept rule, a function taking numbers or text gets the range's own arrays, not copies. `NumberArray` hands over the numbers array itself. `NumberColumn` and `NumberRow` hand over a view of its first column or row; `WholeNumberColumn` hands over a new int64 array, the one conversion its cells need. The text types hand over the host's tuple as it is, with nothing built to carry it; `tests/performance/test_seam_allocation.py` pins a column of ten thousand texts under the slack alone, measured 192 bytes by its comment, down from 160,635 when the tuple went into a numpy array and back out before PR #43. Only the date types build something: a new array of days made from the numbers in one look.
 
 `Cells.from_rows` builds the same object from Python values, for tests. `Cells.from_rows([[1.0, "x"], [None, True]])` classifies each value, fills the kinds and the numbers, collects the texts, and sets the bits of the summary of kinds the host would have set; `tests/unit/test_bridge.py` pins that a row holding a number, a text, a blank, a boolean and a missing argument has all five bits. It rejects an empty range, since Excel never sends fewer than one cell. It is the one loop over cells in the bridge, and it is a test helper, not the host's path.
 
@@ -312,7 +313,7 @@ The probes are the sixteen hidden worksheet functions in the probes module. Each
 
 `Ping` is not a probe. It is the bridge's own worksheet function, listed in the wizard, and returns `goosedove <version> from <path>`, with `source checkout` in place of the version when the package is not installed.
 
-The three looks, a column of numbers, of dates and of text, have no probe, because the host cannot tell those ranges from any other, so `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` live in `tests/performance/conftest.py` only to count the Python side; [history.md](history.md) lists the missing text and date probes as open. `CountMixed` is the exception that made the rule worth stating: the host cannot tell a mixed range apart either, but the rule that admits one is the whole point of the type, so it earns a probe and a control to be read against.
+The four looks, a column of numbers, of whole numbers, of dates and of text, have no probe, because the host cannot tell those ranges from any other, so `FirstOfNumbers`, `FirstOfWholes`, `FirstOfDates` and `FirstOfNames` live in `tests/performance/conftest.py` only to count the Python side; [history.md](history.md) lists the missing text and date probes as open. `CountMixed` is the exception that made the rule worth stating: the host cannot tell a mixed range apart either, but the rule that admits one is the whole point of the type, so it earns a probe and a control to be read against.
 
 ## What is deliberately absent, and why
 

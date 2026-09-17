@@ -20,6 +20,7 @@ from goosedove.excel.bridge import (
     NumberRow,
     TextColumn,
     TextRow,
+    WholeNumberColumn,
     register,
 )
 from goosedove.excel.probes import probe
@@ -41,6 +42,16 @@ def SumColumn(values: NumberColumn) -> float:
 @probe
 def SumRow(values: NumberRow) -> float:
     return float(values.sum())
+
+
+@probe
+def SumWholes(values: WholeNumberColumn) -> float:
+    return float(values.sum())
+
+
+@probe
+def WholeKind(values: WholeNumberColumn) -> str:
+    return f"{values.dtype} {values.tolist()}"
 
 
 @probe
@@ -191,6 +202,19 @@ def TopLeft(values: NumberArray) -> float:
     return float(values[0, 0])
 
 
+# A column of whole numbers is handed over as int64, converted once; a scalar is a column of one,
+# and 2^53 itself passes either side, as the scalar rule has it.
+def test_a_column_of_whole_numbers_is_handed_over_as_int64() -> None:
+    assert (
+        bridge.call("WholeKind", [cells([[1000.0], [2500.0], [-3.0]])]) == "int64 [1000, 2500, -3]"
+    )
+    assert bridge.call("WholeKind", [1000.0]) == "int64 [1000]"
+    assert bridge.call("WholeKind", [cells([[9007199254740992.0], [-9007199254740992.0]])]) == (
+        "int64 [9007199254740992, -9007199254740992]"
+    )
+    assert bridge.call("SumWholes", [cells([[1.0], [2.0], [3.0]])]) == 6.0
+
+
 def test_column_and_row_are_handed_over_as_plain_lists() -> None:
     assert bridge.call("Shape", [COLUMN]) == "(3,)"
     assert bridge.call("RowShape", [ROW]) == "(3,)"
@@ -259,6 +283,64 @@ def test_booleans_are_real_booleans() -> None:
         ("SumArray", "x", "#ERROR SumArray: values is text 'x', expected array of numbers"),
         ("SumArray", None, "#ERROR SumArray: values is blank, expected array of numbers"),
         ("SumArray", MISSING, "#ERROR SumArray: values is missing, expected array of numbers"),
+        (
+            "SumWholes",
+            cells([[1000.0], [2.5]]),
+            "#ERROR SumWholes: values cell (2, 1) is number 2.5, expected whole number",
+        ),
+        (
+            "SumWholes",
+            cells([[1000.0], ["x"]]),
+            "#ERROR SumWholes: values cell (2, 1) is text 'x', expected whole number",
+        ),
+        (
+            "SumWholes",
+            cells([[1000.0], [True]]),
+            "#ERROR SumWholes: values cell (2, 1) is boolean TRUE, expected whole number",
+        ),
+        (
+            "SumWholes",
+            cells([[1000.0], [None]]),
+            "#ERROR SumWholes: values cell (2, 1) is blank, expected whole number",
+        ),
+        # A whole number beyond 2^53 says why, in the way out's words, as the scalar rule does.
+        (
+            "SumWholes",
+            cells([[1e16], [1.0]]),
+            "#ERROR SumWholes: values cell (1, 1) is number 1e+16, "
+            "beyond what a cell holds exactly",
+        ),
+        (
+            "SumWholes",
+            cells([[1.0], [-9007199254740994.0]]),
+            "#ERROR SumWholes: values cell (2, 1) is number -9007199254740994.0, "
+            "beyond what a cell holds exactly",
+        ),
+        (
+            "SumWholes",
+            ROW,
+            "#ERROR SumWholes: values is 1x3 array, expected column of whole numbers",
+        ),
+        (
+            "SumWholes",
+            2.5,
+            "#ERROR SumWholes: values is number 2.5, expected column of whole numbers",
+        ),
+        (
+            "SumWholes",
+            1e16,
+            "#ERROR SumWholes: values is number 1e+16, beyond what a cell holds exactly",
+        ),
+        (
+            "SumWholes",
+            "x",
+            "#ERROR SumWholes: values is text 'x', expected column of whole numbers",
+        ),
+        (
+            "SumWholes",
+            MISSING,
+            "#ERROR SumWholes: values is missing, expected column of whole numbers",
+        ),
         ("SumColumn", ARRAY, "#ERROR SumColumn: values is 2x2 array, expected column of numbers"),
         ("SumColumn", ROW, "#ERROR SumColumn: values is 1x3 array, expected column of numbers"),
         (
@@ -508,6 +590,10 @@ def test_the_first_failing_cell_is_named(rows: int, cols: int, data: st.DataObje
     dates = cells([[60.0 if i in (r, rows) else 46164.0] for i in range(1, rows + 1)])
     assert bridge.call("FirstDate", [dates]) == (
         f"#ERROR FirstDate: dates cell ({r}, 1) is number 60.0, expected date"
+    )
+    wholes = cells([[2.5 if i in (r, rows) else 1000.0] for i in range(1, rows + 1)])
+    assert bridge.call("SumWholes", [wholes]) == (
+        f"#ERROR SumWholes: values cell ({r}, 1) is number 2.5, expected whole number"
     )
 
 

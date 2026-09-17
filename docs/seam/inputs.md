@@ -83,6 +83,7 @@ Built in the range pull request. A date is a whole serial of 61 or more, handed 
 | `NumberArray` | a range of numbers, any shape | `=Total(A2:B4)` | the grid, as on the sheet | a blank, text, or boolean cell, named |
 | `NumberColumn` | a range of numbers, one column wide | `=Strip(A2:A4)` | a plain list of numbers | a row, a wider range, a bad cell |
 | `NumberRow` | a range of numbers, one row tall | `=Weights(A2:C2)` | a plain list of numbers | a column, a taller range, a bad cell |
+| `WholeNumberColumn` | a range of whole numbers, one column wide, each within 2^53 either side | `=Lots(A2:A4)` | a plain list of whole numbers, as int64 | a fraction, a text, boolean or blank cell, a row; a whole number beyond the line, in the way out's words (decision 42) |
 | `DateColumn` | a range of dates, one column wide | `=Schedule(A2:A7)` | a plain list of dates | a fraction, a serial under 61, a blank |
 | `DateRow` | a range of dates, one row tall | `=Expiries(A1:F1)` | a plain list of dates | the same, or a column |
 | `TextColumn` | a range of text, one column wide | `=Names(A2:A4)` | a plain list of text | empty text, a number or boolean cell, a row |
@@ -98,7 +99,7 @@ Built in the table pull request. A table is two arguments: a row of text holding
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| a schema, a subclass of `Table` with one line per column, after a `TextRow` | a body of exactly the schema's columns, in any order, every cell of a column what its column type takes | `=TotalQuantity(A1:D1, A2:D4)` | one record with one typed column per header, dates as dates, numbers as numbers, text as a plain list, booleans as TRUE and FALSE, aligned by row | a header unknown, missing or given twice, a header count that is not the body's width, a cell that fails its column's type, named |
+| a schema, a subclass of `Table` with one line per column, after a `TextRow` | a body of exactly the schema's columns, in any order, every cell of a column what its column type takes | `=TotalQuantity(A1:D1, A2:D4)` | one record with one typed column per header, dates as dates, numbers as numbers, whole numbers as int64, text as a plain list, booleans as TRUE and FALSE, aligned by row | a header unknown, missing or given twice, a header count that is not the body's width, a cell that fails its column's type, named |
 
 The schema is declared beside the function:
 
@@ -131,7 +132,7 @@ Built in the left-out pull request. An argument that may be left out with nothin
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| any of the fourteen written `X \| None = None` | the argument left out, or whatever `X` accepts | `=_CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options, beside `=_CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | `None` for an argument left out, and otherwise what `X` hands over | a blank cell, in the type's own words, and whatever `X` fails on |
+| any of the fifteen written `X \| None = None` | the argument left out, or whatever `X` accepts | `=_CreateExpirySchedule(A2:A7, B2:B7)` for an index with no options, beside `=_CreateExpirySchedule(A2:A7, B2:B7, C2:C7)` | `None` for an argument left out, and otherwise what `X` hands over | a blank cell, in the type's own words, and whatever `X` fails on |
 
 A table, a handle and a bare mixed range are not an `X` here: they take no default on their own, and they may not be left out either. Registration refuses the form without `None` as its default, or with another, and adds nothing after the argument's help, because there is nothing to name; the brackets say it.
 
@@ -213,6 +214,7 @@ Decided 2026-09-15, a handle of any kind.
 Decided 2026-09-17, the whole number's bound.
 
 41. A whole number in is one a cell holds exactly, from −2^53 to 2^53, the line the way out already holds ([outputs.md](outputs.md) decision 6), so whatever a creator keeps can be read back. Beyond it the argument fails in the way out's words, `lot_size is number 1e+16, beyond what a cell holds exactly`, not as `expected whole number`, since 1E16 is whole: this is the one scalar rejection that says why in place of what was expected. 2^53 itself passes either side, and the next double past it fails. Found in review of #69, where a lot size of 1E16 made a contract spec that `util_ReadHandle` could not show.
+42. A column of whole numbers, `WholeNumberColumn`, is the whole-number rule over a column, in one look: each cell a number with no fraction within 2^53 either side, the first bad cell named, `values cell (2, 1) is number 2.5, expected whole number`, and a whole number beyond the line refused in the way out's words as decision 41's scalar is, `values cell (1, 1) is number 1e+16, beyond what a cell holds exactly`, the one cell rejection that says why in place of what was expected. Handed over as int64, converted once. A schema may declare it, and the same rule runs over that column of the body. Never a result: a function declaring it as one is refused at registration, as for the other columns nothing returns. Built in #77 for the contract specs, whose lot sizes are whole numbers one per row.
 
 ## Not supported
 

@@ -67,6 +67,7 @@ DateRow = NewType("DateRow", NDArray[np.datetime64])
 TextColumn = NewType("TextColumn", tuple[str, ...])
 TextRow = NewType("TextRow", tuple[str, ...])
 BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, handed over 1-D
+WholeNumberColumn = NewType("WholeNumberColumn", NDArray[np.int64])  # one column, 1-D int64
 
 # A handle: text in a cell that stands for an object the seam holds. Declared around a class the
 # library defines, `-> Handle[DiscountCurve]` returns the object and the cell shows its handle,
@@ -339,11 +340,14 @@ def _cell(
             assert_never(kind)
 
 
-def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected:
-    """The rejection for the first flagged cell, named as INDEX counts."""
+def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str, reason: str = "") -> _Rejected:
+    """The rejection for the first flagged cell, named as INDEX counts; a reason, when given,
+    says why in place of what was expected, as it does for a scalar."""
     i = int(bad.argmax())
     r, c = divmod(i, cells.kinds.shape[1])
-    return _Rejected((r + 1, c + 1), _cell(cells.kinds, cells.numbers, cells.texts, i), expected)
+    return _Rejected(
+        (r + 1, c + 1), _cell(cells.kinds, cells.numbers, cells.texts, i), expected, reason
+    )
 
 
 # --- one cell ---------------------------------------------------------------
@@ -438,6 +442,31 @@ def _dates(value: object) -> NDArray[np.datetime64]:
             raise _first_bad(value, bad, "date")
         return _as_days(value.numbers)
     return np.array([[_date(value)]])
+
+
+def _wholes(value: object) -> NDArray[np.int64]:
+    """Every cell a whole number within 2^53 either side, kept in sheet order and converted once
+    to int64: the whole-number rule over a range, in one look. A scalar is a 1x1 range.
+
+    A text or blank slot holds NaN, which is not its own floor, and a boolean holds 1.0 or 0.0,
+    which its kind catches. A whole number beyond the line fails in the way out's words, as the
+    scalar rule does under decision 41: the one cell rejection that says why in place of what was
+    expected.
+    """
+    if isinstance(value, Cells):
+        slots = value.numbers
+        whole = slots == np.floor(slots)
+        bad = ~whole | (slots > EXACT) | (slots < -EXACT)
+        if value.seen != ONLY_NUMBERS:
+            bad |= value.kinds != NUMBER_CODE
+        if bad.any():
+            i = int(bad.argmax())
+            beyond = bool(whole.flat[i]) and value.kinds.flat[i] == NUMBER_CODE
+            raise _first_bad(
+                value, bad, "whole number", "beyond what a cell holds exactly" if beyond else ""
+            )
+        return slots.astype(np.int64)
+    return np.array([[_whole(value)]])
 
 
 def _texts(value: object) -> tuple[str, ...]:
@@ -550,6 +579,11 @@ def _date_row(value: object) -> NDArray[np.datetime64]:
     return _dates(value)[0]
 
 
+def _whole_column(value: object) -> NDArray[np.int64]:
+    _one_column(value)
+    return _wholes(value)[:, 0]
+
+
 # The host delivers a range's text cells as a tuple in sheet order, which for one column or
 # one row is the declared representation itself: once the shape is checked, it is handed over
 # as it is, with nothing built to carry it.
@@ -578,6 +612,7 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
     NumberArray: ("array of numbers", _numbers),
     NumberColumn: ("column of numbers", _column),
     NumberRow: ("row of numbers", _row),
+    WholeNumberColumn: ("column of whole numbers", _whole_column),
     DateColumn: ("column of dates", _date_column),
     DateRow: ("row of dates", _date_row),
     TextColumn: ("column of text", _text_column),
@@ -618,13 +653,17 @@ class _Body:
     places: Callable[[], _TextPlaces]
 
 
-def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> TypeValidationError:
-    """The failure for the first flagged cell of column j, named within the whole body."""
+def _bad_cell(
+    body: _Body, j: int, bad: NDArray[np.bool_], expected: str, reason: str = ""
+) -> TypeValidationError:
+    """The failure for the first flagged cell of column j, named within the whole body; a reason,
+    when given, says why in place of what was expected."""
     r = int(bad.argmax())
     mixed = body.mixed
     value = _cell(mixed.kinds, mixed.numeric_slots, mixed.texts, r * mixed.kinds.shape[1] + j)
+    why = reason or f"expected {expected}"
     return TypeValidationError(
-        f"{body.argument} cell ({r + 1}, {j + 1}) is {describe(value)}, expected {expected}"
+        f"{body.argument} cell ({r + 1}, {j + 1}) is {describe(value)}, {why}"
     )
 
 
@@ -636,6 +675,19 @@ def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
     if bad.any():
         raise _bad_cell(body, j, bad, "number")
     return body.mixed.numeric_slots[:, j]
+
+
+def _wholes_of(body: _Body, j: int) -> NDArray[np.int64]:
+    slots = body.mixed.numeric_slots[:, j]
+    whole = slots == np.floor(slots)
+    bad = (body.mixed.kinds[:, j] != NUMBER_CODE) | ~whole | (slots > EXACT) | (slots < -EXACT)
+    if bad.any():
+        r = int(bad.argmax())
+        beyond = bool(whole[r]) and body.mixed.kinds[r, j] == NUMBER_CODE
+        raise _bad_cell(
+            body, j, bad, "whole number", "beyond what a cell holds exactly" if beyond else ""
+        )
+    return slots.astype(np.int64)
 
 
 def _dates_of(body: _Body, j: int) -> NDArray[np.datetime64]:
@@ -665,6 +717,7 @@ def _booleans_of(body: _Body, j: int) -> NDArray[np.bool_]:
 # Every column type a schema may declare, in the words of the sheet, and the rule for a column.
 _COLUMNS: Final[dict[object, tuple[str, Callable[[_Body, int], object]]]] = {
     NumberColumn: ("number", _numbers_of),
+    WholeNumberColumn: ("whole number", _wholes_of),
     DateColumn: ("date", _dates_of),
     TextColumn: ("text", _texts_of),
     BooleanColumn: ("boolean", _booleans_of),
@@ -1548,9 +1601,9 @@ def _validate(parameter: Parameter, value: object) -> object:
             why = rejected.reason or f"expected {parameter.expected}"
             raise TypeValidationError(f"{parameter.name} is {describe(value)}, {why}") from None
         r, c = rejected.cell
+        why = rejected.reason or f"expected {rejected.expected}"
         raise TypeValidationError(
-            f"{parameter.name} cell ({r}, {c}) is {describe(rejected.value)}, "
-            f"expected {rejected.expected}"
+            f"{parameter.name} cell ({r}, {c}) is {describe(rejected.value)}, {why}"
         ) from None
 
 

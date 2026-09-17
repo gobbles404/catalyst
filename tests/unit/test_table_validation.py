@@ -18,6 +18,7 @@ from goosedove.excel.bridge import (
     Table,
     TextColumn,
     TextRow,
+    WholeNumberColumn,
     excel_function,
     register,
 )
@@ -63,6 +64,17 @@ class Flag(Table):
 @probe
 def AnyCleared(header_row: TextRow, flags: Flag) -> bool:
     return bool(flags.cleared.any())
+
+
+class Lots(Table):
+    name: TextColumn
+    lot_size: WholeNumberColumn
+
+
+@probe
+def LotPayload(header_row: TextRow, lots: Lots) -> str:
+    """The whole-number column as the record holds it: int64, converted once."""
+    return f"{lots.name!r} {lots.lot_size.dtype} {lots.lot_size.tolist()}"
 
 
 class Pair(Table):
@@ -140,6 +152,27 @@ def test_the_header_row_reaches_the_function_as_typed() -> None:
 def test_a_scalar_header_and_a_scalar_body_are_a_one_cell_table() -> None:
     assert bridge.call("AnyCleared", ["cleared", True]) is True
     assert bridge.call("AnyCleared", ["CLEARED", False]) is False
+
+
+# A column of whole numbers in a table: the whole-number rule over the column, int64 handed over,
+# and a whole number beyond 2^53 refused in the way out's words, as a scalar is.
+def test_a_table_may_hold_a_column_of_whole_numbers() -> None:
+    headers = cells([["name", "lot_size"]])
+    assert bridge.call(
+        "LotPayload", [headers, cells([["ICE NG", 2500.0], ["NYMEX NG", 10000.0]])]
+    ) == ("('ICE NG', 'NYMEX NG') int64 [2500, 10000]")
+    assert bridge.call("LotPayload", [headers, cells([["ICE NG", 2500.5]])]) == (
+        "#ERROR LotPayload: lots cell (1, 2) is number 2500.5, expected whole number"
+    )
+    assert bridge.call("LotPayload", [headers, cells([["ICE NG", "2500"]])]) == (
+        "#ERROR LotPayload: lots cell (1, 2) is text '2500', expected whole number"
+    )
+    assert bridge.call("LotPayload", [headers, cells([["ICE NG", True]])]) == (
+        "#ERROR LotPayload: lots cell (1, 2) is boolean TRUE, expected whole number"
+    )
+    assert bridge.call("LotPayload", [headers, cells([["ICE NG", 1e16]])]) == (
+        "#ERROR LotPayload: lots cell (1, 2) is number 1e+16, beyond what a cell holds exactly"
+    )
 
 
 def test_a_table_may_hold_two_columns_of_text() -> None:
