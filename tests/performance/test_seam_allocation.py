@@ -192,24 +192,39 @@ def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> N
     )
 
 
-def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
-    """Codes and two date columns for that many monthly contracts, as the sheet sends them."""
+def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells, Cells]:
+    """Codes and three date columns for that many monthly contracts, as the sheet sends them:
+    the futures, the options and the publication dates."""
     codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
     futures = Cells.from_rows([[46161.0 + 30 * i] for i in range(contracts)])
     options = Cells.from_rows([[46156.0 + 30 * i] for i in range(contracts)])
-    return codes, futures, options
+    publications = Cells.from_rows([[46162.0 + 30 * i] for i in range(contracts)])
+    return codes, futures, options, publications
 
 
 # A schedule keeps a copy of each date column, 8 bytes per contract each, and on the way pays
 # each column's conversion to days and its look: measured 4,928 bytes with options and 3,280
 # without at 120 contracts on 2026-09-14, about 32 and 17 bytes per contract on top of a
 # creator's small objects, which twice the slack covers; 39,516 and 21,640 at 1,200 contracts.
+# With the publication dates as well, 7,312 at 120 contracts on 2026-09-17 and 59,180 at 1,200,
+# a third column's copy and conversions; with the publication dates and the options left out,
+# 4,928 and 39,516, the three-column cost.
 def test_an_expiry_schedule_keeps_a_copy_of_each_date_column() -> None:
     contracts = 120
-    codes, futures, options = schedule_columns(contracts)
-    with_options = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options))
+    codes, futures, options, publications = schedule_columns(contracts)
+    every = least_peak(
+        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options, publications)
+    )
+    assert every <= 48 * contracts + 2 * SLACK
+    with_options = least_peak(
+        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options, MISSING)
+    )
     assert with_options <= 32 * contracts + 2 * SLACK
-    without = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING))
+    published = least_peak(
+        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    )
+    assert published <= 32 * contracts + 2 * SLACK
+    without = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING))
     assert without <= 17 * contracts + 2 * SLACK
 
 

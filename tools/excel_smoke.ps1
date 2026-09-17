@@ -87,12 +87,24 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AW1),13,1)" = "46286"
     "=_CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
     "=_CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
-    # The expiry schedule: a creator with three columns and one with two, a futures column one
-    # row short, and a blank in the options column.
+    # The expiry schedule: a creator with three columns and one with two, one with the publication
+    # dates as a fourth and one with them and the options left out, read back through
+    # util_ReadHandle with the publication dates last; a futures column one row short, a blank in
+    # the options column, a publication column one row short and one with a blank.
     "=LEFT(AI1,16)"               = "expiry_schedule:"
     "=LEFT(AI2,16)"               = "expiry_schedule:"
+    "=LEFT(AI3,16)"               = "expiry_schedule:"
+    "=LEFT(AI4,16)"               = "expiry_schedule:"
+    "=COLUMNS(util_ReadHandle(AI3))"   = "4"
+    "=INDEX(util_ReadHandle(AI3),1,4)" = "publication_date"
+    "=INDEX(util_ReadHandle(AI3),8,4)" = "46316"
+    "=COLUMNS(util_ReadHandle(AI4))"   = "3"
+    "=INDEX(util_ReadHandle(AI4),1,3)" = "publication_date"
+    "=INDEX(util_ReadHandle(AI4),3,3)" = "46162"
     "=_CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
     "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR _CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
+    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7,AJ2:AJ6)" = "#ERROR _CreateExpirySchedule: ValueError: publication_date has 5 dates, expected 6, one per future_code"
+    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,,AJ2:AJ8)" = "#ERROR _CreateExpirySchedule: publication_date cell (7, 1) is blank, expected date"
     # The holiday calendar: a creator over three days and one over a single cell, the first read
     # back through util_ReadHandle, a blank in the column, and a row where a column is expected.
     "=LEFT(AM1,17)"               = "holiday_calendar:"
@@ -207,16 +219,19 @@ $cells = [ordered]@{
     "AA3" = "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)"
     "AA4" = "=util_ReadHandle(AA3)"
     # An expiry schedule: six contract codes as the desk types them, the futures and options
-    # expiry beside each, a copy of the options column with a blank, and two creator cells, one
-    # with the options column and one without.
-    "AE2" = "m26"; "AF2" = "19-May-2026"; "AG2" = "14-May-2026"; "AH2" = "14-May-2026"
-    "AE3" = "n26"; "AF3" = "22-Jun-2026"; "AG3" = "16-Jun-2026"; "AH3" = "16-Jun-2026"
-    "AE4" = "q26"; "AF4" = "21-Jul-2026"; "AG4" = "16-Jul-2026"
-    "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"
-    "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"
-    "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"
+    # expiry beside each, a copy of the options column with a blank, the day each contract's
+    # settle is published, and four creator cells: with the options column, without it, with the
+    # publication dates as well, and with the publication dates while the options are left out.
+    "AE2" = "m26"; "AF2" = "19-May-2026"; "AG2" = "14-May-2026"; "AH2" = "14-May-2026"; "AJ2" = "20-May-2026"
+    "AE3" = "n26"; "AF3" = "22-Jun-2026"; "AG3" = "16-Jun-2026"; "AH3" = "16-Jun-2026"; "AJ3" = "23-Jun-2026"
+    "AE4" = "q26"; "AF4" = "21-Jul-2026"; "AG4" = "16-Jul-2026"; "AJ4" = "22-Jul-2026"
+    "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"; "AJ5" = "21-Aug-2026"
+    "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"; "AJ6" = "23-Sep-2026"
+    "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"; "AJ7" = "21-Oct-2026"
     "AI1" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
     "AI2" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7)"
+    "AI3" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7,AJ2:AJ7)"
+    "AI4" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,,AJ2:AJ7)"
     # A holiday calendar: three days one market is closed, a copy of the column with a blank, and
     # two creator cells, one over the column and one over a single cell.
     "AK2" = "1-Jan-2026"; "AL2" = "1-Jan-2026"

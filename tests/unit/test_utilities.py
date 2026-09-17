@@ -76,23 +76,38 @@ def test_a_curve_spills_its_table_with_dates_as_serials_and_factors_exactly() ->
     ]
 
 
-def test_a_schedule_spills_three_columns_with_options_and_two_without() -> None:
+def test_a_schedule_spills_its_columns_with_the_publication_dates_last() -> None:
     codes = Cells.from_rows([["m26"], ["n26"]])
     futures = Cells.from_rows([[46161.0], [46195.0]])
     options = Cells.from_rows([[46156.0], [46189.0]])
-    with_options = bridge.call("_CreateExpirySchedule", [codes, futures, options])
+    publications = Cells.from_rows([[46162.0], [46196.0]])
+    with_options = bridge.call("_CreateExpirySchedule", [codes, futures, options, MISSING])
     assert rows(read(with_options)) == [
         ["future_code", "future_expiry", "option_expiry"],
         ["str", "datetime64[D]", "datetime64[D]"],
         ["m26", 46161.0, 46156.0],
         ["n26", 46195.0, 46189.0],
     ]
-    without = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING])
+    without = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, MISSING])
     assert rows(read(without)) == [
         ["future_code", "future_expiry"],
         ["str", "datetime64[D]"],
         ["m26", 46161.0],
         ["n26", 46195.0],
+    ]
+    every = bridge.call("_CreateExpirySchedule", [codes, futures, options, publications])
+    assert rows(read(every)) == [
+        ["future_code", "future_expiry", "option_expiry", "publication_date"],
+        ["str", "datetime64[D]", "datetime64[D]", "datetime64[D]"],
+        ["m26", 46161.0, 46156.0, 46162.0],
+        ["n26", 46195.0, 46189.0, 46196.0],
+    ]
+    published = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, publications])
+    assert rows(read(published)) == [
+        ["future_code", "future_expiry", "publication_date"],
+        ["str", "datetime64[D]", "datetime64[D]"],
+        ["m26", 46161.0, 46162.0],
+        ["n26", 46195.0, 46196.0],
     ]
 
 

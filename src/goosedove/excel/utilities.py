@@ -10,6 +10,7 @@ from functools import singledispatch
 from typing import Annotated
 
 import numpy as np
+from numpy.typing import NDArray
 
 from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
@@ -49,21 +50,19 @@ def discount_curve_table(obj: DiscountCurve) -> MixedArray:
 
 @shown.register
 def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
-    if obj.option_expiry is None:
-        return MixedArray.table(
-            [("future_code", "future_expiry"), ("str", "datetime64[D]")],
-            obj.codes,
-            obj.future_expiry,
-        )
-    return MixedArray.table(
-        [
-            ("future_code", "future_expiry", "option_expiry"),
-            ("str", "datetime64[D]", "datetime64[D]"),
-        ],
-        obj.codes,
-        obj.future_expiry,
-        obj.option_expiry,
-    )
+    # The codes and the futures always, then the options and the publication dates when the
+    # schedule holds them, in that order, so the publication dates are the last column.
+    headers = ["future_code", "future_expiry"]
+    columns: list[NDArray[np.datetime64] | tuple[str, ...]] = [obj.codes, obj.future_expiry]
+    for header, dates in (
+        ("option_expiry", obj.option_expiry),
+        ("publication_date", obj.publication_date),
+    ):
+        if dates is not None:
+            headers.append(header)
+            columns.append(dates)
+    types = ["str"] + ["datetime64[D]"] * (len(columns) - 1)
+    return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
 @shown.register

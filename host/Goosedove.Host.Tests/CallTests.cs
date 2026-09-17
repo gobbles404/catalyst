@@ -116,9 +116,11 @@ namespace Goosedove.Host.Tests
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
-            // The expiry schedule: a column of codes and two of dates, one row per code, the third column optional.
-            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0) }, "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
-            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0) }, "#ERROR _CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
+            // The expiry schedule: a column of codes and up to three of dates, one row per code, the third and fourth columns optional; a futures column one row short, a blank among the options, a publication column one row short and a blank among the publication dates with the options left out.
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0), Column(46156.0, 46189.0, 46219.0), ExcelMissing.Value }, "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 2 dates, expected 3, one per future_code" };
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, ExcelEmpty.Value, 46219.0), ExcelMissing.Value }, "#ERROR _CreateExpirySchedule: option_expiry cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), Column(46156.0, 46189.0, 46219.0), Column(46162.0, 46196.0) }, "#ERROR _CreateExpirySchedule: ValueError: publication_date has 2 dates, expected 3, one per future_code" };
+            yield return new object[] { "_CreateExpirySchedule", new object[] { Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value, Column(46162.0, ExcelEmpty.Value, 46225.0) }, "#ERROR _CreateExpirySchedule: publication_date cell (2, 1) is blank, expected date" };
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
@@ -145,17 +147,35 @@ namespace Goosedove.Host.Tests
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
-        // and each creator call publishes its own handle.
+        // four make one with the publication dates, and the publication dates with the options
+        // left out make one whose spill puts them last; each creator call publishes its own handle.
         [Fact]
-        public void an_expiry_schedule_is_created_with_and_without_options()
+        public void an_expiry_schedule_is_created_with_and_without_options_and_publication_dates()
         {
             var codes = Column("m26", "n26", "q26");
             var futures = Column(46161.0, 46195.0, 46224.0);
-            var withOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, Column(46156.0, 46189.0, 46219.0));
-            var withoutOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value);
+            var options = Column(46156.0, 46189.0, 46219.0);
+            var publications = Column(46162.0, 46196.0, 46225.0);
+            var withOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, options, ExcelMissing.Value);
+            var withoutOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value, ExcelMissing.Value);
+            var withPublications = (string)Seam.Call("_CreateExpirySchedule", codes, futures, options, publications);
+            var publishedWithoutOptions = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value, publications);
             Assert.StartsWith("expiry_schedule:", withOptions);
             Assert.StartsWith("expiry_schedule:", withoutOptions);
+            Assert.StartsWith("expiry_schedule:", withPublications);
+            Assert.StartsWith("expiry_schedule:", publishedWithoutOptions);
             Assert.NotEqual(withOptions, withoutOptions);
+            Assert.NotEqual(withPublications, publishedWithoutOptions);
+            var spill = (object[,])Seam.Call("util_ReadHandle", withPublications);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(4, spill.GetLength(1));
+            Assert.Equal("publication_date", spill[0, 3]);
+            Assert.Equal("datetime64[D]", spill[1, 3]);
+            Assert.Equal(46225.0, spill[4, 3]);
+            var published = (object[,])Seam.Call("util_ReadHandle", publishedWithoutOptions);
+            Assert.Equal(3, published.GetLength(1));
+            Assert.Equal("publication_date", published[0, 2]);
+            Assert.Equal(46162.0, published[2, 2]);
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and

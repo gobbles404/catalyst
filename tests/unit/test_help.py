@@ -79,10 +79,12 @@ def test_the_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateExpirySchedule"]
     assert not hidden
     assert description == (
-        "Creates an expiry schedule from the contract codes of one index and their expiry dates, "
-        "and shows its handle, the text other formulas take as the schedule."
+        "Creates an expiry schedule from the contract codes of one index, their expiry dates and, "
+        "where given, the dates their settles are published, and shows its handle, the text other "
+        "formulas take as the schedule."
     )
-    # The third argument may be left out with nothing in its place: brackets, and its line alone.
+    # The third and fourth arguments may be left out with nothing in their place: brackets, and
+    # each line alone.
     assert arguments == [
         (
             "future_code",
@@ -95,6 +97,11 @@ def test_the_schedule_creator_explains_itself() -> None:
         (
             "[option_expiry]",
             "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
+        ),
+        (
+            "[publication_date]",
+            "The column of dates each contract's settle is published, beside the codes, such as "
+            "D2:D7, one per code.",
         ),
     ]
 
