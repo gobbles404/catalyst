@@ -92,12 +92,34 @@ def test_the_headers_bind_in_either_order() -> None:
         ),
         (
             HEADERS,
-            Cells.from_rows([[SEP_11, 1.0], [SEP_13, 0.9]]),
-            "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-13, "
-            "expected 2026-09-12, one day after the row above",
+            Cells.from_rows([[SEP_13, 1.0], [SEP_11, 0.9]]),
+            "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, "
+            "expected a date after row 1's 2026-09-13",
         ),
     ],
-    ids=["an unknown header", "text in the date column", "a first factor not one", "a gap"],
+    ids=[
+        "an unknown header",
+        "text in the date column",
+        "a first factor not one",
+        "dates backwards",
+    ],
 )
 def test_a_curve_that_cannot_be_made_says_why(headers: Cells, body: Cells, text: str) -> None:
     assert bridge.call("CreateDiscountCurve", [headers, body]) == text
+
+
+# Anchors two days apart make a curve of three days: the day between is on the straight line,
+# and ReadHandle shows every day, which is how a projection is checked.
+def test_a_gap_between_anchors_is_filled_and_shown_day_by_day() -> None:
+    text = cast(
+        str,
+        bridge.call(
+            "CreateDiscountCurve", [HEADERS, Cells.from_rows([[SEP_11, 1.0], [SEP_13, 0.9998]])]
+        ),
+    )
+    spill = bridge.call("ReadHandle", [text])
+    assert isinstance(spill, tuple)
+    _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
+    assert slots[2:, 0].tolist() == [SEP_11, SEP_12, SEP_13]
+    assert slots[2, 1] == 1.0 and slots[4, 1] == 0.9998
+    assert abs(slots[3, 1] - 0.9999) < 1e-15

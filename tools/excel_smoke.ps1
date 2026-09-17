@@ -78,6 +78,14 @@ $formulas = [ordered]@{
     "=CreateValuationDate(Y2,1.5)" = "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
     "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
+    # The curve from anchors: three anchors over eleven days, read back day by day through
+    # ReadHandle, an anchor exact and a day between on the straight line; and dates that run
+    # backwards.
+    "=ROWS(ReadHandle(AW1))"      = "13"
+    "=INDEX(ReadHandle(AW1),5,2)" = "0.9998"
+    "=INDEX(ReadHandle(AW1),6,2)" = "0.9997"
+    "=INDEX(ReadHandle(AW1),13,1)" = "46286"
+    "=CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
     # The expiry schedule: a creator with three columns and one with two, a futures column one
     # row short, and a blank in the options column.
     "=LEFT(AI1,16)"               = "expiry_schedule:"
@@ -179,6 +187,14 @@ $cells = [ordered]@{
     # The contract spec: a name, a lot size and two fees as the desk types them, and one creator cell.
     "AR2" = "WTI"; "AR3" = "1000"; "AR4" = "3"; "AR5" = "2"
     "AS1" = "=CreateContractSpec(AR2,AR3,AR4,AR5)"
+    # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
+    # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
+    "AU2" = "11-Sep-2026"; "AV2" = "1"
+    "AU3" = "14-Sep-2026"; "AV3" = "0.9997"
+    "AU4" = "21-Sep-2026"; "AV4" = "0.999"
+    "AX2" = "14-Sep-2026"; "AY2" = "1"
+    "AX3" = "11-Sep-2026"; "AY3" = "0.9997"
+    "AW1" = "=CreateDiscountCurve(Y1:Z1,AU2:AV4)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

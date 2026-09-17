@@ -26,7 +26,6 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 |---|---|---|
 | Create | makes an object from what the sheet supplies and shows its handle | `CreateDiscountCurve` |
 | Read | shows what an object holds, and changes nothing | `ReadHandle` |
-| Interpolate | fills the gaps between supplied points | `InterpolateDiscountFactors` |
 
 ## Tables
 

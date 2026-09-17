@@ -108,6 +108,8 @@ namespace Goosedove.Host.Tests
             // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
             yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
             yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
+            // The curve from anchors: dates that run backwards are never sorted.
+            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
             yield return new object[] { "ReadHandle", new object[] { "x" }, "#ERROR ReadHandle: handle is text 'x' naming no live object, expected a handle" };
             yield return new object[] { "ReadHandle", new object[] { 46276.0 }, "#ERROR ReadHandle: handle is number 46276.0, expected a handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
@@ -206,6 +208,23 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46164.0, array[0, 1]);
             Assert.Equal(true, array[1, 0]);
             Assert.Equal(2.5, array[1, 1]);
+        }
+
+        // A curve from anchors: three anchors over eleven days make eleven days, and ReadHandle
+        // spills them all, the anchors exactly and a day between on the straight line.
+        [Fact]
+        public void a_curve_from_anchors_spills_every_day_between_them()
+        {
+            var anchors = new object[,] { { 46276.0, 1.0 }, { 46279.0, 0.9997 }, { 46286.0, 0.999 } };
+            var handle = (string)Seam.Call("CreateDiscountCurve", Row("date", "discount_factor"), anchors);
+            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            Assert.Equal(13, spill.GetLength(0));
+            Assert.Equal(46276.0, spill[2, 0]);
+            Assert.Equal(1.0, spill[2, 1]);
+            Assert.Equal(0.9997, spill[5, 1]);
+            Assert.Equal(46286.0, spill[12, 0]);
+            Assert.Equal(0.999, spill[12, 1]);
+            Assert.Equal(0.9998, (double)spill[4, 1], 12);
         }
 
         // A handle: the creator's text stands for the curve, ReadHandle spills the curve's table

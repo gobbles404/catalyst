@@ -45,8 +45,8 @@ def test_the_curve_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["CreateDiscountCurve"]
     assert not hidden
     assert description == (
-        "Creates a discount curve from a daily table and shows its handle, the text other "
-        "formulas take as the curve."
+        "Creates a discount curve from anchor dates and their discount factors, every day "
+        "between filled in, and shows its handle, the text other formulas take as the curve."
     )
     assert arguments == [
         (
@@ -56,8 +56,9 @@ def test_the_curve_creator_explains_itself() -> None:
         ),
         (
             "table",
-            "The rows under the headers, such as A2:B400: one calendar day per row with its "
-            "discount factor, starting at 1 and never rising.",
+            "The rows under the headers, such as A2:B12: one anchor per row, its date and "
+            "discount factor, dates increasing from the valuation date at 1, the factors never "
+            "rising.",
         ),
     ]
 
