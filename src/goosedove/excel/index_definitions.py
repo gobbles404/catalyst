@@ -50,10 +50,16 @@ def _CreateExpirySchedule(
         DateColumn | None,
         "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
     ] = None,
+    publication_date: Annotated[
+        DateColumn | None,
+        "The column of dates each contract's settle is published, beside the codes, such as "
+        "D2:D7, one per code.",
+    ] = None,
 ) -> Handle[ExpirySchedule]:
-    """Creates an expiry schedule from the contract codes of one index and their expiry dates,
-    and shows its handle, the text other formulas take as the schedule."""
-    return expiry_schedule(future_code, future_expiry, option_expiry)
+    """Creates an expiry schedule from the contract codes of one index, their expiry dates and,
+    where given, the dates their settles are published, and shows its handle, the text other
+    formulas take as the schedule."""
+    return expiry_schedule(future_code, future_expiry, option_expiry, publication_date)
 
 
 @excel_function

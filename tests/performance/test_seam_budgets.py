@@ -659,28 +659,70 @@ def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) ->
     }
 
 
-# --- the first index definition: three columns in, one publication out -----------------
+# --- the first index definition: up to four columns in, one publication out --------------
 
 
-def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
-    """Codes and two date columns for that many monthly contracts, as the sheet sends them."""
+def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells, Cells]:
+    """Codes and three date columns for that many monthly contracts, as the sheet sends them:
+    the futures, the options and the publication dates."""
     codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
     futures = Cells.from_rows([[46161.0 + 30 * i] for i in range(contracts)])
     options = Cells.from_rows([[46156.0 + 30 * i] for i in range(contracts)])
-    return codes, futures, options
+    publications = Cells.from_rows([[46162.0 + 30 * i] for i in range(contracts)])
+    return codes, futures, options, publications
 
 
-# Ten years of monthly contracts: the text column handed over as it is, one look and two
-# conversions per date column, the builder's two copies, and one publication.
-def test_an_expiry_schedule_is_three_columns_in_and_one_publication_out(
+# Ten years of monthly contracts with every column: the text column handed over as it is, one
+# look and two conversions per date column, the builder's three copies, and one publication.
+# Thirty-four calls across fifteen functions, the accept rule once per argument.
+def test_an_expiry_schedule_is_four_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes, futures, options = schedule_columns(120)
-    PATH["_CreateExpirySchedule"](codes, futures, options)
-    assert call_profile(lambda: PATH["_CreateExpirySchedule"](codes, futures, options)) == {
+    codes, futures, options, publications = schedule_columns(120)
+    PATH["_CreateExpirySchedule"](codes, futures, options, publications)
+    assert call_profile(
+        lambda: PATH["_CreateExpirySchedule"](codes, futures, options, publications)
+    ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
+        "_validate": 4,
+        "_text_column": 1,
+        "_date_column": 3,
+        "_one_column": 4,
+        "_shape": 4,
+        "_texts": 1,
+        "_dates": 3,
+        "_not_dates": 3,
+        "_as_days": 3,
+        "_CreateExpirySchedule": 1,
+        "expiry_schedule": 1,
+        "_one_per_code": 3,  # the one rule, once per date column
+        "_publish": 1,
+    }
+    assert numpy_calls(
+        lambda: PATH["_CreateExpirySchedule"](codes, futures, options, publications)
+    ) == {
+        "ndarray.any": 3,  # one look per date column, for the calendar
+        "ndarray.astype": 6,  # each date column on its way to days
+        "numpy.array": 3,  # the three copies the schedule keeps
+        "ndarray.setflags": 3,  # frozen
+        "ufunc.reduce": 3,
+    }
+
+
+# The publication dates with the options left out: three columns' cost, the same as with the
+# options and without the publication dates, since a column left out costs nothing.
+def test_an_expiry_schedule_with_publication_dates_alone_pays_for_three_columns(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, futures, _, publications = schedule_columns(120)
+    PATH["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    assert call_profile(
+        lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    ) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 4,
         "_text_column": 1,
         "_date_column": 2,
         "_one_column": 3,
@@ -691,28 +733,33 @@ def test_an_expiry_schedule_is_three_columns_in_and_one_publication_out(
         "_as_days": 2,
         "_CreateExpirySchedule": 1,
         "expiry_schedule": 1,
-        "_one_per_code": 2,  # the one rule, once per date column
+        "_one_per_code": 2,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateExpirySchedule"](codes, futures, options)) == {
-        "ndarray.any": 2,  # one look per date column, for the calendar
-        "ndarray.astype": 4,  # each date column on its way to days
-        "numpy.array": 2,  # the two copies the schedule keeps
-        "ndarray.setflags": 2,  # frozen
+    assert numpy_calls(
+        lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    ) == {
+        "ndarray.any": 2,
+        "ndarray.astype": 4,
+        "numpy.array": 2,
+        "ndarray.setflags": 2,
         "ufunc.reduce": 2,
     }
 
 
-# The third column left out: the stored default is handed over, and nothing runs for it.
-def test_an_expiry_schedule_without_options_pays_for_two_columns(
+# The third and fourth columns left out: the stored defaults are handed over, and nothing runs
+# for them beyond the accept rule's one call each.
+def test_an_expiry_schedule_without_options_or_publication_dates_pays_for_two_columns(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes, futures, _ = schedule_columns(120)
-    PATH["_CreateExpirySchedule"](codes, futures, MISSING)
-    assert call_profile(lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING)) == {
+    codes, futures, _, _ = schedule_columns(120)
+    PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
+    assert call_profile(
+        lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
+    ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
+        "_validate": 4,
         "_text_column": 1,
         "_date_column": 1,
         "_one_column": 2,
@@ -726,7 +773,7 @@ def test_an_expiry_schedule_without_options_pays_for_two_columns(
         "_one_per_code": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING)) == {
+    assert numpy_calls(lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)) == {
         "ndarray.any": 1,
         "ndarray.astype": 2,
         "numpy.array": 1,
