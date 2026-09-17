@@ -2,7 +2,7 @@
 
 Built in #78; the one-contract form was #69.
 
-The contract specifications of one index: the name of each contract the index trades as, the quantity in one lot of it, and the brokerage and clearing charged per lot, one row per contract, kept as given and reached by handle. An index traded on more than one exchange, gas as NYMEX lots and as ICE lots, has a row for each. Nothing reads the specifications yet, and nothing checks the facts beyond each name once; that check is a task for later, noted at the builder rather than on a backlog. The code is `src/goosedove/index_definitions/contract_specifications.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
+The contract specifications of one index: the name of each contract the index trades as, the quantity in one lot of it, and the brokerage and clearing charged per lot, one row per contract, each name once and each lot size whole, the rest kept as given, and reached by handle. An index traded on more than one exchange, gas as NYMEX lots and as ICE lots, has a row for each. Nothing reads the specifications yet, and nothing checks the facts beyond those two rules; the rest is a task for later, noted at the builder rather than on a backlog. The code is `src/goosedove/index_definitions/contract_specifications.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 
