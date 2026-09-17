@@ -9,8 +9,16 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import DateColumn, Handle, TextColumn, excel_function
-from goosedove.index_definitions.contract_spec import ContractSpec, contract_spec
+from goosedove.excel.bridge import (
+    DateColumn,
+    Handle,
+    NumberColumn,
+    Table,
+    TextColumn,
+    TextRow,
+    excel_function,
+)
+from goosedove.index_definitions.contract_specs import ContractSpecs, contract_specs
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
@@ -18,7 +26,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions, inde
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
-    "_CreateContractSpec",
+    "_CreateContractSpecs",
     "_CreateExpirySchedule",
     "_CreateHolidayCalendar",
     "_CreateIndexConventions",
@@ -77,14 +85,33 @@ def _CreateIndexConventions(
     )
 
 
+class ContractSpecsTable(Table):
+    """The contracts' table: one row per contract an index trades as, its name, lot size and the
+    two fees per lot."""
+
+    name: TextColumn
+    lot_size: NumberColumn
+    brokerage_rate_per_lot: NumberColumn
+    clearing_rate_per_lot: NumberColumn
+
+
 @excel_function
-def _CreateContractSpec(
-    name: Annotated[str, "The contract's name as the desk calls it, such as WTI."],
-    lot_size: Annotated[int, "The quantity in one lot, a whole number such as 1000."],
-    brokerage_rate_per_lot: Annotated[float, "The brokerage charged per lot, such as 3.00."],
-    clearing_rate_per_lot: Annotated[float, "The clearing fee charged per lot, such as 2.00."],
-) -> Handle[ContractSpec]:
-    """Creates a contract spec, the name, lot size and fees per lot of one contract, and shows
-    its handle, the text other formulas take as the spec."""
-    # The four facts are not checked yet: what must hold is a later task, noted in the builder.
-    return contract_spec(name, lot_size, brokerage_rate_per_lot, clearing_rate_per_lot)
+def _CreateContractSpecs(
+    header_row: Annotated[
+        TextRow,
+        "The header cells of your contract table, such as A1:D1, reading name, lot_size, "
+        "brokerage_rate_per_lot and clearing_rate_per_lot in any order.",
+    ],
+    table: Annotated[
+        ContractSpecsTable,
+        "The rows under the headers, such as A2:D3: one contract per row, its name, lot size and "
+        "the two fees per lot, each name once.",
+    ],
+) -> Handle[ContractSpecs]:
+    """Creates the contract specs of one index, the name, lot size and fees per lot of each
+    contract it trades as, and shows its handle, the text other formulas take as the specs."""
+    # Beyond each name once and each lot size whole, the facts are not checked yet: a later task,
+    # noted in the builder.
+    return contract_specs(
+        table.name, table.lot_size, table.brokerage_rate_per_lot, table.clearing_rate_per_lot
+    )

@@ -794,28 +794,56 @@ def test_index_conventions_are_five_texts_in_and_one_publication_out(
     assert numpy_calls(lambda: PATH["_CreateIndexConventions"](*codes)) == {}
 
 
-# --- the fourth index definition: four scalars in, one publication out -----------------
+# --- the fourth index definition: a table of contracts in, one publication out ----------
 
 
-# A text, a whole number and two numbers, each through its rule, the whole number through the
-# number rule on its way; the builder and one publication, nothing asked of numpy.
-def test_a_contract_spec_is_four_scalars_in_and_one_publication_out(
+SPEC_HEADERS = Cells.from_rows(
+    [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+)
+
+
+def spec_body(contracts: int) -> Cells:
+    """That many contracts as the sheet sends them: a name, a whole lot size and two fees."""
+    return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
+
+
+# A dozen contracts at the table path: the header row as any row of text, the body admitted as
+# a mixed range and bound, then each column through its rule, the names gathered and the three
+# number columns as views, the builder's look at the lot sizes for a fraction, its three copies
+# and one publication. Twenty-one calls across eighteen functions.
+def test_contract_specs_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    facts = ("WTI", 1000.0, 3.0, 2.0)
-    PATH["_CreateContractSpec"](*facts)
-    assert call_profile(lambda: PATH["_CreateContractSpec"](*facts)) == {
+    body = spec_body(12)
+    PATH["_CreateContractSpecs"](SPEC_HEADERS, body)
+    assert call_profile(lambda: PATH["_CreateContractSpecs"](SPEC_HEADERS, body)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 4,
-        "_text": 1,
-        "_whole": 1,
-        "_number": 3,  # the lot size on its way to whole, then the two fees
-        "_CreateContractSpec": 1,
-        "contract_spec": 1,
+        "_validate": 2,
+        "_text_row": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_texts": 1,
+        "_mixed": 1,
+        "MixedArray.shape": 1,
+        "_refine": 1,
+        "_bind": 1,
+        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
+        "_text_places": 1,
+        "_texts_of": 1,
+        "_numbers_of": 3,
+        "_CreateContractSpecs": 1,
+        "contract_specs": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateContractSpec"](*facts)) == {}
+    assert numpy_calls(lambda: PATH["_CreateContractSpecs"](SPEC_HEADERS, body)) == {
+        "ndarray.any": 5,  # one look per column, then the builder's, for a lot size with a fraction
+        "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
+        "ndarray.cumsum": 1,  # the text cells above each row
+        "ndarray.sum": 2,  # text cells per row, and to the left
+        "ndarray.setflags": 3,  # frozen
+        "ufunc.reduce": 7,
+    }
 
 
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.

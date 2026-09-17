@@ -136,18 +136,24 @@ def test_the_conventions_creator_explains_itself() -> None:
     ]
 
 
-def test_the_spec_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateContractSpec"]
+def test_the_specs_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateContractSpecs"]
     assert not hidden
     assert description == (
-        "Creates a contract spec, the name, lot size and fees per lot of one contract, and "
-        "shows its handle, the text other formulas take as the spec."
+        "Creates the contract specs of one index, the name, lot size and fees per lot of each "
+        "contract it trades as, and shows its handle, the text other formulas take as the specs."
     )
     assert arguments == [
-        ("name", "The contract's name as the desk calls it, such as WTI."),
-        ("lot_size", "The quantity in one lot, a whole number such as 1000."),
-        ("brokerage_rate_per_lot", "The brokerage charged per lot, such as 3.00."),
-        ("clearing_rate_per_lot", "The clearing fee charged per lot, such as 2.00."),
+        (
+            "header_row",
+            "The header cells of your contract table, such as A1:D1, reading name, lot_size, "
+            "brokerage_rate_per_lot and clearing_rate_per_lot in any order.",
+        ),
+        (
+            "table",
+            "The rows under the headers, such as A2:D3: one contract per row, its name, lot size "
+            "and the two fees per lot, each name once.",
+        ),
     ]
 
 

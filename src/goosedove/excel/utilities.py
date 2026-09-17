@@ -14,7 +14,7 @@ import numpy as np
 from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_spec import ContractSpec
+from goosedove.index_definitions.contract_specs import ContractSpecs
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -116,16 +116,16 @@ def index_conventions_table(obj: IndexConventions) -> MixedArray:
 
 
 @shown.register
-def contract_spec_table(obj: ContractSpec) -> MixedArray:
+def contract_specs_table(obj: ContractSpecs) -> MixedArray:
     return MixedArray.table(
         [
             ("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
-            ("str", "int", "float", "float"),
+            ("str", "float64", "float64", "float64"),
         ],
-        (obj.name,),
-        np.array([obj.lot_size]),
-        np.array([obj.brokerage_rate_per_lot]),
-        np.array([obj.clearing_rate_per_lot]),
+        obj.names,
+        obj.lot_sizes,
+        obj.brokerage_rates_per_lot,
+        obj.clearing_rates_per_lot,
     )
 
 
