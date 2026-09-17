@@ -1,4 +1,4 @@
-"""The discount curve: the rules of meaning and the retained arrays."""
+"""The discount curve: the rules of meaning on the anchors, and the daily arrays the curve keeps."""
 
 import numpy as np
 import pytest
@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import discount_curve
 
 EPOCH = np.datetime64("1899-12-30")
+ONE_DAY = np.timedelta64(1, "D")
 
 
 def days(start: str, count: int) -> NDArray[np.datetime64]:
@@ -26,16 +27,41 @@ def factors(*values: float) -> NDArray[np.float64]:
 THREE_DAYS = days("2026-09-11", 3)
 THREE_FACTORS = factors(1.0, 0.9999, 0.9998)
 
+# The page's sample: the owner's eleven anchors, 22 May to 18 December 2026, as serials.
+SAMPLE_SERIALS = [46164, 46165, 46166, 46171, 46178, 46194, 46254, 46284, 46314, 46344, 46374]
+SAMPLE_FACTORS = factors(
+    1.0, 0.9999, 0.9998, 0.99929, 0.99858, 0.99685, 0.99374, 0.99049, 0.9873, 0.98063, 0.97761
+)
+SAMPLE_DATES = EPOCH + np.array(SAMPLE_SERIALS).astype("timedelta64[D]")
+
 
 # --- what is accepted -------------------------------------------------------
 
 
-def test_a_valid_table_keeps_every_pair_aligned() -> None:
+def test_a_daily_table_keeps_every_pair_aligned() -> None:
     curve = discount_curve(THREE_DAYS, THREE_FACTORS)
     assert (curve.dates == THREE_DAYS).all()
     assert curve.factors.tolist() == [1.0, 0.9999, 0.9998]
     assert curve.start_date == np.datetime64("2026-09-11")
     assert curve.max_date == np.datetime64("2026-09-13")
+
+
+# Anchors two days apart: the day between takes the straight line, and the anchors stay exact.
+def test_a_gap_between_anchors_is_filled_a_day_at_a_time() -> None:
+    curve = discount_curve(dates("2026-09-11", "2026-09-12", "2026-09-14"), THREE_FACTORS)
+    assert np.array_equal(curve.dates, days("2026-09-11", 4))
+    assert curve.factors[[0, 1, 3]].tolist() == [1.0, 0.9999, 0.9998]
+    assert abs(curve.factors[2] - 0.99985) < 1e-15
+
+
+def test_the_pages_eleven_anchors_fill_two_hundred_and_eleven_days() -> None:
+    curve = discount_curve(SAMPLE_DATES, SAMPLE_FACTORS)
+    assert curve.dates.size == curve.factors.size == 211
+    assert curve.start_date == np.datetime64("2026-05-22")
+    assert curve.max_date == np.datetime64("2026-12-18")
+    at = np.array(SAMPLE_SERIALS) - SAMPLE_SERIALS[0]
+    assert curve.factors[at].tolist() == SAMPLE_FACTORS.tolist()
+    assert (curve.factors[1:] <= curve.factors[:-1]).all()
 
 
 def test_consecutive_days_run_across_a_year_end_and_a_leap_day() -> None:
@@ -55,6 +81,30 @@ def test_flat_and_one_row_curves_are_curves(values: NDArray[np.float64]) -> None
     assert curve.factors.tolist() == values.tolist()
 
 
+# The reviewer's anchors of #70, through the builder: a curve never rises, even on its last day
+# near underflow.
+def test_a_curve_near_underflow_never_rises() -> None:
+    anchor_dates = EPOCH + np.array([46023, 46024, 46324]).astype("timedelta64[D]")
+    curve = discount_curve(anchor_dates, factors(1.0, 1e-307, 9.9999999999999e-308))
+    assert (curve.factors[1:] <= curve.factors[:-1]).all()
+    assert curve.factors[-1] == 9.9999999999999e-308
+
+
+# The most days a curve holds is what ReadHandle can show: a sheet's rows less its two heading
+# rows. The last day of the longest curve is 1,048,573 days after the first; one more fails.
+def test_a_curve_holds_at_most_what_a_sheet_shows() -> None:
+    first = np.datetime64("2026-09-11")
+    last = first + np.timedelta64(1_048_573, "D")
+    longest = discount_curve(np.array([first, last]), factors(1.0, 0.5))
+    assert longest.dates.size == 1_048_574
+    beyond = last + ONE_DAY
+    with pytest.raises(ValueError) as failure:
+        discount_curve(np.array([first, beyond]), factors(1.0, 0.5))
+    assert str(failure.value) == (
+        f"date row 2 is {beyond}, expected within 1048573 days of row 1's 2026-09-11"
+    )
+
+
 # --- what is rejected, with the row named as the sheet counts ---------------
 
 
@@ -62,23 +112,21 @@ def test_flat_and_one_row_curves_are_curves(values: NDArray[np.float64]) -> None
     ("bad_dates", "message"),
     [
         (
-            dates("2026-09-11", "2026-09-12", "2026-09-14"),
-            "date row 3 is 2026-09-14, expected 2026-09-13, one day after the row above",
-        ),
-        (
             dates("2026-09-11", "2026-09-11", "2026-09-12"),
-            "date row 2 is 2026-09-11, expected 2026-09-12, one day after the row above",
+            "date row 2 is 2026-09-11, expected a date after row 1's 2026-09-11",
         ),
         (
             dates("2026-09-13", "2026-09-12", "2026-09-11"),
-            "date row 2 is 2026-09-12, expected 2026-09-14, one day after the row above",
+            "date row 2 is 2026-09-12, expected a date after row 1's 2026-09-13",
+        ),
+        (
+            dates("2026-09-11", "2026-09-20", "2026-09-15"),
+            "date row 3 is 2026-09-15, expected a date after row 2's 2026-09-20",
         ),
     ],
-    ids=["a missing day", "a duplicate date", "reversed rows"],
+    ids=["a duplicate date", "reversed rows", "a step back after a gap"],
 )
-def test_dates_are_neither_sorted_nor_filled(
-    bad_dates: NDArray[np.datetime64], message: str
-) -> None:
+def test_dates_are_never_sorted(bad_dates: NDArray[np.datetime64], message: str) -> None:
     with pytest.raises(ValueError) as failure:
         discount_curve(bad_dates, THREE_FACTORS)
     assert str(failure.value) == message
@@ -127,7 +175,7 @@ def test_factors_are_neither_rescaled_nor_clipped(
 
 
 @given(start=st.integers(61, 2958465 - 400), count=st.integers(1, 400), data=st.data())
-def test_any_valid_table_keeps_pairing_and_length(
+def test_any_daily_table_keeps_pairing_and_length(
     start: int, count: int, data: st.DataObject
 ) -> None:
     steps = data.draw(st.lists(st.floats(0.0, 0.001), min_size=count - 1, max_size=count - 1))
@@ -137,6 +185,21 @@ def test_any_valid_table_keeps_pairing_and_length(
     assert curve.dates.size == curve.factors.size == count
     assert (curve.dates == table_dates).all()
     assert (curve.factors == values).all()
+
+
+@given(start=st.integers(61, 2958465 - 5000), count=st.integers(1, 12), data=st.data())
+def test_any_anchors_give_one_day_per_calendar_day_with_every_anchor_kept(
+    start: int, count: int, data: st.DataObject
+) -> None:
+    gaps = data.draw(st.lists(st.integers(1, 400), min_size=count - 1, max_size=count - 1))
+    offsets = np.concatenate(([0], np.cumsum(gaps, dtype=np.int64))).astype(np.int64)
+    steps = data.draw(st.lists(st.floats(0.0, 0.01), min_size=count - 1, max_size=count - 1))
+    values = np.concatenate(([1.0], 1.0 - np.cumsum(steps)))
+    anchor_dates = EPOCH + (start + offsets).astype("timedelta64[D]")
+    curve = discount_curve(anchor_dates, values)
+    assert curve.dates.size == curve.factors.size == int(offsets[-1]) + 1
+    assert (np.diff(curve.dates) == ONE_DAY).all()
+    assert curve.factors[offsets].tolist() == values.tolist()
 
 
 def test_the_curve_owns_its_arrays() -> None:

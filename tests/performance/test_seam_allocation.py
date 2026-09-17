@@ -159,14 +159,33 @@ def test_reading_a_curve_back_peaks_at_its_table_and_the_roads_masks() -> None:
     assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 18 * cells + SLACK
 
 
-# A ten-year curve keeps its two arrays, 16 bytes per day, and on the way pays the table path's
-# conversion of the date column and its own five looks: measured 129,027 bytes at 3,631 days on
-# 2026-09-14, about 36 bytes per day.
-def test_a_discount_curve_keeps_two_arrays_and_pays_its_looks_once() -> None:
+def anchor_body(anchors: int, days: int) -> Cells:
+    """Anchors spread evenly over that many days from 11 September 2026, as the sheet sends them."""
+    step = days // (anchors - 1)
+    return Cells.from_rows([[46276.0 + i * step, 1.0 - i * step * 1e-5] for i in range(anchors)])
+
+
+# A ten-year curve from a daily table keeps its two arrays, 16 bytes per day, and on the way pays
+# the table path's conversion of the date column, the builder's looks, and the filling of every
+# day it was given, the anchors' offsets, the day grid, the anchors each day runs to and the two
+# results: measured 216,443 bytes at 3,631 days on 2026-09-17, about 60 bytes per day, up from
+# 129,027 when a daily table was copied rather than filled.
+def test_a_discount_curve_from_a_daily_table_pays_its_looks_and_its_filling_once() -> None:
     days = 3_631
     body = curve_body(days)
     assert (
-        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 36 * days + SLACK
+        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 60 * days + SLACK
+    )
+
+
+# A dozen anchors over ten years pay for the days they fill, not for the anchors: the day grid,
+# the offsets numpy interpolates over, the anchor each day runs to and the two arrays the curve
+# keeps, measured 89,602 bytes at 3,631 days on 2026-09-17, about 25 bytes per day.
+def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> None:
+    days = 3_631
+    body = anchor_body(12, days - 1)
+    assert (
+        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 25 * days + SLACK
     )
 
 

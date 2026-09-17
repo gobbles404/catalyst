@@ -10,14 +10,13 @@ These pages are for an engineer building a function and for the owner reviewing 
 |---|---|
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [globals/valuation-date.md](globals/valuation-date.md) | `CreateValuationDate`, a date and progress through that day |
-| [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, an explicit daily curve and its upper date bound |
+| [globals/discount-curve.md](globals/discount-curve.md) | `CreateDiscountCurve`, a daily curve from anchors, the days between filled by a straight line, and its upper date bound |
 | [globals/unit-conversions.md](globals/unit-conversions.md) | `UnitConversions`, the shipped unit definitions and the conversion between them |
-| [utilities/interpolate-discount-factors.md](utilities/interpolate-discount-factors.md) | `InterpolateDiscountFactors`, sparse points to a daily table |
 | [market-definitions/expiry-schedule.md](market-definitions/expiry-schedule.md) | `CreateExpirySchedule`, the contract months of one index and their expiry dates |
 | [market-definitions/holiday-calendar.md](market-definitions/holiday-calendar.md) | `CreateHolidayCalendar`, the days one market is closed, listed one by one |
 | [market-definitions/market-conventions.md](market-definitions/market-conventions.md) | `CreateMarketConventions`, the units one index is quoted, settled and measured in |
 | [market-definitions/contract-spec.md](market-definitions/contract-spec.md) | `CreateContractSpec`, the name, lot size and fees per lot of one contract |
-| [utilities/read-handle.md](utilities/read-handle.md) | `ReadHandle`, the object behind any handle spilled as the table its creator took |
+| [utilities/read-handle.md](utilities/read-handle.md) | `ReadHandle`, the object behind any handle spilled as a table, the one its creator took or, for a curve, the daily one it built |
 
 The handle that the creators return, text in a cell that stands for a live object, is the seam's: its spec is [handles.md](../seam/handles.md), with the evidence for its store in [excel-dna-handles.md](../seam/excel-dna-handles.md).
 
@@ -38,7 +37,7 @@ Three things not to do:
 
 ## Where it stands
 
-Built in #53: `CreateValuationDate` and `CreateDiscountCurve`. Built in #60: `CreateExpirySchedule`, the first market definition, the first function to take columns of one kind without headers, and the first to leave an argument out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Built in #66: `ReadHandle`, the object behind any handle spilled as the table its creator took, on the two seam items of #64 and #65; `util_ReadDiscountFactor`, the temporary reader of #53, went with it. Built in #67: `CreateHolidayCalendar`, the second market definition, one column of dates without headers, the list being the calendar. Built in #68: `CreateMarketConventions`, the third, five codes as text scalars kept as typed, their allowed values a task for later. Built in #69: `CreateContractSpec`, the fourth, a name, a whole-number lot size and two fees kept as given, what must hold of them a task for later too. Ready to ship: `UnitConversions` and `InterpolateDiscountFactors`.
+Built in #53: `CreateValuationDate` and `CreateDiscountCurve`. Built in #60: `CreateExpirySchedule`, the first market definition, the first function to take columns of one kind without headers, and the first to leave an argument out with nothing in its place ([inputs.md](../seam/inputs.md) decision 39). Built in #66: `ReadHandle`, the object behind any handle spilled as the table its creator took, on the two seam items of #64 and #65; `util_ReadDiscountFactor`, the temporary reader of #53, went with it. Built in #67: `CreateHolidayCalendar`, the second market definition, one column of dates without headers, the list being the calendar. Built in #68: `CreateMarketConventions`, the third, five codes as text scalars kept as typed, their allowed values a task for later. Built in #69: `CreateContractSpec`, the fourth, a name, a whole-number lot size and two fees kept as given, what must hold of them a task for later too. Since #70 `CreateDiscountCurve` takes anchors, the days between filled by `interpolate_discount_factors` in the library; the owner declined a worksheet surface for the interpolation, and its page folded into the curve's. Ready to ship: `UnitConversions`.
 
 Open across the library, gating nothing: release of a handle when its creator is deleted or its workbook closes, and reuse on an unchanged recalculation, specified in [handles.md](../seam/handles.md) and built by the next handle pull request; and whether library code takes a work counter, parked for the measurement session (issue #10), the functions built so far taking none, their work pinned at the seam. What the first pricing function must settle is under Not here on the pages it touches: how a calculation with several curves stays inside their dates, and the ordering of two valuation dates.
 

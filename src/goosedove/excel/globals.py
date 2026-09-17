@@ -37,7 +37,7 @@ def CreateValuationDate(
 
 
 class DiscountCurveTable(Table):
-    """The curve's table: one row per calendar day, the date and its discount factor."""
+    """The curve's table: one row per anchor, the date and its discount factor."""
 
     date: DateColumn
     discount_factor: NumberColumn
@@ -52,10 +52,10 @@ def CreateDiscountCurve(
     ],
     table: Annotated[
         DiscountCurveTable,
-        "The rows under the headers, such as A2:B400: one calendar day per row with its "
-        "discount factor, starting at 1 and never rising.",
+        "The rows under the headers, such as A2:B12: one anchor per row, its date and discount "
+        "factor, dates increasing from the valuation date at 1, the factors never rising.",
     ],
 ) -> Handle[DiscountCurve]:
-    """Creates a discount curve from a daily table and shows its handle, the text other
-    formulas take as the curve."""
+    """Creates a discount curve from anchor dates and their discount factors, every day between
+    filled in, and shows its handle, the text other formulas take as the curve."""
     return discount_curve(table.date, table.discount_factor)

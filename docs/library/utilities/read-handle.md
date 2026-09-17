@@ -2,7 +2,7 @@
 
 Built in #66.
 
-Reads the object a handle stands for onto the sheet as the table its creator took: a header row, a row of types, then one row per element. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. `util_ReadDiscountFactor` went with it: it existed only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it. The code is `src/goosedove/excel/utilities.py`, the function and the table each kind shows.
+Reads the object a handle stands for onto the sheet as a table, a header row, a row of types, then one row per element: the table its creator took, or, for a curve, the daily table the creator built from the anchors it took, every day between them. It is how a person sees what is in memory, checks a block before stacking the next one on it, and hands an engineer the exact thing a formula holds. `util_ReadDiscountFactor` went with it: it existed only to prove that a handle resolves, and reading a whole curve proves that better than reading one day of it. The code is `src/goosedove/excel/utilities.py`, the function and the table each kind shows.
 
 ## Worksheet contract
 
@@ -29,7 +29,7 @@ def ReadHandle(handle: Handle[object]) -> MixedArray: ...
 | 10 | 12-Sep-2026 | 0.9999 |
 | 11 | 13-Sep-2026 | 0.9998 |
 
-One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the table `CreateDiscountCurve` took, so `=CreateDiscountCurve(A7:B7, A9:B11)` makes an equal curve: a spill can be fed back to a creator.
+One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the daily table `CreateDiscountCurve` built, which as anchors with no gaps is one it takes, so `=CreateDiscountCurve(A7:B7, A9:B11)` makes an equal curve: a spill can be fed back to a creator. A curve built from sparse anchors spills its days, not its anchors, since #70.
 
 ## Excel help
 
@@ -46,14 +46,14 @@ None. Every kind the library publishes has a table, so there is no object the in
 
 ## The table
 
-The first row is the headers, in the creator's own words: the headers its table took, or its parameter names. The second row is the type of what the object holds in each column, in numpy's words where numpy holds it and Python's where Python does. Then one row per element, aligned across the columns as the object aligns them; a scalar field is a column of one row. A column the creator was given none of is not shown, and what a kind keeps only to make a lookup fast, such as the curve's day count of its start, is not a fact of the object and is not shown. Nothing is sorted, rounded or reformatted.
+The first row is the headers, in the creator's own words: the headers its table took, or its parameter names. The rows are what the object holds, which for a curve is every day the creator filled between its anchors. The second row is the type of what the object holds in each column, in numpy's words where numpy holds it and Python's where Python does. Then one row per element, aligned across the columns as the object aligns them; a scalar field is a column of one row. A column the creator was given none of is not shown, and what a kind keeps only to make a lookup fast, such as the curve's day count of its start, is not a fact of the object and is not shown. Nothing is sorted, rounded or reformatted.
 
 What each kind shows:
 
 | Kind | Headers | Types | Rows |
 |---|---|---|---|
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
-| `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day |
+| `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
 | `expiry_schedule` | `future_code`, `future_expiry`, and `option_expiry` when the index has options | `str`, `datetime64[D]`, `datetime64[D]` | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
 | `market_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |

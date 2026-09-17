@@ -131,6 +131,17 @@ def test_a_contract_spec_spills_its_four_fields_under_two_heading_rows() -> None
     ]
 
 
+# Anchors three days apart spill four days, the anchors exact and the days between on the line.
+def test_a_curve_from_anchors_spills_every_day_between_them() -> None:
+    anchors = Cells.from_rows([[SEP_11, 1.0], [SEP_11 + 3, 0.9997]])
+    kinds, slots, joined = read(bridge.call("CreateDiscountCurve", [HEADERS, anchors]))
+    assert kinds.shape == (6, 2)
+    assert joined == "date\0discount_factor\0datetime64[D]\0float64"
+    assert slots[2:, 0].tolist() == [SEP_11, SEP_12, SEP_13, SEP_11 + 3]
+    assert slots[2, 1] == 1.0 and slots[5, 1] == 0.9997
+    assert np.allclose(slots[3:5, 1], [0.9999, 0.9998], rtol=0, atol=1e-15)
+
+
 # --- a spill is the table its creator took ----------------------------------
 
 

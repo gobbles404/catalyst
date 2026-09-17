@@ -554,39 +554,64 @@ def test_a_valuation_date_is_two_scalars_in_and_one_publication_out(
     assert numpy_calls(lambda: PATH["CreateValuationDate"](46276.0, 0.5)) == {}
 
 
-# A ten-year curve: the table path, then the builder's own looks and the two copies it keeps.
+def anchor_body(anchors: int, days: int) -> Cells:
+    """Anchors spread evenly over that many days from 11 September 2026, as the sheet sends them."""
+    step = days // (anchors - 1)
+    return Cells.from_rows([[46276.0 + i * step, 1.0 - i * step * 1e-5] for i in range(anchors)])
+
+
+# A curve: the table path, the builder's own looks on the anchors, the days between them filled,
+# and one publication. The same functions run and the same looks are taken whether the anchors
+# are every day of ten years or a dozen over them: the work of filling is per day, inside one
+# numpy call, and no ledger counts it.
+CURVE_LEDGER = {
+    "Registered.run": 1,
+    "_arguments": 1,
+    "_validate": 2,
+    "_text_row": 1,
+    "_one_row": 1,
+    "_shape": 1,
+    "_texts": 1,
+    "_mixed": 1,
+    "MixedArray.shape": 1,
+    "_refine": 1,
+    "_bind": 1,
+    "_dates_of": 1,  # no column of text, so no text places are made
+    "_not_dates": 1,
+    "_as_days": 1,
+    "_numbers_of": 1,
+    "CreateDiscountCurve": 1,
+    "discount_curve": 1,
+    "interpolate_discount_factors": 1,
+    "_publish": 1,
+}
+CURVE_NUMPY = {
+    "ndarray.any": 5,  # one look per column, then finite, rising and unordered, one look each
+    "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
+    "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
+    "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
+    "ndarray.repeat": 1,  # the anchor each day runs to, which the line is held above
+    "ndarray.setflags": 2,  # frozen
+    "ufunc.reduce": 5,
+}
+
+
 def test_a_discount_curve_is_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     body = curve_body(3_631)
     PATH["CreateDiscountCurve"](CURVE_HEADERS, body)
-    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text_row": 1,
-        "_one_row": 1,
-        "_shape": 1,
-        "_texts": 1,
-        "_mixed": 1,
-        "MixedArray.shape": 1,
-        "_refine": 1,
-        "_bind": 1,
-        "_dates_of": 1,  # no column of text, so no text places are made
-        "_not_dates": 1,
-        "_as_days": 1,
-        "_numbers_of": 1,
-        "CreateDiscountCurve": 1,
-        "discount_curve": 1,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == {
-        "ndarray.any": 5,  # one look per column, then finite, rising and gapped, one look each
-        "ndarray.astype": 2,  # the date column on its way to days
-        "numpy.array": 2,  # the two copies the curve keeps
-        "ndarray.setflags": 2,  # frozen
-        "ufunc.reduce": 5,
-    }
+    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
+    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
+
+
+def test_a_curve_from_a_dozen_anchors_runs_what_a_daily_table_runs(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    body = anchor_body(12, 3_630)
+    PATH["CreateDiscountCurve"](CURVE_HEADERS, body)
+    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
+    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
 
 
 # The reader of any handle: the text rule and one lookup, the kind's table built a column at a
