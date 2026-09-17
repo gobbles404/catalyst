@@ -4,7 +4,11 @@ call, and that its handle resolves to the object the seam kept."""
 import re
 from typing import cast
 
+import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
@@ -360,4 +364,25 @@ def test_a_handle_of_another_kind_is_not_a_contract_spec() -> None:
     assert bridge.call("ReadContractSpec", [other]) == (
         f"#ERROR ReadContractSpec: spec is market conventions handle {other!r}, "
         "expected contract spec handle"
+    )
+
+
+# The seam holds one line on both sides of a lot size: every whole number a cell holds exactly is
+# created and read back through ReadHandle as it was, and one beyond it is refused on creation,
+# in the way out's words, rather than making a spec the reader cannot show.
+@given(lot_size=st.integers(-(2**53), 2**53))
+def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
+    spill = bridge.call("ReadHandle", [a_spec("WTI", float(lot_size), 3.0, 2.0)])
+    assert isinstance(spill, tuple), spill
+    _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
+    assert slots[2, 1] == float(lot_size)
+
+
+@pytest.mark.parametrize("lot_size", [1e16, 1e20, 9007199254740994.0, -1e16])
+def test_a_lot_size_beyond_what_a_cell_holds_exactly_is_refused_on_creation(
+    lot_size: float,
+) -> None:
+    assert bridge.call("CreateContractSpec", ["WTI", lot_size, 3.0, 2.0]) == (
+        f"#ERROR CreateContractSpec: lot_size is number {lot_size!r}, "
+        "beyond what a cell holds exactly"
     )

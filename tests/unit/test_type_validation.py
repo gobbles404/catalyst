@@ -96,6 +96,15 @@ def test_scalar_matrix(function: str, arrival: str) -> None:
         ("Whole", 2.5, "#ERROR Whole: x is number 2.5, expected whole number"),
         ("Whole", 2.9999999996, "#ERROR Whole: x is number 2.9999999996, expected whole number"),
         ("Whole", True, "#ERROR Whole: x is boolean TRUE, expected whole number"),
+        # Whole, and still refused: beyond 2^53 a cell holds it inexactly, and the way out would
+        # refuse the same number, so the words are the way out's.
+        ("Whole", 1e16, "#ERROR Whole: x is number 1e+16, beyond what a cell holds exactly"),
+        ("Whole", -1e16, "#ERROR Whole: x is number -1e+16, beyond what a cell holds exactly"),
+        (
+            "Whole",
+            9007199254740994.0,
+            "#ERROR Whole: x is number 9007199254740994.0, beyond what a cell holds exactly",
+        ),
         (
             "Number",
             Cells.from_rows([[0.0], [0.0], [0.0]]),
@@ -132,6 +141,29 @@ def test_whole_rejects_every_fractional_number(f: float) -> None:
     result = bridge.call("Whole", [f])
     assert isinstance(result, str)
     assert result.endswith("expected whole number")
+
+
+# 2^53 is the last whole number in, as it is the last one out; the next double either side is
+# whole and refused.
+def test_whole_stops_where_the_way_out_stops() -> None:
+    assert bridge.call("Whole", [9007199254740992.0]) == "int 9007199254740992"
+    assert bridge.call("Whole", [-9007199254740992.0]) == "int -9007199254740992"
+    assert bridge.call("Whole", [9007199254740994.0]) == (
+        "#ERROR Whole: x is number 9007199254740994.0, beyond what a cell holds exactly"
+    )
+    assert bridge.call("Whole", [-9007199254740994.0]) == (
+        "#ERROR Whole: x is number -9007199254740994.0, beyond what a cell holds exactly"
+    )
+
+
+@given(
+    st.floats(min_value=float(2**53), exclude_min=True, allow_nan=False, allow_infinity=False)
+    | st.floats(max_value=-float(2**53), exclude_max=True, allow_nan=False, allow_infinity=False)
+)
+def test_whole_rejects_every_number_beyond_what_a_cell_holds_exactly(f: float) -> None:
+    result = bridge.call("Whole", [f])
+    assert isinstance(result, str)
+    assert result.endswith("beyond what a cell holds exactly")
 
 
 # --- optional arguments: only missing takes the default ---------------------

@@ -123,8 +123,9 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
-            // The contract spec: a text, a whole number and two numbers; a lot size with a fraction, text where a fee is expected, and a fee left out.
+            // The contract spec: a text, a whole number and two numbers; a lot size with a fraction and one beyond what a cell holds exactly, text where a fee is expected, and a fee left out.
             yield return new object[] { "CreateContractSpec", new object[] { "WTI", 2.5, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number" };
+            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
             yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, "x", 2.0 }, "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number" };
             yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, 3.0, ExcelMissing.Value }, "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number" };
         }

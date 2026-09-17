@@ -20,7 +20,7 @@ def CreateContractSpec(
 | 4 | clearing_rate_per_lot | 2.00 |
 | 5 | `=CreateContractSpec(B1, B2, B3, B4)` | shows `contract_spec:3f9a1c:000009` |
 
-Four scalars, all required, in this order, which is fixed: the sheet passes them by position, and the code downstream takes the record's fields by name. The name is text, any text with a character in it; the lot size is a whole number, so 1000 passes and 2.5 fails; the two fees are numbers with any fraction. A single-cell reference is a scalar; an array is not, even a 1×1 one. The seam checks each argument alone, left to right, against its declared type and hands over a text, a Python int and two floats; nothing here restates that. The result is a handle: text in the cell that stands for the spec the seam keeps, declared `Handle[ContractSpec]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the spec.
+Four scalars, all required, in this order, which is fixed: the sheet passes them by position, and the code downstream takes the record's fields by name. The name is text, any text with a character in it; the lot size is a whole number a cell holds exactly, so 1000 passes, 2.5 fails and 1E16 fails, in the words the way out uses for the same line ([inputs.md](../../seam/inputs.md) decision 41); the two fees are numbers with any fraction. A single-cell reference is a scalar; an array is not, even a 1×1 one. The seam checks each argument alone, left to right, against its declared type and hands over a text, a Python int and two floats; nothing here restates that. The result is a handle: text in the cell that stands for the spec the seam keeps, declared `Handle[ContractSpec]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the spec.
 
 ## Excel help
 
@@ -50,7 +50,8 @@ The examples and properties below are `tests/unit/test_contract_spec.py`; the se
 | the four facts read back through the handle: the name as text, the lot size as a whole number, the fees as numbers | example, through the seam |
 | a lot size with a fraction, a boolean lot size, a blank name, text where a fee is expected, a fee left out, a one-cell range, and two wrong at once: the seam's words, the earlier argument named | example, through the seam |
 | a handle of another kind is not a contract spec | example, with handles |
-| the creator's handle over four cells, read back through `ReadHandle`, with a lot size with a fraction, text where a fee is expected and a fee left out, in a real workbook | Excel smoke |
+| for any lot size from −2^53 to 2^53, the spec is created and `ReadHandle` shows the lot size as it was; 1E16, 1E20 and the first double past 2^53 are refused on creation, never on reading | property and example, through the seam |
+| the creator's handle over four cells, read back through `ReadHandle`, with a lot size with a fraction and one beyond what a cell holds exactly, text where a fee is expected and a fee left out, in a real workbook | Excel smoke |
 
 ## Not here
 

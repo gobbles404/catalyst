@@ -545,8 +545,7 @@ def test_a_valuation_date_is_two_scalars_in_and_one_publication_out(
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
-        "_date": 1,  # the date, through the whole-number and number rules it builds on
-        "_whole": 1,
+        "_date": 1,  # the date, through the number rule it builds on, then its own two tests
         "_number": 2,
         "CreateValuationDate": 1,
         "valuation_date": 1,
