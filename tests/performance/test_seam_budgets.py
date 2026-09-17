@@ -2,6 +2,7 @@
 
 import ctypes
 from collections.abc import Callable
+from datetime import date
 
 import pytest
 
@@ -931,6 +932,52 @@ def test_daily_fixings_are_a_table_in_and_one_publication_out(
         "ndarray.any": 3,  # one look per column, then the builder's, for a date out of order
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 3,
+    }
+
+
+# --- the third market data: two columns in, the months kept as months -----------------------
+
+
+def month_columns(count: int) -> tuple[Cells, Cells]:
+    """That many months from January 2016 as the sheet sends them, the first day of each as a
+    serial, and a price beside each."""
+    firsts = [date(2016 + i // 12, 1 + i % 12, 1) for i in range(count)]
+    months = Cells.from_rows([[float((first - date(1899, 12, 30)).days)] for first in firsts])
+    return months, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+
+
+# Ten years of months: the date column through its look and its conversion to days, the number
+# column accepted on the host's summary alone, then the builder's two looks, the first day of
+# each month and the order of the months, its months made from the days and its one copy of the
+# prices, and one publication. Seventeen calls across fourteen functions.
+def test_monthly_fixings_are_two_columns_in_and_months_kept(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    months, prices = month_columns(120)
+    PATH["_CreateMonthlyFixings"](months, prices)
+    assert call_profile(lambda: PATH["_CreateMonthlyFixings"](months, prices)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_date_column": 1,
+        "_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_numbers": 1,
+        "_CreateMonthlyFixings": 1,
+        "monthly_fixings": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateMonthlyFixings"](months, prices)) == {
+        "ndarray.any": 3,  # the column's look for the calendar, the first day, the order
+        "ndarray.astype": 4,  # the column to days, to months, and back to days for the look
+        "numpy.asarray": 1,  # the days read as they are
+        "numpy.array": 1,  # the one copy, the prices; the months are the builder's own
         "ndarray.setflags": 2,  # frozen
         "ufunc.reduce": 3,
     }

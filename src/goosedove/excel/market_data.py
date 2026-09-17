@@ -1,6 +1,6 @@
 """The worksheet functions of the market data: the prices of one index, a futures curve and its
-daily fixings, each set created once and reached by handle. docs/library/market-data/ holds a
-page per function.
+daily or monthly fixings, each set created once and reached by handle. docs/library/market-data/
+holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -20,10 +20,11 @@ from goosedove.excel.bridge import (
 )
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
 from goosedove.market_data.futures_curve import FuturesCurve, futures_curve
+from goosedove.market_data.monthly_fixings import MonthlyFixings, monthly_fixings
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateDailyFixings", "_CreateFuturesCurve"]
+__all__ = ["_CreateDailyFixings", "_CreateFuturesCurve", "_CreateMonthlyFixings"]
 
 
 @excel_function
@@ -64,3 +65,19 @@ def _CreateDailyFixings(
     """Creates the daily fixings of one index from the days it fixed and their settles, and
     shows its handle, the text other formulas take as the fixings."""
     return daily_fixings(table.date, table.settle)
+
+
+@excel_function
+def _CreateMonthlyFixings(
+    month: Annotated[
+        DateColumn,
+        "The column of months, each typed as its first day, such as A2:A5 holding 1-May-2026 to "
+        "1-Aug-2026.",
+    ],
+    price: Annotated[
+        NumberColumn, "The column of prices beside the months, such as B2:B5, one per month."
+    ],
+) -> Handle[MonthlyFixings]:
+    """Creates the monthly fixings of one index from the months it fixed and their prices, and
+    shows its handle, the text other formulas take as the fixings."""
+    return monthly_fixings(month, price)

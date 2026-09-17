@@ -139,6 +139,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46148.0, 95.08 }, { 46147.0, 102.27 } } }, "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06" };
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, "x" }, { 46146.0, 106.42 } } }, "#ERROR _CreateDailyFixings: table cell (1, 2) is text 'x', expected number" };
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "price"), new object[,] { { 46143.0, 101.94 } } }, "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'price', expected one of date or settle" };
+            // The monthly fixings: a column of months as their first days and a column of prices; a price column one row short, a day that is not the first, and months backwards.
+            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46143.0, 46174.0, 46204.0), Column(2.86, 3.01) }, "#ERROR _CreateMonthlyFixings: ValueError: price has 2 prices, expected 3, one per month" };
+            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46143.0, 46168.0), Column(2.86, 3.01) }, "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, expected the first day of a month" };
+            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46174.0, 46143.0), Column(3.01, 2.86) }, "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, expected a month after row 1's 2026-06" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -236,6 +240,22 @@ namespace Goosedove.Host.Tests
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal(46143.0, spill[2, 0]);
             Assert.Equal(106.42, spill[3, 1]);
+        }
+
+        // Monthly fixings: two columns make one, and util_ReadHandle spills it back, the two headers,
+        // the month type over the price type, then a row per month, the month as its first day's serial.
+        [Fact]
+        public void monthly_fixings_are_created_from_two_columns_and_read_back_as_first_days()
+        {
+            var handle = (string)Seam.Call("_CreateMonthlyFixings", Column(46143.0, 46174.0), Column(2.86, 3.01));
+            Assert.StartsWith("monthly_fixings:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(4, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("month", spill[0, 0]);
+            Assert.Equal("datetime64[M]", spill[1, 0]);
+            Assert.Equal(46143.0, spill[2, 0]);
+            Assert.Equal(3.01, spill[3, 1]);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.
