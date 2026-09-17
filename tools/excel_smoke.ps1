@@ -148,6 +148,18 @@ $formulas = [ordered]@{
     "=_CreateDailyFixings(BI1:BJ1,BL2:BM3)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
     "=_CreateDailyFixings(BI1:BJ1,BI1:BJ3)" = "#ERROR _CreateDailyFixings: table cell (1, 1) is text 'date', expected date"
     "=_CreateDailyFixings(L1:M1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
+    # The monthly fixings: a creator over a column of months, each its first day, and a column of
+    # prices, read back through util_ReadHandle as first days under the month type; a day that is
+    # not the first, months backwards, and codes where prices are expected.
+    "=LEFT(BQ1,16)"               = "monthly_fixings:"
+    "=INDEX(util_ReadHandle(BQ1),1,1)" = "month"
+    "=INDEX(util_ReadHandle(BQ1),2,1)" = "datetime64[M]"
+    "=INDEX(util_ReadHandle(BQ1),3,1)" = "46143"
+    "=INDEX(util_ReadHandle(BQ1),6,2)" = "3.19"
+    "=ROWS(util_ReadHandle(BQ1))"      = "6"
+    "=_CreateMonthlyFixings(BR2:BR3,BP2:BP3)" = "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, expected the first day of a month"
+    "=_CreateMonthlyFixings(BS2:BS3,BP2:BP3)" = "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, expected a month after row 1's 2026-06"
+    "=_CreateMonthlyFixings(BO2:BO5,BD2:BD5)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'M26', expected number"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -242,6 +254,16 @@ $cells = [ordered]@{
     "BL2" = "6-May-2026"; "BM2" = "95.08"
     "BL3" = "5-May-2026"; "BM3" = "102.27"
     "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)"
+    # Monthly fixings: four months typed as their first days, May to August 2026, and a price
+    # beside each; a pair with a day that is not the first; a pair with the months backwards;
+    # and one creator cell.
+    "BO2" = "1-May-2026"; "BP2" = "2.86"
+    "BO3" = "1-Jun-2026"; "BP3" = "3.01"
+    "BO4" = "1-Jul-2026"; "BP4" = "3.24"
+    "BO5" = "1-Aug-2026"; "BP5" = "3.19"
+    "BR2" = "1-May-2026"; "BR3" = "26-May-2026"
+    "BS2" = "1-Jun-2026"; "BS3" = "1-May-2026"
+    "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

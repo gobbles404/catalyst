@@ -21,6 +21,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.futures_curve import FuturesCurve
+from goosedove.market_data.monthly_fixings import MonthlyFixings
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -117,6 +118,19 @@ def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exact
         ["datetime64[D]", "float64"],
         [46143.0, 101.94],
         [46146.0, 106.42],
+    ]
+
+
+# Serials for 1 May and 1 June 2026: a month spills as its first day, under its own type.
+def test_monthly_fixings_spill_months_as_their_first_days_and_prices_exactly() -> None:
+    months = Cells.from_rows([[46143.0], [46174.0]])
+    prices = Cells.from_rows([[2.86], [3.01]])
+    handle = bridge.call("_CreateMonthlyFixings", [months, prices])
+    assert rows(read(handle)) == [
+        ["month", "price"],
+        ["datetime64[M]", "float64"],
+        [46143.0, 2.86],
+        [46174.0, 3.01],
     ]
 
 
@@ -247,4 +261,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         ContractSpec,
         FuturesCurve,
         DailyFixings,
+        MonthlyFixings,
     } <= set(shown.registry)

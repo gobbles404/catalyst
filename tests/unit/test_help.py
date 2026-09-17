@@ -188,6 +188,23 @@ def test_the_daily_fixings_creator_explains_itself() -> None:
     ]
 
 
+def test_the_monthly_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateMonthlyFixings"]
+    assert not hidden
+    assert description == (
+        "Creates the monthly fixings of one index from the months it fixed and their prices, and "
+        "shows its handle, the text other formulas take as the fixings."
+    )
+    assert arguments == [
+        (
+            "month",
+            "The column of months, each typed as its first day, such as A2:A5 holding 1-May-2026 "
+            "to 1-Aug-2026.",
+        ),
+        ("price", "The column of prices beside the months, such as B2:B5, one per month."),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

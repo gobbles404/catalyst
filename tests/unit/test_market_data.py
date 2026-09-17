@@ -11,6 +11,7 @@ from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.futures_curve import FuturesCurve
+from goosedove.market_data.monthly_fixings import MonthlyFixings
 
 # The first three contracts of the page's sample as the sheet sends them: codes as text, prices
 # as numbers, dollars per barrel.
@@ -217,4 +218,104 @@ def test_a_handle_of_another_kind_is_not_daily_fixings() -> None:
     assert bridge.call("ReadDailyFixings", [other]) == (
         f"#ERROR ReadDailyFixings: fixings is futures curve handle {other!r}, "
         "expected daily fixings handle"
+    )
+
+
+# --- _CreateMonthlyFixings -------------------------------------------------------
+
+
+# The page's sample as the sheet sends it: the first day of each month as a serial, 1 May to
+# 1 August 2026, and a price beside each.
+MONTHS = Cells.from_rows([[46143.0], [46174.0], [46204.0], [46235.0]])
+MONTHLY = Cells.from_rows([[2.86], [3.01], [3.24], [3.19]])
+MONTHLY_HANDLE = re.compile(r"monthly_fixings:[0-9a-f]{6}:([0-9]{6})")
+
+
+# The library has no consumer of monthly fixings yet, so this hidden reader proves that a handle
+# resolves to the fixings the seam kept, the months as months.
+@probe
+def ReadMonthlyFixings(fixings: Handle[MonthlyFixings]) -> str:
+    kept = " ".join(str(month) for month in fixings.months)
+    return f"{kept} | {' '.join(repr(float(p)) for p in fixings.prices)}"
+
+
+def monthly(*columns: object) -> str:
+    text = bridge.call("_CreateMonthlyFixings", list(columns))
+    assert isinstance(text, str) and MONTHLY_HANDLE.fullmatch(text), text
+    return text
+
+
+def test_monthly_fixings_are_created_from_two_columns_and_read_back_as_months() -> None:
+    assert bridge.call("ReadMonthlyFixings", [monthly(MONTHS, MONTHLY)]) == (
+        "2026-05 2026-06 2026-07 2026-08 | 2.86 3.01 3.24 3.19"
+    )
+
+
+# A single cell is a column of one, so a fixing of one month needs no range.
+def test_two_single_cells_make_a_fixing_of_one_month() -> None:
+    assert bridge.call("ReadMonthlyFixings", [monthly(46143.0, 2.86)]) == "2026-05 | 2.86"
+
+
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [MONTHS, Cells.from_rows([[2.86], [3.01], [3.24]])],
+            "#ERROR _CreateMonthlyFixings: ValueError: price has 3 prices, expected 4, "
+            "one per month",
+        ),
+        (
+            [
+                Cells.from_rows([[46143.0], [46168.0], [46204.0]]),
+                Cells.from_rows([[2.86], [3.01], [3.24]]),
+            ],
+            "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, "
+            "expected the first day of a month",
+        ),
+        (
+            [Cells.from_rows([[46174.0], [46143.0]]), Cells.from_rows([[3.01], [2.86]])],
+            "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, "
+            "expected a month after row 1's 2026-06",
+        ),
+        (
+            [MONTHS, Cells.from_rows([[2.86], [None], [3.24], [3.19]])],
+            "#ERROR _CreateMonthlyFixings: price cell (2, 1) is blank, expected number",
+        ),
+        (
+            [Cells.from_rows([["May-26"], [46174.0]]), Cells.from_rows([[2.86], [3.01]])],
+            "#ERROR _CreateMonthlyFixings: month cell (1, 1) is text 'May-26', expected date",
+        ),
+        (
+            [MONTHS, MISSING],
+            "#ERROR _CreateMonthlyFixings: price is missing, expected column of numbers",
+        ),
+    ],
+    ids=[
+        "a price column one row short",
+        "a day that is not the first",
+        "months backwards",
+        "a blank among the prices",
+        "a month typed as text",
+        "the price column left out",
+    ],
+)
+def test_monthly_fixings_that_cannot_be_made_say_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreateMonthlyFixings", args) == text
+
+
+def test_a_failed_monthly_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(monthly(MONTHS, MONTHLY), MONTHLY_HANDLE)
+    backwards = Cells.from_rows([[46174.0], [46143.0]])
+    assert bridge.call("_CreateMonthlyFixings", [backwards, Cells.from_rows([[3.01], [2.86]])]) == (
+        "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, "
+        "expected a month after row 1's 2026-06"
+    )
+    assert number(monthly(MONTHS, MONTHLY), MONTHLY_HANDLE) == before + 1
+
+
+def test_a_handle_of_another_kind_is_not_monthly_fixings() -> None:
+    other = the_fixings(HEADERS, BODY)
+    assert bridge.call("ReadMonthlyFixings", [other]) == (
+        f"#ERROR ReadMonthlyFixings: fixings is daily fixings handle {other!r}, "
+        "expected monthly fixings handle"
     )

@@ -9,6 +9,7 @@ temporary fails here and a change that removes one lowers the ceiling in its own
 import ctypes
 import tracemalloc
 from collections.abc import Callable
+from datetime import date
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
@@ -286,3 +287,21 @@ def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     assert (
         least_peak(lambda: ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, body)) <= 30 * rows + SLACK
     )
+
+
+def month_columns(count: int) -> tuple[Cells, Cells]:
+    """That many months from January 2016 as the sheet sends them, the first day of each as a
+    serial, and a price beside each."""
+    firsts = [date(2016 + i // 12, 1 + i % 12, 1) for i in range(count)]
+    months = Cells.from_rows([[float((first - date(1899, 12, 30)).days)] for first in firsts])
+    return months, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+
+
+# Monthly fixings keep their months, 8 bytes each, and a copy of the prices, 8 bytes each, and
+# on the way pay the date column's masks and arrays to days, the months, and the months back to
+# days for the first-day look: measured 4,472 bytes at 120 months on 2026-09-17, about 37 bytes
+# per month; 32,527 at 1,200 and 313,327 at 12,000, 26 bytes per month.
+def test_monthly_fixings_keep_the_months_and_a_copy_of_the_prices() -> None:
+    count = 120
+    months, prices = month_columns(count)
+    assert least_peak(lambda: ENTRY["_CreateMonthlyFixings"](months, prices)) <= 40 * count + SLACK

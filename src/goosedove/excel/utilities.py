@@ -20,6 +20,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.futures_curve import FuturesCurve
+from goosedove.market_data.monthly_fixings import MonthlyFixings
 
 
 @singledispatch
@@ -69,6 +70,17 @@ def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
 def daily_fixings_table(obj: DailyFixings) -> MixedArray:
     return MixedArray.table(
         [("date", "settle"), ("datetime64[D]", "float64")], obj.dates, obj.settles
+    )
+
+
+@shown.register
+def monthly_fixings_table(obj: MonthlyFixings) -> MixedArray:
+    # A month crosses to the sheet as its first day, docs/library/time.md; the row of types says
+    # what the fixings hold.
+    return MixedArray.table(
+        [("month", "price"), ("datetime64[M]", "float64")],
+        obj.months.astype("datetime64[D]"),
+        obj.prices,
     )
 
 
