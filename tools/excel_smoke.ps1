@@ -136,6 +136,18 @@ $formulas = [ordered]@{
     "=_CreateFuturesCurve(BD2:BD7,BE2:BE6)" = "#ERROR _CreateFuturesCurve: ValueError: price has 5 prices, expected 6, one per future_code"
     "=_CreateFuturesCurve(BD2:BD7,BF2:BF7)" = "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number"
     "=_CreateFuturesCurve(BD2:BD7)" = "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers"
+    # The daily fixings: a creator over a header row and a welded body, read back through
+    # util_ReadHandle, the days newest first, the headers where the body should be, and a header
+    # the table does not have.
+    "=LEFT(BK1,14)"               = "daily_fixings:"
+    "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
+    "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(BK1),3,1)" = "46143"
+    "=INDEX(util_ReadHandle(BK1),6,2)" = "95.08"
+    "=ROWS(util_ReadHandle(BK1))"      = "6"
+    "=_CreateDailyFixings(BI1:BJ1,BL2:BM3)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
+    "=_CreateDailyFixings(BI1:BJ1,BI1:BJ3)" = "#ERROR _CreateDailyFixings: table cell (1, 1) is text 'date', expected date"
+    "=_CreateDailyFixings(L1:M1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -220,6 +232,16 @@ $cells = [ordered]@{
     "BD6" = "V26"; "BE6" = "70.6"; "BF6" = "70.6"
     "BD7" = "X26"; "BE7" = "70.4"; "BF7" = "70.4"
     "BG1" = "=_CreateFuturesCurve(BD2:BD7,BE2:BE7)"
+    # Daily fixings: a header row and four rows, a date and a settle each, 1, 4, 5 and 6 May
+    # 2026; a second body with the days newest first; and one creator cell.
+    "BI1" = "date"; "BJ1" = "settle"
+    "BI2" = "1-May-2026"; "BJ2" = "101.94"
+    "BI3" = "4-May-2026"; "BJ3" = "106.42"
+    "BI4" = "5-May-2026"; "BJ4" = "102.27"
+    "BI5" = "6-May-2026"; "BJ5" = "95.08"
+    "BL2" = "6-May-2026"; "BM2" = "95.08"
+    "BL3" = "5-May-2026"; "BM3" = "102.27"
+    "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

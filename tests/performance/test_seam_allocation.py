@@ -266,3 +266,23 @@ def test_a_futures_curve_keeps_a_copy_of_its_price_column() -> None:
     codes, prices = curve_columns(contracts)
     peak = least_peak(lambda: ENTRY["_CreateFuturesCurve"](codes, prices))
     assert peak <= 8 * contracts + 2 * SLACK
+
+
+FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
+
+
+def fixings_body(rows: int) -> Cells:
+    """That many daily fixings as the sheet sends them, a serial and a settle per row."""
+    return Cells.from_rows([[46143.0 + i, 100.0 + i % 7] for i in range(rows)])
+
+
+# Daily fixings keep a copy of each column, 16 bytes per row, and on the way pay the table path,
+# the date column's masks and its arrays on the way to days, and the builder's look at the order:
+# measured 7,563 bytes at 260 rows on 2026-09-17, about 29 bytes per row; 65,887 at 2,600 and
+# 650,831 at 26,000, 25 bytes per row.
+def test_daily_fixings_keep_a_copy_of_each_column() -> None:
+    rows = 260
+    body = fixings_body(rows)
+    assert (
+        least_peak(lambda: ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, body)) <= 30 * rows + SLACK
+    )

@@ -19,6 +19,7 @@ from goosedove.index_definitions.contract_spec import ContractSpec
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.futures_curve import FuturesCurve
 
 # Serials for 11, 12 and 13 September 2026.
@@ -103,6 +104,19 @@ def test_a_futures_curve_spills_its_two_columns_with_prices_exactly() -> None:
         ["str", "float64"],
         ["M26", 71.25],
         ["N26", 71.4],
+    ]
+
+
+# Serials for 1 and 4 May 2026.
+def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exactly() -> None:
+    headers = Cells.from_rows([["date", "settle"]])
+    body = Cells.from_rows([[46143.0, 101.94], [46146.0, 106.42]])
+    handle = bridge.call("_CreateDailyFixings", [headers, body])
+    assert rows(read(handle)) == [
+        ["date", "settle"],
+        ["datetime64[D]", "float64"],
+        [46143.0, 101.94],
+        [46146.0, 106.42],
     ]
 
 
@@ -232,4 +246,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IndexConventions,
         ContractSpec,
         FuturesCurve,
+        DailyFixings,
     } <= set(shown.registry)

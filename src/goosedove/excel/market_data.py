@@ -1,5 +1,6 @@
-"""The worksheet functions of the market data: the prices of one index, each set created once
-and reached by handle. docs/library/market-data/ holds a page per function.
+"""The worksheet functions of the market data: the prices of one index, a futures curve and its
+daily fixings, each set created once and reached by handle. docs/library/market-data/ holds a
+page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -8,12 +9,21 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 
 from typing import Annotated
 
-from goosedove.excel.bridge import Handle, NumberColumn, TextColumn, excel_function
+from goosedove.excel.bridge import (
+    DateColumn,
+    Handle,
+    NumberColumn,
+    Table,
+    TextColumn,
+    TextRow,
+    excel_function,
+)
+from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
 from goosedove.market_data.futures_curve import FuturesCurve, futures_curve
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateFuturesCurve"]
+__all__ = ["_CreateDailyFixings", "_CreateFuturesCurve"]
 
 
 @excel_function
@@ -29,3 +39,28 @@ def _CreateFuturesCurve(
     """Creates a futures curve from the contract codes of one index and their prices, and shows
     its handle, the text other formulas take as the curve."""
     return futures_curve(future_code, price)
+
+
+class DailyFixingsTable(Table):
+    """The fixings' table: one row per day the index fixed, the date and its settle."""
+
+    date: DateColumn
+    settle: NumberColumn
+
+
+@excel_function
+def _CreateDailyFixings(
+    header_row: Annotated[
+        TextRow,
+        "The header cells of your fixings table, such as A1:B1, reading date and settle in "
+        "either order.",
+    ],
+    table: Annotated[
+        DailyFixingsTable,
+        "The rows under the headers, such as A2:B5: one fixing per row, its date and settle, "
+        "dates increasing.",
+    ],
+) -> Handle[DailyFixings]:
+    """Creates the daily fixings of one index from the days it fixed and their settles, and
+    shows its handle, the text other formulas take as the fixings."""
+    return daily_fixings(table.date, table.settle)
