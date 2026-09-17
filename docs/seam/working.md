@@ -37,11 +37,11 @@ Shows `goosedove 0.1.0 from C:\...\src\goosedove\__init__.py`, with `source chec
 The library's functions are one module per group under `src/goosedove/excel/`: `globals.py`, two creators that return handles; `index_definitions.py`, four creators, one of three columns whose third may be left out, one of a single column of dates, one of five text scalars and one of four scalars, a text, a whole number and two numbers; and `utilities.py`, a reader that takes any handle and spills a table. Beside them are `Ping` in `src/goosedove/excel/bridge.py` and the sixteen probes in `src/goosedove/excel/probes.py`, whose cost is the seam's cost and nothing more; those are the examples to copy. Before writing one, read [baseline.md](baseline.md)'s standing recommendation, which the numbers have now supported twice: declare pricing functions over arrays, one call for a column of trades, and never read a range once per row, which is the most expensive shape there is.
 
 1. Put the module under `src/goosedove/excel/`, beside `bridge.py` and `probes.py`. It may import the pricing code; the pricing code never imports it. That one-way rule is why pricing can be tested without Excel.
-2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the fourteen the seam can receive, or a table schema, or `Handle[Kind]` around a class the library defines, and one of the eleven it can send, or a handle, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). A mixed range crosses in only as a table: a function Excel lists never declares `MixedArray` as a parameter on its own ([inputs.md](inputs.md) decision 38); as a result it is the rectangle of three kinds a function spills, built with `MixedArray.table` from rows of headings over columns of one kind each ([outputs.md](outputs.md) decision 13). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows.
+2. Write a plain function with `@excel_function` above it. Annotate every parameter and the return with a declared type: the annotation that decides which one rule checks the value and which words its messages use, `float` for a number, `NumberColumn` for a column of numbers. It must be one of the fourteen the seam can receive, or a table schema, or `Handle[Kind]` around a class the library defines, and one of the eleven it can send, or a handle, listed in [inputs.md](inputs.md) and [outputs.md](outputs.md). A mixed range crosses in only as a table: a function Excel lists never declares `MixedArray` as a parameter on its own ([inputs.md](inputs.md) decision 38); as a result it is the rectangle of three kinds a function spills, built with `MixedArray.table` from rows of headings over columns of one kind each ([outputs.md](outputs.md) decision 13). The function's own name becomes the worksheet name, and its parameter names become the argument names Excel shows. Name it as the library's [conventions.md](../library/conventions.md#names) says, `_` then a verb, `_Scale`, or `util_` for a utility, and list it in the module's own `__all__`: the underscore is Excel's filter, and without that entry pyright reads it as Python's privacy and reports the function unused.
 3. Write the docstring as the wizard text. The whole docstring, with the surrounding spaces removed, is the description Excel shows, so keep it to one sentence a user of the sheet would read. Beside each parameter, write the one line Excel shows about that argument, `x: Annotated[float, "One number to multiply."]`; the type checker reads the type and ignores the words. The shape of a line, what to select, an example, and at most one thing that must hold, is in the library's [conventions.md](../library/conventions.md#excel-help), with the optional form. A function Excel lists is refused without either, with more than the 253 characters Excel shows, or with a line that does not end with a period. Registration adds what the signature already says: an optional argument's name in brackets and what it takes when omitted, so write neither.
 4. Give an optional argument a default in the signature. The default goes through the same accept rule as a real argument at registration, once, and is stored already converted, so only a missing argument takes it and a blank cell still fails. `None` is never an ordinary default, since every accept rule calls it blank; an argument that may be left out with nothing in its place is declared with its type written `X | None` and `None` as its default, `option_expiry: DateColumn | None = None`, and the function receives `None` only when the formula left the argument out, a blank cell in the slot still failing as a blank. Excel shows such an argument in brackets with its line alone, so again write neither. A table and a handle take no default at all and may not be left out; registration refuses both.
 5. Import the module in the catalogue, `src/goosedove/excel/__init__.py`, and add its name to the `__all__` list beside the two that are there, or the lint step reports the import as unused. The catalogue is the list of modules whose functions Excel sees, and it is the only place a new module is named.
-6. Pin its messages in a unit test under `tests/unit/`. Reach the function the way the tests do, `bridge.call("Scale", [...])`, and assert the exact `#ERROR` text for one wrong argument and the value it hands back for a right one. A pin is a test that holds a fact still, so a change that moves it fails.
+6. Pin its messages in a unit test under `tests/unit/`. Reach the function the way the tests do, `bridge.call("_Scale", [...])`, and assert the exact `#ERROR` text for one wrong argument and the value it hands back for a right one. A pin is a test that holds a fact still, so a change that moves it fails.
 7. Add a row to `tools/excel_smoke.ps1`: the formula exactly as a person would type it, and the exact text the cell must display. Put any input cells the formula needs in the `$cells` list below it. The count it prints at the end follows the list of formulas.
 8. Try it by hand with `.\tools\excel_dev.ps1`, which builds the add-in and opens it in a fresh Excel of its own, then run `.\check.ps1` (section 7).
 
@@ -52,14 +52,16 @@ One function, whole:
 ```python
 from goosedove.excel.bridge import NumberColumn, excel_function
 
+__all__ = ["_Scale"]
+
 
 @excel_function
-def Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
+def _Scale(values: NumberColumn, factor: float = 1.0) -> NumberColumn:
     """Every value times the factor."""
     return NumberColumn(values * factor)
 ```
 
-`=Scale(A1:A100, 2)` spills a hundred answers down. `=Scale(A1:A100)` doubles nothing and returns the column unchanged, because the omitted factor takes its default; `=Scale(A1:A100, B1)` with B1 empty fails, and says so.
+`=_Scale(A1:A100, 2)` spills a hundred answers down. `=_Scale(A1:A100)` doubles nothing and returns the column unchanged, because the omitted factor takes its default; `=_Scale(A1:A100, B1)` with B1 empty fails, and says so.
 
 A function that takes a table, a header row and a body, declares a schema beside it: a class deriving from `Table`, one line per column, the header name and its column type, and takes the header row as a `TextRow` in the parameter just before the table. Nothing else changes: the schema is read at registration as the signature is, the columns bind by name whatever their order, and the function receives one record with a typed attribute per column.
 
@@ -74,6 +76,8 @@ from goosedove.excel.bridge import (
     excel_function,
 )
 
+__all__ = ["_TotalQuantity"]
+
 
 class Trades(Table):
     date: DateColumn
@@ -83,12 +87,12 @@ class Trades(Table):
 
 
 @excel_function
-def TotalQuantity(header_row: TextRow, trades: Trades) -> float:
+def _TotalQuantity(header_row: TextRow, trades: Trades) -> float:
     """Sum of quantity over a table of trades."""
     return float(trades.quantity.sum())
 ```
 
-With `date`, `product`, `quantity` and `cleared` across A1:D1 and a trade per row below, `=TotalQuantity(A1:D1, A2:D4)` sums the quantity column, and a sheet that puts `cleared` first still works. The rules and every message are in [inputs.md](inputs.md), the mechanism in [bridge.md](bridge.md), and `SumQuantity` in `probes.py` is the example to copy.
+With `date`, `product`, `quantity` and `cleared` across A1:D1 and a trade per row below, `=_TotalQuantity(A1:D1, A2:D4)` sums the quantity column, and a sheet that puts `cleared` first still works. The rules and every message are in [inputs.md](inputs.md), the mechanism in [bridge.md](bridge.md), and `SumQuantity` in `probes.py` is the example to copy.
 
 A function that creates an object the sheet reaches by handle declares `Handle[Kind]` as its result, the kind being a class the pricing library defines, and returns the object; the seam keeps it and the cell shows its handle, `discount_curve:3f9a1c:000002`. A function that takes such an object declares a parameter the same way and receives the object, never the text; one that takes the object behind any handle, whatever its kind, declares `Handle[object]`, which only a parameter may, since a creator names what it makes. The mechanism and every message are in [bridge.md](bridge.md#a-handle-one-store-and-the-text); `_CreateDiscountCurve` in `globals.py` and `util_ReadHandle` in `utilities.py` are the examples to copy. A creator's ledger and ceiling go in the two performance files like any other function's, and its creator gets no row in the timing runners, which loop and would keep an object per call.
 
