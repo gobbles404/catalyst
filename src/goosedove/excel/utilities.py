@@ -18,6 +18,7 @@ from goosedove.index_definitions.contract_spec import ContractSpec
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market_data.futures_curve import FuturesCurve
 
 
 @singledispatch
@@ -61,6 +62,11 @@ def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
         obj.future_expiry,
         obj.option_expiry,
     )
+
+
+@shown.register
+def futures_curve_table(obj: FuturesCurve) -> MixedArray:
+    return MixedArray.table([("future_code", "price"), ("str", "float64")], obj.codes, obj.prices)
 
 
 @shown.register

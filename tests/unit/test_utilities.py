@@ -19,6 +19,7 @@ from goosedove.index_definitions.contract_spec import ContractSpec
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market_data.futures_curve import FuturesCurve
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -90,6 +91,18 @@ def test_a_schedule_spills_three_columns_with_options_and_two_without() -> None:
         ["str", "datetime64[D]"],
         ["m26", 46161.0],
         ["n26", 46195.0],
+    ]
+
+
+def test_a_futures_curve_spills_its_two_columns_with_prices_exactly() -> None:
+    codes = Cells.from_rows([["M26"], ["N26"]])
+    prices = Cells.from_rows([[71.25], [71.4]])
+    handle = bridge.call("_CreateFuturesCurve", [codes, prices])
+    assert rows(read(handle)) == [
+        ["future_code", "price"],
+        ["str", "float64"],
+        ["M26", 71.25],
+        ["N26", 71.4],
     ]
 
 
@@ -218,4 +231,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         HolidayCalendar,
         IndexConventions,
         ContractSpec,
+        FuturesCurve,
     } <= set(shown.registry)
