@@ -38,7 +38,7 @@ Quoted from the declaration in `src/goosedove/excel/market_data.py`, which `test
 
 ## The library checks
 
-One rule, the curve's: each date is after the row above. It keeps one fixing per day, since a date twice would be two settles for one day, and the order a reader finds a day by. Rows count as the sheet counts them, the first row of the body being row 1, and the message names the column by its header, because the headers bind in either order.
+One rule, the curve's, which the owner stated as no duplicate dates and the dates ascending: each date is after the row above, and that one comparison covers both. It keeps one fixing per day, since a date twice would be two settles for one day, and the order a reader finds a day by; what more a series must hold true, and tying it to the index it refers to, come later, with the readers. Rows count as the sheet counts them, the first row of the body being row 1, and the message names the column by its header, because the headers bind in either order.
 
 | Rule | Message |
 |---|---|
