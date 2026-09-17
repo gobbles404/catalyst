@@ -40,9 +40,7 @@ class Category:
         exactly: a code is an identifier, never trimmed or re-cased."""
         size = self.sizes.get(unit)
         if size is None:
-            raise ValueError(
-                f"unknown unit {unit!r} in {self.name}; units are {', '.join(self.sizes)}"
-            )
+            raise _unknown_unit(self, unit)
         return size
 
 
@@ -71,14 +69,16 @@ class UnitConversions:
         the one asked for, the first such unit named.
         """
         found = self.category(category)
-        if from_unit not in found.sizes or to_unit not in found.sizes:
+        from_size, to_size = found.sizes.get(from_unit), found.sizes.get(to_unit)
+        if from_size is None or to_size is None:
             from_home, to_home = self._home_of(from_unit), self._home_of(to_unit)
             if from_home is not None and to_home is not None and from_home is not to_home:
                 raise ValueError(
                     f"cannot convert {from_unit} to {to_unit}; "
                     f"{from_home.name} and {to_home.name} are different categories"
                 )
-        return found.size_of(from_unit) / found.size_of(to_unit)
+            raise _unknown_unit(found, from_unit if from_size is None else to_unit)
+        return from_size / to_size
 
     def convert(
         self, quantities: NDArray[np.float64], category: str, from_unit: str, to_unit: str
@@ -96,6 +96,13 @@ class UnitConversions:
             if unit in found.sizes:
                 return found
         return None
+
+
+def _unknown_unit(category: Category, unit: str) -> ValueError:
+    """The one message for a unit the category does not have, raised by whoever looked."""
+    return ValueError(
+        f"unknown unit {unit!r} in {category.name}; units are {', '.join(category.sizes)}"
+    )
 
 
 def _size(value: float) -> str:

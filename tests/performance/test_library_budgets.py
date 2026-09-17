@@ -15,9 +15,12 @@ CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 NumpyCalls = Callable[[Callable[[], object]], dict[str, int]]
 
 
-# A conversion forms its factor once, three lookups in the collection, and multiplies the array
-# once; the definitions are not checked again, so no builder appears. The multiplication is a
-# ufunc by operator, which cProfile does not see, so the numpy ledger is empty.
+# A conversion forms its factor once, three probes of the collection's mappings, the category by
+# name and the two sizes by unit code, each retrieved once and reused, and multiplies the array
+# once; the definitions are not checked again, so no builder appears, and no per-unit lookup
+# method runs. The multiplication is a ufunc by operator, which cProfile does not see, so the
+# numpy ledger is empty. Review of #71 counted five probes when the two sizes were checked for
+# and then looked up again.
 def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
     call_profile: CallProfile, numpy_calls: NumpyCalls
 ) -> None:
@@ -30,7 +33,6 @@ def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
         "UnitConversions.convert": 1,
         "UnitConversions.factor": 1,
         "UnitConversions.category": 1,
-        "Category.size_of": 2,
     }
     assert numpy_calls(convert) == {}
 
