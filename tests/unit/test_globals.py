@@ -96,12 +96,19 @@ def test_the_headers_bind_in_either_order() -> None:
             "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, "
             "expected a date after row 1's 2026-09-13",
         ),
+        (
+            HEADERS,
+            Cells.from_rows([[SEP_11, 1.0], [1094850.0, 0.5]]),
+            "#ERROR CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, "
+            "expected within 1048573 days of row 1's 2026-09-11",
+        ),
     ],
     ids=[
         "an unknown header",
         "text in the date column",
         "a first factor not one",
         "dates backwards",
+        "a span no sheet could show",
     ],
 )
 def test_a_curve_that_cannot_be_made_says_why(headers: Cells, body: Cells, text: str) -> None:

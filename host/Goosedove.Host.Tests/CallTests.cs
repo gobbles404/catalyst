@@ -108,8 +108,9 @@ namespace Goosedove.Host.Tests
             // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
             yield return new object[] { "CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
             yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
-            // The curve from anchors: dates that run backwards are never sorted.
+            // The curve from anchors: dates that run backwards are never sorted, and a span no sheet could show is refused.
             yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
+            yield return new object[] { "CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
             yield return new object[] { "ReadHandle", new object[] { "x" }, "#ERROR ReadHandle: handle is text 'x' naming no live object, expected a handle" };
             yield return new object[] { "ReadHandle", new object[] { 46276.0 }, "#ERROR ReadHandle: handle is number 46276.0, expected a handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.

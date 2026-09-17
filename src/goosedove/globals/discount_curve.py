@@ -3,11 +3,18 @@ from the anchors the desk supplies, the days between them filled by a straight l
 factor. docs/library/globals/discount-curve.md is the page."""
 
 from dataclasses import dataclass
+from typing import Final
 
 import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.interpolation import interpolate_discount_factors
+
+# The most days a curve holds: a sheet's rows less the two heading rows ReadHandle spills first,
+# so that whatever a creator keeps can be read back. A curve two thousand years long that no
+# cell could show was a finding of the review of #70; the seam's own bound on a result's size
+# is open in docs/seam/history.md.
+MAX_DAYS: Final = 1_048_574
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +73,11 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) 
         k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
         raise ValueError(
             f"date row {k + 2} is {days[k + 1]}, expected a date after row {k + 1}'s {days[k]}"
+        )
+    if days[-1] - days[0] >= np.timedelta64(MAX_DAYS, "D"):
+        raise ValueError(
+            f"date row {days.size} is {days[-1]}, "
+            f"expected within {MAX_DAYS - 1} days of row 1's {days[0]}"
         )
     every_day, values = interpolate_discount_factors(days, factors)
     every_day.setflags(write=False)

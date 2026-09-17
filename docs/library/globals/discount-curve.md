@@ -49,6 +49,7 @@ The checks consume typed columns and run on the anchors, before any day is fille
 | non-increasing; the row named is the one that rose | `discount_factor rises at row 412, from 0.91318 to 0.92254` |
 | the last factor is above zero | `discount_factor row 34 is 0.0, expected greater than 0` |
 | each date after the row above; a gap of any length is expected | `date row 12 is 2027-01-17, expected a date after row 11's 2027-02-16` |
+| the curve holds at most 1,048,574 days, a sheet's rows less the two heading rows `ReadHandle` spills first, so whatever is created can be read back | `date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11` |
 
 Those cover the stated rules: the first factor at 1 with non-increasing already implies every factor is at most 1, which rules out a curve for negative rates and the owner accepts that, and the minimum of a non-increasing array is its last element; a day filled between two anchors lies between their factors, so the daily curve holds every rule the anchors hold. No sorting, no discarding; nothing is clipped, smoothed or rounded, and a failure builds no curve.
 
@@ -70,6 +71,8 @@ days = calendar_days(last_anchor - first_anchor) + 1
 No day before the first anchor or after the last: no endpoint extension, no extrapolation. Interpolating on `df` rather than on `log df` is a model choice, not data preparation: the implied forward rate ramps inside each gap and steps at each anchor, about one basis point over a one-year gap in the owner's sample.
 
 [`np.interp`](https://numpy.org/doc/stable/reference/generated/numpy.interp.html) is the implementation. It does not enforce increasing source coordinates, and outside the source range it repeats endpoint values: the builder checks the order first, and asks only for the inclusive range above. Its endpoint behaviour is not permission to accept out-of-range dates. Vectorized throughout; nothing runs per day.
+
+The line is then held above the anchor it runs to. In arithmetic it never falls below that anchor; in `float64`, near underflow, the slope's rounding can take it a step below, and a curve that rose on its last day was a finding of the review of #70. The line never rises above the anchor it runs from, since it adds a non-positive step to it, so the hold is the one bound left to keep; for any ordinary curve it changes nothing, and every anchor is still exact.
 
 The first four anchors of the owner's sample, the table above, give eight days. The gap from May 24 to May 29 spans five calendar-day intervals; the factor change is `0.99929 − 0.9998 = −0.00051`, or `−0.000102` per day.
 
@@ -97,6 +100,8 @@ The examples and properties below are `tests/unit/test_discount_curve.py` and `t
 | the owner's eleven anchors: 211 days, every anchor kept exactly, never rising | example |
 | consecutive dates spanning a year end and a leap day | example |
 | a duplicate date, reversed rows, a step back after a gap: rejected, never sorted | example |
+| the longest curve a sheet shows, 1,048,574 days, accepted; one day longer rejected, naming both dates | example |
+| the review's anchors near underflow: the curve never rises, its last anchor exact | example |
 | factor at the first date is exactly `1` | example |
 | first factor other than `1`: rejected, not rescaled | example |
 | zero, negative, above one, NaN, infinity rejected | example |
@@ -108,10 +113,11 @@ The examples and properties below are `tests/unit/test_discount_curve.py` and `t
 | a one-row curve starts and ends on its one day | example |
 | the straight line over four days hits every quarter exactly; daily anchors come back as they were; a gap over a leap day; equal anchors give a flat line exactly; one anchor is one day; the anchors are left as they were | example, the interpolation |
 | every day from the first anchor to the last once; every anchor keeps its factor exactly; the days never rise, so every day lies between its anchors | property, the interpolation |
+| the review's anchors near underflow held at the last anchor; for anchors falling anywhere above zero, subnormals included, the days never rise and every anchor is kept | example and property, the interpolation |
 | the worked example above, to tolerance | golden, in its own change |
-| the headers bind in either order and either case; a gap filled and shown day by day; dates backwards refused | example, through the seam |
+| the headers bind in either order and either case; a gap filled and shown day by day; dates backwards and a span no sheet could show refused | example, through the seam |
 | validation failure publishes no object and no handle | example, with handles |
-| the creator's handle over anchors read back day by day, an anchor exact and a day between on the line, and dates backwards, in a real workbook | Excel smoke |
+| the creator's handle over anchors read back day by day, an anchor exact and a day between on the line, dates backwards and a span no sheet could show, in a real workbook | Excel smoke |
 
 The daily-coverage and anchor rules are tested independently of generic date acceptance, which is the seam's.
 

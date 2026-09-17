@@ -79,13 +79,14 @@ $formulas = [ordered]@{
     "=CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
     # The curve from anchors: three anchors over eleven days, read back day by day through
-    # ReadHandle, an anchor exact and a day between on the straight line; and dates that run
-    # backwards.
+    # ReadHandle, an anchor exact and a day between on the straight line; dates that run
+    # backwards; and a span no sheet could show.
     "=ROWS(ReadHandle(AW1))"      = "13"
     "=INDEX(ReadHandle(AW1),5,2)" = "0.9998"
     "=INDEX(ReadHandle(AW1),6,2)" = "0.9997"
     "=INDEX(ReadHandle(AW1),13,1)" = "46286"
     "=CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
+    "=CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
     # The expiry schedule: a creator with three columns and one with two, a futures column one
     # row short, and a blank in the options column.
     "=LEFT(AI1,16)"               = "expiry_schedule:"
@@ -195,6 +196,9 @@ $cells = [ordered]@{
     "AX2" = "14-Sep-2026"; "AY2" = "1"
     "AX3" = "11-Sep-2026"; "AY3" = "0.9997"
     "AW1" = "=CreateDiscountCurve(Y1:Z1,AU2:AV4)"
+    # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
+    "BA2" = "46276"; "BB2" = "1"
+    "BA3" = "1094850"; "BB3" = "0.5"
 }
 
 # --- build the host and tell it where Python is -----------------------------

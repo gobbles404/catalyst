@@ -117,3 +117,42 @@ def test_the_days_never_rise_so_every_day_lies_between_its_anchors(given_anchors
     assert (values[1:] <= values[:-1]).all()
     assert values.max() == anchor_factors[0]
     assert values.min() == anchor_factors[-1]
+
+
+# --- the hold: the line never falls below the anchor it runs to ----------------------------
+
+
+# Review of #70: near underflow the slope rounds to a step too large, and the day before the last
+# anchor came out below it, so the curve rose on its last day. The line is held at the anchor.
+def test_a_line_that_would_fall_below_its_anchor_near_underflow_is_held_at_it() -> None:
+    anchor_days = EPOCH + np.array([46023, 46024, 46324]).astype("timedelta64[D]")
+    anchor_factors = factors(1.0, 1e-307, 9.9999999999999e-308)
+    _, values = interpolate_discount_factors(anchor_days, anchor_factors)
+    assert values[[0, 1, 300]].tolist() == anchor_factors.tolist()
+    assert (values[1:] <= values[:-1]).all()
+    assert values[299] >= values[300]
+
+
+@st.composite
+def wide_anchors(draw: st.DrawFn) -> Anchors:
+    """Anchors whose factors fall from 1 to anywhere above zero, subnormals included: where
+    the arithmetic of a straight line is least exact."""
+    count = draw(st.integers(2, 8))
+    gaps = draw(st.lists(st.integers(1, 400), min_size=count - 1, max_size=count - 1))
+    offsets = np.concatenate(([0], np.cumsum(gaps, dtype=np.int64))).astype(np.int64)
+    below = draw(
+        st.lists(st.floats(min_value=5e-324, max_value=1.0), min_size=count - 1, max_size=count - 1)
+    )
+    values = np.concatenate(([1.0], np.sort(np.array(below))[::-1]))
+    return EPOCH + (46023 + offsets).astype("timedelta64[D]"), values
+
+
+@given(wide_anchors())
+def test_even_into_underflow_the_days_never_rise_and_every_anchor_is_kept(
+    given_anchors: Anchors,
+) -> None:
+    anchor_days, anchor_factors = given_anchors
+    _, values = interpolate_discount_factors(anchor_days, anchor_factors)
+    at = ((anchor_days - anchor_days[0]) / ONE_DAY).astype(np.int64)
+    assert values[at].tolist() == anchor_factors.tolist()
+    assert (values[1:] <= values[:-1]).all()

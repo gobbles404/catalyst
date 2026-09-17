@@ -587,9 +587,10 @@ CURVE_LEDGER = {
 }
 CURVE_NUMPY = {
     "ndarray.any": 5,  # one look per column, then finite, rising and unordered, one look each
-    "ndarray.astype": 2,  # the date column on its way to days
+    "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
+    "ndarray.repeat": 1,  # the anchor each day runs to, which the line is held above
     "ndarray.setflags": 2,  # frozen
     "ufunc.reduce": 5,
 }

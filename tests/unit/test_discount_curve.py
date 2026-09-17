@@ -81,6 +81,30 @@ def test_flat_and_one_row_curves_are_curves(values: NDArray[np.float64]) -> None
     assert curve.factors.tolist() == values.tolist()
 
 
+# The reviewer's anchors of #70, through the builder: a curve never rises, even on its last day
+# near underflow.
+def test_a_curve_near_underflow_never_rises() -> None:
+    anchor_dates = EPOCH + np.array([46023, 46024, 46324]).astype("timedelta64[D]")
+    curve = discount_curve(anchor_dates, factors(1.0, 1e-307, 9.9999999999999e-308))
+    assert (curve.factors[1:] <= curve.factors[:-1]).all()
+    assert curve.factors[-1] == 9.9999999999999e-308
+
+
+# The most days a curve holds is what ReadHandle can show: a sheet's rows less its two heading
+# rows. The last day of the longest curve is 1,048,573 days after the first; one more fails.
+def test_a_curve_holds_at_most_what_a_sheet_shows() -> None:
+    first = np.datetime64("2026-09-11")
+    last = first + np.timedelta64(1_048_573, "D")
+    longest = discount_curve(np.array([first, last]), factors(1.0, 0.5))
+    assert longest.dates.size == 1_048_574
+    beyond = last + ONE_DAY
+    with pytest.raises(ValueError) as failure:
+        discount_curve(np.array([first, beyond]), factors(1.0, 0.5))
+    assert str(failure.value) == (
+        f"date row 2 is {beyond}, expected within 1048573 days of row 1's 2026-09-11"
+    )
+
+
 # --- what is rejected, with the row named as the sheet counts ---------------
 
 

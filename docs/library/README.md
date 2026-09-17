@@ -16,7 +16,7 @@ These pages are for an engineer building a function and for the owner reviewing 
 | [market-definitions/holiday-calendar.md](market-definitions/holiday-calendar.md) | `CreateHolidayCalendar`, the days one market is closed, listed one by one |
 | [market-definitions/market-conventions.md](market-definitions/market-conventions.md) | `CreateMarketConventions`, the units one index is quoted, settled and measured in |
 | [market-definitions/contract-spec.md](market-definitions/contract-spec.md) | `CreateContractSpec`, the name, lot size and fees per lot of one contract |
-| [utilities/read-handle.md](utilities/read-handle.md) | `ReadHandle`, the object behind any handle spilled as the table its creator took |
+| [utilities/read-handle.md](utilities/read-handle.md) | `ReadHandle`, the object behind any handle spilled as a table, the one its creator took or, for a curve, the daily one it built |
 
 The handle that the creators return, text in a cell that stands for a live object, is the seam's: its spec is [handles.md](../seam/handles.md), with the evidence for its store in [excel-dna-handles.md](../seam/excel-dna-handles.md).
 
