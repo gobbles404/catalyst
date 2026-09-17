@@ -6,17 +6,17 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 
 | Item | Convention | Example |
 |---|---|---|
-| Worksheet functions | PascalCase, leading with one of the verbs below | `CreateValuationDate`, `ReadHandle` |
+| Worksheet functions | `_` then PascalCase leading with one of the verbs below, so that typing `_` in a cell lists the library's functions and nothing of Excel's; a utility leads with `util_` instead | `_CreateValuationDate`, `util_ReadHandle` |
 | Parameters | snake_case, matching the wording used in Excel help | `as_of`, `day_fraction_elapsed`, `header_row`, `values` |
 | Data fields | snake_case | `unit`, `reference_unit`, `size_in_reference_unit` |
 | Object and seam types | PascalCase, reusing the seam's spelling where one exists | `ValuationDate`, `DiscountCurve`, `Date`, `NumberArray` |
 | Worksheet headers | lowercase snake_case, as declared in the function's schema; bound by name in any order, case ignored ([inputs.md](../seam/inputs.md) decision 29) | `date`, `discount_factor` |
-| Utility functions | `util_` before the name, when the owner states it; a product decision | none today; `util_ReadDiscountFactor` was one until #66 |
+| Utility functions | `util_` then PascalCase, for a function that inspects rather than creates, when the owner states it; a product decision | `util_ReadHandle`, since #73; `util_ReadDiscountFactor` was one until #66 |
 | Handles | `Handle[Kind]` around the library's own class, as a creator's result and as a consumer's parameter; the cell shows `kind:session:number` | `Handle[DiscountCurve]`, `discount_curve:3f9a1c:000002` |
 | Category values | exact lowercase codes, matched case-sensitively | `volume`, `mass`, `energy`, `usd` |
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |
 
-The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name.
+The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. Every function the library lists is `_Name` or `util_Name` since #73; the seam's `Ping` and its hidden probes keep their names, being the seam's instruments and not the desk's.
 
 ## Verbs
 
@@ -24,16 +24,16 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 
 | Verb | Means | Such as |
 |---|---|---|
-| Create | makes an object from what the sheet supplies and shows its handle | `CreateDiscountCurve` |
-| Read | shows what an object holds, and changes nothing | `ReadHandle` |
+| Create | makes an object from what the sheet supplies and shows its handle | `_CreateDiscountCurve` |
+| Read | shows what an object holds, and changes nothing | `util_ReadHandle` |
 
 ## Tables
 
-A function that takes a table, a header row and a body, declares a schema, a class deriving from the seam's `Table` with one line per column, and takes the header row as a `TextRow` in the parameter just before the table. How the headers bind, what each column type accepts, and every message are the seam's: [inputs.md](../seam/inputs.md) decisions 27 to 33 and [bridge.md](../seam/bridge.md#a-table-a-header-row-and-a-schema). A page shows its schema and restates nothing about binding. A mixed range crosses only as a table: a function never declares a bare `MixedArray`, because without headers its columns mean nothing ([inputs.md](../seam/inputs.md) decision 38). Whether a range of one kind needs headers too is not decided; the next few functions will show, and `CreateExpirySchedule`, built in #60, is the first, taking three columns without headers at the cost its page states; `CreateHolidayCalendar`, built in #67, is the second, taking one column, where that cost does not arise.
+A function that takes a table, a header row and a body, declares a schema, a class deriving from the seam's `Table` with one line per column, and takes the header row as a `TextRow` in the parameter just before the table. How the headers bind, what each column type accepts, and every message are the seam's: [inputs.md](../seam/inputs.md) decisions 27 to 33 and [bridge.md](../seam/bridge.md#a-table-a-header-row-and-a-schema). A page shows its schema and restates nothing about binding. A mixed range crosses only as a table: a function never declares a bare `MixedArray`, because without headers its columns mean nothing ([inputs.md](../seam/inputs.md) decision 38). Whether a range of one kind needs headers too is not decided; the next few functions will show, and `_CreateExpirySchedule`, built in #60, is the first, taking three columns without headers at the cost its page states; `_CreateHolidayCalendar`, built in #67, is the second, taking one column, where that cost does not arise.
 
 ## What holds everywhere
 
-Every date is a calendar day, weekends and holidays included; no business-day adjustment happens anywhere, and `CreateHolidayCalendar` only lists the days a market is closed; where a contract's terms will first need business days, and how, is decided in [time.md](time.md), and this sentence changes in that pull request. Interpolation is a straight line on the thing itself, weighted by calendar days, wherever the library fills gaps; a spline, or another basis, is a discussion, not a default. A rejection is a `ValueError` with the page's message, and a failed call publishes nothing.
+Every date is a calendar day, weekends and holidays included; no business-day adjustment happens anywhere, and `_CreateHolidayCalendar` only lists the days a market is closed; where a contract's terms will first need business days, and how, is decided in [time.md](time.md), and this sentence changes in that pull request. Interpolation is a straight line on the thing itself, weighted by calendar days, wherever the library fills gaps; a spline, or another basis, is a discussion, not a default. A rejection is a `ValueError` with the page's message, and a failed call publishes nothing.
 
 ## What the library receives
 
@@ -53,7 +53,7 @@ An argument's line is one sentence with three parts, in this order: what to sele
 name: What to select, such as an example, and the one thing that must hold.
 
 header_row: The header cells of your curve table, such as A1:B1, reading date and discount_factor in either order.
-curve:      A discount-curve handle: the cell showing CreateDiscountCurve's result, such as B5, or a name for it.
+curve:      A discount-curve handle: the cell showing _CreateDiscountCurve's result, such as B5, or a name for it.
 ```
 
 - Write the line as if the argument were required. For an optional one registration adds the brackets and the default, `[factor]` and `One multiplier. 1 when omitted.`, from the signature; for one that may be left out with nothing in its place, `option_expiry: DateColumn | None = None`, it adds the brackets alone. Never write "optional" or the default yourself.

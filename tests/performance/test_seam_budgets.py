@@ -540,18 +540,18 @@ def curve_body(rows: int) -> Cells:
 def test_a_valuation_date_is_two_scalars_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    PATH["CreateValuationDate"](46276.0, 0.5)
-    assert call_profile(lambda: PATH["CreateValuationDate"](46276.0, 0.5)) == {
+    PATH["_CreateValuationDate"](46276.0, 0.5)
+    assert call_profile(lambda: PATH["_CreateValuationDate"](46276.0, 0.5)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
         "_date": 1,  # the date, through the number rule it builds on, then its own two tests
         "_number": 2,
-        "CreateValuationDate": 1,
+        "_CreateValuationDate": 1,
         "valuation_date": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateValuationDate"](46276.0, 0.5)) == {}
+    assert numpy_calls(lambda: PATH["_CreateValuationDate"](46276.0, 0.5)) == {}
 
 
 def anchor_body(anchors: int, days: int) -> Cells:
@@ -580,7 +580,7 @@ CURVE_LEDGER = {
     "_not_dates": 1,
     "_as_days": 1,
     "_numbers_of": 1,
-    "CreateDiscountCurve": 1,
+    "_CreateDiscountCurve": 1,
     "discount_curve": 1,
     "interpolate_discount_factors": 1,
     "_publish": 1,
@@ -600,18 +600,18 @@ def test_a_discount_curve_is_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     body = curve_body(3_631)
-    PATH["CreateDiscountCurve"](CURVE_HEADERS, body)
-    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
-    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
+    PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)
+    assert call_profile(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
+    assert numpy_calls(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
 
 
 def test_a_curve_from_a_dozen_anchors_runs_what_a_daily_table_runs(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     body = anchor_body(12, 3_630)
-    PATH["CreateDiscountCurve"](CURVE_HEADERS, body)
-    assert call_profile(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
-    assert numpy_calls(lambda: PATH["CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
+    PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)
+    assert call_profile(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
+    assert numpy_calls(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
 
 
 # The reader of any handle: the text rule and one lookup, the kind's table built a column at a
@@ -619,15 +619,15 @@ def test_a_curve_from_a_dozen_anchors_runs_what_a_daily_table_runs(
 def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    handle = PATH["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
-    PATH["ReadHandle"](handle)
-    assert call_profile(lambda: PATH["ReadHandle"](handle)) == {
+    handle = PATH["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    PATH["util_ReadHandle"](handle)
+    assert call_profile(lambda: PATH["util_ReadHandle"](handle)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
         "_resolve": 1,  # the handle: the text rule, then one dictionary lookup
         "_text": 1,
-        "ReadHandle": 1,
+        "util_ReadHandle": 1,
         "discount_curve_table": 1,  # the kind's own table, reached by dispatch, not by a check
         "MixedArray.table": 1,
         "_table_column": 2,  # each array column checked before its copy: the dates, the factors
@@ -636,7 +636,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }
-    assert numpy_calls(lambda: PATH["ReadHandle"](handle)) == {
+    assert numpy_calls(lambda: PATH["util_ReadHandle"](handle)) == {
         "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
         "numpy.asarray": 1,
         "numpy.datetime_data": 1,  # the unit of the date column
@@ -648,7 +648,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
 
 def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) -> None:
     dead = "discount_curve:000000:000001"
-    assert call_profile(lambda: PATH["ReadHandle"](dead)) == {
+    assert call_profile(lambda: PATH["util_ReadHandle"](dead)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
@@ -657,7 +657,7 @@ def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) ->
     }
 
 
-# --- the first market definition: three columns in, one publication out -----------------
+# --- the first index definition: three columns in, one publication out -----------------
 
 
 def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
@@ -674,8 +674,8 @@ def test_an_expiry_schedule_is_three_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     codes, futures, options = schedule_columns(120)
-    PATH["CreateExpirySchedule"](codes, futures, options)
-    assert call_profile(lambda: PATH["CreateExpirySchedule"](codes, futures, options)) == {
+    PATH["_CreateExpirySchedule"](codes, futures, options)
+    assert call_profile(lambda: PATH["_CreateExpirySchedule"](codes, futures, options)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
@@ -687,12 +687,12 @@ def test_an_expiry_schedule_is_three_columns_in_and_one_publication_out(
         "_dates": 2,
         "_not_dates": 2,
         "_as_days": 2,
-        "CreateExpirySchedule": 1,
+        "_CreateExpirySchedule": 1,
         "expiry_schedule": 1,
         "_one_per_code": 2,  # the one rule, once per date column
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateExpirySchedule"](codes, futures, options)) == {
+    assert numpy_calls(lambda: PATH["_CreateExpirySchedule"](codes, futures, options)) == {
         "ndarray.any": 2,  # one look per date column, for the calendar
         "ndarray.astype": 4,  # each date column on its way to days
         "numpy.array": 2,  # the two copies the schedule keeps
@@ -706,8 +706,8 @@ def test_an_expiry_schedule_without_options_pays_for_two_columns(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     codes, futures, _ = schedule_columns(120)
-    PATH["CreateExpirySchedule"](codes, futures, MISSING)
-    assert call_profile(lambda: PATH["CreateExpirySchedule"](codes, futures, MISSING)) == {
+    PATH["_CreateExpirySchedule"](codes, futures, MISSING)
+    assert call_profile(lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
@@ -719,12 +719,12 @@ def test_an_expiry_schedule_without_options_pays_for_two_columns(
         "_dates": 1,
         "_not_dates": 1,
         "_as_days": 1,
-        "CreateExpirySchedule": 1,
+        "_CreateExpirySchedule": 1,
         "expiry_schedule": 1,
         "_one_per_code": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateExpirySchedule"](codes, futures, MISSING)) == {
+    assert numpy_calls(lambda: PATH["_CreateExpirySchedule"](codes, futures, MISSING)) == {
         "ndarray.any": 1,
         "ndarray.astype": 2,
         "numpy.array": 1,
@@ -733,7 +733,7 @@ def test_an_expiry_schedule_without_options_pays_for_two_columns(
     }
 
 
-# --- the second market definition: one column in, one publication out ------------------
+# --- the second index definition: one column in, one publication out ------------------
 
 
 def holiday_column(days: int) -> Cells:
@@ -747,8 +747,8 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     holidays = holiday_column(100)
-    PATH["CreateHolidayCalendar"](holidays)
-    assert call_profile(lambda: PATH["CreateHolidayCalendar"](holidays)) == {
+    PATH["_CreateHolidayCalendar"](holidays)
+    assert call_profile(lambda: PATH["_CreateHolidayCalendar"](holidays)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
@@ -758,11 +758,11 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
         "_dates": 1,
         "_not_dates": 1,
         "_as_days": 1,
-        "CreateHolidayCalendar": 1,
+        "_CreateHolidayCalendar": 1,
         "holiday_calendar": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateHolidayCalendar"](holidays)) == {
+    assert numpy_calls(lambda: PATH["_CreateHolidayCalendar"](holidays)) == {
         "ndarray.any": 1,  # one look, for the calendar
         "ndarray.astype": 2,  # the column on its way to days
         "numpy.array": 1,  # the one copy the calendar keeps
@@ -771,29 +771,29 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     }
 
 
-# --- the third market definition: five texts in, one publication out ------------------
+# --- the third index definition: five texts in, one publication out ------------------
 
 
 # Five scalars, each through the text rule, the builder and one publication: nothing is asked of
 # numpy, and the builder has no rule of its own to run.
-def test_market_conventions_are_five_texts_in_and_one_publication_out(
+def test_index_conventions_are_five_texts_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     codes = ("USD", "BBL", "USD", "volume", "BBL")
-    PATH["CreateMarketConventions"](*codes)
-    assert call_profile(lambda: PATH["CreateMarketConventions"](*codes)) == {
+    PATH["_CreateIndexConventions"](*codes)
+    assert call_profile(lambda: PATH["_CreateIndexConventions"](*codes)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 5,
         "_text": 5,
-        "CreateMarketConventions": 1,
-        "market_conventions": 1,
+        "_CreateIndexConventions": 1,
+        "index_conventions": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateMarketConventions"](*codes)) == {}
+    assert numpy_calls(lambda: PATH["_CreateIndexConventions"](*codes)) == {}
 
 
-# --- the fourth market definition: four scalars in, one publication out -----------------
+# --- the fourth index definition: four scalars in, one publication out -----------------
 
 
 # A text, a whole number and two numbers, each through its rule, the whole number through the
@@ -802,19 +802,19 @@ def test_a_contract_spec_is_four_scalars_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     facts = ("WTI", 1000.0, 3.0, 2.0)
-    PATH["CreateContractSpec"](*facts)
-    assert call_profile(lambda: PATH["CreateContractSpec"](*facts)) == {
+    PATH["_CreateContractSpec"](*facts)
+    assert call_profile(lambda: PATH["_CreateContractSpec"](*facts)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 4,
         "_text": 1,
         "_whole": 1,
         "_number": 3,  # the lot size on its way to whole, then the two fees
-        "CreateContractSpec": 1,
+        "_CreateContractSpec": 1,
         "contract_spec": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["CreateContractSpec"](*facts)) == {}
+    assert numpy_calls(lambda: PATH["_CreateContractSpec"](*facts)) == {}
 
 
 # cells_from_buffers is the real entry for a range: what the host's pinned buffers cost to own.

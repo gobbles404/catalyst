@@ -47,7 +47,7 @@ class Category:
     def size_of(self, unit: str) -> float: ...
 ```
 
-The collection is a frozen record of frozen records, plain Python and read-only: each category by name, and in each the size of each unit by code, in the order the tables below list them. Nothing is numpy until a conversion, which takes an array of quantities and returns a new one; a definition is a number looked up by key, not an array. Category names are lowercase and unit codes uppercase, as [conventions.md](../conventions.md) lists them, and since #71 the desk types `volume` in `CreateMarketConventions` the same way.
+The collection is a frozen record of frozen records, plain Python and read-only: each category by name, and in each the size of each unit by code, in the order the tables below list them. Nothing is numpy until a conversion, which takes an array of quantities and returns a new one; a definition is a number looked up by key, not an array. Category names are lowercase and unit codes uppercase, as [conventions.md](../conventions.md) lists them, and since #71 the desk types `volume` in `_CreateIndexConventions` the same way.
 
 ## The library checks
 
@@ -196,4 +196,4 @@ last place, the tests allowing 1e-15 relative. Display rounding must never chang
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
 USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
-category, all excluded above. The check that `CreateMarketConventions`' five codes are among these categories and units, noted at that builder, its own pull request. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.
+category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units, noted at that builder, its own pull request. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.

@@ -90,7 +90,7 @@ def test_a_curve_near_underflow_never_rises() -> None:
     assert curve.factors[-1] == 9.9999999999999e-308
 
 
-# The most days a curve holds is what ReadHandle can show: a sheet's rows less its two heading
+# The most days a curve holds is what util_ReadHandle can show: a sheet's rows less its two heading
 # rows. The last day of the longest curve is 1,048,573 days after the first; one more fails.
 def test_a_curve_holds_at_most_what_a_sheet_shows() -> None:
     first = np.datetime64("2026-09-11")

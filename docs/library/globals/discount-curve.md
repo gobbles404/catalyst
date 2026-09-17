@@ -1,8 +1,8 @@
-# CreateDiscountCurve
+# _CreateDiscountCurve
 
 Built in #53; takes anchors since #70.
 
-A daily discount curve, built from the anchors the desk supplies with the days between them filled by a straight line on the factor, retained and reached by handle. What the first pricing function must settle, how a calculation with several curves stays inside their dates, is under Not here. The code is `src/goosedove/globals/discount_curve.py`, the record and its builder, `src/goosedove/globals/interpolation.py`, the filling of the days between, and `src/goosedove/excel/globals.py`, the worksheet function; [ReadHandle](../utilities/read-handle.md) spills the daily curve back onto the sheet, which is how a projection is checked.
+A daily discount curve, built from the anchors the desk supplies with the days between them filled by a straight line on the factor, retained and reached by handle. What the first pricing function must settle, how a calculation with several curves stays inside their dates, is under Not here. The code is `src/goosedove/globals/discount_curve.py`, the record and its builder, `src/goosedove/globals/interpolation.py`, the filling of the days between, and `src/goosedove/excel/globals.py`, the worksheet function; [util_ReadHandle](../utilities/read-handle.md) spills the daily curve back onto the sheet, which is how a projection is checked.
 
 ## Worksheet contract
 
@@ -12,7 +12,7 @@ class DiscountCurveTable(Table):
     discount_factor: NumberColumn
 
 
-def CreateDiscountCurve(
+def _CreateDiscountCurve(
     header_row: TextRow, table: DiscountCurveTable
 ) -> Handle[DiscountCurve]: ...
 ```
@@ -24,9 +24,9 @@ def CreateDiscountCurve(
 | 3 | 23-May-2026 | 0.9999 |
 | 4 | 24-May-2026 | 0.9998 |
 | 5 | 29-May-2026 | 0.99929 |
-| 6 | `=CreateDiscountCurve(A1:B1, A2:B5)` | shows `discount_curve:3f9a1c:000002`, a curve of eight days |
+| 6 | `=_CreateDiscountCurve(A1:B1, A2:B5)` | shows `discount_curve:3f9a1c:000002`, a curve of eight days |
 
-The input is a table: a header row, then a body with one row per anchor, the date and its discount factor, the first row the curve's start at exactly 1, dates increasing with any gaps between them. The curve is daily whatever the anchors are: every calendar day from the first anchor to the last, an anchor keeping its factor and a day between two anchors taking the straight line between their factors, weighted by calendar days, as The interpolation below says. A daily table is anchors with no gaps, and makes the curve it always did. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first anchor is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the daily curve; `=ReadHandle(B6)` spills its eight days. What is still open about handles, release above all, is [handles.md](../../seam/handles.md).
+The input is a table: a header row, then a body with one row per anchor, the date and its discount factor, the first row the curve's start at exactly 1, dates increasing with any gaps between them. The curve is daily whatever the anchors are: every calendar day from the first anchor to the last, an anchor keeping its factor and a day between two anchors taking the straight line between their factors, weighted by calendar days, as The interpolation below says. A daily table is anchors with no gaps, and makes the curve it always did. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first anchor is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the daily curve; `=util_ReadHandle(B6)` spills its eight days. What is still open about handles, release above all, is [handles.md](../../seam/handles.md).
 
 ## Excel help
 
@@ -49,7 +49,7 @@ The checks consume typed columns and run on the anchors, before any day is fille
 | non-increasing; the row named is the one that rose | `discount_factor rises at row 412, from 0.91318 to 0.92254` |
 | the last factor is above zero | `discount_factor row 34 is 0.0, expected greater than 0` |
 | each date after the row above; a gap of any length is expected | `date row 12 is 2027-01-17, expected a date after row 11's 2027-02-16` |
-| the curve holds at most 1,048,574 days, a sheet's rows less the two heading rows `ReadHandle` spills first, so whatever is created can be read back | `date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11` |
+| the curve holds at most 1,048,574 days, a sheet's rows less the two heading rows `util_ReadHandle` spills first, so whatever is created can be read back | `date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11` |
 
 Those cover the stated rules: the first factor at 1 with non-increasing already implies every factor is at most 1, which rules out a curve for negative rates and the owner accepts that, and the minimum of a non-increasing array is its last element; a day filled between two anchors lies between their factors, so the daily curve holds every rule the anchors hold. No sorting, no discarding; nothing is clipped, smoothed or rounded, and a failure builds no curve.
 
@@ -123,4 +123,4 @@ The daily-coverage and anchor rules are tested independently of generic date acc
 
 ## Not here
 
-How a calculation with several curves knows which dates it must stay inside, and how it is told: a cash flow outside a curve's dates fails, and with several curves the tightest governs, but which object carries them to the calculation is the first pricing function's page. The start date's name: its field is `as_of`, the same word the valuation date uses for a different thing, and the first consumer of both names it. Extrapolation, any other interpolation basis, intraday interpolation, any use of `day_fraction_elapsed`, a second or projection curve, instruments, pricing. A worksheet function for the interpolation alone: the owner declined one, and `ReadHandle` shows the days a curve was given.
+How a calculation with several curves knows which dates it must stay inside, and how it is told: a cash flow outside a curve's dates fails, and with several curves the tightest governs, but which object carries them to the calculation is the first pricing function's page. The start date's name: its field is `as_of`, the same word the valuation date uses for a different thing, and the first consumer of both names it. Extrapolation, any other interpolation basis, intraday interpolation, any use of `day_fraction_elapsed`, a second or projection curve, instruments, pricing. A worksheet function for the interpolation alone: the owner declined one, and `util_ReadHandle` shows the days a curve was given.

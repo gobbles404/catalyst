@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.market_definitions.expiry_schedule import expiry_schedule
+from goosedove.index_definitions.expiry_schedule import expiry_schedule
 
 EPOCH = np.datetime64("1899-12-30")
 

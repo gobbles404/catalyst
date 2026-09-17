@@ -147,8 +147,8 @@ def scenarios() -> list[Scenario]:
     # A valuation date and a ten-year curve, created once here: the reader's handles. The
     # creators themselves have no row, because each call would retain an object for the life of
     # the run.
-    valuation = ENTRY["CreateValuationDate"](46276.0, 0.5)
-    curve = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    curve = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
     cases = [
         Scenario("Zero", "scalar", 0, 1, lambda run=ENTRY["Zero"]: run(), equals(0.0)),
         Scenario("Add", "scalar", 2, 1, lambda run=ENTRY["Add"]: run(1.0, 2.0), equals(3.0)),
@@ -158,19 +158,19 @@ def scenarios() -> list[Scenario]:
         # A handle in: the resolver, then the object's table out. The valuation date's spill is
         # six cells, so the row is the handle's cost; the ten-year curve's is 7,266 cells out.
         Scenario(
-            "ReadHandle",
+            "util_ReadHandle",
             "a handle in",
             1,
             6,
-            lambda run=ENTRY["ReadHandle"], h=valuation: run(h),
+            lambda run=ENTRY["util_ReadHandle"], h=valuation: run(h),
             mixed_out(3, 2),
         ),
         Scenario(
-            "ReadHandle",
+            "util_ReadHandle",
             "a ten-year curve out",
             1,
             7_266,
-            lambda run=ENTRY["ReadHandle"], h=curve: run(h),
+            lambda run=ENTRY["util_ReadHandle"], h=curve: run(h),
             mixed_out(3_633, 2),
         ),
     ]

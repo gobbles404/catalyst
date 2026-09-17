@@ -1,4 +1,4 @@
-"""ReadHandle through the seam: each kind spilled as its creator's table, a spill fed back to a
+"""util_ReadHandle through the seam: each kind spilled as its creator's table, a spill fed back to a
 creator, and the seam's words for a handle that does not resolve."""
 
 from typing import cast
@@ -15,10 +15,10 @@ from goosedove.excel.probes import probe
 from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.market_definitions.contract_spec import ContractSpec
-from goosedove.market_definitions.expiry_schedule import ExpirySchedule
-from goosedove.market_definitions.holiday_calendar import HolidayCalendar
-from goosedove.market_definitions.market_conventions import MarketConventions
+from goosedove.index_definitions.contract_spec import ContractSpec
+from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.index_conventions import IndexConventions
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -30,7 +30,7 @@ Spill = tuple[NDArray[np.uint8], NDArray[np.float64], str]
 
 def read(handle: object) -> Spill:
     """What the host is handed for a spill: the kinds, the numbers, the texts joined."""
-    result = bridge.call("ReadHandle", [handle])
+    result = bridge.call("util_ReadHandle", [handle])
     assert isinstance(result, tuple), result
     return cast(Spill, result)
 
@@ -54,7 +54,7 @@ def rows(spill: Spill) -> list[list[object]]:
 
 
 def test_a_valuation_date_spills_its_two_fields_under_two_heading_rows() -> None:
-    handle = bridge.call("CreateValuationDate", [SEP_11, 0.5])
+    handle = bridge.call("_CreateValuationDate", [SEP_11, 0.5])
     assert rows(read(handle)) == [
         ["as_of", "day_fraction_elapsed"],
         ["datetime64[D]", "float"],
@@ -63,7 +63,7 @@ def test_a_valuation_date_spills_its_two_fields_under_two_heading_rows() -> None
 
 
 def test_a_curve_spills_its_table_with_dates_as_serials_and_factors_exactly() -> None:
-    handle = bridge.call("CreateDiscountCurve", [HEADERS, BODY])
+    handle = bridge.call("_CreateDiscountCurve", [HEADERS, BODY])
     assert rows(read(handle)) == [
         ["date", "discount_factor"],
         ["datetime64[D]", "float64"],
@@ -77,14 +77,14 @@ def test_a_schedule_spills_three_columns_with_options_and_two_without() -> None:
     codes = Cells.from_rows([["m26"], ["n26"]])
     futures = Cells.from_rows([[46161.0], [46195.0]])
     options = Cells.from_rows([[46156.0], [46189.0]])
-    with_options = bridge.call("CreateExpirySchedule", [codes, futures, options])
+    with_options = bridge.call("_CreateExpirySchedule", [codes, futures, options])
     assert rows(read(with_options)) == [
         ["future_code", "future_expiry", "option_expiry"],
         ["str", "datetime64[D]", "datetime64[D]"],
         ["m26", 46161.0, 46156.0],
         ["n26", 46195.0, 46189.0],
     ]
-    without = bridge.call("CreateExpirySchedule", [codes, futures, MISSING])
+    without = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING])
     assert rows(read(without)) == [
         ["future_code", "future_expiry"],
         ["str", "datetime64[D]"],
@@ -96,7 +96,7 @@ def test_a_schedule_spills_three_columns_with_options_and_two_without() -> None:
 # Serials for 1 January, 19 January and 16 February 2026.
 def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
     holidays = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
-    handle = bridge.call("CreateHolidayCalendar", [holidays])
+    handle = bridge.call("_CreateHolidayCalendar", [holidays])
     assert rows(read(handle)) == [
         ["holiday"],
         ["datetime64[D]"],
@@ -106,8 +106,8 @@ def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
     ]
 
 
-def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
-    handle = bridge.call("CreateMarketConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
+    handle = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
     assert rows(read(handle)) == [
         [
             "quote_currency_unit",
@@ -123,7 +123,7 @@ def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows()
 
 # The lot size goes out as a number, as every whole number does on the sheet.
 def test_a_contract_spec_spills_its_four_fields_under_two_heading_rows() -> None:
-    handle = bridge.call("CreateContractSpec", ["WTI", 1000.0, 3.0, 2.0])
+    handle = bridge.call("_CreateContractSpec", ["WTI", 1000.0, 3.0, 2.0])
     assert rows(read(handle)) == [
         ["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"],
         ["str", "int", "float", "float"],
@@ -134,7 +134,7 @@ def test_a_contract_spec_spills_its_four_fields_under_two_heading_rows() -> None
 # Anchors three days apart spill four days, the anchors exact and the days between on the line.
 def test_a_curve_from_anchors_spills_every_day_between_them() -> None:
     anchors = Cells.from_rows([[SEP_11, 1.0], [SEP_11 + 3, 0.9997]])
-    kinds, slots, joined = read(bridge.call("CreateDiscountCurve", [HEADERS, anchors]))
+    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", [HEADERS, anchors]))
     assert kinds.shape == (6, 2)
     assert joined == "date\0discount_factor\0datetime64[D]\0float64"
     assert slots[2:, 0].tolist() == [SEP_11, SEP_12, SEP_13, SEP_11 + 3]
@@ -146,10 +146,10 @@ def test_a_curve_from_anchors_spills_every_day_between_them() -> None:
 
 
 def test_a_curves_spill_fed_back_to_its_creator_makes_an_equal_curve() -> None:
-    first = bridge.call("CreateDiscountCurve", [HEADERS, BODY])
+    first = bridge.call("_CreateDiscountCurve", [HEADERS, BODY])
     spilled = rows(read(first))
     second = bridge.call(
-        "CreateDiscountCurve", [Cells.from_rows([spilled[0]]), Cells.from_rows(spilled[2:])]
+        "_CreateDiscountCurve", [Cells.from_rows([spilled[0]]), Cells.from_rows(spilled[2:])]
     )
     assert second != first  # a new creator call publishes anew
     assert rows(read(second)) == spilled
@@ -158,7 +158,7 @@ def test_a_curves_spill_fed_back_to_its_creator_makes_an_equal_curve() -> None:
 @given(count=st.integers(1, 400))
 def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
     body = Cells.from_rows([[SEP_11 + i, 1.0 - i * 1e-5] for i in range(count)])
-    kinds, slots, joined = read(bridge.call("CreateDiscountCurve", [HEADERS, body]))
+    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", [HEADERS, body]))
     assert kinds.shape == (count + 2, 2)
     assert joined == "date\0discount_factor\0datetime64[D]\0float64"
     assert slots[2:, 0].tolist() == [SEP_11 + i for i in range(count)]
@@ -171,23 +171,23 @@ def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
 @pytest.mark.parametrize(
     ("value", "text"),
     [
-        (3.0, "#ERROR ReadHandle: handle is number 3.0, expected a handle"),
-        (None, "#ERROR ReadHandle: handle is blank, expected a handle"),
+        (3.0, "#ERROR util_ReadHandle: handle is number 3.0, expected a handle"),
+        (None, "#ERROR util_ReadHandle: handle is blank, expected a handle"),
         (
             "discount_curve:000000:000001",
-            "#ERROR ReadHandle: handle is text 'discount_curve:000000:000001' naming no live "
+            "#ERROR util_ReadHandle: handle is text 'discount_curve:000000:000001' naming no live "
             "object, expected a handle",
         ),
         (
-            "#ERROR CreateDiscountCurve: ValueError: x",
-            "#ERROR ReadHandle: handle is the creator's failure, expected a handle: "
-            "#ERROR CreateDiscountCurve: ValueError: x",
+            "#ERROR _CreateDiscountCurve: ValueError: x",
+            "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: "
+            "#ERROR _CreateDiscountCurve: ValueError: x",
         ),
     ],
     ids=["a number", "a blank", "text naming no live object", "a creator's failure, relayed"],
 )
 def test_a_handle_that_does_not_resolve_fails_in_the_seams_words(value: object, text: str) -> None:
-    assert bridge.call("ReadHandle", [value]) == text
+    assert bridge.call("util_ReadHandle", [value]) == text
 
 
 # --- every published kind has a table, and one without fails rather than guessing --------
@@ -205,8 +205,8 @@ def MakeUnshown() -> Handle[Unshown]:
 def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None:
     handle = bridge.call("MakeUnshown", [])
     assert (
-        bridge.call("ReadHandle", [handle])
-        == "#ERROR ReadHandle: TypeError: no table for a Unshown"
+        bridge.call("util_ReadHandle", [handle])
+        == "#ERROR util_ReadHandle: TypeError: no table for a Unshown"
     )
 
 
@@ -216,6 +216,6 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         DiscountCurve,
         ExpirySchedule,
         HolidayCalendar,
-        MarketConventions,
+        IndexConventions,
         ContractSpec,
     } <= set(shown.registry)

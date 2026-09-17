@@ -145,18 +145,18 @@ def least_peak(fn: Callable[[], object]) -> int:
 # three-row table on 2026-09-15: the record and its entry, then the kinds, the slots and the
 # masks of six cells.
 def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
-    assert least_peak(lambda: ENTRY["CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
-    handle = ENTRY["CreateValuationDate"](46276.0, 0.5)
-    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
+    handle = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
 
 # Reading a ten-year curve back builds its table, the kinds and the slots of 3,633 rows by two,
 # the serials on the way, and the mixed road's masks: measured 128,381 bytes on 2026-09-15,
 # about 18 bytes per cell out.
 def test_reading_a_curve_back_peaks_at_its_table_and_the_roads_masks() -> None:
-    handle = ENTRY["CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    handle = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
     cells = 3_633 * 2
-    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 18 * cells + SLACK
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 18 * cells + SLACK
 
 
 def anchor_body(anchors: int, days: int) -> Cells:
@@ -174,7 +174,7 @@ def test_a_discount_curve_from_a_daily_table_pays_its_looks_and_its_filling_once
     days = 3_631
     body = curve_body(days)
     assert (
-        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 60 * days + SLACK
+        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 60 * days + SLACK
     )
 
 
@@ -185,7 +185,7 @@ def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> N
     days = 3_631
     body = anchor_body(12, days - 1)
     assert (
-        least_peak(lambda: ENTRY["CreateDiscountCurve"](CURVE_HEADERS, body)) <= 25 * days + SLACK
+        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 25 * days + SLACK
     )
 
 
@@ -204,9 +204,9 @@ def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
 def test_an_expiry_schedule_keeps_a_copy_of_each_date_column() -> None:
     contracts = 120
     codes, futures, options = schedule_columns(contracts)
-    with_options = least_peak(lambda: ENTRY["CreateExpirySchedule"](codes, futures, options))
+    with_options = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options))
     assert with_options <= 32 * contracts + 2 * SLACK
-    without = least_peak(lambda: ENTRY["CreateExpirySchedule"](codes, futures, MISSING))
+    without = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING))
     assert without <= 17 * contracts + 2 * SLACK
 
 
@@ -222,25 +222,25 @@ def holiday_column(days: int) -> Cells:
 def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     days = 100
     holidays = holiday_column(days)
-    assert least_peak(lambda: ENTRY["CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
 
 
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
-def test_a_creator_of_market_conventions_and_its_reader_stay_small() -> None:
+def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
     codes = ("USD", "BBL", "USD", "volume", "BBL")
-    assert least_peak(lambda: ENTRY["CreateMarketConventions"](*codes)) <= 2 * SLACK
-    handle = ENTRY["CreateMarketConventions"](*codes)
-    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateIndexConventions"](*codes)) <= 2 * SLACK
+    handle = ENTRY["_CreateIndexConventions"](*codes)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
 
 # A text and three numbers kept as they arrived, the record and its entry: measured 272 bytes on
 # 2026-09-16, and 1,205 for reading them back as a three-row table of four columns.
 def test_a_creator_of_a_contract_spec_and_its_reader_stay_small() -> None:
     facts = ("WTI", 1000.0, 3.0, 2.0)
-    assert least_peak(lambda: ENTRY["CreateContractSpec"](*facts)) <= 2 * SLACK
-    handle = ENTRY["CreateContractSpec"](*facts)
-    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateContractSpec"](*facts)) <= 2 * SLACK
+    handle = ENTRY["_CreateContractSpec"](*facts)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
 
 def test_owning_a_range_peaks_at_the_two_copies() -> None:

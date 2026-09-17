@@ -21,9 +21,13 @@ from goosedove.excel.bridge import (
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
 
+# The worksheet functions this module registers, named here so that their leading underscore
+# reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
+__all__ = ["_CreateDiscountCurve", "_CreateValuationDate"]
+
 
 @excel_function
-def CreateValuationDate(
+def _CreateValuationDate(
     as_of: Annotated[
         Date, "The valuation date, a date cell such as 11-Sep-2026, with no time of day."
     ],
@@ -44,7 +48,7 @@ class DiscountCurveTable(Table):
 
 
 @excel_function
-def CreateDiscountCurve(
+def _CreateDiscountCurve(
     header_row: Annotated[
         TextRow,
         "The header cells of your curve table, such as A1:B1, reading date and discount_factor "
