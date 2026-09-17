@@ -135,6 +135,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, 71.4) }, "#ERROR _CreateFuturesCurve: ValueError: price has 2 prices, expected 3, one per future_code" };
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, ExcelEmpty.Value, 71.1) }, "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number" };
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), ExcelMissing.Value }, "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers" };
+            // The daily fixings: a header row and a body of dates and settles; the days newest first, text where a settle is expected, and a header the table does not have.
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46148.0, 95.08 }, { 46147.0, 102.27 } } }, "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06" };
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, "x" }, { 46146.0, 106.42 } } }, "#ERROR _CreateDailyFixings: table cell (1, 2) is text 'x', expected number" };
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "price"), new object[,] { { 46143.0, 101.94 } } }, "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'price', expected one of date or settle" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -216,6 +220,22 @@ namespace Goosedove.Host.Tests
             Assert.Equal("float64", spill[1, 1]);
             Assert.Equal("M26", spill[2, 0]);
             Assert.Equal(71.4, spill[3, 1]);
+        }
+
+        // Daily fixings: a header row and a body make one, and util_ReadHandle spills it back, the
+        // two headers, two types, then a row per day, the date as a serial and the settle as a number.
+        [Fact]
+        public void daily_fixings_are_created_from_a_table_and_read_back_through_their_handle()
+        {
+            var handle = (string)Seam.Call("_CreateDailyFixings", Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } });
+            Assert.StartsWith("daily_fixings:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(4, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("settle", spill[0, 1]);
+            Assert.Equal("datetime64[D]", spill[1, 0]);
+            Assert.Equal(46143.0, spill[2, 0]);
+            Assert.Equal(106.42, spill[3, 1]);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

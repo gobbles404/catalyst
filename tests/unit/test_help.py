@@ -167,6 +167,27 @@ def test_the_futures_curve_creator_explains_itself() -> None:
     ]
 
 
+def test_the_daily_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateDailyFixings"]
+    assert not hidden
+    assert description == (
+        "Creates the daily fixings of one index from the days it fixed and their settles, and "
+        "shows its handle, the text other formulas take as the fixings."
+    )
+    assert arguments == [
+        (
+            "header_row",
+            "The header cells of your fixings table, such as A1:B1, reading date and settle in "
+            "either order.",
+        ),
+        (
+            "table",
+            "The rows under the headers, such as A2:B5: one fixing per row, its date and settle, "
+            "dates increasing.",
+        ),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

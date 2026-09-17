@@ -59,6 +59,7 @@ What each kind shows:
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_spec` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `int`, `float`, `float` | one |
 | `futures_curve` | `future_code`, `price` | `str`, `float64` | one per contract |
+| `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 
 `=util_ReadHandle(B2)` on `=_CreateValuationDate(A2, 0.5)`:
 
@@ -96,6 +97,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | index conventions: one row of five texts under its two heading rows | example |
 | a contract spec: one row, the name as text and the lot size and fees as numbers, under its two heading rows | example |
 | a futures curve: two columns, the code as text and the price exactly, one row per contract under its two heading rows | example |
+| daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |

@@ -885,3 +885,52 @@ def test_a_futures_curve_is_two_columns_in_and_one_publication_out(
         "numpy.array": 1,  # the one copy the curve keeps
         "ndarray.setflags": 1,  # frozen
     }
+
+
+# --- the second market data: a table in, one publication out --------------------------------
+
+
+FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
+
+
+def fixings_body(rows: int) -> Cells:
+    """That many daily fixings as the sheet sends them, a serial and a settle per row."""
+    return Cells.from_rows([[46143.0 + i, 100.0 + i % 7] for i in range(rows)])
+
+
+# A year of fixings at the table path: the header row as any row of text, the body admitted as a
+# mixed range and bound, one look per column, the date column converted to days, the builder's
+# one look for the order of the dates and its two copies, and one publication. Nineteen calls
+# across eighteen functions, the accept rule once per argument.
+def test_daily_fixings_are_a_table_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    body = fixings_body(260)
+    PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)
+    assert call_profile(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_row": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_texts": 1,
+        "_mixed": 1,
+        "MixedArray.shape": 1,
+        "_refine": 1,
+        "_bind": 1,
+        "_dates_of": 1,  # no column of text, so no text places are made
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_numbers_of": 1,
+        "_CreateDailyFixings": 1,
+        "daily_fixings": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)) == {
+        "ndarray.any": 3,  # one look per column, then the builder's, for a date out of order
+        "ndarray.astype": 2,  # the date column on its way to days
+        "numpy.array": 2,  # the two copies the fixings keep
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 3,
+    }
