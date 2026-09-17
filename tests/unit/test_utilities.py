@@ -15,7 +15,7 @@ from goosedove.excel.probes import probe
 from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_specs import ContractSpecs
+from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -163,12 +163,12 @@ def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() 
 
 
 # The lot sizes go out as numbers, as every whole number does on the sheet, one row per contract.
-def test_contract_specs_spill_one_row_per_contract_under_two_heading_rows() -> None:
+def test_contract_specifications_spill_one_row_per_contract_under_two_heading_rows() -> None:
     headers = Cells.from_rows(
         [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
     )
     body = Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]])
-    handle = bridge.call("_CreateContractSpecs", [headers, body])
+    handle = bridge.call("_CreateContractSpecifications", [headers, body])
     assert rows(read(handle)) == [
         ["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"],
         ["str", "float64", "float64", "float64"],
@@ -263,7 +263,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         ExpirySchedule,
         HolidayCalendar,
         IndexConventions,
-        ContractSpecs,
+        ContractSpecifications,
         FuturesCurve,
         DailyFixings,
         MonthlyFixings,

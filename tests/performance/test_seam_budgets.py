@@ -797,12 +797,12 @@ def test_index_conventions_are_five_texts_in_and_one_publication_out(
 # --- the fourth index definition: a table of contracts in, one publication out ----------
 
 
-SPEC_HEADERS = Cells.from_rows(
+SPECIFICATION_HEADERS = Cells.from_rows(
     [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 
 
-def spec_body(contracts: int) -> Cells:
+def specification_body(contracts: int) -> Cells:
     """That many contracts as the sheet sends them: a name, a whole lot size and two fees."""
     return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
 
@@ -811,12 +811,14 @@ def spec_body(contracts: int) -> Cells:
 # a mixed range and bound, then each column through its rule, the names gathered and the three
 # number columns as views, the builder's look at the lot sizes for a fraction, its three copies
 # and one publication. Twenty-one calls across eighteen functions.
-def test_contract_specs_are_a_table_in_and_one_publication_out(
+def test_contract_specifications_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    body = spec_body(12)
-    PATH["_CreateContractSpecs"](SPEC_HEADERS, body)
-    assert call_profile(lambda: PATH["_CreateContractSpecs"](SPEC_HEADERS, body)) == {
+    body = specification_body(12)
+    PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
+    assert call_profile(
+        lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
+    ) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
@@ -832,11 +834,13 @@ def test_contract_specs_are_a_table_in_and_one_publication_out(
         "_text_places": 1,
         "_texts_of": 1,
         "_numbers_of": 3,
-        "_CreateContractSpecs": 1,
-        "contract_specs": 1,
+        "_CreateContractSpecifications": 1,
+        "contract_specifications": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateContractSpecs"](SPEC_HEADERS, body)) == {
+    assert numpy_calls(
+        lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
+    ) == {
         "ndarray.any": 5,  # one look per column, then the builder's, for a lot size with a fraction
         "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
         "ndarray.cumsum": 1,  # the text cells above each row

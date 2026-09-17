@@ -112,18 +112,18 @@ $formulas = [ordered]@{
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5)" = "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text"
-    # The contract specs: a creator over a header row and a table of two contracts, read back
+    # The contract specifications: a creator over a header row and a table of two contracts, read back
     # through util_ReadHandle, a lot size with a fraction, text where a fee is expected, and a
     # name given twice.
-    "=LEFT(BY1,15)"               = "contract_specs:"
+    "=LEFT(BY1,24)"               = "contract_specifications:"
     "=INDEX(util_ReadHandle(BY1),1,3)" = "brokerage_rate_per_lot"
     "=INDEX(util_ReadHandle(BY1),2,2)" = "float64"
     "=INDEX(util_ReadHandle(BY1),3,2)" = "10000"
     "=INDEX(util_ReadHandle(BY1),4,1)" = "ICE NG"
     "=ROWS(util_ReadHandle(BY1))"      = "4"
-    "=_CreateContractSpecs(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecs: ValueError: lot_size row 1 is 2.5, expected a whole number"
-    "=_CreateContractSpecs(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecs: table cell (1, 3) is text 'three', expected number"
-    "=_CreateContractSpecs(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecs: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
+    "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
+    "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
+    "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
     # The futures curve: a creator over a column of codes and a column of prices, read back through
     # util_ReadHandle, a price column one row short, a blank among the prices, and the price
     # column left out.
@@ -221,13 +221,13 @@ $cells = [ordered]@{
     # The index conventions: five codes as the desk types them, and one creator cell.
     "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
-    # Contract specs: a header row and two contracts, NYMEX and ICE lots of gas, and one creator
+    # Contract specifications: a header row and two contracts, NYMEX and ICE lots of gas, and one creator
     # cell; then a row with a lot size with a fraction, one with text where a fee is expected,
     # and two rows naming one contract twice.
     "BU1" = "name"; "BV1" = "lot_size"; "BW1" = "brokerage_rate_per_lot"; "BX1" = "clearing_rate_per_lot"
     "BU2" = "NYMEX NG"; "BV2" = "10000"; "BW2" = "3"; "BX2" = "2"
     "BU3" = "ICE NG"; "BV3" = "2500"; "BW3" = "0.75"; "BX3" = "0.5"
-    "BY1" = "=_CreateContractSpecs(BU1:BX1,BU2:BX3)"
+    "BY1" = "=_CreateContractSpecifications(BU1:BX1,BU2:BX3)"
     "BZ2" = "NYMEX NG"; "CA2" = "2.5"; "CB2" = "3"; "CC2" = "2"
     "CH2" = "NYMEX NG"; "CI2" = "10000"; "CJ2" = "three"; "CK2" = "2"
     "CL2" = "NYMEX NG"; "CM2" = "10000"; "CN2" = "3"; "CO2" = "2"

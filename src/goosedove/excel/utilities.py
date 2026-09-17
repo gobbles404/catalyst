@@ -14,7 +14,7 @@ import numpy as np
 from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_specs import ContractSpecs
+from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -116,7 +116,7 @@ def index_conventions_table(obj: IndexConventions) -> MixedArray:
 
 
 @shown.register
-def contract_specs_table(obj: ContractSpecs) -> MixedArray:
+def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
     return MixedArray.table(
         [
             ("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"),

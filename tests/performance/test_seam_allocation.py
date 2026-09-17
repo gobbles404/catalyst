@@ -235,25 +235,25 @@ def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
 
-SPEC_HEADERS = Cells.from_rows(
+SPECIFICATION_HEADERS = Cells.from_rows(
     [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 
 
-def spec_body(contracts: int) -> Cells:
+def specification_body(contracts: int) -> Cells:
     """That many contracts as the sheet sends them: a name, a whole lot size and two fees."""
     return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
 
 
-# Contract specs keep a copy of each numeric column, 24 bytes per contract, and on the way pay
-# the table path, the names gathered and the builder's look at the lot sizes: measured 12,163
-# bytes at 120 contracts on 2026-09-17, about 76 bytes per contract beyond a creator's small
-# objects; 3,037 at two contracts and 3,327 at a dozen.
-def test_contract_specs_keep_a_copy_of_each_numeric_column() -> None:
+# Contract specifications keep a copy of each numeric column, 24 bytes per contract, and on the
+# way pay the table path, the names gathered and the builder's look at the lot sizes: measured
+# 12,163 bytes at 120 contracts on 2026-09-17, about 76 bytes per contract beyond a creator's
+# small objects; 3,037 at two contracts and 3,327 at a dozen.
+def test_contract_specifications_keep_a_copy_of_each_numeric_column() -> None:
     contracts = 120
-    body = spec_body(contracts)
+    body = specification_body(contracts)
     assert (
-        least_peak(lambda: ENTRY["_CreateContractSpecs"](SPEC_HEADERS, body))
+        least_peak(lambda: ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body))
         <= 100 * contracts + 2 * SLACK
     )
 

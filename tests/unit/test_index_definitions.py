@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
-from goosedove.index_definitions.contract_specs import ContractSpecs
+from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -35,13 +35,16 @@ CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
 UNITS = ["USD", "BBL", "USD", "volume", "BBL"]
 CONVENTIONS = re.compile(r"index_conventions:[0-9a-f]{6}:([0-9]{6})")
 
-# The specs page's sample as the sheet sends it: the header row, then one row per contract, gas
-# traded as NYMEX lots and as ICE lots, the name as text and the lot size and fees as numbers.
-SPEC_HEADERS = Cells.from_rows(
+# The specifications page's sample as the sheet sends it: the header row, then one row per
+# contract, gas traded as NYMEX lots and as ICE lots, the name as text and the lot size and fees
+# as numbers.
+SPECIFICATION_HEADERS = Cells.from_rows(
     [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
-SPEC_BODY = Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]])
-SPECS = re.compile(r"contract_specs:[0-9a-f]{6}:([0-9]{6})")
+SPECIFICATION_BODY = Cells.from_rows(
+    [["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]]
+)
+SPECIFICATIONS = re.compile(r"contract_specifications:[0-9a-f]{6}:([0-9]{6})")
 
 
 # The library has no consumer of a schedule yet, so this hidden reader proves that a handle
@@ -303,37 +306,41 @@ def test_a_handle_of_another_kind_is_not_index_conventions() -> None:
     )
 
 
-# --- _CreateContractSpecs ----------------------------------------------------------
+# --- _CreateContractSpecifications ----------------------------------------------------------
 
 
-# The library has no consumer of the specs yet, so this hidden reader proves that a handle
-# resolves to the specs the seam kept, typed: names as text, lot sizes whole, fees as numbers.
+# The library has no consumer of the specifications yet, so this hidden reader proves that a
+# handle resolves to the specifications the seam kept, typed: names as text, lot sizes whole, fees
+# as numbers.
 @probe
-def ReadContractSpecs(specs: Handle[ContractSpecs]) -> str:
+def ReadContractSpecifications(specifications: Handle[ContractSpecifications]) -> str:
+    lots = specifications.lot_sizes
     return (
-        f"{' '.join(specs.names)} | {specs.lot_sizes.dtype} {specs.lot_sizes.tolist()} | "
-        f"{specs.brokerage_rates_per_lot.tolist()} {specs.clearing_rates_per_lot.tolist()}"
+        f"{' '.join(specifications.names)} | {lots.dtype} {lots.tolist()} | "
+        f"{specifications.brokerage_rates_per_lot.tolist()} "
+        f"{specifications.clearing_rates_per_lot.tolist()}"
     )
 
 
-def the_specs(headers: object, body: object) -> str:
-    text = bridge.call("_CreateContractSpecs", [headers, body])
-    assert isinstance(text, str) and SPECS.fullmatch(text), text
+def the_specifications(headers: object, body: object) -> str:
+    text = bridge.call("_CreateContractSpecifications", [headers, body])
+    assert isinstance(text, str) and SPECIFICATIONS.fullmatch(text), text
     return text
 
 
-def test_contract_specs_are_created_from_a_table_and_read_back_typed() -> None:
-    assert bridge.call("ReadContractSpecs", [the_specs(SPEC_HEADERS, SPEC_BODY)]) == (
-        "NYMEX NG ICE NG | float64 [10000.0, 2500.0] | [3.0, 0.75] [2.0, 0.5]"
-    )
+def test_contract_specifications_are_created_from_a_table_and_read_back_typed() -> None:
+    assert bridge.call(
+        "ReadContractSpecifications",
+        [the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY)],
+    ) == ("NYMEX NG ICE NG | float64 [10000.0, 2500.0] | [3.0, 0.75] [2.0, 0.5]")
 
 
-def test_the_specs_headers_bind_in_any_order_and_one_row_is_a_table() -> None:
+def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -> None:
     headers = Cells.from_rows(
         [["CLEARING_RATE_PER_LOT", "Name", "lot_size", "brokerage_rate_per_lot"]]
     )
     body = Cells.from_rows([[2.0, "NYMEX NG", 10000.0, 3.0]])
-    assert bridge.call("ReadContractSpecs", [the_specs(headers, body)]) == (
+    assert bridge.call("ReadContractSpecifications", [the_specifications(headers, body)]) == (
         "NYMEX NG | float64 [10000.0] | [3.0] [2.0]"
     )
 
@@ -343,45 +350,55 @@ def test_the_specs_headers_bind_in_any_order_and_one_row_is_a_table() -> None:
     [
         (
             Cells.from_rows([["name", "lot_size", "brokerage", "clearing_rate_per_lot"]]),
-            SPEC_BODY,
-            "#ERROR _CreateContractSpecs: header_row cell (1, 3) is text 'brokerage', expected one "
-            "of name, lot_size, brokerage_rate_per_lot or clearing_rate_per_lot",
+            SPECIFICATION_BODY,
+            "#ERROR _CreateContractSpecifications: header_row cell (1, 3) is text 'brokerage', "
+            "expected one of name, lot_size, brokerage_rate_per_lot or clearing_rate_per_lot",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", 2.5, 3.0, 2.0]]),
-            "#ERROR _CreateContractSpecs: ValueError: lot_size row 1 is 2.5, "
+            "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, "
             "expected a whole number",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", True, 3.0, 2.0]]),
-            "#ERROR _CreateContractSpecs: table cell (1, 2) is boolean TRUE, expected number",
+            "#ERROR _CreateContractSpecifications: table cell (1, 2) is boolean TRUE, "
+            "expected number",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", 10000.0, "three", 2.0]]),
-            "#ERROR _CreateContractSpecs: table cell (1, 3) is text 'three', expected number",
+            "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', "
+            "expected number",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([[1.0, 10000.0, 3.0, 2.0]]),
-            "#ERROR _CreateContractSpecs: table cell (1, 1) is number 1.0, expected text",
+            "#ERROR _CreateContractSpecifications: table cell (1, 1) is number 1.0, expected text",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["NYMEX NG", 2500.0, 0.75, 0.5]]),
-            "#ERROR _CreateContractSpecs: ValueError: name row 2 is 'NYMEX NG', "
+            "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', "
             "already given at row 1",
         ),
         (
-            SPEC_HEADERS,
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", 10000.0, 3.0]]),
-            "#ERROR _CreateContractSpecs: header_row has 4 headers, expected 3, "
+            "#ERROR _CreateContractSpecifications: header_row has 4 headers, expected 3, "
             "one per column of table",
         ),
-        (SPEC_HEADERS, None, "#ERROR _CreateContractSpecs: table is blank, expected table"),
-        (SPEC_HEADERS, MISSING, "#ERROR _CreateContractSpecs: table is missing, expected table"),
+        (
+            SPECIFICATION_HEADERS,
+            None,
+            "#ERROR _CreateContractSpecifications: table is blank, expected table",
+        ),
+        (
+            SPECIFICATION_HEADERS,
+            MISSING,
+            "#ERROR _CreateContractSpecifications: table is missing, expected table",
+        ),
     ],
     ids=[
         "an unknown header",
@@ -395,26 +412,30 @@ def test_the_specs_headers_bind_in_any_order_and_one_row_is_a_table() -> None:
         "the body left out",
     ],
 )
-def test_contract_specs_that_cannot_be_made_say_why(
+def test_contract_specifications_that_cannot_be_made_say_why(
     headers: object, body: object, text: str
 ) -> None:
-    assert bridge.call("_CreateContractSpecs", [headers, body]) == text
+    assert bridge.call("_CreateContractSpecifications", [headers, body]) == text
 
 
-def test_a_failed_specs_construction_publishes_no_object_and_no_handle() -> None:
-    before = number(the_specs(SPEC_HEADERS, SPEC_BODY), SPECS)
+def test_a_failed_specifications_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY), SPECIFICATIONS)
     twice = Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["NYMEX NG", 2500.0, 0.75, 0.5]])
-    assert bridge.call("_CreateContractSpecs", [SPEC_HEADERS, twice]) == (
-        "#ERROR _CreateContractSpecs: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
+    assert bridge.call("_CreateContractSpecifications", [SPECIFICATION_HEADERS, twice]) == (
+        "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', "
+        "already given at row 1"
     )
-    assert number(the_specs(SPEC_HEADERS, SPEC_BODY), SPECS) == before + 1
+    assert (
+        number(the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY), SPECIFICATIONS)
+        == before + 1
+    )
 
 
-def test_a_handle_of_another_kind_is_not_contract_specs() -> None:
+def test_a_handle_of_another_kind_is_not_contract_specifications() -> None:
     other = the_conventions(*UNITS)
-    assert bridge.call("ReadContractSpecs", [other]) == (
-        f"#ERROR ReadContractSpecs: specs is index conventions handle {other!r}, "
-        "expected contract specs handle"
+    assert bridge.call("ReadContractSpecifications", [other]) == (
+        f"#ERROR ReadContractSpecifications: specifications is index conventions handle {other!r}, "
+        "expected contract specifications handle"
     )
 
 
@@ -424,7 +445,7 @@ def test_a_handle_of_another_kind_is_not_contract_specs() -> None:
 @given(lot_size=st.integers(-(2**53), 2**53))
 def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
     body = Cells.from_rows([["NYMEX NG", float(lot_size), 3.0, 2.0]])
-    spill = bridge.call("util_ReadHandle", [the_specs(SPEC_HEADERS, body)])
+    spill = bridge.call("util_ReadHandle", [the_specifications(SPECIFICATION_HEADERS, body)])
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
     assert slots[2, 1] == float(lot_size)
@@ -435,7 +456,7 @@ def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept_and_read_back(
     lot_size: float,
 ) -> None:
     body = Cells.from_rows([["NYMEX NG", lot_size, 3.0, 2.0]])
-    spill = bridge.call("util_ReadHandle", [the_specs(SPEC_HEADERS, body)])
+    spill = bridge.call("util_ReadHandle", [the_specifications(SPECIFICATION_HEADERS, body)])
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
     assert slots[2, 1] == lot_size

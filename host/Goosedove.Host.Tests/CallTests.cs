@@ -126,10 +126,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
-            // The contract specs: a header row and a table of contracts; a lot size with a fraction, text where a fee is expected, and a name given twice.
-            yield return new object[] { "_CreateContractSpecs", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecs: ValueError: lot_size row 1 is 2.5, expected a whole number" };
-            yield return new object[] { "_CreateContractSpecs", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "three", 2.0 } } }, "#ERROR _CreateContractSpecs: table cell (1, 3) is text 'three', expected number" };
-            yield return new object[] { "_CreateContractSpecs", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "NYMEX NG", 2500.0, 0.75, 0.5 } } }, "#ERROR _CreateContractSpecs: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
+            // The contract specifications: a header row and a table of contracts; a lot size with a fraction, text where a fee is expected, and a name given twice.
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "NYMEX NG", 2500.0, 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
             // The futures curve: a column of codes and a column of prices, one row per code; a blank among the prices, and the prices left out.
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, 71.4) }, "#ERROR _CreateFuturesCurve: ValueError: price has 2 prices, expected 3, one per future_code" };
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, ExcelEmpty.Value, 71.1) }, "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number" };
@@ -192,14 +192,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal("BBL", spill[2, 4]);
         }
 
-        // Contract specs: a header row and two contracts make one, and util_ReadHandle spills them
+        // Contract specifications: a header row and two contracts make one, and util_ReadHandle spills them
         // back, the four headers, four types, then one row per contract, the name as text and the
         // lot size and fees as numbers.
         [Fact]
-        public void contract_specs_are_created_from_a_table_and_read_back_through_their_handle()
+        public void contract_specifications_are_created_from_a_table_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("_CreateContractSpecs", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
-            Assert.StartsWith("contract_specs:", handle);
+            var handle = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
+            Assert.StartsWith("contract_specifications:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
             Assert.Equal(4, spill.GetLength(1));

@@ -136,12 +136,13 @@ def test_the_conventions_creator_explains_itself() -> None:
     ]
 
 
-def test_the_specs_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateContractSpecs"]
+def test_the_specifications_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateContractSpecifications"]
     assert not hidden
     assert description == (
-        "Creates the contract specs of one index, the name, lot size and fees per lot of each "
-        "contract it trades as, and shows its handle, the text other formulas take as the specs."
+        "Creates the contract specifications of one index, the name, lot size and fees per lot of "
+        "each contract it trades as, and shows its handle, the text other formulas take as the "
+        "specifications."
     )
     assert arguments == [
         (
