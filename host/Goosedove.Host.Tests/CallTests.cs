@@ -131,6 +131,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR _CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
             yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1000.0, "x", 2.0 }, "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number" };
             yield return new object[] { "_CreateContractSpec", new object[] { "WTI", 1000.0, 3.0, ExcelMissing.Value }, "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number" };
+            // The futures curve: a column of codes and a column of prices, one row per code; a blank among the prices, and the prices left out.
+            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, 71.4) }, "#ERROR _CreateFuturesCurve: ValueError: price has 2 prices, expected 3, one per future_code" };
+            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, ExcelEmpty.Value, 71.1) }, "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), ExcelMissing.Value }, "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -196,6 +200,22 @@ namespace Goosedove.Host.Tests
             Assert.Equal("WTI", spill[2, 0]);
             Assert.Equal(1000.0, spill[2, 1]);
             Assert.Equal(3.0, spill[2, 2]);
+        }
+
+        // A futures curve: two columns make one, and util_ReadHandle spills it back, the two
+        // headers, two types, then a row per contract, the code as text and the price as a number.
+        [Fact]
+        public void a_futures_curve_is_created_from_two_columns_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreateFuturesCurve", Column("M26", "N26", "Q26"), Column(71.25, 71.4, 71.1));
+            Assert.StartsWith("futures_curve:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("price", spill[0, 1]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal("M26", spill[2, 0]);
+            Assert.Equal(71.4, spill[3, 1]);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

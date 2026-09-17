@@ -124,6 +124,18 @@ $formulas = [ordered]@{
     "=_CreateContractSpec(AR2,1E16,AR4,AR5)" = "#ERROR _CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly"
     "=_CreateContractSpec(AR2,AR3,E1,AR5)" = "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number"
     "=_CreateContractSpec(AR2,AR3,AR4)" = "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number"
+    # The futures curve: a creator over a column of codes and a column of prices, read back through
+    # util_ReadHandle, a price column one row short, a blank among the prices, and the price
+    # column left out.
+    "=LEFT(BG1,14)"               = "futures_curve:"
+    "=INDEX(util_ReadHandle(BG1),1,2)" = "price"
+    "=INDEX(util_ReadHandle(BG1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(BG1),3,1)" = "M26"
+    "=INDEX(util_ReadHandle(BG1),8,2)" = "70.4"
+    "=ROWS(util_ReadHandle(BG1))"      = "8"
+    "=_CreateFuturesCurve(BD2:BD7,BE2:BE6)" = "#ERROR _CreateFuturesCurve: ValueError: price has 5 prices, expected 6, one per future_code"
+    "=_CreateFuturesCurve(BD2:BD7,BF2:BF7)" = "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number"
+    "=_CreateFuturesCurve(BD2:BD7)" = "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -199,6 +211,15 @@ $cells = [ordered]@{
     # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"
+    # A futures curve: six contract codes and a price beside each, a copy of the price column with
+    # a blank, and one creator cell.
+    "BD2" = "M26"; "BE2" = "71.25"; "BF2" = "71.25"
+    "BD3" = "N26"; "BE3" = "71.4"
+    "BD4" = "Q26"; "BE4" = "71.1"; "BF4" = "71.1"
+    "BD5" = "U26"; "BE5" = "70.85"; "BF5" = "70.85"
+    "BD6" = "V26"; "BE6" = "70.6"; "BF6" = "70.6"
+    "BD7" = "X26"; "BE7" = "70.4"; "BF7" = "70.4"
+    "BG1" = "=_CreateFuturesCurve(BD2:BD7,BE2:BE7)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
