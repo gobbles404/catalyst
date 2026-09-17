@@ -352,93 +352,183 @@ def test_a_handle_of_another_kind_is_not_a_holiday_calendar() -> None:
 # --- _CreateMonthlyFixings -------------------------------------------------------
 
 
-# The page's sample as the sheet sends it: the first day of each month as a serial, 1 May to
-# 1 August 2026, and a price beside each.
-MONTHS = Cells.from_rows([[46143.0], [46174.0], [46204.0], [46235.0]])
-MONTHLY = Cells.from_rows([[2.86], [3.01], [3.24], [3.19]])
+# The page's sample as the sheet sends it, Waha IFERC gas: the day Platts published each month's
+# final index, January to April 2026, January's on 5 January as announced, and an illustrative
+# price beside each.
+JAN_5, FEB_2, MAR_2, APR_1 = 46027.0, 46055.0, 46083.0, 46113.0
+PUBLICATION_DATES = Cells.from_rows([[JAN_5], [FEB_2], [MAR_2], [APR_1]])
+MONTHLY = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
 MONTHLY_HANDLE = re.compile(r"monthly_fixings:[0-9a-f]{6}:([0-9]{6})")
+THE_SCHEDULE = object()  # in a case's arguments: the Waha schedule's handle, made below
+NO_PUBLICATIONS = object()  # the same schedule built without its publication dates
+
+# The Waha schedule as the sheet sends it: six contract months, December 2025 to May 2026, the
+# last day of bidweek as each future's expiry, no options, and the day each month's final index
+# is published, so the fixings above sit inside it with a publication before and one after.
+WAHA_CODES = Cells.from_rows([["Z25"], ["F26"], ["G26"], ["H26"], ["J26"], ["K26"]])
+WAHA_FUTURES = Cells.from_rows([[45989.0], [46022.0], [46052.0], [46080.0], [46112.0], [46142.0]])
+WAHA_PUBLICATIONS = Cells.from_rows([[45992.0], [JAN_5], [FEB_2], [MAR_2], [APR_1], [46143.0]])
+SCHEDULE_HANDLE = re.compile(r"expiry_schedule:[0-9a-f]{6}:([0-9]{6})")
+
+
+@functools.cache
+def the_waha_schedule(published: bool = True) -> str:
+    publications = WAHA_PUBLICATIONS if published else MISSING
+    text = bridge.call("_CreateExpirySchedule", [WAHA_CODES, WAHA_FUTURES, MISSING, publications])
+    assert isinstance(text, str) and SCHEDULE_HANDLE.fullmatch(text), text
+    return text
 
 
 # The library has no consumer of monthly fixings yet, so this hidden reader proves that a handle
-# resolves to the fixings the seam kept, the months as months.
+# resolves to the fixings the seam kept, the publication dates as days.
 @probe
 def ReadMonthlyFixings(fixings: Handle[MonthlyFixings]) -> str:
-    kept = " ".join(str(month) for month in fixings.months)
+    kept = " ".join(str(day) for day in fixings.publication_dates)
     return f"{kept} | {' '.join(repr(float(p)) for p in fixings.prices)}"
 
 
-def monthly(*columns: object) -> str:
-    text = bridge.call("_CreateMonthlyFixings", list(columns))
+def monthly(publication_dates: object, prices: object) -> str:
+    text = bridge.call("_CreateMonthlyFixings", [publication_dates, prices, the_waha_schedule()])
     assert isinstance(text, str) and MONTHLY_HANDLE.fullmatch(text), text
     return text
 
 
-def test_monthly_fixings_are_created_from_two_columns_and_read_back_as_months() -> None:
-    assert bridge.call("ReadMonthlyFixings", [monthly(MONTHS, MONTHLY)]) == (
-        "2026-05 2026-06 2026-07 2026-08 | 2.86 3.01 3.24 3.19"
+def test_monthly_fixings_are_created_from_two_columns_and_a_schedule_and_read_back() -> None:
+    assert bridge.call("ReadMonthlyFixings", [monthly(PUBLICATION_DATES, MONTHLY)]) == (
+        "2026-01-05 2026-02-02 2026-03-02 2026-04-01 | 1.85 2.1 1.95 1.6"
     )
 
 
-# A single cell is a column of one, so a fixing of one month needs no range.
-def test_two_single_cells_make_a_fixing_of_one_month() -> None:
-    assert bridge.call("ReadMonthlyFixings", [monthly(46143.0, 2.86)]) == "2026-05 | 2.86"
+# A single cell is a column of one, so a fixing of one publication needs no range.
+def test_two_single_cells_make_a_fixing_of_one_publication() -> None:
+    assert bridge.call("ReadMonthlyFixings", [monthly(JAN_5, 1.85)]) == "2026-01-05 | 1.85"
+
+
+# The same schedule with its publication dates shuffled and one repeated, codes and futures
+# alongside, says the same about the series.
+def test_a_schedule_with_its_publication_dates_shuffled_and_repeated_says_the_same() -> None:
+    codes = Cells.from_rows([["J26"], ["F26"], ["G26"], ["H26"], ["G26"]])
+    futures = Cells.from_rows([[46112.0], [46022.0], [46052.0], [46080.0], [46052.0]])
+    publications = Cells.from_rows([[APR_1], [JAN_5], [FEB_2], [MAR_2], [FEB_2]])
+    schedule = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, publications])
+    text = bridge.call("_CreateMonthlyFixings", [PUBLICATION_DATES, MONTHLY, schedule])
+    assert bridge.call("ReadMonthlyFixings", [text]) == (
+        "2026-01-05 2026-02-02 2026-03-02 2026-04-01 | 1.85 2.1 1.95 1.6"
+    )
 
 
 @pytest.mark.parametrize(
-    ("args", "text"),
+    ("publication_dates", "prices", "schedule", "text"),
     [
         (
-            [MONTHS, Cells.from_rows([[2.86], [3.01], [3.24]])],
+            PUBLICATION_DATES,
+            Cells.from_rows([[1.85], [2.10], [1.95]]),
+            THE_SCHEDULE,
             "#ERROR _CreateMonthlyFixings: ValueError: price has 3 prices, expected 4, "
-            "one per month",
+            "one per publication_date",
         ),
         (
-            [
-                Cells.from_rows([[46143.0], [46168.0], [46204.0]]),
-                Cells.from_rows([[2.86], [3.01], [3.24]]),
-            ],
-            "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, "
-            "expected the first day of a month",
+            Cells.from_rows([[46023.0], [FEB_2]]),
+            Cells.from_rows([[1.85], [2.10]]),
+            THE_SCHEDULE,
+            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 1 is 2026-01-01, "
+            "expected one of the schedule's publication dates",
         ),
         (
-            [Cells.from_rows([[46174.0], [46143.0]]), Cells.from_rows([[3.01], [2.86]])],
-            "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, "
-            "expected a month after row 1's 2026-06",
+            Cells.from_rows([[FEB_2], [JAN_5]]),
+            Cells.from_rows([[2.10], [1.85]]),
+            THE_SCHEDULE,
+            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-01-05, "
+            "expected a date after row 1's 2026-02-02",
         ),
         (
-            [MONTHS, Cells.from_rows([[2.86], [None], [3.24], [3.19]])],
+            Cells.from_rows([[JAN_5], [MAR_2]]),
+            Cells.from_rows([[1.85], [1.95]]),
+            THE_SCHEDULE,
+            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-03-02, "
+            "expected 2026-02-02, the schedule's publication after row 1's 2026-01-05",
+        ),
+        (
+            PUBLICATION_DATES,
+            MONTHLY,
+            NO_PUBLICATIONS,
+            "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, "
+            "expected a schedule with one per contract",
+        ),
+        (
+            PUBLICATION_DATES,
+            Cells.from_rows([[1.85], [None], [1.95], [1.60]]),
+            THE_SCHEDULE,
             "#ERROR _CreateMonthlyFixings: price cell (2, 1) is blank, expected number",
         ),
         (
-            [Cells.from_rows([["May-26"], [46174.0]]), Cells.from_rows([[2.86], [3.01]])],
-            "#ERROR _CreateMonthlyFixings: month cell (1, 1) is text 'May-26', expected date",
+            Cells.from_rows([["Jan-26"], [FEB_2]]),
+            Cells.from_rows([[1.85], [2.10]]),
+            THE_SCHEDULE,
+            "#ERROR _CreateMonthlyFixings: publication_date cell (1, 1) is text 'Jan-26', "
+            "expected date",
         ),
         (
-            [MONTHS, MISSING],
+            PUBLICATION_DATES,
+            MISSING,
+            THE_SCHEDULE,
             "#ERROR _CreateMonthlyFixings: price is missing, expected column of numbers",
+        ),
+        (
+            PUBLICATION_DATES,
+            MONTHLY,
+            MISSING,
+            "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, "
+            "expected expiry schedule handle",
+        ),
+        (
+            PUBLICATION_DATES,
+            MONTHLY,
+            None,
+            "#ERROR _CreateMonthlyFixings: expiry_schedule is blank, "
+            "expected expiry schedule handle",
+        ),
+        (
+            PUBLICATION_DATES,
+            MONTHLY,
+            2.86,
+            "#ERROR _CreateMonthlyFixings: expiry_schedule is number 2.86, "
+            "expected expiry schedule handle",
         ),
     ],
     ids=[
         "a price column one row short",
-        "a day that is not the first",
-        "months backwards",
+        "the first of the month in place of the publication day",
+        "dates backwards",
+        "a publication skipped",
+        "a schedule without publication dates",
         "a blank among the prices",
-        "a month typed as text",
+        "a date typed as text",
         "the price column left out",
+        "the schedule left out",
+        "a blank cell where the schedule should be",
+        "a number where the schedule should be",
     ],
 )
-def test_monthly_fixings_that_cannot_be_made_say_why(args: list[object], text: str) -> None:
-    assert bridge.call("_CreateMonthlyFixings", args) == text
+def test_monthly_fixings_that_cannot_be_made_say_why(
+    publication_dates: object, prices: object, schedule: object, text: str
+) -> None:
+    if schedule is THE_SCHEDULE:
+        schedule = the_waha_schedule()
+    elif schedule is NO_PUBLICATIONS:
+        schedule = the_waha_schedule(published=False)
+    assert bridge.call("_CreateMonthlyFixings", [publication_dates, prices, schedule]) == text
 
 
 def test_a_failed_monthly_construction_publishes_no_object_and_no_handle() -> None:
-    before = number(monthly(MONTHS, MONTHLY), MONTHLY_HANDLE)
-    backwards = Cells.from_rows([[46174.0], [46143.0]])
-    assert bridge.call("_CreateMonthlyFixings", [backwards, Cells.from_rows([[3.01], [2.86]])]) == (
-        "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, "
-        "expected a month after row 1's 2026-06"
+    before = number(monthly(PUBLICATION_DATES, MONTHLY), MONTHLY_HANDLE)
+    skipped = Cells.from_rows([[JAN_5], [MAR_2]])
+    prices = Cells.from_rows([[1.85], [1.95]])
+    assert bridge.call("_CreateMonthlyFixings", [skipped, prices, the_waha_schedule()]) == (
+        "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-03-02, "
+        "expected 2026-02-02, the schedule's publication after row 1's 2026-01-05"
     )
-    assert number(monthly(MONTHS, MONTHLY), MONTHLY_HANDLE) == before + 1
+    assert number(monthly(PUBLICATION_DATES, MONTHLY), MONTHLY_HANDLE) == before + 1
 
 
 def test_a_handle_of_another_kind_is_not_monthly_fixings() -> None:
@@ -446,4 +536,12 @@ def test_a_handle_of_another_kind_is_not_monthly_fixings() -> None:
     assert bridge.call("ReadMonthlyFixings", [other]) == (
         f"#ERROR ReadMonthlyFixings: fixings is daily fixings handle {other!r}, "
         "expected monthly fixings handle"
+    )
+
+
+def test_a_handle_of_another_kind_is_not_an_expiry_schedule() -> None:
+    other = the_fixings(HEADERS, BODY)
+    assert bridge.call("_CreateMonthlyFixings", [PUBLICATION_DATES, MONTHLY, other]) == (
+        f"#ERROR _CreateMonthlyFixings: expiry_schedule is daily fixings handle {other!r}, "
+        "expected expiry schedule handle"
     )

@@ -166,18 +166,22 @@ $formulas = [ordered]@{
     "=_CreateDailyFixings(L1:M1,BI2:BJ5,AM1)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
     "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle"
     "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,BJ2)" = "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle"
-    # The monthly fixings: a creator over a column of months, each its first day, and a column of
-    # prices, read back through util_ReadHandle as first days under the month type; a day that is
-    # not the first, months backwards, and codes where prices are expected.
+    # The monthly fixings: a creator over a column of publication days, a column of prices and
+    # the schedule in AI3, read back through util_ReadHandle; a day the schedule does not publish
+    # on, the days backwards, a publication skipped and a schedule without publication dates, the
+    # library's words; codes where prices are expected and the schedule left out, the seam's.
     "=LEFT(BQ1,16)"               = "monthly_fixings:"
-    "=INDEX(util_ReadHandle(BQ1),1,1)" = "month"
-    "=INDEX(util_ReadHandle(BQ1),2,1)" = "datetime64[M]"
-    "=INDEX(util_ReadHandle(BQ1),3,1)" = "46143"
+    "=INDEX(util_ReadHandle(BQ1),1,1)" = "publication_date"
+    "=INDEX(util_ReadHandle(BQ1),2,1)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(BQ1),3,1)" = "46162"
     "=INDEX(util_ReadHandle(BQ1),6,2)" = "3.19"
     "=ROWS(util_ReadHandle(BQ1))"      = "6"
-    "=_CreateMonthlyFixings(BR2:BR3,BP2:BP3)" = "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, expected the first day of a month"
-    "=_CreateMonthlyFixings(BS2:BS3,BP2:BP3)" = "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05, expected a month after row 1's 2026-06"
-    "=_CreateMonthlyFixings(BO2:BO5,BD2:BD5)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'M26', expected number"
+    "=_CreateMonthlyFixings(BR2:BR3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-06-01, expected one of the schedule's publication dates"
+    "=_CreateMonthlyFixings(BS2:BS3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-05-20, expected a date after row 1's 2026-06-23"
+    "=_CreateMonthlyFixings(BT2:BT3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-07-22, expected 2026-06-23, the schedule's publication after row 1's 2026-05-20"
+    "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI1)" = "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract"
+    "=_CreateMonthlyFixings(BO2:BO5,BD2:BD5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'M26', expected number"
+    "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -289,16 +293,18 @@ $cells = [ordered]@{
     "BL6" = "2-May-2026"; "BM6" = "100"
     "BL7" = "19-Jan-2026"; "BM7" = "100"
     "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,AM1)"
-    # Monthly fixings: four months typed as their first days, May to August 2026, and a price
-    # beside each; a pair with a day that is not the first; a pair with the months backwards;
-    # and one creator cell.
-    "BO2" = "1-May-2026"; "BP2" = "2.86"
-    "BO3" = "1-Jun-2026"; "BP3" = "3.01"
-    "BO4" = "1-Jul-2026"; "BP4" = "3.24"
-    "BO5" = "1-Aug-2026"; "BP5" = "3.19"
-    "BR2" = "1-May-2026"; "BR3" = "26-May-2026"
-    "BS2" = "1-Jun-2026"; "BS3" = "1-May-2026"
-    "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)"
+    # Monthly fixings: the first four publication days of the schedule in AI3, 20 May to
+    # 21 August 2026, and an illustrative price beside each; a pair with a day the schedule does
+    # not publish on; a pair with the days backwards; a pair with a publication skipped; and one
+    # creator cell, which takes the schedule in AI3.
+    "BO2" = "20-May-2026"; "BP2" = "2.86"
+    "BO3" = "23-Jun-2026"; "BP3" = "3.01"
+    "BO4" = "22-Jul-2026"; "BP4" = "3.24"
+    "BO5" = "21-Aug-2026"; "BP5" = "3.19"
+    "BR2" = "20-May-2026"; "BR3" = "1-Jun-2026"
+    "BS2" = "23-Jun-2026"; "BS3" = "20-May-2026"
+    "BT2" = "20-May-2026"; "BT3" = "22-Jul-2026"
+    "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI3)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
