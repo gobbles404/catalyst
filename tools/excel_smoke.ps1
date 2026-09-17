@@ -112,18 +112,18 @@ $formulas = [ordered]@{
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5)" = "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text"
-    # The contract spec: a creator over a name and three numbers, read back through util_ReadHandle, a
-    # lot size with a fraction and one beyond what a cell holds exactly, text where a fee is
-    # expected, and a fee left out.
-    "=LEFT(AS1,14)"               = "contract_spec:"
-    "=INDEX(util_ReadHandle(AS1),1,3)" = "brokerage_rate_per_lot"
-    "=INDEX(util_ReadHandle(AS1),2,2)" = "int"
-    "=INDEX(util_ReadHandle(AS1),3,2)" = "1000"
-    "=COLUMNS(util_ReadHandle(AS1))"   = "4"
-    "=_CreateContractSpec(AR2,2.5,AR4,AR5)" = "#ERROR _CreateContractSpec: lot_size is number 2.5, expected whole number"
-    "=_CreateContractSpec(AR2,1E16,AR4,AR5)" = "#ERROR _CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly"
-    "=_CreateContractSpec(AR2,AR3,E1,AR5)" = "#ERROR _CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number"
-    "=_CreateContractSpec(AR2,AR3,AR4)" = "#ERROR _CreateContractSpec: clearing_rate_per_lot is missing, expected number"
+    # The contract specifications: a creator over a header row and a table of two contracts, read back
+    # through util_ReadHandle, a lot size with a fraction, text where a fee is expected, and a
+    # name given twice.
+    "=LEFT(BY1,24)"               = "contract_specifications:"
+    "=INDEX(util_ReadHandle(BY1),1,3)" = "brokerage_rate_per_lot"
+    "=INDEX(util_ReadHandle(BY1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(BY1),3,2)" = "10000"
+    "=INDEX(util_ReadHandle(BY1),4,1)" = "ICE NG"
+    "=ROWS(util_ReadHandle(BY1))"      = "4"
+    "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
+    "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
+    "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
     # The futures curve: a creator over a column of codes and a column of prices, read back through
     # util_ReadHandle, a price column one row short, a blank among the prices, and the price
     # column left out.
@@ -221,9 +221,17 @@ $cells = [ordered]@{
     # The index conventions: five codes as the desk types them, and one creator cell.
     "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
-    # The contract spec: a name, a lot size and two fees as the desk types them, and one creator cell.
-    "AR2" = "WTI"; "AR3" = "1000"; "AR4" = "3"; "AR5" = "2"
-    "AS1" = "=_CreateContractSpec(AR2,AR3,AR4,AR5)"
+    # Contract specifications: a header row and two contracts, NYMEX and ICE lots of gas, and one creator
+    # cell; then a row with a lot size with a fraction, one with text where a fee is expected,
+    # and two rows naming one contract twice.
+    "BU1" = "name"; "BV1" = "lot_size"; "BW1" = "brokerage_rate_per_lot"; "BX1" = "clearing_rate_per_lot"
+    "BU2" = "NYMEX NG"; "BV2" = "10000"; "BW2" = "3"; "BX2" = "2"
+    "BU3" = "ICE NG"; "BV3" = "2500"; "BW3" = "0.75"; "BX3" = "0.5"
+    "BY1" = "=_CreateContractSpecifications(BU1:BX1,BU2:BX3)"
+    "BZ2" = "NYMEX NG"; "CA2" = "2.5"; "CB2" = "3"; "CC2" = "2"
+    "CH2" = "NYMEX NG"; "CI2" = "10000"; "CJ2" = "three"; "CK2" = "2"
+    "CL2" = "NYMEX NG"; "CM2" = "10000"; "CN2" = "3"; "CO2" = "2"
+    "CL3" = "NYMEX NG"; "CM3" = "2500"; "CN3" = "0.75"; "CO3" = "0.5"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
