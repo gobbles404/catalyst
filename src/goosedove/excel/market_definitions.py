@@ -57,7 +57,7 @@ def CreateMarketConventions(
         str, "The quantity unit a price of the index is quoted per, such as BBL for USD per barrel."
     ],
     currency_unit: Annotated[str, "The currency unit the index settles in, such as USD."],
-    quantity_type: Annotated[str, "What a quantity of the index measures, such as VOLUME."],
+    quantity_type: Annotated[str, "What a quantity of the index measures, such as volume."],
     quantity_unit: Annotated[str, "The unit a quantity of the index is stated in, such as BBL."],
 ) -> Handle[MarketConventions]:
     """Creates the market conventions of one index, the units it is quoted, settled and measured

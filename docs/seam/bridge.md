@@ -337,7 +337,7 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the globals' creators | `src/goosedove/excel/globals.py` |
 | the market definitions' creators | `src/goosedove/excel/market_definitions.py` |
 | `ReadHandle`, and the table each kind shows | `src/goosedove/excel/utilities.py` |
-| the library's first objects, a valuation date and a discount curve, and their builders | `src/goosedove/globals/` |
+| the library's first objects, a valuation date, a discount curve and the unit conversions, and their builders | `src/goosedove/globals/` |
 | the market definitions, an expiry schedule, a holiday calendar, market conventions and a contract spec, and their builders | `src/goosedove/market_definitions/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
@@ -349,6 +349,7 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the four names, owning a range, `entry` and `call` | `tests/unit/test_bridge.py` |
 | the ledgers, per probe | `tests/performance/test_seam_budgets.py` |
 | the ceilings | `tests/performance/test_seam_allocation.py` |
+| the ledger and ceiling of library code called directly, with no worksheet surface | `tests/performance/test_library_budgets.py` |
 | the host's counts, per probe, and the ceilings on what the host itself allocates | `tests/performance/HostWorkBudgets.cs` |
 | the three test-only looks and the profiler fixtures | `tests/performance/conftest.py` |
 | where the host fetches the four names and builds the summary of kinds | `host/Goosedove.Host/AddIn.cs`, explained in [host.md](host.md) |

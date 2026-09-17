@@ -107,7 +107,7 @@ def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
 
 
 def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
-    handle = bridge.call("CreateMarketConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
+    handle = bridge.call("CreateMarketConventions", ["USD", "BBL", "USD", "volume", "BBL"])
     assert rows(read(handle)) == [
         [
             "quote_currency_unit",
@@ -117,7 +117,7 @@ def test_market_conventions_spill_one_row_of_five_texts_under_two_heading_rows()
             "quantity_unit",
         ],
         ["str", "str", "str", "str", "str"],
-        ["USD", "BBL", "USD", "VOLUME", "BBL"],
+        ["USD", "BBL", "USD", "volume", "BBL"],
     ]
 
 

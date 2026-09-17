@@ -9,7 +9,7 @@ from goosedove.market_definitions.market_conventions import market_conventions
 
 # The page's sample: an index quoted in dollars per barrel, settled in dollars, its quantity a
 # volume stated in barrels.
-SAMPLE = ("USD", "BBL", "USD", "VOLUME", "BBL")
+SAMPLE = ("USD", "BBL", "USD", "volume", "BBL")
 
 
 def test_the_sample_keeps_every_code_in_its_own_field() -> None:
@@ -17,7 +17,7 @@ def test_the_sample_keeps_every_code_in_its_own_field() -> None:
     assert conventions.quote_currency_unit == "USD"
     assert conventions.quote_quantity_unit == "BBL"
     assert conventions.currency_unit == "USD"
-    assert conventions.quantity_type == "VOLUME"
+    assert conventions.quantity_type == "volume"
     assert conventions.quantity_unit == "BBL"
 
 

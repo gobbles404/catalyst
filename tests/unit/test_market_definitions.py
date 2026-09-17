@@ -32,7 +32,7 @@ CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
 
 # The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
 # barrel, settled in dollars, its quantity a volume stated in barrels.
-UNITS = ["USD", "BBL", "USD", "VOLUME", "BBL"]
+UNITS = ["USD", "BBL", "USD", "volume", "BBL"]
 CONVENTIONS = re.compile(r"market_conventions:[0-9a-f]{6}:([0-9]{6})")
 
 # The spec page's sample as the sheet sends it: a name, and three numbers, the lot size whole.
@@ -244,7 +244,7 @@ def the_conventions(*codes: object) -> str:
 
 def test_market_conventions_are_created_from_five_codes_and_read_back_in_order() -> None:
     assert bridge.call("ReadMarketConventions", [the_conventions(*UNITS)]) == (
-        "USD BBL USD VOLUME BBL"
+        "USD BBL USD volume BBL"
     )
 
 
@@ -253,23 +253,23 @@ def test_market_conventions_are_created_from_five_codes_and_read_back_in_order()
     ("args", "text"),
     [
         (
-            ["USD", "BBL", "USD", "VOLUME", None],
+            ["USD", "BBL", "USD", "volume", None],
             "#ERROR CreateMarketConventions: quantity_unit is blank, expected text",
         ),
         (
-            ["USD", "BBL", 1.0, "VOLUME", "BBL"],
+            ["USD", "BBL", 1.0, "volume", "BBL"],
             "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text",
         ),
         (
-            ["", "BBL", "USD", "VOLUME", "BBL"],
+            ["", "BBL", "USD", "volume", "BBL"],
             "#ERROR CreateMarketConventions: quote_currency_unit is empty text, expected text",
         ),
         (
-            ["USD", Cells.from_rows([["BBL"]]), "USD", "VOLUME", "BBL"],
+            ["USD", Cells.from_rows([["BBL"]]), "USD", "volume", "BBL"],
             "#ERROR CreateMarketConventions: quote_quantity_unit is 1x1 array, expected text",
         ),
         (
-            ["USD", "BBL", "USD", "VOLUME", MISSING],
+            ["USD", "BBL", "USD", "volume", MISSING],
             "#ERROR CreateMarketConventions: quantity_unit is missing, expected text",
         ),
         (

@@ -779,7 +779,7 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
 def test_market_conventions_are_five_texts_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
+    codes = ("USD", "BBL", "USD", "volume", "BBL")
     PATH["CreateMarketConventions"](*codes)
     assert call_profile(lambda: PATH["CreateMarketConventions"](*codes)) == {
         "Registered.run": 1,
