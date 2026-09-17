@@ -21,7 +21,7 @@ def CreateMarketConventions(
 | 1 | quote_currency_unit | USD |
 | 2 | quote_quantity_unit | BBL |
 | 3 | currency_unit | USD |
-| 4 | quantity_type | VOLUME |
+| 4 | quantity_type | volume |
 | 5 | quantity_unit | BBL |
 | 6 | `=CreateMarketConventions(B1, B2, B3, B4, B5)` | shows `market_conventions:3f9a1c:000008` |
 
@@ -37,12 +37,12 @@ Quoted from the declaration in `src/goosedove/excel/market_definitions.py`, whic
 | `quote_currency_unit` | The currency unit a price of the index is quoted in, such as USD. |
 | `quote_quantity_unit` | The quantity unit a price of the index is quoted per, such as BBL for USD per barrel. |
 | `currency_unit` | The currency unit the index settles in, such as USD. |
-| `quantity_type` | What a quantity of the index measures, such as VOLUME. |
+| `quantity_type` | What a quantity of the index measures, such as volume. |
 | `quantity_unit` | The unit a quantity of the index is stated in, such as BBL. |
 
 ## The library checks
 
-None yet. The five codes are kept as typed, never trimmed or re-cased: `VOLUME` and `volume` are two different texts. Which codes are allowed, the unit codes and the categories of [unit-conversions.md](../globals/unit-conversions.md), and that a quantity unit belongs to its quantity type, is a task for later, noted at the builder so it is not lost and built when the first consumer needs the codes to mean something; a list guessed at today would refuse codes nobody has decided on. A failed call publishes nothing, and an argument the seam rejects never reaches the function.
+None yet. The five codes are kept as typed, never trimmed or re-cased: `volume` and `VOLUME` are two different texts, and only the first is a category of [unit-conversions.md](../globals/unit-conversions.md), which since #71 holds the categories and unit codes the check will allow. That check, that each code is one the collection defines and that a quantity unit belongs to its quantity type, is a task for later, noted at the builder so it is not lost. A failed call publishes nothing, and an argument the seam rejects never reaches the function.
 
 ## Tests
 
@@ -60,4 +60,4 @@ The examples and properties below are `tests/unit/test_market_conventions.py`; t
 
 ## Not here
 
-The allowed codes and their spelling: [conventions.md](../conventions.md) lists category values as exact lowercase codes, `volume`, while the desk types `VOLUME`; the later check decides which, and the sample above moves with it. What the conventions mean to a price or a quantity: how a price in `quote_currency_unit` per `quote_quantity_unit` becomes a settlement in `currency_unit`, the conversion between `quote_quantity_unit` and `quantity_unit`, and whether the two currency units may differ, are the first consumer's job, with [unit-conversions.md](../globals/unit-conversions.md) for the conversion. The index's name, its exchange, its expiry schedule and its holiday calendar, which are handles of their own. A reader of its own: [ReadHandle](../utilities/read-handle.md) spills any conventions as one row. Market data, pricing.
+The allowed codes: the categories and unit codes of [unit-conversions.md](../globals/unit-conversions.md), lowercase categories and uppercase units as [conventions.md](../conventions.md) lists them, which the sample above has spelt since #71; the check that the five codes are among them is its own pull request. What the conventions mean to a price or a quantity: how a price in `quote_currency_unit` per `quote_quantity_unit` becomes a settlement in `currency_unit`, the conversion between `quote_quantity_unit` and `quantity_unit`, and whether the two currency units may differ, are the first consumer's job, with [unit-conversions.md](../globals/unit-conversions.md) for the conversion. The index's name, its exchange, its expiry schedule and its holiday calendar, which are handles of their own. A reader of its own: [ReadHandle](../utilities/read-handle.md) spills any conventions as one row. Market data, pricing.

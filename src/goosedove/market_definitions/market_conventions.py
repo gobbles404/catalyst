@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class MarketConventions:
     """Five codes, as the desk typed them: the currency unit and the quantity unit a price is
     quoted in, USD per BBL say; the currency unit the market settles in; and what a quantity
-    measures, VOLUME say, with the unit it is stated in, BBL."""
+    measures, volume say, with the unit it is stated in, BBL."""
 
     quote_currency_unit: str
     quote_quantity_unit: str

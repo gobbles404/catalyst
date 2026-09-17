@@ -123,9 +123,9 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
             yield return new object[] { "CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
             // The market conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
-            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
+            yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
             // The contract spec: a text, a whole number and two numbers; a lot size with a fraction and one beyond what a cell holds exactly, text where a fee is expected, and a fee left out.
             yield return new object[] { "CreateContractSpec", new object[] { "WTI", 2.5, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number" };
             yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
@@ -170,14 +170,14 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void market_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("CreateMarketConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var handle = (string)Seam.Call("CreateMarketConventions", "USD", "BBL", "USD", "volume", "BBL");
             Assert.StartsWith("market_conventions:", handle);
             var spill = (object[,])Seam.Call("ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
             Assert.Equal("quantity_type", spill[0, 3]);
             Assert.Equal("str", spill[1, 0]);
-            Assert.Equal("VOLUME", spill[2, 3]);
+            Assert.Equal("volume", spill[2, 3]);
             Assert.Equal("BBL", spill[2, 4]);
         }
 

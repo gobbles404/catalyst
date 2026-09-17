@@ -228,7 +228,7 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_market_conventions_and_its_reader_stay_small() -> None:
-    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
+    codes = ("USD", "BBL", "USD", "volume", "BBL")
     assert least_peak(lambda: ENTRY["CreateMarketConventions"](*codes)) <= 2 * SLACK
     handle = ENTRY["CreateMarketConventions"](*codes)
     assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
