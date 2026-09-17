@@ -48,7 +48,7 @@ Rules:
 3. An array into a scalar slot fails, even a 1×1 one. `=Add(SEQUENCE(1), 2)` fails where Excel's own functions would take the one cell. A scalar into a range slot becomes a 1×1 range.
 4. Every cell of a range is checked as a scalar would be, and the range keeps its order. A blank inside a range of numbers fails, so `A:A` fails on its first unused row.
 5. A one-row-or-column type declares its orientation. A column type fails on a row.
-6. The boundary checks each argument by type and shape, never by meaning. A table's header row is bound to its body, the one place two arguments are read together, and binding a header to a column is type, not meaning: the schema is part of the declaration, and a header is to a column what a parameter name is to an argument. Whether a column is sorted, whether two arguments agree, what a column means: all of that belongs to the library. The one documented exception is that a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999.
+6. The boundary checks each argument by type and shape, never by meaning. A table's header row is bound to its body, the one place two arguments are read together, and binding a header to a column is type, not meaning: the schema is part of the declaration, and a header is to a column what a parameter name is to an argument. Whether a column is sorted, whether two arguments agree, what a column means: all of that belongs to the library. The two documented exceptions are bounds a cell itself sets: a date serial must lie inside Excel's own calendar, 61 to 2958465, which is 1 March 1900 to 31 December 9999, and a whole number within 2^53 either side, which a cell holds exactly (decision 41).
 7. Shape is checked before cells. A range of the wrong shape is reported as a shape failure even when it also holds a bad cell.
 8. A failure names the function, the argument, what arrived, and what was expected: `#ERROR Forward: price is text 'Brent', expected number`. Inside a range the message names the cell the way `INDEX` counts, row then column from 1 within the range, because no sheet address crosses: `#ERROR Strip: values cell (3, 1) is blank, expected number`.
 
@@ -56,7 +56,7 @@ Scalars, rows arriving against columns declared:
 
 | Arrives | number | whole number | date | text | boolean |
 |---|---|---|---|---|---|
-| Number | pass | pass when it has no fraction | pass when whole and 61 or more | fail | fail |
+| Number | pass | pass when it has no fraction and is within 2^53 either side | pass when whole and 61 or more | fail | fail |
 | Text | fail | fail | fail | pass unless empty | fail |
 | Boolean | fail | fail | fail | fail | pass |
 | Blank | fail | fail | fail | fail | fail |
@@ -70,7 +70,7 @@ Built in the scalar pull request:
 | Declared | Accepts | Example | Fails on |
 |---|---|---|---|
 | `float`, a number | one number | `=Forward(B2, 30, 0.05)` | text, boolean, blank, missing, any array |
-| `int`, a whole number | one number with no fraction | `=McPrice(curve, 100000)` | 2.5, 2.9999999996, text, boolean, blank, missing, any array |
+| `int`, a whole number | one number with no fraction, within 2^53 either side, which a cell holds exactly | `=McPrice(curve, 100000)` | 2.5, 2.9999999996, 1E16 (decision 41), text, boolean, blank, missing, any array |
 | `str`, text | one text with at least one character | `=CurveNames("WTI")` | empty text, number, boolean, blank, missing, any array |
 | `bool`, a boolean | TRUE or FALSE | `=Price(curve, TRUE)` | 1 or 0, `"TRUE"`, blank, missing, any array |
 | any of the above with a default | the argument missing | `=OptionPrice(curve, K, T)` | a blank cell |
@@ -209,6 +209,10 @@ Decided 2026-09-14, an argument left out with nothing in its place.
 Decided 2026-09-15, a handle of any kind.
 
 40. A function that takes the object behind any handle declares `handle: Handle[object]`, `object` being Python's name for any class, and receives whatever the key finds. Decision 35's order and words stand, with no kind to name, `expected a handle`; the one step skipped is the comparison of the store's kind with the declared kind, and nothing in the text is parsed. A creator still names what it makes: `Handle[object]` as a result refuses to register, and so does a bare `Handle`, as decision 34 says. First wanted by `ReadHandle`.
+
+Decided 2026-09-17, the whole number's bound.
+
+41. A whole number in is one a cell holds exactly, from −2^53 to 2^53, the line the way out already holds ([outputs.md](outputs.md) decision 6), so whatever a creator keeps can be read back. Beyond it the argument fails in the way out's words, `lot_size is number 1e+16, beyond what a cell holds exactly`, not as `expected whole number`, since 1E16 is whole: this is the one scalar rejection that says why in place of what was expected. 2^53 itself passes either side, and the next double past it fails. Found in review of #69, where a lot size of 1E16 made a contract spec that `ReadHandle` could not show.
 
 ## Not supported
 

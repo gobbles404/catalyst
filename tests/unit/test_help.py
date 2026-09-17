@@ -135,6 +135,21 @@ def test_the_conventions_creator_explains_itself() -> None:
     ]
 
 
+def test_the_spec_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["CreateContractSpec"]
+    assert not hidden
+    assert description == (
+        "Creates a contract spec, the name, lot size and fees per lot of one contract, and "
+        "shows its handle, the text other formulas take as the spec."
+    )
+    assert arguments == [
+        ("name", "The contract's name as the desk calls it, such as WTI."),
+        ("lot_size", "The quantity in one lot, a whole number such as 1000."),
+        ("brokerage_rate_per_lot", "The brokerage charged per lot, such as 3.00."),
+        ("clearing_rate_per_lot", "The clearing fee charged per lot, such as 2.00."),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

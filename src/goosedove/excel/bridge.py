@@ -197,15 +197,22 @@ class TypeValidationError(Exception):
 
 
 class _Rejected(Exception):
-    """Raised inside an accept rule. Names the cell when the failure is inside a range."""
+    """Raised inside an accept rule. Names the cell when the failure is inside a range. For a
+    scalar of the expected kind that is still refused, a whole number beyond what a cell holds
+    exactly, it says why in place of what was expected."""
 
     def __init__(
-        self, cell: tuple[int, int] | None = None, value: object = None, expected: str = ""
+        self,
+        cell: tuple[int, int] | None = None,
+        value: object = None,
+        expected: str = "",
+        reason: str = "",
     ) -> None:
         super().__init__()
         self.cell = cell
         self.value = value
         self.expected = expected
+        self.reason = reason
 
 
 # --- what arrives ------------------------------------------------------------
@@ -352,6 +359,10 @@ EXCEL_EPOCH: Final = np.datetime64("1899-12-30", "D")
 FIRST_SERIAL: Final = 61
 LAST_SERIAL: Final = 2958465
 
+# A whole number is one a cell holds exactly: 2^53 is the largest, either side, and the way out
+# holds the same line, so whatever a creator keeps can be read back.
+EXACT: Final = 2**53
+
 
 def _number(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float):
@@ -360,9 +371,13 @@ def _number(value: object) -> float:
 
 
 def _whole(value: object) -> int:
+    """A number with no fraction, within 2^53 either side, in the words of the way out when it
+    is not: 1e16 is whole and is refused, as the same number would be refused on its way back."""
     number = _number(value)
     if not number.is_integer():
         raise _Rejected
+    if abs(number) > EXACT:
+        raise _Rejected(reason="beyond what a cell holds exactly")
     return int(number)
 
 
@@ -379,10 +394,12 @@ def _boolean(value: object) -> bool:
 
 
 def _date(value: object) -> np.datetime64:
-    serial = _whole(value)
-    if not FIRST_SERIAL <= serial <= LAST_SERIAL:
+    """A whole serial inside the calendar, the three tests the range rule makes over every cell:
+    a fraction, or a serial outside the calendar either side, is not a date, whatever else it is."""
+    serial = _number(value)
+    if not serial.is_integer() or not FIRST_SERIAL <= serial <= LAST_SERIAL:
         raise _Rejected
-    return EXCEL_EPOCH + np.timedelta64(serial, "D")
+    return EXCEL_EPOCH + np.timedelta64(int(serial), "D")
 
 
 # --- every cell of a range: no look when the host's summary settles it, one look otherwise ---
@@ -739,7 +756,6 @@ class _BadResult(Exception):
 
 
 MAX_TEXT: Final = 32767  # the longest text a cell holds; Excel cuts longer text without a word
-EXACT: Final = 2**53  # the largest whole number a cell holds exactly
 CALENDAR: Final = "1900-03-01 to 9999-12-31"
 
 
@@ -1529,9 +1545,8 @@ def _validate(parameter: Parameter, value: object) -> object:
         return parameter.accept(value)
     except _Rejected as rejected:
         if rejected.cell is None:
-            raise TypeValidationError(
-                f"{parameter.name} is {describe(value)}, expected {parameter.expected}"
-            ) from None
+            why = rejected.reason or f"expected {parameter.expected}"
+            raise TypeValidationError(f"{parameter.name} is {describe(value)}, {why}") from None
         r, c = rejected.cell
         raise TypeValidationError(
             f"{parameter.name} cell ({r}, {c}) is {describe(rejected.value)}, "

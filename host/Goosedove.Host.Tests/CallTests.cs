@@ -123,6 +123,11 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR CreateMarketConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text" };
             yield return new object[] { "CreateMarketConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR CreateMarketConventions: quantity_unit is missing, expected text" };
+            // The contract spec: a text, a whole number and two numbers; a lot size with a fraction and one beyond what a cell holds exactly, text where a fee is expected, and a fee left out.
+            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 2.5, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number" };
+            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1e16, 3.0, 2.0 }, "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly" };
+            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, "x", 2.0 }, "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number" };
+            yield return new object[] { "CreateContractSpec", new object[] { "WTI", 1000.0, 3.0, ExcelMissing.Value }, "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -171,6 +176,23 @@ namespace Goosedove.Host.Tests
             Assert.Equal("str", spill[1, 0]);
             Assert.Equal("VOLUME", spill[2, 3]);
             Assert.Equal("BBL", spill[2, 4]);
+        }
+
+        // A contract spec: four facts make one, and ReadHandle spills them back, the four headers,
+        // four types, then the name as text and the three numbers as numbers in one row.
+        [Fact]
+        public void a_contract_spec_is_created_from_four_facts_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("CreateContractSpec", "WTI", 1000.0, 3.0, 2.0);
+            Assert.StartsWith("contract_spec:", handle);
+            var spill = (object[,])Seam.Call("ReadHandle", handle);
+            Assert.Equal(3, spill.GetLength(0));
+            Assert.Equal(4, spill.GetLength(1));
+            Assert.Equal("lot_size", spill[0, 1]);
+            Assert.Equal("int", spill[1, 1]);
+            Assert.Equal("WTI", spill[2, 0]);
+            Assert.Equal(1000.0, spill[2, 1]);
+            Assert.Equal(3.0, spill[2, 2]);
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

@@ -4,11 +4,16 @@ call, and that its handle resolves to the object the seam kept."""
 import re
 from typing import cast
 
+import numpy as np
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+from numpy.typing import NDArray
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
+from goosedove.market_definitions.contract_spec import ContractSpec
 from goosedove.market_definitions.expiry_schedule import ExpirySchedule
 from goosedove.market_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_definitions.market_conventions import MarketConventions
@@ -29,6 +34,10 @@ CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
 # barrel, settled in dollars, its quantity a volume stated in barrels.
 UNITS = ["USD", "BBL", "USD", "VOLUME", "BBL"]
 CONVENTIONS = re.compile(r"market_conventions:[0-9a-f]{6}:([0-9]{6})")
+
+# The spec page's sample as the sheet sends it: a name, and three numbers, the lot size whole.
+FACTS = ["WTI", 1000.0, 3.0, 2.0]
+SPEC = re.compile(r"contract_spec:[0-9a-f]{6}:([0-9]{6})")
 
 
 # The library has no consumer of a schedule yet, so this hidden reader proves that a handle
@@ -286,4 +295,94 @@ def test_a_handle_of_another_kind_is_not_market_conventions() -> None:
     assert bridge.call("ReadMarketConventions", [other]) == (
         f"#ERROR ReadMarketConventions: conventions is holiday calendar handle {other!r}, "
         "expected market conventions handle"
+    )
+
+
+# --- CreateContractSpec -----------------------------------------------------------
+
+
+# The library has no consumer of a spec yet, so this hidden reader proves that a handle resolves
+# to the spec the seam kept, typed: the name as text, the lot size whole, the fees as numbers.
+@probe
+def ReadContractSpec(spec: Handle[ContractSpec]) -> str:
+    return f"{spec.name} {spec.lot_size} {spec.brokerage_rate_per_lot} {spec.clearing_rate_per_lot}"
+
+
+def a_spec(*facts: object) -> str:
+    text = bridge.call("CreateContractSpec", list(facts))
+    assert isinstance(text, str) and SPEC.fullmatch(text), text
+    return text
+
+
+def test_a_contract_spec_is_created_from_four_facts_and_read_back_typed() -> None:
+    assert bridge.call("ReadContractSpec", [a_spec(*FACTS)]) == "WTI 1000 3.0 2.0"
+
+
+# Each argument alone, left to right: the first bad one is named, in the seam's words.
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            ["WTI", 2.5, 3.0, 2.0],
+            "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number",
+        ),
+        (
+            ["WTI", True, 3.0, 2.0],
+            "#ERROR CreateContractSpec: lot_size is boolean TRUE, expected whole number",
+        ),
+        ([None, 1000.0, 3.0, 2.0], "#ERROR CreateContractSpec: name is blank, expected text"),
+        (
+            ["WTI", 1000.0, "three", 2.0],
+            "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'three', expected number",
+        ),
+        (
+            ["WTI", 1000.0, 3.0, MISSING],
+            "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number",
+        ),
+        (
+            ["WTI", Cells.from_rows([[1000.0]]), 3.0, 2.0],
+            "#ERROR CreateContractSpec: lot_size is 1x1 array, expected whole number",
+        ),
+        ([1.0, 2.5, 3.0, 2.0], "#ERROR CreateContractSpec: name is number 1.0, expected text"),
+    ],
+    ids=[
+        "a lot size with a fraction",
+        "a boolean lot size",
+        "a blank name",
+        "text where a fee is expected",
+        "a fee left out",
+        "a one-cell range",
+        "two wrong, the earlier named",
+    ],
+)
+def test_a_contract_spec_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("CreateContractSpec", args) == text
+
+
+def test_a_handle_of_another_kind_is_not_a_contract_spec() -> None:
+    other = the_conventions(*UNITS)
+    assert bridge.call("ReadContractSpec", [other]) == (
+        f"#ERROR ReadContractSpec: spec is market conventions handle {other!r}, "
+        "expected contract spec handle"
+    )
+
+
+# The seam holds one line on both sides of a lot size: every whole number a cell holds exactly is
+# created and read back through ReadHandle as it was, and one beyond it is refused on creation,
+# in the way out's words, rather than making a spec the reader cannot show.
+@given(lot_size=st.integers(-(2**53), 2**53))
+def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
+    spill = bridge.call("ReadHandle", [a_spec("WTI", float(lot_size), 3.0, 2.0)])
+    assert isinstance(spill, tuple), spill
+    _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
+    assert slots[2, 1] == float(lot_size)
+
+
+@pytest.mark.parametrize("lot_size", [1e16, 1e20, 9007199254740994.0, -1e16])
+def test_a_lot_size_beyond_what_a_cell_holds_exactly_is_refused_on_creation(
+    lot_size: float,
+) -> None:
+    assert bridge.call("CreateContractSpec", ["WTI", lot_size, 3.0, 2.0]) == (
+        f"#ERROR CreateContractSpec: lot_size is number {lot_size!r}, "
+        "beyond what a cell holds exactly"
     )

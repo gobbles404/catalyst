@@ -103,6 +103,18 @@ $formulas = [ordered]@{
     "=CreateMarketConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR CreateMarketConventions: quantity_unit is blank, expected text"
     "=CreateMarketConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR CreateMarketConventions: currency_unit is number 1.0, expected text"
     "=CreateMarketConventions(AO2,AO3,AO4,AO5)" = "#ERROR CreateMarketConventions: quantity_unit is missing, expected text"
+    # The contract spec: a creator over a name and three numbers, read back through ReadHandle, a
+    # lot size with a fraction and one beyond what a cell holds exactly, text where a fee is
+    # expected, and a fee left out.
+    "=LEFT(AS1,14)"               = "contract_spec:"
+    "=INDEX(ReadHandle(AS1),1,3)" = "brokerage_rate_per_lot"
+    "=INDEX(ReadHandle(AS1),2,2)" = "int"
+    "=INDEX(ReadHandle(AS1),3,2)" = "1000"
+    "=COLUMNS(ReadHandle(AS1))"   = "4"
+    "=CreateContractSpec(AR2,2.5,AR4,AR5)" = "#ERROR CreateContractSpec: lot_size is number 2.5, expected whole number"
+    "=CreateContractSpec(AR2,1E16,AR4,AR5)" = "#ERROR CreateContractSpec: lot_size is number 1e+16, beyond what a cell holds exactly"
+    "=CreateContractSpec(AR2,AR3,E1,AR5)" = "#ERROR CreateContractSpec: brokerage_rate_per_lot is text 'x', expected number"
+    "=CreateContractSpec(AR2,AR3,AR4)" = "#ERROR CreateContractSpec: clearing_rate_per_lot is missing, expected number"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -164,6 +176,9 @@ $cells = [ordered]@{
     # The market conventions: five codes as the desk types them, and one creator cell.
     "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "VOLUME"; "AO6" = "BBL"
     "AP1" = "=CreateMarketConventions(AO2,AO3,AO4,AO5,AO6)"
+    # The contract spec: a name, a lot size and two fees as the desk types them, and one creator cell.
+    "AR2" = "WTI"; "AR3" = "1000"; "AR4" = "3"; "AR5" = "2"
+    "AS1" = "=CreateContractSpec(AR2,AR3,AR4,AR5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

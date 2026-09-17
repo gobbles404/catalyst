@@ -215,6 +215,15 @@ def test_a_creator_of_market_conventions_and_its_reader_stay_small() -> None:
     assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
 
 
+# A text and three numbers kept as they arrived, the record and its entry: measured 272 bytes on
+# 2026-09-16, and 1,205 for reading them back as a three-row table of four columns.
+def test_a_creator_of_a_contract_spec_and_its_reader_stay_small() -> None:
+    facts = ("WTI", 1000.0, 3.0, 2.0)
+    assert least_peak(lambda: ENTRY["CreateContractSpec"](*facts)) <= 2 * SLACK
+    handle = ENTRY["CreateContractSpec"](*facts)
+    assert least_peak(lambda: ENTRY["ReadHandle"](handle)) <= 2 * SLACK
+
+
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
