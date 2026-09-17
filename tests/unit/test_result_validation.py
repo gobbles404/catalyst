@@ -21,7 +21,6 @@ from goosedove.excel.bridge import (
     NumberArray,
     NumberColumn,
     NumberRow,
-    WholeNumberColumn,
     excel_function,
 )
 from goosedove.excel.probes import probe
@@ -654,15 +653,3 @@ def test_a_text_in_a_rectangle_is_bounded_as_a_text_result_is() -> None:
         MixedArray(np.ones((4000, 1), dtype=np.uint8), np.full((4000, 1), np.nan), many)
     )[2]
     assert joined.count("\0") == 3999
-
-
-def test_a_column_of_whole_numbers_may_be_taken_but_not_returned() -> None:
-    def Lots() -> WholeNumberColumn:
-        return WholeNumberColumn(np.array([1000]))
-
-    with pytest.raises(
-        TypeError,
-        match=r"Lots declares goosedove\.excel\.bridge\.WholeNumberColumn as its result, "
-        r"which the seam cannot send",
-    ):
-        excel_function(Lots)

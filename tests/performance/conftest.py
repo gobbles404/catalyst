@@ -8,23 +8,18 @@ from pathlib import Path
 import pytest
 
 import goosedove
-from goosedove.excel.bridge import DateColumn, NumberColumn, TextColumn, WholeNumberColumn
+from goosedove.excel.bridge import DateColumn, NumberColumn, TextColumn
 from goosedove.excel.probes import probe
 
 PACKAGE_DIR = str(Path(goosedove.__file__).parent)
 
 
-# The column, whole-number, date, and text looks have no probe, because the host cannot tell
-# those ranges from any other; these four exist only to count the Python side of each look. Defined
+# The column, date, and text looks have no probe, because the host cannot tell those ranges
+# from any other; these three exist only to count the Python side of each look. Defined
 # here, outside the package, they are not themselves counted, and pytest registers them
 # before any budget module builds its table of prepared paths.
 @probe
 def FirstOfNumbers(values: NumberColumn) -> float:
-    return float(values[0])
-
-
-@probe
-def FirstOfWholes(values: WholeNumberColumn) -> float:
     return float(values[0])
 
 

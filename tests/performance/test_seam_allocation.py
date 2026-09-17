@@ -55,14 +55,6 @@ def test_a_column_of_text_in_makes_no_temporary() -> None:
     assert peak_bytes(lambda: ENTRY["FirstOfNames"](names)) <= SLACK
 
 
-# A column of whole numbers pays its one look, the floor of every cell and the masks, and its
-# conversion to int64, 8 bytes per cell handed over. Measured 100,448 bytes at ten thousand cells
-# on 2026-09-17, about 10 bytes per cell; rejected on its last cell, 90,352.
-def test_a_column_of_whole_numbers_in_pays_its_look_and_its_conversion() -> None:
-    column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["FirstOfWholes"](column)) <= 11 * N + SLACK
-
-
 # A rejected range still takes the look that names the bad cell: one 1-byte mask over the
 # kinds, and a second one while the bad cell's text is found by counting the text cells before
 # it. Measured 20,640 at ten thousand cells with the bad cell last, down from 87,239 when the
