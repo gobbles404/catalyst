@@ -138,16 +138,26 @@ def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exact
     ]
 
 
-# Serials for 1 May and 1 June 2026: a month spills as its first day, under its own type.
-def test_monthly_fixings_spill_months_as_their_first_days_and_prices_exactly() -> None:
-    months = Cells.from_rows([[46143.0], [46174.0]])
-    prices = Cells.from_rows([[2.86], [3.01]])
-    handle = bridge.call("_CreateMonthlyFixings", [months, prices])
+# Serials for 5 January and 2 February 2026, the days two monthly indices were published, checked
+# against a schedule of those two contract months.
+def test_monthly_fixings_spill_publication_dates_as_serials_and_prices_exactly() -> None:
+    publications = Cells.from_rows([[46027.0], [46055.0]])
+    prices = Cells.from_rows([[1.85], [2.10]])
+    schedule = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            Cells.from_rows([["F26"], ["G26"]]),
+            Cells.from_rows([[46022.0], [46052.0]]),
+            MISSING,
+            publications,
+        ],
+    )
+    handle = bridge.call("_CreateMonthlyFixings", [publications, prices, schedule])
     assert rows(read(handle)) == [
-        ["month", "price"],
-        ["datetime64[M]", "float64"],
-        [46143.0, 2.86],
-        [46174.0, 3.01],
+        ["publication_date", "price"],
+        ["datetime64[D]", "float64"],
+        [46027.0, 1.85],
+        [46055.0, 2.10],
     ]
 
 

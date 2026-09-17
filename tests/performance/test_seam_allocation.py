@@ -9,7 +9,6 @@ temporary fails here and a change that removes one lowers the ceiling in its own
 import ctypes
 import tracemalloc
 from collections.abc import Callable
-from datetime import date
 
 import numpy as np
 
@@ -330,19 +329,25 @@ def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     )
 
 
-def month_columns(count: int) -> tuple[Cells, Cells]:
-    """That many months from January 2016 as the sheet sends them, the first day of each as a
-    serial, and a price beside each."""
-    firsts = [date(2016 + i // 12, 1 + i % 12, 1) for i in range(count)]
-    months = Cells.from_rows([[float((first - date(1899, 12, 30)).days)] for first in firsts])
-    return months, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+def published_columns(count: int) -> tuple[Cells, Cells]:
+    """That many monthly publications as the sheet sends them, the publication dates of the
+    schedule schedule_columns makes, a serial per row, and a price beside each."""
+    _, _, _, publications = schedule_columns(count)
+    return publications, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
 
 
-# Monthly fixings keep their months, 8 bytes each, and a copy of the prices, 8 bytes each, and
-# on the way pay the date column's masks and arrays to days, the months, and the months back to
-# days for the first-day look: measured 4,472 bytes at 120 months on 2026-09-17, about 37 bytes
-# per month; 32,527 at 1,200 and 313,327 at 12,000, 26 bytes per month.
-def test_monthly_fixings_keep_the_months_and_a_copy_of_the_prices() -> None:
+# Monthly fixings keep a copy of each column, 16 bytes per fixing, and on the way pay the date
+# column's masks and arrays to days, a sorted copy of the schedule's publication dates, 8 bytes
+# per contract of the schedule, and the places, the next publications and the looks over the
+# column: measured 7,631 bytes at 120 fixings against a schedule of 120 contracts on 2026-09-17,
+# about 64 bytes per fixing, up from 4,472 when the months were kept as months and nothing was
+# checked; 62,622 at 1,200 and 613,422 at 12,000, 51 bytes per fixing.
+def test_monthly_fixings_keep_a_copy_of_each_column() -> None:
     count = 120
-    months, prices = month_columns(count)
-    assert least_peak(lambda: ENTRY["_CreateMonthlyFixings"](months, prices)) <= 40 * count + SLACK
+    codes, futures, _, publications = schedule_columns(count)
+    schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    dates, prices = published_columns(count)
+    assert (
+        least_peak(lambda: ENTRY["_CreateMonthlyFixings"](dates, prices, schedule))
+        <= 60 * count + 2 * SLACK
+    )

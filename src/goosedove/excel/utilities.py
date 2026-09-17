@@ -74,11 +74,9 @@ def daily_fixings_table(obj: DailyFixings) -> MixedArray:
 
 @shown.register
 def monthly_fixings_table(obj: MonthlyFixings) -> MixedArray:
-    # A month crosses to the sheet as its first day, docs/library/time.md; the row of types says
-    # what the fixings hold.
     return MixedArray.table(
-        [("month", "price"), ("datetime64[M]", "float64")],
-        obj.months.astype("datetime64[D]"),
+        [("publication_date", "price"), ("datetime64[D]", "float64")],
+        obj.publication_dates,
         obj.prices,
     )
 

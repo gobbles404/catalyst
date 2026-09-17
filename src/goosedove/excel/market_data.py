@@ -18,6 +18,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
+from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
 from goosedove.market_data.futures_curve import FuturesCurve, futures_curve
@@ -76,15 +77,21 @@ def _CreateDailyFixings(
 
 @excel_function
 def _CreateMonthlyFixings(
-    month: Annotated[
+    publication_date: Annotated[
         DateColumn,
-        "The column of months, each typed as its first day, such as A2:A5 holding 1-May-2026 to "
-        "1-Aug-2026.",
+        "The column of days the index's monthly settles were published, such as A2:A5 holding "
+        "5-Jan-2026 to 1-Apr-2026, one per fixing.",
     ],
     price: Annotated[
-        NumberColumn, "The column of prices beside the months, such as B2:B5, one per month."
+        NumberColumn, "The column of prices beside the dates, such as B2:B5, one per date."
+    ],
+    expiry_schedule: Annotated[
+        Handle[ExpirySchedule],
+        "The index's expiry-schedule handle, built with its publication dates: the cell showing "
+        "_CreateExpirySchedule's result, such as D6, or a name for it.",
     ],
 ) -> Handle[MonthlyFixings]:
-    """Creates the monthly fixings of one index from the months it fixed and their prices, and
-    shows its handle, the text other formulas take as the fixings."""
-    return monthly_fixings(month, price)
+    """Creates the monthly fixings of one index from the days its settles were published and
+    their prices, checked against the publication dates of its expiry schedule, and shows its
+    handle, the text other formulas take as the fixings."""
+    return monthly_fixings(publication_date, price, expiry_schedule.publication_date)
