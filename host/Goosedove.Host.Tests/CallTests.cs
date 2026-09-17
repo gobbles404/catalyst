@@ -134,10 +134,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, 71.4) }, "#ERROR _CreateFuturesCurve: ValueError: price has 2 prices, expected 3, one per future_code" };
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, ExcelEmpty.Value, 71.1) }, "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number" };
             yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), ExcelMissing.Value }, "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers" };
-            // The daily fixings: a header row and a body of dates and settles; the days newest first, text where a settle is expected, and a header the table does not have.
-            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46148.0, 95.08 }, { 46147.0, 102.27 } } }, "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06" };
-            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, "x" }, { 46146.0, 106.42 } } }, "#ERROR _CreateDailyFixings: table cell (1, 2) is text 'x', expected number" };
-            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "price"), new object[,] { { 46143.0, 101.94 } } }, "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'price', expected one of date or settle" };
+            // The daily fixings: a header row, a body of dates and settles and the market's calendar by handle. The calendar left out, a number in its place and text naming no live object fail in the seam's words, and the seam says so before it looks at the table, so every row that expects the table's words, and the library's rules, which need a live calendar, are in the fact below.
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, ExcelMissing.Value }, "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle" };
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, 101.94 }, "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle" };
+            yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, "x" }, "#ERROR _CreateDailyFixings: holiday_calendar is text 'x' naming no live object, expected holiday calendar handle" };
             // The monthly fixings: a column of months as their first days and a column of prices; a price column one row short, a day that is not the first, and months backwards.
             yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46143.0, 46174.0, 46204.0), Column(2.86, 3.01) }, "#ERROR _CreateMonthlyFixings: ValueError: price has 2 prices, expected 3, one per month" };
             yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46143.0, 46168.0), Column(2.86, 3.01) }, "#ERROR _CreateMonthlyFixings: ValueError: month row 2 is 2026-05-26, expected the first day of a month" };
@@ -226,12 +226,18 @@ namespace Goosedove.Host.Tests
             Assert.Equal(71.4, spill[3, 1]);
         }
 
-        // Daily fixings: a header row and a body make one, and util_ReadHandle spills it back, the
-        // two headers, two types, then a row per day, the date as a serial and the settle as a number.
+        // Daily fixings: a header row, a body and the market's calendar make one, and util_ReadHandle
+        // spills it back, the two headers, two types, then a row per day, the date as a serial and
+        // the settle as a number. With the calendar live, the table's faults say so, text where a
+        // settle is expected and a header the table does not have, and the library's rules answer:
+        // the days newest first, a business day without a fixing, a Saturday, a listed holiday, and
+        // a handle of another kind where the calendar should be.
         [Fact]
-        public void daily_fixings_are_created_from_a_table_and_read_back_through_their_handle()
+        public void daily_fixings_are_created_from_a_table_and_a_calendar_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("_CreateDailyFixings", Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } });
+            var headers = Row("date", "settle");
+            var calendar = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
+            var handle = (string)Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, calendar);
             Assert.StartsWith("daily_fixings:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
@@ -240,6 +246,13 @@ namespace Goosedove.Host.Tests
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal(46143.0, spill[2, 0]);
             Assert.Equal(106.42, spill[3, 1]);
+            Assert.Equal("#ERROR _CreateDailyFixings: table cell (1, 2) is text 'x', expected number", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46143.0, "x" }, { 46146.0, 106.42 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'price', expected one of date or settle", Seam.Call("_CreateDailyFixings", Row("date", "price"), new object[,] { { 46143.0, 101.94 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46148.0, 95.08 }, { 46147.0, 102.27 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46143.0, 101.94 }, { 46147.0, 102.27 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-02, a Saturday, expected a business day", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46143.0, 101.94 }, { 46144.0, 100.0 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46041.0, 100.0 } }, calendar));
+            Assert.Equal("#ERROR _CreateDailyFixings: holiday_calendar is daily fixings handle '" + handle + "', expected holiday calendar handle", Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46143.0, 101.94 } }, handle));
         }
 
         // Monthly fixings: two columns make one, and util_ReadHandle spills it back, the two headers,

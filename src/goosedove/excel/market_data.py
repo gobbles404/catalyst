@@ -18,6 +18,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
 from goosedove.market_data.futures_curve import FuturesCurve, futures_curve
 from goosedove.market_data.monthly_fixings import MonthlyFixings, monthly_fixings
@@ -59,12 +60,18 @@ def _CreateDailyFixings(
     table: Annotated[
         DailyFixingsTable,
         "The rows under the headers, such as A2:B5: one fixing per row, its date and settle, "
-        "dates increasing.",
+        "one for every business day from the first to the last.",
+    ],
+    holiday_calendar: Annotated[
+        Handle[HolidayCalendar],
+        "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
+        "result, such as D2, or a name for it.",
     ],
 ) -> Handle[DailyFixings]:
-    """Creates the daily fixings of one index from the days it fixed and their settles, and
-    shows its handle, the text other formulas take as the fixings."""
-    return daily_fixings(table.date, table.settle)
+    """Creates the daily fixings of one index from the days it fixed and their settles, checked
+    against its market's holiday calendar, and shows its handle, the text other formulas take as
+    the fixings."""
+    return daily_fixings(table.date, table.settle, holiday_calendar.holiday)
 
 
 @excel_function

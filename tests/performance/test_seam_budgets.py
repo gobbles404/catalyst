@@ -4,6 +4,7 @@ import ctypes
 from collections.abc import Callable
 from datetime import date
 
+import numpy as np
 import pytest
 
 from goosedove.excel import bridge
@@ -920,30 +921,41 @@ def test_a_futures_curve_is_two_columns_in_and_one_publication_out(
     }
 
 
-# --- the second market data: a table in, one publication out --------------------------------
+# --- the second market data: a table and a calendar's handle in, one publication out --------
 
 
 FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
 
 
-def fixings_body(rows: int) -> Cells:
-    """That many daily fixings as the sheet sends them, a serial and a settle per row."""
-    return Cells.from_rows([[46143.0 + i, 100.0 + i % 7] for i in range(rows)])
+def fixings_body(rows: int, holidays: int) -> Cells:
+    """That many daily fixings as the sheet sends them, a serial and a settle per row, one per
+    business day from Friday 1 May 2026 under a calendar of that many Thursdays a week apart,
+    the calendar holiday_column makes."""
+    epoch = np.datetime64("1899-12-30")
+    closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
+    days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
+    serials = (days - epoch).astype(np.int64)
+    return Cells.from_rows([[float(serials[i]), 100.0 + i % 7] for i in range(rows)])
 
 
-# A year of fixings at the table path: the header row as any row of text, the body admitted as a
-# mixed range and bound, one look per column, the date column converted to days, the builder's
-# one look for the order of the dates and its two copies, and one publication. Nineteen calls
-# across eighteen functions, the accept rule once per argument.
-def test_daily_fixings_are_a_table_in_and_one_publication_out(
+# A year of fixings at the table path, with the market's calendar by handle: the header row as
+# any row of text, the body admitted as a mixed range and bound, one look per column, the date
+# column converted to days, the handle's text rule and its one lookup, then the builder's three
+# looks, the order of the dates, the days the market is closed and the business days without a
+# fixing, its two copies, and one publication. Twenty-two calls across twenty functions, the
+# accept rule once per argument; before the calendar, nineteen across eighteen. The three
+# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
+# fixture reads, so only their looks are in its count.
+def test_daily_fixings_are_a_table_and_a_calendar_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    body = fixings_body(260)
-    PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)
-    assert call_profile(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)) == {
+    calendar = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    body = fixings_body(260, 100)
+    PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)
+    assert call_profile(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,
+        "_validate": 3,
         "_text_row": 1,
         "_one_row": 1,
         "_shape": 1,
@@ -956,16 +968,18 @@ def test_daily_fixings_are_a_table_in_and_one_publication_out(
         "_not_dates": 1,
         "_as_days": 1,
         "_numbers_of": 1,
+        "_text": 1,  # the handle's text rule
+        "_resolve": 1,  # and its one lookup
         "_CreateDailyFixings": 1,
         "daily_fixings": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body)) == {
-        "ndarray.any": 3,  # one look per column, then the builder's, for a date out of order
+    assert numpy_calls(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)) == {
+        "ndarray.any": 5,  # one look per column, then the builder's: order, days closed, gaps
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
         "ndarray.setflags": 2,  # frozen
-        "ufunc.reduce": 3,
+        "ufunc.reduce": 5,
     }
 
 

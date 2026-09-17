@@ -108,11 +108,13 @@ def test_a_futures_curve_spills_its_two_columns_with_prices_exactly() -> None:
     ]
 
 
-# Serials for 1 and 4 May 2026.
+# Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
+# one day, 1 January.
 def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exactly() -> None:
     headers = Cells.from_rows([["date", "settle"]])
     body = Cells.from_rows([[46143.0, 101.94], [46146.0, 106.42]])
-    handle = bridge.call("_CreateDailyFixings", [headers, body])
+    calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]])])
+    handle = bridge.call("_CreateDailyFixings", [headers, body, calendar])
     assert rows(read(handle)) == [
         ["date", "settle"],
         ["datetime64[D]", "float64"],
