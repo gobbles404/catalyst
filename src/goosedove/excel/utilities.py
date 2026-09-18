@@ -12,6 +12,7 @@ from typing import Annotated
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.calendar.calendar import Calendar
 from goosedove.excel.bridge import Handle, MixedArray, excel_function
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
@@ -63,6 +64,23 @@ def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
             columns.append(dates)
     types = ["str"] + ["datetime64[D]"] * (len(columns) - 1)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+@shown.register
+def calendar_table(obj: Calendar) -> MixedArray:
+    # The dates and the flags were made when the calendar was; the prompt contract's code is
+    # read from the schedule the calendar keeps, one take over the rows, and nothing is rebuilt.
+    codes = np.array(obj.expiry_schedule.codes, dtype=object)[obj.prompt]
+    return MixedArray.table(
+        [
+            ("date", "prompt_contract", "is_business_day", "is_past"),
+            ("datetime64[D]", "str", "bool", "bool"),
+        ],
+        obj.dates,
+        tuple(codes),
+        obj.is_business_day,
+        obj.is_past,
+    )
 
 
 @shown.register

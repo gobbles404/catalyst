@@ -182,6 +182,27 @@ $formulas = [ordered]@{
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI1)" = "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract"
     "=_CreateMonthlyFixings(BO2:BO5,BD2:BD5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'M26', expected number"
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle"
+    # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
+    # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
+    # with the contract prompt on it, whether the market is open and whether the day is past; a
+    # schedule of one contract, a code given twice, expiries backwards and a span no sheet could
+    # show, the library's words; the holiday calendar left out, the seam's.
+    "=LEFT(AR1,9)"                = "calendar:"
+    "=INDEX(util_ReadHandle(AR1),1,2)" = "prompt_contract"
+    "=INDEX(util_ReadHandle(AR1),2,4)" = "bool"
+    "=INDEX(util_ReadHandle(AR1),3,1)" = "46162"
+    "=INDEX(util_ReadHandle(AR1),3,2)" = "n26"
+    "=INDEX(util_ReadHandle(AR1),3,3)" = "TRUE"
+    "=INDEX(util_ReadHandle(AR1),6,3)" = "FALSE"
+    "=INDEX(util_ReadHandle(AR1),3,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(AR1),156,2)" = "X26"
+    "=INDEX(util_ReadHandle(AR1),156,4)" = "FALSE"
+    "=ROWS(util_ReadHandle(AR1))"      = "156"
+    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
+    "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1"
+    "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
+    "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
+    "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -305,6 +326,18 @@ $cells = [ordered]@{
     "BS2" = "23-Jun-2026"; "BS3" = "20-May-2026"
     "BT2" = "20-May-2026"; "BT3" = "22-Jul-2026"
     "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI3)"
+    # The calendar: one creator cell over the valuation date, the six-contract schedule and the
+    # holiday calendar the sheet already holds; then a schedule of one contract, one whose code
+    # is given twice, one whose expiries run backwards and one whose span no sheet could show, for
+    # the calendar to refuse.
+    "AR1" = "=_CreateCalendar(AA2,AI1,AM1)"
+    "AR2" = "=_CreateExpirySchedule(AE2,AF2)"
+    "AS2" = "m26"; "AS3" = "m26"
+    "AR3" = "=_CreateExpirySchedule(AS2:AS3,AF2:AF3)"
+    "AT2" = "22-Jun-2026"; "AT3" = "19-May-2026"
+    "AR4" = "=_CreateExpirySchedule(AE2:AE3,AT2:AT3)"
+    "AT4" = "19-May-2026"; "AT5" = "12-Apr-4897"
+    "AR5" = "=_CreateExpirySchedule(AE2:AE3,AT4:AT5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

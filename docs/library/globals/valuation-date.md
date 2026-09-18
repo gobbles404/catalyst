@@ -55,4 +55,4 @@ Use `np.nextafter(0.0, -np.inf)` and `np.nextafter(1.0, np.inf)` for the boundar
 
 ## Not here
 
-Ordering two valuation dates, and whether the fraction stays: it has no consumer yet, and `(2026-09-11, 1)` and `(2026-09-12, 0)` are two records that describe one moment, so the first function that orders two valuation dates, or measures the time between them, decides both. Elapsed-time arithmetic, hourly mapping, time zones, exchange sessions, day-count arithmetic, fixing and payment cutoffs, curves, instruments, market calendars, pricing.
+Ordering two valuation dates, and whether the fraction stays: its first consumer, the calendar of #82, reads the day alone and never the fraction, and `(2026-09-11, 1)` and `(2026-09-12, 0)` are two records that describe one moment, so the first function that orders two valuation dates, or measures the time between them, decides both. Elapsed-time arithmetic, hourly mapping, time zones, exchange sessions, day-count arithmetic, fixing and payment cutoffs, curves, instruments, market calendars, pricing.

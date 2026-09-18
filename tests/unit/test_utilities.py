@@ -9,8 +9,16 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
+from goosedove.calendar.calendar import Calendar
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle
+from goosedove.excel.bridge import (
+    BOOLEAN_CODE,
+    MISSING,
+    NUMBER_CODE,
+    TEXT_CODE,
+    Cells,
+    Handle,
+)
 from goosedove.excel.probes import probe
 from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
@@ -136,6 +144,31 @@ def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exact
         [46143.0, 101.94],
         [46146.0, 106.42],
     ]
+
+
+# Serials for 19 and 20 May 2026 and 25 May, the valuation date: a calendar of one day spills
+# its four columns, the day as a serial, the code as text and the two flags as booleans, whose
+# kinds the boolean code marks and whose slots hold 1 and 0.
+def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
+    valuation = bridge.call("_CreateValuationDate", [46167.0, 0.5])
+    schedule = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"]]),
+            Cells.from_rows([[46161.0], [46162.0]]),
+            MISSING,
+            MISSING,
+        ],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    handle = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
+    kinds, slots, joined = read(handle)
+    assert rows((kinds, slots, joined)) == [
+        ["date", "prompt_contract", "is_business_day", "is_past"],
+        ["datetime64[D]", "str", "bool", "bool"],
+        [46162.0, "n26", 1.0, 1.0],
+    ]
+    assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE]
 
 
 # Serials for 5 January and 2 February 2026, the days two monthly indices were published, checked
@@ -285,6 +318,7 @@ def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None
 
 def test_every_kind_a_creator_publishes_has_a_table() -> None:
     assert {
+        Calendar,
         ValuationDate,
         DiscountCurve,
         ExpirySchedule,

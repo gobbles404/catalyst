@@ -329,6 +329,35 @@ def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     )
 
 
+def calendar_sources(contracts: int) -> tuple[object, object, object]:
+    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
+    contracts a month apart, and a calendar of a hundred holidays a week apart."""
+    codes, futures, _, _ = schedule_columns(contracts)
+    return (
+        ENTRY["_CreateValuationDate"](46276.0, 0.5),
+        ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+    )
+
+
+# A calendar keeps four columns, 18 bytes per day, the days and the prompt rows 8 each and the
+# two flags a byte each, and on the way pays the arange, the searchsorted and the flags'
+# temporaries: measured 8,620 bytes at 360 days on 2026-09-18, about 24 bytes per day on top of
+# a creator's small objects, which twice the slack covers; 66,741 at 3,630 days and 661,841 at
+# 36,630, 18 bytes per day. Reading it back pays the reader's rectangle, four cells per day,
+# the codes gathered as text and the days to serials: measured 26,308 at 360 days, about 18
+# bytes per cell; 251,938 at 3,630 days.
+def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
+    days = 360
+    valuation, schedule, holidays = calendar_sources(13)
+    assert (
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, schedule, holidays))
+        <= 25 * days + 2 * SLACK
+    )
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+
+
 def published_columns(count: int) -> tuple[Cells, Cells]:
     """That many monthly publications as the sheet sends them, the publication dates of the
     schedule schedule_columns makes, a serial per row, and a price beside each."""
