@@ -185,8 +185,8 @@ $formulas = [ordered]@{
     # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
     # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
     # with the contract prompt on it, whether the market is open and whether the day is past; a
-    # schedule of one contract, a code given twice and expiries backwards, the library's words;
-    # the holiday calendar left out, the seam's.
+    # schedule of one contract, a code given twice, expiries backwards and a span no sheet could
+    # show, the library's words; the holiday calendar left out, the seam's.
     "=LEFT(AR1,9)"                = "calendar:"
     "=INDEX(util_ReadHandle(AR1),1,2)" = "prompt_contract"
     "=INDEX(util_ReadHandle(AR1),2,4)" = "bool"
@@ -201,6 +201,7 @@ $formulas = [ordered]@{
     "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
     "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1"
     "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
+    "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
     "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
 }
 
@@ -327,13 +328,16 @@ $cells = [ordered]@{
     "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI3)"
     # The calendar: one creator cell over the valuation date, the six-contract schedule and the
     # holiday calendar the sheet already holds; then a schedule of one contract, one whose code
-    # is given twice and one whose expiries run backwards, for the calendar to refuse.
+    # is given twice, one whose expiries run backwards and one whose span no sheet could show, for
+    # the calendar to refuse.
     "AR1" = "=_CreateCalendar(AA2,AI1,AM1)"
     "AR2" = "=_CreateExpirySchedule(AE2,AF2)"
     "AS2" = "m26"; "AS3" = "m26"
     "AR3" = "=_CreateExpirySchedule(AS2:AS3,AF2:AF3)"
     "AT2" = "22-Jun-2026"; "AT3" = "19-May-2026"
     "AR4" = "=_CreateExpirySchedule(AE2:AE3,AT2:AT3)"
+    "AT4" = "19-May-2026"; "AT5" = "12-Apr-4897"
+    "AR5" = "=_CreateExpirySchedule(AE2:AE3,AT4:AT5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

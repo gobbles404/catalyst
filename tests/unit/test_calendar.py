@@ -182,6 +182,26 @@ def test_a_schedule_that_cannot_make_a_calendar_says_why(
     assert str(failure.value) == message
 
 
+# The bound the discount curve holds too: a calendar of a sheet's rows less the two heading rows
+# is read back in full, and one day longer is refused, naming both expiries.
+def test_the_longest_calendar_a_sheet_shows_is_made_and_one_day_longer_is_refused() -> None:
+    longest = a_calendar(schedule=a_schedule(("a", "2026-05-19"), ("b", "4897-04-11")))
+    assert longest.dates.size == 1_048_574
+    assert longest.dates[-1] == day("4897-04-11")
+    with pytest.raises(ValueError) as failure:
+        a_calendar(schedule=a_schedule(("a", "2026-05-19"), ("b", "4897-04-12")))
+    assert str(failure.value) == (
+        "future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
+    )
+    with pytest.raises(ValueError) as failure:
+        a_calendar(
+            schedule=a_schedule(("a", "2026-05-19"), ("b", "2026-06-22"), ("c", "9999-12-31"))
+        )
+    assert str(failure.value) == (
+        "future_expiry row 3 is 9999-12-31, expected within 1048574 days of row 1's 2026-05-19"
+    )
+
+
 # --- calendar arithmetic ------------------------------------------------------
 
 

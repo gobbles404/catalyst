@@ -284,8 +284,8 @@ namespace Goosedove.Host.Tests
         // make one, and util_ReadHandle spills it back, the four headers, the four types, then a row
         // per day, the date as a serial, the prompt contract as text and the two flags as booleans.
         // The library's rules answer through the same objects: a schedule of one contract, a code
-        // given twice and expiries backwards; and a handle of another kind where the holiday
-        // calendar should be.
+        // given twice, expiries backwards and a span no sheet could show; and a handle of another
+        // kind where the holiday calendar should be.
         [Fact]
         public void a_calendar_is_created_from_three_handles_and_read_back_through_its_handle()
         {
@@ -314,6 +314,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1", Seam.Call("_CreateCalendar", valuation, twice, holidays));
             var backwards = (string)Seam.Call("_CreateExpirySchedule", Column("m26", "n26"), Column(46195.0, 46161.0), ExcelMissing.Value, ExcelMissing.Value);
             Assert.Equal("#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22", Seam.Call("_CreateCalendar", valuation, backwards, holidays));
+            var tooLong = (string)Seam.Call("_CreateExpirySchedule", Column("m26", "n26"), Column(46161.0, 1094736.0), ExcelMissing.Value, ExcelMissing.Value);
+            Assert.Equal("#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19", Seam.Call("_CreateCalendar", valuation, tooLong, holidays));
             Assert.Equal("#ERROR _CreateCalendar: holiday_calendar is calendar handle '" + handle + "', expected holiday calendar handle", Seam.Call("_CreateCalendar", valuation, schedule, handle));
         }
 

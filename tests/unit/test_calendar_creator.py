@@ -139,6 +139,11 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
             "expected a date after row 1's 2026-05-19",
         ),
         (
+            [THE_VALUATION, (("m26", "n26"), (MAY_19, 1094736.0)), THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, "
+            "expected within 1048574 days of row 1's 2026-05-19",
+        ),
+        (
             [MISSING, THE_SCHEDULE, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle",
         ),
@@ -176,6 +181,7 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
         "a code given twice after the boundary",
         "expiries backwards",
         "two expiries equal",
+        "a span no sheet could show",
         "the valuation date left out",
         "a blank cell where the valuation date should be",
         "a number where the valuation date should be",

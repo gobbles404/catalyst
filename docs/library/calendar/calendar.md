@@ -58,13 +58,14 @@ Quoted from the declaration in `src/goosedove/excel/calendar.py`, which `tests/u
 
 ## The library checks
 
-Three rules on the schedule, in this order, the first failure being the message; they are the calendar's, not the schedule's, so a schedule of one contract or with a code twice is still a schedule. Rows count as the sheet counts them, the schedule's first row being row 1.
+Four rules on the schedule, in this order, the first failure being the message; they are the calendar's, not the schedule's, so a schedule of one contract or with a code twice is still a schedule. Rows count as the sheet counts them, the schedule's first row being row 1.
 
 | Rule | Message |
 |---|---|
 | the schedule has two contracts or more, the first only bounding the calendar | `expiry_schedule has 1 contract, expected at least 2` |
 | each code once, spelling and case as typed, the boundary's included | `future_code row 2 is 'm26', already given at row 1` |
 | each future expiring after the one above, in the order given | `future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22` |
+| the last future within 1,048,574 days of the first, a sheet's rows less the two heading rows `util_ReadHandle` spills first, the bound the discount curve holds, so whatever is created can be read back | `future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19` |
 
 A count of one reads `1 contract`. The codes are labels: `M26` and `m26` are two codes, no code is read for its month, nothing is sorted, and no contract is inferred between two that are given. The schedule as supplied is the whole prompt sequence, so these rules make the mapping unambiguous and say nothing about whether a market lists more contracts than the sheet does. Then the four columns are made, once: the days are one `np.arange` from the day after the first expiry to the last; the prompt on each day is one `np.searchsorted` over the expiries, each day finding the first expiry on or after it, which is never the first row; the business-day flag is `np.is_busday` over the days with the holiday calendar's list, as [time.md](../time.md) decided business days would be counted; and the past flag is one comparison against the valuation date's day. Reading the handle shows the columns as they were made and reads each day's code from the schedule the calendar keeps; nothing is rebuilt. The three objects are kept by reference, not copied, and the columns are frozen. A failed call publishes nothing.
 
@@ -78,6 +79,7 @@ The examples and properties below are `tests/unit/test_calendar.py`; the seam's 
 | four contracts: every interior expiry keeps its contract, the next day switches, and each contract after the boundary holds the days from the expiry before to its own | example |
 | two expiries a day apart: one row, the second contract's | example |
 | one contract, no contract, the boundary code given again or a third time, a code twice after the boundary, two expiries equal, expiries backwards, a later expiry before the one above: rejected, naming the row; the codes before the expiries, and `M26` and `m26` two codes | example |
+| the longest calendar a sheet shows, 1,048,574 days, made and read back in full; one day longer, and a third contract far off, refused naming both expiries | example |
 | a month end, a year end, a leap day and a February without one, the first and last days a cell holds, and a short range at the start of the sheet's calendar: every day a row | example |
 | weekdays open and both weekend days closed; a holiday on a weekday closed, on a weekend nothing; consecutive holidays each closed | example |
 | duplicate, unordered and out-of-range holidays change nothing; a holiday on an expiry changes the business-day flag alone | example |
@@ -86,10 +88,10 @@ The examples and properties below are `tests/unit/test_calendar.py`; the seam's 
 | for any schedule of two to forty contracts with distinct codes and increasing expiries, any holidays and any valuation date: one row per day between the first expiry and the last, consecutive, each day prompt on the one contract whose interval holds it, each contract after the boundary holding exactly the days between its expiry and the one before, and the past flag one comparison | property |
 | the three sources kept by reference, the columns read-only and refusing writes; making a calendar changes no source, and a second calendar leaves the first | example |
 | three handles in and the calendar read back day by day, the flags reaching the sheet as booleans, the codes exactly as typed, one row from two expiries a day apart, the valuation date on the first day and its fraction | example, through the seam |
-| a schedule of one contract, a code twice and expiries backwards, the library's words; each argument left out, blank, a number, text naming no live object, or a handle of another kind, the seam's words, the calendar's own handle where the holiday calendar should be included | example, through the seam |
+| a schedule of one contract, a code twice, expiries backwards and a span no sheet could show, the library's words; each argument left out, blank, a number, text naming no live object, or a handle of another kind, the seam's words, the calendar's own handle where the holiday calendar should be included | example, through the seam |
 | a failed construction publishes no object and no handle; a dead calendar handle cannot be read | example, with handles |
 | the spill: four headers, four types, one row per day with the flags' kinds the boolean code | example |
-| the creator's handle read back in a real workbook, 156 rows over the six-contract schedule, a code and both flags read, and the three refusals | Excel smoke |
+| the creator's handle read back in a real workbook, 156 rows over the six-contract schedule, a code and both flags read, and the four refusals | Excel smoke |
 
 ## Not here
 

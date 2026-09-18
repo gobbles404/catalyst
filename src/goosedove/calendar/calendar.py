@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.globals.discount_curve import MAX_DAYS
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
@@ -36,9 +37,8 @@ def calendar(
     expiry_schedule: ExpirySchedule,
     holiday_calendar: HolidayCalendar,
 ) -> Calendar:
-    """The one way to make a Calendar: three rules of meaning on the schedule, checked once, in
-    this order, the first failure being the message; then the four columns, made once here and
-    never again.
+    """The one way to make a Calendar: four rules on the schedule, checked once, in this order,
+    the first failure being the message; then the four columns, made once here and never again.
 
     The schedule has two contracts or more, since its first only bounds the calendar: nothing
     says when that contract became prompt, so it is never prompt here, and the calendar starts
@@ -47,7 +47,9 @@ def calendar(
     one above, in the order given, since the days between two expiries are the later contract's:
     the expiry day belongs to the contract expiring on it, and the day after to the next
     contract in the schedule, weekends and holidays moving nothing. Nothing is sorted and no
-    code is read for its month; the schedule is the whole prompt sequence, as supplied.
+    code is read for its month; the schedule is the whole prompt sequence, as supplied. And the
+    last future expires within a sheet's rows of the first, MAX_DAYS days, the same bound the
+    discount curve holds, so that whatever calendar is created can be read back in full.
 
     The columns: every calendar day from the day after the first expiry to the last expiry,
     one np.arange; the row prompt on each day, one np.searchsorted over the expiries, each day
@@ -78,6 +80,11 @@ def calendar(
         raise ValueError(
             f"future_expiry row {k + 2} is {expiries[k + 1]}, "
             f"expected a date after row {k + 1}'s {expiries[k]}"
+        )
+    if expiries[-1] - expiries[0] > np.timedelta64(MAX_DAYS, "D"):
+        raise ValueError(
+            f"future_expiry row {expiries.size} is {expiries[-1]}, "
+            f"expected within {MAX_DAYS} days of row 1's {expiries[0]}"
         )
     day = np.timedelta64(1, "D")
     dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
