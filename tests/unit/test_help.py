@@ -106,7 +106,7 @@ def test_the_schedule_creator_explains_itself() -> None:
     ]
 
 
-def test_the_calendar_creator_explains_itself() -> None:
+def test_the_holiday_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateHolidayCalendar"]
     assert not hidden
     assert description == (
@@ -227,6 +227,33 @@ def test_the_monthly_fixings_creator_explains_itself() -> None:
             "expiry_schedule",
             "The index's expiry-schedule handle, built with its publication dates: the cell "
             "showing _CreateExpirySchedule's result, such as D6, or a name for it.",
+        ),
+    ]
+
+
+def test_the_calendar_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateCalendar"]
+    assert not hidden
+    assert description == (
+        "Creates the calendar of one index, every day after its first contract's expiry to its "
+        "last, with the contract prompt on each, whether the market is open and whether the day "
+        "is past, and shows its handle, the text other formulas take as the calendar."
+    )
+    assert arguments == [
+        (
+            "valuation_date",
+            "The valuation-date handle: the cell showing _CreateValuationDate's result, such as "
+            "B2, or a name for it.",
+        ),
+        (
+            "expiry_schedule",
+            "The index's expiry-schedule handle: the cell showing _CreateExpirySchedule's "
+            "result, such as B8, or a name for it, two contracts or more.",
+        ),
+        (
+            "holiday_calendar",
+            "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
+            "result, such as B12, or a name for it.",
         ),
     ]
 

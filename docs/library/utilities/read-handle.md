@@ -61,6 +61,7 @@ What each kind shows:
 | `futures_curve` | `future_code`, `price` | `str`, `float64` | one per contract |
 | `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `monthly_fixings` | `publication_date`, `price` | `datetime64[D]`, `float64` | one per fixing |
+| `calendar` | `date`, `prompt_contract`, `is_business_day`, `is_past` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's |
 
 `=util_ReadHandle(B2)` on `=_CreateValuationDate(A2, 0.5)`:
 
@@ -100,6 +101,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | a futures curve: two columns, the code as text and the price exactly, one row per contract under its two heading rows | example |
 | daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | monthly fixings: two columns, publication dates as serials and prices exactly, one row per fixing under its two heading rows | example |
+| the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |

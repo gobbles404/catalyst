@@ -71,10 +71,11 @@ From the braindump, each with the rule it met and what stands instead:
 | weekends in a period | decided: every calendar day, weekends included |
 | contracts in order and none skipped | decided as the rule; relaxed for a market listing only some months when one arrives |
 | an option's expiry on or before its future's | proposed above; the owner decides with the schedule's rules |
-| prompt on the expiry day | open: the owner decides when the nearby reader is written; one flag on the lookup |
+| prompt on the expiry day | decided in #82 with the calendar: the expiry day belongs to the contract expiring on it, and the day after to the next contract in the schedule; a market whose prompt moves earlier brings a roll lag to the nearby reader, not a change here |
+| codes in the calendar | decided in #82: the calendar takes the schedule's codes as labels, spelling and case as typed, each once by exact equality, and reads nothing from them; the schedule's builder reading codes for their months, above, is still to come, and the calendar will not change when it does |
 | the week mask | decided in #79 with the daily fixings: Monday to Friday, numpy's default, until a market trading weekends arrives with its own |
 | the horizon | decided: 2000 to 2099, fixed |
 
 ## When it is time
 
-Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first. Business days entered in #79 with the daily fixings, checked through `np.is_busday` and `np.busday_offset` over the calendar's list, a fixing refused on a closed day and a business day without one; a contract's terms will bring the counting, and Gas Daily daily is the first daily-settled shape to build for. Nothing from the declined table returns.
+Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first. Business days entered in #79 with the daily fixings, checked through `np.is_busday` and `np.busday_offset` over the calendar's list, a fixing refused on a closed day and a business day without one; a contract's terms will bring the counting, and Gas Daily daily is the first daily-settled shape to build for. The calendar of #82 is the first step along that shape: every calendar day from the schedule's first expiry to its last, weekends and holidays in, each day with its prompt contract and whether the market is open, built once and priced later. Nothing from the declined table returns.

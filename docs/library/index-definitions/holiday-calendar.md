@@ -2,7 +2,7 @@
 
 Built in #67.
 
-The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its first reader is [_CreateDailyFixings](../market-data/daily-fixings.md), since #79: the fixings take the calendar's handle and are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; a reader that counts the business days between two dates is not specified. The code is `src/goosedove/index_definitions/holiday_calendar.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
+The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its first reader is [_CreateDailyFixings](../market-data/daily-fixings.md), since #79: the fixings take the calendar's handle and are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; the [calendar](../calendar/calendar.md) of #82 reads it the same way, flagging whether the market is open on each of its days; a reader that counts the business days between two dates is not specified. The code is `src/goosedove/index_definitions/holiday_calendar.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 
