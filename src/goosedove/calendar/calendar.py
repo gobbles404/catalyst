@@ -80,7 +80,7 @@ def calendar(
             f"expected a date after row {k + 1}'s {expiries[k]}"
         )
     day = np.timedelta64(1, "D")
-    dates: NDArray[np.datetime64] = np.arange(expiries[0] + day, expiries[-1] + day)
+    dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
     prompt = np.searchsorted(expiries, dates, side="left")
     is_business_day = np.is_busday(dates, holidays=holiday_calendar.holiday)
     is_past = dates < valuation_date.as_of
