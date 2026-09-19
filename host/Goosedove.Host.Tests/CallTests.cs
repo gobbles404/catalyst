@@ -157,6 +157,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelEmpty.Value) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number" };
             yield return new object[] { "_CreatePriceVector", new object[] { ExcelMissing.Value }, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers" };
             yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelError.ExcelErrorNA) }, ExcelError.ExcelErrorNA };
+            // The market: two handles, the market history and the price vector. A number, a missing argument and text naming no live object where the history should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
+            yield return new object[] { "_CreateMarket", new object[] { 72.10, ExcelMissing.Value }, "#ERROR _CreateMarket: market_history is number 72.1, expected market history handle" };
+            yield return new object[] { "_CreateMarket", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateMarket: market_history is missing, expected market history handle" };
+            yield return new object[] { "_CreateMarket", new object[] { "x", ExcelMissing.Value }, "#ERROR _CreateMarket: market_history is text 'x' naming no live object, expected market history handle" };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -379,6 +383,49 @@ namespace Goosedove.Host.Tests
             var again = (string)Seam.Call("_CreatePriceVector", Column(74.25, 0.0, -0.5, 74.25));
             Assert.NotEqual(handle, again);
             Assert.Equal(-0.5, ((object[,])Seam.Call("util_ReadHandle", handle))[4, 0]);
+        }
+
+        // The market: the history of the market-history fact, valued on 26 May 2026 with the 25th
+        // a holiday and the three past business days fixed, and a vector of two quotes, n26's and
+        // q26's, make one, and util_ReadHandle spills it back, the calendar's four columns and
+        // price, a fixing on a past business day, closed on the weekend and the holiday, n26's
+        // quote from the valuation day to its expiry and q26's from the day after. The library's
+        // rules answer through the same objects: a quote too few and one too many, and a history
+        // valued before its calendar begins; and a handle of another kind in either slot.
+        [Fact]
+        public void a_market_is_created_from_two_handles_and_read_back_through_its_handle()
+        {
+            var schedule = (string)Seam.Call("_CreateExpirySchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value, ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), schedule, holidays);
+            var headers = Row("date", "settle");
+            var fixings = (string)Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46162.0, 70.85 }, { 46163.0, 71.10 }, { 46164.0, 71.25 } }, holidays);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var quotes = (string)Seam.Call("_CreatePriceVector", Column(72.10, 72.80));
+            var handle = (string)Seam.Call("_CreateMarket", history, quotes);
+            Assert.StartsWith("market:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(65, spill.GetLength(0));
+            Assert.Equal(5, spill.GetLength(1));
+            Assert.Equal("price", spill[0, 4]);
+            Assert.Equal("float64", spill[1, 4]);
+            Assert.Equal(70.85, spill[2, 4]);
+            Assert.Equal(71.25, spill[4, 4]);
+            Assert.Equal("closed", spill[5, 4]);
+            Assert.Equal("closed", spill[7, 4]);
+            Assert.Equal(72.10, spill[8, 4]);
+            Assert.Equal("n26", spill[35, 1]);
+            Assert.Equal(72.10, spill[35, 4]);
+            Assert.Equal("q26", spill[36, 1]);
+            Assert.Equal(72.80, spill[36, 4]);
+            Assert.Equal(72.80, spill[64, 4]);
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", 72.10)));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", Column(72.10, 72.80, 73.0))));
+            var early = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46161.0, 0.5), schedule, holidays);
+            var earlyHistory = (string)Seam.Call("_CreateMarketHistory", early, (string)Seam.Call("_CreateDailyFixings", headers, new object[,] { { 46160.0, 70.0 } }, holidays));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-19, expected a date from 2026-05-20 through 2026-07-21", Seam.Call("_CreateMarket", earlyHistory, quotes));
+            Assert.Equal("#ERROR _CreateMarket: market_history is price vector handle '" + quotes + "', expected market history handle", Seam.Call("_CreateMarket", quotes, quotes));
+            Assert.Equal("#ERROR _CreateMarket: price_vector is market history handle '" + history + "', expected price vector handle", Seam.Call("_CreateMarket", history, history));
         }
 
         // Monthly fixings: a column of publication days, a column of prices and the index's schedule

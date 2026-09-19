@@ -227,6 +227,27 @@ def test_the_price_vector_creator_explains_itself() -> None:
     ]
 
 
+def test_the_market_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateMarket"]
+    assert not hidden
+    assert description == (
+        "Creates the daily market of one index from its history and current futures prices and "
+        "shows its handle, the text other formulas take as the market."
+    )
+    assert arguments == [
+        (
+            "market_history",
+            "The market-history handle: the cell showing _CreateMarketHistory's result, such as "
+            "B10, or a name for it.",
+        ),
+        (
+            "price_vector",
+            "The price-vector handle from _CreatePriceVector, such as B12, with prices in "
+            "schedule order from the valuation day's prompt through the last contract.",
+        ),
+    ]
+
+
 def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden

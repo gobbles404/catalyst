@@ -10,7 +10,7 @@ Reads the object a handle stands for onto the sheet as a table, a header row, a 
 def util_ReadHandle(handle: Handle[object]) -> MixedArray: ...
 ```
 
-`Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result is the mirror of the way in, built in #65 ([outputs.md](../../seam/outputs.md) decision 13): the rectangle spills one tagged value per cell, and `MixedArray.table` builds it from the headings and the object's columns, or, for the market history's column of two kinds, the kind composes the record's three fields itself.
+`Handle[object]` is the seam's form for a handle of any kind, built in #64 ([inputs.md](../../seam/inputs.md) decision 40): the function receives the object whatever its kind, and every failure keeps the seam's words with no kind to name. `MixedArray` as a result is the mirror of the way in, built in #65 ([outputs.md](../../seam/outputs.md) decision 13): the rectangle spills one tagged value per cell, and `MixedArray.table` builds it from the headings and the object's columns, or, for the market history's and the market's columns of two kinds, one helper composes the record's three fields.
 
 | | A | B |
 |---|---|---|
@@ -46,7 +46,7 @@ None. Every kind the library publishes has a table, so there is no object the in
 
 ## The table
 
-The first row is the headers, in the creator's own words: the headers its table took, or its parameter names. The rows are what the object holds, which for a curve is every day the creator filled between its anchors. The second row is the type of what the object holds in each column, in numpy's words where numpy holds it and Python's where Python does. Then one row per element, aligned across the columns as the object aligns them; a scalar field is a column of one row. A column holds one kind, the one its type names, except where a kind says otherwise: the market history's `fixing_price` is a number on a day that fixed and a word on a day that did not, since #84, and its type is the number's, since the words are display, not values. A column the creator was given none of is not shown, and what a kind keeps only to make a lookup fast, such as the curve's day count of its start, is not a fact of the object and is not shown. Nothing is sorted, rounded or reformatted.
+The first row is the headers, in the creator's own words: the headers its table took, or its parameter names. The rows are what the object holds, which for a curve is every day the creator filled between its anchors. The second row is the type of what the object holds in each column, in numpy's words where numpy holds it and Python's where Python does. Then one row per element, aligned across the columns as the object aligns them; a scalar field is a column of one row. A column holds one kind, the one its type names, except where a kind says otherwise: the market history's `fixing_price` is a number on a day that fixed and a word on a day that did not, since #84, and the market's `price` a number on every business day and a word on the rest, since #86, their type the number's, since the words are display, not values. A column the creator was given none of is not shown, and what a kind keeps only to make a lookup fast, such as the curve's day count of its start, is not a fact of the object and is not shown. Nothing is sorted, rounded or reformatted.
 
 What each kind shows:
 
@@ -61,6 +61,7 @@ What each kind shows:
 | `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `monthly_fixings` | `publication_date`, `price` | `datetime64[D]`, `float64` | one per fixing |
 | `price_vector` | `price` | `float64` | one per price, in the column's order |
+| `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the fixing on a past business day, the prompt contract's quote on a business day from the valuation day on, and the word `closed` on a weekend or a holiday |
 | `calendar` | `date`, `prompt_contract`, `is_business_day`, `is_past` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's |
 | `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the settle, a number, on a past business day, the word `closed` on a weekend or a holiday and `unfixed` on the valuation day and the days after it |
 
@@ -102,13 +103,14 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | monthly fixings: two columns, publication dates as serials and prices exactly, one row per fixing under its two heading rows | example |
 | a price vector: one column of prices under its two heading rows, a zero and a negative price in their places | example |
+| a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; and for any history with the quotes it requires, every day's fixing, quote or `closed` | example and property |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
 | the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
 | a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |
-| each kind inspected on a real sheet, with a schedule without options, a calendar of one day, a history over 34 days and a vector of four prices | Excel smoke |
+| each kind inspected on a real sheet, with a schedule without options, a calendar of one day, a history and a market over 34 days and a vector of four prices | Excel smoke |
 
 ## Not here
 

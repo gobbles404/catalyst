@@ -1117,9 +1117,9 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
 
 
 # Reading a history back is reading its calendar back, the same calls, and then the fifth
-# column written by kind: the wider kinds and slots, the codes paired with the words and the
-# pairs shown, the two words shared by every row; no arange, no searchsorted, nothing of the
-# calendar made again.
+# column written by kind through the helper the market's reader shares: the words made once, the
+# wider kinds and slots, the codes paired with the words and the pairs shown, the two words
+# shared by every row; no arange, no searchsorted, nothing of the calendar made again.
 def test_reading_a_market_history_back_rebuilds_nothing(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1133,6 +1133,100 @@ def test_reading_a_market_history_back_rebuilds_nothing(
         "_resolve": 1,
         "util_ReadHandle": 1,
         "market_history_table": 1,
+        "_priced_column": 1,  # the fifth column, through the helper the market's reader shares
+        "calendar_table": 1,  # the calendar's own table, as the calendar shows
+        "MixedArray.table": 1,
+        "_table_column": 3,
+        "_unit": 1,
+        "_serials": 1,
+        "MixedArray.shape": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
+    assert calls == {
+        "numpy.array": 2,  # the calendar's: the codes as an array, its texts gathered
+        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "numpy.empty": 7,  # the calendar's two; the words, kinds, slots, pairs and mask
+        "numpy.asarray": 2,
+        "numpy.datetime_data": 1,  # the unit of the date column
+        "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+# --- the market: two handles in, one number found, nothing built ---------------------------
+
+
+def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
+    """The two handles a market takes: the history of a calendar of that many contracts that
+    many days apart from 19 May 2026, valued on 11 September 2026 with a fixing on every
+    business day before it under a hundred Thursdays, and a vector with one quote per contract
+    from the valuation day's prompt through the last."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
+    futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
+    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
+    rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
+    fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    history = PATH["_CreateMarketHistory"](made, fixings)
+    first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
+    quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
+    return history, PATH["_CreatePriceVector"](quotes)
+
+
+# The hot operation: two handles, each the text rule and one lookup, the builder's two rules on
+# scalars, the valuation day's row from one subtraction and its prompt row read there, and one
+# publication. Eleven calls across eight functions, and not one numpy call: no copy, no look,
+# no mask and no array, whatever the calendar's length and the vector's, a year of days with
+# nine quotes, ten years with one quote, or a year with 246 quotes alike.
+@pytest.mark.parametrize(
+    ("contracts", "days_apart"),
+    [(13, 30), (2, 3600), (361, 1)],
+    ids=["a year of days, nine quotes", "ten years of days, one quote", "a year, 246 quotes"],
+)
+def test_a_market_is_two_handles_in_and_one_number_out_whatever_the_sizes(
+    contracts: int, days_apart: int, call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    history, quotes = market_sources(contracts, days_apart)
+    PATH["_CreateMarket"](history, quotes)
+    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,  # each handle's text rule
+        "_resolve": 2,  # and its one lookup
+        "_CreateMarket": 1,
+        "market": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
+
+
+# Reading a market back is reading its calendar back, then the fifth column through the helper
+# the history's reader shares: the live rows found in one flatnonzero, their prompt rows gathered
+# and the quotes read through them, the fixings and the quotes written into their rows and the
+# word closed shared by every other; no arange, no searchsorted, nothing of the calendar made
+# again.
+def test_reading_a_market_back_rebuilds_nothing(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made = PATH["_CreateMarket"](*market_sources(13, 30))
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "market_table": 1,
+        "_priced_column": 1,
         "calendar_table": 1,  # the calendar's own table, as the calendar shows
         "MixedArray.table": 1,
         "_table_column": 3,
@@ -1145,7 +1239,9 @@ def test_reading_a_market_history_back_rebuilds_nothing(
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
         "numpy.array": 2,  # the calendar's: the schedule's codes as an array, its texts gathered
-        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "ndarray.ravel": 2,  # the calendar's texts in sheet order, and the live mask flattened
+        "numpy.asanyarray": 1,  # on the way to the live rows
+        "ndarray.nonzero": 1,  # the live rows
         "numpy.empty": 6,  # the calendar's two; the kinds, the slots, the pairs and their mask
         "numpy.asarray": 2,
         "numpy.datetime_data": 1,  # the unit of the date column

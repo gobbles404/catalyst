@@ -7,7 +7,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
 from functools import singledispatch
-from typing import Annotated
+from typing import Annotated, Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -26,6 +26,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.monthly_fixings import MonthlyFixings
@@ -90,36 +91,72 @@ def calendar_table(obj: Calendar) -> MixedArray:
     )
 
 
-@shown.register
-def market_history_table(obj: MarketHistory) -> MixedArray:
-    # The calendar's four columns as the calendar's own table shows them, nothing rebuilt, then
-    # fixing_price: the settle on each past business day, a number, and a word on every other
-    # day, closed where the calendar has the market shut and unfixed where it is open, the
-    # valuation day and the days after it. The words are display, not values, and a column
-    # holding numbers on some rows and words on others is not one the table builder takes, so
-    # the fifth column is written by kind: its kinds, its slots, and its words into the texts.
-    calendar = obj.calendar
-    base = calendar_table(calendar)
+def _priced_column(
+    base: MixedArray,
+    header: str,
+    words: NDArray[Any] | str,
+    *priced: tuple[NDArray[np.intp], NDArray[np.float64]],
+) -> MixedArray:
+    """A calendar's table widened by one column that holds a number on some days and a word on
+    the others: each priced pair names calendar rows and the prices on them, and the word, one
+    for every day or one per day, shows on the rest. The words are display, not values, and a
+    column holding numbers on some rows and words on others is not one the table builder takes,
+    so the column is written by kind: its kinds, its slots, and its words into the texts. The
+    calendar's own table stands as it is, nothing rebuilt.
+
+    The texts in sheet order: each heading row's four then this column's, and each day's code
+    then, on a day without a price, its word; the calendar's body texts are its codes alone, one
+    per day, in the same order.
+    """
     rows, width = base.shape
-    fixed = obj.fixed_rows + 2  # under the two heading rows
     kinds = np.empty((rows, width + 1), dtype=np.uint8)
     kinds[:, :width] = base.kinds
     kinds[:, width] = TEXT_CODE
-    kinds[fixed, width] = NUMBER_CODE
     slots = np.full((rows, width + 1), np.nan)
     slots[:, :width] = base.numeric_slots
-    slots[fixed, width] = obj.fixing_prices
-    # The texts in sheet order: each heading row's four then the fifth column's, and each day's
-    # code then, on a day without a price, its word, the two words shared by every row showing
-    # them. The calendar's body texts are its codes alone, one per day, in the same order.
     pairs = np.empty((rows - 2, 2), dtype=object)
     pairs[:, 0] = base.texts[2 * width :]
-    pairs[:, 1] = "closed"
-    pairs[calendar.is_business_day, 1] = "unfixed"
+    pairs[:, 1] = words
     worded = np.ones((rows - 2, 2), dtype=bool)
-    worded[obj.fixed_rows, 1] = False
-    headings = (*base.texts[:width], "fixing_price", *base.texts[width : 2 * width], "float64")
+    for on, prices in priced:  # the pairs, not the prices: one or two of them
+        kinds[on + 2, width] = NUMBER_CODE
+        slots[on + 2, width] = prices
+        worded[on, 1] = False
+    headings = (*base.texts[:width], header, *base.texts[width : 2 * width], "float64")
     return MixedArray(kinds, slots, (*headings, *pairs[worded]))
+
+
+@shown.register
+def market_history_table(obj: MarketHistory) -> MixedArray:
+    # The calendar's four columns, then fixing_price: the settle on each past business day, a
+    # number, and a word on every other day, closed where the calendar has the market shut and
+    # unfixed where it is open, the valuation day and the days after it.
+    calendar = obj.calendar
+    words = np.empty(calendar.dates.size, dtype=object)
+    words[:] = "closed"
+    words[calendar.is_business_day] = "unfixed"
+    return _priced_column(
+        calendar_table(calendar), "fixing_price", words, (obj.fixed_rows, obj.fixing_prices)
+    )
+
+
+@shown.register
+def market_table(obj: Market) -> MixedArray:
+    # The calendar's four columns, then price: the fixing on each past business day, the quote
+    # of the prompt contract on each business day from the valuation day on, and closed on every
+    # other day. The quotes are gathered for those live rows alone, since a past day's prompt
+    # may precede the first contract quoted and would index before the vector.
+    history = obj.market_history
+    calendar = history.calendar
+    live = np.flatnonzero(calendar.is_business_day & ~calendar.is_past)
+    quotes = obj.price_vector.prices[calendar.prompt[live] - obj.first_contract]
+    return _priced_column(
+        calendar_table(calendar),
+        "price",
+        "closed",
+        (history.fixed_rows, history.fixing_prices),
+        (live, quotes),
+    )
 
 
 @shown.register

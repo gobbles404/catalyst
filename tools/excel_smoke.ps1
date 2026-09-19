@@ -232,6 +232,25 @@ $formulas = [ordered]@{
     "=_CreatePriceVector(C1:C3)"   = "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number"
     "=_CreatePriceVector()"        = "#ERROR _CreatePriceVector: prices is missing, expected column of numbers"
     "=_CreatePriceVector(D1:D3)"   = "#N/A"
+    # The market: a creator over the history in CT7 and a vector of one quote, n26 being prompt
+    # on the valuation day and the last contract of that schedule, read back through
+    # util_ReadHandle, a fixing on a past business day, closed on a weekend, the quote on the
+    # valuation day and after; the four-price vector, one for every contract but the one
+    # required, and a history valued before its calendar begins, the library's words; the
+    # vector left out, the seam's.
+    "=LEFT(CW1,7)"                = "market:"
+    "=INDEX(util_ReadHandle(CW1),1,5)" = "price"
+    "=INDEX(util_ReadHandle(CW1),2,5)" = "float64"
+    "=INDEX(util_ReadHandle(CW1),3,5)" = "70.85"
+    "=INDEX(util_ReadHandle(CW1),6,5)" = "closed"
+    "=INDEX(util_ReadHandle(CW1),8,5)" = "71.4"
+    "=INDEX(util_ReadHandle(CW1),9,5)" = "74.25"
+    "=INDEX(util_ReadHandle(CW1),36,5)" = "74.25"
+    "=ROWS(util_ReadHandle(CW1))"      = "36"
+    "=COLUMNS(util_ReadHandle(CW1))"   = "5"
+    "=_CreateMarket(CT7,CV1)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected 1, one per contract from 'n26' through 'n26'"
+    "=_CreateMarket(CW5,CW2)" = "#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-26, expected a date from 2026-06-23 through 2026-07-21"
+    "=_CreateMarket(CT7)" = "#ERROR _CreateMarket: price_vector is missing, expected price vector handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -383,6 +402,15 @@ $cells = [ordered]@{
     "CU1" = "price"; "CU2" = "74.25"; "CU3" = "0"; "CU4" = "-0.5"; "CU5" = "74.25"
     "CU6" = '="74.25"'
     "CV1" = "=_CreatePriceVector(CU2:CU5)"
+    # The market: a vector of one quote and one creator cell over the history in CT7; then a
+    # schedule of the two contracts after m26, a calendar over them valued on 26-May, before it
+    # begins, and its history over the fixings in CT6, none of them required, for the market to
+    # refuse.
+    "CW2" = "=_CreatePriceVector(CU2)"
+    "CW1" = "=_CreateMarket(CT7,CW2)"
+    "CW3" = "=_CreateExpirySchedule(AE3:AE4,AF3:AF4)"
+    "CW4" = "=_CreateCalendar(CT3,CW3,AM1)"
+    "CW5" = "=_CreateMarketHistory(CW4,CT6)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
