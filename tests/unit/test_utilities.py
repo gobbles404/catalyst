@@ -5,9 +5,10 @@ from typing import cast
 
 import numpy as np
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
+from test_market import a_vector, any_history
 
 from goosedove.calendar.calendar import Calendar
 from goosedove.excel import bridge
@@ -27,6 +28,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.monthly_fixings import MonthlyFixings
@@ -236,6 +238,42 @@ def test_monthly_fixings_spill_publication_dates_as_serials_and_prices_exactly()
     ]
 
 
+# Serials for 19 and 20 May 2026: a market over a one-day calendar valued on its day, with a
+# fixing on the 19th, before it, and one quote, spills the calendar's four columns and price, the
+# quote a number on the open day; with the day a holiday, the same market shows closed, text, and
+# the one quote is still required.
+def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
+    schedule = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"]]),
+            Cells.from_rows([[46161.0], [46162.0]]),
+            MISSING,
+            MISSING,
+        ],
+    )
+    headers = Cells.from_rows([["date", "settle"]])
+    valuation = bridge.call("_CreateValuationDate", [46162.0, 0.5])
+    quote = bridge.call("_CreatePriceVector", [72.10])
+    for holiday, flag, cell, kind in (
+        (46167.0, 1.0, 72.10, NUMBER_CODE),
+        (46162.0, 0.0, "closed", TEXT_CODE),
+    ):
+        holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[holiday]])])
+        calendar = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
+        fixings = bridge.call(
+            "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
+        )
+        history = bridge.call("_CreateMarketHistory", [calendar, fixings])
+        kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
+        assert rows((kinds, slots, joined)) == [
+            ["date", "prompt_contract", "is_business_day", "is_past", "price"],
+            ["datetime64[D]", "str", "bool", "bool", "float64"],
+            [46162.0, "n26", flag, 0.0, cell],
+        ]
+        assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, kind]
+
+
 # Four prices selected without a header, a zero and a negative among them and the first
 # repeated: the spill puts the header and the type over them, each price a number in its place.
 def test_a_price_vector_spills_one_column_of_prices_under_two_heading_rows() -> None:
@@ -387,4 +425,42 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         MonthlyFixings,
         MarketHistory,
         PriceVector,
+        Market,
     } <= set(shown.registry)
+
+
+# --- the market's daily view, for any calendar -------------------------------------
+
+
+# For any history of two to eight contracts, any holidays and any valuation day inside its
+# calendar, with the quotes it requires: every row of the calendar's own spill stands, and the
+# fifth cell is the day's fixing where the day is past and open, its prompt contract's quote
+# where it is open and not past, and the word closed where the market is shut; no cell is
+# unfixed, and no past day reads a quote.
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
+    data: st.DataObject,
+) -> None:
+    history = any_history(data)
+    calendar = history.calendar
+    first = int(calendar.prompt[calendar.dates == calendar.valuation_date.as_of][0])
+    quotes = a_vector(*(100.0 + i for i in range(len(calendar.expiry_schedule.codes) - first)))
+    made = market(history, quotes)
+    table = shown(made)
+    body = rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))[2:]
+    days = shown(calendar)
+    assert [row[:4] for row in body] == rows(
+        (days.kinds, days.numeric_slots, "\0".join(days.texts))
+    )[2:]
+    fixed = dict(zip(history.fixed_rows.tolist(), history.fixing_prices.tolist(), strict=True))
+    for row, (shown_row, open_, past, prompt) in enumerate(
+        zip(body, calendar.is_business_day, calendar.is_past, calendar.prompt, strict=True)
+    ):
+        if not open_:
+            assert shown_row[4] == "closed"
+        elif past:
+            assert shown_row[4] == fixed[row]
+        else:
+            assert shown_row[4] == float(quotes.prices[int(prompt) - first])
+    assert "unfixed" not in table.texts

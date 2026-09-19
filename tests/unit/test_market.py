@@ -1,287 +1,312 @@
-"""The market history through the seam: two handles in, one out, and the table its handle spills,
-the calendar's four columns and a fixing price on each day, a number or a word."""
+"""The market: two rules on the history and the price vector, one number found, and nothing
+built; the daily price it implies is read through util_ReadHandle, tested with the utilities."""
 
-import re
-from typing import cast
+import dataclasses
 
+import numpy as np
 import pytest
-from test_utilities import read, rows
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from numpy.typing import NDArray
 
-from goosedove.excel import bridge
-from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells
-
-# The page's sample as the sheet sends it: serials for 18 to 22 May, 25 and 26 May, 22 June and
-# 21 July 2026, and 1 January.
-MAY_18, MAY_19, MAY_20, MAY_21, MAY_22 = 46160.0, 46161.0, 46162.0, 46163.0, 46164.0
-MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 46023.0
-HANDLE = re.compile(r"market_history:[0-9a-f]{6}:([0-9]{6})")
-HEADERS = ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"]
-TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
-FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
-SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
+from goosedove.calendar.calendar import calendar
+from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.market.market import Market, market
+from goosedove.market.market_history import MarketHistory, market_history
+from goosedove.market_data.daily_fixings import daily_fixings
+from goosedove.market_data.price_vector import PriceVector, price_vector
 
 
-def column(*cells: object) -> Cells:
-    return Cells.from_rows([[cell] for cell in cells])
+def dates(*texts: str) -> NDArray[np.datetime64]:
+    return np.array(texts, dtype="datetime64[D]")
 
 
-def a_valuation(serial: float = MAY_26, fraction: float = 0.5) -> str:
-    text = bridge.call("_CreateValuationDate", [serial, fraction])
-    assert isinstance(text, str) and text.startswith("valuation_date:"), text
-    return text
+def day(text: str) -> np.datetime64:
+    return np.datetime64(text, "D")
 
 
-def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
-    text = bridge.call(
-        "_CreateExpirySchedule", [column(*codes), column(*expiries), MISSING, MISSING]
-    )
-    assert isinstance(text, str) and text.startswith("expiry_schedule:"), text
-    return text
+def a_schedule(*contracts: tuple[str, str]) -> ExpirySchedule:
+    codes = tuple(code for code, _ in contracts)
+    return expiry_schedule(codes, dates(*(expiry for _, expiry in contracts)), None, None)
 
 
-def a_holiday_calendar(*serials: float) -> str:
-    text = bridge.call("_CreateHolidayCalendar", [column(*serials)])
-    assert isinstance(text, str) and text.startswith("holiday_calendar:"), text
-    return text
+def a_vector(*prices: float) -> PriceVector:
+    return price_vector(np.array(prices, dtype=np.float64))
 
 
-SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
+# The page's sample: three contracts of one index, the valuation date 26 May 2026, the Monday
+# before it a holiday, the fixings on the three past business days, and two quotes.
+SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "2026-07-21"))
+CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
+ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
 
-def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str:
-    args = [
-        valuation or a_valuation(),
-        a_schedule(*SCHEDULE),
-        holidays or a_holiday_calendar(MAY_25),
-    ]
-    text = bridge.call("_CreateCalendar", args)
-    assert isinstance(text, str) and text.startswith("calendar:"), text
-    return text
+def a_history(
+    as_of: str = "2026-05-26",
+    schedule: ExpirySchedule = SCHEDULE,
+    holidays: HolidayCalendar = CLOSED_MAY_25,
+    fraction: float = 0.5,
+) -> MarketHistory:
+    """The history of that calendar, with a fixing on every business day from ten days before
+    the calendar's first day to the day before the valuation date."""
+    made = calendar(valuation_date(day(as_of), fraction), schedule, holidays)
+    first = made.dates[0] - np.timedelta64(10, "D")
+    days = np.arange(first, day(as_of), dtype="datetime64[D]")
+    days = days[np.is_busday(days, holidays=holidays.holiday)]
+    fixings = daily_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
+    return market_history(made, fixings)
 
 
-def the_fixings(body: list[list[float]] = SAMPLE, holidays: str | None = None) -> str:
-    args = [FIXINGS_HEADERS, Cells.from_rows(body), holidays or a_holiday_calendar(MAY_25)]
-    text = bridge.call("_CreateDailyFixings", args)
-    assert isinstance(text, str) and text.startswith("daily_fixings:"), text
-    return text
+HISTORY = a_history()
+QUOTES = a_vector(72.10, 72.80)
 
 
-def a_history(calendar: str | None = None, fixings: str | None = None) -> str:
-    text = bridge.call("_CreateMarketHistory", [calendar or a_calendar(), fixings or the_fixings()])
-    assert isinstance(text, str) and HANDLE.fullmatch(text), text
-    return text
+# --- the sample and the mapping ------------------------------------------------
 
 
-def number(text: str) -> int:
-    match = HANDLE.fullmatch(text)
-    assert match, text
-    return int(match.group(1))
-
-
-def test_a_history_is_created_from_two_handles_and_read_back_day_by_day() -> None:
-    shown = rows(read(a_history()))
-    assert len(shown) == 65
-    assert shown[0] == HEADERS
-    assert shown[1] == TYPES
-    assert shown[2] == [MAY_20, "n26", 1.0, 1.0, 70.85]
-    assert shown[3] == [MAY_21, "n26", 1.0, 1.0, 71.10]
-    assert shown[4] == [MAY_22, "n26", 1.0, 1.0, 71.25]
-    assert shown[5] == [MAY_22 + 1, "n26", 0.0, 1.0, "closed"]
-    assert shown[6] == [MAY_22 + 2, "n26", 0.0, 1.0, "closed"]
-    assert shown[7] == [MAY_25, "n26", 0.0, 1.0, "closed"]
-    assert shown[8] == [MAY_26, "n26", 1.0, 0.0, "unfixed"]
-    assert shown[9] == [MAY_26 + 1, "n26", 1.0, 0.0, "unfixed"]
-    assert shown[36] == [JUN_22 + 1, "q26", 1.0, 0.0, "unfixed"]
-    assert shown[64] == [JUL_21, "q26", 1.0, 0.0, "unfixed"]
-    assert [row[0] for row in shown[2:]] == [MAY_20 + i for i in range(63)]
-
-
-# Every row of the calendar's own spill stands in the history's, and the fifth cell follows the
-# two flags: closed where the market is shut, unfixed where it is open and the day not past, and
-# the settle, a number, where it is open and past.
-def test_every_calendar_row_stands_and_the_fifth_cell_follows_the_flags() -> None:
-    calendar = a_calendar()
-    days = rows(read(calendar))
-    shown = rows(read(a_history(calendar=calendar)))
-    assert [row[:4] for row in shown] == days
-    fifth = [row[4] for row in shown[2:]]
-    expected: list[object] = []
-    for _, _, open_, past in days[2:]:
-        expected.append("closed" if not open_ else "unfixed" if not past else "a number")
-    assert [word if word in ("closed", "unfixed") else "a number" for word in fifth] == expected
-    assert fifth.count("closed") == 19 and fifth.count("unfixed") == 41
-
-
-# The sheet is handed a number on each fixed day and text on every other, the calendar's own
-# kinds before it: the kinds say so, not the numbers behind them.
-def test_the_fixing_price_reaches_the_sheet_as_a_number_where_fixed_and_text_elsewhere() -> None:
-    kinds, _, _ = read(a_history())
-    assert (kinds[:2] == TEXT_CODE).all()
-    assert (kinds[2:, 0] == NUMBER_CODE).all()
-    assert (kinds[2:, 1] == TEXT_CODE).all()
-    assert (kinds[2:, 2:4] == BOOLEAN_CODE).all()
-    assert kinds[2:5, 4].tolist() == [NUMBER_CODE] * 3
-    assert (kinds[5:, 4] == TEXT_CODE).all()
-
-
-def test_a_settle_of_zero_is_a_number_and_a_day_without_one_is_a_word() -> None:
-    fixings = the_fixings([[MAY_20, 0.0], [MAY_21, -37.63], [MAY_22, 71.25]])
-    spill = read(a_history(fixings=fixings))
-    kinds, _, _ = spill
-    shown = rows(spill)
-    assert shown[2][4] == 0.0 and kinds[2, 4] == NUMBER_CODE
-    assert shown[3][4] == -37.63 and kinds[3, 4] == NUMBER_CODE
-    assert shown[5][4] == "closed" and kinds[5, 4] == TEXT_CODE
-    assert shown[8][4] == "unfixed" and kinds[8, 4] == TEXT_CODE
-
-
-# Valued on 20 May, the calendar's first day, no day is past: the fixings, on the Monday and
-# Tuesday before, are before the valuation date and unused, and every row shows a word.
-def test_a_calendar_with_no_past_business_day_is_a_history_without_a_price() -> None:
-    fixings = the_fixings([[MAY_18, 70.0], [MAY_19, 70.5]])
-    made = a_history(calendar=a_calendar(valuation=a_valuation(MAY_20)), fixings=fixings)
-    shown = rows(read(made))
-    assert len(shown) == 65
-    assert shown[2] == [MAY_20, "n26", 1.0, 0.0, "unfixed"]
-    assert {row[4] for row in shown[2:]} == {"closed", "unfixed"}
-
-
-THE_CALENDAR, THE_FIXINGS = object(), object()
+def test_the_sample_quotes_the_prompt_contract_and_the_one_after_it() -> None:
+    made = market(HISTORY, QUOTES)
+    assert made.market_history is HISTORY
+    assert made.price_vector is QUOTES
+    assert made.first_contract == 1
+    assert SCHEDULE.codes[made.first_contract] == "n26"
 
 
 @pytest.mark.parametrize(
-    ("args", "text"),
+    ("as_of", "first_contract", "quotes"),
+    [
+        ("2026-05-20", 1, 2),
+        ("2026-05-23", 1, 2),
+        ("2026-05-25", 1, 2),
+        ("2026-06-22", 1, 2),
+        ("2026-06-23", 2, 1),
+        ("2026-07-21", 2, 1),
+    ],
+    ids=[
+        "the calendar's first day",
+        "a Saturday: nothing moves to the Monday",
+        "the holiday: nothing moves to the Tuesday",
+        "n26's expiry day: n26 is still quoted",
+        "the day after: q26 first",
+        "the calendar's last day: one quote",
+    ],
+)
+def test_the_valuation_days_prompt_is_the_first_contract_quoted(
+    as_of: str, first_contract: int, quotes: int
+) -> None:
+    history = a_history(as_of)
+    made = market(history, a_vector(*(72.0 + i for i in range(quotes))))
+    assert made.first_contract == first_contract
+    assert history.calendar.prompt[history.calendar.dates == day(as_of)].tolist() == [
+        first_contract
+    ]
+    assert len(SCHEDULE.codes) - first_contract == quotes
+
+
+def test_the_fraction_of_the_valuation_day_changes_nothing() -> None:
+    for fraction in (0.0, 0.5, 1.0):
+        made = market(a_history("2026-06-22", fraction=fraction), QUOTES)
+        assert made.first_contract == 1
+
+
+# Valued on the calendar's last day, a holiday: the last contract has no open day left, and its
+# quote is required all the same.
+def test_a_contract_prompt_on_closed_days_alone_still_takes_a_quote() -> None:
+    closed = holiday_calendar(dates("2026-05-25", "2026-07-21"))
+    history = a_history("2026-07-21", holidays=closed)
+    assert not history.calendar.is_business_day[-1]
+    made = market(history, a_vector(72.80))
+    assert made.first_contract == 2
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector())
+    assert str(failure.value) == (
+        "price_vector has 0 prices, expected 1, one per contract from 'q26' through 'q26'"
+    )
+
+
+# A contract whose days are a weekend alone, b, valued on its Saturday: it is the first quoted,
+# and c after it, two quotes for a calendar with no open day before the valuation date.
+def test_a_contract_whose_days_are_all_closed_keeps_its_place_in_the_vector() -> None:
+    schedule = a_schedule(("a", "2026-05-22"), ("b", "2026-05-24"), ("c", "2026-06-22"))
+    history = a_history("2026-05-23", schedule=schedule, holidays=ELSEWHERE)
+    made = market(history, a_vector(1.0, 2.0))
+    assert made.first_contract == 1
+    assert history.calendar.dates[0] == day("2026-05-23")
+    assert not history.calendar.is_business_day[:2].any()
+    sunday = market(
+        a_history("2026-05-24", schedule=schedule, holidays=ELSEWHERE), a_vector(1.0, 2.0)
+    )
+    assert sunday.first_contract == 1
+
+
+def test_codes_are_labels_and_the_mapping_follows_the_schedules_order() -> None:
+    schedule = a_schedule(
+        ("zz", "2026-05-19"), ("1", "2026-06-05"), ("x y", "2026-06-22"), ("Q", "2026-07-21")
+    )
+    history = a_history("2026-06-10", schedule=schedule)
+    made = market(history, a_vector(1.0, 2.0))
+    assert made.first_contract == 2
+    assert schedule.codes[made.first_contract :] == ("x y", "Q")
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(1.0))
+    assert str(failure.value) == (
+        "price_vector has 1 price, expected 2, one per contract from 'x y' through 'Q'"
+    )
+
+
+# Five contracts, valued after the fourth expiry: four past contracts, one quote.
+def test_many_past_contracts_and_one_quote() -> None:
+    schedule = a_schedule(
+        ("a", "2026-05-19"),
+        ("b", "2026-05-26"),
+        ("c", "2026-06-02"),
+        ("d", "2026-06-09"),
+        ("e", "2026-06-22"),
+    )
+    history = a_history("2026-06-10", schedule=schedule)
+    made = market(history, a_vector(72.80))
+    assert made.first_contract == 4
+    past_prompts = history.calendar.prompt[history.calendar.is_past]
+    assert (past_prompts - made.first_contract).min() < 0  # what the reader must not index
+
+
+# --- what is rejected, in the order the rules run -----------------------------
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "message"),
     [
         (
-            [THE_CALENDAR, ([*SAMPLE, [MAY_26, 71.5]], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or "
-            "after valuation date 2026-05-26, expected dates before the valuation date",
+            "2026-05-19",
+            (72.10, 72.80),
+            "market_history valuation date is 2026-05-19, "
+            "expected a date from 2026-05-20 through 2026-07-21",
         ),
         (
-            [THE_CALENDAR, ([*SAMPLE, [MAY_25, 71.4]], JAN_1)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a "
-            "non-business day in calendar, expected no fixing",
+            "2026-07-22",
+            (72.80,),
+            "market_history valuation date is 2026-07-22, "
+            "expected a date from 2026-05-20 through 2026-07-21",
         ),
         (
-            [THE_CALENDAR, (SAMPLE[:2], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
-            "2026-05-22, expected a fixing for every past business day in calendar",
+            "2025-01-01",
+            (),
+            "market_history valuation date is 2025-01-01, "
+            "expected a date from 2026-05-20 through 2026-07-21",
         ),
         (
-            [JAN_1, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
-            "2026-05-25, expected a fixing for every past business day in calendar",
+            "2026-05-26",
+            (72.10,),
+            "price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'",
         ),
         (
-            [MISSING, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: calendar is missing, expected calendar handle",
+            "2026-05-26",
+            (72.10, 72.80, 73.0),
+            "price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'",
         ),
         (
-            [None, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: calendar is blank, expected calendar handle",
-        ),
-        (
-            [MAY_26, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: calendar is number 46168.0, expected calendar handle",
-        ),
-        (
-            ["x", THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: calendar is text 'x' naming no live object, "
-            "expected calendar handle",
-        ),
-        (
-            [THE_CALENDAR, MISSING],
-            "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle",
-        ),
-        (
-            [THE_CALENDAR, None],
-            "#ERROR _CreateMarketHistory: daily_fixings is blank, expected daily fixings handle",
-        ),
-        (
-            [THE_CALENDAR, 70.85],
-            "#ERROR _CreateMarketHistory: daily_fixings is number 70.85, "
-            "expected daily fixings handle",
-        ),
-        (
-            [THE_CALENDAR, "daily_fixings:000000:000001"],
-            "#ERROR _CreateMarketHistory: daily_fixings is text 'daily_fixings:000000:000001' "
-            "naming no live object, expected daily fixings handle",
-        ),
-        (
-            [THE_CALENDAR, "#ERROR _CreateDailyFixings: table is blank, expected table"],
-            "#ERROR _CreateMarketHistory: daily_fixings is the creator's failure, expected daily "
-            "fixings handle: #ERROR _CreateDailyFixings: table is blank, expected table",
+            "2026-06-23",
+            (72.10, 72.80),
+            "price_vector has 2 prices, expected 1, one per contract from 'q26' through 'q26'",
         ),
     ],
     ids=[
-        "a fixing on the valuation date",
-        "a fixing on the holiday the calendar closes",
-        "the last past business day without a fixing",
-        "a calendar open on the holiday the fixings skip",
-        "the calendar left out",
-        "a blank cell where the calendar should be",
-        "a number where the calendar should be",
-        "text naming no live calendar",
-        "the fixings left out",
-        "a blank cell where the fixings should be",
-        "a number where the fixings should be",
-        "text naming no live fixings",
-        "the fixings creator's failure relayed",
+        "valued the day before the calendar, the boundary expiry",
+        "valued the day after the calendar, with the one quote the last day would take",
+        "valued long before, with no quote at all",
+        "one quote too few",
+        "one quote too many",
+        "two quotes where the last contract alone remains",
     ],
 )
-def test_a_history_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
-    calendar, fixings = args
-    if calendar is THE_CALENDAR:
-        calendar = a_calendar()
-    elif calendar == JAN_1:
-        calendar = a_calendar(holidays=a_holiday_calendar(JAN_1))
-    if fixings is THE_FIXINGS:
-        fixings = the_fixings()
-    elif isinstance(fixings, tuple):
-        body, holiday = cast(tuple[list[list[float]], float], fixings)
-        fixings = the_fixings(body, a_holiday_calendar(holiday))
-    assert bridge.call("_CreateMarketHistory", [calendar, fixings]) == text
+def test_a_market_that_cannot_be_made_says_why(
+    as_of: str, quotes: tuple[float, ...], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        market(a_history(as_of), a_vector(*quotes))
+    assert str(failure.value) == message
 
 
-def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
-    calendar, fixings = a_calendar(), the_fixings()
-    made = a_history(calendar, fixings)
-    assert bridge.call("_CreateMarketHistory", [fixings, fixings]) == (
-        f"#ERROR _CreateMarketHistory: calendar is daily fixings handle {fixings!r}, "
-        "expected calendar handle"
+# --- the general rule ---------------------------------------------------------
+
+
+def any_history(data: st.DataObject) -> MarketHistory:
+    """A history of two to eight contracts up to 45 days apart, any holidays, valued on any day
+    of its calendar, with a fixing on every past business day."""
+    count = data.draw(st.integers(2, 8))
+    gaps = data.draw(st.lists(st.integers(1, 45), min_size=count, max_size=count))
+    offsets = np.cumsum(gaps, dtype=np.int64)
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
     )
-    assert bridge.call("_CreateMarketHistory", [calendar, calendar]) == (
-        f"#ERROR _CreateMarketHistory: daily_fixings is calendar handle {calendar!r}, "
-        "expected daily fixings handle"
+    expiries = start + offsets.astype("timedelta64[D]")
+    schedule = expiry_schedule(tuple(f"c{i}" for i in range(count)), expiries, None, None)
+    listed = expiries[0] + np.array(
+        data.draw(st.lists(st.integers(-20, 400), max_size=30)), dtype="timedelta64[D]"
     )
-    assert bridge.call("_CreateMarketHistory", [made, fixings]) == (
-        f"#ERROR _CreateMarketHistory: calendar is market history handle {made!r}, "
-        "expected calendar handle"
+    holidays = holiday_calendar(listed)
+    span = int(offsets[-1] - offsets[0])
+    as_of = expiries[0] + np.timedelta64(data.draw(st.integers(1, span)), "D")
+    made = calendar(
+        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))), schedule, holidays
     )
+    days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
+    days = days[np.is_busday(days, holidays=listed)]
+    fixings = daily_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), listed)
+    return market_history(made, fixings)
 
 
-def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
-    calendar, fixings = a_calendar(), the_fixings()
-    short = the_fixings(SAMPLE[:2])
-    before = number(a_history(calendar, fixings))
-    assert bridge.call("_CreateMarketHistory", [calendar, short]) == (
-        "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-22, "
-        "expected a fixing for every past business day in calendar"
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_live_business_day_has_its_prompts_quote_and_no_past_day_reads_one(
+    data: st.DataObject,
+) -> None:
+    history = any_history(data)
+    made = history.calendar
+    as_of = made.valuation_date.as_of
+    first = int(made.prompt[made.dates == as_of][0])
+    quotes = a_vector(*(100.0 + i for i in range(len(made.expiry_schedule.codes) - first)))
+    view = market(history, quotes)
+    assert view.first_contract == first
+    assert view.market_history is history and view.price_vector is quotes
+    live = made.is_business_day & ~made.is_past
+    places = made.prompt[live] - first
+    assert places.size == 0 or (places.min() >= 0 and places.max() < quotes.prices.size)
+    assert np.all(made.prompt[~made.is_past] >= first)
+    assert set(np.flatnonzero(made.is_business_day & made.is_past).tolist()) == set(
+        history.fixed_rows.tolist()
     )
-    assert number(a_history(calendar, fixings)) == before + 1
+    with pytest.raises(ValueError):
+        market(history, a_vector(*(100.0 + i for i in range(quotes.prices.size + 1))))
 
 
-def test_two_histories_from_one_calendar_each_read_their_own_prices() -> None:
-    calendar = a_calendar()
-    first = a_history(calendar, the_fixings())
-    second = a_history(calendar, the_fixings([[MAY_20, 1.0], [MAY_21, 2.0], [MAY_22, 3.0]]))
-    assert [row[4] for row in rows(read(first))[2:5]] == [70.85, 71.10, 71.25]
-    assert [row[4] for row in rows(read(second))[2:5]] == [1.0, 2.0, 3.0]
-    assert [row[:4] for row in rows(read(first))] == [row[:4] for row in rows(read(second))]
+# --- ownership ----------------------------------------------------------------
 
 
-def test_a_dead_history_handle_cannot_be_read() -> None:
-    assert bridge.call("util_ReadHandle", ["market_history:000000:000001"]) == (
-        "#ERROR util_ReadHandle: handle is text 'market_history:000000:000001' naming no live "
-        "object, expected a handle"
-    )
+def test_the_market_keeps_both_objects_themselves_and_makes_no_array() -> None:
+    made = market(HISTORY, QUOTES)
+    assert made.market_history is HISTORY
+    assert made.price_vector is QUOTES
+    assert made.market_history.calendar is HISTORY.calendar
+    assert made.price_vector.prices is QUOTES.prices
+    assert Market.__slots__ == ("market_history", "price_vector", "first_contract")
+    field = "first_contract"
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        setattr(made, field, 0)
+
+
+def test_making_a_market_changes_neither_input_and_two_markets_share_the_history() -> None:
+    rows_before, prices_before = HISTORY.fixed_rows.copy(), HISTORY.fixing_prices.copy()
+    quotes_before = QUOTES.prices.copy()
+    first = market(HISTORY, QUOTES)
+    other = a_vector(1.0, 2.0)
+    second = market(HISTORY, other)
+    again = market(HISTORY, QUOTES)
+    assert np.array_equal(HISTORY.fixed_rows, rows_before)
+    assert np.array_equal(HISTORY.fixing_prices, prices_before)
+    assert np.array_equal(QUOTES.prices, quotes_before)
+    assert first.market_history is second.market_history is HISTORY
+    assert first.price_vector is QUOTES and second.price_vector is other
+    assert again is not first and again.first_contract == first.first_contract == 1

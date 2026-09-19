@@ -11,6 +11,7 @@ import tracemalloc
 from collections.abc import Callable
 
 import numpy as np
+import pytest
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
@@ -357,10 +358,11 @@ def history_sources(contracts: int) -> tuple[object, object]:
 # looks, a byte or so per fixing and per day for the days covered and the flags combined:
 # measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 16,641 at 3,600 days and
 # 148,641 at 36,600, 4 bytes per day. Reading it back pays the calendar's table and then the
-# fifth column, the wider kinds and slots, the codes paired with the words, and the mixed
-# road's masks over five columns: measured 51,267 at 360 days, about 28 bytes per cell;
-# 629,741 at 3,600 days and 6,528,344 at 36,600, 35 bytes per cell, where the road splits the
-# joined text per text.
+# fifth column, the words made once, the wider kinds and slots, the codes paired with the
+# words, and the mixed road's masks over five columns: measured 53,627 at 360 days on
+# 2026-09-19 through the helper the market's reader shares, from 51,267 before it, about 30
+# bytes per cell; 629,741 at 3,600 days and 6,528,344 at 36,600, 35 bytes per cell, where the
+# road splits the joined text per text.
 def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
     made, fixings = history_sources(13)
@@ -420,3 +422,47 @@ def test_a_price_vector_keeps_one_copy_of_its_column_and_nothing_per_price_beyon
         assert created <= 8 * prices + 2 * SLACK
         assert read <= 21 * (prices + 2) + SLACK
     assert least_peak(lambda: ENTRY["_CreatePriceVector"](74.25)) <= SLACK
+
+
+def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
+    """The two handles a market takes: the history of a calendar of that many contracts that
+    many days apart from 19 May 2026, valued on 11 September 2026 with a fixing on every
+    business day before it under a hundred Thursdays, and a vector with one quote per contract
+    from the valuation day's prompt through the last."""
+    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
+    futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
+    rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
+    fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    history = ENTRY["_CreateMarketHistory"](made, fixings)
+    first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
+    quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
+    return history, ENTRY["_CreatePriceVector"](quotes)
+
+
+# A market keeps its record, two references and one number, and makes no array: measured 984
+# bytes on 2026-09-19 at a year of days with nine quotes, ten years with one and a year with
+# 246, the same to the byte, which twice the slack covers.
+@pytest.mark.parametrize(
+    ("contracts", "days_apart"),
+    [(13, 30), (2, 3600), (361, 1)],
+    ids=["a year of days, nine quotes", "ten years of days, one quote", "a year, 246 quotes"],
+)
+def test_a_market_keeps_one_small_record_whatever_the_sizes(
+    contracts: int, days_apart: int
+) -> None:
+    history, quotes = market_sources(contracts, days_apart)
+    assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
+
+
+# Reading a market back pays the calendar's table and then the fifth column through the
+# history's helper, with the live rows, their prompts and their quotes on top: measured 50,931
+# bytes at 360 days on 2026-09-19, about 28 bytes per cell, and 501,307 at 3,600.
+def test_reading_a_market_back_pays_per_cell() -> None:
+    days = 360
+    made = ENTRY["_CreateMarket"](*market_sources(13, 30))
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 30 * 5 * days + 2 * SLACK
