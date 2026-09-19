@@ -27,7 +27,7 @@ def _CreateMarketHistory(
 
 Two handles, both required, neither with a default: the index's calendar and its daily fixings, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. There is no valuation date to give: the calendar carries its own, and its past flag says which days have fixed. The function receives the two objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `calendar is daily fixings handle 'daily_fixings:3f9a1c:000015', expected calendar handle`, before the function runs. The seam resolves the two handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the history the seam keeps, declared `Handle[MarketHistory]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the history: the calendar itself, and the row and the price of each past business day.
 
-`=util_ReadHandle(D9)` on the history above shows the calendar's four columns, every row the calendar has in its order, and a fifth, `fixing_price`; among its rows:
+`=util_ReadHandle(C9)` on the history above shows the calendar's four columns, every row the calendar has in its order, and a fifth, `fixing_price`; among its rows:
 
 | date | prompt_contract | is_business_day | is_past | fixing_price |
 |---|---|---|---|---|
