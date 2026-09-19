@@ -58,7 +58,6 @@ What each kind shows:
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_specifications` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `float64`, `float64` | one per contract |
-| `futures_curve` | `future_code`, `price` | `str`, `float64` | one per contract |
 | `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `monthly_fixings` | `publication_date`, `price` | `datetime64[D]`, `float64` | one per fixing |
 | `calendar` | `date`, `prompt_contract`, `is_business_day`, `is_past` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's |
@@ -98,7 +97,6 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | a three-day calendar: one column of dates under its two heading rows | example |
 | index conventions: one row of five texts under its two heading rows | example |
 | contract specifications: one row per contract, the name as text and the lot size and fees as numbers, under its two heading rows | example |
-| a futures curve: two columns, the code as text and the price exactly, one row per contract under its two heading rows | example |
 | daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | monthly fixings: two columns, publication dates as serials and prices exactly, one row per fixing under its two heading rows | example |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |

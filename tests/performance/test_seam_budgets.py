@@ -926,48 +926,7 @@ def test_cells_from_buffers_copies_each_buffer_once(
     }
 
 
-# --- the first market data: two columns in, one publication out ----------------------------
-
-
-def curve_columns(contracts: int) -> tuple[Cells, Cells]:
-    """Codes and prices for that many contracts, as the sheet sends them."""
-    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
-    prices = Cells.from_rows([[70.0 + i / 100] for i in range(contracts)])
-    return codes, prices
-
-
-# Ten years of monthly contracts: the text column handed over as it is, after one pass over the
-# tuple for an empty text, and the number column accepted on the host's summary alone, no look at
-# the kinds of either, the builder's one copy and one publication: fifteen calls across twelve
-# functions, the shape and kind rules once per column. What a welded table of the same two
-# columns would add is in test_a_table_in_itemized: the header row, one look per column and the
-# gathers.
-def test_a_futures_curve_is_two_columns_in_and_one_publication_out(
-    call_profile: CallProfile, numpy_calls: CallProfile
-) -> None:
-    codes, prices = curve_columns(120)
-    PATH["_CreateFuturesCurve"](codes, prices)
-    assert call_profile(lambda: PATH["_CreateFuturesCurve"](codes, prices)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text_column": 1,
-        "_column": 1,
-        "_one_column": 2,
-        "_shape": 2,
-        "_texts": 1,
-        "_numbers": 1,
-        "_CreateFuturesCurve": 1,
-        "futures_curve": 1,
-        "_publish": 1,
-    }
-    assert numpy_calls(lambda: PATH["_CreateFuturesCurve"](codes, prices)) == {
-        "numpy.array": 1,  # the one copy the curve keeps
-        "ndarray.setflags": 1,  # frozen
-    }
-
-
-# --- the second market data: a table and a calendar's handle in, one publication out --------
+# --- the daily fixings: a table and a calendar's handle in, one publication out ---------------
 
 
 FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
@@ -1110,7 +1069,7 @@ def test_reading_a_calendar_back_rebuilds_nothing(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
-# --- the third market data: two columns and a schedule's handle in, the dates kept ----------
+# --- the monthly fixings: two columns and a schedule's handle in, the dates kept ------------
 
 
 def published_columns(count: int) -> tuple[Cells, Cells]:

@@ -21,7 +21,6 @@ from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market_data.daily_fixings import DailyFixings
-from goosedove.market_data.futures_curve import FuturesCurve
 from goosedove.market_data.monthly_fixings import MonthlyFixings
 
 
@@ -97,11 +96,6 @@ def monthly_fixings_table(obj: MonthlyFixings) -> MixedArray:
         obj.publication_dates,
         obj.prices,
     )
-
-
-@shown.register
-def futures_curve_table(obj: FuturesCurve) -> MixedArray:
-    return MixedArray.table([("future_code", "price"), ("str", "float64")], obj.codes, obj.prices)
 
 
 @shown.register

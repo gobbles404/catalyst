@@ -165,22 +165,6 @@ def test_the_specifications_creator_explains_itself() -> None:
     ]
 
 
-def test_the_futures_curve_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateFuturesCurve"]
-    assert not hidden
-    assert description == (
-        "Creates a futures curve from the contract codes of one index and their prices, and "
-        "shows its handle, the text other formulas take as the curve."
-    )
-    assert arguments == [
-        (
-            "future_code",
-            "The column of contract codes, such as A2:A7 holding M26 to X26, one per contract.",
-        ),
-        ("price", "The column of prices beside the codes, such as B2:B7, one per code."),
-    ]
-
-
 def test_the_daily_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateDailyFixings"]
     assert not hidden
