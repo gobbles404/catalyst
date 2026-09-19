@@ -136,18 +136,6 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
     "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
     "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
-    # The futures curve: a creator over a column of codes and a column of prices, read back through
-    # util_ReadHandle, a price column one row short, a blank among the prices, and the price
-    # column left out.
-    "=LEFT(BG1,14)"               = "futures_curve:"
-    "=INDEX(util_ReadHandle(BG1),1,2)" = "price"
-    "=INDEX(util_ReadHandle(BG1),2,2)" = "float64"
-    "=INDEX(util_ReadHandle(BG1),3,1)" = "M26"
-    "=INDEX(util_ReadHandle(BG1),8,2)" = "70.4"
-    "=ROWS(util_ReadHandle(BG1))"      = "8"
-    "=_CreateFuturesCurve(BD2:BD7,BE2:BE6)" = "#ERROR _CreateFuturesCurve: ValueError: price has 5 prices, expected 6, one per future_code"
-    "=_CreateFuturesCurve(BD2:BD7,BF2:BF7)" = "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number"
-    "=_CreateFuturesCurve(BD2:BD7)" = "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers"
     # The daily fixings: a creator over a header row, a welded body and the calendar in AM1, read
     # back through util_ReadHandle; the days newest first, a business day without a fixing, a
     # Saturday and a listed holiday, the library's words; the headers where the body should be, a
@@ -180,7 +168,7 @@ $formulas = [ordered]@{
     "=_CreateMonthlyFixings(BS2:BS3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-05-20, expected a date after row 1's 2026-06-23"
     "=_CreateMonthlyFixings(BT2:BT3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-07-22, expected 2026-06-23, the schedule's publication after row 1's 2026-05-20"
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI1)" = "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract"
-    "=_CreateMonthlyFixings(BO2:BO5,BD2:BD5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'M26', expected number"
+    "=_CreateMonthlyFixings(BO2:BO5,AE2:AE5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'm26', expected number"
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle"
     # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
     # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
@@ -289,15 +277,6 @@ $cells = [ordered]@{
     # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"
-    # A futures curve: six contract codes and a price beside each, a copy of the price column with
-    # a blank, and one creator cell.
-    "BD2" = "M26"; "BE2" = "71.25"; "BF2" = "71.25"
-    "BD3" = "N26"; "BE3" = "71.4"
-    "BD4" = "Q26"; "BE4" = "71.1"; "BF4" = "71.1"
-    "BD5" = "U26"; "BE5" = "70.85"; "BF5" = "70.85"
-    "BD6" = "V26"; "BE6" = "70.6"; "BF6" = "70.6"
-    "BD7" = "X26"; "BE7" = "70.4"; "BF7" = "70.4"
-    "BG1" = "=_CreateFuturesCurve(BD2:BD7,BE2:BE7)"
     # Daily fixings: a header row and four rows, a date and a settle each, 1, 4, 5 and 6 May
     # 2026, every business day of that stretch; a second body with the days newest first, one
     # missing the Monday, one of a Saturday and one of a holiday AM1 lists; and one creator cell,

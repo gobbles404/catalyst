@@ -132,10 +132,6 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "NYMEX NG", 2500.0, 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
-            // The futures curve: a column of codes and a column of prices, one row per code; a blank among the prices, and the prices left out.
-            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, 71.4) }, "#ERROR _CreateFuturesCurve: ValueError: price has 2 prices, expected 3, one per future_code" };
-            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), Column(71.25, ExcelEmpty.Value, 71.1) }, "#ERROR _CreateFuturesCurve: price cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreateFuturesCurve", new object[] { Column("M26", "N26", "Q26"), ExcelMissing.Value }, "#ERROR _CreateFuturesCurve: price is missing, expected column of numbers" };
             // The daily fixings: a header row, a body of dates and settles and the market's calendar by handle. The calendar left out, a number in its place and text naming no live object fail in the seam's words, and the seam says so before it looks at the table, so every row that expects the table's words, and the library's rules, which need a live calendar, are in the fact below.
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, ExcelMissing.Value }, "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle" };
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, 101.94 }, "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle" };
@@ -233,22 +229,6 @@ namespace Goosedove.Host.Tests
             Assert.Equal("ICE NG", spill[3, 0]);
             Assert.Equal(2500.0, spill[3, 1]);
             Assert.Equal(0.75, spill[3, 2]);
-        }
-
-        // A futures curve: two columns make one, and util_ReadHandle spills it back, the two
-        // headers, two types, then a row per contract, the code as text and the price as a number.
-        [Fact]
-        public void a_futures_curve_is_created_from_two_columns_and_read_back_through_its_handle()
-        {
-            var handle = (string)Seam.Call("_CreateFuturesCurve", Column("M26", "N26", "Q26"), Column(71.25, 71.4, 71.1));
-            Assert.StartsWith("futures_curve:", handle);
-            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
-            Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(2, spill.GetLength(1));
-            Assert.Equal("price", spill[0, 1]);
-            Assert.Equal("float64", spill[1, 1]);
-            Assert.Equal("M26", spill[2, 0]);
-            Assert.Equal(71.4, spill[3, 1]);
         }
 
         // Daily fixings: a header row, a body and the market's calendar make one, and util_ReadHandle

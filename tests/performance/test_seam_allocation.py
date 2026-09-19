@@ -281,24 +281,6 @@ def test_owning_a_range_peaks_at_the_two_copies() -> None:
     assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "", 1)) <= 9 * N + SLACK
 
 
-def curve_columns(contracts: int) -> tuple[Cells, Cells]:
-    """Codes and prices for that many contracts, as the sheet sends them."""
-    codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
-    prices = Cells.from_rows([[70.0 + i / 100] for i in range(contracts)])
-    return codes, prices
-
-
-# A futures curve keeps a copy of its price column, 8 bytes per contract, and pays nothing per
-# contract on the way: no look at either column and no conversion. Measured 1,281 bytes at 120
-# contracts on 2026-09-17, about 11 bytes per contract on top of a creator's small objects, which
-# twice the slack covers; 9,922 at 1,200 and 96,322 at 12,000, 8 bytes per contract.
-def test_a_futures_curve_keeps_a_copy_of_its_price_column() -> None:
-    contracts = 120
-    codes, prices = curve_columns(contracts)
-    peak = least_peak(lambda: ENTRY["_CreateFuturesCurve"](codes, prices))
-    assert peak <= 8 * contracts + 2 * SLACK
-
-
 FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
 
 
