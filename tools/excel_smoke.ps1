@@ -191,6 +191,27 @@ $formulas = [ordered]@{
     "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
     "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
     "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
+    # The market history: a creator over the calendar in CT5 and the fixings in CT6, read back
+    # through util_ReadHandle, the calendar's four columns and the fixing price, a number on a past
+    # business day, closed on a weekend and unfixed on the valuation day and after; a fixing on
+    # the valuation date, a past business day without a fixing and a fixing on a day the calendar
+    # closes, the library's words; the fixings left out, the seam's.
+    "=LEFT(CT7,15)"               = "market_history:"
+    "=INDEX(util_ReadHandle(CT7),1,5)" = "fixing_price"
+    "=INDEX(util_ReadHandle(CT7),2,5)" = "float64"
+    "=INDEX(util_ReadHandle(CT7),3,1)" = "46162"
+    "=INDEX(util_ReadHandle(CT7),3,5)" = "70.85"
+    "=INDEX(util_ReadHandle(CT7),5,5)" = "71.25"
+    "=INDEX(util_ReadHandle(CT7),6,5)" = "closed"
+    "=INDEX(util_ReadHandle(CT7),8,5)" = "71.4"
+    "=INDEX(util_ReadHandle(CT7),9,5)" = "unfixed"
+    "=INDEX(util_ReadHandle(CT7),36,5)" = "unfixed"
+    "=ROWS(util_ReadHandle(CT7))"      = "36"
+    "=COLUMNS(util_ReadHandle(CT7))"   = "5"
+    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
+    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
+    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
+    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -317,6 +338,26 @@ $cells = [ordered]@{
     "AR4" = "=_CreateExpirySchedule(AE2:AE3,AT2:AT3)"
     "AT4" = "19-May-2026"; "AT5" = "12-Apr-4897"
     "AR5" = "=_CreateExpirySchedule(AE2:AE3,AT4:AT5)"
+    # The market history: a valuation date, 26-May-2026 at midday, a schedule of the first two
+    # contracts, a calendar over them with the holiday calendar in AM1, which closes no day of
+    # May, and the fixings on its four past business days, 20 to 22 May and the 25th, under the
+    # fixings' headers at BI1:BJ1; then the same fixings with a row on the 26th, the first three
+    # alone, and a calendar that closes the 25th, for the history to refuse.
+    "CT2" = "26-May-2026"
+    "CQ2" = "20-May-2026"; "CR2" = "70.85"
+    "CQ3" = "21-May-2026"; "CR3" = "71.1"
+    "CQ4" = "22-May-2026"; "CR4" = "71.25"
+    "CQ5" = "25-May-2026"; "CR5" = "71.4"
+    "CQ6" = "26-May-2026"; "CR6" = "71.5"
+    "CT3" = "=_CreateValuationDate(CT2,0.5)"
+    "CT4" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3)"
+    "CT5" = "=_CreateCalendar(CT3,CT4,AM1)"
+    "CT6" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR5,AM1)"
+    "CT7" = "=_CreateMarketHistory(CT5,CT6)"
+    "CT8" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR6,AM1)"
+    "CT9" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR4,AM1)"
+    "CT10" = "=_CreateHolidayCalendar(CQ5)"
+    "CT11" = "=_CreateCalendar(CT3,CT4,CT10)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

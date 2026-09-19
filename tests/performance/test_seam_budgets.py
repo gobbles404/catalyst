@@ -1069,6 +1069,93 @@ def test_reading_a_calendar_back_rebuilds_nothing(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
+# --- the market history: two handles in, the calendar kept, its past business days priced ------
+
+
+def history_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a history takes: the calendar calendar_sources makes, valued on 11
+    September 2026, and fixings on every business day from Friday 1 May 2026 to the day
+    before, under the same hundred Thursdays, so every past business day has one."""
+    valuation, schedule, holidays = calendar_sources(contracts)
+    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
+    rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
+    fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    return made, fixings
+
+
+# A year of days and the fixings on its past business days: two handles, each the text rule and
+# one lookup, the builder's three looks, a fixing on or after the valuation date, a fixing on a
+# day the calendar closes and a past business day without one, its rows from one subtraction
+# over the fixings' days, the days covered in one zeros, and one publication. Eleven calls
+# across eight functions, the accept rule once per argument; no arange, no searchsorted and no
+# look at a holiday, since the calendar is taken as it is and nothing of it is made again.
+def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made, fixings = history_sources(13)
+    PATH["_CreateMarketHistory"](made, fixings)
+    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,  # each handle's text rule
+        "_resolve": 2,  # and its one lookup
+        "_CreateMarketHistory": 1,
+        "market_history": 1,
+        "_publish": 1,
+    }
+    calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
+    assert calls == {
+        "ndarray.any": 3,  # the builder's three looks
+        "ndarray.astype": 1,  # the fixings' days to rows of the calendar
+        "numpy.zeros": 1,  # the rows covered
+        "ndarray.setflags": 2,  # the two columns frozen
+        "ufunc.reduce": 3,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+# Reading a history back is reading its calendar back, the same calls, and then the fifth
+# column written by kind: the wider kinds and slots, the codes paired with the words and the
+# pairs shown, the two words shared by every row; no arange, no searchsorted, nothing of the
+# calendar made again.
+def test_reading_a_market_history_back_rebuilds_nothing(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made = PATH["_CreateMarketHistory"](*history_sources(13))
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "market_history_table": 1,
+        "calendar_table": 1,  # the calendar's own table, as the calendar shows
+        "MixedArray.table": 1,
+        "_table_column": 3,
+        "_unit": 1,
+        "_serials": 1,
+        "MixedArray.shape": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
+    assert calls == {
+        "numpy.array": 2,  # the calendar's: the schedule's codes as an array, its texts gathered
+        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "numpy.empty": 6,  # the calendar's two; the kinds, the slots, the pairs and their mask
+        "numpy.asarray": 2,
+        "numpy.datetime_data": 1,  # the unit of the date column
+        "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
 # --- the monthly fixings: two columns and a schedule's handle in, the dates kept ------------
 
 

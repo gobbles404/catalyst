@@ -340,6 +340,35 @@ def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
 
 
+def history_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a history takes: the calendar calendar_sources makes, valued on 11
+    September 2026, and fixings on every business day from Friday 1 May 2026 to the day
+    before, under the same hundred Thursdays, so every past business day has one."""
+    valuation, schedule, holidays = calendar_sources(contracts)
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
+    rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
+    fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    return made, fixings
+
+
+# A history keeps two columns, 16 bytes per past business day, the row and the price, and
+# nothing per day of the calendar, which it keeps as it is; on the way it pays the builder's
+# looks, a byte or so per fixing and per day for the days covered and the flags combined:
+# measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 16,641 at 3,600 days and
+# 148,641 at 36,600, 4 bytes per day. Reading it back pays the calendar's table and then the
+# fifth column, the wider kinds and slots, the codes paired with the words, and the mixed
+# road's masks over five columns: measured 51,267 at 360 days, about 28 bytes per cell;
+# 629,741 at 3,600 days and 6,528,344 at 36,600, 35 bytes per cell, where the road splits the
+# joined text per text.
+def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell() -> None:
+    days = 360
+    made, fixings = history_sources(13)
+    assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 6 * days + 2 * SLACK
+    history = ENTRY["_CreateMarketHistory"](made, fixings)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
+
+
 def published_columns(count: int) -> tuple[Cells, Cells]:
     """That many monthly publications as the sheet sends them, the publication dates of the
     schedule schedule_columns makes, a serial per row, and a price beside each."""

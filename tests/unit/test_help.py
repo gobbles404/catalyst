@@ -242,6 +242,28 @@ def test_the_calendar_creator_explains_itself() -> None:
     ]
 
 
+def test_the_market_history_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateMarketHistory"]
+    assert not hidden
+    assert description == (
+        "Creates the market history of one index, its calendar with the settle fixed on each "
+        "past business day, and shows its handle, the text other formulas take as the history."
+    )
+    assert arguments == [
+        (
+            "calendar",
+            "The index's calendar handle: the cell showing _CreateCalendar's result, such as B7, "
+            "or a name for it.",
+        ),
+        (
+            "daily_fixings",
+            "The index's daily-fixings handle: the cell showing the result of "
+            "_CreateDailyFixings, such as B10, or a name for it, with a fixing on every past "
+            "business day of the calendar.",
+        ),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 
