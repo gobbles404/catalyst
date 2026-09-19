@@ -212,6 +212,26 @@ $formulas = [ordered]@{
     "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
     "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
     "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle"
+    # The price vector: a creator over one column of prices, read back through util_ReadHandle
+    # under its header and type, a zero and a negative price kept in their places, and one over
+    # a single cell; a row where a column is expected, the header taken with the prices, numeric
+    # text, a boolean, a blank and the column left out, the seam's words; an Excel error in the
+    # column, passed through as any is.
+    "=LEFT(CV1,13)"               = "price_vector:"
+    "=INDEX(util_ReadHandle(CV1),1,1)" = "price"
+    "=INDEX(util_ReadHandle(CV1),2,1)" = "float64"
+    "=INDEX(util_ReadHandle(CV1),3,1)" = "74.25"
+    "=INDEX(util_ReadHandle(CV1),4,1)" = "0"
+    "=INDEX(util_ReadHandle(CV1),5,1)" = "-0.5"
+    "=ROWS(util_ReadHandle(CV1))"      = "6"
+    "=LEFT(_CreatePriceVector(CU2),13)" = "price_vector:"
+    "=_CreatePriceVector({74.25,0,-0.5})" = "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers"
+    "=_CreatePriceVector(CU1:CU5)" = "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number"
+    "=_CreatePriceVector(CU5:CU6)" = "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number"
+    "=_CreatePriceVector(H1:H2)"   = "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number"
+    "=_CreatePriceVector(C1:C3)"   = "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number"
+    "=_CreatePriceVector()"        = "#ERROR _CreatePriceVector: prices is missing, expected column of numbers"
+    "=_CreatePriceVector(D1:D3)"   = "#N/A"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -358,6 +378,11 @@ $cells = [ordered]@{
     "CT9" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR4,AM1)"
     "CT10" = "=_CreateHolidayCalendar(CQ5)"
     "CT11" = "=_CreateCalendar(CT3,CT4,CT10)"
+    # The price vector: a header over four prices, a zero and a negative among them and the
+    # first repeated, a cell of numeric text under them, and one creator cell over the prices.
+    "CU1" = "price"; "CU2" = "74.25"; "CU3" = "0"; "CU4" = "-0.5"; "CU5" = "74.25"
+    "CU6" = '="74.25"'
+    "CV1" = "=_CreatePriceVector(CU2:CU5)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

@@ -391,3 +391,32 @@ def test_monthly_fixings_keep_a_copy_of_each_column() -> None:
         least_peak(lambda: ENTRY["_CreateMonthlyFixings"](dates, prices, schedule))
         <= 60 * count + 2 * SLACK
     )
+
+
+def price_column(prices: int) -> Cells:
+    """That many prices as the sheet sends them, one per row, around 74."""
+    return Cells.from_rows([[74.25 + i % 7 - 3.0] for i in range(prices)])
+
+
+def price_vector_peaks(prices: int) -> tuple[int, int]:
+    """The least peak of creating a vector of that many prices, and of reading it back."""
+    column = price_column(prices)
+    made = ENTRY["_CreatePriceVector"](column)
+    return (
+        least_peak(lambda: ENTRY["_CreatePriceVector"](column)),
+        least_peak(lambda: ENTRY["util_ReadHandle"](made)),
+    )
+
+
+# A price vector keeps one copy of its column, 8 bytes per price, and nothing else per price:
+# the column is accepted on the host's summary, so no look and no temporary. Measured 1,273
+# bytes at 120 prices on 2026-09-19, the copy plus a creator's small objects, which twice the
+# slack covers, and 80,314 at 10,000, 8 bytes per price; 392 for a single cell. Reading it back
+# pays the table's kinds and slots and the mixed road's masks: measured 2,492 at 120 prices,
+# about 20 bytes per cell, and 140,812 at 10,000, 14.
+def test_a_price_vector_keeps_one_copy_of_its_column_and_nothing_per_price_beyond() -> None:
+    for prices in (120, 10_000):
+        created, read = price_vector_peaks(prices)
+        assert created <= 8 * prices + 2 * SLACK
+        assert read <= 21 * (prices + 2) + SLACK
+    assert least_peak(lambda: ENTRY["_CreatePriceVector"](74.25)) <= SLACK

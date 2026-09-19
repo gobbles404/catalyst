@@ -30,6 +30,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.monthly_fixings import MonthlyFixings
+from goosedove.market_data.price_vector import PriceVector
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -235,6 +236,22 @@ def test_monthly_fixings_spill_publication_dates_as_serials_and_prices_exactly()
     ]
 
 
+# Four prices selected without a header, a zero and a negative among them and the first
+# repeated: the spill puts the header and the type over them, each price a number in its place.
+def test_a_price_vector_spills_one_column_of_prices_under_two_heading_rows() -> None:
+    handle = bridge.call("_CreatePriceVector", [Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])])
+    kinds, slots, joined = read(handle)
+    assert rows((kinds, slots, joined)) == [
+        ["price"],
+        ["float64"],
+        [74.25],
+        [0.0],
+        [-0.5],
+        [74.25],
+    ]
+    assert kinds[2:, 0].tolist() == [NUMBER_CODE] * 4
+
+
 # Serials for 1 January, 19 January and 16 February 2026.
 def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
     holidays = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
@@ -369,4 +386,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         DailyFixings,
         MonthlyFixings,
         MarketHistory,
+        PriceVector,
     } <= set(shown.registry)

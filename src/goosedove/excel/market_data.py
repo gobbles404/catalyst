@@ -1,5 +1,6 @@
 """The worksheet functions of the market data: the fixings of one index, daily or monthly, each
-series created once and reached by handle. docs/library/market-data/ holds a page per function.
+series created once, and its futures prices, a column snapped as often as the sheet recalculates,
+each reached by handle. docs/library/market-data/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -20,10 +21,11 @@ from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
 from goosedove.market_data.monthly_fixings import MonthlyFixings, monthly_fixings
+from goosedove.market_data.price_vector import PriceVector, price_vector
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateDailyFixings", "_CreateMonthlyFixings"]
+__all__ = ["_CreateDailyFixings", "_CreateMonthlyFixings", "_CreatePriceVector"]
 
 
 class DailyFixingsTable(Table):
@@ -77,3 +79,14 @@ def _CreateMonthlyFixings(
     their prices, checked against the publication dates of its expiry schedule, and shows its
     handle, the text other formulas take as the fixings."""
     return monthly_fixings(publication_date, price, expiry_schedule.publication_date)
+
+
+@excel_function
+def _CreatePriceVector(
+    prices: Annotated[
+        NumberColumn, "The column of futures prices, such as B2:B101, without a header."
+    ],
+) -> Handle[PriceVector]:
+    """Creates a price vector from one column of prices and shows its handle, the text other
+    formulas take as the price vector."""
+    return price_vector(prices)
