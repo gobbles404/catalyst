@@ -27,6 +27,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
 from goosedove.market_data.monthly_fixings import MonthlyFixings
 
@@ -156,6 +157,59 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
         [46162.0, "n26", 1.0, 1.0],
     ]
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE]
+
+
+# Serials for 19 and 20 May 2026 and the valuation date 21 May, with a settle fixed on the 20th:
+# a history of a one-day calendar spills the calendar's four columns and the fixing price, a
+# number on the fixed day, whose kind is the number code. Valued on the 20th instead, the day is
+# not past, and with a fixing on the 19th, before the valuation date and unused, the fifth cell
+# is the word unfixed, whose kind is the text code.
+def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> None:
+    schedule = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"]]),
+            Cells.from_rows([[46161.0], [46162.0]]),
+            MISSING,
+            MISSING,
+        ],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    headers = Cells.from_rows([["date", "settle"]])
+    fixed = bridge.call(
+        "_CreateMarketHistory",
+        [
+            bridge.call(
+                "_CreateCalendar",
+                [bridge.call("_CreateValuationDate", [46163.0, 0.5]), schedule, holidays],
+            ),
+            bridge.call(
+                "_CreateDailyFixings", [headers, Cells.from_rows([[46162.0, 70.85]]), holidays]
+            ),
+        ],
+    )
+    kinds, slots, joined = read(fixed)
+    assert rows((kinds, slots, joined)) == [
+        ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"],
+        ["datetime64[D]", "str", "bool", "bool", "float64"],
+        [46162.0, "n26", 1.0, 1.0, 70.85],
+    ]
+    assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, NUMBER_CODE]
+    unfixed = bridge.call(
+        "_CreateMarketHistory",
+        [
+            bridge.call(
+                "_CreateCalendar",
+                [bridge.call("_CreateValuationDate", [46162.0, 0.5]), schedule, holidays],
+            ),
+            bridge.call(
+                "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
+            ),
+        ],
+    )
+    kinds, slots, joined = read(unfixed)
+    assert rows((kinds, slots, joined))[2] == [46162.0, "n26", 1.0, 0.0, "unfixed"]
+    assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
 
 
 # Serials for 5 January and 2 February 2026, the days two monthly indices were published, checked
@@ -314,4 +368,5 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         ContractSpecifications,
         DailyFixings,
         MonthlyFixings,
+        MarketHistory,
     } <= set(shown.registry)
