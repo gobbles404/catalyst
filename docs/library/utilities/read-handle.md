@@ -60,6 +60,7 @@ What each kind shows:
 | `contract_specifications` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `float64`, `float64` | one per contract |
 | `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `monthly_fixings` | `publication_date`, `price` | `datetime64[D]`, `float64` | one per fixing |
+| `price_vector` | `price` | `float64` | one per price, in the column's order |
 | `calendar` | `date`, `prompt_contract`, `is_business_day`, `is_past` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's |
 | `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the settle, a number, on a past business day, the word `closed` on a weekend or a holiday and `unfixed` on the valuation day and the days after it |
 
@@ -100,13 +101,14 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | contract specifications: one row per contract, the name as text and the lot size and fees as numbers, under its two heading rows | example |
 | daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | monthly fixings: two columns, publication dates as serials and prices exactly, one row per fixing under its two heading rows | example |
+| a price vector: one column of prices under its two heading rows, a zero and a negative price in their places | example |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
 | the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
 | a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |
-| each kind inspected on a real sheet, with a schedule without options, a calendar of one day and a history over 34 days | Excel smoke |
+| each kind inspected on a real sheet, with a schedule without options, a calendar of one day, a history over 34 days and a vector of four prices | Excel smoke |
 
 ## Not here
 

@@ -215,6 +215,18 @@ def test_the_monthly_fixings_creator_explains_itself() -> None:
     ]
 
 
+def test_the_price_vector_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreatePriceVector"]
+    assert not hidden
+    assert description == (
+        "Creates a price vector from one column of prices and shows its handle, the text other "
+        "formulas take as the price vector."
+    )
+    assert arguments == [
+        ("prices", "The column of futures prices, such as B2:B101, without a header."),
+    ]
+
+
 def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden

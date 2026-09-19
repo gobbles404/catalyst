@@ -149,6 +149,14 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateMarketHistory", new object[] { 46168.0, ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is number 46168.0, expected calendar handle" };
             yield return new object[] { "_CreateMarketHistory", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is missing, expected calendar handle" };
             yield return new object[] { "_CreateMarketHistory", new object[] { "x", ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is text 'x' naming no live object, expected calendar handle" };
+            // The price vector: one column of numbers. A row where a column is expected, a header taken with the prices, numeric text, a boolean, a blank and the column left out fail in the seam's words; an Excel error in the column is passed through, as any is.
+            yield return new object[] { "_CreatePriceVector", new object[] { Row(74.25, 0.0, -0.5) }, "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column("price", 74.25) }, "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, "74.25") }, "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, true) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelEmpty.Value) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { ExcelMissing.Value }, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelError.ExcelErrorNA) }, ExcelError.ExcelErrorNA };
         }
 
         // An expiry schedule: three columns make one, two make one for an index without options,
@@ -345,6 +353,32 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
             Assert.Equal("#ERROR _CreateMarketHistory: calendar is daily fixings handle '" + fixings + "', expected calendar handle", Seam.Call("_CreateMarketHistory", fixings, fixings));
             Assert.Equal("#ERROR _CreateMarketHistory: daily_fixings is calendar handle '" + calendar + "', expected daily fixings handle", Seam.Call("_CreateMarketHistory", calendar, calendar));
+        }
+
+        // The price vector: one column of prices makes one, a single cell makes one of one price,
+        // and util_ReadHandle spills it back, the header, the type, then each price as a number,
+        // a zero and a negative price kept in their places; a second call over the same prices
+        // publishes its own handle, and the first still reads the same.
+        [Fact]
+        public void a_price_vector_is_created_from_a_column_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreatePriceVector", Column(74.25, 0.0, -0.5, 74.25));
+            Assert.StartsWith("price_vector:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(6, spill.GetLength(0));
+            Assert.Equal(1, spill.GetLength(1));
+            Assert.Equal("price", spill[0, 0]);
+            Assert.Equal("float64", spill[1, 0]);
+            Assert.Equal(74.25, spill[2, 0]);
+            Assert.Equal(0.0, spill[3, 0]);
+            Assert.Equal(-0.5, spill[4, 0]);
+            Assert.Equal(74.25, spill[5, 0]);
+            var one = (string)Seam.Call("_CreatePriceVector", 74.25);
+            Assert.StartsWith("price_vector:", one);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
+            var again = (string)Seam.Call("_CreatePriceVector", Column(74.25, 0.0, -0.5, 74.25));
+            Assert.NotEqual(handle, again);
+            Assert.Equal(-0.5, ((object[,])Seam.Call("util_ReadHandle", handle))[4, 0]);
         }
 
         // Monthly fixings: a column of publication days, a column of prices and the index's schedule

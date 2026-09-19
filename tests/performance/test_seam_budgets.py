@@ -1210,3 +1210,37 @@ def test_monthly_fixings_are_two_columns_and_a_schedule_in_and_the_dates_kept(
         "ndarray.setflags": 2,  # frozen
         "ufunc.reduce": 4,
     }
+
+
+# --- the price vector: one column of numbers in, one copy kept, one publication out -----------
+
+
+def price_column(prices: int) -> Cells:
+    """That many prices as the sheet sends them, one per row, around 74."""
+    return Cells.from_rows([[74.25 + i % 7 - 3.0] for i in range(prices)])
+
+
+# The hot column: accepted on the host's summary, no look, then the builder's one copy and its
+# freeze, and one publication. Ten calls across ten functions, the accept rule once, and on
+# numpy the copy and the freeze alone; nothing is sorted, checked or converted.
+def test_a_price_vector_is_one_column_in_and_one_copy_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    column = price_column(120)
+    PATH["_CreatePriceVector"](column)
+    assert call_profile(lambda: PATH["_CreatePriceVector"](column)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_column": 1,
+        "_one_column": 1,
+        "_shape": 1,
+        "_numbers": 1,  # the host's summary settles it: no look
+        "_CreatePriceVector": 1,
+        "price_vector": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreatePriceVector"](column)) == {
+        "numpy.array": 1,  # the one copy the vector keeps
+        "ndarray.setflags": 1,  # frozen
+    }

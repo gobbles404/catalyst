@@ -6,6 +6,7 @@ import re
 from typing import cast
 
 import pytest
+from test_utilities import read, rows
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
@@ -454,3 +455,96 @@ def test_a_handle_of_another_kind_is_not_an_expiry_schedule() -> None:
         f"#ERROR _CreateMonthlyFixings: expiry_schedule is daily fixings handle {other!r}, "
         "expected expiry schedule handle"
     )
+
+
+# --- _CreatePriceVector -----------------------------------------------------------
+
+
+# The page's sample as the sheet sends it: four prices, a zero and a negative among them and the
+# first repeated, selected without a header.
+PRICES = Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])
+VECTOR = re.compile(r"price_vector:[0-9a-f]{6}:([0-9]{6})")
+
+
+def a_vector(prices: object = PRICES) -> str:
+    text = bridge.call("_CreatePriceVector", [prices])
+    assert isinstance(text, str) and VECTOR.fullmatch(text), text
+    return text
+
+
+def test_a_price_vector_is_created_from_a_column_and_read_back_in_order() -> None:
+    assert rows(read(a_vector())) == [["price"], ["float64"], [74.25], [0.0], [-0.5], [74.25]]
+
+
+def test_one_cell_is_a_vector_of_one_price() -> None:
+    assert rows(read(a_vector(74.25))) == [["price"], ["float64"], [74.25]]
+
+
+# Each call publishes anew, over the same prices or a different number of them, and an earlier
+# handle still reads its own snapshot.
+def test_every_vector_call_publishes_a_fresh_handle_and_the_earlier_ones_stand() -> None:
+    first = a_vector()
+    same = a_vector()
+    longer = a_vector(Cells.from_rows([[74.25], [0.0], [-0.5], [74.25], [75.0]]))
+    assert number(same, VECTOR) == number(first, VECTOR) + 1
+    assert number(longer, VECTOR) == number(same, VECTOR) + 1
+    assert rows(read(first))[2:] == [[74.25], [0.0], [-0.5], [74.25]]
+    assert rows(read(same))[2:] == [[74.25], [0.0], [-0.5], [74.25]]
+    assert rows(read(longer))[2:] == [[74.25], [0.0], [-0.5], [74.25], [75.0]]
+
+
+@pytest.mark.parametrize(
+    ("prices", "text"),
+    [
+        (
+            Cells.from_rows([[74.25, 0.0, -0.5]]),
+            "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers",
+        ),
+        (
+            Cells.from_rows([[74.25, 1.0], [0.0, 2.0]]),
+            "#ERROR _CreatePriceVector: prices is 2x2 array, expected column of numbers",
+        ),
+        (
+            Cells.from_rows([["price"], [74.25]]),
+            "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number",
+        ),
+        (
+            Cells.from_rows([[74.25], ["74.25"]]),
+            "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number",
+        ),
+        (
+            Cells.from_rows([[74.25], [True]]),
+            "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number",
+        ),
+        (
+            Cells.from_rows([[74.25], [None]]),
+            "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number",
+        ),
+        (None, "#ERROR _CreatePriceVector: prices is blank, expected column of numbers"),
+        (MISSING, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers"),
+        ("74.25", "#ERROR _CreatePriceVector: prices is text '74.25', expected column of numbers"),
+        (True, "#ERROR _CreatePriceVector: prices is boolean TRUE, expected column of numbers"),
+    ],
+    ids=[
+        "a row where a column is expected",
+        "two columns",
+        "the header taken with the prices",
+        "numeric text among the prices",
+        "a boolean among the prices",
+        "a blank among the prices",
+        "a blank cell where the column should be",
+        "the column left out",
+        "numeric text where the column should be",
+        "a boolean where the column should be",
+    ],
+)
+def test_a_vector_that_cannot_be_made_says_why(prices: object, text: str) -> None:
+    assert bridge.call("_CreatePriceVector", [prices]) == text
+
+
+def test_a_failed_vector_publishes_no_object_and_no_handle() -> None:
+    before = number(a_vector(), VECTOR)
+    assert bridge.call("_CreatePriceVector", [Cells.from_rows([[74.25], [None]])]) == (
+        "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number"
+    )
+    assert number(a_vector(), VECTOR) == before + 1
