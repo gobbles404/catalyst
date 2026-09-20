@@ -1006,8 +1006,8 @@ def calendar_sources(contracts: int) -> tuple[object, str, object, object]:
 # A year of days from thirteen contracts: three handles, each the text rule and one lookup, and
 # the mode, the text rule alone, the builder's look at the mode and its one look at the order of
 # the expiries, its days in one arange, the prompt row of each in one searchsorted, the two
-# flags, and one publication. Fifteen calls across eight functions, the accept rule once per
-# argument, from fourteen before the mode; is_busday and the comparison against the valuation
+# flags, and one publication. Sixteen calls across eight functions, the accept rule once per
+# argument, from fourteen before the mode, which adds its check and its text rule; is_busday and the comparison against the valuation
 # date raise no event the numpy fixture reads, and nor does the mode, matched as an enum.
 def test_a_calendar_is_three_handles_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
