@@ -1,4 +1,5 @@
-"""The calendar: three rules on the schedule, and the four columns made once from three objects."""
+"""The calendar: two rules on the mode and four on the schedule, and the four columns made once from
+three objects, the same for daily and for monthly fixings."""
 
 import numpy as np
 import pytest
@@ -6,7 +7,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar, calendar
+from goosedove.calendar.calendar import Calendar, FixingMode, calendar
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
@@ -38,12 +39,32 @@ CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
 
+# The same schedule with the day each contract's price is published, for a monthly calendar.
+PUBLISHED = expiry_schedule(
+    SCHEDULE.codes,
+    SCHEDULE.future_expiry,
+    None,
+    dates("2026-05-20", "2026-06-23", "2026-07-22"),
+)
+
+
 def a_calendar(
     valuation: ValuationDate = MAY_25,
     schedule: ExpirySchedule = SCHEDULE,
     holidays: HolidayCalendar = CLOSED_MAY_25,
+    mode: str = "daily",
 ) -> Calendar:
-    return calendar(valuation, schedule, holidays)
+    return calendar(valuation, mode, schedule, holidays)
+
+
+def columns(
+    made: Calendar,
+) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.bool_], NDArray[np.bool_]]:
+    return made.dates, made.prompt, made.is_business_day, made.is_past
+
+
+def same_columns(one: Calendar, other: Calendar) -> bool:
+    return all(np.array_equal(a, b) for a, b in zip(columns(one), columns(other), strict=True))
 
 
 # --- the sample ---------------------------------------------------------------
@@ -51,6 +72,7 @@ def a_calendar(
 
 def test_the_sample_runs_from_the_day_after_the_first_expiry_to_the_last() -> None:
     made = a_calendar()
+    assert made.fixing_mode is FixingMode.DAILY
     assert made.dates.size == 63
     assert made.dates[0] == day("2026-05-20")
     assert made.dates[-1] == day("2026-07-21")
@@ -112,6 +134,112 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
     assert codes_of(made) == ["n26"]
     assert made.is_business_day.tolist() == [True]
     assert made.is_past.tolist() == [True]
+
+
+# --- the fixing mode ----------------------------------------------------------
+
+
+# The mode is the caller's word, never read off the schedule: a daily calendar is daily with or
+# without publication dates, a monthly one needs them, and the days, prompts and flags are the
+# same in either mode.
+def test_daily_and_monthly_calendars_have_the_same_columns_and_differ_in_mode_alone() -> None:
+    daily = a_calendar(schedule=PUBLISHED, mode="daily")
+    monthly = a_calendar(schedule=PUBLISHED, mode="monthly")
+    plain = a_calendar()
+    assert daily.fixing_mode is FixingMode.DAILY
+    assert monthly.fixing_mode is FixingMode.MONTHLY
+    assert same_columns(daily, monthly) and same_columns(daily, plain)
+    assert monthly.expiry_schedule is PUBLISHED
+    published = monthly.expiry_schedule.publication_date
+    assert published is not None
+    assert np.array_equal(published, dates("2026-05-20", "2026-06-23", "2026-07-22"))
+
+
+# The page's example: valued on 23 June 2026, the day after n26 expires. q26 is prompt on that
+# day, and n26's publication date is that day too: the date stays with n26's row of the
+# schedule, and no row of the calendar carries it or a price.
+def test_a_publication_date_stays_with_its_contract_whatever_is_prompt_that_day() -> None:
+    made = a_calendar(
+        valuation=valuation_date(day("2026-06-23"), 0.5),
+        schedule=PUBLISHED,
+        holidays=ELSEWHERE,
+        mode="monthly",
+    )
+    shown = {
+        str(d): (c, bool(o), bool(p))
+        for d, c, o, p in zip(
+            made.dates, codes_of(made), made.is_business_day, made.is_past, strict=True
+        )
+    }
+    assert shown["2026-05-20"] == ("n26", True, True)
+    assert shown["2026-05-23"] == ("n26", False, True)
+    assert shown["2026-06-22"] == ("n26", True, True)
+    assert shown["2026-06-23"] == ("q26", True, False)
+    assert shown["2026-07-21"] == ("q26", True, False)
+    published = made.expiry_schedule.publication_date
+    assert published is not None
+    assert str(published[1]) == "2026-06-23"
+    assert str(published[2]) == "2026-07-22"  # after the calendar's last day, kept
+    assert made.dates[-1] == day("2026-07-21")
+
+
+@pytest.mark.parametrize(
+    "mode", ["Daily", "DAILY", " daily", "daily ", "Monthly", "auto", "", "weekly"]
+)
+def test_a_mode_that_is_not_exactly_daily_or_monthly_is_refused(mode: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        a_calendar(schedule=PUBLISHED, mode=mode)
+    assert str(failure.value) == f"fixing_mode is {mode!r}, expected 'daily' or 'monthly'"
+
+
+def test_a_monthly_calendar_needs_the_schedules_publication_dates() -> None:
+    with pytest.raises(ValueError) as failure:
+        a_calendar(schedule=SCHEDULE, mode="monthly")
+    assert (
+        str(failure.value) == "fixing_mode 'monthly' requires publication_date in expiry_schedule"
+    )
+    with_options = expiry_schedule(
+        SCHEDULE.codes,
+        SCHEDULE.future_expiry,
+        dates("2026-05-14", "2026-06-16", "2026-07-16"),
+        None,
+    )
+    with pytest.raises(ValueError):
+        a_calendar(schedule=with_options, mode="monthly")
+    assert a_calendar(schedule=with_options, mode="daily").fixing_mode is FixingMode.DAILY
+
+
+# The mode's rules run before the schedule's: a wrong mode is named on a schedule of one
+# contract, and missing publication dates before the contract count.
+def test_the_modes_rules_run_before_the_schedules() -> None:
+    one = a_schedule(("m26", "2026-05-19"))
+    with pytest.raises(ValueError) as failure:
+        a_calendar(schedule=one, mode="auto")
+    assert str(failure.value) == "fixing_mode is 'auto', expected 'daily' or 'monthly'"
+    with pytest.raises(ValueError) as failure:
+        a_calendar(schedule=one, mode="monthly")
+    assert (
+        str(failure.value) == "fixing_mode 'monthly' requires publication_date in expiry_schedule"
+    )
+
+
+# Publication dates change nothing of the columns in either mode: earlier, later, on either
+# side of the valuation date, before the calendar or after it, they are kept in the schedule
+# and read by nothing here.
+def test_publication_dates_change_no_column_in_either_mode() -> None:
+    plain = a_calendar()
+    for publications in (
+        dates("2026-05-20", "2026-06-23", "2026-07-22"),
+        dates("2026-01-01", "2026-05-24", "2030-12-31"),
+        dates("2026-05-25", "2026-05-25", "2026-05-25"),
+        dates("2026-07-21", "2026-06-22", "2026-05-19"),
+    ):
+        schedule = expiry_schedule(SCHEDULE.codes, SCHEDULE.future_expiry, None, publications)
+        for mode in ("daily", "monthly"):
+            made = a_calendar(schedule=schedule, mode=mode)
+            assert same_columns(made, plain)
+            kept = made.expiry_schedule.publication_date
+            assert kept is not None and np.array_equal(kept, publications)
 
 
 # --- what is rejected, in the order the rules run -----------------------------
@@ -402,7 +530,10 @@ def any_schedule(data: st.DataObject) -> ExpirySchedule:
     start = np.datetime64("2000-01-01", "D") + np.timedelta64(
         data.draw(st.integers(0, 20_000)), "D"
     )
-    return expiry_schedule(codes, start + offsets.astype("timedelta64[D]"), None, None)
+    expiries = start + offsets.astype("timedelta64[D]")
+    published = data.draw(st.booleans())
+    publications = expiries + np.timedelta64(1, "D") if published else None
+    return expiry_schedule(codes, expiries, None, publications)
 
 
 @settings(deadline=None)
@@ -416,7 +547,11 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
         data.draw(st.lists(st.integers(-10, 2500), max_size=30)), dtype="timedelta64[D]"
     )
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, holiday_calendar(listed))
+    mode = (
+        "monthly" if schedule.publication_date is not None and data.draw(st.booleans()) else "daily"
+    )
+    made = calendar(valuation_date(as_of, 0.5), mode, schedule, holiday_calendar(listed))
+    assert made.fixing_mode is FixingMode(mode)
     span = int((expiries[-1] - expiries[0]).astype(np.int64))
     assert made.dates.size == span
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
@@ -441,6 +576,11 @@ def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only()
     assert made.valuation_date is MAY_25
     assert made.expiry_schedule is SCHEDULE
     assert made.holiday_calendar is CLOSED_MAY_25
+    monthly = a_calendar(schedule=PUBLISHED, mode="monthly")
+    assert monthly.expiry_schedule is PUBLISHED
+    assert monthly.expiry_schedule.publication_date is PUBLISHED.publication_date
+    for column in (monthly.dates, monthly.prompt, monthly.is_business_day, monthly.is_past):
+        assert not column.flags.writeable
     for column in (made.dates, made.prompt, made.is_business_day, made.is_past):
         assert not column.flags.writeable
     with pytest.raises(ValueError):
@@ -461,3 +601,10 @@ def test_making_a_calendar_changes_no_source_and_a_second_calendar_leaves_the_fi
     assert np.array_equal(first.is_past, past_before)
     assert second.is_past.sum() > first.is_past.sum()
     assert first.dates is not second.dates
+    monthly = a_calendar(schedule=PUBLISHED, mode="monthly")
+    assert np.array_equal(first.is_past, past_before)
+    assert first.fixing_mode is FixingMode.DAILY and monthly.fixing_mode is FixingMode.MONTHLY
+    assert PUBLISHED.publication_date is not None
+    assert np.array_equal(
+        PUBLISHED.publication_date, dates("2026-05-20", "2026-06-23", "2026-07-22")
+    )

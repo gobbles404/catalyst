@@ -22,7 +22,7 @@ def _CreateMarketHistory(
 | 5 | 21-May-2026 | 71.10 | | |
 | 6 | 22-May-2026 | 71.25 | | |
 | 7 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateExpirySchedule(C2:C4, D2:D4)` | shows `expiry_schedule:3f9a1c:000004` |
-| 8 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | `=_CreateCalendar(A7, C7, A8)` | shows `calendar:3f9a1c:000012` |
+| 8 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | `=_CreateCalendar(A7, "daily", C7, A8)` | shows `calendar:3f9a1c:000012` |
 | 9 | `=_CreateDailyFixings(A3:B3, A4:B6, A8)` | shows `daily_fixings:3f9a1c:000015` | `=_CreateMarketHistory(C8, A9)` | shows `market_history:3f9a1c:000019` |
 
 Two handles, both required, neither with a default: the index's calendar and its daily fixings, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. There is no valuation date to give: the calendar carries its own, and its past flag says which days have fixed. The function receives the two objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `calendar is daily fixings handle 'daily_fixings:3f9a1c:000015', expected calendar handle`, before the function runs. The seam resolves the two handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the history the seam keeps, declared `Handle[MarketHistory]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the history: the calendar itself, and the row and the price of each past business day.
@@ -57,7 +57,7 @@ Quoted from the declaration in `src/goosedove/excel/market.py`, which `tests/uni
 
 ## The library checks
 
-Three rules on the fixings against the calendar, in this order, the first failure being the message; they are the history's, not the fixings', so daily fixings whole under their own holiday calendar are still fixings. The calendar is not checked at all: it was checked when it was made, and nothing of it is made again. Each message names the earliest offending date, since the calendar's days are in order and so are the fixings'.
+One rule on the calendar and three on the fixings against it, in this order, the first failure being the message; they are the history's, not the fixings', so daily fixings whole under their own holiday calendar are still fixings. The calendar is a daily one: this history is the daily fixings' along the calendar's business days, and what a monthly calendar's history is, one published price per contract on its publication date, is not built, so a monthly calendar is refused, `monthly market history is not supported yet`, before any fixing is looked at, rather than read by daily rules. Nothing else of the calendar is checked: it was checked when it was made, and nothing of it is made again. Each message names the earliest offending date, since the calendar's days are in order and so are the fixings'.
 
 | Rule | Message |
 |---|---|
@@ -76,6 +76,7 @@ The examples and properties below are `tests/unit/test_market_history.py`; the s
 | Case | Kind |
 |---|---|
 | the sample above: the three past business days priced, in the calendar's rows, and no other day; the rows the page shows, every row of the calendar standing | example |
+| a monthly calendar over the same schedule with its publication dates: refused, whatever the fixings, while the daily calendar over that schedule makes the same history | example, and through the seam |
 | a single required fixing, alone and inside a longer series | example |
 | a settle of zero and one below zero kept as prices | example |
 | fixings before the calendar's first day, and after its last, allowed and unused, no row added and the ends unmatched | example |
@@ -94,4 +95,4 @@ The examples and properties below are `tests/unit/test_market_history.py`; the s
 
 ## Not here
 
-The market itself, the history combined with the current futures prices: [market.md](market.md), since #86, which quotes each business day from the valuation day on by its prompt contract and decides the order of the price vector, [price-vector.md](../market-data/price-vector.md), the column snapped as it stands since #85. Monthly fixings bound to the calendar, and a revision to a published settle: not built, and when a revision arrives it is a new fixings object, never an edit. Whether the calendar and the fixings belong to the same index: nothing in either says which index it is, so nothing checks it; the desk pairs them, and [daily-fixings.md](../market-data/daily-fixings.md) parks the binding of fixings to an index definition. A settle read by date, and the average over a period, which is how a swap settles: the first pricing function's, along this history. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any history as the calendar's columns and the fixing price. Pricing and risk.
+The market itself, the history combined with the current futures prices: [market.md](market.md), since #86, which quotes each business day from the valuation day on by its prompt contract and decides the order of the price vector, [price-vector.md](../market-data/price-vector.md), the column snapped as it stands since #85. Monthly fixings bound to a monthly calendar, one published price per contract on its publication date, and a revision to a published settle: not built, the monthly calendar refused here meanwhile, and when a revision arrives it is a new fixings object, never an edit. Whether the calendar and the fixings belong to the same index: nothing in either says which index it is, so nothing checks it; the desk pairs them, and [daily-fixings.md](../market-data/daily-fixings.md) parks the binding of fixings to an index definition. A settle read by date, and the average over a period, which is how a swap settles: the first pricing function's, along this history. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any history as the calendar's columns and the fixing price. Pricing and risk.

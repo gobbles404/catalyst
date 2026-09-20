@@ -1,4 +1,5 @@
-"""The calendar through the seam: three handles in, one out, and the table its handle spills."""
+"""The calendar through the seam: three handles and the fixing mode in, one out, and the table its
+handle spills, the same for daily and for monthly fixings."""
 
 import re
 from typing import cast
@@ -27,9 +28,12 @@ def a_valuation(serial: float = MAY_25, fraction: float = 0.5) -> str:
     return text
 
 
-def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
+def a_schedule(
+    codes: tuple[str, ...], expiries: tuple[float, ...], publications: tuple[float, ...] = ()
+) -> str:
+    published = column(*publications) if publications else MISSING
     text = bridge.call(
-        "_CreateExpirySchedule", [column(*codes), column(*expiries), MISSING, MISSING]
+        "_CreateExpirySchedule", [column(*codes), column(*expiries), MISSING, published]
     )
     assert isinstance(text, str) and text.startswith("expiry_schedule:"), text
     return text
@@ -42,11 +46,19 @@ def a_holiday_calendar(*serials: float) -> str:
 
 
 SAMPLE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
+# The same schedule with the day each contract's price is published, for a monthly calendar.
+PUBLISHED = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21), (MAY_20, JUN_22 + 1, JUL_21 + 1))
 
 
-def a_calendar(valuation: object = None, schedule: object = None, holidays: object = None) -> str:
+def a_calendar(
+    valuation: object = None,
+    schedule: object = None,
+    holidays: object = None,
+    mode: object = "daily",
+) -> str:
     args = [
         valuation or a_valuation(),
+        mode,
         schedule or a_schedule(*SAMPLE),
         holidays or a_holiday_calendar(MAY_25),
     ]
@@ -100,6 +112,16 @@ def test_the_codes_come_back_exactly_as_typed() -> None:
     assert shown[36][1] == "Q26 "
 
 
+# A monthly calendar spills the same four columns as the daily one over the same schedule, and
+# the mode is not a column: the handle is the difference, and the history refuses one.
+def test_a_monthly_calendar_spills_the_same_rows_as_the_daily_one() -> None:
+    schedule = a_schedule(*PUBLISHED)
+    daily = a_calendar(schedule=schedule, mode="daily")
+    monthly = a_calendar(schedule=schedule, mode="monthly")
+    assert HANDLE.fullmatch(monthly) and monthly != daily
+    assert rows(read(monthly)) == rows(read(daily)) == rows(read(a_calendar()))
+
+
 def test_a_valuation_date_on_the_first_day_and_the_fraction_change_the_past_flag_alone() -> None:
     for fraction in (0.0, 1.0):
         shown = rows(read(a_calendar(valuation=a_valuation(MAY_20, fraction))))
@@ -114,65 +136,110 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
     ("args", "text"),
     [
         (
-            [THE_VALUATION, (("m26",), (MAY_19,)), THE_HOLIDAYS],
+            [THE_VALUATION, "daily", (("m26",), (MAY_19,)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, "
             "expected at least 2",
         ),
         (
-            [THE_VALUATION, (("m26", "m26"), (MAY_19, JUN_22)), THE_HOLIDAYS],
+            [THE_VALUATION, "daily", (("m26", "m26"), (MAY_19, JUN_22)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: "
             "future_code row 2 is 'm26', already given at row 1",
         ),
         (
-            [THE_VALUATION, (("m26", "n26", "n26"), (MAY_19, JUN_22, JUL_21)), THE_HOLIDAYS],
+            [
+                THE_VALUATION,
+                "daily",
+                (("m26", "n26", "n26"), (MAY_19, JUN_22, JUL_21)),
+                THE_HOLIDAYS,
+            ],
             "#ERROR _CreateCalendar: ValueError: "
             "future_code row 3 is 'n26', already given at row 2",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (JUN_22, MAY_19)), THE_HOLIDAYS],
+            [THE_VALUATION, "daily", (("m26", "n26"), (JUN_22, MAY_19)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, "
             "expected a date after row 1's 2026-06-22",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (MAY_19, MAY_19)), THE_HOLIDAYS],
+            [THE_VALUATION, "daily", (("m26", "n26"), (MAY_19, MAY_19)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, "
             "expected a date after row 1's 2026-05-19",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (MAY_19, 1094736.0)), THE_HOLIDAYS],
+            [THE_VALUATION, "daily", (("m26", "n26"), (MAY_19, 1094736.0)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, "
             "expected within 1048574 days of row 1's 2026-05-19",
         ),
         (
-            [MISSING, THE_SCHEDULE, THE_HOLIDAYS],
+            [MISSING, "daily", THE_SCHEDULE, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle",
         ),
         (
-            [None, THE_SCHEDULE, THE_HOLIDAYS],
+            [None, "daily", THE_SCHEDULE, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: valuation_date is blank, expected valuation date handle",
         ),
         (
-            [MAY_25, THE_SCHEDULE, THE_HOLIDAYS],
+            [MAY_25, "daily", THE_SCHEDULE, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: valuation_date is number 46167.0, "
             "expected valuation date handle",
         ),
         (
-            ["x", THE_SCHEDULE, THE_HOLIDAYS],
+            ["x", "daily", THE_SCHEDULE, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: valuation_date is text 'x' naming no live object, "
             "expected valuation date handle",
         ),
         (
-            [THE_VALUATION, MISSING, THE_HOLIDAYS],
+            [THE_VALUATION, "daily", MISSING, THE_HOLIDAYS],
             "#ERROR _CreateCalendar: expiry_schedule is missing, expected expiry schedule handle",
         ),
         (
-            [THE_VALUATION, THE_SCHEDULE, MISSING],
+            [THE_VALUATION, "daily", THE_SCHEDULE, MISSING],
             "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle",
         ),
         (
-            [THE_VALUATION, THE_SCHEDULE, "calendar:000000:000001"],
+            [THE_VALUATION, "daily", THE_SCHEDULE, "calendar:000000:000001"],
             "#ERROR _CreateCalendar: holiday_calendar is text 'calendar:000000:000001' naming "
             "no live object, expected holiday calendar handle",
+        ),
+        (
+            [THE_VALUATION, MISSING, THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: fixing_mode is missing, expected text",
+        ),
+        (
+            [THE_VALUATION, None, THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: fixing_mode is blank, expected text",
+        ),
+        (
+            [THE_VALUATION, "", THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: fixing_mode is empty text, expected text",
+        ),
+        (
+            [THE_VALUATION, 1.0, THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: fixing_mode is number 1.0, expected text",
+        ),
+        (
+            [THE_VALUATION, True, THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: fixing_mode is boolean TRUE, expected text",
+        ),
+        (
+            [THE_VALUATION, "Daily", THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: ValueError: fixing_mode is 'Daily', "
+            "expected 'daily' or 'monthly'",
+        ),
+        (
+            [THE_VALUATION, " monthly", THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: ValueError: fixing_mode is ' monthly', "
+            "expected 'daily' or 'monthly'",
+        ),
+        (
+            [THE_VALUATION, "monthly", THE_SCHEDULE, THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: ValueError: fixing_mode 'monthly' requires "
+            "publication_date in expiry_schedule",
+        ),
+        (
+            [THE_VALUATION, "monthly", (("m26",), (MAY_19,)), THE_HOLIDAYS],
+            "#ERROR _CreateCalendar: ValueError: fixing_mode 'monthly' requires "
+            "publication_date in expiry_schedule",
         ),
     ],
     ids=[
@@ -189,6 +256,15 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
         "the schedule left out",
         "the holiday calendar left out",
         "a dead handle where the holiday calendar should be",
+        "the mode left out",
+        "a blank cell where the mode should be",
+        "empty text where the mode should be",
+        "a number where the mode should be",
+        "a boolean where the mode should be",
+        "the mode capitalized",
+        "the mode with a space before it",
+        "monthly over a schedule without publication dates",
+        "monthly over a schedule of one contract without them, the mode's rule first",
     ],
 )
 def test_a_calendar_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
@@ -211,26 +287,45 @@ def test_a_calendar_that_cannot_be_made_says_why(args: list[object], text: str) 
 def test_a_handle_of_another_kind_in_any_slot_is_refused_by_name() -> None:
     valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
     made = a_calendar(valuation, schedule, holidays)
-    assert bridge.call("_CreateCalendar", [schedule, schedule, holidays]) == (
+    assert bridge.call("_CreateCalendar", [schedule, "daily", schedule, holidays]) == (
         f"#ERROR _CreateCalendar: valuation_date is expiry schedule handle {schedule!r}, "
         "expected valuation date handle"
     )
-    assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
+    assert bridge.call("_CreateCalendar", [valuation, "daily", holidays, holidays]) == (
         f"#ERROR _CreateCalendar: expiry_schedule is holiday calendar handle {holidays!r}, "
         "expected expiry schedule handle"
     )
-    assert bridge.call("_CreateCalendar", [valuation, schedule, made]) == (
+    assert bridge.call("_CreateCalendar", [valuation, "daily", schedule, made]) == (
         f"#ERROR _CreateCalendar: holiday_calendar is calendar handle {made!r}, "
         "expected holiday calendar handle"
     )
+
+
+# The three-handle form of #82 to #86 is gone: its schedule lands in the mode's slot, which takes
+# any text, and its holiday calendar in the schedule's, which names the wrong kind.
+def test_the_old_three_argument_form_fails_and_makes_nothing() -> None:
+    valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
+    before = number(a_calendar(valuation, schedule, holidays))
+    assert bridge.call("_CreateCalendar", [valuation, schedule, holidays, MISSING]) == (
+        f"#ERROR _CreateCalendar: expiry_schedule is holiday calendar handle {holidays!r}, "
+        "expected expiry schedule handle"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, schedule, MISSING, MISSING]) == (
+        "#ERROR _CreateCalendar: expiry_schedule is missing, expected expiry schedule handle"
+    )
+    assert number(a_calendar(valuation, schedule, holidays)) == before + 1
 
 
 def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
     one = a_schedule(("m26",), (MAY_19,))
     before = number(a_calendar(valuation, schedule, holidays))
-    assert bridge.call("_CreateCalendar", [valuation, one, holidays]) == (
+    assert bridge.call("_CreateCalendar", [valuation, "daily", one, holidays]) == (
         "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, "monthly", schedule, holidays]) == (
+        "#ERROR _CreateCalendar: ValueError: fixing_mode 'monthly' requires publication_date "
+        "in expiry_schedule"
     )
     assert number(a_calendar(valuation, schedule, holidays)) == before + 1
 

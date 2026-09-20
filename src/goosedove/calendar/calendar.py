@@ -1,8 +1,10 @@
 """A calendar: every day of one index from the day after its first contract expires to the day
 its last expires, the contract prompt on each day, whether the market is open that day and
-whether the day is before the valuation date. docs/library/calendar/calendar.md is the page."""
+whether the day is before the valuation date, made for daily or for monthly fixings, as the
+caller says. docs/library/calendar/calendar.md is the page."""
 
 from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,17 +15,32 @@ from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 
 
+class FixingMode(Enum):
+    """How the index fixes, chosen by the caller and never inferred from the schedule: daily, a
+    settle on each business day, the fixings _CreateDailyFixings holds; or monthly, one
+    published price per contract, the fixings _CreateMonthlyFixings holds, which needs the day
+    each contract's price is published, the schedule's publication dates. The value of each is
+    the text the sheet types, exactly."""
+
+    DAILY = "daily"
+    MONTHLY = "monthly"
+
+
 @dataclass(frozen=True, slots=True)
 class Calendar:
-    """The three objects the calendar was built from, kept by reference, and four columns
-    aligned by position, all read-only: dates[i] is one calendar day, prompt[i] the row of the
-    schedule whose contract is prompt on it, never row 0, is_business_day[i] whether the
-    market is open on it, Monday to Friday and not a holiday, and is_past[i] whether it is
-    before the valuation date's day. The dates run from the day after the schedule's first
-    future expires to the day its last expires, every calendar day between, weekends and
-    holidays included. The prompt contract's code is the schedule's, read through the row."""
+    """The three objects the calendar was built from, kept by reference, its fixing mode, one
+    property of the whole calendar, and four columns aligned by position, all read-only:
+    dates[i] is one calendar day, prompt[i] the row of the schedule whose contract is prompt on
+    it, never row 0, is_business_day[i] whether the market is open on it, Monday to Friday and
+    not a holiday, and is_past[i] whether it is before the valuation date's day, a comparison
+    of dates that says nothing about whether the day has a fixing. The dates run from the day
+    after the schedule's first future expires to the day its last expires, every calendar day
+    between, weekends and holidays included, in either mode. The prompt contract's code is the
+    schedule's, read through the row, and so is its publication date when the schedule has
+    them, which a monthly calendar requires."""
 
     valuation_date: ValuationDate
+    fixing_mode: FixingMode
     expiry_schedule: ExpirySchedule
     holiday_calendar: HolidayCalendar
     dates: NDArray[np.datetime64]
@@ -34,11 +51,21 @@ class Calendar:
 
 def calendar(
     valuation_date: ValuationDate,
+    fixing_mode: str,
     expiry_schedule: ExpirySchedule,
     holiday_calendar: HolidayCalendar,
 ) -> Calendar:
-    """The one way to make a Calendar: four rules on the schedule, checked once, in this order,
-    the first failure being the message; then the four columns, made once here and never again.
+    """The one way to make a Calendar: two rules on the mode and four on the schedule, checked
+    once, in this order, the first failure being the message; then the four columns, made once
+    here and never again, the same in either mode.
+
+    The mode is the text the sheet typed, exactly 'daily' or 'monthly': nothing is trimmed or
+    cased, and nothing is read off the schedule, since a schedule with publication dates may
+    serve a daily index too. A monthly calendar needs the schedule's publication dates, the day
+    each contract's price is published, and the schedule's creator has already checked that
+    they are one per contract; they are kept where they are, in the schedule, each with its
+    contract's row, whether or not the day falls within the calendar, and nothing here reads
+    them, orders them or attaches a price to any day.
 
     The schedule has two contracts or more, since its first only bounds the calendar: nothing
     says when that contract became prompt, so it is never prompt here, and the calendar starts
@@ -61,6 +88,12 @@ def calendar(
     objects are kept by reference and not copied, and the columns are frozen. Rows count as the
     sheet counts them, the schedule's first row being row 1.
     """
+    try:
+        mode = FixingMode(fixing_mode)
+    except ValueError:
+        raise ValueError(f"fixing_mode is {fixing_mode!r}, expected 'daily' or 'monthly'") from None
+    if mode is FixingMode.MONTHLY and expiry_schedule.publication_date is None:
+        raise ValueError("fixing_mode 'monthly' requires publication_date in expiry_schedule")
     codes = expiry_schedule.codes
     expiries = expiry_schedule.future_expiry
     if len(codes) < 2:
@@ -94,5 +127,12 @@ def calendar(
     for column in (dates, prompt, is_business_day, is_past):
         column.setflags(write=False)
     return Calendar(
-        valuation_date, expiry_schedule, holiday_calendar, dates, prompt, is_business_day, is_past
+        valuation_date,
+        mode,
+        expiry_schedule,
+        holiday_calendar,
+        dates,
+        prompt,
+        is_business_day,
+        is_past,
     )

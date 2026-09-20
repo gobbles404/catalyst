@@ -1,7 +1,7 @@
 """The worksheet function of the calendar: every day of one index from its first contract's
-expiry to its last, with the contract prompt on each day and two flags, created once from three
-objects the sheet already holds and reached by handle. docs/library/calendar/calendar.md is the
-page.
+expiry to its last, with the contract prompt on each day and two flags, for daily or monthly
+fixings, created once from three objects the sheet already holds and reached by handle.
+docs/library/calendar/calendar.md is the page.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -28,6 +28,12 @@ def _CreateCalendar(
         "The valuation-date handle: the cell showing _CreateValuationDate's result, such as B2, "
         "or a name for it.",
     ],
+    fixing_mode: Annotated[
+        str,
+        "How the index fixes, the text daily or monthly, such as B4: daily for a settle on each "
+        "business day, monthly for one published price per contract, which needs the schedule's "
+        "publication dates.",
+    ],
     expiry_schedule: Annotated[
         Handle[ExpirySchedule],
         "The index's expiry-schedule handle: the cell showing _CreateExpirySchedule's result, "
@@ -39,7 +45,7 @@ def _CreateCalendar(
         "result, such as B12, or a name for it.",
     ],
 ) -> Handle[Calendar]:
-    """Creates the calendar of one index, every day after its first contract's expiry to its
-    last, with the contract prompt on each, whether the market is open and whether the day is
-    past, and shows its handle, the text other formulas take as the calendar."""
-    return calendar(valuation_date, expiry_schedule, holiday_calendar)
+    """Creates the calendar of one index for daily or monthly fixings, each day after its first
+    expiry to its last, its prompt contract, whether the market is open and whether it is past,
+    and shows its handle, the text other formulas take as the calendar."""
+    return calendar(valuation_date, fixing_mode, expiry_schedule, holiday_calendar)

@@ -152,7 +152,7 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
         ],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
-    handle = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
+    handle = bridge.call("_CreateCalendar", [valuation, "daily", schedule, holidays])
     kinds, slots, joined = read(handle)
     assert rows((kinds, slots, joined)) == [
         ["date", "prompt_contract", "is_business_day", "is_past"],
@@ -184,7 +184,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         [
             bridge.call(
                 "_CreateCalendar",
-                [bridge.call("_CreateValuationDate", [46163.0, 0.5]), schedule, holidays],
+                [bridge.call("_CreateValuationDate", [46163.0, 0.5]), "daily", schedule, holidays],
             ),
             bridge.call(
                 "_CreateDailyFixings", [headers, Cells.from_rows([[46162.0, 70.85]]), holidays]
@@ -203,7 +203,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         [
             bridge.call(
                 "_CreateCalendar",
-                [bridge.call("_CreateValuationDate", [46162.0, 0.5]), schedule, holidays],
+                [bridge.call("_CreateValuationDate", [46162.0, 0.5]), "daily", schedule, holidays],
             ),
             bridge.call(
                 "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
@@ -260,7 +260,7 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         (46162.0, 0.0, "closed", TEXT_CODE),
     ):
         holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[holiday]])])
-        calendar = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
+        calendar = bridge.call("_CreateCalendar", [valuation, "daily", schedule, holidays])
         fixings = bridge.call(
             "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
         )

@@ -170,12 +170,17 @@ $formulas = [ordered]@{
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI1)" = "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract"
     "=_CreateMonthlyFixings(BO2:BO5,AE2:AE5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'm26', expected number"
     "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle"
-    # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
-    # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
-    # with the contract prompt on it, whether the market is open and whether the day is past; a
-    # schedule of one contract, a code given twice, expiries backwards and a span no sheet could
-    # show, the library's words; the holiday calendar left out, the seam's.
+    # The calendar: a creator over the valuation date in AA2, the mode daily, the schedule in AI1
+    # and the holiday calendar in AM1, read back through util_ReadHandle, every day from 20 May to
+    # 20 October 2026 with the contract prompt on it, whether the market is open and whether the
+    # day is past, and a monthly one over the schedule with publication dates in AI3, the same
+    # kind; a schedule of one contract, a code given twice, expiries backwards and a span no
+    # sheet could show, the mode capitalized and monthly over a schedule without publication
+    # dates, the library's words; the holiday calendar left out, the mode left out, blank or
+    # empty, and the three-handle form of #82, its schedule taken as the mode, the seam's.
     "=LEFT(AR1,9)"                = "calendar:"
+    '=LEFT(_CreateCalendar(AA2,"monthly",AI3,AM1),9)' = "calendar:"
+    '=ROWS(util_ReadHandle(_CreateCalendar(AA2,"monthly",AI3,AM1)))' = "156"
     "=INDEX(util_ReadHandle(AR1),1,2)" = "prompt_contract"
     "=INDEX(util_ReadHandle(AR1),2,4)" = "bool"
     "=INDEX(util_ReadHandle(AR1),3,1)" = "46162"
@@ -186,11 +191,17 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AR1),156,2)" = "X26"
     "=INDEX(util_ReadHandle(AR1),156,4)" = "FALSE"
     "=ROWS(util_ReadHandle(AR1))"      = "156"
-    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
-    "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1"
-    "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
-    "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
-    "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
+    '=_CreateCalendar(AA2,"daily",AR2,AM1)' = "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
+    '=_CreateCalendar(AA2,"daily",AR3,AM1)' = "#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1"
+    '=_CreateCalendar(AA2,"daily",AR4,AM1)' = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
+    '=_CreateCalendar(AA2,"daily",AR5,AM1)' = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
+    '=_CreateCalendar(AA2,"Daily",AI1,AM1)' = "#ERROR _CreateCalendar: ValueError: fixing_mode is 'Daily', expected 'daily' or 'monthly'"
+    '=_CreateCalendar(AA2,"monthly",AI1,AM1)' = "#ERROR _CreateCalendar: ValueError: fixing_mode 'monthly' requires publication_date in expiry_schedule"
+    '=_CreateCalendar(AA2,"daily",AI1)' = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
+    '=_CreateCalendar(AA2,,AI1,AM1)' = "#ERROR _CreateCalendar: fixing_mode is missing, expected text"
+    '=_CreateCalendar(AA2,C2,AI1,AM1)' = "#ERROR _CreateCalendar: fixing_mode is blank, expected text"
+    '=_CreateCalendar(AA2,I2,AI1,AM1)' = "#ERROR _CreateCalendar: fixing_mode is empty text, expected text"
+    "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: expiry_schedule is missing, expected expiry schedule handle"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, read back
     # through util_ReadHandle, the calendar's four columns and the fixing price, a number on a past
     # business day, closed on a weekend and unfixed on the valuation day and after; a fixing on
@@ -212,6 +223,7 @@ $formulas = [ordered]@{
     "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
     "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
     "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle"
+    "=_CreateMarketHistory(CX2,CT6)" = "#ERROR _CreateMarketHistory: ValueError: monthly market history is not supported yet"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -369,7 +381,7 @@ $cells = [ordered]@{
     # holiday calendar the sheet already holds; then a schedule of one contract, one whose code
     # is given twice, one whose expiries run backwards and one whose span no sheet could show, for
     # the calendar to refuse.
-    "AR1" = "=_CreateCalendar(AA2,AI1,AM1)"
+    "AR1" = '=_CreateCalendar(AA2,"daily",AI1,AM1)'
     "AR2" = "=_CreateExpirySchedule(AE2,AF2)"
     "AS2" = "m26"; "AS3" = "m26"
     "AR3" = "=_CreateExpirySchedule(AS2:AS3,AF2:AF3)"
@@ -390,13 +402,13 @@ $cells = [ordered]@{
     "CQ6" = "26-May-2026"; "CR6" = "71.5"
     "CT3" = "=_CreateValuationDate(CT2,0.5)"
     "CT4" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3)"
-    "CT5" = "=_CreateCalendar(CT3,CT4,AM1)"
+    "CT5" = '=_CreateCalendar(CT3,"daily",CT4,AM1)'
     "CT6" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR5,AM1)"
     "CT7" = "=_CreateMarketHistory(CT5,CT6)"
     "CT8" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR6,AM1)"
     "CT9" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR4,AM1)"
     "CT10" = "=_CreateHolidayCalendar(CQ5)"
-    "CT11" = "=_CreateCalendar(CT3,CT4,CT10)"
+    "CT11" = '=_CreateCalendar(CT3,"daily",CT4,CT10)'
     # The price vector: a header over four prices, a zero and a negative among them and the
     # first repeated, a cell of numeric text under them, and one creator cell over the prices.
     "CU1" = "price"; "CU2" = "74.25"; "CU3" = "0"; "CU4" = "-0.5"; "CU5" = "74.25"
@@ -409,8 +421,12 @@ $cells = [ordered]@{
     "CW2" = "=_CreatePriceVector(CU2)"
     "CW1" = "=_CreateMarket(CT7,CW2)"
     "CW3" = "=_CreateExpirySchedule(AE3:AE4,AF3:AF4)"
-    "CW4" = "=_CreateCalendar(CT3,CW3,AM1)"
+    "CW4" = '=_CreateCalendar(CT3,"daily",CW3,AM1)'
     "CW5" = "=_CreateMarketHistory(CW4,CT6)"
+    # A monthly calendar over the two contracts with their publication dates, valued on 26-May,
+    # for the history to refuse.
+    "CX1" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3,,AJ2:AJ3)"
+    "CX2" = '=_CreateCalendar(CT3,"monthly",CX1,AM1)'
 }
 
 # --- build the host and tell it where Python is -----------------------------

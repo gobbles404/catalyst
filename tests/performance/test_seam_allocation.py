@@ -312,12 +312,13 @@ def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     )
 
 
-def calendar_sources(contracts: int) -> tuple[object, object, object]:
-    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
-    contracts a month apart, and a calendar of a hundred holidays a week apart."""
+def calendar_sources(contracts: int) -> tuple[object, str, object, object]:
+    """What a calendar takes: the valuation date's handle, the mode, daily, a schedule of that
+    many monthly contracts a month apart, and a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     return (
         ENTRY["_CreateValuationDate"](46276.0, 0.5),
+        "daily",
         ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING),
         ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
     )
@@ -327,26 +328,33 @@ def calendar_sources(contracts: int) -> tuple[object, object, object]:
 # two flags a byte each, and on the way pays the arange, the searchsorted and the flags'
 # temporaries: measured 8,620 bytes at 360 days on 2026-09-18, about 24 bytes per day on top of
 # a creator's small objects, which twice the slack covers; 66,741 at 3,630 days and 661,841 at
-# 36,630, 18 bytes per day. Reading it back pays the reader's rectangle, four cells per day,
+# 36,630, 18 bytes per day. The mode, since #87, adds one reference to the record and nothing
+# per day, daily or monthly alike. Reading it back pays the reader's rectangle, four cells per day,
 # the codes gathered as text and the days to serials: measured 26,308 at 360 days, about 18
 # bytes per cell; 251,938 at 3,630 days.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
-    valuation, schedule, holidays = calendar_sources(13)
+    valuation, mode, schedule, holidays = calendar_sources(13)
     assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, schedule, holidays))
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays))
         <= 25 * days + 2 * SLACK
     )
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    made = ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+    codes, futures, _, publications = schedule_columns(13)
+    published = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    assert (
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, "monthly", published, holidays))
+        <= 25 * days + 2 * SLACK
+    )
 
 
 def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
     before, under the same hundred Thursdays, so every past business day has one."""
-    valuation, schedule, holidays = calendar_sources(contracts)
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    valuation, mode, schedule, holidays = calendar_sources(contracts)
+    made = ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
@@ -434,7 +442,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
     holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    made = ENTRY["_CreateCalendar"](valuation, "daily", schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
