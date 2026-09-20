@@ -1289,14 +1289,15 @@ def monthly_market_sources(contracts: int) -> tuple[object, object]:
 # A year of days over thirteen contracts, four expired, and the three fixings they need: two
 # handles, each the text rule and one lookup, the builder's match on the mode and the kind,
 # then the monthly rules and the assignment in a function of their own, and one publication.
-# Twelve calls across nine functions, the daily history's count. On numpy: the schedule's
-# publication dates sorted once into a copy and looked at for a repeat; the expired contracts
+# Twelve calls across nine functions, the daily history's count. On numpy: one look at the
+# schedule's publication dates for their order, no sort and no copy; the expired contracts
 # found in one searchsorted over the expiries; the live contracts' dates and then the expired
 # ones' searched in the supplied dates, one searchsorted each, the two looks with their
-# reductions, and asanyarray on the way; the fixed rows found in one searchsorted over the
-# prompts and listed in one arange; the prices gathered once and copied out of the fixings;
-# the two columns frozen. No look at a day, a holiday or a flag, since the days of the expired
-# contracts are the calendar's first rows and the calendar is taken as it is.
+# reductions; the fixed rows found in one searchsorted over the prompts and listed in one
+# arange; the prices gathered once through the prompts, a gather raising no event the numpy
+# fixture reads; the two columns frozen. No sort, no copy and no look at a day, a holiday or a
+# flag, since the days of the expired contracts are the calendar's first rows and the calendar
+# is taken as it is.
 def test_a_monthly_history_is_two_handles_in_and_the_expired_contracts_priced(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1314,13 +1315,10 @@ def test_a_monthly_history_is_two_handles_in_and_the_expired_contracts_priced(
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
-        "ndarray.sort": 1,  # the schedule's publication dates, once, into a copy
-        "ndarray.any": 2,  # a repeated publication date, then a live contract's fixing
+        "ndarray.any": 2,  # the publication dates' order, then a live contract's fixing
         "ndarray.all": 1,  # every expired contract's fixing found
         "ndarray.searchsorted": 4,  # the expired contracts, the live dates, the wanted, the rows
-        "numpy.asanyarray": 1,
         "numpy.arange": 1,  # the fixed rows, the calendar's first
-        "ndarray.copy": 1,  # the prices, out of the fixings
         "ndarray.setflags": 2,  # the two columns frozen
         "ufunc.reduce": 3,
     }

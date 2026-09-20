@@ -1,6 +1,8 @@
-"""Monthly fixings: the price of one index for each contract month, dated by the day its settle
-was published, price beside publication date, as the desk keeps them, for an index published
-once a month. docs/library/market-data/monthly-fixings.md is the page."""
+"""Monthly fixings: the price of one index for each contract month, dated by the day the index's
+schedule says its settle is published, price beside publication date, as the desk keeps them,
+for an index published once a month; a price is what the desk holds for the month, the settle
+once published or a provisional value supplied before it appears, keyed by the same day.
+docs/library/market-data/monthly-fixings.md is the page."""
 
 from dataclasses import dataclass
 
@@ -12,8 +14,9 @@ from numpy.typing import NDArray
 class MonthlyFixings:
     """Publication dates and prices aligned by position, both read-only: publication_dates[i]
     and prices[i] describe one fixing. The dates are the schedule's publication dates from the
-    first to the last, every one and no other, increasing; a price is any number a cell holds,
-    zero and below included. The schedule the dates were checked against is not kept."""
+    first to the last, every one and no other, increasing, past or still to come; a price is
+    any number a cell holds, zero and below included, published or provisional, which nothing
+    here tells apart. The schedule the dates were checked against is not kept."""
 
     publication_dates: NDArray[np.datetime64]
     prices: NDArray[np.float64]
@@ -32,7 +35,9 @@ def monthly_fixings(
     after the row above, which keeps one fixing per publication in the order a reader searches;
     nothing is sorted, so a series pasted newest first fails at its second row. Each date is one
     the schedule publishes on, before its first and after its last as much as between them,
-    since a price on any other day is not this index's monthly settle. And no publication
+    since a price on any other day is not this index's monthly settle; a date still to come is
+    as good a key as a past one, the value a provisional one until the settle appears. And no
+    publication
     between the first date and the last is without a fixing, since a gap is a row the desk did
     not paste: with every date scheduled and the dates increasing, the series is whole exactly
     when each date is the schedule's next publication after the one above, one search over the

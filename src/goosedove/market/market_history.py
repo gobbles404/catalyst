@@ -131,10 +131,14 @@ def _monthly_history(calendar: Calendar, fixings: MonthlyFixings) -> MarketHisto
     which only bounds the calendar and is never prompt, needs no fixing. Each other expired
     contract needs the fixing dated its publication date, the day the schedule says its price
     is published: a fixing supplied is a value, provisional or published, and a value is
-    never invented here. The rules: the schedule's publication dates are each one contract's,
-    since a fixing keyed by date alone cannot tell two contracts apart; no fixing is supplied
-    for a contract of the schedule that has not expired, since its price is the live quote's
-    and never taken from history; and every expired contract's fixing is there, named with its
+    never invented here. The rules: the schedule's publication dates increase with its
+    contracts, each after the one before in the schedule's order, so that a fixing keyed by
+    date alone names one contract and the fixings the expired contracts need are one run of
+    the schedule's publications with no live contract's between, the series their own creator
+    accepts whole, a schedule publishing a later contract before an earlier one being refused
+    here, both rows named, before any fixing is looked at; no fixing is supplied for a
+    contract of the schedule that has not expired, since its price is the live quote's and
+    never taken from history; and every expired contract's fixing is there, named with its
     publication date when it is not. A fixing dated no contract's publication date, or the
     first contract's, is allowed and unused, and a publication date may fall after the
     valuation date or after the calendar's last day. The days are then assigned once: the
@@ -146,14 +150,12 @@ def _monthly_history(calendar: Calendar, fixings: MonthlyFixings) -> MarketHisto
     codes = schedule.codes
     published = cast(NDArray[np.datetime64], schedule.publication_date)  # a monthly calendar's
     as_of = calendar.valuation_date.as_of
-    in_order = np.sort(published)
-    twice = in_order[1:] == in_order[:-1]
-    if twice.any():
-        date = in_order[int(twice.argmax()) + 1]
-        shared = [repr(codes[row]) for row in np.flatnonzero(published == date).tolist()]
+    unordered = published[1:] <= published[:-1]
+    if unordered.any():
+        k = int(unordered.argmax())  # published[k + 1] is the first date not after the one before
         raise ValueError(
-            f"calendar publication date {date} is {', '.join(shared[:-1])} and {shared[-1]}, "
-            "expected one contract per publication date"
+            f"calendar publication date row {k + 2} is {published[k + 1]} for {codes[k + 1]!r}, "
+            f"expected a date after row {k + 1}'s {published[k]} for {codes[k]!r}"
         )
     expired = int(np.searchsorted(schedule.future_expiry, as_of, side="left"))
     supplied = fixings.publication_dates

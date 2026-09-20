@@ -617,6 +617,7 @@ def test_a_dead_market_handle_cannot_be_read() -> None:
 # published, valued on 25 June 2026 with the 24th a holiday, n26's fixing 2.95 dated the 23rd,
 # and the quotes 3.10 and 3.20 of q26 and u26.
 AUG_20, AUG_21, JUN_24, JUN_25 = 46254.0, 46255.0, 46197.0, 46198.0
+AUG_1, JUL_22, SEP_1 = 46235.0, 46225.0, 46266.0
 TOY = (
     ("m26", "n26", "q26", "u26"),
     (MAY_19, JUN_22, JUL_21, AUG_20),
@@ -723,9 +724,61 @@ def test_a_monthly_history_that_cannot_be_made_says_why() -> None:
         "_CreateMarketHistory",
         [ambiguous, bridge.call("_CreateMonthlyFixings", [JUN_23, 2.95, shared])],
     ) == (
-        "#ERROR _CreateMarketHistory: ValueError: calendar publication date 2026-06-23 is 'n26' "
-        "and 'q26', expected one contract per publication date"
+        "#ERROR _CreateMarketHistory: ValueError: calendar publication date row 3 is 2026-06-23 "
+        "for 'q26', expected a date after row 2's 2026-06-23 for 'n26'"
     )
+
+
+# The case a review of #88 found, through both creators: n26 published on 1 September, after
+# q26's 22 July and u26's 21 August, valued on 1 August with n26 and q26 expired. The two
+# fixings the history needs are a series with a gap to _CreateMonthlyFixings, the series with
+# u26's publication holds a live contract's fixing, and _CreateMarketHistory refuses the
+# schedule's order first, naming both rows; the same contracts published late in their order
+# take the two fixings the expired contracts need and nothing else.
+def test_publication_dates_out_of_order_are_refused_before_the_fixings_are_read() -> None:
+    reviewed = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            column("m26", "n26", "q26", "u26"),
+            column(MAY_19, JUN_22, JUL_21, AUG_20),
+            MISSING,
+            column(MAY_20, SEP_1, JUL_22, AUG_21),
+        ],
+    )
+    calendar = bridge.call(
+        "_CreateCalendar", [a_valuation(AUG_1), "monthly", reviewed, a_holiday_calendar(JUN_24)]
+    )
+    assert bridge.call(
+        "_CreateMonthlyFixings", [column(JUL_22, SEP_1), column(3.05, 2.95), reviewed]
+    ) == (
+        "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-09-01, "
+        "expected 2026-08-21, the schedule's publication after row 1's 2026-07-22"
+    )
+    whole = bridge.call(
+        "_CreateMonthlyFixings", [column(JUL_22, AUG_21, SEP_1), column(3.05, 3.15, 2.95), reviewed]
+    )
+    assert isinstance(whole, str) and whole.startswith("monthly_fixings:"), whole
+    assert bridge.call("_CreateMarketHistory", [calendar, whole]) == (
+        "#ERROR _CreateMarketHistory: ValueError: calendar publication date row 3 is 2026-07-22 "
+        "for 'q26', expected a date after row 2's 2026-09-01 for 'n26'"
+    )
+    ordered = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            column("m26", "n26", "q26", "u26"),
+            column(MAY_19, JUN_22, JUL_21, AUG_20),
+            MISSING,
+            column(MAY_20, SEP_1, SEP_1 + 1, SEP_1 + 2),
+        ],
+    )
+    late = bridge.call(
+        "_CreateCalendar", [a_valuation(AUG_1), "monthly", ordered, a_holiday_calendar(JUN_24)]
+    )
+    fixings = bridge.call(
+        "_CreateMonthlyFixings", [column(SEP_1, SEP_1 + 1), column(2.95, 3.05), ordered]
+    )
+    shown = rows(read(bridge.call("_CreateMarketHistory", [late, fixings])))
+    assert [row[4] for row in shown[2:]] == [2.95] * 34 + [3.05] * 29 + ["unfixed"] * 30
 
 
 def test_a_failed_monthly_history_publishes_no_object_and_no_handle() -> None:

@@ -196,15 +196,15 @@ def test_the_monthly_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMonthlyFixings"]
     assert not hidden
     assert description == (
-        "Creates the monthly fixings of one index from the days its settles were published and "
-        "their prices, checked against the publication dates of its expiry schedule, and shows "
-        "its handle, the text other formulas take as the fixings."
+        "Creates the monthly fixings of one index from its prices, published or provisional, each "
+        "dated the day its expiry schedule says the settle is published, and shows its handle, "
+        "the text other formulas take as the fixings."
     )
     assert arguments == [
         (
             "publication_date",
-            "The column of days the index's monthly settles were published, such as A2:A5 "
-            "holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
+            "The column of days the index's monthly settles are published, as its schedule "
+            "states them, such as A2:A5 holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
         ),
         ("price", "The column of prices beside the dates, such as B2:B5, one per date."),
         (

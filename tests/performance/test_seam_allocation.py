@@ -398,9 +398,9 @@ def monthly_sources(contracts: int) -> tuple[object, object]:
 # A monthly history keeps the same two columns, 16 bytes per day of an expired contract, every
 # day of it, weekends and holidays included, and nothing per day of the rest of the calendar;
 # on the way it pays the rows listed, the prompts of those rows and the prices gathered through
-# them, 8 bytes each per such day, and a sorted copy of the schedule's publication dates with
-# the searches over them, a few bytes per contract: measured 3,815 bytes at 360 days with 90
-# such days on 2026-09-20, and 4,427 at 3,600 days over 121 contracts with the same 90, the
+# them, 8 bytes each per such day, and the searches over the schedule's publication dates, a
+# few bytes per contract: measured 3,599 bytes at 360 days with 90 such days on
+# 2026-09-20, and 3,707 at 3,600 days over 121 contracts with the same 90, the
 # difference the contracts' own. Reading it back pays what the daily history's reading pays
 # less the words array, one word serving every day without a fixing: measured 50,227 at 360
 # days, about 28 bytes per cell, and 631,465 at 3,600.
