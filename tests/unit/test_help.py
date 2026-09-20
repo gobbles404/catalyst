@@ -196,15 +196,15 @@ def test_the_monthly_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMonthlyFixings"]
     assert not hidden
     assert description == (
-        "Creates the monthly fixings of one index from the days its settles were published and "
-        "their prices, checked against the publication dates of its expiry schedule, and shows "
-        "its handle, the text other formulas take as the fixings."
+        "Creates the monthly fixings of one index from its prices, published or provisional, each "
+        "dated the day its expiry schedule says the settle is published, and shows its handle, "
+        "the text other formulas take as the fixings."
     )
     assert arguments == [
         (
             "publication_date",
-            "The column of days the index's monthly settles were published, such as A2:A5 "
-            "holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
+            "The column of days the index's monthly settles are published, as its schedule "
+            "states them, such as A2:A5 holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
         ),
         ("price", "The column of prices beside the dates, such as B2:B5, one per date."),
         (
@@ -231,8 +231,9 @@ def test_the_market_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMarket"]
     assert not hidden
     assert description == (
-        "Creates the daily market of one index from its history and current futures prices and "
-        "shows its handle, the text other formulas take as the market."
+        "Creates the market of one index from its history and current futures prices, the prompt "
+        "contract's quote on each day still to fix, and shows its handle, the text other formulas "
+        "take as the market."
     )
     assert arguments == [
         (
@@ -285,8 +286,9 @@ def test_the_market_history_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMarketHistory"]
     assert not hidden
     assert description == (
-        "Creates the market history of one index, its calendar with the settle fixed on each "
-        "past business day, and shows its handle, the text other formulas take as the history."
+        "Creates the market history of one index, its calendar with the fixing on each day that "
+        "has fixed, the settle of each past business day or the price of each expired contract, "
+        "and shows its handle, the text other formulas take as the history."
     )
     assert arguments == [
         (
@@ -295,10 +297,10 @@ def test_the_market_history_creator_explains_itself() -> None:
             "or a name for it.",
         ),
         (
-            "daily_fixings",
-            "The index's daily-fixings handle: the cell showing the result of "
-            "_CreateDailyFixings, such as B10, or a name for it, with a fixing on every past "
-            "business day of the calendar.",
+            "fixings",
+            "The index's fixings handle, daily or monthly as the calendar's mode says: the cell "
+            "showing the result of _CreateDailyFixings or _CreateMonthlyFixings, such as B10, "
+            "or a name for it.",
         ),
     ]
 

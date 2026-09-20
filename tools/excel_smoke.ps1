@@ -219,11 +219,33 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(CT7),36,5)" = "unfixed"
     "=ROWS(util_ReadHandle(CT7))"      = "36"
     "=COLUMNS(util_ReadHandle(CT7))"   = "5"
-    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
-    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
-    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
-    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle"
-    "=_CreateMarketHistory(CX2,CT6)" = "#ERROR _CreateMarketHistory: ValueError: monthly market history is not supported yet"
+    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
+    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
+    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
+    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: fixings is missing, expected daily fixings or monthly fixings handle"
+    "=_CreateMarketHistory(CX2,CT6)" = "#ERROR _CreateMarketHistory: ValueError: fixings is daily fixings, expected monthly fixings for a monthly calendar"
+    # The monthly history and market: a monthly calendar over the six-contract schedule with its
+    # publication dates, valued on 25-Jun-2026, n26 expired and its fixing supplied in CY4, read
+    # back through util_ReadHandle, n26's fixing on every day of n26, a Saturday included, and
+    # unfixed on every day after; the market over it with four quotes, q26's on every day of
+    # q26, the 23rd and the 24th past and the 27th a Saturday, and u26's from 22-Jul; a fixing
+    # of q26, not expired, and no fixing of n26, the library's words; monthly fixings along the
+    # daily calendar in CT5, the library's too.
+    "=LEFT(CY5,15)"               = "market_history:"
+    "=INDEX(util_ReadHandle(CY5),34,5)" = "3.01"
+    "=INDEX(util_ReadHandle(CY5),36,5)" = "3.01"
+    "=INDEX(util_ReadHandle(CY5),37,5)" = "unfixed"
+    "=INDEX(util_ReadHandle(CY5),34,3)" = "FALSE"
+    "=ROWS(util_ReadHandle(CY5))"      = "156"
+    "=LEFT(CY11,7)"               = "market:"
+    "=INDEX(util_ReadHandle(CY11),34,5)" = "3.01"
+    "=INDEX(util_ReadHandle(CY11),37,5)" = "3.1"
+    "=INDEX(util_ReadHandle(CY11),38,5)" = "3.1"
+    "=INDEX(util_ReadHandle(CY11),41,5)" = "3.1"
+    "=INDEX(util_ReadHandle(CY11),66,5)" = "3.2"
+    "=_CreateMarketHistory(CY3,BQ1)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-07-22 is 'q26', not expired on 2026-06-25, expected fixings of expired contracts only"
+    "=_CreateMarketHistory(CY3,CY12)" = "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 'n26' published 2026-06-23, expected a fixing for every expired contract in calendar"
+    "=_CreateMarketHistory(CT5,CY4)" = "#ERROR _CreateMarketHistory: ValueError: fixings is monthly fixings, expected daily fixings for a daily calendar"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -427,6 +449,19 @@ $cells = [ordered]@{
     # for the history to refuse.
     "CX1" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3,,AJ2:AJ3)"
     "CX2" = '=_CreateCalendar(CT3,"monthly",CX1,AM1)'
+    # The monthly history and market: a valuation date, 25-Jun-2026, a monthly calendar over the
+    # schedule with publication dates in AI3, the monthly fixings of m26 and n26 from BO2:BP3,
+    # the anchor's unused, the history, four quotes, q26 through X26, their vector and the
+    # market; then the fixings of m26 alone, no fixing of n26, for the history to refuse.
+    "CY2" = "25-Jun-2026"
+    "CY1" = "=_CreateValuationDate(CY2,0.5)"
+    "CY3" = '=_CreateCalendar(CY1,"monthly",AI3,AM1)'
+    "CY4" = "=_CreateMonthlyFixings(BO2:BO3,BP2:BP3,AI3)"
+    "CY5" = "=_CreateMarketHistory(CY3,CY4)"
+    "CY6" = "3.1"; "CY7" = "3.2"; "CY8" = "3.3"; "CY9" = "3.4"
+    "CY10" = "=_CreatePriceVector(CY6:CY9)"
+    "CY11" = "=_CreateMarket(CY5,CY10)"
+    "CY12" = "=_CreateMonthlyFixings(BO2,BP2,AI3)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

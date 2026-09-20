@@ -214,6 +214,10 @@ Decided 2026-09-17, the whole number's bound.
 
 41. A whole number in is one a cell holds exactly, from −2^53 to 2^53, the line the way out already holds ([outputs.md](outputs.md) decision 6), so whatever a creator keeps can be read back. Beyond it the argument fails in the way out's words, `lot_size is number 1e+16, beyond what a cell holds exactly`, not as `expected whole number`, since 1E16 is whole: this is the one scalar rejection that says why in place of what was expected. 2^53 itself passes either side, and the next double past it fails. Found in review of #69, where a lot size of 1E16 made a contract spec that `util_ReadHandle` could not show.
 
+Decided 2026-09-20, a handle of one of several kinds.
+
+42. A parameter that takes the object behind a handle of one of several kinds declares them as a union inside the alias, `fixings: Handle[DailyFixings | MonthlyFixings]`, each a class the library defines, and receives the object, whichever kind it is. Decision 35's order and words stand, the kinds named together, `fixings is calendar handle 'calendar:3f9a1c:000012', expected daily fixings or monthly fixings handle`; decision 37 stands, one lookup and one test of the store's kind against the declared ones, nothing in the text parsed. Which kind arrived is the library's to tell, once, by its own means, and the seam says nothing of it. The union is a parameter's form: `object` among several kinds, one of the seam's own types or a table among them refuses to register as decision 34 says, and a creator names the one kind it makes, so a union as a result refuses too. First wanted by `_CreateMarketHistory` (#88), for the fixings of either kind the calendar's mode names.
+
 ## Not supported
 
 - References to other workbooks. The seam sees values only, so this is policy, not a check.
@@ -221,6 +225,6 @@ Decided 2026-09-17, the whole number's bound.
 
 ## Parked
 
-Handles, built in part by #53: the way in, `Handle[Kind]`, is decisions 34 to 37 above, taken by a creator since #79, `_CreateDailyFixings` and its calendar, where `util_ReadHandle` takes any handle by decision 40; the way out is [outputs.md](outputs.md), and the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text). Release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and columns of handles are open; the spec is [handles.md](handles.md).
+Handles, built in part by #53: the way in, `Handle[Kind]`, is decisions 34 to 37 above, taken by a creator since #79, `_CreateDailyFixings` and its calendar, where `util_ReadHandle` takes any handle by decision 40 and `_CreateMarketHistory` one of two kinds by decision 42; the way out is [outputs.md](outputs.md), and the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text). Release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and columns of handles are open; the spec is [handles.md](handles.md).
 
 The way out, results returning to the sheet, is [outputs.md](outputs.md).

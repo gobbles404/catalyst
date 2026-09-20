@@ -1,5 +1,5 @@
-"""The market history: three rules on the fixings against the calendar, and the two columns made
-once from two objects, the calendar kept as it is."""
+"""The market history: the fixings that fit the calendar's mode, the daily rules and the monthly
+rules, and the two columns made once from two objects, the calendar kept as it is."""
 
 import numpy as np
 import pytest
@@ -13,6 +13,7 @@ from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_s
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
+from goosedove.market_data.monthly_fixings import MonthlyFixings, monthly_fixings
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -171,13 +172,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             whole_fixings("2026-05-20", "2026-05-29"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
@@ -188,61 +189,61 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
                 CLOSED_MAY_25,
             ),
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-25", holidays=ELSEWHERE),
-            "daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
+            "fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
         ),
         (
             calendar(
                 MAY_26, "daily", SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22"))
             ),
             FIXINGS,
-            "daily_fixings date 2026-05-21 is a non-business day in calendar, expected no fixing",
+            "fixings date 2026-05-21 is a non-business day in calendar, expected no fixing",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21", "2026-05-22"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21"),
-            "daily_fixings has no fixing for 2026-05-22, "
+            "fixings has no fixing for 2026-05-22, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-22", holidays=holiday_calendar(dates("2026-05-21"))),
-            "daily_fixings has no fixing for 2026-05-21, "
+            "fixings has no fixing for 2026-05-21, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             calendar(MAY_26, "daily", SCHEDULE, ELSEWHERE),
             FIXINGS,
-            "daily_fixings has no fixing for 2026-05-25, "
+            "fixings has no fixing for 2026-05-25, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             calendar(valuation_date(day("2026-08-01"), 0.0), "daily", SCHEDULE, CLOSED_MAY_25),
             FIXINGS,
-            "daily_fixings has no fixing for 2026-05-26, "
+            "fixings has no fixing for 2026-05-26, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-11", "2026-05-12", "2026-05-13"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
@@ -255,13 +256,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
                 "2026-05-26",
                 holidays=ELSEWHERE,
             ),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21", "2026-05-22", "2026-05-25", holidays=ELSEWHERE),
-            "daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
+            "fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
         ),
     ],
     ids=[
@@ -297,7 +298,7 @@ def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
         )
         with pytest.raises(ValueError) as failure:
             market_history(made, late)
-        assert str(failure.value).startswith("daily_fixings date 2026-05-26 is on or after")
+        assert str(failure.value).startswith("fixings date 2026-05-26 is on or after")
         assert priced(market_history(made, FIXINGS)) == priced(a_history())
 
 
@@ -377,28 +378,417 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     assert history.fixing_prices.size == required.size
 
 
+# --- the fixings that fit the calendar's mode ------------------------------------
+
+
+PUBLISHED = expiry_schedule(
+    SCHEDULE.codes,
+    SCHEDULE.future_expiry,
+    None,
+    dates("2026-05-20", "2026-06-23", "2026-07-22"),
+)
+
+
+def monthly_fixings_on(
+    *pairs: tuple[str, float], schedule: ExpirySchedule = PUBLISHED
+) -> MonthlyFixings:
+    published = schedule.publication_date
+    assert published is not None
+    return monthly_fixings(
+        dates(*(d for d, _ in pairs)), np.array([p for _, p in pairs], dtype=np.float64), published
+    )
+
+
+# The calendar says how the index fixes, and the fixings must be of that kind: never read off
+# the fixings themselves, and never a monthly series along a daily calendar or the reverse.
+def test_the_fixings_must_be_of_the_calendars_kind() -> None:
+    daily = calendar(MAY_26, "daily", PUBLISHED, CLOSED_MAY_25)
+    monthly = calendar(MAY_26, "monthly", PUBLISHED, CLOSED_MAY_25)
+    with pytest.raises(ValueError) as failure:
+        market_history(daily, monthly_fixings_on(("2026-05-20", 2.5)))
+    assert str(failure.value) == (
+        "fixings is monthly fixings, expected daily fixings for a daily calendar"
+    )
+    with pytest.raises(ValueError) as failure:
+        market_history(monthly, FIXINGS)
+    assert str(failure.value) == (
+        "fixings is daily fixings, expected monthly fixings for a monthly calendar"
+    )
+    assert priced(market_history(daily, FIXINGS)) == priced(a_history())
+    assert market_history(monthly, monthly_fixings_on(("2026-05-20", 2.5))).fixed_rows.size == 0
+
+
 # --- a monthly calendar ---------------------------------------------------------
 
 
-# The history is the daily fixings' along a daily calendar; what a monthly calendar's history
-# is, one published price per contract, is not built, and a monthly calendar is refused before
-# any fixing is looked at.
-def test_a_monthly_calendar_is_refused_until_its_history_is_built() -> None:
-    published = expiry_schedule(
-        SCHEDULE.codes,
-        SCHEDULE.future_expiry,
-        None,
-        dates("2026-05-20", "2026-06-23", "2026-07-22"),
+# The page's example: four contracts, the first the anchor, each with the day its price is
+# published; valued on 25 June 2026 with the 24th a holiday, n26 expired on the 22nd and its
+# fixing supplied, q26 and u26 live.
+TOY = expiry_schedule(
+    ("m26", "n26", "q26", "u26"),
+    dates("2026-05-19", "2026-06-22", "2026-07-21", "2026-08-20"),
+    None,
+    dates("2026-05-20", "2026-06-23", "2026-07-22", "2026-08-21"),
+)
+CLOSED_JUN_24 = holiday_calendar(dates("2026-06-24"))
+MONTHLY = calendar(valuation_date(day("2026-06-25"), 0.5), "monthly", TOY, CLOSED_JUN_24)
+N26 = monthly_fixings_on(("2026-06-23", 2.95), schedule=TOY)
+
+
+def a_monthly_calendar(
+    as_of: str, fraction: float = 0.5, schedule: ExpirySchedule = TOY
+) -> Calendar:
+    return calendar(valuation_date(day(as_of), fraction), "monthly", schedule, CLOSED_JUN_24)
+
+
+def test_the_example_prices_every_day_of_the_expired_contract_and_no_other() -> None:
+    made = market_history(MONTHLY, N26)
+    assert made.calendar is MONTHLY
+    assert made.fixed_rows.tolist() == list(range(34))  # 20 May to 22 June, n26's days
+    assert made.fixing_prices.tolist() == [2.95] * 34
+    assert made.fixed_rows.dtype == np.dtype(np.intp)
+    assert made.fixing_prices.dtype == np.dtype(np.float64)
+    shown = priced(made)
+    assert shown["2026-05-20"] == shown["2026-06-20"] == shown["2026-06-22"] == 2.95
+    for text in (
+        "2026-06-23",
+        "2026-06-24",
+        "2026-06-25",
+        "2026-06-27",
+        "2026-07-22",
+        "2026-08-20",
+    ):
+        assert text not in shown
+    flags = dict(
+        zip((str(d) for d in MONTHLY.dates), MONTHLY.is_business_day.tolist(), strict=True)
     )
-    monthly = calendar(MAY_26, "monthly", published, CLOSED_MAY_25)
+    assert (
+        flags["2026-06-20"] is False and flags["2026-06-24"] is False
+    )  # priced or live, still closed
+
+
+# Valued on 1 August: n26 and q26 expired, each day of each taking its own fixing, u26 live.
+def test_several_expired_contracts_each_take_their_own_fixing_on_every_day() -> None:
+    made = market_history(
+        a_monthly_calendar("2026-08-01"),
+        monthly_fixings_on(("2026-06-23", 2.95), ("2026-07-22", 3.05), schedule=TOY),
+    )
+    assert made.fixed_rows.tolist() == list(range(63))  # 20 May to 21 July
+    shown = priced(made)
+    assert (
+        shown["2026-06-22"] == 2.95 and shown["2026-06-23"] == 3.05 and shown["2026-07-21"] == 3.05
+    )
+    assert "2026-07-22" not in shown
+    assert made.fixing_prices.tolist() == [2.95] * 34 + [3.05] * 29
+
+
+# Expiry day is live whatever fraction of it has elapsed; the day after, the contract has
+# expired and its fixing is required.
+def test_the_expiring_contract_is_live_on_its_expiry_day_and_expired_the_day_after() -> None:
+    anchor_only = monthly_fixings_on(("2026-05-20", 1.0), schedule=TOY)
+    for fraction in (0.0, 0.5, 1.0):
+        made = market_history(a_monthly_calendar("2026-06-22", fraction), anchor_only)
+        assert made.fixed_rows.size == 0 and made.fixing_prices.size == 0
+        with pytest.raises(ValueError) as failure:
+            market_history(a_monthly_calendar("2026-06-23", fraction), anchor_only)
+        assert str(failure.value) == (
+            "fixings has no fixing for 'n26' published 2026-06-23, "
+            "expected a fixing for every expired contract in calendar"
+        )
+        assert market_history(a_monthly_calendar("2026-06-23", fraction), N26).fixed_rows.size == 34
+
+
+# The days of a contract still live take nothing, past or not, open or closed: 23 and 24 June
+# are past and q26's, and stay unfixed for the market's quote.
+def test_past_days_of_a_live_contract_stay_unfixed() -> None:
+    made = market_history(MONTHLY, N26)
+    past_live = MONTHLY.is_past & (MONTHLY.prompt == 2)
+    assert past_live.sum() == 2
+    assert not np.isin(np.flatnonzero(past_live), made.fixed_rows).any()
+
+
+# A publication date may fall after the valuation date, or after the calendar's last day, and
+# the schedule's publication dates need no order: the fixing keyed by it is still the contract's.
+# Publication dates after the valuation date, and after the calendar's last day, still key the
+# fixings: the same contracts published late, in their order, valued on 1 August with n26 and
+# q26 expired, take the fixings dated 1 and 2 September; and a fixing dated a publication still
+# to come, the provisional roll's, keys its contract the day after expiry.
+def test_a_publication_date_after_valuation_or_after_the_calendar_still_keys_the_fixing() -> None:
+    late = expiry_schedule(
+        TOY.codes,
+        TOY.future_expiry,
+        None,
+        dates("2026-05-20", "2026-09-01", "2026-09-02", "2026-09-03"),
+    )
+    made = market_history(
+        a_monthly_calendar("2026-08-01", schedule=late),
+        monthly_fixings_on(("2026-09-01", 2.95), ("2026-09-02", 3.05), schedule=late),
+    )
+    assert made.fixed_rows.tolist() == list(range(63))
+    assert made.fixing_prices.tolist() == [2.95] * 34 + [3.05] * 29
+    soon = expiry_schedule(
+        TOY.codes,
+        TOY.future_expiry,
+        None,
+        dates("2026-05-20", "2026-06-24", "2026-07-22", "2026-08-21"),
+    )
+    provisional = market_history(
+        a_monthly_calendar("2026-06-23", schedule=soon),
+        monthly_fixings_on(("2026-06-24", 2.90), schedule=soon),
+    )
+    assert provisional.fixing_prices.tolist() == [2.90] * 34
+
+
+def test_a_missing_required_fixing_names_the_contract_and_its_publication_date() -> None:
     with pytest.raises(ValueError) as failure:
-        market_history(monthly, FIXINGS)
-    assert str(failure.value) == "monthly market history is not supported yet"
+        market_history(a_monthly_calendar("2026-08-01"), N26)
+    assert str(failure.value) == (
+        "fixings has no fixing for 'q26' published 2026-07-22, "
+        "expected a fixing for every expired contract in calendar"
+    )
     with pytest.raises(ValueError) as failure:
-        market_history(monthly, fixings_on("2026-05-20"))
-    assert str(failure.value) == "monthly market history is not supported yet"
-    daily = calendar(MAY_26, "daily", published, CLOSED_MAY_25)
-    assert priced(market_history(daily, FIXINGS)) == priced(a_history())
+        market_history(MONTHLY, monthly_fixings_on(("2026-05-20", 1.0), schedule=TOY))
+    assert str(failure.value) == (
+        "fixings has no fixing for 'n26' published 2026-06-23, "
+        "expected a fixing for every expired contract in calendar"
+    )
+
+
+# The schedule's publication dates increase with its contracts: two sharing a date, three, a
+# later contract published before an earlier one and the anchor published after the next are
+# refused, naming both rows, before any fixing is looked at, whatever the fixings hold.
+def test_publication_dates_out_of_the_contracts_order_are_refused_by_row_and_name() -> None:
+    for published, fixing, message in (
+        (
+            ("2026-05-20", "2026-06-23", "2026-06-23", "2026-08-21"),
+            "2026-06-23",
+            "calendar publication date row 3 is 2026-06-23 for 'q26', "
+            "expected a date after row 2's 2026-06-23 for 'n26'",
+        ),
+        (
+            ("2026-06-23", "2026-06-23", "2026-06-23", "2026-08-21"),
+            "2026-06-23",
+            "calendar publication date row 2 is 2026-06-23 for 'n26', "
+            "expected a date after row 1's 2026-06-23 for 'm26'",
+        ),
+        (
+            ("2026-05-20", "2026-09-01", "2026-07-22", "2026-08-21"),
+            "2026-07-22",
+            "calendar publication date row 3 is 2026-07-22 for 'q26', "
+            "expected a date after row 2's 2026-09-01 for 'n26'",
+        ),
+        (
+            ("2026-06-24", "2026-06-23", "2026-07-22", "2026-08-21"),
+            "2026-06-23",
+            "calendar publication date row 2 is 2026-06-23 for 'n26', "
+            "expected a date after row 1's 2026-06-24 for 'm26'",
+        ),
+    ):
+        schedule = expiry_schedule(TOY.codes, TOY.future_expiry, None, dates(*published))
+        with pytest.raises(ValueError) as failure:
+            market_history(
+                a_monthly_calendar("2026-06-25", schedule=schedule),
+                monthly_fixings_on((fixing, 2.95), schedule=schedule),
+            )
+        assert str(failure.value) == message
+
+
+# The case a review of #88 found, through both builders: n26 published on 1 September, after
+# q26's 22 July and u26's 21 August, valued on 1 August with n26 and q26 expired. The run the
+# history would need, 22 July and 1 September, skips u26's publication, which the fixings'
+# builder refuses as a gap; the run with u26's holds a live contract's fixing; so the order
+# rule refuses the schedule before either is looked at, and the same contracts published late
+# in their order take exactly the run the expired contracts need.
+def test_a_schedule_publishing_out_of_order_cannot_be_served_and_is_refused_first() -> None:
+    reviewed = expiry_schedule(
+        TOY.codes,
+        TOY.future_expiry,
+        None,
+        dates("2026-05-20", "2026-09-01", "2026-07-22", "2026-08-21"),
+    )
+    with pytest.raises(ValueError) as gap:
+        monthly_fixings_on(("2026-07-22", 3.05), ("2026-09-01", 2.95), schedule=reviewed)
+    assert str(gap.value) == (
+        "publication_date row 2 is 2026-09-01, expected 2026-08-21, "
+        "the schedule's publication after row 1's 2026-07-22"
+    )
+    whole = monthly_fixings_on(
+        ("2026-07-22", 3.05), ("2026-08-21", 3.15), ("2026-09-01", 2.95), schedule=reviewed
+    )
+    with pytest.raises(ValueError) as order:
+        market_history(a_monthly_calendar("2026-08-01", schedule=reviewed), whole)
+    assert str(order.value) == (
+        "calendar publication date row 3 is 2026-07-22 for 'q26', "
+        "expected a date after row 2's 2026-09-01 for 'n26'"
+    )
+    ordered = expiry_schedule(
+        TOY.codes,
+        TOY.future_expiry,
+        None,
+        dates("2026-05-20", "2026-09-01", "2026-09-02", "2026-09-03"),
+    )
+    made = market_history(
+        a_monthly_calendar("2026-08-01", schedule=ordered),
+        monthly_fixings_on(("2026-09-01", 2.95), ("2026-09-02", 3.05), schedule=ordered),
+    )
+    assert priced(made) == {
+        **{str(d): 2.95 for d in made.calendar.dates[:34]},
+        **{str(d): 3.05 for d in made.calendar.dates[34:63]},
+    }
+
+
+# The anchor's fixing and a fixing of another schedule are unused; a fixing of a contract not
+# yet expired is refused, since its price is the live quote's.
+def test_extra_fixings_are_unused_unless_they_are_a_live_contracts() -> None:
+    with_anchor = monthly_fixings_on(("2026-05-20", 1.0), ("2026-06-23", 2.95), schedule=TOY)
+    assert priced(market_history(MONTHLY, with_anchor)) == priced(market_history(MONTHLY, N26))
+    other = monthly_fixings(dates("2026-01-05"), np.array([1.85]), dates("2026-01-05"))
+    assert market_history(a_monthly_calendar("2026-06-22"), other).fixed_rows.size == 0
+    with pytest.raises(ValueError) as failure:
+        market_history(
+            MONTHLY, monthly_fixings_on(("2026-06-23", 2.95), ("2026-07-22", 3.05), schedule=TOY)
+        )
+    assert str(failure.value) == (
+        "fixings date 2026-07-22 is 'q26', not expired on 2026-06-25, "
+        "expected fixings of expired contracts only"
+    )
+    with pytest.raises(ValueError) as failure:
+        market_history(
+            a_monthly_calendar("2026-05-01"),
+            monthly_fixings_on(("2026-05-20", 1.0), ("2026-06-23", 2.95), schedule=TOY),
+        )
+    assert str(failure.value) == (
+        "fixings date 2026-06-23 is 'n26', not expired on 2026-05-01, "
+        "expected fixings of expired contracts only"
+    )
+
+
+# The provisional roll: on expiry day n26 is live; the day after, the desk supplies a value
+# keyed by n26's scheduled publication date, whatever it is; when the published price arrives
+# the desk replaces it, and the earlier history stands as it was.
+def test_the_provisional_roll() -> None:
+    soon = expiry_schedule(
+        TOY.codes,
+        TOY.future_expiry,
+        None,
+        dates("2026-05-20", "2026-06-24", "2026-07-22", "2026-08-21"),
+    )
+    on_expiry = market_history(
+        a_monthly_calendar("2026-06-22", 1.0, schedule=soon),
+        monthly_fixings_on(("2026-05-20", 1.0), schedule=soon),
+    )
+    assert on_expiry.fixed_rows.size == 0
+    provisional = market_history(
+        a_monthly_calendar("2026-06-23", 0.0, schedule=soon),
+        monthly_fixings_on(("2026-06-24", 2.90), schedule=soon),
+    )
+    assert provisional.fixing_prices.tolist() == [2.90] * 34
+    published = market_history(
+        provisional.calendar, monthly_fixings_on(("2026-06-24", 2.95), schedule=soon)
+    )
+    assert published.fixing_prices.tolist() == [2.95] * 34
+    assert provisional.fixing_prices.tolist() == [2.90] * 34
+    assert published.calendar is provisional.calendar
+
+
+# Valued before the calendar, nothing is required and nothing priced; inside, the expired
+# contracts; after its last day, every contract but the anchor.
+def test_valuation_before_inside_and_after_the_calendar() -> None:
+    before = market_history(
+        a_monthly_calendar("2026-05-01"), monthly_fixings_on(("2026-05-20", 1.0), schedule=TOY)
+    )
+    assert before.fixed_rows.size == 0 and before.calendar.dates.size == 93
+    inside = market_history(MONTHLY, N26)
+    assert inside.fixed_rows.size == 34
+    after = market_history(
+        a_monthly_calendar("2026-09-01"),
+        monthly_fixings_on(
+            ("2026-06-23", 2.95), ("2026-07-22", 3.05), ("2026-08-21", 3.15), schedule=TOY
+        ),
+    )
+    assert after.fixed_rows.tolist() == list(range(93))
+    assert after.fixing_prices.tolist() == [2.95] * 34 + [3.05] * 29 + [3.15] * 30
+
+
+def test_a_monthly_fixing_of_zero_or_below_is_a_price() -> None:
+    made = market_history(
+        a_monthly_calendar("2026-08-01"),
+        monthly_fixings_on(("2026-06-23", 0.0), ("2026-07-22", -1.5), schedule=TOY),
+    )
+    assert made.fixing_prices.tolist() == [0.0] * 34 + [-1.5] * 29
+
+
+def test_a_monthly_history_keeps_the_calendar_itself_and_changes_no_input() -> None:
+    dates_before, prompt_before = MONTHLY.dates.copy(), MONTHLY.prompt.copy()
+    fixings_before = N26.prices.copy()
+    first = market_history(MONTHLY, N26)
+    second = market_history(MONTHLY, monthly_fixings_on(("2026-06-23", 3.33), schedule=TOY))
+    assert first.calendar is MONTHLY and second.calendar is MONTHLY
+    assert np.array_equal(MONTHLY.dates, dates_before) and np.array_equal(
+        MONTHLY.prompt, prompt_before
+    )
+    assert np.array_equal(N26.prices, fixings_before)
+    assert not first.fixed_rows.flags.writeable and not first.fixing_prices.flags.writeable
+    with pytest.raises(ValueError):
+        first.fixing_prices[0] = 1.0
+    assert (
+        first.fixing_prices.tolist() == [2.95] * 34 and second.fixing_prices.tolist() == [3.33] * 34
+    )
+    assert not np.shares_memory(first.fixing_prices, N26.prices)
+
+
+# --- the general monthly rule ----------------------------------------------------
+
+
+def any_monthly_history(data: st.DataObject) -> MarketHistory:
+    """A monthly history of two to eight contracts up to 45 days apart, published in the order
+    they expire on days of their own, the run of publications up to 40 days before or after
+    the run of expiries, any holidays, valued on any day from the calendar's first to the day
+    after its last, with a fixing for every expired contract and for nothing else."""
+    count = data.draw(st.integers(2, 8))
+    gaps = data.draw(st.lists(st.integers(1, 45), min_size=count, max_size=count))
+    offsets = np.cumsum(gaps, dtype=np.int64)
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
+    )
+    expiries = start + offsets.astype("timedelta64[D]")
+    lags = data.draw(st.lists(st.integers(1, 45), min_size=count, max_size=count))
+    lead = data.draw(st.integers(-40, 40))
+    published: NDArray[np.datetime64] = start + (lead + np.cumsum(lags, dtype=np.int64)).astype(
+        "timedelta64[D]"
+    )
+    schedule = expiry_schedule(tuple(f"c{i}" for i in range(count)), expiries, None, published)
+    listed = expiries[0] + np.array(
+        data.draw(st.lists(st.integers(-20, 400), max_size=30)), dtype="timedelta64[D]"
+    )
+    span = int(offsets[-1] - offsets[0])
+    as_of: np.datetime64 = expiries[0] + np.timedelta64(data.draw(st.integers(1, span + 1)), "D")
+    made = calendar(
+        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))),
+        "monthly",
+        schedule,
+        holiday_calendar(listed),
+    )
+    expired = int(np.searchsorted(expiries, as_of, side="left"))
+    supplied = published[1:expired]
+    prices = 50.0 + np.arange(supplied.size, dtype=np.float64)
+    return market_history(made, monthly_fixings(supplied, prices, published))
+
+
+# For any monthly history: the fixed rows are exactly the days whose prompt contract expired
+# before the valuation day, and each takes the price supplied for its contract, 50 for the
+# schedule's second contract, 51 for its third, and so on, the anchor never among them.
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_day_of_an_expired_contract_takes_its_fixing_and_no_other_day_takes_one(
+    data: st.DataObject,
+) -> None:
+    history = any_monthly_history(data)
+    made = history.calendar
+    expired = made.expiry_schedule.future_expiry < made.valuation_date.as_of
+    assert history.fixed_rows.tolist() == np.flatnonzero(expired[made.prompt]).tolist()
+    assert history.fixing_prices.tolist() == (49.0 + made.prompt[history.fixed_rows]).tolist()
+    assert 0 not in made.prompt[history.fixed_rows]
 
 
 # --- ownership ----------------------------------------------------------------

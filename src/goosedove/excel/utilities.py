@@ -7,12 +7,12 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
 from functools import singledispatch
-from typing import Annotated, Any
+from typing import Annotated, Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
+from goosedove.calendar.calendar import Calendar, FixingMode
 from goosedove.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
@@ -128,13 +128,22 @@ def _priced_column(
 
 @shown.register
 def market_history_table(obj: MarketHistory) -> MixedArray:
-    # The calendar's four columns, then fixing_price: the settle on each past business day, a
-    # number, and a word on every other day, closed where the calendar has the market shut and
-    # unfixed where it is open, the valuation day and the days after it.
+    # The calendar's four columns, then fixing_price: the price on each fixed day, a number,
+    # and a word on every other day. For a daily calendar, closed where the market is shut and
+    # unfixed where it is open, the valuation day and the days after it; for a monthly one,
+    # unfixed on every day of a contract still live, weekends and holidays alike, since a
+    # monthly price falls on every day of its contract.
     calendar = obj.calendar
-    words = np.empty(calendar.dates.size, dtype=object)
-    words[:] = "closed"
-    words[calendar.is_business_day] = "unfixed"
+    words: NDArray[Any] | str
+    match calendar.fixing_mode:
+        case FixingMode.DAILY:
+            words = np.empty(calendar.dates.size, dtype=object)
+            words[:] = "closed"
+            words[calendar.is_business_day] = "unfixed"
+        case FixingMode.MONTHLY:
+            words = "unfixed"
+        case _:
+            assert_never(calendar.fixing_mode)
     return _priced_column(
         calendar_table(calendar), "fixing_price", words, (obj.fixed_rows, obj.fixing_prices)
     )
@@ -142,13 +151,21 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
 
 @shown.register
 def market_table(obj: Market) -> MixedArray:
-    # The calendar's four columns, then price: the fixing on each past business day, the quote
-    # of the prompt contract on each business day from the valuation day on, and closed on every
-    # other day. The quotes are gathered for those live rows alone, since a past day's prompt
+    # The calendar's four columns, then price: the history's fixing on each day it has, the
+    # quote of the prompt contract on each live day, and closed on the rest. For a daily
+    # calendar the live days are the business days from the valuation day on; for a monthly one
+    # every day of a contract not yet expired, weekends, holidays and past days alike, so no
+    # day is closed. The quotes are gathered for the live rows alone, since a past day's prompt
     # may precede the first contract quoted and would index before the vector.
     history = obj.market_history
     calendar = history.calendar
-    live = np.flatnonzero(calendar.is_business_day & ~calendar.is_past)
+    match calendar.fixing_mode:
+        case FixingMode.DAILY:
+            live = np.flatnonzero(calendar.is_business_day & ~calendar.is_past)
+        case FixingMode.MONTHLY:
+            live = np.flatnonzero(calendar.prompt >= obj.first_contract)
+        case _:
+            assert_never(calendar.fixing_mode)
     quotes = obj.price_vector.prices[calendar.prompt[live] - obj.first_contract]
     return _priced_column(
         calendar_table(calendar),

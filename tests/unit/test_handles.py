@@ -6,7 +6,15 @@ from typing import cast
 import pytest
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle, Table, TextRow, excel_function
+from goosedove.excel.bridge import (
+    MISSING,
+    Cells,
+    Handle,
+    Table,
+    TextRow,
+    excel_function,
+    register,
+)
 from goosedove.excel.probes import probe
 
 
@@ -23,6 +31,10 @@ class Other:
 
 class Steeper(Curve):
     """A subclass: not the declared kind, so a creator returning one fails."""
+
+
+class Third:
+    """A third kind, refused where one of two is expected."""
 
 
 _returns: dict[str, object] = {}
@@ -53,6 +65,17 @@ def FailToMake() -> Handle[Curve]:
 def ReadCurve(curve: Handle[Curve]) -> float:
     _seen["curve"] = curve
     return curve.level
+
+
+@probe
+def MakeThird() -> Handle[Third]:
+    return Third()
+
+
+@probe
+def ReadEither(item: Handle[Curve | Other]) -> str:
+    _seen["either"] = item
+    return type(item).__name__
 
 
 TEXT = re.compile(r"(curve|other):([0-9a-f]{6}):([0-9]{6})")
@@ -290,3 +313,72 @@ def test_a_creator_of_any_kind_and_a_bare_handle_refuse_to_register() -> None:
         excel_function(MakeAny)
     with pytest.raises(TypeError, match="ReadBare: handle declares Handle, which the seam cannot"):
         excel_function(ReadBare)
+
+
+# --- a handle of one of several kinds ------------------------------------------------
+
+
+# A parameter declared Handle[Curve | Other] takes a curve's handle or another's and receives
+# the object either stands for, the same object a single-kind parameter receives.
+def test_a_handle_of_either_declared_kind_resolves_to_its_object() -> None:
+    curve, other = bridge.call("MakeCurve", [1.5]), bridge.call("MakeOther", [])
+    assert bridge.call("ReadEither", [curve]) == "Curve"
+    bridge.call("ReadCurve", [curve])
+    assert _seen["either"] is _seen["curve"]
+    assert bridge.call("ReadEither", [other]) == "Other"
+
+
+def test_a_handle_of_a_third_kind_is_refused_naming_both_kinds() -> None:
+    third = bridge.call("MakeThird", [])
+    assert bridge.call("ReadEither", [third]) == (
+        f"#ERROR ReadEither: item is third handle {third!r}, expected curve or other handle"
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (3.0, "#ERROR ReadEither: item is number 3.0, expected curve or other handle"),
+        (None, "#ERROR ReadEither: item is blank, expected curve or other handle"),
+        (MISSING, "#ERROR ReadEither: item is missing, expected curve or other handle"),
+        ("", "#ERROR ReadEither: item is empty text, expected curve or other handle"),
+        (
+            "curve:000000:000001",
+            "#ERROR ReadEither: item is text 'curve:000000:000001' naming no live object, "
+            "expected curve or other handle",
+        ),
+        (
+            "#ERROR MakeCurve: ValueError: x",
+            "#ERROR ReadEither: item is the creator's failure, expected curve or other handle: "
+            "#ERROR MakeCurve: ValueError: x",
+        ),
+    ],
+    ids=["a number", "a blank", "missing", "empty text", "a dead handle", "a relayed failure"],
+)
+def test_a_handle_of_either_kind_keeps_every_other_failure(value: object, text: str) -> None:
+    assert bridge.call("ReadEither", [value]) == text
+
+
+# The kinds of a union are each a class the library defines: one of the seam's own, or object
+# beside another kind, refuses to register as an unknown annotation does; and a creator names
+# the one kind it makes, so a union as a result refuses to register too.
+def test_a_handle_of_several_kinds_registers_around_library_classes_as_a_parameter() -> None:
+    def Mixed(x: Handle[Curve | float]) -> float:
+        return 1.0
+
+    def AnyToo(x: Handle[Curve | object]) -> float:
+        return 1.0
+
+    def MakeEither() -> Handle[Curve | Other]:
+        return Curve(1.0)
+
+    with pytest.raises(TypeError, match=r"Mixed: x declares .*, which the seam"):
+        register(Mixed, hidden=True)
+    with pytest.raises(TypeError, match=r"AnyToo: x declares .*, which the seam"):
+        register(AnyToo, hidden=True)
+    with pytest.raises(
+        TypeError,
+        match="MakeEither declares a handle of several kinds as its result; "
+        "a creator names the one kind it makes",
+    ):
+        register(MakeEither, hidden=True)

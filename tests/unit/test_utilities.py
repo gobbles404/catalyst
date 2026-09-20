@@ -5,10 +5,11 @@ from typing import cast
 
 import numpy as np
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 from test_market import a_vector, any_history
+from test_market_history import any_monthly_history
 
 from goosedove.calendar.calendar import Calendar
 from goosedove.excel import bridge
@@ -274,6 +275,81 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, kind]
 
 
+# Serials for 18 to 23 May 2026: three contracts two days apart, each published the day after
+# it expires, over a four-day calendar with the Thursday a holiday. Valued on that Thursday with
+# n26's fixing supplied, n26 has expired: both of its days show the fixing in the history and
+# the market alike, a number each; q26's two days show unfixed in the history and, with q26's one
+# quote, the quote in the market, the holiday included. Valued on n26's expiry day instead, with
+# only the anchor's fixing supplied, which is ignored, every day is unfixed in the history and
+# the market shows each day its contract's quote, two quotes being required.
+def test_a_monthly_history_and_market_spill_a_price_on_every_day_by_kind() -> None:
+    schedule = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"], ["q26"]]),
+            Cells.from_rows([[46160.0], [46162.0], [46164.0]]),
+            MISSING,
+            Cells.from_rows([[46161.0], [46163.0], [46165.0]]),
+        ],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46163.0]])])
+    unfixed = ["unfixed"] * 4
+    for as_of, published, price, quotes, past, in_history, in_market in (
+        (
+            46163.0,
+            46163.0,
+            2.95,
+            [[3.10]],
+            [1.0, 1.0, 0.0, 0.0],
+            [2.95, 2.95, *unfixed[2:]],
+            [2.95, 2.95, 3.10, 3.10],
+        ),
+        (
+            46162.0,
+            46161.0,
+            1.0,
+            [[2.9], [3.10]],
+            [1.0, 0.0, 0.0, 0.0],
+            unfixed,
+            [2.9, 2.9, 3.10, 3.10],
+        ),
+    ):
+        valuation = bridge.call("_CreateValuationDate", [as_of, 0.5])
+        calendar = bridge.call("_CreateCalendar", [valuation, "monthly", schedule, holidays])
+        fixings = bridge.call(
+            "_CreateMonthlyFixings",
+            [Cells.from_rows([[published]]), Cells.from_rows([[price]]), schedule],
+        )
+        history = bridge.call("_CreateMarketHistory", [calendar, fixings])
+        kinds, slots, joined = read(history)
+        body = rows((kinds, slots, joined))
+        assert body[:2] == [
+            ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"],
+            ["datetime64[D]", "str", "bool", "bool", "float64"],
+        ]
+        assert body[2:] == [
+            [46161.0, "n26", 1.0, past[0], in_history[0]],
+            [46162.0, "n26", 1.0, past[1], in_history[1]],
+            [46163.0, "q26", 0.0, past[2], in_history[2]],
+            [46164.0, "q26", 1.0, past[3], in_history[3]],
+        ]
+        assert kinds[2:, 4].tolist() == [
+            TEXT_CODE if cell == "unfixed" else NUMBER_CODE for cell in in_history
+        ]
+        quote = bridge.call("_CreatePriceVector", [Cells.from_rows(quotes)])
+        kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
+        body = rows((kinds, slots, joined))
+        assert body[1][4] == "float64"
+        assert [row[:4] for row in body[2:]] == [
+            [46161.0, "n26", 1.0, past[0]],
+            [46162.0, "n26", 1.0, past[1]],
+            [46163.0, "q26", 0.0, past[2]],
+            [46164.0, "q26", 1.0, past[3]],
+        ]
+        assert [row[4] for row in body[2:]] == in_market
+        assert kinds[2:, 4].tolist() == [NUMBER_CODE] * 4
+
+
 # Four prices selected without a header, a zero and a negative among them and the first
 # repeated: the spill puts the header and the type over them, each price a number in its place.
 def test_a_price_vector_spills_one_column_of_prices_under_two_heading_rows() -> None:
@@ -464,3 +540,35 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
         else:
             assert shown_row[4] == float(quotes.prices[int(prompt) - first])
     assert "unfixed" not in table.texts
+
+
+# For any monthly history valued inside its calendar, with the fixings its expired contracts
+# require and the quotes the rest require: every day of an expired contract shows its fixing in
+# the history and the market alike, every other day shows unfixed in the history and its
+# contract's quote in the market, weekends and holidays the same as open days, and no day is
+# closed in either.
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_day_of_a_monthly_market_shows_its_contracts_fixing_or_quote(
+    data: st.DataObject,
+) -> None:
+    history = any_monthly_history(data)
+    calendar = history.calendar
+    assume(calendar.valuation_date.as_of <= calendar.dates[-1])
+    first = int(calendar.prompt[calendar.dates == calendar.valuation_date.as_of][0])
+    quotes = a_vector(*(100.0 + i for i in range(len(calendar.expiry_schedule.codes) - first)))
+    made = market(history, quotes)
+    fixed = dict(zip(history.fixed_rows.tolist(), history.fixing_prices.tolist(), strict=True))
+    fixings, prices = shown(history), shown(made)
+    history_rows = rows((fixings.kinds, fixings.numeric_slots, "\0".join(fixings.texts)))[2:]
+    market_rows = rows((prices.kinds, prices.numeric_slots, "\0".join(prices.texts)))[2:]
+    for row, (shown_fixing, shown_price, prompt) in enumerate(
+        zip(history_rows, market_rows, calendar.prompt, strict=True)
+    ):
+        assert shown_fixing[:4] == shown_price[:4]
+        if row in fixed:
+            assert shown_fixing[4] == fixed[row] and shown_price[4] == fixed[row]
+        else:
+            assert shown_fixing[4] == "unfixed"
+            assert shown_price[4] == float(quotes.prices[int(prompt) - first])
+    assert "closed" not in fixings.texts and "closed" not in prices.texts
