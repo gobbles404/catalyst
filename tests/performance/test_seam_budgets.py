@@ -1088,10 +1088,12 @@ def history_sources(contracts: int) -> tuple[object, object]:
 
 
 # A year of days and the fixings on its past business days: two handles, each the text rule and
-# one lookup, the builder's three looks, a fixing on or after the valuation date, a fixing on a
-# day the calendar closes and a past business day without one, its rows from one subtraction
-# over the fixings' days, the days covered in one zeros, and one publication. Eleven calls
-# across eight functions, the accept rule once per argument; no arange, no searchsorted and no
+# one lookup, the fixings' among two kinds, the builder's match on the calendar's mode and the
+# fixings' kind, then the daily rules' three looks, a fixing on or after the valuation date, a
+# fixing on a day the calendar closes and a past business day without one, its rows from one
+# subtraction over the fixings' days, the days covered in one zeros, and one publication.
+# Twelve calls across nine functions since #88, the daily rules a function of their own, from
+# eleven across eight, the accept rule once per argument; no arange, no searchsorted and no
 # look at a holiday, since the calendar is taken as it is and nothing of it is made again.
 def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
     call_profile: CallProfile, numpy_calls: CallProfile
@@ -1103,9 +1105,10 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
         "_arguments": 1,
         "_validate": 2,
         "_text": 2,  # each handle's text rule
-        "_resolve": 2,  # and its one lookup
+        "_resolve": 2,  # and its one lookup, the fixings' against two kinds
         "_CreateMarketHistory": 1,
         "market_history": 1,
+        "_daily_history": 1,  # the daily rules, chosen by the calendar's mode
         "_publish": 1,
     }
     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
@@ -1249,6 +1252,180 @@ def test_reading_a_market_back_rebuilds_nothing(
         "numpy.asarray": 2,
         "numpy.datetime_data": 1,  # the unit of the date column
         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+# --- the monthly history and market: the expired contracts priced, the rest quoted -------------
+
+
+def monthly_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a monthly history takes: a monthly calendar over the schedule of
+    schedule_columns with its publication dates, the day after each expiry, under the same
+    hundred Thursdays, valued on 11 September 2026, and fixings for the contracts expired by
+    then, the anchor's left out, so every expired contract has one and no other does."""
+    codes, futures, _, publications = schedule_columns(contracts)
+    schedule = PATH["_CreateExpirySchedule"](codes, futures, MISSING, publications)
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    made = PATH["_CreateCalendar"](valuation, "monthly", schedule, holidays)
+    expired = int(np.searchsorted(46161.0 + 30 * np.arange(contracts), 46276.0))
+    dates = Cells.from_rows([[46162.0 + 30 * i] for i in range(1, expired)])
+    prices = Cells.from_rows([[2.0 + i / 100] for i in range(1, expired)])
+    return made, PATH["_CreateMonthlyFixings"](dates, prices, schedule)
+
+
+def monthly_market_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a monthly market takes: the history monthly_sources makes and a vector
+    with one quote per contract from the valuation day's prompt through the last."""
+    history = PATH["_CreateMarketHistory"](*monthly_sources(contracts))
+    first = int(np.searchsorted(46161.0 + 30 * np.arange(contracts), 46276.0))
+    quotes = Cells.from_rows([[3.0 + i % 5 / 10] for i in range(contracts - first)])
+    return history, PATH["_CreatePriceVector"](quotes)
+
+
+# A year of days over thirteen contracts, four expired, and the three fixings they need: two
+# handles, each the text rule and one lookup, the builder's match on the mode and the kind,
+# then the monthly rules and the assignment in a function of their own, and one publication.
+# Twelve calls across nine functions, the daily history's count. On numpy: the schedule's
+# publication dates sorted once into a copy and looked at for a repeat; the expired contracts
+# found in one searchsorted over the expiries; the live contracts' dates and then the expired
+# ones' searched in the supplied dates, one searchsorted each, the two looks with their
+# reductions, and asanyarray on the way; the fixed rows found in one searchsorted over the
+# prompts and listed in one arange; the prices gathered once and copied out of the fixings;
+# the two columns frozen. No look at a day, a holiday or a flag, since the days of the expired
+# contracts are the calendar's first rows and the calendar is taken as it is.
+def test_a_monthly_history_is_two_handles_in_and_the_expired_contracts_priced(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made, fixings = monthly_sources(13)
+    PATH["_CreateMarketHistory"](made, fixings)
+    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,  # each handle's text rule
+        "_resolve": 2,  # and its one lookup, the fixings' against two kinds
+        "_CreateMarketHistory": 1,
+        "market_history": 1,
+        "_monthly_history": 1,  # the monthly rules, chosen by the calendar's mode
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "ndarray.sort": 1,  # the schedule's publication dates, once, into a copy
+        "ndarray.any": 2,  # a repeated publication date, then a live contract's fixing
+        "ndarray.all": 1,  # every expired contract's fixing found
+        "ndarray.searchsorted": 4,  # the expired contracts, the live dates, the wanted, the rows
+        "numpy.asanyarray": 1,
+        "numpy.arange": 1,  # the fixed rows, the calendar's first
+        "ndarray.copy": 1,  # the prices, out of the fixings
+        "ndarray.setflags": 2,  # the two columns frozen
+        "ufunc.reduce": 3,
+    }
+
+
+# Reading a monthly history back is reading its calendar back and then the fifth column through
+# the helper the daily history's reader shares, one empty fewer than the daily's: there is no
+# words array to make, since every day without a fixing shows the one word; no arange, no
+# searchsorted, nothing of the calendar made again.
+def test_reading_a_monthly_history_back_rebuilds_nothing(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made = PATH["_CreateMarketHistory"](*monthly_sources(13))
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "market_history_table": 1,
+        "_priced_column": 1,
+        "calendar_table": 1,
+        "MixedArray.table": 1,
+        "_table_column": 3,
+        "_unit": 1,
+        "_serials": 1,
+        "MixedArray.shape": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
+    assert calls == {
+        "numpy.array": 2,  # the calendar's: the codes as an array, its texts gathered
+        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "numpy.empty": 6,  # the calendar's two; the kinds, slots, pairs and mask, no words
+        "numpy.asarray": 2,
+        "numpy.datetime_data": 1,  # the unit of the date column
+        "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+# A monthly market is the daily one's call: two handles, the builder's two rules on scalars,
+# one number and one publication, eleven calls across eight functions and no numpy call; the
+# mode is read when the handle is, not here.
+def test_a_monthly_market_is_two_handles_in_and_one_number_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    history, quotes = monthly_market_sources(13)
+    PATH["_CreateMarket"](history, quotes)
+    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateMarket": 1,
+        "market": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
+
+
+# Reading a monthly market back is reading its calendar back, then the fifth column through the
+# helper: the live rows, every day of a contract not yet expired, found in one flatnonzero over
+# the prompts, their quotes read through them, the fixings and the quotes written into their
+# rows and no word left, the same calls as the daily market's reading; no arange, no
+# searchsorted, nothing of the calendar made again.
+def test_reading_a_monthly_market_back_rebuilds_nothing(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made = PATH["_CreateMarket"](*monthly_market_sources(13))
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "market_table": 1,
+        "_priced_column": 1,
+        "calendar_table": 1,
+        "MixedArray.table": 1,
+        "_table_column": 3,
+        "_unit": 1,
+        "_serials": 1,
+        "MixedArray.shape": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
+    assert calls == {
+        "numpy.array": 2,
+        "ndarray.ravel": 2,  # the calendar's texts in sheet order, and the live mask flattened
+        "numpy.asanyarray": 1,  # on the way to the live rows
+        "ndarray.nonzero": 1,  # the live rows
+        "numpy.empty": 6,
+        "numpy.asarray": 2,
+        "numpy.datetime_data": 1,
+        "ndarray.any": 5,
         "numpy.ascontiguousarray": 2,
         "ufunc.reduce": 5,
     }

@@ -16,6 +16,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holida
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.daily_fixings import daily_fixings
+from goosedove.market_data.monthly_fixings import monthly_fixings
 from goosedove.market_data.price_vector import PriceVector, price_vector
 
 
@@ -313,3 +314,54 @@ def test_making_a_market_changes_neither_input_and_two_markets_share_the_history
     assert first.market_history is second.market_history is HISTORY
     assert first.price_vector is QUOTES and second.price_vector is other
     assert again is not first and again.first_contract == first.first_contract == 1
+
+
+# --- a monthly market ------------------------------------------------------------
+
+
+# The page's example: the monthly history valued on 25 June with n26's fixing, and two quotes,
+# q26's and u26's: q26 is prompt on the valuation day, so it is the first quoted, and every day
+# of q26 and u26, the past 23rd and 24th included, is the market's to price from the vector.
+def test_a_monthly_market_quotes_the_contracts_not_yet_expired() -> None:
+    schedule = expiry_schedule(
+        ("m26", "n26", "q26", "u26"),
+        dates("2026-05-19", "2026-06-22", "2026-07-21", "2026-08-20"),
+        None,
+        dates("2026-05-20", "2026-06-23", "2026-07-22", "2026-08-21"),
+    )
+    published = schedule.publication_date
+    assert published is not None
+    made = calendar(
+        valuation_date(day("2026-06-25"), 0.5),
+        "monthly",
+        schedule,
+        holiday_calendar(dates("2026-06-24")),
+    )
+    history = market_history(
+        made, monthly_fixings(dates("2026-06-23"), np.array([2.95]), published)
+    )
+    quotes = a_vector(3.10, 3.20)
+    view = market(history, quotes)
+    assert view.first_contract == 2
+    assert view.market_history is history and view.price_vector is quotes
+    live = made.prompt >= view.first_contract
+    assert live.sum() == 93 - 34
+    assert (made.prompt[live] - view.first_contract).min() == 0
+    assert (made.prompt[live] - view.first_contract).max() == 1
+    assert not np.isin(np.flatnonzero(live), history.fixed_rows).any()
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(3.10))
+    assert str(failure.value) == (
+        "price_vector has 1 price, expected 2, one per contract from 'q26' through 'u26'"
+    )
+    on_expiry = calendar(
+        valuation_date(day("2026-06-22"), 1.0),
+        "monthly",
+        schedule,
+        holiday_calendar(dates("2026-06-24")),
+    )
+    still_live = market(
+        market_history(on_expiry, monthly_fixings(dates("2026-05-20"), np.array([1.0]), published)),
+        a_vector(2.95, 3.10, 3.20),
+    )
+    assert still_live.first_contract == 1
