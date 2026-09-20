@@ -51,7 +51,7 @@ def a_history(
 ) -> MarketHistory:
     """The history of that calendar, with a fixing on every business day from ten days before
     the calendar's first day to the day before the valuation date."""
-    made = calendar(valuation_date(day(as_of), fraction), schedule, holidays)
+    made = calendar(valuation_date(day(as_of), fraction), "daily", schedule, holidays)
     first = made.dates[0] - np.timedelta64(10, "D")
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
@@ -250,7 +250,10 @@ def any_history(data: st.DataObject) -> MarketHistory:
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(1, span)), "D")
     made = calendar(
-        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))), schedule, holidays
+        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))),
+        "daily",
+        schedule,
+        holidays,
     )
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]

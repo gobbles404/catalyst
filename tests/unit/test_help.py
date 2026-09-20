@@ -252,15 +252,21 @@ def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden
     assert description == (
-        "Creates the calendar of one index, every day after its first contract's expiry to its "
-        "last, with the contract prompt on each, whether the market is open and whether the day "
-        "is past, and shows its handle, the text other formulas take as the calendar."
+        "Creates the calendar of one index for daily or monthly fixings, each day after its "
+        "first expiry to its last, its prompt contract, whether the market is open and whether "
+        "it is past, and shows its handle, the text other formulas take as the calendar."
     )
     assert arguments == [
         (
             "valuation_date",
             "The valuation-date handle: the cell showing _CreateValuationDate's result, such as "
             "B2, or a name for it.",
+        ),
+        (
+            "fixing_mode",
+            "How the index fixes, the text daily or monthly, such as B4: daily for a settle on "
+            "each business day, monthly for one published price per contract, which needs the "
+            "schedule's publication dates.",
         ),
         (
             "expiry_schedule",

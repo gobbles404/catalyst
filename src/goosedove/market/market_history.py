@@ -3,11 +3,12 @@ its past business days, taken from the index's daily fixings, one price for ever
 none for any other. docs/library/market/market-history.md is the page."""
 
 from dataclasses import dataclass
+from typing import assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
+from goosedove.calendar.calendar import Calendar, FixingMode
 from goosedove.market_data.daily_fixings import DailyFixings
 
 
@@ -27,12 +28,17 @@ class MarketHistory:
 
 
 def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHistory:
-    """The one way to make a MarketHistory: three rules on the fixings against the calendar,
-    checked once, in this order, the first failure being the message; then the two columns.
+    """The one way to make a MarketHistory: one rule on the calendar and three on the fixings
+    against it, checked once, in this order, the first failure being the message; then the two
+    columns.
 
-    The calendar decides the days and the fixings supply the prices on them. Every fixing is
-    historical: none is dated on or after the valuation date's day, inside the calendar or out,
-    whatever fraction of the day has elapsed, since a price on the valuation day is not history.
+    The calendar is a daily one: this history is the daily fixings' along the calendar's
+    business days, and what a monthly calendar's history is, one published price per contract
+    on its publication date, is not built, so a monthly calendar is refused rather than read
+    by daily rules. The calendar decides the days and the fixings supply the prices on them.
+    Every fixing is historical: none is dated on or after the valuation date's day, inside the
+    calendar or out, whatever fraction of the day has elapsed, since a price on the valuation
+    day is not history.
     Every fixing inside the calendar's days is on a day the calendar has the market open, since
     a fixing on a day the calendar closes means the two disagree about a holiday, and neither
     is guessed right. And every past business day of the calendar has a fixing on that exact
@@ -48,6 +54,13 @@ def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHis
     prices copied out of the fixings' column, and both are frozen. Nothing is sorted and no
     calendar is rebuilt.
     """
+    match calendar.fixing_mode:
+        case FixingMode.DAILY:
+            pass
+        case FixingMode.MONTHLY:
+            raise ValueError("monthly market history is not supported yet")
+        case _:
+            assert_never(calendar.fixing_mode)
     as_of = calendar.valuation_date.as_of
     fixing_dates = daily_fixings.dates
     late = fixing_dates >= as_of

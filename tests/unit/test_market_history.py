@@ -36,7 +36,7 @@ MAY_26 = valuation_date(day("2026-05-26"), 0.5)
 CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
-CALENDAR = calendar(MAY_26, SCHEDULE, CLOSED_MAY_25)
+CALENDAR = calendar(MAY_26, "daily", SCHEDULE, CLOSED_MAY_25)
 
 
 def fixings_on(
@@ -116,6 +116,7 @@ def test_the_rows_the_page_shows() -> None:
 def test_a_single_required_fixing_is_a_history() -> None:
     one_day = calendar(
         valuation_date(day("2026-05-21"), 0.5),
+        "daily",
         a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-20")),
         CLOSED_MAY_25,
     )
@@ -148,7 +149,7 @@ def test_fixings_before_the_calendars_first_day_are_allowed_and_unused() -> None
 # A calendar entirely in the past, valued on 1 August 2026: every business day from 20 May to
 # 21 July needs a fixing, and the fixings running on to the end of July are allowed and unused.
 def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
-    past = calendar(valuation_date(day("2026-08-01"), 0.0), SCHEDULE, CLOSED_MAY_25)
+    past = calendar(valuation_date(day("2026-08-01"), 0.0), "daily", SCHEDULE, CLOSED_MAY_25)
     fixings = whole_fixings("2026-05-20", "2026-07-31")
     made = market_history(past, fixings)
     assert made.calendar is past
@@ -181,7 +182,10 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
         ),
         (
             calendar(
-                MAY_26, a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-22")), CLOSED_MAY_25
+                MAY_26,
+                "daily",
+                a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-22")),
+                CLOSED_MAY_25,
             ),
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27"),
             "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
@@ -193,7 +197,9 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
             "daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
         ),
         (
-            calendar(MAY_26, SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22"))),
+            calendar(
+                MAY_26, "daily", SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22"))
+            ),
             FIXINGS,
             "daily_fixings date 2026-05-21 is a non-business day in calendar, expected no fixing",
         ),
@@ -222,13 +228,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
             "expected a fixing for every past business day in calendar",
         ),
         (
-            calendar(MAY_26, SCHEDULE, ELSEWHERE),
+            calendar(MAY_26, "daily", SCHEDULE, ELSEWHERE),
             FIXINGS,
             "daily_fixings has no fixing for 2026-05-25, "
             "expected a fixing for every past business day in calendar",
         ),
         (
-            calendar(valuation_date(day("2026-08-01"), 0.0), SCHEDULE, CLOSED_MAY_25),
+            calendar(valuation_date(day("2026-08-01"), 0.0), "daily", SCHEDULE, CLOSED_MAY_25),
             FIXINGS,
             "daily_fixings has no fixing for 2026-05-26, "
             "expected a fixing for every past business day in calendar",
@@ -286,7 +292,9 @@ def test_a_history_that_cannot_be_made_says_why(
 def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
     late = fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26")
     for fraction in (0.0, 0.5, 1.0):
-        made = calendar(valuation_date(day("2026-05-26"), fraction), SCHEDULE, CLOSED_MAY_25)
+        made = calendar(
+            valuation_date(day("2026-05-26"), fraction), "daily", SCHEDULE, CLOSED_MAY_25
+        )
         with pytest.raises(ValueError) as failure:
             market_history(made, late)
         assert str(failure.value).startswith("daily_fixings date 2026-05-26 is on or after")
@@ -300,7 +308,7 @@ def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
 # the fixings, the last week of April, are before the valuation date, outside the calendar and
 # unused.
 def test_a_calendar_entirely_to_come_is_a_history_without_a_price() -> None:
-    future = calendar(valuation_date(day("2026-05-01"), 0.5), SCHEDULE, CLOSED_MAY_25)
+    future = calendar(valuation_date(day("2026-05-01"), 0.5), "daily", SCHEDULE, CLOSED_MAY_25)
     made = market_history(future, whole_fixings("2026-04-27", "2026-04-30"))
     assert made.calendar is future
     assert made.fixed_rows.size == 0
@@ -314,7 +322,7 @@ def test_a_calendar_entirely_to_come_is_a_history_without_a_price() -> None:
 # a business day, so nothing is required; the fixings, on the days before, are unused.
 def test_a_calendar_whose_past_days_are_all_closed_is_a_history_without_a_price() -> None:
     closed = calendar(
-        MAY_26, a_schedule(("m26", "2026-05-22"), ("n26", "2026-05-25")), CLOSED_MAY_25
+        MAY_26, "daily", a_schedule(("m26", "2026-05-22"), ("n26", "2026-05-25")), CLOSED_MAY_25
     )
     assert closed.is_past.all() and not closed.is_business_day.any()
     made = market_history(closed, FIXINGS)
@@ -342,7 +350,7 @@ def any_calendar(data: st.DataObject) -> Calendar:
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, span + 10)), "D")
     fraction = data.draw(st.sampled_from((0.0, 0.5, 1.0)))
-    return calendar(valuation_date(as_of, fraction), schedule, holiday_calendar(listed))
+    return calendar(valuation_date(as_of, fraction), "daily", schedule, holiday_calendar(listed))
 
 
 @settings(deadline=None)
@@ -367,6 +375,30 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     assert np.array_equal(fixings.dates[where], made.dates[required])
     assert np.array_equal(history.fixing_prices, fixings.settles[where])
     assert history.fixing_prices.size == required.size
+
+
+# --- a monthly calendar ---------------------------------------------------------
+
+
+# The history is the daily fixings' along a daily calendar; what a monthly calendar's history
+# is, one published price per contract, is not built, and a monthly calendar is refused before
+# any fixing is looked at.
+def test_a_monthly_calendar_is_refused_until_its_history_is_built() -> None:
+    published = expiry_schedule(
+        SCHEDULE.codes,
+        SCHEDULE.future_expiry,
+        None,
+        dates("2026-05-20", "2026-06-23", "2026-07-22"),
+    )
+    monthly = calendar(MAY_26, "monthly", published, CLOSED_MAY_25)
+    with pytest.raises(ValueError) as failure:
+        market_history(monthly, FIXINGS)
+    assert str(failure.value) == "monthly market history is not supported yet"
+    with pytest.raises(ValueError) as failure:
+        market_history(monthly, fixings_on("2026-05-20"))
+    assert str(failure.value) == "monthly market history is not supported yet"
+    daily = calendar(MAY_26, "daily", published, CLOSED_MAY_25)
+    assert priced(market_history(daily, FIXINGS)) == priced(a_history())
 
 
 # --- ownership ----------------------------------------------------------------

@@ -51,9 +51,12 @@ def a_holiday_calendar(*serials: float) -> str:
 SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 
 
-def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str:
+def a_calendar(
+    valuation: str | None = None, holidays: str | None = None, mode: str = "daily"
+) -> str:
     args = [
         valuation or a_valuation(),
+        mode,
         a_schedule(*SCHEDULE),
         holidays or a_holiday_calendar(MAY_25),
     ]
@@ -244,6 +247,30 @@ def test_a_history_that_cannot_be_made_says_why(args: list[object], text: str) -
         body, holiday = cast(tuple[list[list[float]], float], fixings)
         fixings = the_fixings(body, a_holiday_calendar(holiday))
     assert bridge.call("_CreateMarketHistory", [calendar, fixings]) == text
+
+
+# A monthly calendar, over the same schedule given its publication dates, is refused by the
+# history in the library's words, before any fixing is looked at.
+def test_a_monthly_calendar_is_refused_by_the_history() -> None:
+    published = bridge.call(
+        "_CreateExpirySchedule",
+        [
+            column("m26", "n26", "q26"),
+            column(MAY_19, JUN_22, JUL_21),
+            MISSING,
+            column(MAY_20, JUN_22 + 1, JUL_21 + 1),
+        ],
+    )
+    monthly = bridge.call(
+        "_CreateCalendar", [a_valuation(), "monthly", published, a_holiday_calendar(MAY_25)]
+    )
+    assert isinstance(monthly, str) and monthly.startswith("calendar:"), monthly
+    assert bridge.call("_CreateMarketHistory", [monthly, the_fixings()]) == (
+        "#ERROR _CreateMarketHistory: ValueError: monthly market history is not supported yet"
+    )
+    assert bridge.call("_CreateMarketHistory", [monthly, the_fixings(SAMPLE[:1])]) == (
+        "#ERROR _CreateMarketHistory: ValueError: monthly market history is not supported yet"
+    )
 
 
 def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:

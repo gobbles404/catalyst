@@ -991,38 +991,41 @@ def test_daily_fixings_are_a_table_and_a_calendar_in_and_one_publication_out(
 # --- the calendar: three handles in, four columns made once, one publication out ------------
 
 
-def calendar_sources(contracts: int) -> tuple[object, object, object]:
-    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
-    contracts a month apart, and a calendar of a hundred holidays a week apart."""
+def calendar_sources(contracts: int) -> tuple[object, str, object, object]:
+    """What a calendar takes: the valuation date's handle, the mode, daily, a schedule of that
+    many monthly contracts a month apart, and a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     return (
         PATH["_CreateValuationDate"](46276.0, 0.5),
+        "daily",
         PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING),
         PATH["_CreateHolidayCalendar"](holiday_column(100)),
     )
 
 
-# A year of days from thirteen contracts: three handles, each the text rule and one lookup,
-# the builder's one look at the order of the expiries, its days in one arange, the prompt row
-# of each in one searchsorted, the two flags, and one publication. Fourteen calls across eight
-# functions, the accept rule once per argument; is_busday and the comparison against the
-# valuation date raise no event the numpy fixture reads.
+# A year of days from thirteen contracts: three handles, each the text rule and one lookup, and
+# the mode, the text rule alone, the builder's look at the mode and its one look at the order of
+# the expiries, its days in one arange, the prompt row of each in one searchsorted, the two
+# flags, and one publication. Sixteen calls across eight functions, the accept rule once per
+# argument, from fourteen before the mode, which adds its check and its text rule; is_busday
+# and the comparison against the valuation date raise no event the numpy fixture reads, and nor
+# does the mode, held as an enum.
 def test_a_calendar_is_three_handles_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    valuation, schedule, holidays = calendar_sources(13)
-    PATH["_CreateCalendar"](valuation, schedule, holidays)
-    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, holidays)) == {
+    valuation, mode, schedule, holidays = calendar_sources(13)
+    PATH["_CreateCalendar"](valuation, mode, schedule, holidays)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, mode, schedule, holidays)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
-        "_text": 3,  # each handle's text rule
-        "_resolve": 3,  # and its one lookup
+        "_validate": 4,
+        "_text": 4,  # each handle's text rule, and the mode's
+        "_resolve": 3,  # each handle's one lookup
         "_CreateCalendar": 1,
         "calendar": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, holidays)) == {
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, mode, schedule, holidays)) == {
         "ndarray.any": 1,  # the builder's look at the order of the expiries
         "numpy.arange": 1,  # every day, once
         "ndarray.searchsorted": 1,  # the prompt row of every day, once
@@ -1076,8 +1079,8 @@ def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
     before, under the same hundred Thursdays, so every past business day has one."""
-    valuation, schedule, holidays = calendar_sources(contracts)
-    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    valuation, mode, schedule, holidays = calendar_sources(contracts)
+    made = PATH["_CreateCalendar"](valuation, mode, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
@@ -1170,7 +1173,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
     holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
-    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    made = PATH["_CreateCalendar"](valuation, "daily", schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
