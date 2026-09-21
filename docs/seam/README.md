@@ -60,6 +60,7 @@ Each page defines these where it first uses them; here they are once, so the pag
 | the runners, the summary, the before-and-after tool | `tools/performance/` |
 | the smoke test in a hidden Excel, Excel by hand, a workbook printed as its cells show, the build | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/excel_show.ps1`, `tools/host_build.ps1` |
 | the workbooks we keep, one per topic, for talking about a function on a real sheet | `workbooks/handles.xlsx` |
+| the validation workbooks, one per commodity, the market built on a real sheet over years of dated inputs and checked row by row against an oracle of their own, each with a page beside it, and the validator that replays each in a hidden Excel of its own | `workbooks/wti-validation.xlsx`, `ng-validation.xlsx`, `copper-validation.xlsx`; `tools/validate_wti_workbook.ps1`, `validate_ng_workbook.ps1` with `ng_benchmark_checks.ps1`, `validate_copper_workbook.ps1` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
 
