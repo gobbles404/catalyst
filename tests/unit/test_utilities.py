@@ -26,6 +26,7 @@ from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
+from goosedove.index_definitions.delivery_schedule import DeliverySchedule
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -122,6 +123,22 @@ def test_a_schedule_spills_its_columns_with_the_publication_dates_last() -> None
         ["m26", 46161.0, 46162.0],
         ["n26", 46195.0, 46196.0],
     ]
+
+
+# Serials for 1 and 30 November and 1 and 31 December 2026, two months of delivery.
+def test_a_delivery_schedule_spills_its_three_columns_under_two_heading_rows() -> None:
+    codes = Cells.from_rows([["X26"], ["Z26"]])
+    starts = Cells.from_rows([[46327.0], [46357.0]])
+    ends = Cells.from_rows([[46356.0], [46387.0]])
+    kinds, slots, joined = read(bridge.call("_CreateDeliverySchedule", [codes, starts, ends]))
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "delivery_start", "delivery_end"],
+        ["str", "datetime64[D]", "datetime64[D]"],
+        ["X26", 46327.0, 46356.0],
+        ["Z26", 46357.0, 46387.0],
+    ]
+    assert kinds.shape == (4, 3)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 2
 
 
 # Serials for 2 November and 1 December 2026, the days two reference prices are published.
@@ -514,6 +531,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IndexConventions,
         ContractSpecifications,
         PublicationSchedule,
+        DeliverySchedule,
         DailyFixings,
         MonthlyFixings,
         MarketHistory,

@@ -130,6 +130,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", 46023.0), Column(46328.0, 46357.0) }, "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
             yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), ExcelMissing.Value }, "#ERROR _CreatePublicationSchedule: publication_date is missing, expected column of dates" };
             yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), Row(46328.0, 46357.0) }, "#ERROR _CreatePublicationSchedule: publication_date is 1x2 array, expected column of dates" };
+            // The delivery schedule: an end column one row long and an end before its start, the library's words; a blank among the ends, a number among the codes, the ends left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", "Z26"), Column(46327.0, 46357.0), Column(46356.0, 46387.0, 46418.0) }, "#ERROR _CreateDeliverySchedule: ValueError: delivery_end has 3 dates, expected 2, one per contract_code" };
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", "Z26"), Column(46327.0, 46357.0), Column(46356.0, 46356.0) }, "#ERROR _CreateDeliverySchedule: ValueError: delivery_end row 2 is 2026-11-30, expected a date on or after row 2's delivery_start 2026-12-01" };
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", "Z26"), Column(46327.0, 46357.0), Column(46356.0, ExcelEmpty.Value) }, "#ERROR _CreateDeliverySchedule: delivery_end cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", 46023.0), Column(46327.0, 46357.0), Column(46356.0, 46387.0) }, "#ERROR _CreateDeliverySchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", "Z26"), Column(46327.0, 46357.0), ExcelMissing.Value }, "#ERROR _CreateDeliverySchedule: delivery_end is missing, expected column of dates" };
+            yield return new object[] { "_CreateDeliverySchedule", new object[] { Column("X26", "Z26"), Column(46327.0, 46357.0), Row(46356.0, 46387.0) }, "#ERROR _CreateDeliverySchedule: delivery_end is 1x2 array, expected column of dates" };
             // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
@@ -217,6 +224,36 @@ namespace Goosedove.Host.Tests
             var oneDay = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
+        }
+
+        // A delivery schedule: three columns make one, three single cells make one of one contract,
+        // equal ends and starts make periods of one day, and util_ReadHandle spills it back, the
+        // three headers, the three types, then a row per contract, the code as text and both days
+        // as serials.
+        [Fact]
+        public void a_delivery_schedule_is_created_from_three_columns_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreateDeliverySchedule", Column("X26", "Z26"), Column(46327.0, 46357.0), Column(46356.0, 46387.0));
+            Assert.StartsWith("delivery_schedule:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(4, spill.GetLength(0));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("delivery_start", spill[0, 1]);
+            Assert.Equal("delivery_end", spill[0, 2]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 1]);
+            Assert.Equal("datetime64[D]", spill[1, 2]);
+            Assert.Equal("X26", spill[2, 0]);
+            Assert.Equal(46327.0, spill[2, 1]);
+            Assert.Equal(46356.0, spill[2, 2]);
+            Assert.Equal("Z26", spill[3, 0]);
+            Assert.Equal(46387.0, spill[3, 2]);
+            var one = (string)Seam.Call("_CreateDeliverySchedule", "X26", 46327.0, 46356.0);
+            Assert.NotEqual(handle, one);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
+            var singleDays = (string)Seam.Call("_CreateDeliverySchedule", Column("X26", "Z26"), Column(46327.0, 46357.0), Column(46327.0, 46357.0));
+            Assert.Equal(46357.0, ((object[,])Seam.Call("util_ReadHandle", singleDays))[3, 2]);
         }
 
         // A publication schedule: two columns make one, two single cells make one of one contract,

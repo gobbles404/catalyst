@@ -121,6 +121,29 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     ]
 
 
+def test_the_delivery_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateDeliverySchedule"]
+    assert not hidden
+    assert description == (
+        "Creates a delivery schedule from the contract codes of one index and their first and "
+        "last delivery dates, and shows its handle, the text other formulas take as the schedule."
+    )
+    assert arguments == [
+        (
+            "contract_code",
+            "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
+        ),
+        (
+            "delivery_start",
+            "The column of first delivery dates beside the codes, such as B2:B3, one per code.",
+        ),
+        (
+            "delivery_end",
+            "The column of last delivery dates beside the codes, such as C2:C3, one per code.",
+        ),
+    ]
+
+
 def test_the_publication_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreatePublicationSchedule"]
     assert not hidden

@@ -264,6 +264,37 @@ def test_a_publication_schedule_keeps_a_copy_of_its_date_column() -> None:
     )
 
 
+def delivery_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last delivery day of that many monthly contracts, as the sheet
+    sends them: the codes of schedule_columns, and periods thirty days long a month apart."""
+    codes, _, _, _ = schedule_columns(contracts)
+    starts = Cells.from_rows([[46327.0 + 30 * i] for i in range(contracts)])
+    ends = Cells.from_rows([[46356.0 + 30 * i] for i in range(contracts)])
+    return codes, starts, ends
+
+
+# A delivery schedule keeps a copy of each date column, 16 bytes per contract, and the seam's
+# tuple of codes as it is, and on the way pays each column's conversion to days and its look,
+# and the one look over the two columns for a period ending before it starts: measured 5,144
+# bytes at 120 contracts on 2026-09-22, about 34 bytes per contract on top of a creator's small
+# objects, which twice the slack covers; 40,812 at 1,200 contracts, the expiry schedule with
+# options plus the endpoint look's byte per contract. Reading it back pays the table's kinds and
+# slots, three cells per contract, the codes gathered as text and the two date columns to
+# serials, and the mixed road's masks: measured 7,891 at 120 contracts, about 22 bytes per cell,
+# and 72,275 at 1,200, 20.
+def test_a_delivery_schedule_keeps_a_copy_of_each_date_column_and_reads_back_per_cell() -> None:
+    contracts = 120
+    codes, starts, ends = delivery_columns(contracts)
+    assert (
+        least_peak(lambda: ENTRY["_CreateDeliverySchedule"](codes, starts, ends))
+        <= 34 * contracts + 2 * SLACK
+    )
+    made = ENTRY["_CreateDeliverySchedule"](codes, starts, ends)
+    assert (
+        least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 22 * 3 * (contracts + 2) + 2 * SLACK
+    )
+
+
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:

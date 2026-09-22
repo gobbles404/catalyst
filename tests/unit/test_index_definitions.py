@@ -14,6 +14,7 @@ from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
+from goosedove.index_definitions.delivery_schedule import DeliverySchedule
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -449,6 +450,183 @@ def test_a_handle_of_another_kind_is_not_a_publication_schedule() -> None:
     assert bridge.call("ReadPublicationSchedule", [other]) == (
         f"#ERROR ReadPublicationSchedule: schedule is expiry schedule handle {other!r}, "
         "expected publication schedule handle"
+    )
+
+
+# --- _CreateDeliverySchedule -------------------------------------------------------
+
+
+# The delivery schedule page's sample as the sheet sends it: two codes as text and the serials
+# of 1 and 30 November and 1 and 31 December 2026.
+DELIVERY_CODES = Cells.from_rows([["X26"], ["Z26"]])
+DELIVERY_STARTS = Cells.from_rows([[46327.0], [46357.0]])
+DELIVERY_ENDS = Cells.from_rows([[46356.0], [46387.0]])
+DELIVERY = re.compile(r"delivery_schedule:[0-9a-f]{6}:([0-9]{6})")
+
+
+# The library has no consumer of a delivery schedule yet, so this hidden reader proves that a
+# handle resolves to the schedule the seam kept, with its columns as they arrived.
+@probe
+def ReadDeliverySchedule(schedule: Handle[DeliverySchedule]) -> str:
+    return (
+        f"{' '.join(schedule.codes)} | {days_or_none(schedule.delivery_start)} | "
+        f"{days_or_none(schedule.delivery_end)}"
+    )
+
+
+def a_delivery_schedule(codes: object, starts: object, ends: object) -> str:
+    text = bridge.call("_CreateDeliverySchedule", [codes, starts, ends])
+    assert isinstance(text, str) and DELIVERY.fullmatch(text), text
+    return text
+
+
+def test_a_delivery_schedule_is_created_from_three_columns_and_read_back() -> None:
+    schedule = a_delivery_schedule(DELIVERY_CODES, DELIVERY_STARTS, DELIVERY_ENDS)
+    assert bridge.call("ReadDeliverySchedule", [schedule]) == (
+        "X26 Z26 | 2026-11-01 2026-12-01 | 2026-11-30 2026-12-31"
+    )
+
+
+# Three single cells are three columns of one, so a schedule of one contract needs no range; and
+# equal dates are a period of one day.
+def test_three_single_cells_are_a_delivery_schedule_of_one_contract() -> None:
+    schedule = a_delivery_schedule("X26", 46327.0, 46356.0)
+    assert bridge.call("ReadDeliverySchedule", [schedule]) == "X26 | 2026-11-01 | 2026-11-30"
+    one_day = a_delivery_schedule("Z26", 46357.0, 46357.0)
+    assert bridge.call("ReadDeliverySchedule", [one_day]) == "Z26 | 2026-12-01 | 2026-12-01"
+
+
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [DELIVERY_CODES, Cells.from_rows([[46327.0]]), DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: ValueError: delivery_start has 1 date, expected 2, "
+            "one per contract_code",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0], [46387.0], [46418.0]])],
+            "#ERROR _CreateDeliverySchedule: ValueError: delivery_end has 3 dates, expected 2, "
+            "one per contract_code",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0], [46356.0]])],
+            "#ERROR _CreateDeliverySchedule: ValueError: delivery_end row 2 is 2026-11-30, "
+            "expected a date on or after row 2's delivery_start 2026-12-01",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_ENDS, DELIVERY_STARTS],
+            "#ERROR _CreateDeliverySchedule: ValueError: delivery_end row 1 is 2026-11-01, "
+            "expected a date on or after row 1's delivery_start 2026-11-30",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0], [None]])],
+            "#ERROR _CreateDeliverySchedule: delivery_end cell (2, 1) is blank, expected date",
+        ),
+        (
+            [DELIVERY_CODES, Cells.from_rows([[46327.5], [46357.0]]), DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: delivery_start cell (1, 1) is number 46327.5, "
+            "expected date",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([["30-Nov-2026"], [46387.0]])],
+            "#ERROR _CreateDeliverySchedule: delivery_end cell (1, 1) is text '30-Nov-2026', "
+            "expected date",
+        ),
+        (
+            [Cells.from_rows([["X26"], [46023.0]]), DELIVERY_STARTS, DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["X26", "Z26"]]), DELIVERY_STARTS, DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: contract_code is 1x2 array, expected column of text",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0, 46387.0]])],
+            "#ERROR _CreateDeliverySchedule: delivery_end is 1x2 array, expected column of dates",
+        ),
+        (
+            [MISSING, DELIVERY_STARTS, DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: contract_code is missing, expected column of text",
+        ),
+        (
+            [DELIVERY_CODES, MISSING, DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: delivery_start is missing, expected column of dates",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, MISSING],
+            "#ERROR _CreateDeliverySchedule: delivery_end is missing, expected column of dates",
+        ),
+        (
+            [DELIVERY_CODES, None, DELIVERY_ENDS],
+            "#ERROR _CreateDeliverySchedule: delivery_start is blank, expected column of dates",
+        ),
+        (
+            [DELIVERY_CODES, DELIVERY_STARTS, None],
+            "#ERROR _CreateDeliverySchedule: delivery_end is blank, expected column of dates",
+        ),
+        (
+            [DELIVERY_CODES, Cells.from_rows([[46327.0]]), Cells.from_rows([[46356.0], [None]])],
+            "#ERROR _CreateDeliverySchedule: delivery_end cell (2, 1) is blank, expected date",
+        ),
+    ],
+    ids=[
+        "a start column one row short",
+        "an end column one row long",
+        "an end before its start",
+        "the columns swapped",
+        "a blank in the end column",
+        "a start with a time",
+        "text in the end column",
+        "a number among the codes",
+        "a row of codes",
+        "a row of ends",
+        "the codes left out",
+        "the starts left out",
+        "the ends left out",
+        "a blank cell where the starts should be",
+        "a blank cell where the ends should be",
+        "the seam's blank before the library's short column",
+    ],
+)
+def test_a_delivery_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreateDeliverySchedule", args) == text
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_delivery_schedule_publishes_no_object_and_no_handle() -> None:
+    before = number(a_delivery_schedule(DELIVERY_CODES, DELIVERY_STARTS, DELIVERY_ENDS), DELIVERY)
+    assert bridge.call(
+        "_CreateDeliverySchedule", [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0]])]
+    ) == (
+        "#ERROR _CreateDeliverySchedule: ValueError: delivery_end has 1 date, expected 2, "
+        "one per contract_code"
+    )
+    assert bridge.call(
+        "_CreateDeliverySchedule", [DELIVERY_CODES, DELIVERY_ENDS, DELIVERY_STARTS]
+    ) == (
+        "#ERROR _CreateDeliverySchedule: ValueError: delivery_end row 1 is 2026-11-01, "
+        "expected a date on or after row 1's delivery_start 2026-11-30"
+    )
+    assert (
+        bridge.call(
+            "_CreateDeliverySchedule",
+            [DELIVERY_CODES, DELIVERY_STARTS, Cells.from_rows([[46356.0], [None]])],
+        )
+        == "#ERROR _CreateDeliverySchedule: delivery_end cell (2, 1) is blank, expected date"
+    )
+    assert number(
+        a_delivery_schedule(DELIVERY_CODES, DELIVERY_STARTS, DELIVERY_ENDS), DELIVERY
+    ) == (before + 1)
+
+
+def test_a_handle_of_another_kind_is_not_a_delivery_schedule() -> None:
+    other = a_schedule(CODES, FUTURES, MISSING, MISSING)
+    assert bridge.call("ReadDeliverySchedule", [other]) == (
+        f"#ERROR ReadDeliverySchedule: schedule is expiry schedule handle {other!r}, "
+        "expected delivery schedule handle"
     )
 
 

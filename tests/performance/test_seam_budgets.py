@@ -863,6 +863,88 @@ def test_a_publication_schedule_is_two_columns_in_and_one_publication_out(
     }
 
 
+# --- the sixth index definition: three columns in, one publication out, and read back ---------
+
+
+def delivery_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last delivery day of that many monthly contracts, as the sheet
+    sends them: the codes of schedule_columns, and periods thirty days long a month apart."""
+    codes, _, _, _ = schedule_columns(contracts)
+    starts = Cells.from_rows([[46327.0 + 30 * i] for i in range(contracts)])
+    ends = Cells.from_rows([[46356.0 + 30 * i] for i in range(contracts)])
+    return codes, starts, ends
+
+
+# Ten years of monthly deliveries: the text column handed over as it is, one look and two
+# conversions per date column, the builder's two copies with their rule, one look over the two
+# columns for a period ending before it starts, and one publication. Twenty-six calls across
+# fifteen functions, the accept rule once per argument.
+def test_a_delivery_schedule_is_three_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, starts, ends = delivery_columns(120)
+    PATH["_CreateDeliverySchedule"](codes, starts, ends)
+    assert call_profile(lambda: PATH["_CreateDeliverySchedule"](codes, starts, ends)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text_column": 1,
+        "_date_column": 2,
+        "_one_column": 3,
+        "_shape": 3,
+        "_texts": 1,
+        "_dates": 2,
+        "_not_dates": 2,
+        "_as_days": 2,
+        "_CreateDeliverySchedule": 1,
+        "delivery_schedule": 1,
+        "_one_per_code": 2,  # the count rule, once per date column
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateDeliverySchedule"](codes, starts, ends)) == {
+        "ndarray.any": 3,  # one look per date column for the calendar, then the periods' ends
+        "ndarray.astype": 4,  # each date column on its way to days
+        "numpy.array": 2,  # the two copies the schedule keeps
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 3,
+    }
+
+
+# Reading a delivery schedule back: a text call, one lookup, the table built from the codes and
+# the two date columns, each to serials with its two checks, then the mixed road out with its
+# three looks; nothing of the schedule is made again.
+def test_reading_a_delivery_schedule_back_is_its_three_columns_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made = PATH["_CreateDeliverySchedule"](*delivery_columns(120))
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "delivery_schedule_table": 1,
+        "MixedArray.table": 1,
+        "_table_column": 2,  # the two date columns; the codes are a tuple of text
+        "_unit": 2,
+        "_serials": 2,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ReadHandle"](made)) == {
+        "numpy.array": 1,  # the texts gathered
+        "ndarray.ravel": 1,  # in sheet order
+        "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
+        "numpy.asarray": 1,
+        "numpy.datetime_data": 2,  # the unit of each date column
+        "ndarray.any": 7,  # the serials' two checks per date column, then the road's three looks
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 7,
+    }
+
+
 # --- the third index definition: five texts in, one publication out ------------------
 
 
