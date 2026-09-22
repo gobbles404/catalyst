@@ -243,6 +243,27 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
 
 
+def publication_columns(contracts: int) -> tuple[Cells, Cells]:
+    """Codes and the day each contract's reference price is published, for that many monthly
+    contracts, as the sheet sends them: the codes and the publication dates of schedule_columns."""
+    codes, _, _, publications = schedule_columns(contracts)
+    return codes, publications
+
+
+# A publication schedule keeps a copy of its date column, 8 bytes per contract, and the seam's
+# tuple of codes as it is, and on the way pays the column's conversion to days and its look, as a
+# schedule without options does: measured 3,280 bytes at 120 contracts on 2026-09-22,
+# about 17 bytes per contract on top of a creator's small objects, which twice the slack covers;
+# 21,640 at 1,200 contracts, the two-column expiry schedule's figures to the byte.
+def test_a_publication_schedule_keeps_a_copy_of_its_date_column() -> None:
+    contracts = 120
+    codes, publications = publication_columns(contracts)
+    assert (
+        least_peak(lambda: ENTRY["_CreatePublicationSchedule"](codes, publications))
+        <= 17 * contracts + 2 * SLACK
+    )
+
+
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
