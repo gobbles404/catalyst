@@ -1,6 +1,6 @@
 # _CreatePublicationSchedule
 
-Built in #90.
+Built in #91.
 
 The publication schedule of one reference index: each contract's code and the day the index's reference price for that contract is published, kept as given and reached by handle. It is the fifth index definition, and the first to hold a fact of the publisher rather than the exchange: an expiry is the exchange's, the day a monthly index prints is the publisher's, and a gas market can have both, IFERC's monthly indices beside the NYMEX futures they settle against. Since #80 the [expiry schedule](expiry-schedule.md) carries a publication date beside each future, and the monthly [calendar](../calendar/calendar.md) and [market history](../market/market-history.md) read it there; this object is where that fact will live on its own. Its first planned reader is a publication-schedule path of `_CreateCalendar`, a later ticket, which takes this schedule directly, without an expiry schedule, row `i` pairing `codes[i]` with `publication_date[i]`, and after it the market history matching fixings to the scheduled dates; what a code must mean, whether codes repeat, whether dates increase and which fixings must be present are those readers' rules, written when they are. There is no join by code or by position with the expiry schedule. Nothing reads it yet but `util_ReadHandle`. The code is `src/goosedove/index_definitions/publication_schedule.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 
