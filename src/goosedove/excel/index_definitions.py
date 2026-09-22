@@ -22,6 +22,7 @@ from goosedove.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
 )
+from goosedove.index_definitions.delivery_schedule import DeliverySchedule, delivery_schedule
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
@@ -34,6 +35,7 @@ from goosedove.index_definitions.publication_schedule import (
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
     "_CreateContractSpecifications",
+    "_CreateDeliverySchedule",
     "_CreateExpirySchedule",
     "_CreateHolidayCalendar",
     "_CreateIndexConventions",
@@ -94,6 +96,26 @@ def _CreatePublicationSchedule(
     reference prices are published, and shows its handle, the text other formulas take as the
     schedule."""
     return publication_schedule(contract_code, publication_date)
+
+
+@excel_function
+def _CreateDeliverySchedule(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
+    ],
+    delivery_start: Annotated[
+        DateColumn,
+        "The column of first delivery dates beside the codes, such as B2:B3, one per code.",
+    ],
+    delivery_end: Annotated[
+        DateColumn,
+        "The column of last delivery dates beside the codes, such as C2:C3, one per code.",
+    ],
+) -> Handle[DeliverySchedule]:
+    """Creates a delivery schedule from the contract codes of one index and their first and last
+    delivery dates, and shows its handle, the text other formulas take as the schedule."""
+    return delivery_schedule(contract_code, delivery_start, delivery_end)
 
 
 @excel_function

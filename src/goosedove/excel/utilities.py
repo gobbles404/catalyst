@@ -23,6 +23,7 @@ from goosedove.excel.bridge import (
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
+from goosedove.index_definitions.delivery_schedule import DeliverySchedule
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -204,6 +205,19 @@ def publication_schedule_table(obj: PublicationSchedule) -> MixedArray:
         [("contract_code", "publication_date"), ("str", "datetime64[D]")],
         obj.codes,
         obj.publication_date,
+    )
+
+
+@shown.register
+def delivery_schedule_table(obj: DeliverySchedule) -> MixedArray:
+    return MixedArray.table(
+        [
+            ("contract_code", "delivery_start", "delivery_end"),
+            ("str", "datetime64[D]", "datetime64[D]"),
+        ],
+        obj.codes,
+        obj.delivery_start,
+        obj.delivery_end,
     )
 
 

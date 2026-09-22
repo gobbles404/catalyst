@@ -265,6 +265,26 @@ $formulas = [ordered]@{
     "=_CreatePublicationSchedule(DA6:DA7,DB2:DB3)" = "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreatePublicationSchedule(DA2:DA3)" = "#ERROR _CreatePublicationSchedule: publication_date is missing, expected column of dates"
     "=_CreatePublicationSchedule(DA2:DA3,DB2:DC2)" = "#ERROR _CreatePublicationSchedule: publication_date is 1x2 array, expected column of dates"
+    # The delivery schedule: a creator over two contract codes and the first and last day each one
+    # delivers, in DF to DH, over the first row alone, and over ends that make Z26 a single day,
+    # read back through util_ReadHandle; an end column one row long, a start column one row short
+    # and an end before its start, the library's words; a blank among the ends, a number among the
+    # codes and the ends left out, the seam's.
+    "=LEFT(DJ1,18)"               = "delivery_schedule:"
+    "=LEFT(DJ2,18)"               = "delivery_schedule:"
+    "=INDEX(util_ReadHandle(DJ1),1,3)" = "delivery_end"
+    "=INDEX(util_ReadHandle(DJ1),2,2)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(DJ1),3,1)" = "X26"
+    "=INDEX(util_ReadHandle(DJ1),4,3)" = "46387"
+    "=COLUMNS(util_ReadHandle(DJ1))"   = "3"
+    "=ROWS(util_ReadHandle(DJ2))"      = "3"
+    "=INDEX(util_ReadHandle(DJ3),4,3)" = "46357"
+    "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3,DH2:DH4)" = "#ERROR _CreateDeliverySchedule: ValueError: delivery_end has 3 dates, expected 2, one per contract_code"
+    "=_CreateDeliverySchedule(DF2:DF3,DG2,DH2:DH3)" = "#ERROR _CreateDeliverySchedule: ValueError: delivery_start has 1 date, expected 2, one per contract_code"
+    "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3,DI6:DI7)" = "#ERROR _CreateDeliverySchedule: ValueError: delivery_end row 2 is 2026-11-30, expected a date on or after row 2's delivery_start 2026-12-01"
+    "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3,DH6:DH7)" = "#ERROR _CreateDeliverySchedule: delivery_end cell (2, 1) is blank, expected date"
+    "=_CreateDeliverySchedule(DA6:DA7,DG2:DG3,DH2:DH3)" = "#ERROR _CreateDeliverySchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3)" = "#ERROR _CreateDeliverySchedule: delivery_end is missing, expected column of dates"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -490,6 +510,17 @@ $cells = [ordered]@{
     "DA6" = "X26"; "DA7" = "46023"
     "DD1" = "=_CreatePublicationSchedule(DA2:DA3,DB2:DB3)"
     "DD2" = "=_CreatePublicationSchedule(DA2,DB2)"
+    # The delivery schedule: two contract codes with the first and last day each one delivers, a
+    # third end for a column one row long, ends that make Z26 a single day and ends that make it
+    # end before it starts, an end beside a blank, and three creator cells: over the two rows,
+    # over the first row alone, and over the single-day ends.
+    "DF2" = "X26"; "DG2" = "1-Nov-2026"; "DH2" = "30-Nov-2026"; "DI2" = "30-Nov-2026"
+    "DF3" = "Z26"; "DG3" = "1-Dec-2026"; "DH3" = "31-Dec-2026"; "DI3" = "1-Dec-2026"
+    "DH4" = "31-Jan-2027"
+    "DH6" = "30-Nov-2026"; "DI6" = "30-Nov-2026"; "DI7" = "30-Nov-2026"
+    "DJ1" = "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3,DH2:DH3)"
+    "DJ2" = "=_CreateDeliverySchedule(DF2,DG2,DH2)"
+    "DJ3" = "=_CreateDeliverySchedule(DF2:DF3,DG2:DG3,DI2:DI3)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
