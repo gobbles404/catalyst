@@ -17,6 +17,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.index_definitions.publication_schedule import PublicationSchedule
 
 # The first three contracts of the page's sample as the sheet sends them: codes as text, dates as
 # serials, 19 May, 22 June and 21 July 2026 for the futures and a few days earlier for the options.
@@ -292,6 +293,162 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
     assert bridge.call("ReadHolidayCalendar", [other]) == (
         f"#ERROR ReadHolidayCalendar: calendar is expiry schedule handle {other!r}, "
         "expected holiday calendar handle"
+    )
+
+
+# --- _CreatePublicationSchedule ---------------------------------------------------
+
+
+# The publication schedule page's sample as the sheet sends it: two codes as text and two
+# serials, 2 November and 1 December 2026.
+PUBLISHED_CODES = Cells.from_rows([["X26"], ["Z26"]])
+PUBLISHED_DATES = Cells.from_rows([[46328.0], [46357.0]])
+PUBLICATION = re.compile(r"publication_schedule:[0-9a-f]{6}:([0-9]{6})")
+
+
+# The library has no consumer of a publication schedule yet, so this hidden reader proves that
+# a handle resolves to the schedule the seam kept, with its columns as they arrived.
+@probe
+def ReadPublicationSchedule(schedule: Handle[PublicationSchedule]) -> str:
+    return f"{' '.join(schedule.codes)} | {days_or_none(schedule.publication_date)}"
+
+
+def a_publication_schedule(codes: object, published: object) -> str:
+    text = bridge.call("_CreatePublicationSchedule", [codes, published])
+    assert isinstance(text, str) and PUBLICATION.fullmatch(text), text
+    return text
+
+
+def test_a_publication_schedule_is_created_from_two_columns_and_read_back() -> None:
+    schedule = a_publication_schedule(PUBLISHED_CODES, PUBLISHED_DATES)
+    assert bridge.call("ReadPublicationSchedule", [schedule]) == "X26 Z26 | 2026-11-02 2026-12-01"
+
+
+# Two single cells are two columns of one, so a schedule of one contract needs no range.
+def test_two_single_cells_are_a_publication_schedule_of_one_contract() -> None:
+    schedule = a_publication_schedule("X26", 46328.0)
+    assert bridge.call("ReadPublicationSchedule", [schedule]) == "X26 | 2026-11-02"
+
+
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46328.0], [46357.0], [46391.0]])],
+            "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 3 dates, "
+            "expected 2, one per contract_code",
+        ),
+        (
+            ["X26", PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 2 dates, "
+            "expected 1, one per contract_code",
+        ),
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46328.0], [None]])],
+            "#ERROR _CreatePublicationSchedule: publication_date cell (2, 1) is blank, "
+            "expected date",
+        ),
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46328.0], [46357.5]])],
+            "#ERROR _CreatePublicationSchedule: publication_date cell (2, 1) is number 46357.5, "
+            "expected date",
+        ),
+        (
+            [PUBLISHED_CODES, Cells.from_rows([["2-Nov-2026"], [46357.0]])],
+            "#ERROR _CreatePublicationSchedule: publication_date cell (1, 1) is text "
+            "'2-Nov-2026', expected date",
+        ),
+        (
+            [Cells.from_rows([["X26"], [46023.0]]), PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["X26"], [""]]), PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is empty text, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["X26", "Z26"]]), PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: contract_code is 1x2 array, "
+            "expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, Cells.from_rows([[46328.0, 46357.0]])],
+            "#ERROR _CreatePublicationSchedule: publication_date is 1x2 array, "
+            "expected column of dates",
+        ),
+        (
+            [MISSING, PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: contract_code is missing, expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, MISSING],
+            "#ERROR _CreatePublicationSchedule: publication_date is missing, "
+            "expected column of dates",
+        ),
+        (
+            [None, PUBLISHED_DATES],
+            "#ERROR _CreatePublicationSchedule: contract_code is blank, expected column of text",
+        ),
+        (
+            [PUBLISHED_CODES, None],
+            "#ERROR _CreatePublicationSchedule: publication_date is blank, "
+            "expected column of dates",
+        ),
+        (
+            [Cells.from_rows([["X26"], [46023.0]]), Cells.from_rows([[46328.0], [None]])],
+            "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+    ],
+    ids=[
+        "a date column one row long",
+        "two dates for one code",
+        "a blank in the date column",
+        "a date with a time",
+        "text in the date column",
+        "a number among the codes",
+        "empty text among the codes",
+        "a row of codes",
+        "a row of dates",
+        "the codes left out",
+        "the dates left out",
+        "a blank cell where the codes should be",
+        "a blank cell where the dates should be",
+        "both columns wrong, the codes named first",
+    ],
+)
+def test_a_publication_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreatePublicationSchedule", args) == text
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_publication_schedule_publishes_no_object_and_no_handle() -> None:
+    before = number(a_publication_schedule(PUBLISHED_CODES, PUBLISHED_DATES), PUBLICATION)
+    assert bridge.call(
+        "_CreatePublicationSchedule", [PUBLISHED_CODES, Cells.from_rows([[46328.0]])]
+    ) == (
+        "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 1 date, "
+        "expected 2, one per contract_code"
+    )
+    assert (
+        bridge.call(
+            "_CreatePublicationSchedule", [PUBLISHED_CODES, Cells.from_rows([[46328.0], [None]])]
+        )
+        == "#ERROR _CreatePublicationSchedule: publication_date cell (2, 1) is blank, expected date"
+    )
+    assert number(a_publication_schedule(PUBLISHED_CODES, PUBLISHED_DATES), PUBLICATION) == (
+        before + 1
+    )
+
+
+def test_a_handle_of_another_kind_is_not_a_publication_schedule() -> None:
+    other = a_schedule(CODES, FUTURES, MISSING, PUBLICATIONS)
+    assert bridge.call("ReadPublicationSchedule", [other]) == (
+        f"#ERROR ReadPublicationSchedule: schedule is expiry schedule handle {other!r}, "
+        "expected publication schedule handle"
     )
 
 

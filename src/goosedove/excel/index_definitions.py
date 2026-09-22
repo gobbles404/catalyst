@@ -25,6 +25,10 @@ from goosedove.index_definitions.contract_specifications import (
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
+from goosedove.index_definitions.publication_schedule import (
+    PublicationSchedule,
+    publication_schedule,
+)
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
@@ -33,6 +37,7 @@ __all__ = [
     "_CreateExpirySchedule",
     "_CreateHolidayCalendar",
     "_CreateIndexConventions",
+    "_CreatePublicationSchedule",
 ]
 
 
@@ -72,6 +77,23 @@ def _CreateHolidayCalendar(
     """Creates a holiday calendar from the days one market is closed and shows its handle, the
     text other formulas take as the calendar."""
     return holiday_calendar(holiday)
+
+
+@excel_function
+def _CreatePublicationSchedule(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
+    ],
+    publication_date: Annotated[
+        DateColumn,
+        "The column of publication dates beside the codes, such as B2:B3, one per code.",
+    ],
+) -> Handle[PublicationSchedule]:
+    """Creates a publication schedule from the contract codes of one index and the dates their
+    reference prices are published, and shows its handle, the text other formulas take as the
+    schedule."""
+    return publication_schedule(contract_code, publication_date)
 
 
 @excel_function

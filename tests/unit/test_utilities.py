@@ -29,6 +29,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.index_definitions.publication_schedule import PublicationSchedule
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
@@ -121,6 +122,21 @@ def test_a_schedule_spills_its_columns_with_the_publication_dates_last() -> None
         ["m26", 46161.0, 46162.0],
         ["n26", 46195.0, 46196.0],
     ]
+
+
+# Serials for 2 November and 1 December 2026, the days two reference prices are published.
+def test_a_publication_schedule_spills_its_two_columns_under_two_heading_rows() -> None:
+    codes = Cells.from_rows([["X26"], ["Z26"]])
+    published = Cells.from_rows([[46328.0], [46357.0]])
+    kinds, slots, joined = read(bridge.call("_CreatePublicationSchedule", [codes, published]))
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "publication_date"],
+        ["str", "datetime64[D]"],
+        ["X26", 46328.0],
+        ["Z26", 46357.0],
+    ]
+    assert kinds.shape == (4, 2)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 2
 
 
 # Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
@@ -497,6 +513,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         HolidayCalendar,
         IndexConventions,
         ContractSpecifications,
+        PublicationSchedule,
         DailyFixings,
         MonthlyFixings,
         MarketHistory,

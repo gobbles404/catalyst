@@ -121,6 +121,26 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     ]
 
 
+def test_the_publication_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreatePublicationSchedule"]
+    assert not hidden
+    assert description == (
+        "Creates a publication schedule from the contract codes of one index and the dates their "
+        "reference prices are published, and shows its handle, the text other formulas take as "
+        "the schedule."
+    )
+    assert arguments == [
+        (
+            "contract_code",
+            "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
+        ),
+        (
+            "publication_date",
+            "The column of publication dates beside the codes, such as B2:B3, one per code.",
+        ),
+    ]
+
+
 def test_the_conventions_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden

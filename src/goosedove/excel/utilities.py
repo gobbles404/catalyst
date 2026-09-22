@@ -26,6 +26,7 @@ from goosedove.index_definitions.contract_specifications import ContractSpecific
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.index_definitions.publication_schedule import PublicationSchedule
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
@@ -195,6 +196,15 @@ def monthly_fixings_table(obj: MonthlyFixings) -> MixedArray:
 @shown.register
 def price_vector_table(obj: PriceVector) -> MixedArray:
     return MixedArray.table([("price",), ("float64",)], obj.prices)
+
+
+@shown.register
+def publication_schedule_table(obj: PublicationSchedule) -> MixedArray:
+    return MixedArray.table(
+        [("contract_code", "publication_date"), ("str", "datetime64[D]")],
+        obj.codes,
+        obj.publication_date,
+    )
 
 
 @shown.register

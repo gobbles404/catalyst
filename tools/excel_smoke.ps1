@@ -246,6 +246,25 @@ $formulas = [ordered]@{
     "=_CreateMarketHistory(CY3,BQ1)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-07-22 is 'q26', not expired on 2026-06-25, expected fixings of expired contracts only"
     "=_CreateMarketHistory(CY3,CY12)" = "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 'n26' published 2026-06-23, expected a fixing for every expired contract in calendar"
     "=_CreateMarketHistory(CT5,CY4)" = "#ERROR _CreateMarketHistory: ValueError: fixings is monthly fixings, expected daily fixings for a daily calendar"
+    # The publication schedule: a creator over two contract codes and the day each one's reference
+    # price is published, in DA and DB, and over the first row alone, read back through
+    # util_ReadHandle; a date column one row long and one row short, the library's words; a blank
+    # among the dates, a number among the codes, the dates left out and a row where a column is
+    # expected, the seam's.
+    "=LEFT(DD1,21)"               = "publication_schedule:"
+    "=LEFT(DD2,21)"               = "publication_schedule:"
+    "=INDEX(util_ReadHandle(DD1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(DD1),2,2)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(DD1),3,1)" = "X26"
+    "=INDEX(util_ReadHandle(DD1),4,2)" = "46357"
+    "=COLUMNS(util_ReadHandle(DD1))"   = "2"
+    "=ROWS(util_ReadHandle(DD2))"      = "3"
+    "=_CreatePublicationSchedule(DA2:DA3,DB2:DB4)" = "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 3 dates, expected 2, one per contract_code"
+    "=_CreatePublicationSchedule(DA2,DB2:DB3)" = "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 2 dates, expected 1, one per contract_code"
+    "=_CreatePublicationSchedule(DA2:DA3,DC2:DC3)" = "#ERROR _CreatePublicationSchedule: publication_date cell (2, 1) is blank, expected date"
+    "=_CreatePublicationSchedule(DA6:DA7,DB2:DB3)" = "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreatePublicationSchedule(DA2:DA3)" = "#ERROR _CreatePublicationSchedule: publication_date is missing, expected column of dates"
+    "=_CreatePublicationSchedule(DA2:DA3,DB2:DC2)" = "#ERROR _CreatePublicationSchedule: publication_date is 1x2 array, expected column of dates"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -462,6 +481,15 @@ $cells = [ordered]@{
     "CY10" = "=_CreatePriceVector(CY6:CY9)"
     "CY11" = "=_CreateMarket(CY5,CY10)"
     "CY12" = "=_CreateMonthlyFixings(BO2,BP2,AI3)"
+    # The publication schedule: two contract codes and the day each one's reference price is
+    # published, a third date for a column one row long, the first date beside a blank, a code
+    # over a number, and two creator cells, over the two rows and over the first row alone.
+    "DA2" = "X26"; "DB2" = "2-Nov-2026"; "DC2" = "2-Nov-2026"
+    "DA3" = "Z26"; "DB3" = "1-Dec-2026"
+    "DB4" = "4-Jan-2027"
+    "DA6" = "X26"; "DA7" = "46023"
+    "DD1" = "=_CreatePublicationSchedule(DA2:DA3,DB2:DB3)"
+    "DD2" = "=_CreatePublicationSchedule(DA2,DB2)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

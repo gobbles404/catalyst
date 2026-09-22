@@ -819,6 +819,50 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     }
 
 
+# --- the fifth index definition: two columns in, one publication out ------------------
+
+
+def publication_columns(contracts: int) -> tuple[Cells, Cells]:
+    """Codes and the day each contract's reference price is published, for that many monthly
+    contracts, as the sheet sends them: the codes and the publication dates of schedule_columns."""
+    codes, _, _, publications = schedule_columns(contracts)
+    return codes, publications
+
+
+# Ten years of monthly publications: the text column handed over as it is, one look and two
+# conversions for the date column, the builder's one copy and one publication. Seventeen calls
+# across fourteen functions, the accept rule once per argument: the two-column expiry schedule's
+# call less the two arguments left out and their rule, which this creator has no place for.
+def test_a_publication_schedule_is_two_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, publications = publication_columns(120)
+    PATH["_CreatePublicationSchedule"](codes, publications)
+    assert call_profile(lambda: PATH["_CreatePublicationSchedule"](codes, publications)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text_column": 1,
+        "_date_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_texts": 1,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_CreatePublicationSchedule": 1,
+        "publication_schedule": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreatePublicationSchedule"](codes, publications)) == {
+        "ndarray.any": 1,  # one look, for the calendar
+        "ndarray.astype": 2,  # the column on its way to days
+        "numpy.array": 1,  # the one copy the schedule keeps
+        "ndarray.setflags": 1,  # frozen
+        "ufunc.reduce": 1,
+    }
+
+
 # --- the third index definition: five texts in, one publication out ------------------
 
 

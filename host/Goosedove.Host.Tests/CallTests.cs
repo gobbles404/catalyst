@@ -124,6 +124,12 @@ namespace Goosedove.Host.Tests
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
+            // The publication schedule: a date column one row long, the library's words; a blank among the dates, a number among the codes, the dates left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), Column(46328.0, 46357.0, 46391.0) }, "#ERROR _CreatePublicationSchedule: ValueError: publication_date has 3 dates, expected 2, one per contract_code" };
+            yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), Column(46328.0, ExcelEmpty.Value) }, "#ERROR _CreatePublicationSchedule: publication_date cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", 46023.0), Column(46328.0, 46357.0) }, "#ERROR _CreatePublicationSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
+            yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), ExcelMissing.Value }, "#ERROR _CreatePublicationSchedule: publication_date is missing, expected column of dates" };
+            yield return new object[] { "_CreatePublicationSchedule", new object[] { Column("X26", "Z26"), Row(46328.0, 46357.0) }, "#ERROR _CreatePublicationSchedule: publication_date is 1x2 array, expected column of dates" };
             // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
@@ -211,6 +217,30 @@ namespace Goosedove.Host.Tests
             var oneDay = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
+        }
+
+        // A publication schedule: two columns make one, two single cells make one of one contract,
+        // and util_ReadHandle spills it back, the two headers, the two types, then a row per contract,
+        // the code as text and the publication date as a serial.
+        [Fact]
+        public void a_publication_schedule_is_created_from_two_columns_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreatePublicationSchedule", Column("X26", "Z26"), Column(46328.0, 46357.0));
+            Assert.StartsWith("publication_schedule:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(4, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("publication_date", spill[0, 1]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 1]);
+            Assert.Equal("X26", spill[2, 0]);
+            Assert.Equal(46328.0, spill[2, 1]);
+            Assert.Equal("Z26", spill[3, 0]);
+            Assert.Equal(46357.0, spill[3, 1]);
+            var one = (string)Seam.Call("_CreatePublicationSchedule", "X26", 46328.0);
+            Assert.NotEqual(handle, one);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
         }
 
         // Index conventions: five codes make one, and util_ReadHandle spills them back, the five
