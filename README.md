@@ -6,6 +6,8 @@ A commodities derivatives pricing library for Excel.
 
 Requires Python 3.13.13 and uv 0.12.9 (`py -3.13 -m pip install uv==0.12.9`).
 
+On a fresh machine, [docs/getting-started.md](docs/getting-started.md) walks from the clone to a formula in Excel, one step at a time, with a check after each and a table of what to do when a step fails.
+
     uv sync --locked
     .\check.ps1
 
