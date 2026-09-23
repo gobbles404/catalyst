@@ -1,9 +1,8 @@
-"""The market: an index's history, its calendar with the fixing on each day that has fixed, and
-the current futures prices, one quote per contract from the valuation day's prompt through the
-last; together the fixing on every day that has fixed and the prompt contract's quote on every
-day still to fix, a business day from the valuation day on of a daily calendar or any day of a
-contract not yet expired of a monthly one, so that a daily calendar prices its business days
-and a monthly one every day. docs/library/market/market.md is the page."""
+"""The market: an index's history, its calendar with the settle fixed on each past business day,
+and the current futures prices, one quote per contract from the valuation day's prompt through
+the last; together the price on every business day of the calendar, the fixing where the day
+has fixed and the prompt contract's quote where it has not. docs/library/market/market.md is
+the page."""
 
 from dataclasses import dataclass
 
@@ -17,11 +16,10 @@ from goosedove.market_data.price_vector import PriceVector
 class Market:
     """The two objects the market was made from, kept by reference, and one number:
     first_contract is the row of the expiry schedule whose contract is prompt on the valuation
-    day, counted from zero, so that the quote of the contract prompt on any day still to fix,
-    a business day from the valuation day on of a daily calendar or any day of a contract not
-    yet expired of a monthly one, is price_vector.prices[calendar.prompt[row] - first_contract],
-    and the price on a day that has fixed is the history's fixing. Nothing else is held: the
-    days, the prompts, the flags, the mode, the fixings and the quotes stay where they are."""
+    day, counted from zero, so that the quote of the contract prompt on any business day from
+    the valuation day on is price_vector.prices[calendar.prompt[row] - first_contract], and the
+    price on a past business day is the history's fixing. Nothing else is held: the days, the
+    prompts, the flags, the fixings and the quotes stay where they are."""
 
     market_history: MarketHistory
     price_vector: PriceVector

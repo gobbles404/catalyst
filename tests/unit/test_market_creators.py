@@ -51,12 +51,9 @@ def a_holiday_calendar(*serials: float) -> str:
 SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 
 
-def a_calendar(
-    valuation: str | None = None, holidays: str | None = None, mode: str = "daily"
-) -> str:
+def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str:
     args = [
         valuation or a_valuation(),
-        mode,
         a_schedule(*SCHEDULE),
         holidays or a_holiday_calendar(MAY_25),
     ]
@@ -160,22 +157,22 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
     [
         (
             [THE_CALENDAR, ([*SAMPLE, [MAY_26, 71.5]], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or "
+            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or "
             "after valuation date 2026-05-26, expected dates before the valuation date",
         ),
         (
             [THE_CALENDAR, ([*SAMPLE, [MAY_25, 71.4]], JAN_1)],
-            "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-25 is a "
+            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a "
             "non-business day in calendar, expected no fixing",
         ),
         (
             [THE_CALENDAR, (SAMPLE[:2], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for "
+            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
             "2026-05-22, expected a fixing for every past business day in calendar",
         ),
         (
             [JAN_1, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for "
+            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
             "2026-05-25, expected a fixing for every past business day in calendar",
         ),
         (
@@ -197,29 +194,26 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
         ),
         (
             [THE_CALENDAR, MISSING],
-            "#ERROR _CreateMarketHistory: fixings is missing, "
-            "expected daily fixings or monthly fixings handle",
+            "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle",
         ),
         (
             [THE_CALENDAR, None],
-            "#ERROR _CreateMarketHistory: fixings is blank, "
-            "expected daily fixings or monthly fixings handle",
+            "#ERROR _CreateMarketHistory: daily_fixings is blank, expected daily fixings handle",
         ),
         (
             [THE_CALENDAR, 70.85],
-            "#ERROR _CreateMarketHistory: fixings is number 70.85, "
-            "expected daily fixings or monthly fixings handle",
+            "#ERROR _CreateMarketHistory: daily_fixings is number 70.85, "
+            "expected daily fixings handle",
         ),
         (
             [THE_CALENDAR, "daily_fixings:000000:000001"],
-            "#ERROR _CreateMarketHistory: fixings is text 'daily_fixings:000000:000001' "
-            "naming no live object, expected daily fixings or monthly fixings handle",
+            "#ERROR _CreateMarketHistory: daily_fixings is text 'daily_fixings:000000:000001' "
+            "naming no live object, expected daily fixings handle",
         ),
         (
             [THE_CALENDAR, "#ERROR _CreateDailyFixings: table is blank, expected table"],
-            "#ERROR _CreateMarketHistory: fixings is the creator's failure, expected daily "
-            "fixings or monthly fixings handle: #ERROR _CreateDailyFixings: table is blank, "
-            "expected table",
+            "#ERROR _CreateMarketHistory: daily_fixings is the creator's failure, expected daily "
+            "fixings handle: #ERROR _CreateDailyFixings: table is blank, expected table",
         ),
     ],
     ids=[
@@ -252,35 +246,6 @@ def test_a_history_that_cannot_be_made_says_why(args: list[object], text: str) -
     assert bridge.call("_CreateMarketHistory", [calendar, fixings]) == text
 
 
-# The fixings must be of the calendar's kind: monthly fixings along a daily calendar, and daily
-# fixings along a monthly one, are refused in the library's words before any fixing is read.
-def test_the_fixings_must_be_of_the_calendars_kind() -> None:
-    published = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            column("m26", "n26", "q26"),
-            column(MAY_19, JUN_22, JUL_21),
-            MISSING,
-            column(MAY_20, JUN_22 + 1, JUL_21 + 1),
-        ],
-    )
-    monthly = bridge.call(
-        "_CreateCalendar", [a_valuation(), "monthly", published, a_holiday_calendar(MAY_25)]
-    )
-    assert isinstance(monthly, str) and monthly.startswith("calendar:"), monthly
-    monthly_fixings = bridge.call("_CreateMonthlyFixings", [MAY_20, 2.5, published])
-    assert bridge.call("_CreateMarketHistory", [monthly, the_fixings()]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is daily fixings, "
-        "expected monthly fixings for a monthly calendar"
-    )
-    assert bridge.call("_CreateMarketHistory", [a_calendar(), monthly_fixings]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is monthly fixings, "
-        "expected daily fixings for a daily calendar"
-    )
-    made = bridge.call("_CreateMarketHistory", [monthly, monthly_fixings])
-    assert isinstance(made, str) and HANDLE.fullmatch(made), made
-
-
 def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
     calendar, fixings = a_calendar(), the_fixings()
     made = a_history(calendar, fixings)
@@ -289,8 +254,8 @@ def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
         "expected calendar handle"
     )
     assert bridge.call("_CreateMarketHistory", [calendar, calendar]) == (
-        f"#ERROR _CreateMarketHistory: fixings is calendar handle {calendar!r}, "
-        "expected daily fixings or monthly fixings handle"
+        f"#ERROR _CreateMarketHistory: daily_fixings is calendar handle {calendar!r}, "
+        "expected daily fixings handle"
     )
     assert bridge.call("_CreateMarketHistory", [made, fixings]) == (
         f"#ERROR _CreateMarketHistory: calendar is market history handle {made!r}, "
@@ -303,7 +268,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     short = the_fixings(SAMPLE[:2])
     before = number(a_history(calendar, fixings))
     assert bridge.call("_CreateMarketHistory", [calendar, short]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-22, "
+        "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-22, "
         "expected a fixing for every past business day in calendar"
     )
     assert number(a_history(calendar, fixings)) == before + 1
@@ -608,236 +573,3 @@ def test_a_dead_market_handle_cannot_be_read() -> None:
         "#ERROR util_ReadHandle: handle is text 'market:000000:000001' naming no live object, "
         "expected a handle"
     )
-
-
-# --- a monthly history and market -------------------------------------------------
-
-
-# The market page's example as the sheet sends it: four contracts with the day each is
-# published, valued on 25 June 2026 with the 24th a holiday, n26's fixing 2.95 dated the 23rd,
-# and the quotes 3.10 and 3.20 of q26 and u26.
-AUG_20, AUG_21, JUN_24, JUN_25 = 46254.0, 46255.0, 46197.0, 46198.0
-AUG_1, JUL_22, SEP_1 = 46235.0, 46225.0, 46266.0
-TOY = (
-    ("m26", "n26", "q26", "u26"),
-    (MAY_19, JUN_22, JUL_21, AUG_20),
-    (MAY_20, JUN_23, JUL_21 + 1, AUG_21),
-)
-
-
-def a_toy_schedule() -> str:
-    codes, expiries, publications = TOY
-    text = bridge.call(
-        "_CreateExpirySchedule",
-        [column(*codes), column(*expiries), MISSING, column(*publications)],
-    )
-    assert isinstance(text, str) and text.startswith("expiry_schedule:"), text
-    return text
-
-
-def a_monthly_history(
-    as_of: float = JUN_25, fixings: list[list[float]] | None = None, schedule: str | None = None
-) -> str:
-    schedule = schedule or a_toy_schedule()
-    calendar = bridge.call(
-        "_CreateCalendar",
-        [a_valuation(as_of), "monthly", schedule, a_holiday_calendar(JUN_24)],
-    )
-    body = fixings or [[JUN_23, 2.95]]
-    monthly = bridge.call(
-        "_CreateMonthlyFixings",
-        [column(*(d for d, _ in body)), column(*(p for _, p in body)), schedule],
-    )
-    assert isinstance(monthly, str) and monthly.startswith("monthly_fixings:"), monthly
-    text = bridge.call("_CreateMarketHistory", [calendar, monthly])
-    assert isinstance(text, str) and HANDLE.fullmatch(text), text
-    return text
-
-
-def test_a_monthly_history_prices_every_day_of_the_expired_contract_and_is_unfixed_elsewhere() -> (
-    None
-):
-    shown = rows(read(a_monthly_history()))
-    assert len(shown) == 95 and shown[0] == HEADERS and shown[1] == TYPES
-    by_day = {row[0]: row[1:] for row in shown[2:]}
-    assert by_day[MAY_20] == ["n26", 1.0, 1.0, 2.95]
-    assert by_day[JUN_22 - 2] == ["n26", 0.0, 1.0, 2.95]  # Saturday 20 June, priced and closed
-    assert by_day[JUN_22] == ["n26", 1.0, 1.0, 2.95]
-    assert by_day[JUN_23] == ["q26", 1.0, 1.0, "unfixed"]
-    assert by_day[JUN_24] == ["q26", 0.0, 1.0, "unfixed"]
-    assert by_day[JUN_25] == ["q26", 1.0, 0.0, "unfixed"]
-    assert by_day[JUN_25 + 2] == ["q26", 0.0, 0.0, "unfixed"]
-    assert by_day[JUL_21 + 1] == ["u26", 1.0, 0.0, "unfixed"]
-    fifth = [row[4] for row in shown[2:]]
-    assert "closed" not in fifth and fifth.count("unfixed") == 59 and fifth.count(2.95) == 34
-
-
-def test_a_monthly_market_prices_every_day_from_history_or_the_vector() -> None:
-    made = bridge.call("_CreateMarket", [a_monthly_history(), a_vector(3.10, 3.20)])
-    assert isinstance(made, str) and MARKET.fullmatch(made), made
-    shown = rows(read(made))
-    by_day = {row[0]: row[1:] for row in shown[2:]}
-    assert by_day[JUN_22 - 2] == ["n26", 0.0, 1.0, 2.95]
-    assert by_day[JUN_22] == ["n26", 1.0, 1.0, 2.95]
-    assert by_day[JUN_23] == ["q26", 1.0, 1.0, 3.10]
-    assert by_day[JUN_24] == ["q26", 0.0, 1.0, 3.10]
-    assert by_day[JUN_25] == ["q26", 1.0, 0.0, 3.10]
-    assert by_day[JUN_25 + 2] == ["q26", 0.0, 0.0, 3.10]
-    assert by_day[JUL_21 + 1] == ["u26", 1.0, 0.0, 3.20]
-    assert by_day[AUG_20] == ["u26", 1.0, 0.0, 3.20]
-    fifth = [row[4] for row in shown[2:]]
-    assert all(not isinstance(cell, str) for cell in fifth)
-    kinds, _, _ = read(made)
-    assert (kinds[2:, 4] == NUMBER_CODE).all()
-
-
-def test_a_monthly_history_that_cannot_be_made_says_why() -> None:
-    schedule = a_toy_schedule()
-    calendar = bridge.call(
-        "_CreateCalendar", [a_valuation(JUN_25), "monthly", schedule, a_holiday_calendar(JUN_24)]
-    )
-    anchor_only = bridge.call("_CreateMonthlyFixings", [MAY_20, 1.0, schedule])
-    assert bridge.call("_CreateMarketHistory", [calendar, anchor_only]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 'n26' published "
-        "2026-06-23, expected a fixing for every expired contract in calendar"
-    )
-    too_far = bridge.call(
-        "_CreateMonthlyFixings", [column(JUN_23, JUL_21 + 1), column(2.95, 3.05), schedule]
-    )
-    assert bridge.call("_CreateMarketHistory", [calendar, too_far]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-07-22 is 'q26', not expired "
-        "on 2026-06-25, expected fixings of expired contracts only"
-    )
-    shared = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            column("m26", "n26", "q26", "u26"),
-            column(MAY_19, JUN_22, JUL_21, AUG_20),
-            MISSING,
-            column(MAY_20, JUN_23, JUN_23, AUG_21),
-        ],
-    )
-    ambiguous = bridge.call(
-        "_CreateCalendar", [a_valuation(JUN_25), "monthly", shared, a_holiday_calendar(JUN_24)]
-    )
-    assert bridge.call(
-        "_CreateMarketHistory",
-        [ambiguous, bridge.call("_CreateMonthlyFixings", [JUN_23, 2.95, shared])],
-    ) == (
-        "#ERROR _CreateMarketHistory: ValueError: calendar publication date row 3 is 2026-06-23 "
-        "for 'q26', expected a date after row 2's 2026-06-23 for 'n26'"
-    )
-
-
-# The case a review of #88 found, through both creators: n26 published on 1 September, after
-# q26's 22 July and u26's 21 August, valued on 1 August with n26 and q26 expired. The two
-# fixings the history needs are a series with a gap to _CreateMonthlyFixings, the series with
-# u26's publication holds a live contract's fixing, and _CreateMarketHistory refuses the
-# schedule's order first, naming both rows; the same contracts published late in their order
-# take the two fixings the expired contracts need and nothing else.
-def test_publication_dates_out_of_order_are_refused_before_the_fixings_are_read() -> None:
-    reviewed = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            column("m26", "n26", "q26", "u26"),
-            column(MAY_19, JUN_22, JUL_21, AUG_20),
-            MISSING,
-            column(MAY_20, SEP_1, JUL_22, AUG_21),
-        ],
-    )
-    calendar = bridge.call(
-        "_CreateCalendar", [a_valuation(AUG_1), "monthly", reviewed, a_holiday_calendar(JUN_24)]
-    )
-    assert bridge.call(
-        "_CreateMonthlyFixings", [column(JUL_22, SEP_1), column(3.05, 2.95), reviewed]
-    ) == (
-        "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-09-01, "
-        "expected 2026-08-21, the schedule's publication after row 1's 2026-07-22"
-    )
-    whole = bridge.call(
-        "_CreateMonthlyFixings", [column(JUL_22, AUG_21, SEP_1), column(3.05, 3.15, 2.95), reviewed]
-    )
-    assert isinstance(whole, str) and whole.startswith("monthly_fixings:"), whole
-    assert bridge.call("_CreateMarketHistory", [calendar, whole]) == (
-        "#ERROR _CreateMarketHistory: ValueError: calendar publication date row 3 is 2026-07-22 "
-        "for 'q26', expected a date after row 2's 2026-09-01 for 'n26'"
-    )
-    ordered = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            column("m26", "n26", "q26", "u26"),
-            column(MAY_19, JUN_22, JUL_21, AUG_20),
-            MISSING,
-            column(MAY_20, SEP_1, SEP_1 + 1, SEP_1 + 2),
-        ],
-    )
-    late = bridge.call(
-        "_CreateCalendar", [a_valuation(AUG_1), "monthly", ordered, a_holiday_calendar(JUN_24)]
-    )
-    fixings = bridge.call(
-        "_CreateMonthlyFixings", [column(SEP_1, SEP_1 + 1), column(2.95, 3.05), ordered]
-    )
-    shown = rows(read(bridge.call("_CreateMarketHistory", [late, fixings])))
-    assert [row[4] for row in shown[2:]] == [2.95] * 34 + [3.05] * 29 + ["unfixed"] * 30
-
-
-def test_a_failed_monthly_history_publishes_no_object_and_no_handle() -> None:
-    schedule = a_toy_schedule()
-    calendar = bridge.call(
-        "_CreateCalendar", [a_valuation(JUN_25), "monthly", schedule, a_holiday_calendar(JUN_24)]
-    )
-    good = bridge.call("_CreateMonthlyFixings", [JUN_23, 2.95, schedule])
-    anchor_only = bridge.call("_CreateMonthlyFixings", [MAY_20, 1.0, schedule])
-    first = bridge.call("_CreateMarketHistory", [calendar, good])
-    assert isinstance(first, str)
-    before = number(first)
-    refused = bridge.call("_CreateMarketHistory", [calendar, anchor_only])
-    assert isinstance(refused, str) and refused.startswith("#ERROR")
-    second = bridge.call("_CreateMarketHistory", [calendar, good])
-    assert isinstance(second, str) and number(second) == before + 1
-
-
-# The provisional roll through the seam: valued on n26's expiry day it is quoted; the day
-# after, its provisional value keyed by its publication date, the 24th, replaces the quote in
-# the vector, and the vector rolls to q26; the published price replaces the provisional one.
-def test_the_provisional_roll_through_the_seam() -> None:
-    schedule = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            column("m26", "n26", "q26", "u26"),
-            column(MAY_19, JUN_22, JUL_21, AUG_20),
-            MISSING,
-            column(MAY_20, JUN_24, JUL_21 + 1, AUG_21),
-        ],
-    )
-    holidays = a_holiday_calendar(JAN_1)
-    on_expiry = bridge.call(
-        "_CreateCalendar", [a_valuation(JUN_22, 1.0), "monthly", schedule, holidays]
-    )
-    anchor_only = bridge.call("_CreateMonthlyFixings", [MAY_20, 1.0, schedule])
-    live = bridge.call(
-        "_CreateMarket",
-        [bridge.call("_CreateMarketHistory", [on_expiry, anchor_only]), a_vector(2.93, 3.10, 3.20)],
-    )
-    assert rows(read(live))[2 + 33][1:] == ["n26", 1.0, 0.0, 2.93]  # 22 June, expiry day, quoted
-    day_after = bridge.call(
-        "_CreateCalendar", [a_valuation(JUN_23, 0.0), "monthly", schedule, holidays]
-    )
-    provisional = bridge.call("_CreateMonthlyFixings", [JUN_24, 2.90, schedule])
-    rolled = bridge.call(
-        "_CreateMarket",
-        [bridge.call("_CreateMarketHistory", [day_after, provisional]), a_vector(3.10, 3.20)],
-    )
-    shown = rows(read(rolled))
-    assert shown[2 + 33][1:] == ["n26", 1.0, 1.0, 2.90] and shown[2 + 34][1:] == [
-        "q26",
-        1.0,
-        0.0,
-        3.10,
-    ]
-    published = bridge.call("_CreateMonthlyFixings", [JUN_24, 2.95, schedule])
-    final = bridge.call(
-        "_CreateMarket",
-        [bridge.call("_CreateMarketHistory", [day_after, published]), a_vector(3.10, 3.20)],
-    )
-    assert rows(read(final))[2 + 33][4] == 2.95 and rows(read(rolled))[2 + 33][4] == 2.90
