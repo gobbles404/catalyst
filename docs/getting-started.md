@@ -36,7 +36,13 @@ py -3.13 -m pip install uv==0.12.9
 uv --version
 ```
 
-The second line shows `uv 0.12.9`. If PowerShell says `uv` is not recognized, that Python's `Scripts` folder is not on your PATH: either add it, or write `py -3.13 -m uv` wherever this page writes `uv`.
+The second line shows `uv 0.12.9`. If PowerShell says `uv` is not recognized, the install worked but that Python's `Scripts` folder is not on your PATH, and it has to be: `.\check.ps1`, `.\measure.ps1` and the host build that `.\tools\excel_dev.ps1` runs all call `uv` by name, so writing `py -3.13 -m uv` for the commands you type would carry you through step 3 and fail at step 5. pip named the folder in a warning at the end of the install; if it has scrolled away, this prints it:
+
+```powershell
+py -3.13 -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+```
+
+Add that folder to your account's Path (Settings, System, About, Advanced system settings, Environment Variables, then Path under User variables, New), close and reopen the terminal, and run `uv --version` again.
 
 ## 3. Create the environment
 
@@ -116,7 +122,8 @@ Six steps in order, stopping at the first failure: formatting, lint, types, the 
 
 | What you see | Why | What to do |
 |---|---|---|
-| `uv` or `dotnet` is not recognized | not installed, or the terminal was opened before the install | install it, or close and reopen the terminal |
+| `uv` is not recognized | not installed, the terminal was opened before the install, or that Python's `Scripts` folder is not on your PATH | step 2: install it, put the folder on your PATH, then close and reopen the terminal |
+| `dotnet` is not recognized | not installed, or the terminal was opened before the install | install it, or close and reopen the terminal |
 | `uv sync --locked` says the lock file needs updating | `pyproject.toml` or `uv.lock` differs from `main` | `git status`, then `git pull`; never edit the lock by hand |
 | `dotnet` says a compatible SDK was not found, requested 8.0.423 | only another major version of the SDK is installed | install the .NET 8.0 SDK |
 | the build says the reference assemblies for .NETFramework v4.8 were not found | the first restore could not reach NuGet | check the network or proxy, then `dotnet restore host\Goosedove.Host` |
