@@ -121,49 +121,6 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     ]
 
 
-def test_the_delivery_schedule_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateDeliverySchedule"]
-    assert not hidden
-    assert description == (
-        "Creates a delivery schedule from the contract codes of one index and their first and "
-        "last delivery dates, and shows its handle, the text other formulas take as the schedule."
-    )
-    assert arguments == [
-        (
-            "contract_code",
-            "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
-        ),
-        (
-            "delivery_start",
-            "The column of first delivery dates beside the codes, such as B2:B3, one per code.",
-        ),
-        (
-            "delivery_end",
-            "The column of last delivery dates beside the codes, such as C2:C3, one per code.",
-        ),
-    ]
-
-
-def test_the_publication_schedule_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreatePublicationSchedule"]
-    assert not hidden
-    assert description == (
-        "Creates a publication schedule from the contract codes of one index and the dates their "
-        "reference prices are published, and shows its handle, the text other formulas take as "
-        "the schedule."
-    )
-    assert arguments == [
-        (
-            "contract_code",
-            "The column of contract codes, such as A2:A3 holding X26 and Z26, one per contract.",
-        ),
-        (
-            "publication_date",
-            "The column of publication dates beside the codes, such as B2:B3, one per code.",
-        ),
-    ]
-
-
 def test_the_conventions_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden
@@ -239,15 +196,15 @@ def test_the_monthly_fixings_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMonthlyFixings"]
     assert not hidden
     assert description == (
-        "Creates the monthly fixings of one index from its prices, published or provisional, each "
-        "dated the day its expiry schedule says the settle is published, and shows its handle, "
-        "the text other formulas take as the fixings."
+        "Creates the monthly fixings of one index from the days its settles were published and "
+        "their prices, checked against the publication dates of its expiry schedule, and shows "
+        "its handle, the text other formulas take as the fixings."
     )
     assert arguments == [
         (
             "publication_date",
-            "The column of days the index's monthly settles are published, as its schedule "
-            "states them, such as A2:A5 holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
+            "The column of days the index's monthly settles were published, such as A2:A5 "
+            "holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
         ),
         ("price", "The column of prices beside the dates, such as B2:B5, one per date."),
         (
@@ -274,9 +231,8 @@ def test_the_market_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMarket"]
     assert not hidden
     assert description == (
-        "Creates the market of one index from its history and current futures prices, the prompt "
-        "contract's quote on each day still to fix, and shows its handle, the text other formulas "
-        "take as the market."
+        "Creates the daily market of one index from its history and current futures prices and "
+        "shows its handle, the text other formulas take as the market."
     )
     assert arguments == [
         (
@@ -296,21 +252,15 @@ def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden
     assert description == (
-        "Creates the calendar of one index for daily or monthly fixings, each day after its "
-        "first expiry to its last, its prompt contract, whether the market is open and whether "
-        "it is past, and shows its handle, the text other formulas take as the calendar."
+        "Creates the calendar of one index, every day after its first contract's expiry to its "
+        "last, with the contract prompt on each, whether the market is open and whether the day "
+        "is past, and shows its handle, the text other formulas take as the calendar."
     )
     assert arguments == [
         (
             "valuation_date",
             "The valuation-date handle: the cell showing _CreateValuationDate's result, such as "
             "B2, or a name for it.",
-        ),
-        (
-            "fixing_mode",
-            "How the index fixes, the text daily or monthly, such as B4: daily for a settle on "
-            "each business day, monthly for one published price per contract, which needs the "
-            "schedule's publication dates.",
         ),
         (
             "expiry_schedule",
@@ -329,9 +279,8 @@ def test_the_market_history_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMarketHistory"]
     assert not hidden
     assert description == (
-        "Creates the market history of one index, its calendar with the fixing on each day that "
-        "has fixed, the settle of each past business day or the price of each expired contract, "
-        "and shows its handle, the text other formulas take as the history."
+        "Creates the market history of one index, its calendar with the settle fixed on each "
+        "past business day, and shows its handle, the text other formulas take as the history."
     )
     assert arguments == [
         (
@@ -340,10 +289,10 @@ def test_the_market_history_creator_explains_itself() -> None:
             "or a name for it.",
         ),
         (
-            "fixings",
-            "The index's fixings handle, daily or monthly as the calendar's mode says: the cell "
-            "showing the result of _CreateDailyFixings or _CreateMonthlyFixings, such as B10, "
-            "or a name for it.",
+            "daily_fixings",
+            "The index's daily-fixings handle: the cell showing the result of "
+            "_CreateDailyFixings, such as B10, or a name for it, with a fixing on every past "
+            "business day of the calendar.",
         ),
     ]
 

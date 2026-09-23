@@ -70,11 +70,9 @@ BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, hande
 
 # A handle: text in a cell that stands for an object the seam holds. Declared around a class the
 # library defines, `-> Handle[DiscountCurve]` returns the object and the cell shows its handle,
-# and `curve: Handle[DiscountCurve]` receives the object the handle stands for; a parameter may
-# take one of several kinds, `fixings: Handle[DailyFixings | MonthlyFixings]`, and receives
-# whichever the handle stands for. To the type checker it is the class itself, or the union, so
-# a function body needs no cast; to registration it is the mark that selects publishing on the
-# way out and resolving on the way in.
+# and `curve: Handle[DiscountCurve]` receives the object the handle stands for. To the type
+# checker it is the class itself, so a function body needs no cast; to registration it is the
+# mark that selects publishing on the way out and resolving on the way in.
 type Handle[T] = T
 
 
@@ -1078,25 +1076,18 @@ def _is_handle(annotation: object) -> bool:
     return get_origin(annotation) is Handle
 
 
-def _handle_kinds(annotation: object) -> tuple[type[object], ...] | None:
-    """The classes inside Handle[...]: one, or each of a union, any class but the seam's own;
-    None when any is not one, or when `object`, which takes any kind, is one of several."""
-    inner = get_args(annotation)[0]
-    members = get_args(inner) if get_origin(inner) in (Union, UnionType) else (inner,)
-    kinds: list[type[object]] = []
-    for member in members:
-        if (
-            not isinstance(member, type)
-            or member in _DECLARED
-            or member in _RESULTS
-            or member is Cells
-            or issubclass(member, Table)
-        ):
-            return None
-        kinds.append(cast(type[object], member))
-    if len(kinds) > 1 and object in kinds:
+def _handle_kind(annotation: object) -> type[object] | None:
+    """The class inside Handle[...]: any class but the seam's own, or None when it is not one."""
+    kind = get_args(annotation)[0]
+    if (
+        not isinstance(kind, type)
+        or kind in _DECLARED
+        or kind in _RESULTS
+        or kind is Cells
+        or issubclass(kind, Table)
+    ):
         return None
-    return tuple(kinds)
+    return cast(type[object], kind)
 
 
 def _words(kind: type[object]) -> str:
@@ -1124,17 +1115,14 @@ def _publish(kind: type[object], tag: str, words: str, value: object) -> str:
 _RELAY: Final = re.compile(r"#ERROR \w+: \w+ is the creator's failure, expected [^:]+: (.+)", re.S)
 
 
-def _resolve(
-    kinds: tuple[type[object], ...] | None, expected: str, name: str, value: object
-) -> object:
+def _resolve(kind: type[object], expected: str, name: str, value: object) -> object:
     """The object a handle stands for, or the failure.
 
     The text's own faults come first, through the text rule, so a number, a blank, a missing
     argument or an empty text fail in the seam's usual words. Then a creator's failure relayed
     by a reference to its cell, carried whole; then text naming no live object; then an object
-    of another kind, the kinds being the one declared or each of a union, compared by identity
-    against what the store recorded. A declaration of `object` takes any kind, so that last
-    comparison is the one step it skips: whatever the key finds is handed over.
+    of another kind. A declaration of `object` takes any kind, so that last comparison is the
+    one step it skips: whatever the key finds is handed over.
     """
     text = _text(value)
     if text.startswith("#ERROR "):
@@ -1146,7 +1134,7 @@ def _resolve(
         raise TypeValidationError(
             f"{name} is text {text!r} naming no live object, expected {expected}"
         )
-    if kinds is not None and held.kind not in kinds:
+    if kind is not object and held.kind is not kind:
         raise TypeValidationError(
             f"{name} is {_words(held.kind)} handle {text!r}, expected {expected}"
         )
@@ -1416,18 +1404,15 @@ def _declared(
             raise TypeError(f"{function}: {spec.name} declares a table, which takes no default")
         return "table", _mixed
     if _is_handle(spec.annotation):
-        kinds = _handle_kinds(spec.annotation)
-        if kinds is None:
+        kind = _handle_kind(spec.annotation)
+        if kind is None:
             return None
         # A handle resolves against the store, which holds nothing at registration.
         if spec.default is not inspect.Parameter.empty:
             raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
-        # Handle[object] takes the object behind any handle, so its words name no kind; a union
-        # names each of its kinds, and the rule takes any of them.
-        if kinds == (object,):
-            return "a handle", partial(_resolve, None, "a handle", spec.name)
-        expected = f"{' or '.join(_words(kind) for kind in kinds)} handle"
-        return expected, partial(_resolve, kinds, expected, spec.name)
+        # Handle[object] takes the object behind any handle, so its words name no kind.
+        expected = "a handle" if kind is object else f"{_words(kind)} handle"
+        return expected, partial(_resolve, kind, expected, spec.name)
     return _DECLARED.get(spec.annotation)
 
 
@@ -1491,21 +1476,14 @@ def _result(function: str, annotation: object) -> Callable[[object], object]:
         )
     convert = _RESULTS.get(annotation)
     if convert is None and _is_handle(annotation):
-        kinds = _handle_kinds(annotation)
-        if kinds == (object,):
+        kind = _handle_kind(annotation)
+        if kind is object:
             # A store entry of kind "any" could never be told apart, and no typed consumer
             # could take it: Handle[object] is a parameter's declaration only.
             raise TypeError(
                 f"{function} declares Handle[object] as its result; a creator names what it makes"
             )
-        if kinds is not None:
-            if len(kinds) != 1:
-                # The store records one kind per entry, the one the creator declared.
-                raise TypeError(
-                    f"{function} declares a handle of several kinds as its result; "
-                    "a creator names the one kind it makes"
-                )
-            (kind,) = kinds
+        if kind is not None:
             words = _words(kind)
             return partial(_publish, kind, words.replace(" ", "_"), words)
     if convert is None:
