@@ -243,58 +243,6 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
 
 
-def publication_columns(contracts: int) -> tuple[Cells, Cells]:
-    """Codes and the day each contract's reference price is published, for that many monthly
-    contracts, as the sheet sends them: the codes and the publication dates of schedule_columns."""
-    codes, _, _, publications = schedule_columns(contracts)
-    return codes, publications
-
-
-# A publication schedule keeps a copy of its date column, 8 bytes per contract, and the seam's
-# tuple of codes as it is, and on the way pays the column's conversion to days and its look, as a
-# schedule without options does: measured 3,280 bytes at 120 contracts on 2026-09-22,
-# about 17 bytes per contract on top of a creator's small objects, which twice the slack covers;
-# 21,640 at 1,200 contracts, the two-column expiry schedule's figures to the byte.
-def test_a_publication_schedule_keeps_a_copy_of_its_date_column() -> None:
-    contracts = 120
-    codes, publications = publication_columns(contracts)
-    assert (
-        least_peak(lambda: ENTRY["_CreatePublicationSchedule"](codes, publications))
-        <= 17 * contracts + 2 * SLACK
-    )
-
-
-def delivery_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
-    """Codes and the first and last delivery day of that many monthly contracts, as the sheet
-    sends them: the codes of schedule_columns, and periods thirty days long a month apart."""
-    codes, _, _, _ = schedule_columns(contracts)
-    starts = Cells.from_rows([[46327.0 + 30 * i] for i in range(contracts)])
-    ends = Cells.from_rows([[46356.0 + 30 * i] for i in range(contracts)])
-    return codes, starts, ends
-
-
-# A delivery schedule keeps a copy of each date column, 16 bytes per contract, and the seam's
-# tuple of codes as it is, and on the way pays each column's conversion to days and its look,
-# and the one look over the two columns for a period ending before it starts: measured 5,144
-# bytes at 120 contracts on 2026-09-22, about 34 bytes per contract on top of a creator's small
-# objects, which twice the slack covers; 40,812 at 1,200 contracts, the expiry schedule with
-# options plus the endpoint look's byte per contract. Reading it back pays the table's kinds and
-# slots, three cells per contract, the codes gathered as text and the two date columns to
-# serials, and the mixed road's masks: measured 7,891 at 120 contracts, about 22 bytes per cell,
-# and 72,275 at 1,200, 20.
-def test_a_delivery_schedule_keeps_a_copy_of_each_date_column_and_reads_back_per_cell() -> None:
-    contracts = 120
-    codes, starts, ends = delivery_columns(contracts)
-    assert (
-        least_peak(lambda: ENTRY["_CreateDeliverySchedule"](codes, starts, ends))
-        <= 34 * contracts + 2 * SLACK
-    )
-    made = ENTRY["_CreateDeliverySchedule"](codes, starts, ends)
-    assert (
-        least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 22 * 3 * (contracts + 2) + 2 * SLACK
-    )
-
-
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
@@ -364,13 +312,12 @@ def test_daily_fixings_keep_a_copy_of_each_column() -> None:
     )
 
 
-def calendar_sources(contracts: int) -> tuple[object, str, object, object]:
-    """What a calendar takes: the valuation date's handle, the mode, daily, a schedule of that
-    many monthly contracts a month apart, and a calendar of a hundred holidays a week apart."""
+def calendar_sources(contracts: int) -> tuple[object, object, object]:
+    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
+    contracts a month apart, and a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
     return (
         ENTRY["_CreateValuationDate"](46276.0, 0.5),
-        "daily",
         ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING),
         ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
     )
@@ -380,88 +327,46 @@ def calendar_sources(contracts: int) -> tuple[object, str, object, object]:
 # two flags a byte each, and on the way pays the arange, the searchsorted and the flags'
 # temporaries: measured 8,620 bytes at 360 days on 2026-09-18, about 24 bytes per day on top of
 # a creator's small objects, which twice the slack covers; 66,741 at 3,630 days and 661,841 at
-# 36,630, 18 bytes per day. The mode, since #87, adds one reference to the record and nothing
-# per day, daily or monthly alike. Reading it back pays the reader's rectangle, four cells per day,
+# 36,630, 18 bytes per day. Reading it back pays the reader's rectangle, four cells per day,
 # the codes gathered as text and the days to serials: measured 26,308 at 360 days, about 18
 # bytes per cell; 251,938 at 3,630 days.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
-    valuation, mode, schedule, holidays = calendar_sources(13)
+    valuation, schedule, holidays = calendar_sources(13)
     assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays))
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, schedule, holidays))
         <= 25 * days + 2 * SLACK
     )
-    made = ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays)
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
-    codes, futures, _, publications = schedule_columns(13)
-    published = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
-    assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, "monthly", published, holidays))
-        <= 25 * days + 2 * SLACK
-    )
 
 
 def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
     before, under the same hundred Thursdays, so every past business day has one."""
-    valuation, mode, schedule, holidays = calendar_sources(contracts)
-    made = ENTRY["_CreateCalendar"](valuation, mode, schedule, holidays)
+    valuation, schedule, holidays = calendar_sources(contracts)
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
     return made, fixings
 
 
-# A daily history keeps two columns, 16 bytes per past business day, the row and the price, and
+# A history keeps two columns, 16 bytes per past business day, the row and the price, and
 # nothing per day of the calendar, which it keeps as it is; on the way it pays the builder's
 # looks, a byte or so per fixing and per day for the days covered and the flags combined:
-# measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19 and again on 2026-09-20 with
-# the daily rules in a function of their own, 16,641 at 3,600 days and 148,641 at 36,600, 4
-# bytes per day. Reading it back pays the calendar's table and then the fifth column, the words
-# made once, the wider kinds and slots, the codes paired with the words, and the mixed road's
-# masks over five columns: measured 53,627 at 360 days on 2026-09-19 through the helper the
-# market's reader shares, from 51,267 before it, about 30 bytes per cell; 629,741 at 3,600 days
-# and 6,528,344 at 36,600, 35 bytes per cell, where the road splits the joined text per text.
+# measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 16,641 at 3,600 days and
+# 148,641 at 36,600, 4 bytes per day. Reading it back pays the calendar's table and then the
+# fifth column, the words made once, the wider kinds and slots, the codes paired with the
+# words, and the mixed road's masks over five columns: measured 53,627 at 360 days on
+# 2026-09-19 through the helper the market's reader shares, from 51,267 before it, about 30
+# bytes per cell; 629,741 at 3,600 days and 6,528,344 at 36,600, 35 bytes per cell, where the
+# road splits the joined text per text.
 def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
     made, fixings = history_sources(13)
     assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 6 * days + 2 * SLACK
-    history = ENTRY["_CreateMarketHistory"](made, fixings)
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
-
-
-def monthly_sources(contracts: int) -> tuple[object, object]:
-    """The two handles a monthly history takes: a monthly calendar over the schedule of
-    schedule_columns with its publication dates, the day after each expiry, under the same
-    hundred Thursdays, valued on 11 September 2026, and fixings for the contracts expired by
-    then, the anchor's left out, so every expired contract has one and no other does."""
-    codes, futures, _, publications = schedule_columns(contracts)
-    schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
-    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
-    made = ENTRY["_CreateCalendar"](valuation, "monthly", schedule, holidays)
-    expired = int(np.searchsorted(46161.0 + 30 * np.arange(contracts), 46276.0))
-    dates = Cells.from_rows([[46162.0 + 30 * i] for i in range(1, expired)])
-    prices = Cells.from_rows([[2.0 + i / 100] for i in range(1, expired)])
-    return made, ENTRY["_CreateMonthlyFixings"](dates, prices, schedule)
-
-
-# A monthly history keeps the same two columns, 16 bytes per day of an expired contract, every
-# day of it, weekends and holidays included, and nothing per day of the rest of the calendar;
-# on the way it pays the rows listed, the prompts of those rows and the prices gathered through
-# them, 8 bytes each per such day, and the searches over the schedule's publication dates, a
-# few bytes per contract: measured 3,599 bytes at 360 days with 90 such days on
-# 2026-09-20, and 3,707 at 3,600 days over 121 contracts with the same 90, the
-# difference the contracts' own. Reading it back pays what the daily history's reading pays
-# less the words array, one word serving every day without a fixing: measured 50,227 at 360
-# days, about 28 bytes per cell, and 631,465 at 3,600.
-def test_a_monthly_history_keeps_two_columns_of_its_expired_days_and_reads_back_per_cell() -> None:
-    days, priced = 360, 90
-    made, fixings = monthly_sources(13)
-    assert (
-        least_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 32 * priced + 2 * SLACK
-    )
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
 
@@ -529,7 +434,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
     holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
-    made = ENTRY["_CreateCalendar"](valuation, "daily", schedule, holidays)
+    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
     fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
@@ -560,18 +465,4 @@ def test_a_market_keeps_one_small_record_whatever_the_sizes(
 def test_reading_a_market_back_pays_per_cell() -> None:
     days = 360
     made = ENTRY["_CreateMarket"](*market_sources(13, 30))
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 30 * 5 * days + 2 * SLACK
-
-
-# A monthly market keeps the same record and makes no array, measured 984 bytes on 2026-09-20
-# at a year of days over thirteen contracts, the daily market's figure to the byte. Reading it
-# back pays the calendar's table and the fifth column with the live rows, every day of a
-# contract not yet expired, their prompts and their quotes: measured 50,547 bytes at 360 days,
-# about 28 bytes per cell, and 500,907 at 3,600.
-def test_a_monthly_market_keeps_one_small_record_and_reads_back_per_cell() -> None:
-    days = 360
-    history = ENTRY["_CreateMarketHistory"](*monthly_sources(13))
-    quotes = ENTRY["_CreatePriceVector"](Cells.from_rows([[3.0 + i % 5 / 10] for i in range(9)]))
-    assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
-    made = ENTRY["_CreateMarket"](history, quotes)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 30 * 5 * days + 2 * SLACK

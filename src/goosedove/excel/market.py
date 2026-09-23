@@ -1,5 +1,5 @@
 """The worksheet functions of the market: the history of one index, its calendar bound to the
-fixings that fit its mode, daily or monthly, created once from two objects the sheet already
+settle fixed on each of its past business days, created once from two objects the sheet already
 holds, and the market, the history with the current futures prices, created as often as the
 prices move, each reached by handle. docs/library/market/ holds a page per function.
 
@@ -15,7 +15,6 @@ from goosedove.excel.bridge import Handle, excel_function
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.daily_fixings import DailyFixings
-from goosedove.market_data.monthly_fixings import MonthlyFixings
 from goosedove.market_data.price_vector import PriceVector
 
 # The worksheet functions this module registers, named here so that their leading underscore
@@ -30,17 +29,15 @@ def _CreateMarketHistory(
         "The index's calendar handle: the cell showing _CreateCalendar's result, such as B7, "
         "or a name for it.",
     ],
-    fixings: Annotated[
-        Handle[DailyFixings | MonthlyFixings],
-        "The index's fixings handle, daily or monthly as the calendar's mode says: the cell "
-        "showing the result of _CreateDailyFixings or _CreateMonthlyFixings, such as B10, or a "
-        "name for it.",
+    daily_fixings: Annotated[
+        Handle[DailyFixings],
+        "The index's daily-fixings handle: the cell showing the result of _CreateDailyFixings, "
+        "such as B10, or a name for it, with a fixing on every past business day of the calendar.",
     ],
 ) -> Handle[MarketHistory]:
-    """Creates the market history of one index, its calendar with the fixing on each day that
-    has fixed, the settle of each past business day or the price of each expired contract, and
-    shows its handle, the text other formulas take as the history."""
-    return market_history(calendar, fixings)
+    """Creates the market history of one index, its calendar with the settle fixed on each past
+    business day, and shows its handle, the text other formulas take as the history."""
+    return market_history(calendar, daily_fixings)
 
 
 @excel_function
@@ -56,7 +53,6 @@ def _CreateMarket(
         "order from the valuation day's prompt through the last contract.",
     ],
 ) -> Handle[Market]:
-    """Creates the market of one index from its history and current futures prices, the prompt
-    contract's quote on each day still to fix, and shows its handle, the text other formulas
-    take as the market."""
+    """Creates the daily market of one index from its history and current futures prices and
+    shows its handle, the text other formulas take as the market."""
     return market(market_history, price_vector)
