@@ -130,6 +130,12 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", 46023.0), Column(46295.0, 46325.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Column(46295.0, 46325.0), ExcelMissing.Value }, "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates" };
             yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Row(46295.0, 46325.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: last_trading_date is 1x2 array, expected column of dates" };
+            // The Gas Daily schedule: a first-date column one row short, the library's words; a blank among the last dates, a number among the codes, the last dates left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26", "X26"), Column(46266.0, 46296.0), Column(46295.0, 46326.0, 46356.0) }, "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, one per contract_code" };
+            yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), Column(46295.0, ExcelEmpty.Value) }, "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", 46023.0), Column(46266.0, 46296.0), Column(46295.0, 46326.0) }, "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
+            yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), ExcelMissing.Value }, "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates" };
+            yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Row(46266.0, 46296.0), Column(46295.0, 46326.0) }, "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates" };
             // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
@@ -245,6 +251,34 @@ namespace Goosedove.Host.Tests
             var one = (string)Seam.Call("_CreateIfercSchedule", "V26", 46295.0, 46296.0);
             Assert.NotEqual(handle, one);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
+        }
+
+        // A Gas Daily schedule: three columns make one, three single cells make one of one contract
+        // month, and util_ReadHandle spills it back, the three headers, the three types, then a
+        // row per contract month, the code as text and both dates as serials.
+        [Fact]
+        public void a_gas_daily_schedule_is_created_from_three_columns_and_read_back_through_its_handle()
+        {
+            var handle = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
+            Assert.StartsWith("gas_daily_schedule:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("first_date", spill[0, 1]);
+            Assert.Equal("last_date", spill[0, 2]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 1]);
+            Assert.Equal("datetime64[D]", spill[1, 2]);
+            Assert.Equal("U26", spill[2, 0]);
+            Assert.Equal(46266.0, spill[2, 1]);
+            Assert.Equal(46295.0, spill[2, 2]);
+            Assert.Equal("X26", spill[4, 0]);
+            Assert.Equal(46327.0, spill[4, 1]);
+            Assert.Equal(46356.0, spill[4, 2]);
+            var oneMonth = (string)Seam.Call("_CreateGasDailySchedule", "U26", 46266.0, 46295.0);
+            Assert.NotEqual(handle, oneMonth);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneMonth)).GetLength(0));
         }
 
         // Index conventions: five codes make one, and util_ReadHandle spills them back, the five

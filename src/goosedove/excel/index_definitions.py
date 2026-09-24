@@ -23,6 +23,7 @@ from goosedove.index_definitions.contract_specifications import (
     contract_specifications,
 )
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
@@ -32,6 +33,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions, inde
 __all__ = [
     "_CreateContractSpecifications",
     "_CreateExpirySchedule",
+    "_CreateGasDailySchedule",
     "_CreateHolidayCalendar",
     "_CreateIfercSchedule",
     "_CreateIndexConventions",
@@ -96,6 +98,29 @@ def _CreateIfercSchedule(
     future stops trading and the day its index is published, and shows its handle, the text
     other formulas take as the schedule."""
     return iferc_schedule(contract_code, last_trading_date, publication_date)
+
+
+@excel_function
+def _CreateGasDailySchedule(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, such as A2:A4 holding U26 to X26, one per contract month.",
+    ],
+    first_date: Annotated[
+        DateColumn,
+        "The column of each month's first day of gas, beside the codes, such as B2:B4, one per "
+        "code.",
+    ],
+    last_date: Annotated[
+        DateColumn,
+        "The column of each month's last day of gas, beside the codes, such as C2:C4, one per "
+        "code.",
+    ],
+) -> Handle[GasDailySchedule]:
+    """Creates a Gas Daily schedule from the contract months of one index and the first and
+    last day of gas each month's price covers, and shows its handle, the text other formulas
+    take as the schedule."""
+    return gas_daily_schedule(contract_code, first_date, last_date)
 
 
 @excel_function

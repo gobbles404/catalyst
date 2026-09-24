@@ -147,6 +147,33 @@ def test_the_iferc_schedule_creator_explains_itself() -> None:
     ]
 
 
+def test_the_gas_daily_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateGasDailySchedule"]
+    assert not hidden
+    assert description == (
+        "Creates a Gas Daily schedule from the contract months of one index and the first and "
+        "last day of gas each month's price covers, and shows its handle, the text other "
+        "formulas take as the schedule."
+    )
+    assert arguments == [
+        (
+            "contract_code",
+            "The column of contract codes, such as A2:A4 holding U26 to X26, one per contract "
+            "month.",
+        ),
+        (
+            "first_date",
+            "The column of each month's first day of gas, beside the codes, such as B2:B4, one "
+            "per code.",
+        ),
+        (
+            "last_date",
+            "The column of each month's last day of gas, beside the codes, such as C2:C4, one "
+            "per code.",
+        ),
+    ]
+
+
 def test_the_conventions_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden

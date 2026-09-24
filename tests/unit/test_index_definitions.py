@@ -15,6 +15,7 @@ from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -493,6 +494,195 @@ def test_a_handle_of_another_kind_is_not_an_iferc_schedule() -> None:
     assert bridge.call("ReadIfercSchedule", [other]) == (
         f"#ERROR ReadIfercSchedule: schedule is expiry schedule handle {other!r}, "
         "expected iferc schedule handle"
+    )
+
+
+# --- _CreateGasDailySchedule ----------------------------------------------------
+
+
+# The Gas Daily schedule page's sample as the sheet sends it: three codes as text and two
+# columns of serials, 1 September, 1 October and 1 November 2026 for the first days and
+# 30 September, 31 October and 30 November for the last.
+GAS_CODES = Cells.from_rows([["U26"], ["V26"], ["X26"]])
+FIRST_DATES = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
+LAST_DATES = Cells.from_rows([[46295.0], [46326.0], [46356.0]])
+GAS_DAILY = re.compile(r"gas_daily_schedule:[0-9a-f]{6}:([0-9]{6})")
+
+
+# The library has no consumer of a Gas Daily schedule yet, so this hidden reader proves that a
+# handle resolves to the schedule the seam kept, with its columns as they arrived.
+@probe
+def ReadGasDailySchedule(schedule: Handle[GasDailySchedule]) -> str:
+    return (
+        f"{' '.join(schedule.codes)} | {days_or_none(schedule.first_date)} | "
+        f"{days_or_none(schedule.last_date)}"
+    )
+
+
+def a_gas_daily_schedule(codes: object, first: object, last: object) -> str:
+    text = bridge.call("_CreateGasDailySchedule", [codes, first, last])
+    assert isinstance(text, str) and GAS_DAILY.fullmatch(text), text
+    return text
+
+
+def test_a_gas_daily_schedule_is_created_from_three_columns_and_read_back() -> None:
+    schedule = a_gas_daily_schedule(GAS_CODES, FIRST_DATES, LAST_DATES)
+    assert bridge.call("ReadGasDailySchedule", [schedule]) == (
+        "U26 V26 X26 | 2026-09-01 2026-10-01 2026-11-01 | 2026-09-30 2026-10-31 2026-11-30"
+    )
+
+
+# Three single cells are three columns of one, so a schedule of one contract month needs no range.
+def test_three_single_cells_are_a_gas_daily_schedule_of_one_contract_month() -> None:
+    schedule = a_gas_daily_schedule("U26", 46266.0, 46295.0)
+    assert bridge.call("ReadGasDailySchedule", [schedule]) == "U26 | 2026-09-01 | 2026-09-30"
+
+
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [GAS_CODES, Cells.from_rows([[46266.0], [46296.0], [46327.0], [46357.0]]), LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: ValueError: first_date has 4 dates, expected 3, "
+            "one per contract_code",
+        ),
+        (
+            [GAS_CODES, Cells.from_rows([[46266.0], [46296.0]]), LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, "
+            "one per contract_code",
+        ),
+        (
+            [GAS_CODES, FIRST_DATES, Cells.from_rows([[46295.0], [46326.0], [46356.0], [46387.0]])],
+            "#ERROR _CreateGasDailySchedule: ValueError: last_date has 4 dates, expected 3, "
+            "one per contract_code",
+        ),
+        (
+            ["U26", FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: ValueError: first_date has 3 dates, expected 1, "
+            "one per contract_code",
+        ),
+        (
+            [GAS_CODES, Cells.from_rows([[46266.0], [46296.0]]), Cells.from_rows([[46295.0]])],
+            "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, "
+            "one per contract_code",
+        ),
+        (
+            [GAS_CODES, FIRST_DATES, Cells.from_rows([[46295.0], [None], [46356.0]])],
+            "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date",
+        ),
+        (
+            [GAS_CODES, FIRST_DATES, Cells.from_rows([[46295.0], [46326.5], [46356.0]])],
+            "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is number 46326.5, "
+            "expected date",
+        ),
+        (
+            [GAS_CODES, Cells.from_rows([["1-Sep-2026"], [46296.0], [46327.0]]), LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: first_date cell (1, 1) is text '1-Sep-2026', "
+            "expected date",
+        ),
+        (
+            [Cells.from_rows([["U26"], [46023.0], ["X26"]]), FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["U26"], [""], ["X26"]]), FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is empty text, "
+            "expected text",
+        ),
+        (
+            [Cells.from_rows([["U26", "V26", "X26"]]), FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: contract_code is 1x3 array, expected column of text",
+        ),
+        (
+            [GAS_CODES, Cells.from_rows([[46266.0, 46296.0, 46327.0]]), LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: first_date is 1x3 array, expected column of dates",
+        ),
+        (
+            [MISSING, FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: contract_code is missing, expected column of text",
+        ),
+        (
+            [GAS_CODES, MISSING, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: first_date is missing, expected column of dates",
+        ),
+        (
+            [GAS_CODES, FIRST_DATES, MISSING],
+            "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates",
+        ),
+        (
+            [None, FIRST_DATES, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: contract_code is blank, expected column of text",
+        ),
+        (
+            [GAS_CODES, None, LAST_DATES],
+            "#ERROR _CreateGasDailySchedule: first_date is blank, expected column of dates",
+        ),
+        (
+            [GAS_CODES, FIRST_DATES, None],
+            "#ERROR _CreateGasDailySchedule: last_date is blank, expected column of dates",
+        ),
+        (
+            [
+                Cells.from_rows([["U26"], [46023.0], ["X26"]]),
+                Cells.from_rows([[46266.0], [None], [46327.0]]),
+                Cells.from_rows([[46295.0], [46326.0]]),
+            ],
+            "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, "
+            "expected text",
+        ),
+    ],
+    ids=[
+        "a first-date column one row long",
+        "a first-date column one row short",
+        "a last-date column one row long",
+        "three first dates for one code",
+        "both date columns wrong, the first dates named first",
+        "a blank in the last-date column",
+        "a date with a time",
+        "text in the first-date column",
+        "a number among the codes",
+        "empty text among the codes",
+        "a row of codes",
+        "a row of dates",
+        "the codes left out",
+        "the first dates left out",
+        "the last dates left out",
+        "a blank cell where the codes should be",
+        "a blank cell where the first dates should be",
+        "a blank cell where the last dates should be",
+        "every column wrong, the codes named first",
+    ],
+)
+def test_a_gas_daily_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreateGasDailySchedule", args) == text
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_gas_daily_schedule_publishes_no_object_and_no_handle() -> None:
+    before = number(a_gas_daily_schedule(GAS_CODES, FIRST_DATES, LAST_DATES), GAS_DAILY)
+    assert bridge.call(
+        "_CreateGasDailySchedule",
+        [GAS_CODES, Cells.from_rows([[46266.0], [46296.0]]), LAST_DATES],
+    ) == (
+        "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, "
+        "one per contract_code"
+    )
+    assert bridge.call(
+        "_CreateGasDailySchedule",
+        [GAS_CODES, FIRST_DATES, Cells.from_rows([[46295.0], [None], [46356.0]])],
+    ) == ("#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date")
+    assert number(a_gas_daily_schedule(GAS_CODES, FIRST_DATES, LAST_DATES), GAS_DAILY) == (
+        before + 1
+    )
+
+
+def test_a_handle_of_another_kind_is_not_a_gas_daily_schedule() -> None:
+    other = an_iferc_schedule(IFERC_CODES, LAST_TRADING, IFERC_PUBLICATIONS)
+    assert bridge.call("ReadGasDailySchedule", [other]) == (
+        f"#ERROR ReadGasDailySchedule: schedule is iferc schedule handle {other!r}, "
+        "expected gas daily schedule handle"
     )
 
 

@@ -26,6 +26,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -138,6 +139,24 @@ def test_an_iferc_schedule_spills_its_three_columns_under_two_heading_rows() -> 
         ["V26", 46295.0, 46296.0],
         ["X26", 46325.0, 46328.0],
         ["Z26", 46356.0, 46357.0],
+    ]
+    assert kinds.shape == (5, 3)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
+
+
+# Serials for the first and last days of September, October and November 2026, three contract
+# months of Gas Daily.
+def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() -> None:
+    codes = Cells.from_rows([["U26"], ["V26"], ["X26"]])
+    first = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
+    last = Cells.from_rows([[46295.0], [46326.0], [46356.0]])
+    kinds, slots, joined = read(bridge.call("_CreateGasDailySchedule", [codes, first, last]))
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "first_date", "last_date"],
+        ["str", "datetime64[D]", "datetime64[D]"],
+        ["U26", 46266.0, 46295.0],
+        ["V26", 46296.0, 46326.0],
+        ["X26", 46327.0, 46356.0],
     ]
     assert kinds.shape == (5, 3)
     assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
@@ -439,6 +458,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         ValuationDate,
         DiscountCurve,
         ExpirySchedule,
+        GasDailySchedule,
         HolidayCalendar,
         IfercSchedule,
         IndexConventions,

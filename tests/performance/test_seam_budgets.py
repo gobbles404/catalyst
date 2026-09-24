@@ -868,6 +868,50 @@ def test_an_iferc_schedule_is_three_columns_in_and_one_publication_out(
     }
 
 
+# --- the sixth index definition: three columns in, one publication out ---------------
+
+
+def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last day of gas of that many contract months, as the sheet sends
+    them: the codes, the options and the publication dates of schedule_columns, any dates
+    serving a count."""
+    codes, _, first, last = schedule_columns(contracts)
+    return codes, first, last
+
+
+# Ten years of Gas Daily contract months: the IFERC schedule's ledger to the call, three
+# columns of the same kinds through the same rules and a builder of the same shape.
+def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, first, last = gas_daily_columns(120)
+    PATH["_CreateGasDailySchedule"](codes, first, last)
+    assert call_profile(lambda: PATH["_CreateGasDailySchedule"](codes, first, last)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text_column": 1,
+        "_date_column": 2,
+        "_one_column": 3,
+        "_shape": 3,
+        "_texts": 1,
+        "_dates": 2,
+        "_not_dates": 2,
+        "_as_days": 2,
+        "_CreateGasDailySchedule": 1,
+        "gas_daily_schedule": 1,
+        "_one_per_code": 2,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateGasDailySchedule"](codes, first, last)) == {
+        "ndarray.any": 2,  # one look per date column, for the calendar
+        "ndarray.astype": 4,  # each date column on its way to days
+        "numpy.array": 2,  # the two copies the schedule keeps
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 2,
+    }
+
+
 # --- the third index definition: five texts in, one publication out ------------------
 
 
