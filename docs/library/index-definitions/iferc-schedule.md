@@ -1,6 +1,6 @@
 # _CreateIfercSchedule
 
-Ready to ship.
+Built in #97.
 
 The IFERC schedule of one index: each contract month's code, the day the month's future stops trading and the day the month's index is published, kept as given and reached by handle. Inside FERC, IFERC for short, is the S&P Global Platts publication whose monthly bidweek index prints once per delivery month, on the first publication day of that month; ICE's basis and fixed-price futures settle on it, the Waha and Henry basis futures among them, each stopping trading on the last business day before its delivery month and settling to the index printed after. So an IFERC contract month has two dates, one the exchange's and one the publisher's, and this schedule holds both beside the month's code. It is the IFERC market's own object, next to the [expiry schedule](expiry-schedule.md), which is the exchange's schedule of futures and options and stays as it is. Nothing reads it yet but [util_ReadHandle](../utilities/read-handle.md); the calendar of the IFERC market is the first reader, when it is written. The code is `src/goosedove/index_definitions/iferc_schedule.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 
