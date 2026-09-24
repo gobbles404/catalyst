@@ -24,6 +24,7 @@ from goosedove.index_definitions.contract_specifications import (
 )
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
 
 # The worksheet functions this module registers, named here so that their leading underscore
@@ -32,6 +33,7 @@ __all__ = [
     "_CreateContractSpecifications",
     "_CreateExpirySchedule",
     "_CreateHolidayCalendar",
+    "_CreateIfercSchedule",
     "_CreateIndexConventions",
 ]
 
@@ -72,6 +74,28 @@ def _CreateHolidayCalendar(
     """Creates a holiday calendar from the days one market is closed and shows its handle, the
     text other formulas take as the calendar."""
     return holiday_calendar(holiday)
+
+
+@excel_function
+def _CreateIfercSchedule(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, such as A2:A4 holding V26 to Z26, one per contract month.",
+    ],
+    last_trading_date: Annotated[
+        DateColumn,
+        "The column of last trading dates beside the codes, such as B2:B4, one per code.",
+    ],
+    publication_date: Annotated[
+        DateColumn,
+        "The column of dates the index is published, beside the codes, such as C2:C4, one per "
+        "code.",
+    ],
+) -> Handle[IfercSchedule]:
+    """Creates an IFERC schedule from the contract months of one index, the day each month's
+    future stops trading and the day its index is published, and shows its handle, the text
+    other formulas take as the schedule."""
+    return iferc_schedule(contract_code, last_trading_date, publication_date)
 
 
 @excel_function

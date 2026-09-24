@@ -56,6 +56,7 @@ What each kind shows:
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
 | `expiry_schedule` | `future_code`, `future_expiry`, then `option_expiry` when the index has options and `publication_date`, last, when its settles are published | `str`, then `datetime64[D]` per date column | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
+| `iferc_schedule` | `contract_code`, `last_trading_date`, `publication_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_specifications` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `float64`, `float64` | one per contract |
 | `daily_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
@@ -98,6 +99,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | the three-day curve: the two headers, the two types, three rows, dates as serials, factors exactly | example |
 | the six-contract schedule with options: three columns; without options: two | example |
 | a three-day calendar: one column of dates under its two heading rows | example |
+| the IFERC schedule: three headers, three types, then a code as text and two dates as serials per contract month | example |
 | index conventions: one row of five texts under its two heading rows | example |
 | contract specifications: one row per contract, the name as text and the lot size and fees as numbers, under its two heading rows | example |
 | daily fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |

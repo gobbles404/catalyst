@@ -251,6 +251,28 @@ $formulas = [ordered]@{
     "=_CreateMarket(CT7,CV1)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected 1, one per contract from 'n26' through 'n26'"
     "=_CreateMarket(CW5,CW2)" = "#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-26, expected a date from 2026-06-23 through 2026-07-21"
     "=_CreateMarket(CT7)" = "#ERROR _CreateMarket: price_vector is missing, expected price vector handle"
+    # The IFERC schedule: a creator over three contract months, their codes, the day each month's
+    # future stops trading and the day its index is published, in DA to DC, and over the first row
+    # alone, read back through util_ReadHandle; a last trading column one row long and a
+    # publication column one row short, the library's words; a blank among the publication dates,
+    # a number among the codes, the publication dates left out and a row where a column is
+    # expected, the seam's.
+    "=LEFT(DE1,15)"               = "iferc_schedule:"
+    "=LEFT(DE2,15)"               = "iferc_schedule:"
+    "=INDEX(util_ReadHandle(DE1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(DE1),1,3)" = "publication_date"
+    "=INDEX(util_ReadHandle(DE1),2,2)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(DE1),3,1)" = "V26"
+    "=INDEX(util_ReadHandle(DE1),4,2)" = "46325"
+    "=INDEX(util_ReadHandle(DE1),5,3)" = "46357"
+    "=COLUMNS(util_ReadHandle(DE1))"   = "3"
+    "=ROWS(util_ReadHandle(DE2))"      = "3"
+    "=_CreateIfercSchedule(DA2:DA4,DB2:DB5,DC2:DC4)" = "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 4 dates, expected 3, one per contract_code"
+    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DC2:DC3)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code"
+    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DD2:DD4)" = "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date"
+    "=_CreateIfercSchedule(DA6:DA7,DB2:DB3,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
+    "=_CreateIfercSchedule(DA2:DA4,DB2:DC2,DC2:DC4)" = "#ERROR _CreateIfercSchedule: last_trading_date is 1x2 array, expected column of dates"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -411,6 +433,17 @@ $cells = [ordered]@{
     "CW3" = "=_CreateExpirySchedule(AE3:AE4,AF3:AF4)"
     "CW4" = "=_CreateCalendar(CT3,CW3,AM1)"
     "CW5" = "=_CreateMarketHistory(CW4,CT6)"
+    # The IFERC schedule: three contract months of the Waha basis, the day each month's future
+    # stops trading and the day its index is published, a fourth last trading date for a column
+    # one row long, a copy of the publication column with a blank, a code over a number, and two
+    # creator cells, over the three rows and over the first row alone.
+    "DA2" = "V26"; "DB2" = "30-Sep-2026"; "DC2" = "1-Oct-2026"; "DD2" = "1-Oct-2026"
+    "DA3" = "X26"; "DB3" = "30-Oct-2026"; "DC3" = "2-Nov-2026"
+    "DA4" = "Z26"; "DB4" = "30-Nov-2026"; "DC4" = "1-Dec-2026"; "DD4" = "1-Dec-2026"
+    "DB5" = "31-Dec-2026"
+    "DA6" = "V26"; "DA7" = "46023"
+    "DE1" = "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DC2:DC4)"
+    "DE2" = "=_CreateIfercSchedule(DA2,DB2,DC2)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

@@ -27,6 +27,7 @@ from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
@@ -120,6 +121,26 @@ def test_a_schedule_spills_its_columns_with_the_publication_dates_last() -> None
         ["m26", 46161.0, 46162.0],
         ["n26", 46195.0, 46196.0],
     ]
+
+
+# Serials for 30 September, 30 October and 30 November 2026, the days three IFERC contract
+# months stop trading, and 1 October, 2 November and 1 December, the days their indices print.
+def test_an_iferc_schedule_spills_its_three_columns_under_two_heading_rows() -> None:
+    codes = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
+    last_trading = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
+    published = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
+    kinds, slots, joined = read(
+        bridge.call("_CreateIfercSchedule", [codes, last_trading, published])
+    )
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "last_trading_date", "publication_date"],
+        ["str", "datetime64[D]", "datetime64[D]"],
+        ["V26", 46295.0, 46296.0],
+        ["X26", 46325.0, 46328.0],
+        ["Z26", 46356.0, 46357.0],
+    ]
+    assert kinds.shape == (5, 3)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
 
 
 # Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
@@ -419,6 +440,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         DiscountCurve,
         ExpirySchedule,
         HolidayCalendar,
+        IfercSchedule,
         IndexConventions,
         ContractSpecifications,
         DailyFixings,

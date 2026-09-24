@@ -121,6 +121,32 @@ def test_the_holiday_calendar_creator_explains_itself() -> None:
     ]
 
 
+def test_the_iferc_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateIfercSchedule"]
+    assert not hidden
+    assert description == (
+        "Creates an IFERC schedule from the contract months of one index, the day each month's "
+        "future stops trading and the day its index is published, and shows its handle, the "
+        "text other formulas take as the schedule."
+    )
+    assert arguments == [
+        (
+            "contract_code",
+            "The column of contract codes, such as A2:A4 holding V26 to Z26, one per contract "
+            "month.",
+        ),
+        (
+            "last_trading_date",
+            "The column of last trading dates beside the codes, such as B2:B4, one per code.",
+        ),
+        (
+            "publication_date",
+            "The column of dates the index is published, beside the codes, such as C2:C4, one "
+            "per code.",
+        ),
+    ]
+
+
 def test_the_conventions_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndexConventions"]
     assert not hidden
