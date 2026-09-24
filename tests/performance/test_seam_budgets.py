@@ -819,6 +819,55 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
     }
 
 
+# --- the fifth index definition: three columns in, one publication out ---------------
+
+
+def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes, the day each month's future stops trading and the day its index is published, for
+    that many contract months, as the sheet sends them: the codes, the futures and the
+    publication dates of schedule_columns."""
+    codes, last_trading, _, publications = schedule_columns(contracts)
+    return codes, last_trading, publications
+
+
+# Ten years of IFERC contract months: the text column handed over as it is, one look and two
+# conversions per date column, the builder's two copies and one publication. Twenty-six calls
+# across fifteen functions, the accept rule once per argument: the expiry schedule with its
+# publication dates and the options left out, less the one argument left out, its rule and the
+# builder's third slot.
+def test_an_iferc_schedule_is_three_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    codes, last_trading, publications = iferc_columns(120)
+    PATH["_CreateIfercSchedule"](codes, last_trading, publications)
+    assert call_profile(
+        lambda: PATH["_CreateIfercSchedule"](codes, last_trading, publications)
+    ) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text_column": 1,
+        "_date_column": 2,
+        "_one_column": 3,
+        "_shape": 3,
+        "_texts": 1,
+        "_dates": 2,
+        "_not_dates": 2,
+        "_as_days": 2,
+        "_CreateIfercSchedule": 1,
+        "iferc_schedule": 1,
+        "_one_per_code": 2,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateIfercSchedule"](codes, last_trading, publications)) == {
+        "ndarray.any": 2,  # one look per date column, for the calendar
+        "ndarray.astype": 4,  # each date column on its way to days
+        "numpy.array": 2,  # the two copies the schedule keeps
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 2,
+    }
+
+
 # --- the third index definition: five texts in, one publication out ------------------
 
 
