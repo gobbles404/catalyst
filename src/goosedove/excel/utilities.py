@@ -24,6 +24,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -85,6 +86,16 @@ def iferc_schedule_table(obj: IfercSchedule) -> MixedArray:
         obj.codes,
         obj.last_trading_date,
         obj.publication_date,
+    )
+
+
+@shown.register
+def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
+    return MixedArray.table(
+        [("contract_code", "first_date", "last_date"), ("str", "datetime64[D]", "datetime64[D]")],
+        obj.codes,
+        obj.first_date,
+        obj.last_date,
     )
 
 

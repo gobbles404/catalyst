@@ -265,6 +265,26 @@ def test_an_iferc_schedule_keeps_a_copy_of_each_date_column() -> None:
     )
 
 
+def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last day of gas of that many contract months, as the sheet sends
+    them: the codes, the options and the publication dates of schedule_columns, any dates
+    serving a peak."""
+    codes, _, first, last = schedule_columns(contracts)
+    return codes, first, last
+
+
+# A Gas Daily schedule keeps a copy of each of its two date columns, as the IFERC schedule does:
+# measured 4,928 bytes at 120 contract months on 2026-09-24 and 39,516 at 1,200, the IFERC
+# schedule's figures to the byte, under the same ceiling.
+def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
+    contracts = 120
+    codes, first, last = gas_daily_columns(contracts)
+    assert (
+        least_peak(lambda: ENTRY["_CreateGasDailySchedule"](codes, first, last))
+        <= 32 * contracts + 2 * SLACK
+    )
+
+
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:

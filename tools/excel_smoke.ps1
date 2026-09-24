@@ -273,6 +273,27 @@ $formulas = [ordered]@{
     "=_CreateIfercSchedule(DA6:DA7,DB2:DB3,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateIfercSchedule(DA2:DA4,DB2:DB4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
     "=_CreateIfercSchedule(DA2:DA4,DB2:DC2,DC2:DC4)" = "#ERROR _CreateIfercSchedule: last_trading_date is 1x2 array, expected column of dates"
+    # The Gas Daily schedule: a creator over three contract months, their codes and the first and
+    # last day of gas of each, in DG to DI, and over the first row alone, read back through
+    # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
+    # library's words; a blank among the last dates, a number among the codes, the last dates left
+    # out and a row where a column is expected, the seam's.
+    "=LEFT(DK1,19)"               = "gas_daily_schedule:"
+    "=LEFT(DK2,19)"               = "gas_daily_schedule:"
+    "=INDEX(util_ReadHandle(DK1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(DK1),1,3)" = "last_date"
+    "=INDEX(util_ReadHandle(DK1),2,2)" = "datetime64[D]"
+    "=INDEX(util_ReadHandle(DK1),3,1)" = "U26"
+    "=INDEX(util_ReadHandle(DK1),4,2)" = "46296"
+    "=INDEX(util_ReadHandle(DK1),5,3)" = "46356"
+    "=COLUMNS(util_ReadHandle(DK1))"   = "3"
+    "=ROWS(util_ReadHandle(DK2))"      = "3"
+    "=_CreateGasDailySchedule(DG2:DG4,DH2:DH5,DI2:DI4)" = "#ERROR _CreateGasDailySchedule: ValueError: first_date has 4 dates, expected 3, one per contract_code"
+    "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4,DI2:DI3)" = "#ERROR _CreateGasDailySchedule: ValueError: last_date has 2 dates, expected 3, one per contract_code"
+    "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4,DJ2:DJ4)" = "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date"
+    "=_CreateGasDailySchedule(DG6:DG7,DH2:DH3,DI2:DI3)" = "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4)" = "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates"
+    "=_CreateGasDailySchedule(DG2:DG4,DH2:DI2,DI2:DI4)" = "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -444,6 +465,17 @@ $cells = [ordered]@{
     "DA6" = "V26"; "DA7" = "46023"
     "DE1" = "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DC2:DC4)"
     "DE2" = "=_CreateIfercSchedule(DA2,DB2,DC2)"
+    # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
+    # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
+    # with a blank, a code over a number, and two creator cells, over the three rows and over the
+    # first row alone.
+    "DG2" = "U26"; "DH2" = "1-Sep-2026"; "DI2" = "30-Sep-2026"; "DJ2" = "30-Sep-2026"
+    "DG3" = "V26"; "DH3" = "1-Oct-2026"; "DI3" = "31-Oct-2026"
+    "DG4" = "X26"; "DH4" = "1-Nov-2026"; "DI4" = "30-Nov-2026"; "DJ4" = "30-Nov-2026"
+    "DH5" = "1-Dec-2026"
+    "DG6" = "U26"; "DG7" = "46023"
+    "DK1" = "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4,DI2:DI4)"
+    "DK2" = "=_CreateGasDailySchedule(DG2,DH2,DI2)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
