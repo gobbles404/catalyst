@@ -37,7 +37,7 @@ Four steps, and the page is the only document. A page says what the desk types, 
 1. **Write the page when the function is next, not before.** From the skeleton in [conventions.md](conventions.md): the formula a person types, the cells beside it, what the cell shows, the declaration, the help lines, the rules it needs today with their messages, the tests to write, and Not here. That is the spec, and it is a docs pull request.
 2. **Engineering answers one question on that pull request: can the seam carry it as written?** If yes, the page's first line reads `Ready to ship.` If not, the page names the one seam item in words, the item goes in the seam's wanted-next table in [inputs.md](../seam/inputs.md) with the recommended form, and the first line reads `Waiting on the seam: ...`. That answer is the merge gate.
 3. **Seam first, when needed, in its own pull request.** A new type follows [working.md §3](../seam/working.md#3-adding-a-declared-type); a new form of declaration is the same shape and smaller.
-4. **Build in one pull request**, following [working.md §2](../seam/working.md#2-adding-a-worksheet-function). Open it against the seam branch when there is one, so GitHub shows only its own changes and it can merge only after the seam does. The build sets the first line to `Built in #105`, points the Tests table at the files, and the page becomes the reference.
+4. **Build in one pull request**, following [working.md §2](../seam/working.md#2-adding-a-worksheet-function). Open it against the seam branch when there is one, so GitHub shows only its own changes and it can merge only after the seam does. The build sets the first line to `Built in #NN`, points the Tests table at the files, and the page becomes the reference.
 
 Three things not to do:
 
