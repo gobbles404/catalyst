@@ -63,6 +63,7 @@ def test_the_sample_runs_from_the_day_after_the_first_expiry_to_the_last() -> No
     assert made.is_priced.dtype == np.dtype(bool)
     assert made.is_fixed.dtype == np.dtype(bool)
     assert made.contract.size == made.is_priced.size == made.is_fixed.size == 63
+    assert made.first_unfixed == 5  # the days before the valuation day, 25 May
 
 
 def test_the_rows_the_page_shows() -> None:
@@ -347,6 +348,7 @@ def test_the_days_before_the_valuation_date_are_past_and_the_day_itself_is_not(
 ) -> None:
     made = a_calendar(valuation=valuation_date(day(as_of), 0.5))
     assert int(made.is_fixed.sum()) == past_days
+    assert made.first_unfixed == past_days
     assert made.is_fixed.tolist() == [bool(date < day(as_of)) for date in made.dates]
     if past_days:
         assert made.is_fixed[:past_days].all() and not made.is_fixed[past_days:].any()
@@ -432,6 +434,7 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
         == days_per_contract.tolist()
     )
     assert np.array_equal(made.is_fixed, made.dates < as_of)
+    assert made.first_unfixed == int(np.count_nonzero(made.is_fixed))
 
 
 # --- ownership ----------------------------------------------------------------
@@ -448,6 +451,9 @@ def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only()
         made.dates[0] = day("2030-01-01")
     with pytest.raises(ValueError):
         made.is_fixed[0] = False
+    field = "first_unfixed"
+    with pytest.raises(AttributeError):
+        setattr(made, field, 0)
 
 
 def test_making_a_calendar_changes_no_source_and_a_second_calendar_leaves_the_first() -> None:
@@ -499,6 +505,7 @@ def test_the_gas_daily_sample_runs_from_the_first_months_first_day_to_the_lasts_
     assert made.is_priced.all()
     assert made.is_fixed.tolist() == [bool(date <= day("2026-09-25")) for date in made.dates]
     assert int(made.is_fixed.sum()) == 25
+    assert made.first_unfixed == 25
     assert made.schedule is GAS_DAILY and made.holiday_calendar is None
     assert made.valuation_date is SEP_25
 
@@ -524,10 +531,13 @@ def test_gas_daily_months_across_a_month_end_and_a_year_end_are_a_row_per_day() 
 def test_a_gas_daily_calendar_prices_every_day_wherever_the_valuation_date_falls() -> None:
     before = calendar(valuation_date(day("2026-01-01"), 0.5), GAS_DAILY, None)
     assert before.is_priced.all() and not before.is_fixed.any()
+    assert before.first_unfixed == 0
     after = calendar(valuation_date(day("2027-01-01"), 0.0), GAS_DAILY, None)
     assert after.is_priced.all() and after.is_fixed.all()
+    assert after.first_unfixed == 91
     on_the_first = calendar(valuation_date(day("2026-09-01"), 0.0), GAS_DAILY, None)
     assert on_the_first.is_fixed.tolist()[:2] == [True, False]
+    assert on_the_first.first_unfixed == 1
 
 
 def test_a_holiday_calendar_given_with_a_gas_daily_schedule_is_refused() -> None:
@@ -636,12 +646,14 @@ def test_the_iferc_sample_is_one_row_per_month_dated_by_its_publication_day() ->
     assert made.contract.tolist() == [0, 1, 2]
     assert made.is_priced.all()
     assert made.is_fixed.tolist() == [True, True, False]
+    assert made.first_unfixed == 2
     assert made.schedule is IFERC and made.holiday_calendar is None
 
 
 def test_an_iferc_month_is_fixed_the_day_after_its_publication_day() -> None:
     on_the_day = calendar(valuation_date(day("2026-11-02"), 1.0), IFERC, None)
     assert on_the_day.is_fixed.tolist() == [True, False, False]
+    assert on_the_day.first_unfixed == 1
     the_day_after = calendar(valuation_date(day("2026-11-03"), 0.0), IFERC, None)
     assert the_day_after.is_fixed.tolist() == [True, True, False]
     before_any = calendar(valuation_date(day("2026-10-01"), 0.5), IFERC, None)

@@ -1453,11 +1453,11 @@ MARKET_LEDGER = {
 
 
 # The hot operation: two handles, each the text rule and one lookup, the builder's two rules on
-# scalars, the row of the first unfixed period from one count of the fixed flags, numpy's own
-# routine, which the ledger does not see, and its contract read there, and one publication.
-# Eleven calls across eight functions, and not one numpy call: no copy, no look, no mask and no
-# array, whatever the calendar's length and the vector's, a year of days with nine quotes, ten
-# years with one quote, or a year with 246 quotes alike.
+# scalars, the row of the first unfixed period read off the calendar, which counted its fixed
+# flags once when it was made, its contract read there, and one publication. Eleven calls across
+# eight functions, and not one numpy call: no copy, no count, no look, no mask and no array,
+# whatever the calendar's length and the vector's, a year of days with nine quotes, ten years
+# with one quote, or a year with 246 quotes alike.
 @pytest.mark.parametrize(
     ("contracts", "days_apart"),
     [(13, 30), (2, 3600), (361, 1)],

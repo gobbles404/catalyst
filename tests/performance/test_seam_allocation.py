@@ -617,7 +617,7 @@ def iferc_market_sources() -> tuple[object, object]:
 
 
 # The same record over the other two histories, a year of flow days with four quotes and ten
-# years of months with 116, the count of the fixed flags making no array either.
+# years of months with 116, the row of the first unfixed period read off the calendar.
 @pytest.mark.parametrize(
     "sources",
     [gas_daily_market_sources, iferc_market_sources],

@@ -6,8 +6,6 @@ docs/library/market/market.md is the page."""
 
 from dataclasses import dataclass
 
-import numpy as np
-
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.price_vector import PriceVector
 
@@ -41,17 +39,18 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
 
     The calendar's periods are in date order and the fixed side is before the valuation date
     or, for a Gas Daily flow day, on or before it, so the fixed periods come first and the row
-    of the first unfixed one is the count of the fixed flags: one count and one read, no
-    search, and no array made. On a futures calendar that period is the valuation day and its
-    contract the prompt; on a Gas Daily calendar the day after the valuation day, so the first
-    quote is the balance of that month; on an IFERC calendar the first month whose index has
-    not published. The two objects are kept as they are.
+    of the first unfixed one is the count of the fixed flags, which the calendar took once
+    when it was made and holds: the market reads that row and the contract there, two reads,
+    no count, no search, and no array made. On a futures calendar that period is the valuation
+    day and its contract the prompt; on a Gas Daily calendar the day after the valuation day,
+    so the first quote is the balance of that month; on an IFERC calendar the first month
+    whose index has not published. The two objects are kept as they are.
     """
     calendar = market_history.calendar
-    fixed = int(np.count_nonzero(calendar.is_fixed))  # the fixed periods come first
-    if fixed == calendar.dates.size:
+    first = calendar.first_unfixed  # counted once when the calendar was made
+    if first == calendar.dates.size:
         raise ValueError("market_history has no unfixed period, expected at least one to quote")
-    first_contract = int(calendar.contract[fixed])
+    first_contract = int(calendar.contract[first])
     codes = calendar.schedule.codes
     expected = len(codes) - first_contract
     given = price_vector.prices.size

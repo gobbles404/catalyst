@@ -62,7 +62,11 @@ class Calendar:
     price of its own, Monday to Friday and not a holiday on a futures calendar and every row on
     the other two; and is_fixed[i] whether the period is on the fixed side of the valuation
     date, a futures day before it, a Gas Daily flow day on or before it, an IFERC month
-    published before it. The contract's code is the schedule's, read through the row."""
+    published before it. The contract's code is the schedule's, read through the row. And one
+    number, first_unfixed: the row of the first period not yet fixed, which is the count of
+    the fixed periods, since the periods are in date order and the fixed side is the earlier
+    one, and the calendar's length when every period has fixed; the market reads it, so that
+    a market is made with no look along the calendar."""
 
     valuation_date: ValuationDate
     schedule: FuturesSchedule | IfercSchedule | GasDailySchedule
@@ -72,6 +76,7 @@ class Calendar:
     contract: NDArray[np.intp]
     is_priced: NDArray[np.bool_]
     is_fixed: NDArray[np.bool_]
+    first_unfixed: int
 
 
 def calendar(
@@ -79,7 +84,8 @@ def calendar(
 ) -> Calendar:
     """The one way to make a Calendar: the schedule's kind chooses which calendar is made, the
     holiday calendar is checked against it, then that kind's rules run, in order, the first
-    failure being the message, and its four columns are made once, here and never again.
+    failure being the message, and its four columns and the row of its first unfixed period
+    are made once, here and never again.
 
     The kind is read off the object the seam hands over, the one way the library tells kinds
     apart, as util_ReadHandle chooses a table for a handle; an object of no schedule kind is
@@ -292,6 +298,15 @@ def _frozen(
 ) -> Calendar:
     for column in (dates, contract, is_priced, is_fixed):
         column.setflags(write=False)
+    first_unfixed = int(np.count_nonzero(is_fixed))  # the fixed periods come first
     return Calendar(
-        valuation_date, schedule, holiday_calendar, kind, dates, contract, is_priced, is_fixed
+        valuation_date,
+        schedule,
+        holiday_calendar,
+        kind,
+        dates,
+        contract,
+        is_priced,
+        is_fixed,
+        first_unfixed,
     )
