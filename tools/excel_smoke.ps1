@@ -87,24 +87,17 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AW1),13,1)" = "46286"
     "=_CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
     "=_CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
-    # The expiry schedule: a creator with three columns and one with two, one with the publication
-    # dates as a fourth and one with them and the options left out, read back through
-    # util_ReadHandle with the publication dates last; a futures column one row short, a blank in
-    # the options column, a publication column one row short and one with a blank.
-    "=LEFT(AI1,16)"               = "expiry_schedule:"
-    "=LEFT(AI2,16)"               = "expiry_schedule:"
-    "=LEFT(AI3,16)"               = "expiry_schedule:"
-    "=LEFT(AI4,16)"               = "expiry_schedule:"
-    "=COLUMNS(util_ReadHandle(AI3))"   = "4"
-    "=INDEX(util_ReadHandle(AI3),1,4)" = "publication_date"
-    "=INDEX(util_ReadHandle(AI3),8,4)" = "46316"
-    "=COLUMNS(util_ReadHandle(AI4))"   = "3"
-    "=INDEX(util_ReadHandle(AI4),1,3)" = "publication_date"
-    "=INDEX(util_ReadHandle(AI4),3,3)" = "46162"
-    "=_CreateExpirySchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR _CreateExpirySchedule: ValueError: future_expiry has 5 dates, expected 6, one per future_code"
-    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR _CreateExpirySchedule: option_expiry cell (3, 1) is blank, expected date"
-    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7,AJ2:AJ6)" = "#ERROR _CreateExpirySchedule: ValueError: publication_date has 5 dates, expected 6, one per future_code"
-    "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,,AJ2:AJ8)" = "#ERROR _CreateExpirySchedule: publication_date cell (7, 1) is blank, expected date"
+    # The futures schedule: a creator with three columns and one with two, read back through
+    # util_ReadHandle with the options last; a futures column one row short and a blank in the
+    # options column.
+    "=LEFT(AI1,17)"               = "futures_schedule:"
+    "=LEFT(AI2,17)"               = "futures_schedule:"
+    "=COLUMNS(util_ReadHandle(AI1))"   = "3"
+    "=INDEX(util_ReadHandle(AI1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(AI1),1,3)" = "option_expiry"
+    "=INDEX(util_ReadHandle(AI2),3,2)" = "46161"
+    "=_CreateFuturesSchedule(AE2:AE7,AF2:AF6,AG2:AG7)" = "#ERROR _CreateFuturesSchedule: ValueError: future_expiry has 5 dates, expected 6, one per contract_code"
+    "=_CreateFuturesSchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR _CreateFuturesSchedule: option_expiry cell (3, 1) is blank, expected date"
     # The holiday calendar: a creator over three days and one over a single cell, the first read
     # back through util_ReadHandle, a blank in the column, and a row where a column is expected.
     "=LEFT(AM1,17)"               = "holiday_calendar:"
@@ -190,8 +183,8 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AR1),156,2)" = "X26"
     "=INDEX(util_ReadHandle(AR1),156,4)" = "FALSE"
     "=ROWS(util_ReadHandle(AR1))"      = "156"
-    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
-    "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: future_code row 2 is 'm26', already given at row 1"
+    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, expected at least 2"
+    "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: contract_code row 2 is 'm26', already given at row 1"
     "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
     "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
     "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
@@ -359,20 +352,17 @@ $cells = [ordered]@{
     "AA2" = "=_CreateValuationDate(Y2,0.5)"
     "AA3" = "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)"
     "AA4" = "=util_ReadHandle(AA3)"
-    # An expiry schedule: six contract codes as the desk types them, the futures and options
-    # expiry beside each, a copy of the options column with a blank, the day each contract's
-    # settle is published, and four creator cells: with the options column, without it, with the
-    # publication dates as well, and with the publication dates while the options are left out.
-    "AE2" = "m26"; "AF2" = "19-May-2026"; "AG2" = "14-May-2026"; "AH2" = "14-May-2026"; "AJ2" = "20-May-2026"
-    "AE3" = "n26"; "AF3" = "22-Jun-2026"; "AG3" = "16-Jun-2026"; "AH3" = "16-Jun-2026"; "AJ3" = "23-Jun-2026"
-    "AE4" = "q26"; "AF4" = "21-Jul-2026"; "AG4" = "16-Jul-2026"; "AJ4" = "22-Jul-2026"
-    "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"; "AJ5" = "21-Aug-2026"
-    "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"; "AJ6" = "23-Sep-2026"
-    "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"; "AJ7" = "21-Oct-2026"
-    "AI1" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
-    "AI2" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7)"
-    "AI3" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,AG2:AG7,AJ2:AJ7)"
-    "AI4" = "=_CreateExpirySchedule(AE2:AE7,AF2:AF7,,AJ2:AJ7)"
+    # A futures schedule: six contract codes as the desk types them, the futures and options
+    # expiry beside each, a copy of the options column with a blank, and two creator cells, with
+    # the options column and without it.
+    "AE2" = "m26"; "AF2" = "19-May-2026"; "AG2" = "14-May-2026"; "AH2" = "14-May-2026"
+    "AE3" = "n26"; "AF3" = "22-Jun-2026"; "AG3" = "16-Jun-2026"; "AH3" = "16-Jun-2026"
+    "AE4" = "q26"; "AF4" = "21-Jul-2026"; "AG4" = "16-Jul-2026"
+    "AE5" = "u26"; "AF5" = "20-Aug-2026"; "AG5" = "17-Aug-2026"; "AH5" = "17-Aug-2026"
+    "AE6" = "V26"; "AF6" = "22-Sep-2026"; "AG6" = "17-Sep-2026"; "AH6" = "17-Sep-2026"
+    "AE7" = "X26"; "AF7" = "20-Oct-2026"; "AG7" = "15-Oct-2026"; "AH7" = "15-Oct-2026"
+    "AI1" = "=_CreateFuturesSchedule(AE2:AE7,AF2:AF7,AG2:AG7)"
+    "AI2" = "=_CreateFuturesSchedule(AE2:AE7,AF2:AF7)"
     # A holiday calendar: three days one market is closed, a copy of the column with a blank, and
     # two creator cells, one over the column and one over a single cell.
     "AK2" = "1-Jan-2026"; "AL2" = "1-Jan-2026"
@@ -439,13 +429,13 @@ $cells = [ordered]@{
     # is given twice, one whose expiries run backwards and one whose span no sheet could show, for
     # the calendar to refuse.
     "AR1" = "=_CreateCalendar(AA2,AI1,AM1)"
-    "AR2" = "=_CreateExpirySchedule(AE2,AF2)"
+    "AR2" = "=_CreateFuturesSchedule(AE2,AF2)"
     "AS2" = "m26"; "AS3" = "m26"
-    "AR3" = "=_CreateExpirySchedule(AS2:AS3,AF2:AF3)"
+    "AR3" = "=_CreateFuturesSchedule(AS2:AS3,AF2:AF3)"
     "AT2" = "22-Jun-2026"; "AT3" = "19-May-2026"
-    "AR4" = "=_CreateExpirySchedule(AE2:AE3,AT2:AT3)"
+    "AR4" = "=_CreateFuturesSchedule(AE2:AE3,AT2:AT3)"
     "AT4" = "19-May-2026"; "AT5" = "12-Apr-4897"
-    "AR5" = "=_CreateExpirySchedule(AE2:AE3,AT4:AT5)"
+    "AR5" = "=_CreateFuturesSchedule(AE2:AE3,AT4:AT5)"
     # The market history: a valuation date, 26-May-2026 at midday, a schedule of the first two
     # contracts, a calendar over them with the holiday calendar in AM1, which closes no day of
     # May, and the fixings on its four past business days, 20 to 22 May and the 25th, under the
@@ -458,7 +448,7 @@ $cells = [ordered]@{
     "CQ5" = "25-May-2026"; "CR5" = "71.4"
     "CQ6" = "26-May-2026"; "CR6" = "71.5"
     "CT3" = "=_CreateValuationDate(CT2,0.5)"
-    "CT4" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3)"
+    "CT4" = "=_CreateFuturesSchedule(AE2:AE3,AF2:AF3)"
     "CT5" = "=_CreateCalendar(CT3,CT4,AM1)"
     "CT6" = "=_CreateFuturesFixings(CQ2:CQ5,CR2:CR5,AM1)"
     "CT7" = "=_CreateMarketHistory(CT5,CT6)"
@@ -477,7 +467,7 @@ $cells = [ordered]@{
     # refuse.
     "CW2" = "=_CreatePriceVector(CU2)"
     "CW1" = "=_CreateMarket(CT7,CW2)"
-    "CW3" = "=_CreateExpirySchedule(AE3:AE4,AF3:AF4)"
+    "CW3" = "=_CreateFuturesSchedule(AE3:AE4,AF3:AF4)"
     "CW4" = "=_CreateCalendar(CT3,CW3,AM1)"
     "CW5" = "=_CreateMarketHistory(CW4,CT6)"
     # The IFERC schedule: three contract months of the Waha basis, the day each month's future

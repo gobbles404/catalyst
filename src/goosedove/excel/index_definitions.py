@@ -22,7 +22,7 @@ from goosedove.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
 )
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
@@ -32,7 +32,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions, inde
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
     "_CreateContractSpecifications",
-    "_CreateExpirySchedule",
+    "_CreateFuturesSchedule",
     "_CreateGasDailySchedule",
     "_CreateHolidayCalendar",
     "_CreateIfercSchedule",
@@ -41,8 +41,8 @@ __all__ = [
 
 
 @excel_function
-def _CreateExpirySchedule(
-    future_code: Annotated[
+def _CreateFuturesSchedule(
+    contract_code: Annotated[
         TextColumn,
         "The column of contract codes, such as A2:A7 holding m26 to X26, one per contract.",
     ],
@@ -54,16 +54,11 @@ def _CreateExpirySchedule(
         DateColumn | None,
         "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
     ] = None,
-    publication_date: Annotated[
-        DateColumn | None,
-        "The column of dates each contract's settle is published, beside the codes, such as "
-        "D2:D7, one per code.",
-    ] = None,
-) -> Handle[ExpirySchedule]:
-    """Creates an expiry schedule from the contract codes of one index, their expiry dates and,
-    where given, the dates their settles are published, and shows its handle, the text other
+) -> Handle[FuturesSchedule]:
+    """Creates the futures schedule of one index from its contract codes, the day each future
+    expires and, where given, the day its option expires, and shows its handle, the text other
     formulas take as the schedule."""
-    return expiry_schedule(future_code, future_expiry, option_expiry, publication_date)
+    return futures_schedule(contract_code, future_expiry, option_expiry)
 
 
 @excel_function

@@ -9,22 +9,22 @@ The calendar of one index: every calendar day from the day after its first contr
 ```python
 def _CreateCalendar(
     valuation_date: Handle[ValuationDate],
-    expiry_schedule: Handle[ExpirySchedule],
+    futures_schedule: Handle[FuturesSchedule],
     holiday_calendar: Handle[HolidayCalendar],
 ) -> Handle[Calendar]: ...
 ```
 
 | | A | B | C | D |
 |---|---|---|---|---|
-| 1 | as_of | 25-May-2026 | future_code | future_expiry |
+| 1 | as_of | 25-May-2026 | contract_code | future_expiry |
 | 2 | holiday | 25-May-2026 | m26 | 19-May-2026 |
 | 3 | | | n26 | 22-Jun-2026 |
 | 4 | | | q26 | 21-Jul-2026 |
-| 5 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateExpirySchedule(C2:C4, D2:D4)` | shows `expiry_schedule:3f9a1c:000004` |
+| 5 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateFuturesSchedule(C2:C4, D2:D4)` | shows `futures_schedule:3f9a1c:000004` |
 | 6 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | | |
 | 7 | `=_CreateCalendar(A5, C5, A6)` | shows `calendar:3f9a1c:000012` | | |
 
-Three handles, all required, none with a default: the valuation date, the index's expiry schedule and the market's holiday calendar, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. The function receives the three objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `holiday_calendar is calendar handle 'calendar:3f9a1c:000012', expected holiday calendar handle`, before the function runs. The seam resolves the three handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the calendar the seam keeps, declared `Handle[Calendar]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the calendar, its three sources by reference and its four columns.
+Three handles, all required, none with a default: the valuation date, the index's futures schedule and the market's holiday calendar, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. The function receives the three objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `holiday_calendar is calendar handle 'calendar:3f9a1c:000012', expected holiday calendar handle`, before the function runs. The seam resolves the three handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the calendar the seam keeps, declared `Handle[Calendar]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the calendar, its three sources by reference and its four columns.
 
 `=util_ReadHandle(A7)` on the calendar above runs from 20 May to 21 July 2026, 63 days, and shows among its rows:
 
@@ -53,7 +53,7 @@ Quoted from the declaration in `src/goosedove/excel/calendar.py`, which `tests/u
 |---|---|
 | Function | Creates the calendar of one index, every day after its first contract's expiry to its last, with the contract prompt on each, whether the market is open and whether the day is past, and shows its handle, the text other formulas take as the calendar. |
 | `valuation_date` | The valuation-date handle: the cell showing _CreateValuationDate's result, such as B2, or a name for it. |
-| `expiry_schedule` | The index's expiry-schedule handle: the cell showing _CreateExpirySchedule's result, such as B8, or a name for it, two contracts or more. |
+| `futures_schedule` | The index's futures-schedule handle: the cell showing _CreateFuturesSchedule's result, such as B8, or a name for it, two contracts or more. |
 | `holiday_calendar` | The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's result, such as B12, or a name for it. |
 
 ## The library checks
@@ -62,8 +62,8 @@ Four rules on the schedule, in this order, the first failure being the message; 
 
 | Rule | Message |
 |---|---|
-| the schedule has two contracts or more, the first only bounding the calendar | `expiry_schedule has 1 contract, expected at least 2` |
-| each code once, spelling and case as typed, the boundary's included | `future_code row 2 is 'm26', already given at row 1` |
+| the schedule has two contracts or more, the first only bounding the calendar | `futures_schedule has 1 contract, expected at least 2` |
+| each code once, spelling and case as typed, the boundary's included | `contract_code row 2 is 'm26', already given at row 1` |
 | each future expiring after the one above, in the order given | `future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22` |
 | the last future within 1,048,574 days of the first, a sheet's rows less the two heading rows `util_ReadHandle` spills first, the bound the discount curve holds, so whatever is created can be read back | `future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19` |
 
@@ -84,7 +84,7 @@ The examples and properties below are `tests/unit/test_calendar.py`; the seam's 
 | weekdays open and both weekend days closed; a holiday on a weekday closed, on a weekend nothing; consecutive holidays each closed | example |
 | duplicate, unordered and out-of-range holidays change nothing; a holiday on an expiry changes the business-day flag alone | example |
 | the valuation date before, on the boundary, on the first day, inside, on the last day, after and well after the calendar: the days before it past and the day itself not; the fraction of the day changing nothing; the two flags independent, a past Saturday closed and past | example |
-| option expiries and publication dates, added, removed or changed, change nothing | example |
+| option expiries, added, removed or changed, change nothing | example |
 | for any schedule of two to forty contracts with distinct codes and increasing expiries, any holidays and any valuation date: one row per day between the first expiry and the last, consecutive, each day prompt on the one contract whose interval holds it, each contract after the boundary holding exactly the days between its expiry and the one before, and the past flag one comparison | property |
 | the three sources kept by reference, the columns read-only and refusing writes; making a calendar changes no source, and a second calendar leaves the first | example |
 | three handles in and the calendar read back day by day, the flags reaching the sheet as booleans, the codes exactly as typed, one row from two expiries a day apart, the valuation date on the first day and its fraction | example, through the seam |

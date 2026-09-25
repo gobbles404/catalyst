@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from goosedove.globals.discount_curve import MAX_DAYS
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 
 
@@ -24,7 +24,7 @@ class Calendar:
     holidays included. The prompt contract's code is the schedule's, read through the row."""
 
     valuation_date: ValuationDate
-    expiry_schedule: ExpirySchedule
+    futures_schedule: FuturesSchedule
     holiday_calendar: HolidayCalendar
     dates: NDArray[np.datetime64]
     prompt: NDArray[np.intp]
@@ -34,7 +34,7 @@ class Calendar:
 
 def calendar(
     valuation_date: ValuationDate,
-    expiry_schedule: ExpirySchedule,
+    futures_schedule: FuturesSchedule,
     holiday_calendar: HolidayCalendar,
 ) -> Calendar:
     """The one way to make a Calendar: four rules on the schedule, checked once, in this order,
@@ -61,17 +61,17 @@ def calendar(
     objects are kept by reference and not copied, and the columns are frozen. Rows count as the
     sheet counts them, the schedule's first row being row 1.
     """
-    codes = expiry_schedule.codes
-    expiries = expiry_schedule.future_expiry
+    codes = futures_schedule.codes
+    expiries = futures_schedule.future_expiry
     if len(codes) < 2:
         have = f"{len(codes)} {'contract' if len(codes) == 1 else 'contracts'}"
-        raise ValueError(f"expiry_schedule has {have}, expected at least 2")
+        raise ValueError(f"futures_schedule has {have}, expected at least 2")
     if len(set(codes)) != len(codes):
         seen: dict[str, int] = {}
         for row, code in enumerate(codes, start=1):
             if code in seen:
                 raise ValueError(
-                    f"future_code row {row} is {code!r}, already given at row {seen[code]}"
+                    f"contract_code row {row} is {code!r}, already given at row {seen[code]}"
                 )
             seen[code] = row
     unordered = expiries[1:] <= expiries[:-1]
@@ -94,5 +94,5 @@ def calendar(
     for column in (dates, prompt, is_business_day, is_past):
         column.setflags(write=False)
     return Calendar(
-        valuation_date, expiry_schedule, holiday_calendar, dates, prompt, is_business_day, is_past
+        valuation_date, futures_schedule, holiday_calendar, dates, prompt, is_business_day, is_past
     )

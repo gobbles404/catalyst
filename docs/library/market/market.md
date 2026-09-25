@@ -24,7 +24,7 @@ Two handles, both required, neither with a default: the index's market history a
 
 ## The price vector's order
 
-The first price is the quote of the contract prompt on the calendar's valuation day, and the prices after it are the quotes of every remaining contract in the expiry schedule's order, through its last: exactly one price per contract in that sequence.
+The first price is the quote of the contract prompt on the calendar's valuation day, and the prices after it are the quotes of every remaining contract in the futures schedule's order, through its last: exactly one price per contract in that sequence.
 
 - The contracts that expired before the valuation day are left out.
 - The contract expiring on the valuation day is in: its expiry day is its own, as [calendar.md](../calendar/calendar.md) decided.

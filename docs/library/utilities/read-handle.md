@@ -54,7 +54,7 @@ What each kind shows:
 |---|---|---|---|
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
-| `expiry_schedule` | `future_code`, `future_expiry`, then `option_expiry` when the index has options and `publication_date`, last, when its settles are published | `str`, then `datetime64[D]` per date column | one per contract |
+| `futures_schedule` | `contract_code`, `future_expiry`, then `option_expiry` when the index has options | `str`, then `datetime64[D]` per date column | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
 | `iferc_schedule` | `contract_code`, `last_trading_date`, `publication_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `gas_daily_schedule` | `contract_code`, `first_date`, `last_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
@@ -75,9 +75,9 @@ What each kind shows:
 | datetime64[D] | float |
 | 11-Sep-2026 | 0.5 |
 
-`=util_ReadHandle(A8)` on the six-contract schedule of [expiry-schedule.md](../index-definitions/expiry-schedule.md) built with its options and without its publication dates; the same schedule built without options shows the first two columns alone, and built with the publication dates shows them as the last column, after the options when it has them:
+`=util_ReadHandle(A8)` on the six-contract schedule of [futures-schedule.md](../index-definitions/futures-schedule.md) built with its options; the same schedule built without options shows the first two columns alone:
 
-| future_code | future_expiry | option_expiry |
+| contract_code | future_expiry | option_expiry |
 |---|---|---|
 | str | datetime64[D] | datetime64[D] |
 | m26 | 19-May-2026 | 14-May-2026 |

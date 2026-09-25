@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
@@ -27,9 +27,9 @@ def day(text: str) -> np.datetime64:
     return np.datetime64(text, "D")
 
 
-def a_schedule(*contracts: tuple[str, str]) -> ExpirySchedule:
+def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
     codes = tuple(code for code, _ in contracts)
-    return expiry_schedule(codes, dates(*(expiry for _, expiry in contracts)), None, None)
+    return futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
 
 
 def a_vector(*prices: float) -> PriceVector:
@@ -45,7 +45,7 @@ ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
 def a_history(
     as_of: str = "2026-05-26",
-    schedule: ExpirySchedule = SCHEDULE,
+    schedule: FuturesSchedule = SCHEDULE,
     holidays: HolidayCalendar = CLOSED_MAY_25,
     fraction: float = 0.5,
 ) -> MarketHistory:
@@ -242,7 +242,7 @@ def any_history(data: st.DataObject) -> MarketHistory:
         data.draw(st.integers(0, 20_000)), "D"
     )
     expiries = start + offsets.astype("timedelta64[D]")
-    schedule = expiry_schedule(tuple(f"c{i}" for i in range(count)), expiries, None, None)
+    schedule = futures_schedule(tuple(f"c{i}" for i in range(count)), expiries, None)
     listed = expiries[0] + np.array(
         data.draw(st.lists(st.integers(-20, 400), max_size=30)), dtype="timedelta64[D]"
     )
@@ -267,7 +267,7 @@ def test_every_live_business_day_has_its_prompts_quote_and_no_past_day_reads_one
     made = history.calendar
     as_of = made.valuation_date.as_of
     first = int(made.prompt[made.dates == as_of][0])
-    quotes = a_vector(*(100.0 + i for i in range(len(made.expiry_schedule.codes) - first)))
+    quotes = a_vector(*(100.0 + i for i in range(len(made.futures_schedule.codes) - first)))
     view = market(history, quotes)
     assert view.first_contract == first
     assert view.market_history is history and view.price_vector is quotes

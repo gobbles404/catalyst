@@ -23,7 +23,7 @@ from goosedove.excel.bridge import (
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
@@ -61,20 +61,23 @@ def discount_curve_table(obj: DiscountCurve) -> MixedArray:
 
 
 @shown.register
-def expiry_schedule_table(obj: ExpirySchedule) -> MixedArray:
-    # The codes and the futures always, then the options and the publication dates when the
-    # schedule holds them, in that order, so the publication dates are the last column.
-    headers = ["future_code", "future_expiry"]
-    columns: list[NDArray[np.datetime64] | tuple[str, ...]] = [obj.codes, obj.future_expiry]
-    for header, dates in (
-        ("option_expiry", obj.option_expiry),
-        ("publication_date", obj.publication_date),
-    ):
-        if dates is not None:
-            headers.append(header)
-            columns.append(dates)
-    types = ["str"] + ["datetime64[D]"] * (len(columns) - 1)
-    return MixedArray.table([tuple(headers), tuple(types)], *columns)
+def futures_schedule_table(obj: FuturesSchedule) -> MixedArray:
+    # The codes and the futures always, then the options when the index has them.
+    if obj.option_expiry is None:
+        return MixedArray.table(
+            [("contract_code", "future_expiry"), ("str", "datetime64[D]")],
+            obj.codes,
+            obj.future_expiry,
+        )
+    return MixedArray.table(
+        [
+            ("contract_code", "future_expiry", "option_expiry"),
+            ("str", "datetime64[D]", "datetime64[D]"),
+        ],
+        obj.codes,
+        obj.future_expiry,
+        obj.option_expiry,
+    )
 
 
 @shown.register
@@ -104,7 +107,7 @@ def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
 def calendar_table(obj: Calendar) -> MixedArray:
     # The dates and the flags were made when the calendar was; the prompt contract's code is
     # read from the schedule the calendar keeps, one take over the rows, and nothing is rebuilt.
-    codes = np.array(obj.expiry_schedule.codes, dtype=object)[obj.prompt]
+    codes = np.array(obj.futures_schedule.codes, dtype=object)[obj.prompt]
     return MixedArray.table(
         [
             ("date", "prompt_contract", "is_business_day", "is_past"),

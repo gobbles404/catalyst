@@ -75,19 +75,18 @@ def test_the_handle_reader_explains_itself() -> None:
     ]
 
 
-def test_the_schedule_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateExpirySchedule"]
+def test_the_futures_schedule_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden
     assert description == (
-        "Creates an expiry schedule from the contract codes of one index, their expiry dates and, "
-        "where given, the dates their settles are published, and shows its handle, the text other "
-        "formulas take as the schedule."
+        "Creates the futures schedule of one index from its contract codes, the day each future "
+        "expires and, where given, the day its option expires, and shows its handle, the text "
+        "other formulas take as the schedule."
     )
-    # The third and fourth arguments may be left out with nothing in their place: brackets, and
-    # each line alone.
+    # The third argument may be left out with nothing in its place: brackets, and its line alone.
     assert arguments == [
         (
-            "future_code",
+            "contract_code",
             "The column of contract codes, such as A2:A7 holding m26 to X26, one per contract.",
         ),
         (
@@ -97,11 +96,6 @@ def test_the_schedule_creator_explains_itself() -> None:
         (
             "[option_expiry]",
             "The column of option expiry dates beside the codes, such as C2:C7, one per code.",
-        ),
-        (
-            "[publication_date]",
-            "The column of dates each contract's settle is published, beside the codes, such as "
-            "D2:D7, one per code.",
         ),
     ]
 
@@ -331,8 +325,8 @@ def test_the_calendar_creator_explains_itself() -> None:
             "B2, or a name for it.",
         ),
         (
-            "expiry_schedule",
-            "The index's expiry-schedule handle: the cell showing _CreateExpirySchedule's "
+            "futures_schedule",
+            "The index's futures-schedule handle: the cell showing _CreateFuturesSchedule's "
             "result, such as B8, or a name for it, two contracts or more.",
         ),
         (

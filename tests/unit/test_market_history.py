@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar, calendar
 from goosedove.globals.valuation_date import valuation_date
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
@@ -23,9 +23,9 @@ def day(text: str) -> np.datetime64:
     return np.datetime64(text, "D")
 
 
-def a_schedule(*contracts: tuple[str, str]) -> ExpirySchedule:
+def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
     codes = tuple(code for code, _ in contracts)
-    return expiry_schedule(codes, dates(*(expiry for _, expiry in contracts)), None, None)
+    return futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
 
 
 # The page's sample: three contracts of one index, the valuation date 26 May 2026 at midday, a
@@ -337,7 +337,7 @@ def any_calendar(data: st.DataObject) -> Calendar:
         data.draw(st.integers(0, 20_000)), "D"
     )
     expiries = start + offsets.astype("timedelta64[D]")
-    schedule = expiry_schedule(tuple(f"c{i}" for i in range(count)), expiries, None, None)
+    schedule = futures_schedule(tuple(f"c{i}" for i in range(count)), expiries, None)
     listed = expiries[0] + np.array(
         data.draw(st.lists(st.integers(-20, 400), max_size=30)), dtype="timedelta64[D]"
     )
