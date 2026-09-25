@@ -52,7 +52,7 @@ A count of one reads `1 settle`. The first and last dates bound the check: nothi
 
 ## Tests
 
-The examples and properties below are `tests/unit/test_futures_fixings.py`; the seam's texts and the handle are `tests/unit/test_market_data.py`, whose hidden reader proves the handle resolves to the fixings; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market history's tests build their fixings through this creator and move with it, and its argument, `futures_fixings` until #101, is `futures_fixings`, its three messages and the seam's handle words with it; its own cases are unchanged.
+The examples and properties below are `tests/unit/test_futures_fixings.py`; the seam's texts and the handle are `tests/unit/test_market_data.py`, whose hidden reader proves the handle resolves to the fixings; the spill is `tests/unit/test_utilities.py`; the help is pinned in `tests/unit/test_help.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`. What a call costs is pinned in `tests/performance/test_seam_budgets.py` and `tests/performance/test_seam_allocation.py`. The market history's tests build their fixings through this creator and move with it, and its argument, `daily_fixings` until #101, is `futures_fixings`, its three messages and the seam's handle words with it; its own cases are unchanged.
 
 | Case | Kind |
 |---|---|
