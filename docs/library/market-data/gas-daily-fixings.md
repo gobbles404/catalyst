@@ -1,6 +1,6 @@
 # _CreateGasDailyFixings
 
-Ready to ship.
+Built in #100.
 
 The Gas Daily fixings of one index: the midpoint Platts printed for each day gas flowed, price beside flow day, one row for every calendar day from the first to the last, kept as given and reached by handle. Gas Daily prints its daily price survey on the business day before the gas flows, one midpoint per flow day, and its flow-date symbols date each value by the day the gas flows rather than the day the deal was done, so a Friday's print arrives as three rows, Saturday, Sunday and Monday, and the Friday before Labor Day 2026 as four, each carrying the same number. The desk pastes those rows as Platts dates them, weekends and holidays included, and the library moves no date and carries nothing forward: a Saturday's price is the number Platts dated Saturday, not something reached back for from Friday. It is the [daily fixings](daily-fixings.md)' sibling for an index that prices every calendar day, and it takes no holiday calendar, since no day is closed, and no schedule, since a flow day's month is the month it flows in and needs no lookup. Nothing reads it yet but [util_ReadHandle](../utilities/read-handle.md); the history of the Gas Daily market is the first reader, when it is written, binding each day's price to the days of the Gas Daily calendar built from the [Gas Daily schedule](../index-definitions/gas-daily-schedule.md). The code is `src/goosedove/market_data/gas_daily_fixings.py`, the record and its builder, and `src/goosedove/excel/market_data.py`, the worksheet function.
 
