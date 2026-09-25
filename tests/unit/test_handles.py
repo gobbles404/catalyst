@@ -202,6 +202,86 @@ def test_a_handle_parameter_takes_no_default() -> None:
         excel_function(ReadWithDefault)
 
 
+# --- a handle that may be left out, with nothing in its place --------------------
+
+
+# The form of an argument that may be left out takes a handle: None is the argument's absence,
+# not a default the store would have to hold, so the handle is declared as if required and
+# resolves as one when given.
+@probe
+def MaybeCurve(curve: Handle[Curve] | None = None) -> str:
+    return "nothing" if curve is None else repr(curve.level)
+
+
+@probe
+def MaybeAny(handle: Handle[object] | None = None) -> str:
+    return "nothing" if handle is None else type(handle).__name__
+
+
+def test_a_handle_left_out_hands_the_function_nothing() -> None:
+    assert bridge.call("MaybeCurve", [MISSING]) == "nothing"
+    assert bridge.call("MaybeAny", [MISSING]) == "nothing"
+
+
+def test_a_handle_given_resolves_as_a_required_one_does() -> None:
+    curve = cast(str, bridge.call("MakeCurve", [2.5]))
+    assert bridge.call("MaybeCurve", [curve]) == "2.5"
+    assert bridge.call("MaybeAny", [curve]) == "Curve"
+    other = cast(str, bridge.call("MakeOther", []))
+    assert bridge.call("MaybeAny", [other]) == "Other"
+
+
+# Blank and left out are different facts, and a handle's faults keep decision 35's order.
+def test_a_handle_that_may_be_left_out_still_fails_in_the_handles_words() -> None:
+    assert (
+        bridge.call("MaybeCurve", [None])
+        == "#ERROR MaybeCurve: curve is blank, expected curve handle"
+    )
+    assert (
+        bridge.call("MaybeCurve", [3.0])
+        == "#ERROR MaybeCurve: curve is number 3.0, expected curve handle"
+    )
+    assert bridge.call("MaybeCurve", ["curve:000000:000001"]) == (
+        "#ERROR MaybeCurve: curve is text 'curve:000000:000001' naming no live object, "
+        "expected curve handle"
+    )
+    other = cast(str, bridge.call("MakeOther", []))
+    assert bridge.call("MaybeCurve", [other]) == (
+        f"#ERROR MaybeCurve: curve is other handle {other!r}, expected curve handle"
+    )
+    assert bridge.call("MaybeCurve", ["#ERROR FailToMake: ValueError: no"]) == (
+        "#ERROR MaybeCurve: curve is the creator's failure, expected curve handle: "
+        "#ERROR FailToMake: ValueError: no"
+    )
+    assert bridge.call("MaybeAny", [None]) == "#ERROR MaybeAny: handle is blank, expected a handle"
+
+
+# The form takes None as its default and nothing else, for a handle as for any type; a real
+# default on a handle is still refused, above.
+def test_the_form_around_a_handle_takes_none_and_nothing_else() -> None:
+    def Undefaulted(curve: Handle[Curve] | None) -> float:
+        return 0.0
+
+    def Defaulted(curve: Handle[Curve] | None = A_CURVE) -> float:
+        return 0.0
+
+    with pytest.raises(
+        TypeError, match=r"Undefaulted: curve declares .* and no default, expected None"
+    ):
+        excel_function(Undefaulted)
+    with pytest.raises(
+        TypeError, match=r"Defaulted: curve declares .* and defaults to .*, expected None"
+    ):
+        excel_function(Defaulted)
+
+
+# Excel sees the name in brackets and nothing after the help, as for any argument left out.
+def test_a_handle_that_may_be_left_out_is_shown_in_brackets() -> None:
+    specs = {name: arguments for name, _, arguments, _ in bridge.function_specs()}
+    assert specs["MaybeCurve"] == [("[curve]", "")]
+    assert specs["ReadCurve"] == [("curve", "")]
+
+
 def test_a_handle_around_one_of_the_seams_own_types_refuses_to_register() -> None:
     def Boxed() -> Handle[float]:
         return 1.0

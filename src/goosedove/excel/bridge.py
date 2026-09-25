@@ -1442,11 +1442,18 @@ def _parameter(function: str, spec: inspect.Parameter, hidden: bool) -> Paramete
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r} and {what}, expected None"
         )
-    # The type inside the form selects the rule and the words; a table, a handle or a bare mixed
-    # range inside it is refused as it is on its own, since none of those takes a default.
-    declared = _declared(
-        function, spec if inner is None else spec.replace(annotation=inner), hidden
-    )
+    # The type inside the form selects the rule and the words. A handle inside it is declared
+    # as if required: the form's None is the argument's absence, not a default the store would
+    # have to hold. A table or a bare mixed range inside it is refused as it is on its own,
+    # since neither takes a default.
+    if inner is None:
+        declared = _declared(function, spec, hidden)
+    elif _is_handle(inner):
+        declared = _declared(
+            function, spec.replace(annotation=inner, default=inspect.Parameter.empty), hidden
+        )
+    else:
+        declared = _declared(function, spec.replace(annotation=inner), hidden)
     if declared is None:
         raise TypeError(
             f"{function}: {spec.name} declares {spec.annotation!r}, which the seam cannot receive"
