@@ -208,7 +208,7 @@ Decided 2026-09-14, an argument left out with nothing in its place.
 
 Decided 2026-09-15, a handle of any kind.
 
-40. A function that takes the object behind any handle declares `handle: Handle[object]`, `object` being Python's name for any class, and receives whatever the key finds. Decision 35's order and words stand, with no kind to name, `expected a handle`; the one step skipped is the comparison of the store's kind with the declared kind, and nothing in the text is parsed. A creator still names what it makes: `Handle[object]` as a result refuses to register, and so does a bare `Handle`, as decision 34 says. First wanted by `util_ReadHandle`; the calendar takes its schedule so since #NN, and refuses in its own words what is not a schedule.
+40. A function that takes the object behind any handle declares `handle: Handle[object]`, `object` being Python's name for any class, and receives whatever the key finds. Decision 35's order and words stand, with no kind to name, `expected a handle`; the one step skipped is the comparison of the store's kind with the declared kind, and nothing in the text is parsed. A creator still names what it makes: `Handle[object]` as a result refuses to register, and so does a bare `Handle`, as decision 34 says. First wanted by `util_ReadHandle`; the calendar takes its schedule so since #104, and refuses in its own words what is not a schedule.
 
 Decided 2026-09-17, the whole number's bound.
 
