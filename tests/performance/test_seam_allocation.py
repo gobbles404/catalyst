@@ -413,28 +413,22 @@ def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell()
     assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
 
 
-def published_columns(count: int) -> tuple[Cells, Cells]:
-    """That many monthly publications as the sheet sends them, the publication dates of the
-    schedule schedule_columns makes, a serial per row, and a price beside each."""
-    _, _, _, publications = schedule_columns(count)
-    return publications, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
+    """That many contract months' indices as the sheet sends them: the codes of schedule_columns
+    and a price beside each."""
+    codes, _, _, _ = schedule_columns(count)
+    return codes, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
 
 
-# Monthly fixings keep a copy of each column, 16 bytes per fixing, and on the way pay the date
-# column's masks and arrays to days, a sorted copy of the schedule's publication dates, 8 bytes
-# per contract of the schedule, and the places, the next publications and the looks over the
-# column: measured 7,631 bytes at 120 fixings against a schedule of 120 contracts on 2026-09-17,
-# about 64 bytes per fixing, up from 4,472 when the months were kept as months and nothing was
-# checked; 62,622 at 1,200 and 613,422 at 12,000, 51 bytes per fixing.
-def test_monthly_fixings_keep_a_copy_of_each_column() -> None:
+# IFERC fixings keep the seam's tuple of codes as it is and a copy of the price column, 8 bytes
+# per month, and on the way pay the set the codes are checked for repeats through, which is
+# most of the peak at a small count: measured 10,600 bytes at 120 months on 2026-09-24, about
+# 80 bytes per month at that size on top of a creator's small objects, which twice the slack
+# covers, and 41,348 at 1,200, 34 bytes per month, the set growing slower than the count.
+def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
     count = 120
-    codes, futures, _, publications = schedule_columns(count)
-    schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
-    dates, prices = published_columns(count)
-    assert (
-        least_peak(lambda: ENTRY["_CreateMonthlyFixings"](dates, prices, schedule))
-        <= 60 * count + 2 * SLACK
-    )
+    codes, prices = iferc_fixing_columns(count)
+    assert least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices)) <= 80 * count + 2 * SLACK
 
 
 def price_column(prices: int) -> Cells:

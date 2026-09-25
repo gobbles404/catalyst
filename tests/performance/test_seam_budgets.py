@@ -1345,59 +1345,42 @@ def test_reading_a_market_back_rebuilds_nothing(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
-# --- the monthly fixings: two columns and a schedule's handle in, the dates kept ------------
+# --- the IFERC fixings: two columns in, the codes kept and the prices copied ---------------
 
 
-def published_columns(count: int) -> tuple[Cells, Cells]:
-    """That many monthly publications as the sheet sends them, the publication dates of the
-    schedule schedule_columns makes, a serial per row, and a price beside each."""
-    _, _, _, publications = schedule_columns(count)
-    return publications, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
+    """That many contract months' indices as the sheet sends them: the codes of schedule_columns
+    and a price beside each."""
+    codes, _, _, _ = schedule_columns(count)
+    return codes, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
 
 
-# Ten years of monthly publications, with the index's schedule by handle: the date column
-# through its look and its conversion to days, the number column accepted on the host's summary
-# alone, the handle's text rule and its one lookup, then the builder's three looks, the order of
-# the dates, the dates the schedule does not publish on and the publications without a fixing,
-# its sorted copy of the schedule's dates and its one search over the column, its two copies,
-# and one publication. Twenty calls across sixteen functions; before the schedule, seventeen
-# across fourteen. On numpy the sorted copy is np.unique's flatten, sort and two asanyarray,
-# then one searchsorted, four looks with their reductions, and the two copies frozen.
-def test_monthly_fixings_are_two_columns_and_a_schedule_in_and_the_dates_kept(
+# Ten years of monthly indices: the text column handed over as it is, the number column accepted
+# on the host's summary alone, the builder's count, its one pass over the codes as a set, its one
+# copy of the prices, and one publication. Fifteen calls across twelve functions, the accept rule
+# once per argument; nothing is asked of numpy but the copy and its freeze.
+def test_iferc_fixings_are_two_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes, futures, _, publications = schedule_columns(120)
-    schedule = PATH["_CreateExpirySchedule"](codes, futures, MISSING, publications)
-    dates, prices = published_columns(120)
-    PATH["_CreateMonthlyFixings"](dates, prices, schedule)
-    assert call_profile(lambda: PATH["_CreateMonthlyFixings"](dates, prices, schedule)) == {
+    codes, prices = iferc_fixing_columns(120)
+    PATH["_CreateIfercFixings"](codes, prices)
+    assert call_profile(lambda: PATH["_CreateIfercFixings"](codes, prices)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
-        "_date_column": 1,
+        "_validate": 2,
+        "_text_column": 1,
         "_column": 1,
         "_one_column": 2,
         "_shape": 2,
-        "_dates": 1,
-        "_not_dates": 1,
-        "_as_days": 1,
+        "_texts": 1,
         "_numbers": 1,
-        "_text": 1,  # the handle's text rule
-        "_resolve": 1,  # and its one lookup
-        "_CreateMonthlyFixings": 1,
-        "monthly_fixings": 1,
+        "_CreateIfercFixings": 1,
+        "iferc_fixings": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateMonthlyFixings"](dates, prices, schedule)) == {
-        "ndarray.any": 4,  # the column's look for the calendar, then the order, absent, skipped
-        "ndarray.astype": 2,  # the column on its way to days
-        "ndarray.flatten": 1,  # np.unique's copy of the schedule's dates
-        "numpy.asanyarray": 2,  # and its reads of them
-        "ndarray.sort": 1,  # sorted once
-        "ndarray.searchsorted": 1,  # each date's place among the publications
-        "numpy.array": 2,  # the two copies the fixings keep
-        "ndarray.setflags": 2,  # frozen
-        "ufunc.reduce": 4,
+    assert numpy_calls(lambda: PATH["_CreateIfercFixings"](codes, prices)) == {
+        "numpy.array": 1,  # the one copy the fixings keep
+        "ndarray.setflags": 1,  # frozen
     }
 
 

@@ -12,7 +12,7 @@ from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.market_data.daily_fixings import DailyFixings
-from goosedove.market_data.monthly_fixings import MonthlyFixings
+from goosedove.market_data.iferc_fixings import IfercFixings
 
 
 def number(text: str, handle: re.Pattern[str]) -> int:
@@ -259,201 +259,184 @@ def test_a_handle_of_another_kind_is_not_a_holiday_calendar() -> None:
     )
 
 
-# --- _CreateMonthlyFixings -------------------------------------------------------
+# --- _CreateIfercFixings ---------------------------------------------------------
 
 
-# The page's sample as the sheet sends it, Waha IFERC gas: the day Platts published each month's
-# final index, January to April 2026, January's on 5 January as announced, and an illustrative
-# price beside each.
-JAN_5, FEB_2, MAR_2, APR_1 = 46027.0, 46055.0, 46083.0, 46113.0
-PUBLICATION_DATES = Cells.from_rows([[JAN_5], [FEB_2], [MAR_2], [APR_1]])
-MONTHLY = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
-MONTHLY_HANDLE = re.compile(r"monthly_fixings:[0-9a-f]{6}:([0-9]{6})")
-THE_SCHEDULE = object()  # in a case's arguments: the Waha schedule's handle, made below
-NO_PUBLICATIONS = object()  # the same schedule built without its publication dates
-
-# The Waha schedule as the sheet sends it: six contract months, December 2025 to May 2026, the
-# last day of bidweek as each future's expiry, no options, and the day each month's final index
-# is published, so the fixings above sit inside it with a publication before and one after.
-WAHA_CODES = Cells.from_rows([["Z25"], ["F26"], ["G26"], ["H26"], ["J26"], ["K26"]])
-WAHA_FUTURES = Cells.from_rows([[45989.0], [46022.0], [46052.0], [46080.0], [46112.0], [46142.0]])
-WAHA_PUBLICATIONS = Cells.from_rows([[45992.0], [JAN_5], [FEB_2], [MAR_2], [APR_1], [46143.0]])
-SCHEDULE_HANDLE = re.compile(r"expiry_schedule:[0-9a-f]{6}:([0-9]{6})")
+# The page's sample as the sheet sends it, Waha IFERC gas: the first four months of 2026 as
+# codes, and an illustrative index beside each.
+IFERC_CODES = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
+IFERC_PRICES = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
+IFERC_HANDLE = re.compile(r"iferc_fixings:[0-9a-f]{6}:([0-9]{6})")
 
 
-@functools.cache
-def the_waha_schedule(published: bool = True) -> str:
-    publications = WAHA_PUBLICATIONS if published else MISSING
-    text = bridge.call("_CreateExpirySchedule", [WAHA_CODES, WAHA_FUTURES, MISSING, publications])
-    assert isinstance(text, str) and SCHEDULE_HANDLE.fullmatch(text), text
-    return text
-
-
-# The library has no consumer of monthly fixings yet, so this hidden reader proves that a handle
-# resolves to the fixings the seam kept, the publication dates as days.
+# The library has no consumer of IFERC fixings yet, so this hidden reader proves that a handle
+# resolves to the fixings the seam kept, the codes as typed and the prices as numbers.
 @probe
-def ReadMonthlyFixings(fixings: Handle[MonthlyFixings]) -> str:
-    kept = " ".join(str(day) for day in fixings.publication_dates)
-    return f"{kept} | {' '.join(repr(float(p)) for p in fixings.prices)}"
+def ReadIfercFixings(fixings: Handle[IfercFixings]) -> str:
+    return f"{' '.join(fixings.codes)} | {' '.join(repr(float(p)) for p in fixings.prices)}"
 
 
-def monthly(publication_dates: object, prices: object) -> str:
-    text = bridge.call("_CreateMonthlyFixings", [publication_dates, prices, the_waha_schedule()])
-    assert isinstance(text, str) and MONTHLY_HANDLE.fullmatch(text), text
+def iferc(codes: object, prices: object) -> str:
+    text = bridge.call("_CreateIfercFixings", [codes, prices])
+    assert isinstance(text, str) and IFERC_HANDLE.fullmatch(text), text
     return text
 
 
-def test_monthly_fixings_are_created_from_two_columns_and_a_schedule_and_read_back() -> None:
-    assert bridge.call("ReadMonthlyFixings", [monthly(PUBLICATION_DATES, MONTHLY)]) == (
-        "2026-01-05 2026-02-02 2026-03-02 2026-04-01 | 1.85 2.1 1.95 1.6"
+def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
+    assert bridge.call("ReadIfercFixings", [iferc(IFERC_CODES, IFERC_PRICES)]) == (
+        "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
     )
 
 
-# A single cell is a column of one, so a fixing of one publication needs no range.
-def test_two_single_cells_make_a_fixing_of_one_publication() -> None:
-    assert bridge.call("ReadMonthlyFixings", [monthly(JAN_5, 1.85)]) == "2026-01-05 | 1.85"
-
-
-# The same schedule with its publication dates shuffled and one repeated, codes and futures
-# alongside, says the same about the series.
-def test_a_schedule_with_its_publication_dates_shuffled_and_repeated_says_the_same() -> None:
-    codes = Cells.from_rows([["J26"], ["F26"], ["G26"], ["H26"], ["G26"]])
-    futures = Cells.from_rows([[46112.0], [46022.0], [46052.0], [46080.0], [46052.0]])
-    publications = Cells.from_rows([[APR_1], [JAN_5], [FEB_2], [MAR_2], [FEB_2]])
-    schedule = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, publications])
-    text = bridge.call("_CreateMonthlyFixings", [PUBLICATION_DATES, MONTHLY, schedule])
-    assert bridge.call("ReadMonthlyFixings", [text]) == (
-        "2026-01-05 2026-02-02 2026-03-02 2026-04-01 | 1.85 2.1 1.95 1.6"
-    )
+# A single cell is a column of one, so the fixings of one month need no range.
+def test_two_single_cells_make_the_fixings_of_one_month() -> None:
+    assert bridge.call("ReadIfercFixings", [iferc("F26", 1.85)]) == "F26 | 1.85"
 
 
 @pytest.mark.parametrize(
-    ("publication_dates", "prices", "schedule", "text"),
+    ("codes", "prices", "text"),
     [
         (
-            PUBLICATION_DATES,
+            IFERC_CODES,
             Cells.from_rows([[1.85], [2.10], [1.95]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: ValueError: price has 3 prices, expected 4, "
-            "one per publication_date",
+            "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, "
+            "one per contract_code",
         ),
         (
-            Cells.from_rows([[46023.0], [FEB_2]]),
-            Cells.from_rows([[1.85], [2.10]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 1 is 2026-01-01, "
-            "expected one of the schedule's publication dates",
+            IFERC_CODES,
+            Cells.from_rows([[1.85], [2.10], [1.95], [1.60], [1.50]]),
+            "#ERROR _CreateIfercFixings: ValueError: price has 5 prices, expected 4, "
+            "one per contract_code",
         ),
         (
-            Cells.from_rows([[FEB_2], [JAN_5]]),
-            Cells.from_rows([[2.10], [1.85]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-01-05, "
-            "expected a date after row 1's 2026-02-02",
+            Cells.from_rows([["F26"], ["G26"], ["G26"], ["J26"]]),
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: ValueError: contract_code row 3 is 'G26', "
+            "already given at row 2",
         ),
         (
-            Cells.from_rows([[JAN_5], [MAR_2]]),
-            Cells.from_rows([[1.85], [1.95]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-03-02, "
-            "expected 2026-02-02, the schedule's publication after row 1's 2026-01-05",
-        ),
-        (
-            PUBLICATION_DATES,
-            MONTHLY,
-            NO_PUBLICATIONS,
-            "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, "
-            "expected a schedule with one per contract",
-        ),
-        (
-            PUBLICATION_DATES,
+            IFERC_CODES,
             Cells.from_rows([[1.85], [None], [1.95], [1.60]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: price cell (2, 1) is blank, expected number",
+            "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number",
         ),
         (
-            Cells.from_rows([["Jan-26"], [FEB_2]]),
-            Cells.from_rows([[1.85], [2.10]]),
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: publication_date cell (1, 1) is text 'Jan-26', "
-            "expected date",
+            IFERC_CODES,
+            Cells.from_rows([[1.85], ["2.10"], [1.95], [1.60]]),
+            "#ERROR _CreateIfercFixings: price cell (2, 1) is text '2.10', expected number",
         ),
         (
-            PUBLICATION_DATES,
+            Cells.from_rows([["F26"], [46027.0], ["H26"], ["J26"]]),
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, "
+            "expected text",
+        ),
+        (
+            Cells.from_rows([["F26"], [""], ["H26"], ["J26"]]),
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is empty text, expected text",
+        ),
+        (
+            Cells.from_rows([["F26", "G26"]]),
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: contract_code is 1x2 array, expected column of text",
+        ),
+        (
+            IFERC_CODES,
+            Cells.from_rows([[1.85, 2.10]]),
+            "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers",
+        ),
+        (
             MISSING,
-            THE_SCHEDULE,
-            "#ERROR _CreateMonthlyFixings: price is missing, expected column of numbers",
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: contract_code is missing, expected column of text",
         ),
         (
-            PUBLICATION_DATES,
-            MONTHLY,
+            IFERC_CODES,
             MISSING,
-            "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, "
-            "expected expiry schedule handle",
+            "#ERROR _CreateIfercFixings: price is missing, expected column of numbers",
         ),
         (
-            PUBLICATION_DATES,
-            MONTHLY,
             None,
-            "#ERROR _CreateMonthlyFixings: expiry_schedule is blank, "
-            "expected expiry schedule handle",
+            IFERC_PRICES,
+            "#ERROR _CreateIfercFixings: contract_code is blank, expected column of text",
         ),
         (
-            PUBLICATION_DATES,
-            MONTHLY,
-            2.86,
-            "#ERROR _CreateMonthlyFixings: expiry_schedule is number 2.86, "
-            "expected expiry schedule handle",
+            IFERC_CODES,
+            None,
+            "#ERROR _CreateIfercFixings: price is blank, expected column of numbers",
+        ),
+        (
+            Cells.from_rows([["F26"], [46027.0]]),
+            Cells.from_rows([[1.85], [None]]),
+            "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, "
+            "expected text",
         ),
     ],
     ids=[
         "a price column one row short",
-        "the first of the month in place of the publication day",
-        "dates backwards",
-        "a publication skipped",
-        "a schedule without publication dates",
+        "a price column one row long",
+        "a code given twice",
         "a blank among the prices",
-        "a date typed as text",
-        "the price column left out",
-        "the schedule left out",
-        "a blank cell where the schedule should be",
-        "a number where the schedule should be",
+        "text where a price should be",
+        "a number among the codes",
+        "empty text among the codes",
+        "a row of codes",
+        "a row of prices",
+        "the codes left out",
+        "the prices left out",
+        "a blank cell where the codes should be",
+        "a blank cell where the prices should be",
+        "both columns wrong, the codes named first",
     ],
 )
-def test_monthly_fixings_that_cannot_be_made_say_why(
-    publication_dates: object, prices: object, schedule: object, text: str
+def test_iferc_fixings_that_cannot_be_made_say_why(
+    codes: object, prices: object, text: str
 ) -> None:
-    if schedule is THE_SCHEDULE:
-        schedule = the_waha_schedule()
-    elif schedule is NO_PUBLICATIONS:
-        schedule = the_waha_schedule(published=False)
-    assert bridge.call("_CreateMonthlyFixings", [publication_dates, prices, schedule]) == text
+    assert bridge.call("_CreateIfercFixings", [codes, prices]) == text
 
 
-def test_a_failed_monthly_construction_publishes_no_object_and_no_handle() -> None:
-    before = number(monthly(PUBLICATION_DATES, MONTHLY), MONTHLY_HANDLE)
-    skipped = Cells.from_rows([[JAN_5], [MAR_2]])
-    prices = Cells.from_rows([[1.85], [1.95]])
-    assert bridge.call("_CreateMonthlyFixings", [skipped, prices, the_waha_schedule()]) == (
-        "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-03-02, "
-        "expected 2026-02-02, the schedule's publication after row 1's 2026-01-05"
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(iferc(IFERC_CODES, IFERC_PRICES), IFERC_HANDLE)
+    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85]])]) == (
+        "#ERROR _CreateIfercFixings: ValueError: price has 1 price, expected 4, "
+        "one per contract_code"
     )
-    assert number(monthly(PUBLICATION_DATES, MONTHLY), MONTHLY_HANDLE) == before + 1
-
-
-def test_a_handle_of_another_kind_is_not_monthly_fixings() -> None:
-    other = the_fixings(HEADERS, BODY)
-    assert bridge.call("ReadMonthlyFixings", [other]) == (
-        f"#ERROR ReadMonthlyFixings: fixings is daily fixings handle {other!r}, "
-        "expected monthly fixings handle"
+    twice = Cells.from_rows([["F26"], ["F26"]])
+    assert bridge.call("_CreateIfercFixings", [twice, Cells.from_rows([[1.85], [2.10]])]) == (
+        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', "
+        "already given at row 1"
     )
+    assert (
+        bridge.call(
+            "_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85], [None], [1.95], [1.60]])]
+        )
+        == "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
+    )
+    assert number(iferc(IFERC_CODES, IFERC_PRICES), IFERC_HANDLE) == before + 1
 
 
-def test_a_handle_of_another_kind_is_not_an_expiry_schedule() -> None:
+def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
     other = the_fixings(HEADERS, BODY)
-    assert bridge.call("_CreateMonthlyFixings", [PUBLICATION_DATES, MONTHLY, other]) == (
-        f"#ERROR _CreateMonthlyFixings: expiry_schedule is daily fixings handle {other!r}, "
-        "expected expiry schedule handle"
+    assert bridge.call("ReadIfercFixings", [other]) == (
+        f"#ERROR ReadIfercFixings: fixings is daily fixings handle {other!r}, "
+        "expected iferc fixings handle"
+    )
+    schedule = cast(
+        str,
+        bridge.call(
+            "_CreateIfercSchedule",
+            [
+                Cells.from_rows([["F26"], ["G26"]]),
+                Cells.from_rows([[46022.0], [46052.0]]),
+                Cells.from_rows([[46027.0], [46055.0]]),
+            ],
+        ),
+    )
+    assert bridge.call("ReadIfercFixings", [schedule]) == (
+        f"#ERROR ReadIfercFixings: fixings is iferc schedule handle {schedule!r}, "
+        "expected iferc fixings handle"
     )
 
 

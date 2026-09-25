@@ -245,25 +245,23 @@ def test_the_daily_fixings_creator_explains_itself() -> None:
     ]
 
 
-def test_the_monthly_fixings_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateMonthlyFixings"]
+def test_the_iferc_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateIfercFixings"]
     assert not hidden
     assert description == (
-        "Creates the monthly fixings of one index from the days its settles were published and "
-        "their prices, checked against the publication dates of its expiry schedule, and shows "
-        "its handle, the text other formulas take as the fixings."
+        "Creates the IFERC fixings of one index from the contract months whose index has been "
+        "published and the index printed for each, and shows its handle, the text other "
+        "formulas take as the fixings."
     )
     assert arguments == [
         (
-            "publication_date",
-            "The column of days the index's monthly settles were published, such as A2:A5 "
-            "holding 5-Jan-2026 to 1-Apr-2026, one per fixing.",
+            "contract_code",
+            "The column of contract codes, such as A2:A5 holding F26 to J26, one per month "
+            "published.",
         ),
-        ("price", "The column of prices beside the dates, such as B2:B5, one per date."),
         (
-            "expiry_schedule",
-            "The index's expiry-schedule handle, built with its publication dates: the cell "
-            "showing _CreateExpirySchedule's result, such as D6, or a name for it.",
+            "price",
+            "The column of published indices beside the codes, such as B2:B5, one per code.",
         ),
     ]
 

@@ -148,11 +148,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, ExcelMissing.Value }, "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle" };
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, 101.94 }, "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle" };
             yield return new object[] { "_CreateDailyFixings", new object[] { Row("date", "settle"), new object[,] { { 46143.0, 101.94 }, { 46146.0, 106.42 } }, "x" }, "#ERROR _CreateDailyFixings: holiday_calendar is text 'x' naming no live object, expected holiday calendar handle" };
-            // The monthly fixings: a column of publication days, a column of prices and the index's schedule by handle. Text among the days and a blank among the prices fail before the schedule is looked at; the schedule left out and a number in its place fail in the seam's words. The library's rules, which need a live schedule, are in the fact below.
-            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column("Jan-26", 46055.0), Column(1.85, 2.10), ExcelMissing.Value }, "#ERROR _CreateMonthlyFixings: publication_date cell (1, 1) is text 'Jan-26', expected date" };
-            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46027.0, 46055.0), Column(1.85, ExcelEmpty.Value), ExcelMissing.Value }, "#ERROR _CreateMonthlyFixings: price cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46027.0, 46055.0), Column(1.85, 2.10), ExcelMissing.Value }, "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle" };
-            yield return new object[] { "_CreateMonthlyFixings", new object[] { Column(46027.0, 46055.0), Column(1.85, 2.10), 2.86 }, "#ERROR _CreateMonthlyFixings: expiry_schedule is number 2.86, expected expiry schedule handle" };
+            // The IFERC fixings: a column of contract codes and a column of indices. A price column one row short and a code given twice, the library's words; a blank among the prices, a number among the codes, the prices left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26", "H26"), Column(1.85, 2.10) }, "#ERROR _CreateIfercFixings: ValueError: price has 2 prices, expected 3, one per contract_code" };
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "F26"), Column(1.85, 2.10) }, "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1" };
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Column(1.85, ExcelEmpty.Value) }, "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", 46027.0), Column(1.85, 2.10) }, "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, expected text" };
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), ExcelMissing.Value }, "#ERROR _CreateIfercFixings: price is missing, expected column of numbers" };
+            yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Row(1.85, 2.10) }, "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers" };
             // The calendar: three handles, the valuation date, the expiry schedule and the holiday calendar. A number, a missing argument and text naming no live object where the valuation date should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
             yield return new object[] { "_CreateCalendar", new object[] { 46167.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is number 46167.0, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle" };
@@ -496,32 +498,29 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateMarket: price_vector is market history handle '" + history + "', expected price vector handle", Seam.Call("_CreateMarket", history, history));
         }
 
-        // Monthly fixings: a column of publication days, a column of prices and the index's schedule
-        // make one, and util_ReadHandle spills it back, the two headers, the day type over the price
-        // type, then a row per fixing. With the schedule live, the library's rules answer: a price
-        // column one row short, a day the schedule does not publish on, the days backwards, a
-        // publication skipped, and a schedule built without publication dates.
+        // IFERC fixings: a column of contract codes and a column of indices make one, two single
+        // cells make the fixings of one month, and util_ReadHandle spills it back, the two headers,
+        // the text type over the number type, then a row per month, the code as text and the index
+        // as a number.
         [Fact]
-        public void monthly_fixings_are_created_from_two_columns_and_a_schedule_and_read_back_through_their_handle()
+        public void iferc_fixings_are_created_from_two_columns_and_read_back_through_their_handle()
         {
-            var codes = Column("F26", "G26", "H26");
-            var futures = Column(46022.0, 46052.0, 46080.0);
-            var schedule = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value, Column(46027.0, 46055.0, 46083.0));
-            var handle = (string)Seam.Call("_CreateMonthlyFixings", Column(46027.0, 46055.0), Column(1.85, 2.10), schedule);
-            Assert.StartsWith("monthly_fixings:", handle);
+            var handle = (string)Seam.Call("_CreateIfercFixings", Column("F26", "G26", "H26", "J26"), Column(1.85, 2.10, 1.95, 1.60));
+            Assert.StartsWith("iferc_fixings:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
-            Assert.Equal(4, spill.GetLength(0));
+            Assert.Equal(6, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
-            Assert.Equal("publication_date", spill[0, 0]);
-            Assert.Equal("datetime64[D]", spill[1, 0]);
-            Assert.Equal(46027.0, spill[2, 0]);
-            Assert.Equal(2.10, spill[3, 1]);
-            Assert.Equal("#ERROR _CreateMonthlyFixings: ValueError: price has 1 price, expected 2, one per publication_date", Seam.Call("_CreateMonthlyFixings", Column(46027.0, 46055.0), Column(1.85), schedule));
-            Assert.Equal("#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-01-06, expected one of the schedule's publication dates", Seam.Call("_CreateMonthlyFixings", Column(46027.0, 46028.0), Column(1.85, 2.10), schedule));
-            Assert.Equal("#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-01-05, expected a date after row 1's 2026-02-02", Seam.Call("_CreateMonthlyFixings", Column(46055.0, 46027.0), Column(2.10, 1.85), schedule));
-            Assert.Equal("#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-03-02, expected 2026-02-02, the schedule's publication after row 1's 2026-01-05", Seam.Call("_CreateMonthlyFixings", Column(46027.0, 46083.0), Column(1.85, 1.95), schedule));
-            var unpublished = (string)Seam.Call("_CreateExpirySchedule", codes, futures, ExcelMissing.Value, ExcelMissing.Value);
-            Assert.Equal("#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract", Seam.Call("_CreateMonthlyFixings", Column(46027.0, 46055.0), Column(1.85, 2.10), unpublished));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("price", spill[0, 1]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal("F26", spill[2, 0]);
+            Assert.Equal(1.85, spill[2, 1]);
+            Assert.Equal("J26", spill[5, 0]);
+            Assert.Equal(1.60, spill[5, 1]);
+            var oneMonth = (string)Seam.Call("_CreateIfercFixings", "F26", 1.85);
+            Assert.NotEqual(handle, oneMonth);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneMonth)).GetLength(0));
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.
