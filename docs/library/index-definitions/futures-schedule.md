@@ -69,7 +69,7 @@ The examples and property below are `tests/unit/test_futures_schedule.py`; the s
 | a blank cell in the options column fails in the seam's words, not as an argument left out; text or a row of dates where the options column should be, and a blank cell in its slot, the seam's words; a fourth argument refused as one too many | example, through the seam |
 | a handle of another kind is not a futures schedule, the IFERC schedule's included | example, with handles |
 | the spill: three columns with options and two without, under the two heading rows | example |
-| the creator's handle with and without options read back through `util_ReadHandle`, a column one row short, a blank among the options and a fourth argument, in a real workbook | Excel smoke |
+| the creator's handle with and without options read back through `util_ReadHandle`, a column one row short and a blank among the options, in a real workbook; a fourth argument never reaches the seam, since Excel refuses it as one too many when the formula is typed | Excel smoke |
 
 ## Not here
 
