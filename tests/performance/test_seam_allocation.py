@@ -431,6 +431,29 @@ def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
     assert least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices)) <= 80 * count + 2 * SLACK
 
 
+def flow_day_columns(count: int) -> tuple[Cells, Cells]:
+    """That many consecutive flow days from 1 September 2026 as the sheet sends them, a serial
+    per row, and a price beside each."""
+    return (
+        Cells.from_rows([[46266.0 + i] for i in range(count)]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(count)]),
+    )
+
+
+# Gas Daily fixings keep a copy of each column, 16 bytes per flow day, and on the way pay the
+# date column's masks and its arrays on the way to days, then the day after each day and the
+# mask of the days that are not it: measured 13,108 bytes at a year of flow days on 2026-09-24,
+# 36 bytes per day, and 121,513 at ten years, 33 bytes per day, which 40 per day covers with
+# twice the slack for a creator's small objects.
+def test_gas_daily_fixings_keep_a_copy_of_each_column() -> None:
+    count = 365
+    flow_days, prices = flow_day_columns(count)
+    assert (
+        least_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices))
+        <= 40 * count + 2 * SLACK
+    )
+
+
 def price_column(prices: int) -> Cells:
     """That many prices as the sheet sends them, one per row, around 74."""
     return Cells.from_rows([[74.25 + i % 7 - 3.0] for i in range(prices)])

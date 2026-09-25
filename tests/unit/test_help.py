@@ -266,6 +266,27 @@ def test_the_iferc_fixings_creator_explains_itself() -> None:
     ]
 
 
+def test_the_gas_daily_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateGasDailyFixings"]
+    assert not hidden
+    assert description == (
+        "Creates the Gas Daily fixings of one index from the days gas flowed and the midpoint "
+        "printed for each, one for every calendar day from the first to the last, and shows its "
+        "handle, the text other formulas take as the fixings."
+    )
+    assert arguments == [
+        (
+            "flow_date",
+            "The column of flow days, such as A2:A7 holding 4-Sep-2026 to 9-Sep-2026, one for "
+            "every calendar day from the first to the last.",
+        ),
+        (
+            "price",
+            "The column of midpoints beside the flow days, such as B2:B7, one per day.",
+        ),
+    ]
+
+
 def test_the_price_vector_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreatePriceVector"]
     assert not hidden

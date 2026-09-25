@@ -295,6 +295,27 @@ $formulas = [ordered]@{
     "=_CreateGasDailySchedule(DG6:DG7,DH2:DH3,DI2:DI3)" = "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4)" = "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates"
     "=_CreateGasDailySchedule(DG2:DG4,DH2:DI2,DI2:DI4)" = "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates"
+    # The Gas Daily fixings: a creator over six flow days, Labor Day week 2026, and the midpoint
+    # printed for each, in DM and DN, and over the first row alone, read back through
+    # util_ReadHandle; a price column one row short, a day skipped and a series pasted newest
+    # first, the library's words; a blank among the prices, text among the days and the prices
+    # left out, the seam's.
+    "=LEFT(DR1,18)"               = "gas_daily_fixings:"
+    "=LEFT(DR2,18)"               = "gas_daily_fixings:"
+    "=INDEX(util_ReadHandle(DR1),1,1)" = "flow_date"
+    "=INDEX(util_ReadHandle(DR1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(DR1),3,1)" = "46269"
+    "=INDEX(util_ReadHandle(DR1),6,1)" = "46272"
+    "=INDEX(util_ReadHandle(DR1),6,2)" = "2.875"
+    "=INDEX(util_ReadHandle(DR1),8,2)" = "2.9"
+    "=ROWS(util_ReadHandle(DR1))"      = "8"
+    "=ROWS(util_ReadHandle(DR2))"      = "3"
+    "=_CreateGasDailyFixings(DM2:DM7,DN2:DN6)" = "#ERROR _CreateGasDailyFixings: ValueError: price has 5 prices, expected 6, one per flow_date"
+    "=_CreateGasDailyFixings(DP2:DP3,DN2:DN3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, expected 2026-09-05, the day after row 1's 2026-09-04"
+    "=_CreateGasDailyFixings(DQ2:DQ3,DN2:DN3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, expected 2026-09-06, the day after row 1's 2026-09-05"
+    "=_CreateGasDailyFixings(DM2:DM3,DO2:DO3)" = "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number"
+    "=_CreateGasDailyFixings(DP5:DP6,DN2:DN3)" = "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date"
+    "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -476,6 +497,21 @@ $cells = [ordered]@{
     "DG6" = "U26"; "DG7" = "46023"
     "DK1" = "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4,DI2:DI4)"
     "DK2" = "=_CreateGasDailySchedule(DG2,DH2,DI2)"
+    # The Gas Daily fixings: six flow days of Henry Hub over Labor Day week 2026 and the midpoint
+    # printed for each, Friday 4 September's print carrying Saturday to Tuesday; the first two
+    # prices with the second blank; a pair of days with one skipped; a pair newest first; a day
+    # over text; and two creator cells, over the six days and over the first alone.
+    "DM2" = "4-Sep-2026"; "DN2" = "2.93"; "DO2" = "2.93"
+    "DM3" = "5-Sep-2026"; "DN3" = "2.875"
+    "DM4" = "6-Sep-2026"; "DN4" = "2.875"
+    "DM5" = "7-Sep-2026"; "DN5" = "2.875"
+    "DM6" = "8-Sep-2026"; "DN6" = "2.875"
+    "DM7" = "9-Sep-2026"; "DN7" = "2.9"
+    "DP2" = "4-Sep-2026"; "DP3" = "6-Sep-2026"
+    "DQ2" = "5-Sep-2026"; "DQ3" = "4-Sep-2026"
+    "DP5" = "4-Sep-2026"; "DP6" = "x"
+    "DR1" = "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)"
+    "DR2" = "=_CreateGasDailyFixings(DM2,DN2)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
