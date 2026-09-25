@@ -72,7 +72,7 @@ The record and its builder are `src/goosedove/market_data/price_vector.py`, the 
 
 ## Not here
 
-No contract codes, dates, index identity, layout handle, calendar work, fixings, market construction or matching positions to contracts. No in-place updates, deduplication of equal snapshots, subscription machinery, handle-lifetime changes or float32 conversion. The correspondence between prices and contracts is [market.md](../market/market.md)'s, since #86: one price per contract from the valuation day's prompt through the schedule's last, in the schedule's order.
+No contract codes, dates, index identity, layout handle, calendar work, fixings, market construction or matching positions to contracts. No in-place updates, deduplication of equal snapshots, subscription machinery, handle-lifetime changes or float32 conversion. The correspondence between prices and contracts is [market.md](../market/market.md)'s, since #86 and, for any calendar, #NN: one price per contract from the first unfixed period's contract through the schedule's last, in the schedule's order.
 
 ### Deferred: Excel-DNA `double[,]` transport
 

@@ -1420,11 +1420,44 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     return history, PATH["_CreatePriceVector"](quotes)
 
 
+def gas_daily_market_sources() -> tuple[object, object]:
+    """The two handles a Gas Daily market takes: the history gas_daily_history_sources makes,
+    the twelve months of 2026 valued on 11 September, and a vector of four quotes, the balance
+    of September and the three months after it."""
+    history = PATH["_CreateMarketHistory"](*gas_daily_history_sources())
+    return history, PATH["_CreatePriceVector"](Cells.from_rows([[3.0 + i] for i in range(4)]))
+
+
+def iferc_market_sources() -> tuple[object, object]:
+    """The two handles an IFERC market takes: the calendar of the ten years of months
+    iferc_columns lays out, valued on 11 September 2026 with four months published and an index
+    for each, and a vector of 116 quotes, one per month still to publish."""
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
+    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4))
+    history = PATH["_CreateMarketHistory"](made, fixings)
+    return history, PATH["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
+
+
+MARKET_LEDGER = {
+    "Registered.run": 1,
+    "_arguments": 1,
+    "_validate": 2,
+    "_text": 2,  # each handle's text rule
+    "_resolve": 2,  # and its one lookup
+    "_CreateMarket": 1,
+    "market": 1,
+    "_publish": 1,
+}
+
+
 # The hot operation: two handles, each the text rule and one lookup, the builder's two rules on
-# scalars, the valuation day's row from one subtraction and its prompt row read there, and one
-# publication. Eleven calls across eight functions, and not one numpy call: no copy, no look,
-# no mask and no array, whatever the calendar's length and the vector's, a year of days with
-# nine quotes, ten years with one quote, or a year with 246 quotes alike.
+# scalars, the row of the first unfixed period from one count of the fixed flags, numpy's own
+# routine, which the ledger does not see, and its contract read there, and one publication.
+# Eleven calls across eight functions, and not one numpy call: no copy, no look, no mask and no
+# array, whatever the calendar's length and the vector's, a year of days with nine quotes, ten
+# years with one quote, or a year with 246 quotes alike.
 @pytest.mark.parametrize(
     ("contracts", "days_apart"),
     [(13, 30), (2, 3600), (361, 1)],
@@ -1435,16 +1468,25 @@ def test_a_market_is_two_handles_in_and_one_number_out_whatever_the_sizes(
 ) -> None:
     history, quotes = market_sources(contracts, days_apart)
     PATH["_CreateMarket"](history, quotes)
-    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == {
-        "Registered.run": 1,
-        "_arguments": 1,
-        "_validate": 2,
-        "_text": 2,  # each handle's text rule
-        "_resolve": 2,  # and its one lookup
-        "_CreateMarket": 1,
-        "market": 1,
-        "_publish": 1,
-    }
+    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == MARKET_LEDGER
+    assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
+
+
+# The same ledger over a Gas Daily history, a year of flow days with four quotes, and over an
+# IFERC one, ten years of months with 116: the kind of the calendar is read by nothing here.
+@pytest.mark.parametrize(
+    "sources",
+    [gas_daily_market_sources, iferc_market_sources],
+    ids=["a Gas Daily market", "an IFERC market"],
+)
+def test_a_market_over_the_other_two_calendars_costs_the_same(
+    sources: Callable[[], tuple[object, object]],
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+) -> None:
+    history, quotes = sources()
+    PATH["_CreateMarket"](history, quotes)
+    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == MARKET_LEDGER
     assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
 
 
@@ -1453,10 +1495,17 @@ def test_a_market_is_two_handles_in_and_one_number_out_whatever_the_sizes(
 # and the quotes read through them, the fixings and the quotes written into their rows and the
 # word closed shared by every other; no arange, no searchsorted, nothing of the calendar made
 # again.
+@pytest.mark.parametrize(
+    "sources",
+    [lambda: market_sources(13, 30), gas_daily_market_sources, iferc_market_sources],
+    ids=["a futures market", "a Gas Daily market", "an IFERC market"],
+)
 def test_reading_a_market_back_rebuilds_nothing(
-    call_profile: CallProfile, numpy_calls: CallProfile
+    sources: Callable[[], tuple[object, object]],
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
 ) -> None:
-    made = PATH["_CreateMarket"](*market_sources(13, 30))
+    made = PATH["_CreateMarket"](*sources())
     PATH["util_ReadHandle"](made)
     assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
         "Registered.run": 1,

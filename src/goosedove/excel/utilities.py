@@ -171,10 +171,10 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
 
 @shown.register
 def market_table(obj: Market) -> MixedArray:
-    # The calendar's four columns, then price: the fixing on each past business day, the quote
-    # of the prompt contract on each business day from the valuation day on, and closed on every
-    # other day. The quotes are gathered for those live rows alone, since a past day's prompt
-    # may precede the first contract quoted and would index before the vector.
+    # The calendar's four columns, then price: the fixing on each fixed and priced period, the
+    # quote of its contract on each unfixed period, and closed on every other. The quotes are
+    # gathered for those live rows alone, since a fixed period's contract may precede the first
+    # contract quoted and would index before the vector.
     history = obj.market_history
     calendar = history.calendar
     live = np.flatnonzero(calendar.is_priced & ~calendar.is_fixed)

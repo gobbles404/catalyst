@@ -64,7 +64,7 @@ What each kind shows:
 | `iferc_fixings` | `contract_code`, `price` | `str`, `float64` | one per month published |
 | `gas_daily_fixings` | `flow_date`, `price` | `datetime64[D]`, `float64` | one per calendar day, weekends and holidays included |
 | `price_vector` | `price` | `float64` | one per price, in the column's order |
-| `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the fixing on a past business day, the prompt contract's quote on a business day from the valuation day on, and the word `closed` on a weekend or a holiday |
+| `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar period, every row the calendar has; the fifth cell the fixing on a fixed and priced period, its contract's quote on an unfixed period, and the word `closed` where the calendar does not price the day, a futures weekend or holiday |
 | `calendar` | `date`, `contract`, `is_priced`, `is_fixed` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's on a futures calendar, one per flow day on a Gas Daily calendar, one per contract month on an IFERC calendar |
 | `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar period, every row the calendar has; the fifth cell the price fixed, a number, on a fixed and priced period, the word `closed` where the calendar does not price the day, a futures weekend or holiday, and `unfixed` where it prices but has not fixed, whatever market the calendar is of |
 
@@ -109,7 +109,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | IFERC fixings: two columns, codes as text and prices exactly, a zero and a negative in their places, one row per month under its two heading rows | example |
 | Gas Daily fixings: two columns, flow days as serials and prices exactly, a Friday and the three rows its print covers, under its two heading rows | example |
 | a price vector: one column of prices under its two heading rows, a zero and a negative price in their places | example |
-| a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; and for any history with the quotes it requires, every day's fixing, quote or `closed` | example and property |
+| a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; a Gas Daily and an IFERC market of one month, the print or the index where fixed and the quote elsewhere; and for any history with the quotes it requires, every day's fixing, quote or `closed` | example and property |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
 | the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price, over a futures calendar and over the other two | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
