@@ -568,7 +568,7 @@ def test_a_holiday_calendar_given_with_a_gas_daily_schedule_is_refused() -> None
         (
             a_gas_daily_schedule(U26, ("V26", "2026-10-01", "4897-07-26")),
             "last_date row 2 is 4897-07-26, "
-            "expected within 1048574 days of row 1's first_date 2026-09-01",
+            "expected within 1048573 days of row 1's first_date 2026-09-01",
         ),
         (gas_daily_schedule((), dates(), dates()), "schedule has 0 contracts, expected at least 1"),
     ],
@@ -590,10 +590,20 @@ def test_a_gas_daily_schedule_that_cannot_make_a_calendar_says_why(
     assert str(failure.value) == message
 
 
-def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made() -> None:
-    made = calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-25")), None)
-    assert made.dates.size == 1_048_575
+# Both ends are rows here, so the longest Gas Daily calendar a sheet shows ends a day before the
+# longest futures calendar from the same first day, and one day longer is refused.
+def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made_and_one_day_longer_is_refused() -> (
+    None
+):
+    made = calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-24")), None)
+    assert made.dates.size == 1_048_574
     assert codes_of(made)[-1] == "a"
+    with pytest.raises(ValueError) as failure:
+        calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-25")), None)
+    assert str(failure.value) == (
+        "last_date row 1 is 4897-07-25, expected within 1048573 days of row 1's first_date "
+        "2026-09-01"
+    )
 
 
 # --- an IFERC schedule: one row per month, dated by its publication day ----------------

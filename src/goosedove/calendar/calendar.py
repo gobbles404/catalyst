@@ -172,7 +172,8 @@ def gas_daily_calendar(
     Each code is given once. Each month's last day is on or after its first, and each month's
     first day is the day after the month above's last, so the flow days run without a gap or an
     overlap and the schedule's order is the days' order; nothing is sorted. And the last month's
-    last day is within a sheet's rows of the first month's first day. The columns: every calendar
+    last day is within a sheet's rows of the first month's first day, both ends being rows, so
+    the span is one day shorter than a futures calendar's. The columns: every calendar
     day from the first day to the last, one np.arange; the month on each day, one np.searchsorted
     over the months' last days; priced throughout, since Gas Daily prints every flow day; and
     fixed when the flow day is on or before the valuation date's day, since its print preceded
@@ -199,10 +200,10 @@ def gas_daily_calendar(
             f"first_date row {k + 2} is {first[k + 1]}, expected {last[k] + day}, "
             f"the day after row {k + 1}'s last_date {last[k]}"
         )
-    if last[-1] - first[0] > np.timedelta64(MAX_DAYS, "D"):
+    if last[-1] - first[0] >= np.timedelta64(MAX_DAYS, "D"):
         raise ValueError(
             f"last_date row {last.size} is {last[-1]}, "
-            f"expected within {MAX_DAYS} days of row 1's first_date {first[0]}"
+            f"expected within {MAX_DAYS - 1} days of row 1's first_date {first[0]}"
         )
     dates = np.arange(first[0], last[-1] + day, dtype="datetime64[D]")
     contract = np.searchsorted(last, dates, side="left")
