@@ -341,13 +341,13 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the market's creators | `src/goosedove/excel/market.py` |
 | `util_ReadHandle`, and the table each kind shows | `src/goosedove/excel/utilities.py` |
 | the library's first objects, a valuation date, a discount curve and the unit conversions, and their builders | `src/goosedove/globals/` |
-| the index definitions, an expiry schedule, a holiday calendar, index conventions and contract specifications, and their builders | `src/goosedove/index_definitions/` |
+| the index definitions, a futures schedule, a holiday calendar, index conventions and contract specifications, and their builders | `src/goosedove/index_definitions/` |
 | the market data, futures fixings, IFERC fixings, Gas Daily fixings and the price vector, and their builders | `src/goosedove/market_data/` |
 | the calendar, every day of an index with its prompt contract and two flags, and its builder | `src/goosedove/calendar/` |
 | the market history, an index's calendar bound to the settle fixed on each of its past business days, and the market, the history with the current futures prices, and their builders | `src/goosedove/market/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |
-| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_index_definitions.py`, `test_utilities.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_expiry_schedule.py`, `test_holiday_calendar.py`, `test_index_conventions.py`, `test_contract_specifications.py`, `test_market_data.py`, `test_futures_fixings.py`, `test_iferc_fixings.py`, `test_gas_daily_fixings.py`, `test_price_vector.py`, `test_calendar.py`, `test_calendar_creator.py`, `test_market_history.py`, `test_market.py`, `test_market_creators.py` |
+| the library's functions through the seam, and the library's own rules | `tests/unit/test_globals.py`, `test_index_definitions.py`, `test_utilities.py`, `test_valuation_date.py`, `test_discount_curve.py`, `test_futures_schedule.py`, `test_holiday_calendar.py`, `test_index_conventions.py`, `test_contract_specifications.py`, `test_market_data.py`, `test_futures_fixings.py`, `test_iferc_fixings.py`, `test_gas_daily_fixings.py`, `test_price_vector.py`, `test_calendar.py`, `test_calendar_creator.py`, `test_market_history.py`, `test_market.py`, `test_market_creators.py` |
 | the exact text of every scalar rejection, the form of an argument that may be left out, and what registration refuses on a parameter | `tests/unit/test_type_validation.py` |
 | every range rejection, and the property that the first bad cell is named | `tests/unit/test_range_validation.py` |
 | every table rejection, the precedence, the properties that the earliest column wins and that a column of text keeps its own texts, and what registration refuses on a schema | `tests/unit/test_table_validation.py` |

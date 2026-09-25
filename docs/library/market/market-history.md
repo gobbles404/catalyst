@@ -15,13 +15,13 @@ def _CreateMarketHistory(
 
 | | A | B | C | D |
 |---|---|---|---|---|
-| 1 | as_of | 26-May-2026 | future_code | future_expiry |
+| 1 | as_of | 26-May-2026 | contract_code | future_expiry |
 | 2 | holiday | 25-May-2026 | m26 | 19-May-2026 |
 | 3 | date | settle | n26 | 22-Jun-2026 |
 | 4 | 20-May-2026 | 70.85 | q26 | 21-Jul-2026 |
 | 5 | 21-May-2026 | 71.10 | | |
 | 6 | 22-May-2026 | 71.25 | | |
-| 7 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateExpirySchedule(C2:C4, D2:D4)` | shows `expiry_schedule:3f9a1c:000004` |
+| 7 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateFuturesSchedule(C2:C4, D2:D4)` | shows `futures_schedule:3f9a1c:000004` |
 | 8 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | `=_CreateCalendar(A7, C7, A8)` | shows `calendar:3f9a1c:000012` |
 | 9 | `=_CreateFuturesFixings(A4:A6, B4:B6, A8)` | shows `futures_fixings:3f9a1c:000015` | `=_CreateMarketHistory(C8, A9)` | shows `market_history:3f9a1c:000019` |
 

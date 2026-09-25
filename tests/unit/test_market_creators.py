@@ -34,10 +34,8 @@ def a_valuation(serial: float = MAY_26, fraction: float = 0.5) -> str:
 
 
 def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
-    text = bridge.call(
-        "_CreateExpirySchedule", [column(*codes), column(*expiries), MISSING, MISSING]
-    )
-    assert isinstance(text, str) and text.startswith("expiry_schedule:"), text
+    text = bridge.call("_CreateFuturesSchedule", [column(*codes), column(*expiries), MISSING])
+    assert isinstance(text, str) and text.startswith("futures_schedule:"), text
     return text
 
 

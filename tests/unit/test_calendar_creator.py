@@ -28,10 +28,8 @@ def a_valuation(serial: float = MAY_25, fraction: float = 0.5) -> str:
 
 
 def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
-    text = bridge.call(
-        "_CreateExpirySchedule", [column(*codes), column(*expiries), MISSING, MISSING]
-    )
-    assert isinstance(text, str) and text.startswith("expiry_schedule:"), text
+    text = bridge.call("_CreateFuturesSchedule", [column(*codes), column(*expiries), MISSING])
+    assert isinstance(text, str) and text.startswith("futures_schedule:"), text
     return text
 
 
@@ -115,18 +113,18 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
     [
         (
             [THE_VALUATION, (("m26",), (MAY_19,)), THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, "
+            "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, "
             "expected at least 2",
         ),
         (
             [THE_VALUATION, (("m26", "m26"), (MAY_19, JUN_22)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: "
-            "future_code row 2 is 'm26', already given at row 1",
+            "contract_code row 2 is 'm26', already given at row 1",
         ),
         (
             [THE_VALUATION, (("m26", "n26", "n26"), (MAY_19, JUN_22, JUL_21)), THE_HOLIDAYS],
             "#ERROR _CreateCalendar: ValueError: "
-            "future_code row 3 is 'n26', already given at row 2",
+            "contract_code row 3 is 'n26', already given at row 2",
         ),
         (
             [THE_VALUATION, (("m26", "n26"), (JUN_22, MAY_19)), THE_HOLIDAYS],
@@ -163,7 +161,7 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
         ),
         (
             [THE_VALUATION, MISSING, THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: expiry_schedule is missing, expected expiry schedule handle",
+            "#ERROR _CreateCalendar: futures_schedule is missing, expected futures schedule handle",
         ),
         (
             [THE_VALUATION, THE_SCHEDULE, MISSING],
@@ -212,12 +210,12 @@ def test_a_handle_of_another_kind_in_any_slot_is_refused_by_name() -> None:
     valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
     made = a_calendar(valuation, schedule, holidays)
     assert bridge.call("_CreateCalendar", [schedule, schedule, holidays]) == (
-        f"#ERROR _CreateCalendar: valuation_date is expiry schedule handle {schedule!r}, "
+        f"#ERROR _CreateCalendar: valuation_date is futures schedule handle {schedule!r}, "
         "expected valuation date handle"
     )
     assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
-        f"#ERROR _CreateCalendar: expiry_schedule is holiday calendar handle {holidays!r}, "
-        "expected expiry schedule handle"
+        f"#ERROR _CreateCalendar: futures_schedule is holiday calendar handle {holidays!r}, "
+        "expected futures schedule handle"
     )
     assert bridge.call("_CreateCalendar", [valuation, schedule, made]) == (
         f"#ERROR _CreateCalendar: holiday_calendar is calendar handle {made!r}, "
@@ -230,7 +228,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     one = a_schedule(("m26",), (MAY_19,))
     before = number(a_calendar(valuation, schedule, holidays))
     assert bridge.call("_CreateCalendar", [valuation, one, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: expiry_schedule has 1 contract, expected at least 2"
+        "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, expected at least 2"
     )
     assert number(a_calendar(valuation, schedule, holidays)) == before + 1
 

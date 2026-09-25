@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar, calendar
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 
 
@@ -20,13 +20,13 @@ def day(text: str) -> np.datetime64:
     return np.datetime64(text, "D")
 
 
-def a_schedule(*contracts: tuple[str, str]) -> ExpirySchedule:
+def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
     codes = tuple(code for code, _ in contracts)
-    return expiry_schedule(codes, dates(*(expiry for _, expiry in contracts)), None, None)
+    return futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
 
 
 def codes_of(made: Calendar) -> list[str]:
-    return [made.expiry_schedule.codes[row] for row in made.prompt.tolist()]
+    return [made.futures_schedule.codes[row] for row in made.prompt.tolist()]
 
 
 # The page's sample: three contracts of one index, the valuation date 25 May 2026 at midday,
@@ -40,7 +40,7 @@ ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
 def a_calendar(
     valuation: ValuationDate = MAY_25,
-    schedule: ExpirySchedule = SCHEDULE,
+    schedule: FuturesSchedule = SCHEDULE,
     holidays: HolidayCalendar = CLOSED_MAY_25,
 ) -> Calendar:
     return calendar(valuation, schedule, holidays)
@@ -120,22 +120,22 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
 @pytest.mark.parametrize(
     ("schedule", "message"),
     [
-        (a_schedule(("m26", "2026-05-19")), "expiry_schedule has 1 contract, expected at least 2"),
+        (a_schedule(("m26", "2026-05-19")), "futures_schedule has 1 contract, expected at least 2"),
         (
-            expiry_schedule((), dates(), None, None),
-            "expiry_schedule has 0 contracts, expected at least 2",
+            futures_schedule((), dates(), None),
+            "futures_schedule has 0 contracts, expected at least 2",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("m26", "2026-06-22")),
-            "future_code row 2 is 'm26', already given at row 1",
+            "contract_code row 2 is 'm26', already given at row 1",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("m26", "2026-07-21")),
-            "future_code row 3 is 'm26', already given at row 1",
+            "contract_code row 3 is 'm26', already given at row 1",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("n26", "2026-07-21")),
-            "future_code row 3 is 'n26', already given at row 2",
+            "contract_code row 3 is 'n26', already given at row 2",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-19")),
@@ -151,7 +151,7 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
         ),
         (
             a_schedule(("m26", "2026-06-22"), ("m26", "2026-05-19")),
-            "future_code row 2 is 'm26', already given at row 1",
+            "contract_code row 2 is 'm26', already given at row 1",
         ),
         (
             a_schedule(("M26", "2026-05-19"), ("m26", "2026-06-22")),
@@ -172,7 +172,7 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
     ],
 )
 def test_a_schedule_that_cannot_make_a_calendar_says_why(
-    schedule: ExpirySchedule, message: str
+    schedule: FuturesSchedule, message: str
 ) -> None:
     if message.startswith("future_expiry row 2 is 2026-06-22"):
         a_calendar(schedule=schedule)  # two codes, so the calendar is made
@@ -368,17 +368,14 @@ def test_the_two_flags_are_independent() -> None:
 # --- what the schedule's other columns do: nothing ---------------------------------
 
 
-def test_option_expiries_and_publication_dates_change_nothing() -> None:
+def test_option_expiries_change_nothing() -> None:
     codes = ("m26", "n26", "q26")
     futures = dates("2026-05-19", "2026-06-22", "2026-07-21")
     options = dates("2026-05-14", "2026-06-16", "2026-07-16")
-    publications = dates("2026-05-20", "2026-06-23", "2026-07-22")
     plain = a_calendar()
     for schedule in (
-        expiry_schedule(codes, futures, options, None),
-        expiry_schedule(codes, futures, None, publications),
-        expiry_schedule(codes, futures, options, publications),
-        expiry_schedule(codes, futures, dates("2027-01-01", "2027-01-02", "2027-01-03"), None),
+        futures_schedule(codes, futures, options),
+        futures_schedule(codes, futures, dates("2027-01-01", "2027-01-02", "2027-01-03")),
     ):
         made = a_calendar(schedule=schedule)
         assert np.array_equal(made.dates, plain.dates)
@@ -390,7 +387,7 @@ def test_option_expiries_and_publication_dates_change_nothing() -> None:
 # --- the general rule ---------------------------------------------------------
 
 
-def any_schedule(data: st.DataObject) -> ExpirySchedule:
+def any_schedule(data: st.DataObject) -> FuturesSchedule:
     count = data.draw(st.integers(2, 40))
     codes = tuple(
         data.draw(
@@ -402,7 +399,7 @@ def any_schedule(data: st.DataObject) -> ExpirySchedule:
     start = np.datetime64("2000-01-01", "D") + np.timedelta64(
         data.draw(st.integers(0, 20_000)), "D"
     )
-    return expiry_schedule(codes, start + offsets.astype("timedelta64[D]"), None, None)
+    return futures_schedule(codes, start + offsets.astype("timedelta64[D]"), None)
 
 
 @settings(deadline=None)
@@ -439,7 +436,7 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
 def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only() -> None:
     made = a_calendar()
     assert made.valuation_date is MAY_25
-    assert made.expiry_schedule is SCHEDULE
+    assert made.futures_schedule is SCHEDULE
     assert made.holiday_calendar is CLOSED_MAY_25
     for column in (made.dates, made.prompt, made.is_business_day, made.is_past):
         assert not column.flags.writeable

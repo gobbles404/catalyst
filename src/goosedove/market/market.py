@@ -15,7 +15,7 @@ from goosedove.market_data.price_vector import PriceVector
 @dataclass(frozen=True, slots=True)
 class Market:
     """The two objects the market was made from, kept by reference, and one number:
-    first_contract is the row of the expiry schedule whose contract is prompt on the valuation
+    first_contract is the row of the futures schedule whose contract is prompt on the valuation
     day, counted from zero, so that the quote of the contract prompt on any business day from
     the valuation day on is price_vector.prices[calendar.prompt[row] - first_contract], and the
     price on a past business day is the history's fixing. Nothing else is held: the days, the
@@ -56,7 +56,7 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
         (as_of - dates[0]) // np.timedelta64(1, "D")
     )  # the calendar's days are consecutive
     first_contract = int(calendar.prompt[valuation_row])
-    codes = calendar.expiry_schedule.codes
+    codes = calendar.futures_schedule.codes
     expected = len(codes) - first_contract
     given = price_vector.prices.size
     if given != expected:

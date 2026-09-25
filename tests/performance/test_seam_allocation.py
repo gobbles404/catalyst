@@ -194,7 +194,8 @@ def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> N
 
 def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells, Cells]:
     """Codes and three date columns for that many monthly contracts, as the sheet sends them:
-    the futures, the options and the publication dates."""
+    the futures, the options and a third column a month apart, dates for the schedules of the
+    other markets."""
     codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
     futures = Cells.from_rows([[46161.0 + 30 * i] for i in range(contracts)])
     options = Cells.from_rows([[46156.0 + 30 * i] for i in range(contracts)])
@@ -206,25 +207,12 @@ def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells, Cells]:
 # each column's conversion to days and its look: measured 4,928 bytes with options and 3,280
 # without at 120 contracts on 2026-09-14, about 32 and 17 bytes per contract on top of a
 # creator's small objects, which twice the slack covers; 39,516 and 21,640 at 1,200 contracts.
-# With the publication dates as well, 7,312 at 120 contracts on 2026-09-17 and 59,180 at 1,200,
-# a third column's copy and conversions; with the publication dates and the options left out,
-# 4,928 and 39,516, the three-column cost.
-def test_an_expiry_schedule_keeps_a_copy_of_each_date_column() -> None:
+def test_a_futures_schedule_keeps_a_copy_of_each_date_column() -> None:
     contracts = 120
-    codes, futures, options, publications = schedule_columns(contracts)
-    every = least_peak(
-        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options, publications)
-    )
-    assert every <= 48 * contracts + 2 * SLACK
-    with_options = least_peak(
-        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, options, MISSING)
-    )
+    codes, futures, options, _ = schedule_columns(contracts)
+    with_options = least_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, options))
     assert with_options <= 32 * contracts + 2 * SLACK
-    published = least_peak(
-        lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, publications)
-    )
-    assert published <= 32 * contracts + 2 * SLACK
-    without = least_peak(lambda: ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING))
+    without = least_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING))
     assert without <= 17 * contracts + 2 * SLACK
 
 
@@ -246,7 +234,7 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
 def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
     """Codes, the day each month's future stops trading and the day its index is published, for
     that many contract months, as the sheet sends them: the codes, the futures and the
-    publication dates of schedule_columns."""
+    third date column of schedule_columns."""
     codes, last_trading, _, publications = schedule_columns(contracts)
     return codes, last_trading, publications
 
@@ -255,7 +243,7 @@ def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
 # each, and on the way pays each column's conversion to days and its look, as an expiry
 # schedule with options does: measured 4,928 bytes at 120 contract months on 2026-09-24, about
 # 32 bytes per month on top of a creator's small objects, which twice the slack covers; 39,516
-# at 1,200, the expiry schedule with options' figures to the byte.
+# at 1,200, the futures schedule with options' figures to the byte.
 def test_an_iferc_schedule_keeps_a_copy_of_each_date_column() -> None:
     contracts = 120
     codes, last_trading, publications = iferc_columns(contracts)
@@ -267,7 +255,7 @@ def test_an_iferc_schedule_keeps_a_copy_of_each_date_column() -> None:
 
 def gas_daily_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
     """Codes and the first and last day of gas of that many contract months, as the sheet sends
-    them: the codes, the options and the publication dates of schedule_columns, any dates
+    them: the codes, the options and the third date column of schedule_columns, any dates
     serving a peak."""
     codes, _, first, last = schedule_columns(contracts)
     return codes, first, last
@@ -360,7 +348,7 @@ def calendar_sources(contracts: int) -> tuple[object, object, object]:
     codes, futures, _, _ = schedule_columns(contracts)
     return (
         ENTRY["_CreateValuationDate"](46276.0, 0.5),
-        ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING),
+        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
         ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
     )
 
@@ -491,7 +479,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     codes = Cells.from_rows([[f"c{i}"] for i in range(contracts)])
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    schedule = ENTRY["_CreateExpirySchedule"](codes, futures, MISSING, MISSING)
+    schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
     holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
     made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")

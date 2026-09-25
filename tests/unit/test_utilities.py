@@ -25,7 +25,7 @@ from goosedove.excel.utilities import shown
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
@@ -90,38 +90,23 @@ def test_a_curve_spills_its_table_with_dates_as_serials_and_factors_exactly() ->
     ]
 
 
-def test_a_schedule_spills_its_columns_with_the_publication_dates_last() -> None:
+def test_a_schedule_spills_its_columns_with_the_options_last() -> None:
     codes = Cells.from_rows([["m26"], ["n26"]])
     futures = Cells.from_rows([[46161.0], [46195.0]])
     options = Cells.from_rows([[46156.0], [46189.0]])
-    publications = Cells.from_rows([[46162.0], [46196.0]])
-    with_options = bridge.call("_CreateExpirySchedule", [codes, futures, options, MISSING])
+    with_options = bridge.call("_CreateFuturesSchedule", [codes, futures, options])
     assert rows(read(with_options)) == [
-        ["future_code", "future_expiry", "option_expiry"],
+        ["contract_code", "future_expiry", "option_expiry"],
         ["str", "datetime64[D]", "datetime64[D]"],
         ["m26", 46161.0, 46156.0],
         ["n26", 46195.0, 46189.0],
     ]
-    without = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, MISSING])
+    without = bridge.call("_CreateFuturesSchedule", [codes, futures, MISSING])
     assert rows(read(without)) == [
-        ["future_code", "future_expiry"],
+        ["contract_code", "future_expiry"],
         ["str", "datetime64[D]"],
         ["m26", 46161.0],
         ["n26", 46195.0],
-    ]
-    every = bridge.call("_CreateExpirySchedule", [codes, futures, options, publications])
-    assert rows(read(every)) == [
-        ["future_code", "future_expiry", "option_expiry", "publication_date"],
-        ["str", "datetime64[D]", "datetime64[D]", "datetime64[D]"],
-        ["m26", 46161.0, 46156.0, 46162.0],
-        ["n26", 46195.0, 46189.0, 46196.0],
-    ]
-    published = bridge.call("_CreateExpirySchedule", [codes, futures, MISSING, publications])
-    assert rows(read(published)) == [
-        ["future_code", "future_expiry", "publication_date"],
-        ["str", "datetime64[D]", "datetime64[D]"],
-        ["m26", 46161.0, 46162.0],
-        ["n26", 46195.0, 46196.0],
     ]
 
 
@@ -184,13 +169,8 @@ def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_e
 def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
     valuation = bridge.call("_CreateValuationDate", [46167.0, 0.5])
     schedule = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            Cells.from_rows([["m26"], ["n26"]]),
-            Cells.from_rows([[46161.0], [46162.0]]),
-            MISSING,
-            MISSING,
-        ],
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
     handle = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
@@ -210,13 +190,8 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
 # is the word unfixed, whose kind is the text code.
 def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> None:
     schedule = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            Cells.from_rows([["m26"], ["n26"]]),
-            Cells.from_rows([[46161.0], [46162.0]]),
-            MISSING,
-            MISSING,
-        ],
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
     fixed = bridge.call(
@@ -293,13 +268,8 @@ def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
 # the one quote is still required.
 def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
     schedule = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            Cells.from_rows([["m26"], ["n26"]]),
-            Cells.from_rows([[46161.0], [46162.0]]),
-            MISSING,
-            MISSING,
-        ],
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     valuation = bridge.call("_CreateValuationDate", [46162.0, 0.5])
     quote = bridge.call("_CreatePriceVector", [72.10])
@@ -463,7 +433,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         Calendar,
         ValuationDate,
         DiscountCurve,
-        ExpirySchedule,
+        FuturesSchedule,
         GasDailySchedule,
         HolidayCalendar,
         IfercSchedule,
@@ -494,7 +464,7 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     history = any_history(data)
     calendar = history.calendar
     first = int(calendar.prompt[calendar.dates == calendar.valuation_date.as_of][0])
-    quotes = a_vector(*(100.0 + i for i in range(len(calendar.expiry_schedule.codes) - first)))
+    quotes = a_vector(*(100.0 + i for i in range(len(calendar.futures_schedule.codes) - first)))
     made = market(history, quotes)
     table = shown(made)
     body = rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))[2:]
