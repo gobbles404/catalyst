@@ -412,7 +412,7 @@ def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
 def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
-    before, under the same hundred Thursdays, so every past business day has one."""
+    before, under the same hundred Thursdays, so every fixed business day has one."""
     valuation, schedule, holidays = calendar_sources(contracts)
     made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
@@ -421,7 +421,7 @@ def history_sources(contracts: int) -> tuple[object, object]:
     return made, fixings
 
 
-# A history keeps two columns, 16 bytes per past business day, the row and the price, and
+# A history keeps two columns, 16 bytes per fixed business day, the row and the price, and
 # nothing per day of the calendar, which it keeps as it is; on the way it pays the builder's
 # looks, a byte or so per fixing and per day for the days covered and the flags combined:
 # measured 3,681 bytes at 360 days with 76 fixings on 2026-09-19, 16,641 at 3,600 days and
@@ -437,6 +437,58 @@ def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell()
     assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 6 * days + 2 * SLACK
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
+
+
+def gas_daily_history_sources() -> tuple[object, object]:
+    """The two handles a Gas Daily history takes: the calendar of the twelve months of 2026
+    valued on 11 September, and a print on every flow day from New Year's Day to the 11th, so
+    that every fixed day has one."""
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    schedule = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
+    fixings = ENTRY["_CreateGasDailyFixings"](
+        Cells.from_rows([[46023.0 + i] for i in range(days)]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+    )
+    return made, fixings
+
+
+def iferc_history_sources() -> tuple[object, object]:
+    """The two handles an IFERC history takes: the calendar of the ten years of months
+    iferc_columns lays out, valued after the last month's publication day so that every month
+    has fixed, and an index for each of them."""
+    valuation = ENTRY["_CreateValuationDate"](49740.0, 0.5)
+    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(120))
+    return made, fixings
+
+
+# A Gas Daily history keeps the same two columns, 16 bytes per fixed day, and every day of the
+# calendar through the valuation day is fixed, so it pays per day what the futures history pays
+# per fixing, the print's row and its inside mask, the days covered, the flags combined and the
+# copied prices: measured 7,404 bytes at 365 days with 254 prints on 2026-09-25, and 95,752 at
+# 3,652 days all fixed, 26 bytes per day, which 30 per day covers with twice the slack. An IFERC
+# history keeps two columns per month and pays the dict its codes are found through, the rows,
+# the two looks and the argsort, most of the peak at a small count: measured 12,544 bytes at 120
+# months and 105,204 at 1,200, 88 bytes per month, which 100 per month covers. Reading either
+# back pays the reader's rectangle as the futures history's does: measured 51,332 at 365 days
+# and 480,153 at 3,652, 26 bytes per cell; 19,091 at 120 months, 32 bytes per cell at that
+# count, and 158,941 at 1,200, 26 per cell.
+def test_the_other_two_histories_keep_two_short_columns_and_their_readers_pay_per_cell() -> None:
+    days, months = 365, 120
+    made, prints = gas_daily_history_sources()
+    assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, prints)) <= 30 * days + 2 * SLACK
+    daily = ENTRY["_CreateMarketHistory"](made, prints)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * days + 2 * SLACK
+    calendar, indices = iferc_history_sources()
+    assert (
+        least_peak(lambda: ENTRY["_CreateMarketHistory"](calendar, indices))
+        <= 100 * months + 2 * SLACK
+    )
+    monthly = ENTRY["_CreateMarketHistory"](calendar, indices)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
 
 
 def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:

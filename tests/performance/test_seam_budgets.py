@@ -1205,7 +1205,7 @@ def test_an_iferc_calendar_is_a_schedule_and_a_valuation_date_in_and_four_column
     }
 
 
-# --- the market history: two handles in, the calendar kept, its past business days priced ------
+# --- the market history: two handles in, the calendar kept, its fixed periods priced -----------
 
 
 def history_sources(contracts: int) -> tuple[object, object]:
@@ -1220,12 +1220,13 @@ def history_sources(contracts: int) -> tuple[object, object]:
     return made, fixings
 
 
-# A year of days and the fixings on its past business days: two handles, each the text rule and
-# one lookup, the builder's three looks, a fixing on or after the valuation date, a fixing on a
-# day the calendar closes and a past business day without one, its rows from one subtraction
-# over the fixings' days, the days covered in one zeros, and one publication. Eleven calls
-# across eight functions, the accept rule once per argument; no arange, no searchsorted and no
-# look at a holiday, since the calendar is taken as it is and nothing of it is made again.
+# A year of days and the fixings on its fixed business days: two handles, each the text rule and
+# one lookup, the builder's dispatch to the futures binder, its check of the calendar's kind, its
+# three looks, a fixing on or after the valuation date, a fixing on a day the calendar closes and
+# a fixed day without one, its rows from one subtraction over the fixings' days, the days covered
+# in one zeros, the two columns frozen, and one publication. Fifteen calls across twelve
+# functions, the accept rule once per argument; no arange, no searchsorted and no look at a
+# holiday, since the calendar is taken as it is and nothing of it is made again.
 def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1239,6 +1240,10 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
         "_resolve": 2,  # and its one lookup
         "_CreateMarketHistory": 1,
         "market_history": 1,
+        "futures_history": 1,
+        "_of_the_market": 1,
+        "_every_fixed_day": 1,
+        "_frozen": 1,
         "_publish": 1,
     }
     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
@@ -1248,6 +1253,105 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
         "numpy.zeros": 1,  # the rows covered
         "ndarray.setflags": 2,  # the two columns frozen
         "ufunc.reduce": 3,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+def gas_daily_history_sources() -> tuple[object, object]:
+    """The two handles a Gas Daily history takes: the calendar of the twelve months of 2026
+    valued on 11 September, and a print on every flow day from New Year's Day to the 11th, so
+    that every fixed day has one."""
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
+    fixings = PATH["_CreateGasDailyFixings"](
+        Cells.from_rows([[46023.0 + i] for i in range(days)]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+    )
+    return made, fixings
+
+
+# A year of flow days and the prints on those that have fixed: two handles as above, the
+# builder's dispatch to the Gas Daily binder, its check of the calendar's kind, its two looks, a
+# print after the valuation day and a fixed day without one, its rows from one subtraction over
+# the flow days, the days covered in one zeros, the two columns frozen, and one publication.
+# Fifteen calls across twelve functions, the accept rule once per argument; no arange, no
+# searchsorted and no look at a holiday.
+def test_a_gas_daily_history_is_two_handles_in_and_the_calendar_kept(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made, fixings = gas_daily_history_sources()
+    PATH["_CreateMarketHistory"](made, fixings)
+    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateMarketHistory": 1,
+        "market_history": 1,
+        "gas_daily_history": 1,
+        "_of_the_market": 1,
+        "_every_fixed_day": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
+    assert calls == {
+        "ndarray.any": 2,  # the builder's two looks
+        "ndarray.astype": 1,  # the flow days to rows of the calendar
+        "numpy.zeros": 1,  # the rows covered
+        "ndarray.setflags": 2,  # the two columns frozen
+        "ufunc.reduce": 2,
+    }
+    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+def iferc_history_sources() -> tuple[object, object]:
+    """The two handles an IFERC history takes: the calendar of the ten years of months
+    iferc_columns lays out, valued after the last month's publication day so that every month
+    has fixed, and an index for each of them."""
+    valuation = PATH["_CreateValuationDate"](49740.0, 0.5)
+    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
+    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(120))
+    return made, fixings
+
+
+# Ten years of months, every one published, and their indices: two handles as above, the
+# builder's dispatch to the IFERC binder, its check of the calendar's kind, one pass over the
+# codes against the calendar's, the rows of the months in one array, two looks, an index for a
+# month not yet fixed and a fixed month without one, the months covered in one zeros, the rows
+# put in the calendar's order by one argsort, the two columns frozen, and one publication.
+# Fourteen calls across eleven functions, the accept rule once per argument; no arange and no
+# searchsorted.
+def test_an_iferc_history_is_two_handles_in_and_the_calendar_kept(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    made, fixings = iferc_history_sources()
+    PATH["_CreateMarketHistory"](made, fixings)
+    assert call_profile(lambda: PATH["_CreateMarketHistory"](made, fixings)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateMarketHistory": 1,
+        "market_history": 1,
+        "iferc_history": 1,
+        "_of_the_market": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
+    assert calls == {
+        "numpy.array": 1,  # the row of each index's month
+        "ndarray.any": 2,  # the builder's two looks
+        "numpy.zeros": 1,  # the months covered
+        "ndarray.argsort": 1,  # the calendar's order
+        "ndarray.setflags": 2,  # the two columns frozen
+        "ufunc.reduce": 2,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 

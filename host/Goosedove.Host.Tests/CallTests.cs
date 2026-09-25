@@ -166,7 +166,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateCalendar", new object[] { 46167.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is number 46167.0, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { "x", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is text 'x' naming no live object, expected valuation date handle" };
-            // The market history: two handles, the calendar and the futures fixings. A number, a missing argument and text naming no live object where the calendar should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
+            // The market history: two handles, the calendar and the fixings of its market, any handle. A number, a missing argument and text naming no live object where the calendar should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the facts below.
             yield return new object[] { "_CreateMarketHistory", new object[] { 46168.0, ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is number 46168.0, expected calendar handle" };
             yield return new object[] { "_CreateMarketHistory", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is missing, expected calendar handle" };
             yield return new object[] { "_CreateMarketHistory", new object[] { "x", ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is text 'x' naming no live object, expected calendar handle" };
@@ -409,8 +409,9 @@ namespace Goosedove.Host.Tests
         // util_ReadHandle spills it back, the calendar's four columns and fixing_price, a number on
         // a fixed day, closed on the weekend and the holiday, unfixed on the valuation day and
         // after. The library's rules answer through the same objects: a fixing on the valuation
-        // date, a past business day without one, and a fixing on a day the calendar closes; and a
-        // handle of another kind in either slot.
+        // date, a fixed day without one, and a fixing on a day the calendar closes; a handle of
+        // another kind where the calendar should be, the seam's words, and a calendar where the
+        // fixings should be, the library's.
         [Fact]
         public void a_market_history_is_created_from_two_handles_and_read_back_through_its_handle()
         {
@@ -437,14 +438,59 @@ namespace Goosedove.Host.Tests
             Assert.Equal("unfixed", spill[8, 4]);
             Assert.Equal("unfixed", spill[64, 4]);
             var late = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0, 46168.0), Column(70.85, 71.10, 71.25, 71.5), holidays);
-            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date", Seam.Call("_CreateMarketHistory", calendar, late));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date", Seam.Call("_CreateMarketHistory", calendar, late));
             var twoDays = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0), Column(70.85, 71.10), holidays);
-            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for 2026-05-22, expected a fixing for every past business day in calendar", Seam.Call("_CreateMarketHistory", calendar, twoDays));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-22, expected a fixing for every fixed day in calendar", Seam.Call("_CreateMarketHistory", calendar, twoDays));
             var elsewhere = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
             var onTheHoliday = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0, 46167.0), Column(70.85, 71.10, 71.25, 71.4), elsewhere);
-            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-25 is a closed day in calendar, expected no fixing", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
             Assert.Equal("#ERROR _CreateMarketHistory: calendar is futures fixings handle '" + fixings + "', expected calendar handle", Seam.Call("_CreateMarketHistory", fixings, fixings));
-            Assert.Equal("#ERROR _CreateMarketHistory: futures_fixings is calendar handle '" + calendar + "', expected futures fixings handle", Seam.Call("_CreateMarketHistory", calendar, calendar));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", calendar, calendar));
+        }
+
+        // The market history over the other two calendars: a Gas Daily calendar of September to
+        // November 2026 valued on 11 September and a print on every flow day from the 1st to the
+        // 11th make one, every flow day through the valuation day priced and the next unfixed; an
+        // IFERC calendar of October to December valued on 15 November and the indices of the two
+        // published months, November's first, make one, the two priced in the calendar's order and
+        // December unfixed. The library's rules answer through the same objects: a print for the
+        // day after the valuation day, an index for a month not yet published, IFERC fixings with
+        // the Gas Daily calendar, and a history where the fixings should be.
+        [Fact]
+        public void a_gas_daily_and_an_iferc_history_are_created_from_two_handles_each_and_read_back()
+        {
+            var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
+            var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasDaily, ExcelMissing.Value);
+            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0));
+            var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
+            Assert.StartsWith("market_history:", daily);
+            var days = (object[,])Seam.Call("util_ReadHandle", daily);
+            Assert.Equal(93, days.GetLength(0));
+            Assert.Equal(5, days.GetLength(1));
+            Assert.Equal(2.91, days[2, 4]);
+            Assert.Equal(true, days[12, 3]);
+            Assert.Equal(3.0, days[12, 4]);
+            Assert.Equal(false, days[13, 3]);
+            Assert.Equal("unfixed", days[13, 4]);
+            Assert.Equal("unfixed", days[92, 4]);
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), iferc, ExcelMissing.Value);
+            var indices = (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85));
+            var monthly = (string)Seam.Call("_CreateMarketHistory", november, indices);
+            Assert.StartsWith("market_history:", monthly);
+            var months = (object[,])Seam.Call("util_ReadHandle", monthly);
+            Assert.Equal(5, months.GetLength(0));
+            Assert.Equal(46296.0, months[2, 0]);
+            Assert.Equal("V26", months[2, 1]);
+            Assert.Equal(1.85, months[2, 4]);
+            Assert.Equal(2.10, months[3, 4]);
+            Assert.Equal("unfixed", months[4, 4]);
+            var earlier = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46275.0, 0.5), gasDaily, ExcelMissing.Value);
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings flow_date 2026-09-11 is after valuation date 2026-09-10, expected flow days on or before the valuation date", Seam.Call("_CreateMarketHistory", earlier, prints));
+            var december = (string)Seam.Call("_CreateIfercFixings", Column("V26", "X26", "Z26"), Column(1.85, 2.10, 2.20));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings contract_code 'Z26' is a month not yet fixed in calendar, expected an index for fixed months alone", Seam.Call("_CreateMarketHistory", november, december));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is IFERC fixings, expected Gas Daily fixings with a Gas Daily calendar", Seam.Call("_CreateMarketHistory", september, indices));
+            Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", september, daily));
         }
 
         // The price vector: one column of prices makes one, a single cell makes one of one price,
