@@ -155,6 +155,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", 46027.0), Column(1.85, 2.10) }, "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, expected text" };
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), ExcelMissing.Value }, "#ERROR _CreateIfercFixings: price is missing, expected column of numbers" };
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Row(1.85, 2.10) }, "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers" };
+            // The Gas Daily fixings: a column of flow days and a column of midpoints. A price column one row short and a day skipped, the library's words; a blank among the prices, text among the days, the prices left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0, 46271.0), Column(2.93, 2.875) }, "#ERROR _CreateGasDailyFixings: ValueError: price has 2 prices, expected 3, one per flow_date" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46271.0), Column(2.93, 2.875) }, "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, expected 2026-09-05, the day after row 1's 2026-09-04" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Column(2.93, ExcelEmpty.Value) }, "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, "x"), Column(2.93, 2.875) }, "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Row(2.93, 2.875) }, "#ERROR _CreateGasDailyFixings: price is 1x2 array, expected column of numbers" };
             // The calendar: three handles, the valuation date, the expiry schedule and the holiday calendar. A number, a missing argument and text naming no live object where the valuation date should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
             yield return new object[] { "_CreateCalendar", new object[] { 46167.0, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is number 46167.0, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle" };
@@ -521,6 +528,30 @@ namespace Goosedove.Host.Tests
             var oneMonth = (string)Seam.Call("_CreateIfercFixings", "F26", 1.85);
             Assert.NotEqual(handle, oneMonth);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneMonth)).GetLength(0));
+        }
+
+        // Gas Daily fixings: a column of flow days and a column of midpoints make one, two single
+        // cells make the fixings of one day, and util_ReadHandle spills it back, the two headers,
+        // the day type over the number type, then a row per flow day, the weekend rows among them.
+        [Fact]
+        public void gas_daily_fixings_are_created_from_two_columns_and_read_back_through_their_handle()
+        {
+            var handle = (string)Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0, 46271.0, 46272.0), Column(2.93, 2.875, 2.875, 2.875));
+            Assert.StartsWith("gas_daily_fixings:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(6, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("flow_date", spill[0, 0]);
+            Assert.Equal("price", spill[0, 1]);
+            Assert.Equal("datetime64[D]", spill[1, 0]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal(46269.0, spill[2, 0]);
+            Assert.Equal(2.93, spill[2, 1]);
+            Assert.Equal(46272.0, spill[5, 0]);
+            Assert.Equal(2.875, spill[5, 1]);
+            var oneDay = (string)Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93);
+            Assert.NotEqual(handle, oneDay);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
         }
 
         // The mixed road out: a rectangle of three kinds comes back one tagged value per cell.

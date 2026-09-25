@@ -31,6 +31,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
 
@@ -188,6 +189,13 @@ def market_table(obj: Market) -> MixedArray:
 def daily_fixings_table(obj: DailyFixings) -> MixedArray:
     return MixedArray.table(
         [("date", "settle"), ("datetime64[D]", "float64")], obj.dates, obj.settles
+    )
+
+
+@shown.register
+def gas_daily_fixings_table(obj: GasDailyFixings) -> MixedArray:
+    return MixedArray.table(
+        [("flow_date", "price"), ("datetime64[D]", "float64")], obj.dates, obj.prices
     )
 
 

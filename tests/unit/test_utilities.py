@@ -33,6 +33,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
 
@@ -255,6 +256,24 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
 
 
+# Serials for 4 to 7 September 2026, a Friday through Labor Day Monday, the three rows after
+# the Friday carrying its one print.
+def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> None:
+    flow_days = Cells.from_rows([[46269.0], [46270.0], [46271.0], [46272.0]])
+    prices = Cells.from_rows([[2.930], [2.875], [2.875], [2.875]])
+    kinds, slots, joined = read(bridge.call("_CreateGasDailyFixings", [flow_days, prices]))
+    assert rows((kinds, slots, joined)) == [
+        ["flow_date", "price"],
+        ["datetime64[D]", "float64"],
+        [46269.0, 2.930],
+        [46270.0, 2.875],
+        [46271.0, 2.875],
+        [46272.0, 2.875],
+    ]
+    assert kinds.shape == (6, 2)
+    assert kinds[2:].tolist() == [[NUMBER_CODE, NUMBER_CODE]] * 4
+
+
 # Two months of Waha IFERC, the codes as typed and an index beside each, a zero and a negative
 # among four kept in their places.
 def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
@@ -459,6 +478,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IndexConventions,
         ContractSpecifications,
         DailyFixings,
+        GasDailyFixings,
         IfercFixings,
         MarketHistory,
         PriceVector,

@@ -12,6 +12,7 @@ from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 
 
@@ -437,6 +438,206 @@ def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
     assert bridge.call("ReadIfercFixings", [schedule]) == (
         f"#ERROR ReadIfercFixings: fixings is iferc schedule handle {schedule!r}, "
         "expected iferc fixings handle"
+    )
+
+
+# --- _CreateGasDailyFixings ------------------------------------------------------
+
+
+# The page's sample as the sheet sends it, Henry Hub Gas Daily over Labor Day week 2026: serials
+# for 4 to 9 September and an illustrative midpoint beside each, Friday's print carrying the
+# weekend and the holiday.
+SEP_4, SEP_5, SEP_6, SEP_7, SEP_8, SEP_9 = 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0
+FLOW_DAYS = Cells.from_rows([[SEP_4], [SEP_5], [SEP_6], [SEP_7], [SEP_8], [SEP_9]])
+MIDPOINTS = Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875], [2.900]])
+GAS_DAILY_HANDLE = re.compile(r"gas_daily_fixings:[0-9a-f]{6}:([0-9]{6})")
+
+
+# The library has no consumer of Gas Daily fixings yet, so this hidden reader proves that a
+# handle resolves to the fixings the seam kept, the flow days as days and the prices as numbers.
+@probe
+def ReadGasDailyFixings(fixings: Handle[GasDailyFixings]) -> str:
+    kept = " ".join(str(day) for day in fixings.dates)
+    return f"{kept} | {' '.join(repr(float(p)) for p in fixings.prices)}"
+
+
+def gas_daily(flow_days: object, prices: object) -> str:
+    text = bridge.call("_CreateGasDailyFixings", [flow_days, prices])
+    assert isinstance(text, str) and GAS_DAILY_HANDLE.fullmatch(text), text
+    return text
+
+
+def test_gas_daily_fixings_are_created_from_two_columns_and_read_back() -> None:
+    assert bridge.call("ReadGasDailyFixings", [gas_daily(FLOW_DAYS, MIDPOINTS)]) == (
+        "2026-09-04 2026-09-05 2026-09-06 2026-09-07 2026-09-08 2026-09-09 | "
+        "2.93 2.875 2.875 2.875 2.875 2.9"
+    )
+
+
+# A single cell is a column of one, so the fixings of one day need no range.
+def test_two_single_cells_make_the_fixings_of_one_day() -> None:
+    assert bridge.call("ReadGasDailyFixings", [gas_daily(SEP_4, 2.930)]) == "2026-09-04 | 2.93"
+
+
+@pytest.mark.parametrize(
+    ("flow_days", "prices", "text"),
+    [
+        (
+            FLOW_DAYS,
+            Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: price has 5 prices, expected 6, "
+            "one per flow_date",
+        ),
+        (
+            Cells.from_rows([[SEP_4], [SEP_6]]),
+            Cells.from_rows([[2.930], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, "
+            "expected 2026-09-05, the day after row 1's 2026-09-04",
+        ),
+        (
+            Cells.from_rows([[SEP_4], [SEP_4]]),
+            Cells.from_rows([[2.930], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
+            "expected 2026-09-05, the day after row 1's 2026-09-04",
+        ),
+        (
+            Cells.from_rows([[SEP_5], [SEP_4]]),
+            Cells.from_rows([[2.875], [2.930]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
+            "expected 2026-09-06, the day after row 1's 2026-09-05",
+        ),
+        (
+            Cells.from_rows([[SEP_4], [None], [SEP_6]]),
+            Cells.from_rows([[2.930], [2.875], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is blank, expected date",
+        ),
+        (
+            Cells.from_rows([[SEP_4], [SEP_5 + 0.5]]),
+            Cells.from_rows([[2.930], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is number 46270.5, expected date",
+        ),
+        (
+            Cells.from_rows([["4-Sep-2026"], [SEP_5]]),
+            Cells.from_rows([[2.930], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: flow_date cell (1, 1) is text '4-Sep-2026', "
+            "expected date",
+        ),
+        (
+            FLOW_DAYS,
+            Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]]),
+            "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number",
+        ),
+        (
+            FLOW_DAYS,
+            Cells.from_rows([[2.930], ["2.875"], [2.875], [2.875], [2.875], [2.900]]),
+            "#ERROR _CreateGasDailyFixings: price cell (2, 1) is text '2.875', expected number",
+        ),
+        (
+            Cells.from_rows([[SEP_4, SEP_5]]),
+            MIDPOINTS,
+            "#ERROR _CreateGasDailyFixings: flow_date is 1x2 array, expected column of dates",
+        ),
+        (
+            FLOW_DAYS,
+            Cells.from_rows([[2.930, 2.875]]),
+            "#ERROR _CreateGasDailyFixings: price is 1x2 array, expected column of numbers",
+        ),
+        (
+            MISSING,
+            MIDPOINTS,
+            "#ERROR _CreateGasDailyFixings: flow_date is missing, expected column of dates",
+        ),
+        (
+            FLOW_DAYS,
+            MISSING,
+            "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers",
+        ),
+        (
+            None,
+            MIDPOINTS,
+            "#ERROR _CreateGasDailyFixings: flow_date is blank, expected column of dates",
+        ),
+        (
+            FLOW_DAYS,
+            None,
+            "#ERROR _CreateGasDailyFixings: price is blank, expected column of numbers",
+        ),
+        (
+            Cells.from_rows([[SEP_4], [None]]),
+            Cells.from_rows([[2.930], [None]]),
+            "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is blank, expected date",
+        ),
+    ],
+    ids=[
+        "a price column one row short",
+        "a day skipped",
+        "a day given twice",
+        "a series pasted newest first",
+        "a blank among the days",
+        "a day with a time",
+        "a day typed as text",
+        "a blank among the prices",
+        "text where a price should be",
+        "a row of days",
+        "a row of prices",
+        "the days left out",
+        "the prices left out",
+        "a blank cell where the days should be",
+        "a blank cell where the prices should be",
+        "both columns wrong, the days named first",
+    ],
+)
+def test_gas_daily_fixings_that_cannot_be_made_say_why(
+    flow_days: object, prices: object, text: str
+) -> None:
+    assert bridge.call("_CreateGasDailyFixings", [flow_days, prices]) == text
+
+
+# The publication number moves only when an object is stored, so a failed creator leaves no gap,
+# whether the library or the seam refused the call.
+def test_a_failed_gas_daily_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(gas_daily(FLOW_DAYS, MIDPOINTS), GAS_DAILY_HANDLE)
+    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, Cells.from_rows([[2.930]])]) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: price has 1 price, expected 6, "
+        "one per flow_date"
+    )
+    skipped = Cells.from_rows([[SEP_4], [SEP_6]])
+    assert bridge.call(
+        "_CreateGasDailyFixings", [skipped, Cells.from_rows([[2.930], [2.875]])]
+    ) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, "
+        "expected 2026-09-05, the day after row 1's 2026-09-04"
+    )
+    assert (
+        bridge.call(
+            "_CreateGasDailyFixings",
+            [FLOW_DAYS, Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]])],
+        )
+        == "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number"
+    )
+    assert number(gas_daily(FLOW_DAYS, MIDPOINTS), GAS_DAILY_HANDLE) == before + 1
+
+
+def test_a_handle_of_another_kind_is_not_gas_daily_fixings() -> None:
+    other = the_fixings(HEADERS, BODY)
+    assert bridge.call("ReadGasDailyFixings", [other]) == (
+        f"#ERROR ReadGasDailyFixings: fixings is daily fixings handle {other!r}, "
+        "expected gas daily fixings handle"
+    )
+    schedule = cast(
+        str,
+        bridge.call(
+            "_CreateGasDailySchedule",
+            [
+                Cells.from_rows([["U26"], ["V26"]]),
+                Cells.from_rows([[46266.0], [46296.0]]),
+                Cells.from_rows([[46295.0], [46326.0]]),
+            ],
+        ),
+    )
+    assert bridge.call("ReadGasDailyFixings", [schedule]) == (
+        f"#ERROR ReadGasDailyFixings: fixings is gas daily schedule handle {schedule!r}, "
+        "expected gas daily fixings handle"
     )
 
 

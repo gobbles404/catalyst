@@ -1345,6 +1345,53 @@ def test_reading_a_market_back_rebuilds_nothing(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
+# --- the Gas Daily fixings: two columns in, the days checked and both copied -----------------
+
+
+def flow_day_columns(count: int) -> tuple[Cells, Cells]:
+    """That many consecutive flow days from 1 September 2026 as the sheet sends them, a serial
+    per row, and a price beside each."""
+    return (
+        Cells.from_rows([[46266.0 + i] for i in range(count)]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(count)]),
+    )
+
+
+# A year of flow days: the date column through its look and its conversion to days, the number
+# column accepted on the host's summary alone, the builder's one look over the days for the day
+# after each, its two copies and one publication. Seventeen calls across fourteen functions, the
+# accept rule once per argument; on numpy one look for the calendar and one for the days, the
+# column's two conversions, the two copies and their freezes.
+def test_gas_daily_fixings_are_two_columns_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    flow_days, prices = flow_day_columns(365)
+    PATH["_CreateGasDailyFixings"](flow_days, prices)
+    assert call_profile(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_date_column": 1,
+        "_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
+        "_numbers": 1,
+        "_CreateGasDailyFixings": 1,
+        "gas_daily_fixings": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices)) == {
+        "ndarray.any": 2,  # the column's look for the calendar, then the look over the days
+        "ndarray.astype": 2,  # the column on its way to days
+        "numpy.array": 2,  # the two copies the fixings keep
+        "ndarray.setflags": 2,  # frozen
+        "ufunc.reduce": 2,
+    }
+
+
 # --- the IFERC fixings: two columns in, the codes kept and the prices copied ---------------
 
 
