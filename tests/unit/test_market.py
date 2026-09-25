@@ -12,10 +12,14 @@ from numpy.typing import NDArray
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
+from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
+from goosedove.market_data.gas_daily_fixings import gas_daily_fixings
+from goosedove.market_data.iferc_fixings import iferc_fixings
 from goosedove.market_data.price_vector import PriceVector, price_vector
 
 
@@ -227,6 +231,35 @@ def test_a_market_that_cannot_be_made_says_why(
     with pytest.raises(ValueError) as failure:
         market(a_history(as_of), a_vector(*quotes))
     assert str(failure.value) == message
+
+
+# The history of a Gas Daily calendar of one month valued on 25 September 2026, and of an IFERC
+# calendar of one month valued after its index printed: each a history, and neither a market
+# yet, refused by the kind the calendar holds before any count is looked at.
+def test_a_history_over_another_calendar_is_refused_until_the_markets_own_ticket() -> None:
+    september = calendar(
+        valuation_date(day("2026-09-25"), 0.5),
+        gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")),
+        None,
+    )
+    days = np.arange(day("2026-09-01"), day("2026-09-26"), dtype="datetime64[D]")
+    prints = gas_daily_fixings(days, 2.8 + np.arange(days.size, dtype=np.float64) / 100)
+    with pytest.raises(ValueError) as failure:
+        market(market_history(september, prints), a_vector(3.0))
+    assert str(failure.value) == (
+        "market_history is over a Gas Daily calendar, expected a futures calendar"
+    )
+    october = calendar(
+        valuation_date(day("2026-11-15"), 0.5),
+        iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")),
+        None,
+    )
+    indices = iferc_fixings(("V26",), np.array([1.85], dtype=np.float64))
+    with pytest.raises(ValueError) as failure:
+        market(market_history(october, indices), a_vector(2.0))
+    assert str(failure.value) == (
+        "market_history is over an IFERC calendar, expected a futures calendar"
+    )
 
 
 # --- the general rule ---------------------------------------------------------

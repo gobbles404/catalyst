@@ -157,9 +157,9 @@ def _priced_column(
 
 @shown.register
 def market_history_table(obj: MarketHistory) -> MixedArray:
-    # The calendar's four columns, then fixing_price: the settle on each past business day, a
-    # number, and a word on every other day, closed where the calendar has the market shut and
-    # unfixed where it is open, the valuation day and the days after it.
+    # The calendar's four columns, then fixing_price: the price fixed on each fixed and priced
+    # period, a number, and a word on every other, closed where the calendar does not price the
+    # day and unfixed where it prices but has not fixed, whatever the market.
     calendar = obj.calendar
     words = np.empty(calendar.dates.size, dtype=object)
     words[:] = "closed"

@@ -1,13 +1,14 @@
-"""The market: an index's history, its calendar with the settle fixed on each past business day,
-and the current futures prices, one quote per contract from the valuation day's prompt through
-the last; together the price on every business day of the calendar, the fixing where the day
-has fixed and the prompt contract's quote where it has not. docs/library/market/market.md is
-the page."""
+"""The market: an index's futures history, its calendar with the settle fixed on each past
+business day, and the current futures prices, one quote per contract from the valuation day's
+prompt through the last; together the price on every business day of the calendar, the fixing
+where the day has fixed and the prompt contract's quote where it has not.
+docs/library/market/market.md is the page."""
 
 from dataclasses import dataclass
 
 import numpy as np
 
+from goosedove.calendar.calendar import Kind, described
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.price_vector import PriceVector
 
@@ -27,8 +28,13 @@ class Market:
 
 
 def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
-    """The one way to make a Market: two rules, checked once, in this order, the first failure
-    being the message; then one number, and nothing built.
+    """The one way to make a Market: three rules, checked once, in this order, the first
+    failure being the message; then one number, and nothing built.
+
+    The history is over a futures calendar: what a Gas Daily or an IFERC market quotes for the
+    periods to come, and which month stands first on the valuation day, is the market's next
+    ticket, and until then a history over either calendar is refused here, naming the kind the
+    calendar holds.
 
     The valuation date lies within the calendar's days, the first and the last included: a
     calendar that starts after it or ends before it has no day whose prompt contract the first
@@ -45,6 +51,10 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
     search, and no array made. The two objects are kept as they are.
     """
     calendar = market_history.calendar
+    if calendar.kind is not Kind.FUTURES:
+        raise ValueError(
+            f"market_history is over {described(calendar.kind)}, expected a futures calendar"
+        )
     dates = calendar.dates
     as_of = calendar.valuation_date.as_of
     if as_of < dates[0] or as_of > dates[-1]:

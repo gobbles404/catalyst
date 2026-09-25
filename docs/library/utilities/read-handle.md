@@ -66,7 +66,7 @@ What each kind shows:
 | `price_vector` | `price` | `float64` | one per price, in the column's order |
 | `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the fixing on a past business day, the prompt contract's quote on a business day from the valuation day on, and the word `closed` on a weekend or a holiday |
 | `calendar` | `date`, `contract`, `is_priced`, `is_fixed` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's on a futures calendar, one per flow day on a Gas Daily calendar, one per contract month on an IFERC calendar |
-| `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the settle, a number, on a past business day, the word `closed` on a weekend or a holiday and `unfixed` on the valuation day and the days after it |
+| `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar period, every row the calendar has; the fifth cell the price fixed, a number, on a fixed and priced period, the word `closed` where the calendar does not price the day, a futures weekend or holiday, and `unfixed` where it prices but has not fixed, whatever market the calendar is of |
 
 `=util_ReadHandle(B2)` on `=_CreateValuationDate(A2, 0.5)`:
 
@@ -111,7 +111,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | a price vector: one column of prices under its two heading rows, a zero and a negative price in their places | example |
 | a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; and for any history with the quotes it requires, every day's fixing, quote or `closed` | example and property |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
-| the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price | example |
+| the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price, over a futures calendar and over the other two | example |
 | a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
 | for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |

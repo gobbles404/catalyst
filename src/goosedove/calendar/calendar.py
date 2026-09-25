@@ -43,6 +43,15 @@ def described(kind: Kind) -> str:
             assert_never(kind)
 
 
+def named(obj: object) -> str:
+    """An object of no expected kind named in a message by its class, in the words the seam gives
+    a handle's kind: a holiday calendar, futures fixings, an iferc schedule."""
+    words = re.sub(r"(?<!^)(?=[A-Z])", " ", type(obj).__name__).lower()
+    if words.endswith("s"):
+        return words
+    return f"{'an' if words[0] in 'aeiou' else 'a'} {words}"
+
+
 @dataclass(frozen=True, slots=True)
 class Calendar:
     """The objects the calendar was built from, kept by reference, its kind, and four columns
@@ -87,10 +96,8 @@ def calendar(
 def _of(
     schedule: object, valuation_date: ValuationDate, holiday_calendar: HolidayCalendar | None
 ) -> Calendar:
-    kind = re.sub(r"(?<!^)(?=[A-Z])", " ", type(schedule).__name__).lower()
-    article = "" if kind.endswith("s") else "a "
     raise ValueError(
-        f"schedule is {article}{kind}, expected a futures, IFERC or Gas Daily schedule"
+        f"schedule is {named(schedule)}, expected a futures, IFERC or Gas Daily schedule"
     )
 
 

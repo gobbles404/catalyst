@@ -207,9 +207,9 @@ $formulas = [ordered]@{
     "=_CreateCalendar(AA2,AM1)" = "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
     "=_CreateCalendar(AA2,DK3)" = "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, expected 2026-10-01, the day after row 1's last_date 2026-09-30"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, read back
-    # through util_ReadHandle, the calendar's four columns and the fixing price, a number on a past
-    # business day, closed on a weekend and unfixed on the valuation day and after; a fixing on
-    # the valuation date, a past business day without a fixing and a fixing on a day the calendar
+    # through util_ReadHandle, the calendar's four columns and the fixing price, a number on a
+    # fixed business day, closed on a weekend and unfixed on the valuation day and after; a fixing
+    # on the valuation date, a fixed day without a fixing and a fixing on a day the calendar
     # closes, the library's words; the fixings left out, the seam's.
     "=LEFT(CT7,15)"               = "market_history:"
     "=INDEX(util_ReadHandle(CT7),1,5)" = "fixing_price"
@@ -223,10 +223,29 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(CT7),36,5)" = "unfixed"
     "=ROWS(util_ReadHandle(CT7))"      = "36"
     "=COLUMNS(util_ReadHandle(CT7))"   = "5"
-    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
-    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
-    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
-    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: futures_fixings is missing, expected futures fixings handle"
+    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
+    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-25, expected a fixing for every fixed day in calendar"
+    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-25 is a closed day in calendar, expected no fixing"
+    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: fixings is missing, expected a handle"
+    # The market history over the other two calendars: the Gas Daily history in DU2 read back,
+    # every flow day through the valuation day priced and the next unfixed, and the IFERC history
+    # in DW4, one row per month, the two published months priced in the calendar's order whatever
+    # order the indices came in and December unfixed; a print for the day after the valuation
+    # day, IFERC fixings with a Gas Daily calendar and a history where the fixings should be, the
+    # library's words.
+    "=LEFT(DU2,15)"               = "market_history:"
+    "=ROWS(util_ReadHandle(DU2))"      = "93"
+    "=INDEX(util_ReadHandle(DU2),3,5)" = "2.91"
+    "=INDEX(util_ReadHandle(DU2),13,5)" = "3"
+    "=INDEX(util_ReadHandle(DU2),14,5)" = "unfixed"
+    "=LEFT(DW4,15)"               = "market_history:"
+    "=ROWS(util_ReadHandle(DW4))"      = "5"
+    "=INDEX(util_ReadHandle(DW4),3,5)" = "1.85"
+    "=INDEX(util_ReadHandle(DW4),4,5)" = "2.1"
+    "=INDEX(util_ReadHandle(DW4),5,5)" = "unfixed"
+    "=_CreateMarketHistory(DW6,DU1)" = "#ERROR _CreateMarketHistory: ValueError: fixings flow_date 2026-09-11 is after valuation date 2026-09-10, expected flow days on or before the valuation date"
+    "=_CreateMarketHistory(AR6,DW3)" = "#ERROR _CreateMarketHistory: ValueError: fixings is IFERC fixings, expected Gas Daily fixings with a Gas Daily calendar"
+    "=_CreateMarketHistory(CT5,CT7)" = "#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC or Gas Daily fixings"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -530,6 +549,35 @@ $cells = [ordered]@{
     "DP5" = "4-Sep-2026"; "DP6" = "x"
     "DR1" = "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)"
     "DR2" = "=_CreateGasDailyFixings(DM2,DN2)"
+    # The market history over the other two calendars: eleven flow days of Henry Hub, 1 to 11
+    # September 2026, and the midpoint printed for each, so that the Gas Daily calendar in AR6,
+    # valued on the 11th, has a print on every fixed day; a valuation date of 15-Nov-2026, the
+    # IFERC calendar over DE1 valued on it, October and November published and December not, and
+    # the two months' indices, November's first; and a Gas Daily calendar valued on the 10th, for
+    # the print of the 11th to be refused.
+    "DS2" = "1-Sep-2026"; "DT2" = "2.91"
+    "DS3" = "2-Sep-2026"; "DT3" = "2.92"
+    "DS4" = "3-Sep-2026"; "DT4" = "2.93"
+    "DS5" = "4-Sep-2026"; "DT5" = "2.93"
+    "DS6" = "5-Sep-2026"; "DT6" = "2.875"
+    "DS7" = "6-Sep-2026"; "DT7" = "2.875"
+    "DS8" = "7-Sep-2026"; "DT8" = "2.875"
+    "DS9" = "8-Sep-2026"; "DT9" = "2.875"
+    "DS10" = "9-Sep-2026"; "DT10" = "2.9"
+    "DS11" = "10-Sep-2026"; "DT11" = "2.95"
+    "DS12" = "11-Sep-2026"; "DT12" = "3"
+    "DU1" = "=_CreateGasDailyFixings(DS2:DS12,DT2:DT12)"
+    "DU2" = "=_CreateMarketHistory(AR6,DU1)"
+    "DV2" = "15-Nov-2026"
+    "DW1" = "=_CreateValuationDate(DV2,0.5)"
+    "DW2" = "=_CreateCalendar(DW1,DE1)"
+    "DX2" = "X26"; "DY2" = "2.1"
+    "DX3" = "V26"; "DY3" = "1.85"
+    "DW3" = "=_CreateIfercFixings(DX2:DX3,DY2:DY3)"
+    "DW4" = "=_CreateMarketHistory(DW2,DW3)"
+    "DV5" = "10-Sep-2026"
+    "DW5" = "=_CreateValuationDate(DV5,0.5)"
+    "DW6" = "=_CreateCalendar(DW5,DK1)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

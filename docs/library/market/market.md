@@ -2,7 +2,7 @@
 
 Built in #86.
 
-The market of one index: its history, the calendar bound to the settle fixed on each of its past business days, together with the current futures prices, one quote per contract from the contract prompt on the valuation day through the schedule's last, so that every business day of the calendar has a price, the fixing where the day has fixed and the prompt contract's quote where it has not, and every other day is closed. It is what the pricing will take: the history prepared once, and combined with the prices as often as they move. Creating one is the hot operation, so it keeps the two objects as they are and finds one number, the schedule row of the valuation day's prompt contract; the daily view is made only when the handle is read. The code is `src/goosedove/market/market.py`, the record and its builder, and `src/goosedove/excel/market.py`, the worksheet function.
+The market of one index: its futures history, the calendar bound to the settle fixed on each of its past business days, together with the current futures prices, one quote per contract from the contract prompt on the valuation day through the schedule's last, so that every business day of the calendar has a price, the fixing where the day has fixed and the prompt contract's quote where it has not, and every other day is closed. It is what the pricing will take: the history prepared once, and combined with the prices as often as they move. Creating one is the hot operation, so it keeps the two objects as they are and finds one number, the schedule row of the valuation day's prompt contract; the daily view is made only when the handle is read. The code is `src/goosedove/market/market.py`, the record and its builder, and `src/goosedove/excel/market.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -46,10 +46,11 @@ Quoted from the declaration in `src/goosedove/excel/market.py`, which `tests/uni
 
 ## The library checks
 
-Two rules, in this order, the first failure being the message; they are the market's, not its inputs', which were checked when they were made and are not checked again.
+Three rules, in this order, the first failure being the message; they are the market's, not its inputs', which were checked when they were made and are not checked again.
 
 | Rule | Message |
 |---|---|
+| the history is over a futures calendar, since #105, when the history took the other two; what a Gas Daily or an IFERC market quotes for its periods to come is the market's next ticket | `market_history is over a Gas Daily calendar, expected a futures calendar` |
 | the valuation date lies within the calendar's days, the first and the last included; a calendar that starts after it or ends before it is refused, never extended, and no earlier prompt contract is guessed | `market_history valuation date is 2026-05-19, expected a date from 2026-05-20 through 2026-07-21` |
 | the vector holds exactly one price per contract from the valuation day's prompt through the schedule's last | `price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'` |
 
@@ -101,8 +102,9 @@ The examples and the property below are `tests/unit/test_market.py`; the seam's 
 | a failed construction publishes no object and no handle; repeated calls publish fresh handles and the earlier ones stand; a dead market handle cannot be read | example, with handles |
 | the spill of a one-day market: the quote a number on the open day, `closed` as text when the day is a holiday, the quote still required | example |
 | for any history and the quotes it requires: every row of the calendar's spill stands, and the fifth cell is the fixing, the prompt contract's quote or `closed`, with no `unfixed` day | property |
+| a history over a Gas Daily calendar and one over an IFERC calendar, each refused naming the kind, in the library and through the seam | example |
 | the creator's handle read back in a real workbook, 34 days over a two-contract schedule with one quote, a fixing, `closed` and the quote read, and the three refusals | Excel smoke |
 
 ## Not here
 
-A monthly market, pricing and risk, and the settle of a period: the work built on this. A feed subscription, the freshness of a quote, and a quote for the days already fixed: the vector is a snapshot as [price-vector.md](../market-data/price-vector.md) says, and a fixing stands. Whether the vector is this index's, in this order: nothing in it says so, and the sheet keeps the two together. A layout handle, a cache, the release of a handle, float32 storage and a typed transport for the prices: none of them here. Reading a settle by date or the average over a period: the pricing's, along this market. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any market as the calendar's columns and the price.
+A Gas Daily or an IFERC market, what it quotes for the periods to come and which month stands first on the valuation day: the market's next ticket, and until then a history over either calendar is refused here, since #105, when the history took them. Pricing and risk, and the settle of a period: the work built on this. A feed subscription, the freshness of a quote, and a quote for the days already fixed: the vector is a snapshot as [price-vector.md](../market-data/price-vector.md) says, and a fixing stands. Whether the vector is this index's, in this order: nothing in it says so, and the sheet keeps the two together. A layout handle, a cache, the release of a handle, float32 storage and a typed transport for the prices: none of them here. Reading a settle by date or the average over a period: the pricing's, along this market. A reader of its own: [util_ReadHandle](../utilities/read-handle.md) spills any market as the calendar's columns and the price.

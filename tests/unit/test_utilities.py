@@ -226,6 +226,59 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
 
 
+# A Gas Daily calendar of one month, September 2026, valued on the 2nd with a print on the 1st
+# and the 2nd, and an IFERC calendar of two months valued on 15 October with October's index: the
+# same five columns, a number on each fixed period and the word unfixed on the rest, no period
+# being closed.
+def test_the_other_two_histories_spill_the_same_five_columns() -> None:
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    gas_daily = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), month, MISSING]
+    )
+    prints = bridge.call(
+        "_CreateGasDailyFixings",
+        [Cells.from_rows([[46266.0], [46267.0]]), Cells.from_rows([[2.91], [2.92]])],
+    )
+    kinds, slots, joined = read(bridge.call("_CreateMarketHistory", [gas_daily, prints]))
+    shown = rows((kinds, slots, joined))
+    assert len(shown) == 32
+    assert shown[:5] == [
+        ["date", "contract", "is_priced", "is_fixed", "fixing_price"],
+        ["datetime64[D]", "str", "bool", "bool", "float64"],
+        [46266.0, "U26", 1.0, 1.0, 2.91],
+        [46267.0, "U26", 1.0, 1.0, 2.92],
+        [46268.0, "U26", 1.0, 0.0, "unfixed"],
+    ]
+    assert {row[4] for row in shown[4:]} == {"unfixed"}
+    assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, NUMBER_CODE]
+    assert kinds[4].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
+    months = bridge.call(
+        "_CreateIfercSchedule",
+        [
+            Cells.from_rows([["V26"], ["X26"]]),
+            Cells.from_rows([[46295.0], [46325.0]]),
+            Cells.from_rows([[46296.0], [46328.0]]),
+        ],
+    )
+    iferc = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), months, MISSING]
+    )
+    indices = bridge.call(
+        "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]])]
+    )
+    kinds, slots, joined = read(bridge.call("_CreateMarketHistory", [iferc, indices]))
+    assert rows((kinds, slots, joined)) == [
+        ["date", "contract", "is_priced", "is_fixed", "fixing_price"],
+        ["datetime64[D]", "str", "bool", "bool", "float64"],
+        [46296.0, "V26", 1.0, 1.0, 1.85],
+        [46328.0, "X26", 1.0, 0.0, "unfixed"],
+    ]
+    assert kinds[2:, 4].tolist() == [NUMBER_CODE, TEXT_CODE]
+
+
 # Serials for 4 to 7 September 2026, a Friday through Labor Day Monday, the three rows after
 # the Friday carrying its one print.
 def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> None:
