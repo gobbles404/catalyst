@@ -1,6 +1,7 @@
-"""The worksheet functions of the market data: the fixings of one index, daily or monthly, each
-series created once, and its futures prices, a column snapped as often as the sheet recalculates,
-each reached by handle. docs/library/market-data/ holds a page per function.
+"""The worksheet functions of the market data: the fixings of one index, a settle on each business
+day or Inside FERC's index for each contract month, each series created once, and its futures
+prices, a column snapped as often as the sheet recalculates, each reached by handle.
+docs/library/market-data/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -14,18 +15,18 @@ from goosedove.excel.bridge import (
     Handle,
     NumberColumn,
     Table,
+    TextColumn,
     TextRow,
     excel_function,
 )
-from goosedove.index_definitions.expiry_schedule import ExpirySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
-from goosedove.market_data.monthly_fixings import MonthlyFixings, monthly_fixings
+from goosedove.market_data.iferc_fixings import IfercFixings, iferc_fixings
 from goosedove.market_data.price_vector import PriceVector, price_vector
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateDailyFixings", "_CreateMonthlyFixings", "_CreatePriceVector"]
+__all__ = ["_CreateDailyFixings", "_CreateIfercFixings", "_CreatePriceVector"]
 
 
 class DailyFixingsTable(Table):
@@ -60,25 +61,20 @@ def _CreateDailyFixings(
 
 
 @excel_function
-def _CreateMonthlyFixings(
-    publication_date: Annotated[
-        DateColumn,
-        "The column of days the index's monthly settles were published, such as A2:A5 holding "
-        "5-Jan-2026 to 1-Apr-2026, one per fixing.",
+def _CreateIfercFixings(
+    contract_code: Annotated[
+        TextColumn,
+        "The column of contract codes, such as A2:A5 holding F26 to J26, one per month published.",
     ],
     price: Annotated[
-        NumberColumn, "The column of prices beside the dates, such as B2:B5, one per date."
+        NumberColumn,
+        "The column of published indices beside the codes, such as B2:B5, one per code.",
     ],
-    expiry_schedule: Annotated[
-        Handle[ExpirySchedule],
-        "The index's expiry-schedule handle, built with its publication dates: the cell showing "
-        "_CreateExpirySchedule's result, such as D6, or a name for it.",
-    ],
-) -> Handle[MonthlyFixings]:
-    """Creates the monthly fixings of one index from the days its settles were published and
-    their prices, checked against the publication dates of its expiry schedule, and shows its
-    handle, the text other formulas take as the fixings."""
-    return monthly_fixings(publication_date, price, expiry_schedule.publication_date)
+) -> Handle[IfercFixings]:
+    """Creates the IFERC fixings of one index from the contract months whose index has been
+    published and the index printed for each, and shows its handle, the text other formulas
+    take as the fixings."""
+    return iferc_fixings(contract_code, price)
 
 
 @excel_function

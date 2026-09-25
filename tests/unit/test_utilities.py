@@ -33,7 +33,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.daily_fixings import DailyFixings
-from goosedove.market_data.monthly_fixings import MonthlyFixings
+from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
 
 # Serials for 11, 12 and 13 September 2026.
@@ -255,27 +255,22 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
 
 
-# Serials for 5 January and 2 February 2026, the days two monthly indices were published, checked
-# against a schedule of those two contract months.
-def test_monthly_fixings_spill_publication_dates_as_serials_and_prices_exactly() -> None:
-    publications = Cells.from_rows([[46027.0], [46055.0]])
-    prices = Cells.from_rows([[1.85], [2.10]])
-    schedule = bridge.call(
-        "_CreateExpirySchedule",
-        [
-            Cells.from_rows([["F26"], ["G26"]]),
-            Cells.from_rows([[46022.0], [46052.0]]),
-            MISSING,
-            publications,
-        ],
-    )
-    handle = bridge.call("_CreateMonthlyFixings", [publications, prices, schedule])
-    assert rows(read(handle)) == [
-        ["publication_date", "price"],
-        ["datetime64[D]", "float64"],
-        [46027.0, 1.85],
-        [46055.0, 2.10],
+# Two months of Waha IFERC, the codes as typed and an index beside each, a zero and a negative
+# among four kept in their places.
+def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
+    codes = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
+    prices = Cells.from_rows([[1.85], [0.0], [-0.5], [1.60]])
+    kinds, slots, joined = read(bridge.call("_CreateIfercFixings", [codes, prices]))
+    assert rows((kinds, slots, joined)) == [
+        ["contract_code", "price"],
+        ["str", "float64"],
+        ["F26", 1.85],
+        ["G26", 0.0],
+        ["H26", -0.5],
+        ["J26", 1.60],
     ]
+    assert kinds.shape == (6, 2)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 4
 
 
 # Serials for 19 and 20 May 2026: a market over a one-day calendar valued on its day, with a
@@ -464,7 +459,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IndexConventions,
         ContractSpecifications,
         DailyFixings,
-        MonthlyFixings,
+        IfercFixings,
         MarketHistory,
         PriceVector,
         Market,

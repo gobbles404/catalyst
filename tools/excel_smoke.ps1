@@ -154,22 +154,23 @@ $formulas = [ordered]@{
     "=_CreateDailyFixings(L1:M1,BI2:BJ5,AM1)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
     "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle"
     "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,BJ2)" = "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle"
-    # The monthly fixings: a creator over a column of publication days, a column of prices and
-    # the schedule in AI3, read back through util_ReadHandle; a day the schedule does not publish
-    # on, the days backwards, a publication skipped and a schedule without publication dates, the
-    # library's words; codes where prices are expected and the schedule left out, the seam's.
-    "=LEFT(BQ1,16)"               = "monthly_fixings:"
-    "=INDEX(util_ReadHandle(BQ1),1,1)" = "publication_date"
-    "=INDEX(util_ReadHandle(BQ1),2,1)" = "datetime64[D]"
-    "=INDEX(util_ReadHandle(BQ1),3,1)" = "46162"
-    "=INDEX(util_ReadHandle(BQ1),6,2)" = "3.19"
+    # The IFERC fixings: a creator over a column of contract codes and a column of indices, read
+    # back through util_ReadHandle; a price column one row short and a code given twice, the
+    # library's words; a blank among the prices, a number among the codes, the prices left out
+    # and a row where a column is expected, the seam's.
+    "=LEFT(BQ1,14)"               = "iferc_fixings:"
+    "=INDEX(util_ReadHandle(BQ1),1,1)" = "contract_code"
+    "=INDEX(util_ReadHandle(BQ1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(BQ1),3,1)" = "F26"
+    "=INDEX(util_ReadHandle(BQ1),6,2)" = "1.6"
     "=ROWS(util_ReadHandle(BQ1))"      = "6"
-    "=_CreateMonthlyFixings(BR2:BR3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-06-01, expected one of the schedule's publication dates"
-    "=_CreateMonthlyFixings(BS2:BS3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-05-20, expected a date after row 1's 2026-06-23"
-    "=_CreateMonthlyFixings(BT2:BT3,BP2:BP3,AI3)" = "#ERROR _CreateMonthlyFixings: ValueError: publication_date row 2 is 2026-07-22, expected 2026-06-23, the schedule's publication after row 1's 2026-05-20"
-    "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI1)" = "#ERROR _CreateMonthlyFixings: ValueError: expiry_schedule has no publication dates, expected a schedule with one per contract"
-    "=_CreateMonthlyFixings(BO2:BO5,AE2:AE5,AI3)" = "#ERROR _CreateMonthlyFixings: price cell (1, 1) is text 'm26', expected number"
-    "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5)" = "#ERROR _CreateMonthlyFixings: expiry_schedule is missing, expected expiry schedule handle"
+    "=COLUMNS(util_ReadHandle(BQ1))"   = "2"
+    "=_CreateIfercFixings(BO2:BO5,BP2:BP4)" = "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, one per contract_code"
+    "=_CreateIfercFixings(BR2:BR3,BP2:BP3)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1"
+    "=_CreateIfercFixings(BO2:BO3,BT2:BT3)" = "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
+    "=_CreateIfercFixings(BS2:BS3,BP2:BP3)" = "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreateIfercFixings(BO2:BO5)" = "#ERROR _CreateIfercFixings: price is missing, expected column of numbers"
+    "=_CreateIfercFixings(BO2:BO5,BP2:BQ2)" = "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers"
     # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
     # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
     # with the contract prompt on it, whether the market is open and whether the day is past; a
@@ -396,18 +397,17 @@ $cells = [ordered]@{
     "BL6" = "2-May-2026"; "BM6" = "100"
     "BL7" = "19-Jan-2026"; "BM7" = "100"
     "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,AM1)"
-    # Monthly fixings: the first four publication days of the schedule in AI3, 20 May to
-    # 21 August 2026, and an illustrative price beside each; a pair with a day the schedule does
-    # not publish on; a pair with the days backwards; a pair with a publication skipped; and one
-    # creator cell, which takes the schedule in AI3.
-    "BO2" = "20-May-2026"; "BP2" = "2.86"
-    "BO3" = "23-Jun-2026"; "BP3" = "3.01"
-    "BO4" = "22-Jul-2026"; "BP4" = "3.24"
-    "BO5" = "21-Aug-2026"; "BP5" = "3.19"
-    "BR2" = "20-May-2026"; "BR3" = "1-Jun-2026"
-    "BS2" = "23-Jun-2026"; "BS3" = "20-May-2026"
-    "BT2" = "20-May-2026"; "BT3" = "22-Jul-2026"
-    "BQ1" = "=_CreateMonthlyFixings(BO2:BO5,BP2:BP5,AI3)"
+    # IFERC fixings: four contract months of Waha, January to April 2026, and an illustrative
+    # index beside each; a pair of codes with one given twice; a code over a number; the first
+    # price over a blank; and one creator cell over the four months.
+    "BO2" = "F26"; "BP2" = "1.85"
+    "BO3" = "G26"; "BP3" = "2.1"
+    "BO4" = "H26"; "BP4" = "1.95"
+    "BO5" = "J26"; "BP5" = "1.6"
+    "BR2" = "F26"; "BR3" = "F26"
+    "BS2" = "F26"; "BS3" = "46023"
+    "BT2" = "1.85"
+    "BQ1" = "=_CreateIfercFixings(BO2:BO5,BP2:BP5)"
     # The calendar: one creator cell over the valuation date, the six-contract schedule and the
     # holiday calendar the sheet already holds; then a schedule of one contract, one whose code
     # is given twice, one whose expiries run backwards and one whose span no sheet could show, for
