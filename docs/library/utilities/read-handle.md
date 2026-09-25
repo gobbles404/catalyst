@@ -65,7 +65,7 @@ What each kind shows:
 | `gas_daily_fixings` | `flow_date`, `price` | `datetime64[D]`, `float64` | one per calendar day, weekends and holidays included |
 | `price_vector` | `price` | `float64` | one per price, in the column's order |
 | `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the fixing on a past business day, the prompt contract's quote on a business day from the valuation day on, and the word `closed` on a weekend or a holiday |
-| `calendar` | `date`, `prompt_contract`, `is_business_day`, `is_past` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's |
+| `calendar` | `date`, `contract`, `is_priced`, `is_fixed` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's on a futures calendar, one per flow day on a Gas Daily calendar, one per contract month on an IFERC calendar |
 | `market_history` | the calendar's four, then `fixing_price` | the calendar's four, then `float64` | one per calendar day, every row the calendar has; the fifth cell the settle, a number, on a past business day, the word `closed` on a weekend or a holiday and `unfixed` on the valuation day and the days after it |
 
 `=util_ReadHandle(B2)` on `=_CreateValuationDate(A2, 0.5)`:

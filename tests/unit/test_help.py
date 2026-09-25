@@ -314,9 +314,9 @@ def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden
     assert description == (
-        "Creates the calendar of one index, every day after its first contract's expiry to its "
-        "last, with the contract prompt on each, whether the market is open and whether the day "
-        "is past, and shows its handle, the text other formulas take as the calendar."
+        "Creates the calendar of one index from its schedule, one row per day it prices, or per "
+        "month for an index published monthly, each with its contract and whether it has fixed, "
+        "and shows its handle, the text other formulas take as the calendar."
     )
     assert arguments == [
         (
@@ -325,14 +325,16 @@ def test_the_calendar_creator_explains_itself() -> None:
             "B2, or a name for it.",
         ),
         (
-            "futures_schedule",
-            "The index's futures-schedule handle: the cell showing _CreateFuturesSchedule's "
-            "result, such as B8, or a name for it, two contracts or more.",
+            "schedule",
+            "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its "
+            "creator's result, such as B8, or a name for it; a futures schedule needs two "
+            "contracts or more.",
         ),
         (
-            "holiday_calendar",
-            "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
-            "result, such as B12, or a name for it.",
+            "[holiday_calendar]",
+            "The market's holiday-calendar handle with a futures schedule: the cell showing "
+            "_CreateHolidayCalendar's result, such as B12, or a name for it; left out for an "
+            "IFERC or Gas Daily schedule.",
         ),
     ]
 

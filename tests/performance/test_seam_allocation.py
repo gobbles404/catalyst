@@ -371,6 +371,44 @@ def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
 
 
+def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last day of that many calendar months from January 2026, laid
+    end to end, as the sheet sends them."""
+    firsts = np.arange("2026-01", "2126-01", dtype="datetime64[M]")[: months + 1]
+    starts = firsts[:-1].astype("datetime64[D]")
+    ends = firsts[1:].astype("datetime64[D]") - np.timedelta64(1, "D")
+    # Days since 1970 to the sheet's serials: 1 January 1970 is serial 25569.
+    first = starts.astype(np.int64) + 25569
+    last = ends.astype(np.int64) + 25569
+    return (
+        Cells.from_rows([[f"c{i}"] for i in range(months)]),
+        Cells.from_rows([[float(first[i])] for i in range(months)]),
+        Cells.from_rows([[float(last[i])] for i in range(months)]),
+    )
+
+
+# A Gas Daily calendar keeps the futures calendar's four columns, 18 bytes per day, and pays the
+# arange, the searchsorted and the flags' temporaries the same way, less a business-day look:
+# measured 7,969 bytes at 365 days on 2026-09-25, about 22 bytes per day, and 67,351 at 3,653,
+# 18 bytes per day, which the futures calendar's 25 per day covers. An IFERC calendar keeps one
+# row per month, its copy of the publication days and its rows, and pays one look, the flags
+# and the set its codes are checked through, most of the peak at a small count: measured
+# 10,504 bytes at 120 months and 41,224 at 1,200, 34 bytes per month, which 80 per month covers
+# with twice the slack, as the IFERC fixings' set does.
+def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    gas_daily = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+    assert (
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily, MISSING))
+        <= 25 * 365 + 2 * SLACK
+    )
+    iferc = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    assert (
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc, MISSING))
+        <= 80 * 120 + 2 * SLACK
+    )
+
+
 def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day

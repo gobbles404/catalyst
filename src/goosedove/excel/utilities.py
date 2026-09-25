@@ -107,16 +107,16 @@ def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
 def calendar_table(obj: Calendar) -> MixedArray:
     # The dates and the flags were made when the calendar was; the prompt contract's code is
     # read from the schedule the calendar keeps, one take over the rows, and nothing is rebuilt.
-    codes = np.array(obj.futures_schedule.codes, dtype=object)[obj.prompt]
+    codes = np.array(obj.schedule.codes, dtype=object)[obj.contract]
     return MixedArray.table(
         [
-            ("date", "prompt_contract", "is_business_day", "is_past"),
+            ("date", "contract", "is_priced", "is_fixed"),
             ("datetime64[D]", "str", "bool", "bool"),
         ],
         obj.dates,
         tuple(codes),
-        obj.is_business_day,
-        obj.is_past,
+        obj.is_priced,
+        obj.is_fixed,
     )
 
 
@@ -163,7 +163,7 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
     calendar = obj.calendar
     words = np.empty(calendar.dates.size, dtype=object)
     words[:] = "closed"
-    words[calendar.is_business_day] = "unfixed"
+    words[calendar.is_priced] = "unfixed"
     return _priced_column(
         calendar_table(calendar), "fixing_price", words, (obj.fixed_rows, obj.fixing_prices)
     )
@@ -177,8 +177,8 @@ def market_table(obj: Market) -> MixedArray:
     # may precede the first contract quoted and would index before the vector.
     history = obj.market_history
     calendar = history.calendar
-    live = np.flatnonzero(calendar.is_business_day & ~calendar.is_past)
-    quotes = obj.price_vector.prices[calendar.prompt[live] - obj.first_contract]
+    live = np.flatnonzero(calendar.is_priced & ~calendar.is_fixed)
+    quotes = obj.price_vector.prices[calendar.contract[live] - obj.first_contract]
     return _priced_column(
         calendar_table(calendar),
         "price",

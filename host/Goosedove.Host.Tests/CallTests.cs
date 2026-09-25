@@ -366,7 +366,7 @@ namespace Goosedove.Host.Tests
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(65, spill.GetLength(0));
             Assert.Equal(4, spill.GetLength(1));
-            Assert.Equal("prompt_contract", spill[0, 1]);
+            Assert.Equal("contract", spill[0, 1]);
             Assert.Equal("bool", spill[1, 3]);
             Assert.Equal(46162.0, spill[2, 0]);
             Assert.Equal("n26", spill[2, 1]);
@@ -378,7 +378,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("q26", spill[36, 1]);
             Assert.Equal("q26", spill[64, 1]);
             var one = (string)Seam.Call("_CreateFuturesSchedule", Column("m26"), Column(46161.0), ExcelMissing.Value);
-            Assert.Equal("#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, expected at least 2", Seam.Call("_CreateCalendar", valuation, one, holidays));
+            Assert.Equal("#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2", Seam.Call("_CreateCalendar", valuation, one, holidays));
             var twice = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "m26"), Column(46161.0, 46195.0), ExcelMissing.Value);
             Assert.Equal("#ERROR _CreateCalendar: ValueError: contract_code row 2 is 'm26', already given at row 1", Seam.Call("_CreateCalendar", valuation, twice, holidays));
             var backwards = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46195.0, 46161.0), ExcelMissing.Value);
@@ -386,6 +386,22 @@ namespace Goosedove.Host.Tests
             var tooLong = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 1094736.0), ExcelMissing.Value);
             Assert.Equal("#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19", Seam.Call("_CreateCalendar", valuation, tooLong, holidays));
             Assert.Equal("#ERROR _CreateCalendar: holiday_calendar is calendar handle '" + handle + "', expected holiday calendar handle", Seam.Call("_CreateCalendar", valuation, schedule, handle));
+            var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
+            var flowDays = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46290.0, 0.5), gasDaily, ExcelMissing.Value));
+            Assert.Equal(93, flowDays.GetLength(0));
+            Assert.Equal("U26", flowDays[2, 1]);
+            Assert.Equal(true, flowDays[26, 3]);
+            Assert.Equal(false, flowDays[27, 3]);
+            Assert.Equal("X26", flowDays[92, 1]);
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var months = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), iferc, ExcelMissing.Value));
+            Assert.Equal(5, months.GetLength(0));
+            Assert.Equal(46328.0, months[3, 0]);
+            Assert.Equal(true, months[3, 3]);
+            Assert.Equal(false, months[4, 3]);
+            Assert.Equal("#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule", Seam.Call("_CreateCalendar", valuation, gasDaily, holidays));
+            Assert.Equal("#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule", Seam.Call("_CreateCalendar", valuation, schedule, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule", Seam.Call("_CreateCalendar", valuation, holidays, holidays));
         }
 
         // The market history: the calendar of the fact above valued a day later, on 26 May 2026

@@ -176,7 +176,7 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
     handle = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
     kinds, slots, joined = read(handle)
     assert rows((kinds, slots, joined)) == [
-        ["date", "prompt_contract", "is_business_day", "is_past"],
+        ["date", "contract", "is_priced", "is_fixed"],
         ["datetime64[D]", "str", "bool", "bool"],
         [46162.0, "n26", 1.0, 1.0],
     ]
@@ -206,7 +206,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
     )
     kinds, slots, joined = read(fixed)
     assert rows((kinds, slots, joined)) == [
-        ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"],
+        ["date", "contract", "is_priced", "is_fixed", "fixing_price"],
         ["datetime64[D]", "str", "bool", "bool", "float64"],
         [46162.0, "n26", 1.0, 1.0, 70.85],
     ]
@@ -283,7 +283,7 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         history = bridge.call("_CreateMarketHistory", [calendar, fixings])
         kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
         assert rows((kinds, slots, joined)) == [
-            ["date", "prompt_contract", "is_business_day", "is_past", "price"],
+            ["date", "contract", "is_priced", "is_fixed", "price"],
             ["datetime64[D]", "str", "bool", "bool", "float64"],
             [46162.0, "n26", flag, 0.0, cell],
         ]
@@ -463,8 +463,8 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
 ) -> None:
     history = any_history(data)
     calendar = history.calendar
-    first = int(calendar.prompt[calendar.dates == calendar.valuation_date.as_of][0])
-    quotes = a_vector(*(100.0 + i for i in range(len(calendar.futures_schedule.codes) - first)))
+    first = int(calendar.contract[calendar.dates == calendar.valuation_date.as_of][0])
+    quotes = a_vector(*(100.0 + i for i in range(len(calendar.schedule.codes) - first)))
     made = market(history, quotes)
     table = shown(made)
     body = rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))[2:]
@@ -474,7 +474,7 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     )[2:]
     fixed = dict(zip(history.fixed_rows.tolist(), history.fixing_prices.tolist(), strict=True))
     for row, (shown_row, open_, past, prompt) in enumerate(
-        zip(body, calendar.is_business_day, calendar.is_past, calendar.prompt, strict=True)
+        zip(body, calendar.is_priced, calendar.is_fixed, calendar.contract, strict=True)
     ):
         if not open_:
             assert shown_row[4] == "closed"

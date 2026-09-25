@@ -1,4 +1,5 @@
-"""The calendar: three rules on the schedule, and the four columns made once from three objects."""
+"""The calendar: the schedule's kind choosing which is made, each kind's rules, and the four
+columns made once."""
 
 import numpy as np
 import pytest
@@ -6,10 +7,12 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar, calendar
+from goosedove.calendar.calendar import Calendar, Kind, calendar
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
+from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -26,7 +29,7 @@ def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
 
 
 def codes_of(made: Calendar) -> list[str]:
-    return [made.futures_schedule.codes[row] for row in made.prompt.tolist()]
+    return [made.schedule.codes[row] for row in made.contract.tolist()]
 
 
 # The page's sample: three contracts of one index, the valuation date 25 May 2026 at midday,
@@ -41,7 +44,7 @@ ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 def a_calendar(
     valuation: ValuationDate = MAY_25,
     schedule: FuturesSchedule = SCHEDULE,
-    holidays: HolidayCalendar = CLOSED_MAY_25,
+    holidays: HolidayCalendar | None = CLOSED_MAY_25,
 ) -> Calendar:
     return calendar(valuation, schedule, holidays)
 
@@ -56,10 +59,10 @@ def test_the_sample_runs_from_the_day_after_the_first_expiry_to_the_last() -> No
     assert made.dates[-1] == day("2026-07-21")
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
     assert made.dates.dtype == np.dtype("datetime64[D]")
-    assert made.prompt.dtype == np.dtype(np.intp)
-    assert made.is_business_day.dtype == np.dtype(bool)
-    assert made.is_past.dtype == np.dtype(bool)
-    assert made.prompt.size == made.is_business_day.size == made.is_past.size == 63
+    assert made.contract.dtype == np.dtype(np.intp)
+    assert made.is_priced.dtype == np.dtype(bool)
+    assert made.is_fixed.dtype == np.dtype(bool)
+    assert made.contract.size == made.is_priced.size == made.is_fixed.size == 63
 
 
 def test_the_rows_the_page_shows() -> None:
@@ -67,7 +70,7 @@ def test_the_rows_the_page_shows() -> None:
     shown = {
         str(date): (code, bool(open_), bool(past))
         for date, code, open_, past in zip(
-            made.dates, codes_of(made), made.is_business_day, made.is_past, strict=True
+            made.dates, codes_of(made), made.is_priced, made.is_fixed, strict=True
         )
     }
     assert shown["2026-05-20"] == ("n26", True, True)
@@ -83,9 +86,9 @@ def test_the_rows_the_page_shows() -> None:
 
 def test_the_boundary_contract_is_never_prompt() -> None:
     made = a_calendar()
-    assert 0 not in made.prompt
+    assert 0 not in made.contract
     assert "m26" not in codes_of(made)
-    assert made.prompt.min() == 1
+    assert made.contract.min() == 1
 
 
 # Every interior expiry keeps its contract, and the next calendar day switches to the next one;
@@ -103,15 +106,15 @@ def test_prompt_transitions_fall_the_day_after_each_expiry() -> None:
     assert shown["2026-07-21"] == "q26"
     assert shown["2026-07-22"] == "u26"
     assert shown["2026-08-20"] == "u26"
-    assert np.bincount(made.prompt, minlength=4).tolist() == [0, 34, 29, 30]
+    assert np.bincount(made.contract, minlength=4).tolist() == [0, 34, 29, 30]
 
 
 def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None:
     made = a_calendar(schedule=a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-20")))
     assert made.dates.tolist() == [day("2026-05-20")]
     assert codes_of(made) == ["n26"]
-    assert made.is_business_day.tolist() == [True]
-    assert made.is_past.tolist() == [True]
+    assert made.is_priced.tolist() == [True]
+    assert made.is_fixed.tolist() == [True]
 
 
 # --- what is rejected, in the order the rules run -----------------------------
@@ -120,10 +123,10 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
 @pytest.mark.parametrize(
     ("schedule", "message"),
     [
-        (a_schedule(("m26", "2026-05-19")), "futures_schedule has 1 contract, expected at least 2"),
+        (a_schedule(("m26", "2026-05-19")), "schedule has 1 contract, expected at least 2"),
         (
             futures_schedule((), dates(), None),
-            "futures_schedule has 0 contracts, expected at least 2",
+            "schedule has 0 contracts, expected at least 2",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("m26", "2026-06-22")),
@@ -240,7 +243,7 @@ def test_every_calendar_day_between_the_expiries_is_a_row(
 def flags(made: Calendar) -> dict[str, tuple[bool, bool]]:
     return {
         str(date): (bool(open_), bool(past))
-        for date, open_, past in zip(made.dates, made.is_business_day, made.is_past, strict=True)
+        for date, open_, past in zip(made.dates, made.is_priced, made.is_fixed, strict=True)
     }
 
 
@@ -295,19 +298,19 @@ def test_duplicate_unordered_and_out_of_range_holidays_change_nothing() -> None:
             )
         )
     )
-    assert np.array_equal(plain.is_business_day, messy.is_business_day)
+    assert np.array_equal(plain.is_priced, messy.is_priced)
     assert np.array_equal(plain.dates, messy.dates)
-    assert np.array_equal(plain.prompt, messy.prompt)
-    assert np.array_equal(plain.is_past, messy.is_past)
+    assert np.array_equal(plain.contract, messy.contract)
+    assert np.array_equal(plain.is_fixed, messy.is_fixed)
 
 
 def test_a_holiday_on_an_expiry_changes_the_business_day_flag_alone() -> None:
     plain = a_calendar(holidays=ELSEWHERE)
     closed = a_calendar(holidays=holiday_calendar(dates("2026-06-22")))
     assert np.array_equal(plain.dates, closed.dates)
-    assert np.array_equal(plain.prompt, closed.prompt)
-    assert np.array_equal(plain.is_past, closed.is_past)
-    changed = plain.is_business_day != closed.is_business_day
+    assert np.array_equal(plain.contract, closed.contract)
+    assert np.array_equal(plain.is_fixed, closed.is_fixed)
+    changed = plain.is_priced != closed.is_priced
     assert plain.dates[changed].tolist() == [day("2026-06-22")]
     assert flags(closed)["2026-06-22"][0] is False
     assert codes_of(closed)[33] == "n26"
@@ -343,16 +346,16 @@ def test_the_days_before_the_valuation_date_are_past_and_the_day_itself_is_not(
     as_of: str, past_days: int
 ) -> None:
     made = a_calendar(valuation=valuation_date(day(as_of), 0.5))
-    assert int(made.is_past.sum()) == past_days
-    assert made.is_past.tolist() == [bool(date < day(as_of)) for date in made.dates]
+    assert int(made.is_fixed.sum()) == past_days
+    assert made.is_fixed.tolist() == [bool(date < day(as_of)) for date in made.dates]
     if past_days:
-        assert made.is_past[:past_days].all() and not made.is_past[past_days:].any()
+        assert made.is_fixed[:past_days].all() and not made.is_fixed[past_days:].any()
 
 
 def test_the_fraction_of_the_valuation_day_changes_nothing() -> None:
     whole = [a_calendar(valuation=valuation_date(day("2026-05-25"), f)) for f in (0.0, 0.5, 1.0)]
     for made in whole[1:]:
-        assert np.array_equal(made.is_past, whole[0].is_past)
+        assert np.array_equal(made.is_fixed, whole[0].is_fixed)
     assert not flags(whole[0])["2026-05-25"][1]
     assert not flags(whole[2])["2026-05-25"][1]
 
@@ -379,9 +382,9 @@ def test_option_expiries_change_nothing() -> None:
     ):
         made = a_calendar(schedule=schedule)
         assert np.array_equal(made.dates, plain.dates)
-        assert np.array_equal(made.prompt, plain.prompt)
-        assert np.array_equal(made.is_business_day, plain.is_business_day)
-        assert np.array_equal(made.is_past, plain.is_past)
+        assert np.array_equal(made.contract, plain.contract)
+        assert np.array_equal(made.is_priced, plain.is_priced)
+        assert np.array_equal(made.is_fixed, plain.is_fixed)
 
 
 # --- the general rule ---------------------------------------------------------
@@ -419,15 +422,16 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
     assert made.dates[0] == expiries[0] + np.timedelta64(1, "D")
     assert made.dates[-1] == expiries[-1]
-    before = expiries[made.prompt - 1]
-    own = expiries[made.prompt]
+    before = expiries[made.contract - 1]
+    own = expiries[made.contract]
     assert np.all((before < made.dates) & (made.dates <= own))
-    assert made.prompt.min() >= 1
+    assert made.contract.min() >= 1
     days_per_contract = np.diff(expiries).astype(np.int64)
     assert (
-        np.bincount(made.prompt, minlength=expiries.size)[1:].tolist() == days_per_contract.tolist()
+        np.bincount(made.contract, minlength=expiries.size)[1:].tolist()
+        == days_per_contract.tolist()
     )
-    assert np.array_equal(made.is_past, made.dates < as_of)
+    assert np.array_equal(made.is_fixed, made.dates < as_of)
 
 
 # --- ownership ----------------------------------------------------------------
@@ -436,14 +440,14 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
 def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only() -> None:
     made = a_calendar()
     assert made.valuation_date is MAY_25
-    assert made.futures_schedule is SCHEDULE
+    assert made.schedule is SCHEDULE
     assert made.holiday_calendar is CLOSED_MAY_25
-    for column in (made.dates, made.prompt, made.is_business_day, made.is_past):
+    for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
         assert not column.flags.writeable
     with pytest.raises(ValueError):
         made.dates[0] = day("2030-01-01")
     with pytest.raises(ValueError):
-        made.is_past[0] = False
+        made.is_fixed[0] = False
 
 
 def test_making_a_calendar_changes_no_source_and_a_second_calendar_leaves_the_first() -> None:
@@ -453,8 +457,311 @@ def test_making_a_calendar_changes_no_source_and_a_second_calendar_leaves_the_fi
     assert np.array_equal(holidays.holiday, listed_before)
     assert np.array_equal(SCHEDULE.future_expiry, dates("2026-05-19", "2026-06-22", "2026-07-21"))
     assert SCHEDULE.codes == ("m26", "n26", "q26")
-    past_before = first.is_past.copy()
+    past_before = first.is_fixed.copy()
     second = a_calendar(valuation=valuation_date(day("2026-07-01"), 0.0), holidays=holidays)
-    assert np.array_equal(first.is_past, past_before)
-    assert second.is_past.sum() > first.is_past.sum()
+    assert np.array_equal(first.is_fixed, past_before)
+    assert second.is_fixed.sum() > first.is_fixed.sum()
     assert first.dates is not second.dates
+
+
+# --- a Gas Daily schedule: every flow day, its month on each ------------------------
+
+
+def a_gas_daily_schedule(*months: tuple[str, str, str]) -> GasDailySchedule:
+    codes = tuple(code for code, _, _ in months)
+    firsts = dates(*(first for _, first, _ in months))
+    lasts = dates(*(last for _, _, last in months))
+    return gas_daily_schedule(codes, firsts, lasts)
+
+
+# The Gas Daily schedule page's sample, three months of one index, valued on 25 September 2026.
+U26 = ("U26", "2026-09-01", "2026-09-30")
+V26 = ("V26", "2026-10-01", "2026-10-31")
+Z26 = ("Z26", "2026-12-01", "2026-12-31")
+F27 = ("F27", "2027-01-01", "2027-01-31")
+GAS_DAILY = a_gas_daily_schedule(
+    U26,
+    V26,
+    ("X26", "2026-11-01", "2026-11-30"),
+)
+SEP_25 = valuation_date(day("2026-09-25"), 0.5)
+
+
+def test_the_gas_daily_sample_runs_from_the_first_months_first_day_to_the_lasts_last() -> None:
+    made = calendar(SEP_25, GAS_DAILY, None)
+    assert made.kind is Kind.GAS_DAILY
+    assert made.dates.size == 91
+    assert made.dates[0] == day("2026-09-01") and made.dates[-1] == day("2026-11-30")
+    assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
+    assert codes_of(made)[:30] == ["U26"] * 30
+    assert codes_of(made)[30:61] == ["V26"] * 31
+    assert codes_of(made)[61:] == ["X26"] * 30
+    assert made.is_priced.all()
+    assert made.is_fixed.tolist() == [bool(date <= day("2026-09-25")) for date in made.dates]
+    assert int(made.is_fixed.sum()) == 25
+    assert made.schedule is GAS_DAILY and made.holiday_calendar is None
+    assert made.valuation_date is SEP_25
+
+
+def test_a_gas_daily_schedule_of_one_month_or_of_one_day_is_a_calendar() -> None:
+    one = calendar(SEP_25, a_gas_daily_schedule(U26), None)
+    assert one.dates.size == 30 and codes_of(one) == ["U26"] * 30
+    day_long = calendar(SEP_25, a_gas_daily_schedule(("U26", "2026-09-01", "2026-09-01")), None)
+    assert day_long.dates.tolist() == [day("2026-09-01")] and codes_of(day_long) == ["U26"]
+
+
+def test_gas_daily_months_across_a_month_end_and_a_year_end_are_a_row_per_day() -> None:
+    made = calendar(
+        SEP_25,
+        a_gas_daily_schedule(Z26, F27),
+        None,
+    )
+    assert made.dates.size == 62
+    assert codes_of(made)[30:32] == ["Z26", "F27"]
+    assert not made.is_fixed.any()
+
+
+def test_a_gas_daily_calendar_prices_every_day_wherever_the_valuation_date_falls() -> None:
+    before = calendar(valuation_date(day("2026-01-01"), 0.5), GAS_DAILY, None)
+    assert before.is_priced.all() and not before.is_fixed.any()
+    after = calendar(valuation_date(day("2027-01-01"), 0.0), GAS_DAILY, None)
+    assert after.is_priced.all() and after.is_fixed.all()
+    on_the_first = calendar(valuation_date(day("2026-09-01"), 0.0), GAS_DAILY, None)
+    assert on_the_first.is_fixed.tolist()[:2] == [True, False]
+
+
+def test_a_holiday_calendar_given_with_a_gas_daily_schedule_is_refused() -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(SEP_25, GAS_DAILY, CLOSED_MAY_25)
+    assert str(failure.value) == (
+        "holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    )
+
+
+@pytest.mark.parametrize(
+    ("schedule", "message"),
+    [
+        (
+            a_gas_daily_schedule(U26, ("U26", "2026-10-01", "2026-10-31")),
+            "contract_code row 2 is 'U26', already given at row 1",
+        ),
+        (
+            a_gas_daily_schedule(U26, ("V26", "2026-10-01", "2026-09-30")),
+            "last_date row 2 is 2026-09-30, expected a date on or after row 2's first_date "
+            "2026-10-01",
+        ),
+        (
+            a_gas_daily_schedule(U26, ("V26", "2026-10-02", "2026-10-31")),
+            "first_date row 2 is 2026-10-02, expected 2026-10-01, "
+            "the day after row 1's last_date 2026-09-30",
+        ),
+        (
+            a_gas_daily_schedule(U26, ("V26", "2026-09-30", "2026-10-31")),
+            "first_date row 2 is 2026-09-30, expected 2026-10-01, "
+            "the day after row 1's last_date 2026-09-30",
+        ),
+        (
+            a_gas_daily_schedule(V26, U26),
+            "first_date row 2 is 2026-09-01, expected 2026-11-01, "
+            "the day after row 1's last_date 2026-10-31",
+        ),
+        (
+            a_gas_daily_schedule(U26, ("V26", "2026-10-01", "4897-07-26")),
+            "last_date row 2 is 4897-07-26, "
+            "expected within 1048574 days of row 1's first_date 2026-09-01",
+        ),
+        (gas_daily_schedule((), dates(), dates()), "schedule has 0 contracts, expected at least 1"),
+    ],
+    ids=[
+        "a code twice",
+        "a month whose last day precedes its first",
+        "a gap of a day between two months",
+        "an overlap of a day",
+        "months out of order",
+        "a span no sheet could show",
+        "no month",
+    ],
+)
+def test_a_gas_daily_schedule_that_cannot_make_a_calendar_says_why(
+    schedule: GasDailySchedule, message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(SEP_25, schedule, None)
+    assert str(failure.value) == message
+
+
+def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made() -> None:
+    made = calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-25")), None)
+    assert made.dates.size == 1_048_575
+    assert codes_of(made)[-1] == "a"
+
+
+# --- an IFERC schedule: one row per month, dated by its publication day ----------------
+
+
+def an_iferc_schedule(*months: tuple[str, str, str]) -> IfercSchedule:
+    codes = tuple(code for code, _, _ in months)
+    last_trading = dates(*(trading for _, trading, _ in months))
+    published = dates(*(publication for _, _, publication in months))
+    return iferc_schedule(codes, last_trading, published)
+
+
+# The IFERC schedule page's sample, three months of one index, valued on 15 November 2026,
+# when one of the three has been published.
+V26_IFERC = ("V26", "2026-09-30", "2026-10-01")
+X26_IFERC = ("X26", "2026-10-30", "2026-11-02")
+IFERC = an_iferc_schedule(
+    V26_IFERC,
+    X26_IFERC,
+    ("Z26", "2026-11-30", "2026-12-01"),
+)
+NOV_15 = valuation_date(day("2026-11-15"), 0.5)
+
+
+def test_the_iferc_sample_is_one_row_per_month_dated_by_its_publication_day() -> None:
+    made = calendar(NOV_15, IFERC, None)
+    assert made.kind is Kind.IFERC
+    assert [str(date) for date in made.dates] == ["2026-10-01", "2026-11-02", "2026-12-01"]
+    assert codes_of(made) == ["V26", "X26", "Z26"]
+    assert made.contract.tolist() == [0, 1, 2]
+    assert made.is_priced.all()
+    assert made.is_fixed.tolist() == [True, True, False]
+    assert made.schedule is IFERC and made.holiday_calendar is None
+
+
+def test_an_iferc_month_is_fixed_the_day_after_its_publication_day() -> None:
+    on_the_day = calendar(valuation_date(day("2026-11-02"), 1.0), IFERC, None)
+    assert on_the_day.is_fixed.tolist() == [True, False, False]
+    the_day_after = calendar(valuation_date(day("2026-11-03"), 0.0), IFERC, None)
+    assert the_day_after.is_fixed.tolist() == [True, True, False]
+    before_any = calendar(valuation_date(day("2026-10-01"), 0.5), IFERC, None)
+    assert not before_any.is_fixed.any()
+
+
+def test_an_iferc_schedule_of_one_month_is_a_calendar() -> None:
+    one = calendar(NOV_15, an_iferc_schedule(V26_IFERC), None)
+    assert codes_of(one) == ["V26"] and one.is_fixed.tolist() == [True]
+    assert one.dates.tolist() == [day("2026-10-01")]
+
+
+def test_a_holiday_calendar_given_with_an_iferc_schedule_is_refused() -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(NOV_15, IFERC, CLOSED_MAY_25)
+    assert str(failure.value) == (
+        "holiday_calendar is a holiday calendar, expected none with an IFERC schedule"
+    )
+
+
+@pytest.mark.parametrize(
+    ("schedule", "message"),
+    [
+        (
+            an_iferc_schedule(V26_IFERC, ("V26", "2026-10-30", "2026-11-02")),
+            "contract_code row 2 is 'V26', already given at row 1",
+        ),
+        (
+            an_iferc_schedule(X26_IFERC, V26_IFERC),
+            "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-11-02",
+        ),
+        (
+            an_iferc_schedule(V26_IFERC, ("X26", "2026-10-30", "2026-10-01")),
+            "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-10-01",
+        ),
+        (iferc_schedule((), dates(), dates()), "schedule has 0 contracts, expected at least 1"),
+    ],
+    ids=["a code twice", "publication days out of order", "two publication days equal", "no month"],
+)
+def test_an_iferc_schedule_that_cannot_make_a_calendar_says_why(
+    schedule: IfercSchedule, message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(NOV_15, schedule, None)
+    assert str(failure.value) == message
+
+
+# --- the schedule's kind chooses the calendar, and nothing else is one -----------------
+
+
+def test_an_object_of_no_schedule_kind_is_refused_naming_what_it_is() -> None:
+    for wrong, named in (
+        (CLOSED_MAY_25, "a holiday calendar"),
+        (MAY_25, "a valuation date"),
+        (a_calendar(), "a calendar"),
+    ):
+        with pytest.raises(ValueError) as failure:
+            calendar(MAY_25, wrong, None)
+        assert str(failure.value) == (
+            f"schedule is {named}, expected a futures, IFERC or Gas Daily schedule"
+        )
+
+
+def test_a_futures_schedule_brings_the_holiday_calendar() -> None:
+    with pytest.raises(ValueError) as failure:
+        calendar(MAY_25, SCHEDULE, None)
+    assert str(failure.value) == (
+        "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+    )
+    assert a_calendar().kind is Kind.FUTURES
+
+
+# --- the general rules of the two new kinds ---------------------------------------------
+
+
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_flow_day_of_gas_daily_months_laid_end_to_end_is_one_row_on_its_month(
+    data: st.DataObject,
+) -> None:
+    count = data.draw(st.integers(1, 40))
+    codes = tuple(
+        data.draw(
+            st.lists(st.text(min_size=1, max_size=6), unique=True, min_size=count, max_size=count)
+        )
+    )
+    lengths = np.array(
+        data.draw(st.lists(st.integers(1, 40), min_size=count, max_size=count)), dtype=np.int64
+    )
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
+    )
+    one_day = np.timedelta64(1, "D")
+    lasts = start + np.cumsum(lengths).astype("timedelta64[D]") - one_day
+    firsts = lasts - lengths.astype("timedelta64[D]") + one_day
+    schedule = gas_daily_schedule(codes, firsts, lasts)
+    as_of = start + np.timedelta64(data.draw(st.integers(-10, 2000)), "D")
+    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    assert made.dates.size == int(lengths.sum())
+    assert np.all(np.diff(made.dates) == one_day)
+    assert made.dates[0] == firsts[0] and made.dates[-1] == lasts[-1]
+    assert np.all((firsts[made.contract] <= made.dates) & (made.dates <= lasts[made.contract]))
+    assert np.bincount(made.contract, minlength=count).tolist() == lengths.tolist()
+    assert made.is_priced.all()
+    assert np.array_equal(made.is_fixed, made.dates <= as_of)
+
+
+@settings(deadline=None)
+@given(data=st.data())
+def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.DataObject) -> None:
+    count = data.draw(st.integers(1, 40))
+    codes = tuple(
+        data.draw(
+            st.lists(st.text(min_size=1, max_size=6), unique=True, min_size=count, max_size=count)
+        )
+    )
+    gaps = np.array(
+        data.draw(st.lists(st.integers(1, 60), min_size=count, max_size=count)), dtype=np.int64
+    )
+    start = np.datetime64("2000-01-01", "D") + np.timedelta64(
+        data.draw(st.integers(0, 20_000)), "D"
+    )
+    published = start + np.cumsum(gaps).astype("timedelta64[D]")
+    schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
+    as_of = start + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
+    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    assert np.array_equal(made.dates, published)
+    assert made.dates is not schedule.publication_date
+    assert made.contract.tolist() == list(range(count))
+    assert made.is_priced.all()
+    assert np.array_equal(made.is_fixed, published < as_of)
+    for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
+        assert not column.flags.writeable

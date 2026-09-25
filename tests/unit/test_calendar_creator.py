@@ -1,4 +1,5 @@
-"""The calendar through the seam: three handles in, one out, and the table its handle spills."""
+"""The calendar through the seam: a valuation date, any schedule and, with a futures schedule, a
+holiday calendar in, one handle out, and the table it spills."""
 
 import re
 from typing import cast
@@ -13,7 +14,7 @@ from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE
 # 21 July 2026.
 MAY_19, MAY_20, MAY_25, JUN_22, JUL_21 = 46161.0, 46162.0, 46167.0, 46195.0, 46224.0
 HANDLE = re.compile(r"calendar:[0-9a-f]{6}:([0-9]{6})")
-HEADERS = ["date", "prompt_contract", "is_business_day", "is_past"]
+HEADERS = ["date", "contract", "is_priced", "is_fixed"]
 TYPES = ["datetime64[D]", "str", "bool", "bool"]
 
 
@@ -113,8 +114,7 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
     [
         (
             [THE_VALUATION, (("m26",), (MAY_19,)), THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, "
-            "expected at least 2",
+            "#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2",
         ),
         (
             [THE_VALUATION, (("m26", "m26"), (MAY_19, JUN_22)), THE_HOLIDAYS],
@@ -161,11 +161,12 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
         ),
         (
             [THE_VALUATION, MISSING, THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: futures_schedule is missing, expected futures schedule handle",
+            "#ERROR _CreateCalendar: schedule is missing, expected a handle",
         ),
         (
             [THE_VALUATION, THE_SCHEDULE, MISSING],
-            "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle",
+            "#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, expected holiday "
+            "calendar handle with a futures schedule",
         ),
         (
             [THE_VALUATION, THE_SCHEDULE, "calendar:000000:000001"],
@@ -214,8 +215,8 @@ def test_a_handle_of_another_kind_in_any_slot_is_refused_by_name() -> None:
         "expected valuation date handle"
     )
     assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
-        f"#ERROR _CreateCalendar: futures_schedule is holiday calendar handle {holidays!r}, "
-        "expected futures schedule handle"
+        "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, "
+        "expected a futures, IFERC or Gas Daily schedule"
     )
     assert bridge.call("_CreateCalendar", [valuation, schedule, made]) == (
         f"#ERROR _CreateCalendar: holiday_calendar is calendar handle {made!r}, "
@@ -228,7 +229,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     one = a_schedule(("m26",), (MAY_19,))
     before = number(a_calendar(valuation, schedule, holidays))
     assert bridge.call("_CreateCalendar", [valuation, one, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, expected at least 2"
+        "#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2"
     )
     assert number(a_calendar(valuation, schedule, holidays)) == before + 1
 
@@ -237,4 +238,154 @@ def test_a_dead_calendar_handle_cannot_be_read() -> None:
     assert bridge.call("util_ReadHandle", ["calendar:000000:000001"]) == (
         "#ERROR util_ReadHandle: handle is text 'calendar:000000:000001' naming no live object, "
         "expected a handle"
+    )
+
+
+# --- the two other schedules through the seam, the holiday calendar left out -------------
+
+# Serials for the two schedule pages' samples: 1 September, 30 September, 1 October, 31 October,
+# 1 November and 30 November 2026 for the Gas Daily months; the last trading and publication
+# days of the IFERC months, 30 September and 1 October, 30 October and 2 November, 30 November
+# and 1 December 2026; and the valuation dates 25 September and 15 November 2026.
+SEP_1, SEP_30, OCT_1, OCT_31, NOV_1, NOV_30 = 46266.0, 46295.0, 46296.0, 46326.0, 46327.0, 46356.0
+OCT_30, NOV_2, DEC_1 = 46325.0, 46328.0, 46357.0
+SEP_25, NOV_15 = 46290.0, 46341.0
+
+
+def a_gas_daily_schedule() -> str:
+    text = bridge.call(
+        "_CreateGasDailySchedule",
+        [column("U26", "V26", "X26"), column(SEP_1, OCT_1, NOV_1), column(SEP_30, OCT_31, NOV_30)],
+    )
+    assert isinstance(text, str) and text.startswith("gas_daily_schedule:"), text
+    return text
+
+
+def an_iferc_schedule() -> str:
+    text = bridge.call(
+        "_CreateIfercSchedule",
+        [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
+    )
+    assert isinstance(text, str) and text.startswith("iferc_schedule:"), text
+    return text
+
+
+def a_gas_daily_calendar() -> str:
+    text = bridge.call("_CreateCalendar", [a_valuation(SEP_25), a_gas_daily_schedule(), MISSING])
+    assert isinstance(text, str) and HANDLE.fullmatch(text), text
+    return text
+
+
+def an_iferc_calendar() -> str:
+    text = bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_iferc_schedule(), MISSING])
+    assert isinstance(text, str) and HANDLE.fullmatch(text), text
+    return text
+
+
+def test_a_gas_daily_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
+    shown = rows(read(a_gas_daily_calendar()))
+    assert len(shown) == 93
+    assert shown[0] == HEADERS and shown[1] == TYPES
+    assert shown[2] == [SEP_1, "U26", 1.0, 1.0]
+    assert shown[26] == [SEP_25, "U26", 1.0, 1.0]  # the valuation day, printed before it began
+    assert shown[27] == [SEP_25 + 1, "U26", 1.0, 0.0]
+    assert shown[31] == [SEP_30, "U26", 1.0, 0.0]
+    assert shown[32] == [OCT_1, "V26", 1.0, 0.0]
+    assert shown[92] == [NOV_30, "X26", 1.0, 0.0]
+    assert [row[0] for row in shown[2:]] == [SEP_1 + i for i in range(91)]
+
+
+def test_an_iferc_calendar_is_created_from_two_handles_and_read_back_month_by_month() -> None:
+    assert rows(read(an_iferc_calendar())) == [
+        HEADERS,
+        TYPES,
+        [OCT_1, "V26", 1.0, 1.0],
+        [NOV_2, "X26", 1.0, 1.0],
+        [DEC_1, "Z26", 1.0, 0.0],
+    ]
+
+
+def test_the_flags_of_the_two_other_kinds_reach_the_sheet_as_booleans() -> None:
+    for made in (a_gas_daily_calendar(), an_iferc_calendar()):
+        kinds, _, _ = read(made)
+        assert (kinds[:2] == TEXT_CODE).all()
+        assert (kinds[2:, 0] == NUMBER_CODE).all()
+        assert (kinds[2:, 1] == TEXT_CODE).all()
+        assert (kinds[2:, 2:] == BOOLEAN_CODE).all()
+
+
+def test_the_holiday_calendar_is_taken_with_a_futures_schedule_alone() -> None:
+    holidays = a_holiday_calendar(MAY_25)
+    assert bridge.call(
+        "_CreateCalendar", [a_valuation(SEP_25), a_gas_daily_schedule(), holidays]
+    ) == (
+        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
+        "expected none with a Gas Daily schedule"
+    )
+    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_iferc_schedule(), holidays]) == (
+        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
+        "expected none with an IFERC schedule"
+    )
+    assert bridge.call("_CreateCalendar", [a_valuation(), a_schedule(*SAMPLE), MISSING]) == (
+        "#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, "
+        "expected holiday calendar handle with a futures schedule"
+    )
+    # Blank and left out are different facts: a blank cell in the slot is a blank.
+    assert bridge.call("_CreateCalendar", [a_valuation(), a_schedule(*SAMPLE), None]) == (
+        "#ERROR _CreateCalendar: holiday_calendar is blank, expected holiday calendar handle"
+    )
+
+
+def test_a_handle_of_no_schedule_kind_where_the_schedule_should_be_is_refused_by_name() -> None:
+    valuation, holidays = a_valuation(), a_holiday_calendar(MAY_25)
+    made = a_calendar(valuation, a_schedule(*SAMPLE), holidays)
+    assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
+        "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, "
+        "expected a futures, IFERC or Gas Daily schedule"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, made, MISSING]) == (
+        "#ERROR _CreateCalendar: ValueError: schedule is a calendar, "
+        "expected a futures, IFERC or Gas Daily schedule"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, valuation, MISSING]) == (
+        "#ERROR _CreateCalendar: ValueError: schedule is a valuation date, "
+        "expected a futures, IFERC or Gas Daily schedule"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, MISSING, MISSING]) == (
+        "#ERROR _CreateCalendar: schedule is missing, expected a handle"
+    )
+    assert bridge.call("_CreateCalendar", [valuation, 3.0, MISSING]) == (
+        "#ERROR _CreateCalendar: schedule is number 3.0, expected a handle"
+    )
+
+
+def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librarys_words() -> None:
+    gapped = bridge.call(
+        "_CreateGasDailySchedule",
+        [column("U26", "V26"), column(SEP_1, OCT_1 + 1), column(SEP_30, OCT_31)],
+    )
+    assert bridge.call("_CreateCalendar", [a_valuation(SEP_25), gapped, MISSING]) == (
+        "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, "
+        "expected 2026-10-01, the day after row 1's last_date 2026-09-30"
+    )
+    backwards = bridge.call(
+        "_CreateIfercSchedule",
+        [column("X26", "V26"), column(OCT_30, SEP_30), column(NOV_2, OCT_1)],
+    )
+    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), backwards, MISSING]) == (
+        "#ERROR _CreateCalendar: ValueError: publication_date row 2 is 2026-10-01, "
+        "expected a date after row 1's 2026-11-02"
+    )
+
+
+def test_a_failed_construction_of_the_other_kinds_publishes_no_object_and_no_handle() -> None:
+    valuation, schedule = a_valuation(SEP_25), a_gas_daily_schedule()
+    holidays = a_holiday_calendar(MAY_25)
+    before = number(cast(str, bridge.call("_CreateCalendar", [valuation, schedule, MISSING])))
+    assert bridge.call("_CreateCalendar", [valuation, schedule, holidays]) == (
+        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
+        "expected none with a Gas Daily schedule"
+    )
+    assert number(cast(str, bridge.call("_CreateCalendar", [valuation, schedule, MISSING]))) == (
+        before + 1
     )
