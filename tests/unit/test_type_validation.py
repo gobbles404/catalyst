@@ -11,7 +11,6 @@ from goosedove.excel.bridge import (
     MISSING,
     Cells,
     DateColumn,
-    Handle,
     MixedArray,
     NumberColumn,
     Table,
@@ -287,13 +286,11 @@ class Rows(Table):
     values: NumberColumn
 
 
-# A table, a handle and a bare mixed range take no default on their own, and the form does not
-# change that: each is refused with the words it always had.
+# A table and a bare mixed range take no default on their own, and the form does not change
+# that: each is refused with the words it always had. A handle may be left out, which
+# test_handles.py pins.
 def test_what_takes_no_default_may_not_be_left_out_either() -> None:
     def Kept(header_row: TextRow, rows: Rows | None = None) -> float:
-        return 0.0
-
-    def Read(curve: Handle[Curve] | None = None) -> float:
         return 0.0
 
     def Bare(values: MixedArray | None = None) -> float:
@@ -304,8 +301,6 @@ def test_what_takes_no_default_may_not_be_left_out_either() -> None:
 
     with pytest.raises(TypeError, match="Kept: rows declares a table, which takes no default"):
         excel_function(Kept)
-    with pytest.raises(TypeError, match="Read: curve declares a handle, which takes no default"):
-        excel_function(Read)
     with pytest.raises(TypeError, match="Bare: values declares MixedArray, which a function Excel"):
         excel_function(Bare)
     with pytest.raises(
