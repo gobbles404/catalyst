@@ -1,6 +1,6 @@
-"""Daily fixings: the settlement price of one index on each day it fixed, date beside settle, as
+"""Futures fixings: the settlement price of one index on each day it fixed, date beside settle, as
 the desk keeps them, one for every business day of its market from the first to the last.
-docs/library/market-data/daily-fixings.md is the page."""
+docs/library/market-data/futures-fixings.md is the page."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -13,7 +13,7 @@ WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", 
 
 
 @dataclass(frozen=True, slots=True)
-class DailyFixings:
+class FuturesFixings:
     """Dates and settles aligned by position, both read-only: dates[i] and settles[i] describe
     one fixing. The dates are the business days of the index's market from the first to the
     last, every one and no other, increasing; a settle is any number a cell holds, zero and
@@ -23,15 +23,16 @@ class DailyFixings:
     settles: NDArray[np.float64]
 
 
-def daily_fixings(
+def futures_fixings(
     dates: NDArray[np.datetime64],
     settles: NDArray[np.float64],
     holidays: NDArray[np.datetime64],
-) -> DailyFixings:
-    """The one way to make a DailyFixings: its three rules of meaning, checked once, vectorized,
+) -> FuturesFixings:
+    """The one way to make a FuturesFixings: its four rules of meaning, checked once, vectorized,
     in this order, the first failure being the message.
 
-    Each date is after the row above, which keeps one fixing per day in the order a reader
+    One settle per date, since the seam never compares two columns and a series is rows. Each
+    date is after the row above, which keeps one fixing per day in the order a reader
     searches; nothing is sorted, so a series pasted newest first fails at its second row, and
     the desk sorts it. Each date is a business day, Monday to Friday and not a holiday, since
     an index fixes only when its market is open: a weekend day or a holiday in the series is
@@ -44,8 +45,11 @@ def daily_fixings(
     counts once, and a day listed on a weekend adds nothing. Both columns are copied and then
     frozen, so the fixings own their data: a Python caller keeps whatever it passed, and a
     later change to an input never changes a fixing. Rows count as the sheet counts them, the
-    first row of the body being row 1.
+    first row of the column being row 1.
     """
+    if settles.size != dates.size:
+        have = f"{settles.size} {'settle' if settles.size == 1 else 'settles'}"
+        raise ValueError(f"settle has {have}, expected {dates.size}, one per date")
     days = np.array(dates, dtype="datetime64[D]")
     unordered = days[1:] <= days[:-1]
     if unordered.any():
@@ -71,4 +75,4 @@ def daily_fixings(
     prices = np.array(settles, dtype=np.float64)
     days.setflags(write=False)
     prices.setflags(write=False)
-    return DailyFixings(days, prices)
+    return FuturesFixings(days, prices)

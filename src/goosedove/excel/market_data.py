@@ -15,13 +15,11 @@ from goosedove.excel.bridge import (
     DateColumn,
     Handle,
     NumberColumn,
-    Table,
     TextColumn,
-    TextRow,
     excel_function,
 )
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
+from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
 from goosedove.market_data.iferc_fixings import IfercFixings, iferc_fixings
 from goosedove.market_data.price_vector import PriceVector, price_vector
@@ -29,42 +27,34 @@ from goosedove.market_data.price_vector import PriceVector, price_vector
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
-    "_CreateDailyFixings",
+    "_CreateFuturesFixings",
     "_CreateGasDailyFixings",
     "_CreateIfercFixings",
     "_CreatePriceVector",
 ]
 
 
-class DailyFixingsTable(Table):
-    """The fixings' table: one row per day the index fixed, the date and its settle."""
-
-    date: DateColumn
-    settle: NumberColumn
-
-
 @excel_function
-def _CreateDailyFixings(
-    header_row: Annotated[
-        TextRow,
-        "The header cells of your fixings table, such as A1:B1, reading date and settle in "
-        "either order.",
-    ],
-    table: Annotated[
-        DailyFixingsTable,
-        "The rows under the headers, such as A2:B5: one fixing per row, its date and settle, "
+def _CreateFuturesFixings(
+    date: Annotated[
+        DateColumn,
+        "The column of days the index fixed, such as A2:A5 holding 1-May-2026 to 6-May-2026, "
         "one for every business day from the first to the last.",
+    ],
+    settle: Annotated[
+        NumberColumn,
+        "The column of settles beside the days, such as B2:B5, one per day.",
     ],
     holiday_calendar: Annotated[
         Handle[HolidayCalendar],
         "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
         "result, such as D2, or a name for it.",
     ],
-) -> Handle[DailyFixings]:
-    """Creates the daily fixings of one index from the days it fixed and their settles, checked
+) -> Handle[FuturesFixings]:
+    """Creates the futures fixings of one index from the days it fixed and their settles, checked
     against its market's holiday calendar, and shows its handle, the text other formulas take as
     the fixings."""
-    return daily_fixings(table.date, table.settle, holiday_calendar.holiday)
+    return futures_fixings(date, settle, holiday_calendar.holiday)
 
 
 @excel_function

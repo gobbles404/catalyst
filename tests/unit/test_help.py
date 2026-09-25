@@ -218,25 +218,21 @@ def test_the_specifications_creator_explains_itself() -> None:
     ]
 
 
-def test_the_daily_fixings_creator_explains_itself() -> None:
-    description, arguments, hidden = SPECS["_CreateDailyFixings"]
+def test_the_futures_fixings_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateFuturesFixings"]
     assert not hidden
     assert description == (
-        "Creates the daily fixings of one index from the days it fixed and their settles, "
+        "Creates the futures fixings of one index from the days it fixed and their settles, "
         "checked against its market's holiday calendar, and shows its handle, the text other "
         "formulas take as the fixings."
     )
     assert arguments == [
         (
-            "header_row",
-            "The header cells of your fixings table, such as A1:B1, reading date and settle in "
-            "either order.",
-        ),
-        (
-            "table",
-            "The rows under the headers, such as A2:B5: one fixing per row, its date and settle, "
+            "date",
+            "The column of days the index fixed, such as A2:A5 holding 1-May-2026 to 6-May-2026, "
             "one for every business day from the first to the last.",
         ),
+        ("settle", "The column of settles beside the days, such as B2:B5, one per day."),
         (
             "holiday_calendar",
             "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
@@ -361,9 +357,9 @@ def test_the_market_history_creator_explains_itself() -> None:
             "or a name for it.",
         ),
         (
-            "daily_fixings",
-            "The index's daily-fixings handle: the cell showing the result of "
-            "_CreateDailyFixings, such as B10, or a name for it, with a fixing on every past "
+            "futures_fixings",
+            "The index's futures-fixings handle: the cell showing the result of "
+            "_CreateFuturesFixings, such as B10, or a name for it, with a fixing on every past "
             "business day of the calendar.",
         ),
     ]

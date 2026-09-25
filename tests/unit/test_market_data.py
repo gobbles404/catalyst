@@ -11,7 +11,7 @@ from test_utilities import read, rows
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
-from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 
@@ -28,15 +28,15 @@ def a_valuation_date() -> str:
     return cast(str, bridge.call("_CreateValuationDate", [46161.0, 0.5]))
 
 
-# --- _CreateDailyFixings ---------------------------------------------------------
+# --- _CreateFuturesFixings ---------------------------------------------------------
 
 
-# The page's sample as the sheet sends it: the header row, then four rows of a serial and a
-# settle, 1, 4, 5 and 6 May 2026, a Friday and the Monday to Wednesday after it.
+# The page's sample as the sheet sends it: a column of four serials, 1, 4, 5 and 6 May 2026, a
+# Friday and the Monday to Wednesday after it, and a column of the settles beside them.
 MAY_1, MAY_2, MAY_4, MAY_5, MAY_6 = 46143.0, 46144.0, 46146.0, 46147.0, 46148.0
-HEADERS = Cells.from_rows([["date", "settle"]])
-BODY = Cells.from_rows([[MAY_1, 101.94], [MAY_4, 106.42], [MAY_5, 102.27], [MAY_6, 95.08]])
-FIXINGS = re.compile(r"daily_fixings:[0-9a-f]{6}:([0-9]{6})")
+DATES = Cells.from_rows([[MAY_1], [MAY_4], [MAY_5], [MAY_6]])
+SETTLES = Cells.from_rows([[101.94], [106.42], [102.27], [95.08]])
+FIXINGS = re.compile(r"futures_fixings:[0-9a-f]{6}:([0-9]{6})")
 
 # The calendar page's sample as the sheet sends it, the ten days one market is closed in 2026,
 # one serial per row; the one in May is the 25th, a Monday. Made once into the handle every
@@ -70,156 +70,207 @@ def the_calendar() -> str:
     return text
 
 
-# The library has no consumer of daily fixings yet, so this hidden reader proves that a handle
-# resolves to the fixings the seam kept, with their columns as they arrived.
+# The market history reads futures fixings, but this hidden reader proves on its own that a
+# handle resolves to the fixings the seam kept, with their columns as they arrived.
 @probe
-def ReadDailyFixings(fixings: Handle[DailyFixings]) -> str:
+def ReadFuturesFixings(fixings: Handle[FuturesFixings]) -> str:
     days = " ".join(str(day) for day in fixings.dates)
     return f"{days} | {' '.join(repr(float(s)) for s in fixings.settles)}"
 
 
-def the_fixings(headers: object, body: object) -> str:
-    text = bridge.call("_CreateDailyFixings", [headers, body, the_calendar()])
+def the_fixings(days: object, settles: object) -> str:
+    text = bridge.call("_CreateFuturesFixings", [days, settles, the_calendar()])
     assert isinstance(text, str) and FIXINGS.fullmatch(text), text
     return text
 
 
-def test_fixings_are_created_from_a_table_and_a_calendar_and_read_back() -> None:
-    assert bridge.call("ReadDailyFixings", [the_fixings(HEADERS, BODY)]) == (
+def test_fixings_are_created_from_two_columns_and_a_calendar_and_read_back() -> None:
+    assert bridge.call("ReadFuturesFixings", [the_fixings(DATES, SETTLES)]) == (
         "2026-05-01 2026-05-04 2026-05-05 2026-05-06 | 101.94 106.42 102.27 95.08"
     )
 
 
-def test_the_fixings_headers_bind_in_either_order_and_any_case() -> None:
-    headers = Cells.from_rows([["SETTLE", "Date"]])
-    body = Cells.from_rows([[101.94, MAY_1], [106.42, MAY_4]])
-    assert bridge.call("ReadDailyFixings", [the_fixings(headers, body)]) == (
-        "2026-05-01 2026-05-04 | 101.94 106.42"
-    )
+# A single cell is a column of one, so the fixings of one day need no range.
+def test_two_single_cells_make_the_fixings_of_one_day_under_a_calendar() -> None:
+    assert bridge.call("ReadFuturesFixings", [the_fixings(MAY_1, 101.94)]) == "2026-05-01 | 101.94"
 
 
 # Friday 22 May and Tuesday 26 May 2026: the weekend and the holiday between them are the days
 # without a fixing, and the calendar's handle is what says so.
 def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
-    body = Cells.from_rows([[46164.0, 101.94], [46168.0, 106.42]])
-    assert bridge.call("ReadDailyFixings", [the_fixings(HEADERS, body)]) == (
+    days = Cells.from_rows([[46164.0], [46168.0]])
+    settles = Cells.from_rows([[101.94], [106.42]])
+    assert bridge.call("ReadFuturesFixings", [the_fixings(days, settles)]) == (
         "2026-05-22 2026-05-26 | 101.94 106.42"
     )
 
 
 @pytest.mark.parametrize(
-    ("headers", "body", "calendar", "text"),
+    ("days", "settles", "calendar", "text"),
     [
         (
-            Cells.from_rows([["date", "price"]]),
-            BODY,
+            DATES,
+            Cells.from_rows([[101.94], [106.42], [102.27]]),
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'price', "
-            "expected one of date or settle",
+            "#ERROR _CreateFuturesFixings: ValueError: settle has 3 settles, expected 4, "
+            "one per date",
         ),
         (
-            HEADERS,
-            Cells.from_rows([[MAY_1, "x"], [MAY_4, 106.42]]),
+            Cells.from_rows([[MAY_4], [MAY_1]]),
+            Cells.from_rows([[106.42], [101.94]]),
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: table cell (1, 2) is text 'x', expected number",
-        ),
-        (
-            HEADERS,
-            Cells.from_rows([[MAY_4, 106.42], [MAY_1, 101.94]]),
-            THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-01, "
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, "
             "expected a date after row 1's 2026-05-04",
         ),
         (
-            HEADERS,
-            Cells.from_rows([[MAY_1, 101.94], [MAY_2, 100.0]]),
+            Cells.from_rows([[MAY_1], [MAY_2]]),
+            Cells.from_rows([[101.94], [100.0]]),
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
             "expected a business day",
         ),
         (
-            HEADERS,
-            Cells.from_rows([[MAY_25, 100.0]]),
+            MAY_25,
+            100.0,
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-05-25, a holiday, "
+            "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-25, a holiday, "
             "expected a business day",
         ),
         (
-            HEADERS,
-            Cells.from_rows([[MAY_1, 101.94], [MAY_5, 102.27]]),
+            Cells.from_rows([[MAY_1], [MAY_5]]),
+            Cells.from_rows([[101.94], [102.27]]),
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, "
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, "
             "expected 2026-05-04, the business day after row 1's 2026-05-01",
         ),
         (
-            HEADERS,
-            Cells.from_rows([[MAY_1, 101.94, 1.0]]),
+            Cells.from_rows([[MAY_1], [None], [MAY_5]]),
+            Cells.from_rows([[101.94], [106.42], [102.27]]),
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: header_row has 2 headers, expected 3, "
-            "one per column of table",
+            "#ERROR _CreateFuturesFixings: date cell (2, 1) is blank, expected date",
         ),
-        (HEADERS, None, THE_CALENDAR, "#ERROR _CreateDailyFixings: table is blank, expected table"),
         (
-            HEADERS,
+            Cells.from_rows([[MAY_1], [MAY_4 + 0.5]]),
+            Cells.from_rows([[101.94], [106.42]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date cell (2, 1) is number 46146.5, expected date",
+        ),
+        (
+            Cells.from_rows([["1-May-2026"], [MAY_4]]),
+            Cells.from_rows([[101.94], [106.42]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date cell (1, 1) is text '1-May-2026', expected date",
+        ),
+        (
+            DATES,
+            Cells.from_rows([[101.94], [None], [102.27], [95.08]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: settle cell (2, 1) is blank, expected number",
+        ),
+        (
+            DATES,
+            Cells.from_rows([[101.94], ["x"], [102.27], [95.08]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: settle cell (2, 1) is text 'x', expected number",
+        ),
+        (
+            Cells.from_rows([[MAY_1, MAY_4]]),
+            SETTLES,
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date is 1x2 array, expected column of dates",
+        ),
+        (
+            DATES,
+            Cells.from_rows([[101.94, 106.42]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: settle is 1x2 array, expected column of numbers",
+        ),
+        (
+            MISSING,
+            SETTLES,
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date is missing, expected column of dates",
+        ),
+        (
+            DATES,
             MISSING,
             THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: table is missing, expected table",
+            "#ERROR _CreateFuturesFixings: settle is missing, expected column of numbers",
         ),
         (
-            Cells.from_rows([["date"], ["settle"]]),
-            BODY,
-            THE_CALENDAR,
-            "#ERROR _CreateDailyFixings: header_row is 2x1 array, expected row of text",
-        ),
-        (
-            HEADERS,
-            BODY,
-            3.0,
-            "#ERROR _CreateDailyFixings: holiday_calendar is number 3.0, "
-            "expected holiday calendar handle",
-        ),
-        (
-            HEADERS,
-            BODY,
             None,
-            "#ERROR _CreateDailyFixings: holiday_calendar is blank, "
+            SETTLES,
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date is blank, expected column of dates",
+        ),
+        (
+            DATES,
+            None,
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: settle is blank, expected column of numbers",
+        ),
+        (
+            Cells.from_rows([[MAY_1], [None]]),
+            Cells.from_rows([[101.94], [None]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: date cell (2, 1) is blank, expected date",
+        ),
+        (
+            DATES,
+            SETTLES,
+            3.0,
+            "#ERROR _CreateFuturesFixings: holiday_calendar is number 3.0, "
             "expected holiday calendar handle",
         ),
         (
-            HEADERS,
-            BODY,
+            DATES,
+            SETTLES,
+            None,
+            "#ERROR _CreateFuturesFixings: holiday_calendar is blank, "
+            "expected holiday calendar handle",
+        ),
+        (
+            DATES,
+            SETTLES,
             MISSING,
-            "#ERROR _CreateDailyFixings: holiday_calendar is missing, "
+            "#ERROR _CreateFuturesFixings: holiday_calendar is missing, "
             "expected holiday calendar handle",
         ),
         (
-            HEADERS,
-            BODY,
+            DATES,
+            SETTLES,
             "holiday_calendar:000000:000001",
-            "#ERROR _CreateDailyFixings: holiday_calendar is text "
+            "#ERROR _CreateFuturesFixings: holiday_calendar is text "
             "'holiday_calendar:000000:000001' naming no live object, "
             "expected holiday calendar handle",
         ),
         (
-            HEADERS,
-            BODY,
+            DATES,
+            SETTLES,
             "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date",
-            "#ERROR _CreateDailyFixings: holiday_calendar is the creator's failure, "
+            "#ERROR _CreateFuturesFixings: holiday_calendar is the creator's failure, "
             "expected holiday calendar handle: #ERROR _CreateHolidayCalendar: holiday cell "
             "(2, 1) is blank, expected date",
         ),
     ],
     ids=[
-        "an unknown header",
-        "text in the settle column",
+        "a settle column one row short",
         "dates backwards",
         "a Saturday in the series",
-        "a listed holiday in the series",
+        "a listed holiday in the series, one cell each",
         "a business day without a fixing",
-        "a body one column wider than its headers",
-        "a blank cell where the body should be",
-        "the body left out",
-        "headers down a column",
+        "a blank among the days",
+        "a day with a time",
+        "a day typed as text",
+        "a blank among the settles",
+        "text where a settle should be",
+        "a row of days",
+        "a row of settles",
+        "the days left out",
+        "the settles left out",
+        "a blank cell where the days should be",
+        "a blank cell where the settles should be",
+        "both columns wrong, the days named first",
         "a number where the calendar should be",
         "a blank cell where the calendar should be",
         "the calendar left out",
@@ -228,34 +279,43 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
     ],
 )
 def test_fixings_that_cannot_be_made_say_why(
-    headers: object, body: object, calendar: object, text: str
+    days: object, settles: object, calendar: object, text: str
 ) -> None:
     calendar = the_calendar() if calendar is THE_CALENDAR else calendar
-    assert bridge.call("_CreateDailyFixings", [headers, body, calendar]) == text
+    assert bridge.call("_CreateFuturesFixings", [days, settles, calendar]) == text
 
 
 def test_a_failed_fixings_construction_publishes_no_object_and_no_handle() -> None:
-    before = number(the_fixings(HEADERS, BODY), FIXINGS)
-    gap = Cells.from_rows([[MAY_1, 101.94], [MAY_5, 102.27]])
-    assert bridge.call("_CreateDailyFixings", [HEADERS, gap, the_calendar()]) == (
-        "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, "
+    before = number(the_fixings(DATES, SETTLES), FIXINGS)
+    gap = Cells.from_rows([[MAY_1], [MAY_5]])
+    assert bridge.call("_CreateFuturesFixings", [gap, SETTLES, the_calendar()]) == (
+        "#ERROR _CreateFuturesFixings: ValueError: settle has 4 settles, expected 2, one per date"
+    )
+    two = Cells.from_rows([[101.94], [102.27]])
+    assert bridge.call("_CreateFuturesFixings", [gap, two, the_calendar()]) == (
+        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, "
         "expected 2026-05-04, the business day after row 1's 2026-05-01"
     )
-    assert number(the_fixings(HEADERS, BODY), FIXINGS) == before + 1
+    saturday = Cells.from_rows([[MAY_1], [MAY_2]])
+    assert bridge.call("_CreateFuturesFixings", [saturday, two, the_calendar()]) == (
+        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
+        "expected a business day"
+    )
+    assert number(the_fixings(DATES, SETTLES), FIXINGS) == before + 1
 
 
-def test_a_handle_of_another_kind_is_not_daily_fixings() -> None:
+def test_a_handle_of_another_kind_is_not_futures_fixings() -> None:
     other = a_valuation_date()
-    assert bridge.call("ReadDailyFixings", [other]) == (
-        f"#ERROR ReadDailyFixings: fixings is valuation date handle {other!r}, "
-        "expected daily fixings handle"
+    assert bridge.call("ReadFuturesFixings", [other]) == (
+        f"#ERROR ReadFuturesFixings: fixings is valuation date handle {other!r}, "
+        "expected futures fixings handle"
     )
 
 
 def test_a_handle_of_another_kind_is_not_a_holiday_calendar() -> None:
     other = a_valuation_date()
-    assert bridge.call("_CreateDailyFixings", [HEADERS, BODY, other]) == (
-        f"#ERROR _CreateDailyFixings: holiday_calendar is valuation date handle {other!r}, "
+    assert bridge.call("_CreateFuturesFixings", [DATES, SETTLES, other]) == (
+        f"#ERROR _CreateFuturesFixings: holiday_calendar is valuation date handle {other!r}, "
         "expected holiday calendar handle"
     )
 
@@ -419,9 +479,9 @@ def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None
 
 
 def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
-    other = the_fixings(HEADERS, BODY)
+    other = the_fixings(DATES, SETTLES)
     assert bridge.call("ReadIfercFixings", [other]) == (
-        f"#ERROR ReadIfercFixings: fixings is daily fixings handle {other!r}, "
+        f"#ERROR ReadIfercFixings: fixings is futures fixings handle {other!r}, "
         "expected iferc fixings handle"
     )
     schedule = cast(
@@ -619,9 +679,9 @@ def test_a_failed_gas_daily_construction_publishes_no_object_and_no_handle() -> 
 
 
 def test_a_handle_of_another_kind_is_not_gas_daily_fixings() -> None:
-    other = the_fixings(HEADERS, BODY)
+    other = the_fixings(DATES, SETTLES)
     assert bridge.call("ReadGasDailyFixings", [other]) == (
-        f"#ERROR ReadGasDailyFixings: fixings is daily fixings handle {other!r}, "
+        f"#ERROR ReadGasDailyFixings: fixings is futures fixings handle {other!r}, "
         "expected gas daily fixings handle"
     )
     schedule = cast(

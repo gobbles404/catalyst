@@ -15,7 +15,7 @@ from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_s
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.daily_fixings import daily_fixings
+from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import PriceVector, price_vector
 
 
@@ -55,7 +55,7 @@ def a_history(
     first = made.dates[0] - np.timedelta64(10, "D")
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
-    fixings = daily_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
+    fixings = futures_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
     return market_history(made, fixings)
 
 
@@ -254,7 +254,7 @@ def any_history(data: st.DataObject) -> MarketHistory:
     )
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]
-    fixings = daily_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), listed)
+    fixings = futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), listed)
     return market_history(made, fixings)
 
 

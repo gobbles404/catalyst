@@ -12,7 +12,7 @@ from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.expiry_schedule import ExpirySchedule, expiry_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.daily_fixings import DailyFixings, daily_fixings
+from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -41,15 +41,15 @@ CALENDAR = calendar(MAY_26, SCHEDULE, CLOSED_MAY_25)
 
 def fixings_on(
     *days: str, prices: tuple[float, ...] = (), holidays: HolidayCalendar = CLOSED_MAY_25
-) -> DailyFixings:
+) -> FuturesFixings:
     settles = np.array(prices or tuple(70.0 + i for i in range(len(days))), dtype=np.float64)
-    return daily_fixings(dates(*days), settles, holidays.holiday)
+    return futures_fixings(dates(*days), settles, holidays.holiday)
 
 
 FIXINGS = fixings_on("2026-05-20", "2026-05-21", "2026-05-22", prices=(70.85, 71.10, 71.25))
 
 
-def a_history(made: Calendar = CALENDAR, fixings: DailyFixings = FIXINGS) -> MarketHistory:
+def a_history(made: Calendar = CALENDAR, fixings: FuturesFixings = FIXINGS) -> MarketHistory:
     return market_history(made, fixings)
 
 
@@ -65,10 +65,12 @@ def business_days(first: str, last: str, holidays: HolidayCalendar) -> NDArray[n
     return days[np.is_busday(days, holidays=holidays.holiday)]
 
 
-def whole_fixings(first: str, last: str, holidays: HolidayCalendar = CLOSED_MAY_25) -> DailyFixings:
+def whole_fixings(
+    first: str, last: str, holidays: HolidayCalendar = CLOSED_MAY_25
+) -> FuturesFixings:
     """A fixing on every business day from the first day to the last, priced by position."""
     days = business_days(first, last, holidays)
-    return daily_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
+    return futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
 
 
 # --- the sample ---------------------------------------------------------------
@@ -170,13 +172,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             whole_fixings("2026-05-20", "2026-05-29"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
@@ -184,59 +186,59 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
                 MAY_26, a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-22")), CLOSED_MAY_25
             ),
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27"),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-25", holidays=ELSEWHERE),
-            "daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
+            "futures_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
         ),
         (
             calendar(MAY_26, SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22"))),
             FIXINGS,
-            "daily_fixings date 2026-05-21 is a non-business day in calendar, expected no fixing",
+            "futures_fixings date 2026-05-21 is a non-business day in calendar, expected no fixing",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21", "2026-05-22"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "futures_fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-21"),
-            "daily_fixings has no fixing for 2026-05-22, "
+            "futures_fixings has no fixing for 2026-05-22, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-20", "2026-05-22", holidays=holiday_calendar(dates("2026-05-21"))),
-            "daily_fixings has no fixing for 2026-05-21, "
+            "futures_fixings has no fixing for 2026-05-21, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "futures_fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             calendar(MAY_26, SCHEDULE, ELSEWHERE),
             FIXINGS,
-            "daily_fixings has no fixing for 2026-05-25, "
+            "futures_fixings has no fixing for 2026-05-25, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             calendar(valuation_date(day("2026-08-01"), 0.0), SCHEDULE, CLOSED_MAY_25),
             FIXINGS,
-            "daily_fixings has no fixing for 2026-05-26, "
+            "futures_fixings has no fixing for 2026-05-26, "
             "expected a fixing for every past business day in calendar",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-11", "2026-05-12", "2026-05-13"),
-            "daily_fixings has no fixing for 2026-05-20, "
+            "futures_fixings has no fixing for 2026-05-20, "
             "expected a fixing for every past business day in calendar",
         ),
         (
@@ -249,13 +251,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
                 "2026-05-26",
                 holidays=ELSEWHERE,
             ),
-            "daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+            "futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
             "expected dates before the valuation date",
         ),
         (
             CALENDAR,
             fixings_on("2026-05-21", "2026-05-22", "2026-05-25", holidays=ELSEWHERE),
-            "daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
+            "futures_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing",
         ),
     ],
     ids=[
@@ -276,7 +278,7 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
     ],
 )
 def test_a_history_that_cannot_be_made_says_why(
-    made: Calendar, fixings: DailyFixings, message: str
+    made: Calendar, fixings: FuturesFixings, message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
         market_history(made, fixings)
@@ -289,7 +291,7 @@ def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
         made = calendar(valuation_date(day("2026-05-26"), fraction), SCHEDULE, CLOSED_MAY_25)
         with pytest.raises(ValueError) as failure:
             market_history(made, late)
-        assert str(failure.value).startswith("daily_fixings date 2026-05-26 is on or after")
+        assert str(failure.value).startswith("futures_fixings date 2026-05-26 is on or after")
         assert priced(market_history(made, FIXINGS)) == priced(a_history())
 
 
@@ -358,7 +360,7 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     days = np.arange(as_of - np.timedelta64(span, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=made.holiday_calendar.holiday)]
     settles = data.draw(st.floats(-100, 100)) + np.arange(days.size, dtype=np.float64)
-    fixings = daily_fixings(days, settles, made.holiday_calendar.holiday)
+    fixings = futures_fixings(days, settles, made.holiday_calendar.holiday)
     history = market_history(made, fixings)
     required = np.flatnonzero(made.is_past & made.is_business_day)
     assert history.calendar is made

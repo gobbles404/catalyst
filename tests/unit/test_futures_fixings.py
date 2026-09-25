@@ -1,4 +1,4 @@
-"""The daily fixings: the three rules of meaning, and the columns retained and aligned."""
+"""The futures fixings: the four rules of meaning, and the columns retained and aligned."""
 
 import numpy as np
 import pytest
@@ -6,7 +6,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.market_data.daily_fixings import daily_fixings
+from goosedove.market_data.futures_fixings import futures_fixings
 
 EPOCH = np.datetime64("1899-12-30")
 
@@ -47,7 +47,7 @@ ELSEWHERE = dates("2026-01-01")
 
 
 def test_the_sample_keeps_every_date_and_settle_aligned() -> None:
-    fixings = daily_fixings(DATES, SETTLES, HOLIDAYS)
+    fixings = futures_fixings(DATES, SETTLES, HOLIDAYS)
     assert np.array_equal(fixings.dates, DATES)
     assert fixings.settles.tolist() == [101.94, 106.42, 102.27, 95.08]
     assert fixings.dates.dtype == np.dtype("datetime64[D]")
@@ -55,7 +55,7 @@ def test_the_sample_keeps_every_date_and_settle_aligned() -> None:
 
 
 def test_one_fixing_is_a_series() -> None:
-    fixings = daily_fixings(DATES[:1], SETTLES[:1], HOLIDAYS)
+    fixings = futures_fixings(DATES[:1], SETTLES[:1], HOLIDAYS)
     assert np.array_equal(fixings.dates, DATES[:1])
     assert fixings.settles.tolist() == [101.94]
 
@@ -64,7 +64,7 @@ def test_one_fixing_is_a_series() -> None:
 # without a fixing, and the series is whole without them.
 def test_a_weekend_and_a_listed_holiday_are_the_days_without_a_fixing() -> None:
     given = dates("2026-05-22", "2026-05-26")
-    fixings = daily_fixings(given, SETTLES[:2], HOLIDAYS)
+    fixings = futures_fixings(given, SETTLES[:2], HOLIDAYS)
     assert np.array_equal(fixings.dates, given)
 
 
@@ -72,14 +72,14 @@ def test_a_weekend_and_a_listed_holiday_are_the_days_without_a_fixing() -> None:
 # and neither is asked for, since the first and last dates bound the check.
 def test_nothing_is_asked_for_before_the_first_date_or_after_the_last() -> None:
     given = dates("2026-05-05", "2026-05-06", "2026-05-07")
-    fixings = daily_fixings(given, SETTLES[:3], HOLIDAYS)
+    fixings = futures_fixings(given, SETTLES[:3], HOLIDAYS)
     assert np.array_equal(fixings.dates, given)
 
 
 # A settle at or below zero is kept as given. WTI's May 2020 contract settled at minus 37.63
 # on Monday 20 April 2020.
 def test_a_settle_at_or_below_zero_is_kept() -> None:
-    fixings = daily_fixings(
+    fixings = futures_fixings(
         dates("2020-04-20", "2020-04-21", "2020-04-22"), settles(-37.63, 0.0, 39.27), HOLIDAYS
     )
     assert fixings.settles.tolist() == [-37.63, 0.0, 39.27]
@@ -89,9 +89,9 @@ def test_a_settle_at_or_below_zero_is_kept() -> None:
 # read as numpy reads it, and the series that is whole without those days is whole with them.
 def test_a_holiday_listed_twice_or_on_a_weekend_changes_nothing() -> None:
     calendar = dates("2026-05-25", "2026-05-25", "2026-05-02", "2026-05-03")
-    fixings = daily_fixings(DATES, SETTLES, calendar)
+    fixings = futures_fixings(DATES, SETTLES, calendar)
     assert np.array_equal(fixings.dates, DATES)
-    fixings = daily_fixings(dates("2026-05-22", "2026-05-26"), SETTLES[:2], calendar)
+    fixings = futures_fixings(dates("2026-05-22", "2026-05-26"), SETTLES[:2], calendar)
     assert fixings.dates.tolist() == [np.datetime64("2026-05-22"), np.datetime64("2026-05-26")]
 
 
@@ -210,7 +210,39 @@ def test_a_series_that_cannot_be_made_says_why(
     given: NDArray[np.datetime64], calendar: NDArray[np.datetime64], message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
-        daily_fixings(given, SETTLES[: len(given)], calendar)
+        futures_fixings(given, SETTLES[: len(given)], calendar)
+    assert str(failure.value) == message
+
+
+# --- what is rejected, naming the count ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("given", "given_settles", "message"),
+    [
+        (DATES, SETTLES[:3], "settle has 3 settles, expected 4, one per date"),
+        (DATES, np.append(SETTLES, 90.0), "settle has 5 settles, expected 4, one per date"),
+        (DATES, SETTLES[:1], "settle has 1 settle, expected 4, one per date"),
+        (DATES[:1], SETTLES, "settle has 4 settles, expected 1, one per date"),
+        (
+            dates("2026-05-04", "2026-05-01"),
+            SETTLES[:1],
+            "settle has 1 settle, expected 2, one per date",
+        ),
+    ],
+    ids=[
+        "a settle column one row short",
+        "a settle column one row long",
+        "one settle for four dates",
+        "four settles for one date",
+        "the count is checked before the order",
+    ],
+)
+def test_a_settle_column_that_does_not_match_the_dates_says_why(
+    given: NDArray[np.datetime64], given_settles: NDArray[np.float64], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        futures_fixings(given, given_settles, HOLIDAYS)
     assert str(failure.value) == message
 
 
@@ -232,7 +264,7 @@ def test_any_run_of_business_days_and_their_settles_are_kept_aligned(
     given_settles = np.array(
         data.draw(st.lists(st.floats(-1e6, 1e6), min_size=count, max_size=count)), dtype=np.float64
     )
-    fixings = daily_fixings(given_dates, given_settles, holidays)
+    fixings = futures_fixings(given_dates, given_settles, holidays)
     assert np.array_equal(fixings.dates, given_dates)
     assert np.array_equal(fixings.settles, given_settles)
 
@@ -251,7 +283,7 @@ def test_a_run_of_business_days_with_one_left_out_names_the_missing_day(
     left_out = data.draw(st.integers(1, count - 2))
     given = np.delete(run, left_out)
     with pytest.raises(ValueError) as failure:
-        daily_fixings(given, np.zeros(count - 1), holidays)
+        futures_fixings(given, np.zeros(count - 1), holidays)
     assert str(failure.value) == (
         f"date row {left_out + 1} is {run[left_out + 1]}, expected {run[left_out]}, "
         f"the business day after row {left_out}'s {run[left_out - 1]}"
@@ -263,7 +295,7 @@ def test_a_run_of_business_days_with_one_left_out_names_the_missing_day(
 
 def test_the_fixings_own_their_columns() -> None:
     given_dates, given_settles = DATES.copy(), SETTLES.copy()
-    fixings = daily_fixings(given_dates, given_settles, HOLIDAYS)
+    fixings = futures_fixings(given_dates, given_settles, HOLIDAYS)
     given_dates[0] = np.datetime64("2030-01-01")
     given_settles[0] = 0.0
     assert fixings.dates[0] == np.datetime64("2026-05-01")
