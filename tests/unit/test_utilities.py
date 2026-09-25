@@ -32,7 +32,7 @@ from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
-from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
@@ -165,11 +165,11 @@ def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() 
 
 # Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
 # one day, 1 January.
-def test_daily_fixings_spill_their_table_with_dates_as_serials_and_settles_exactly() -> None:
-    headers = Cells.from_rows([["date", "settle"]])
-    body = Cells.from_rows([[46143.0, 101.94], [46146.0, 106.42]])
+def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_exactly() -> None:
+    days = Cells.from_rows([[46143.0], [46146.0]])
+    settles = Cells.from_rows([[101.94], [106.42]])
     calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]])])
-    handle = bridge.call("_CreateDailyFixings", [headers, body, calendar])
+    handle = bridge.call("_CreateFuturesFixings", [days, settles, calendar])
     assert rows(read(handle)) == [
         ["date", "settle"],
         ["datetime64[D]", "float64"],
@@ -219,7 +219,6 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         ],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
-    headers = Cells.from_rows([["date", "settle"]])
     fixed = bridge.call(
         "_CreateMarketHistory",
         [
@@ -227,9 +226,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
                 "_CreateCalendar",
                 [bridge.call("_CreateValuationDate", [46163.0, 0.5]), schedule, holidays],
             ),
-            bridge.call(
-                "_CreateDailyFixings", [headers, Cells.from_rows([[46162.0, 70.85]]), holidays]
-            ),
+            bridge.call("_CreateFuturesFixings", [46162.0, 70.85, holidays]),
         ],
     )
     kinds, slots, joined = read(fixed)
@@ -246,9 +243,7 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
                 "_CreateCalendar",
                 [bridge.call("_CreateValuationDate", [46162.0, 0.5]), schedule, holidays],
             ),
-            bridge.call(
-                "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
-            ),
+            bridge.call("_CreateFuturesFixings", [46161.0, 70.0, holidays]),
         ],
     )
     kinds, slots, joined = read(unfixed)
@@ -306,7 +301,6 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
             MISSING,
         ],
     )
-    headers = Cells.from_rows([["date", "settle"]])
     valuation = bridge.call("_CreateValuationDate", [46162.0, 0.5])
     quote = bridge.call("_CreatePriceVector", [72.10])
     for holiday, flag, cell, kind in (
@@ -315,9 +309,7 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
     ):
         holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[holiday]])])
         calendar = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
-        fixings = bridge.call(
-            "_CreateDailyFixings", [headers, Cells.from_rows([[46161.0, 70.0]]), holidays]
-        )
+        fixings = bridge.call("_CreateFuturesFixings", [46161.0, 70.0, holidays])
         history = bridge.call("_CreateMarketHistory", [calendar, fixings])
         kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
         assert rows((kinds, slots, joined)) == [
@@ -477,7 +469,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IfercSchedule,
         IndexConventions,
         ContractSpecifications,
-        DailyFixings,
+        FuturesFixings,
         GasDailyFixings,
         IfercFixings,
         MarketHistory,

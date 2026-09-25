@@ -14,7 +14,7 @@ from goosedove.calendar.calendar import Calendar
 from goosedove.excel.bridge import Handle, excel_function
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
-from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.price_vector import PriceVector
 
 # The worksheet functions this module registers, named here so that their leading underscore
@@ -29,15 +29,15 @@ def _CreateMarketHistory(
         "The index's calendar handle: the cell showing _CreateCalendar's result, such as B7, "
         "or a name for it.",
     ],
-    daily_fixings: Annotated[
-        Handle[DailyFixings],
-        "The index's daily-fixings handle: the cell showing the result of _CreateDailyFixings, "
+    futures_fixings: Annotated[
+        Handle[FuturesFixings],
+        "The index's futures-fixings handle: the cell showing the result of _CreateFuturesFixings, "
         "such as B10, or a name for it, with a fixing on every past business day of the calendar.",
     ],
 ) -> Handle[MarketHistory]:
     """Creates the market history of one index, its calendar with the settle fixed on each past
     business day, and shows its handle, the text other formulas take as the history."""
-    return market_history(calendar, daily_fixings)
+    return market_history(calendar, futures_fixings)
 
 
 @excel_function

@@ -1,5 +1,5 @@
 """The market history: an index's calendar, kept by reference, and the settle fixed on each of
-its past business days, taken from the index's daily fixings, one price for every such day and
+its past business days, taken from the index's futures fixings, one price for every such day and
 none for any other. docs/library/market/market-history.md is the page."""
 
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar
-from goosedove.market_data.daily_fixings import DailyFixings
+from goosedove.market_data.futures_fixings import FuturesFixings
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +26,7 @@ class MarketHistory:
     fixing_prices: NDArray[np.float64]
 
 
-def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHistory:
+def market_history(calendar: Calendar, futures_fixings: FuturesFixings) -> MarketHistory:
     """The one way to make a MarketHistory: three rules on the fixings against the calendar,
     checked once, in this order, the first failure being the message; then the two columns.
 
@@ -49,12 +49,12 @@ def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHis
     calendar is rebuilt.
     """
     as_of = calendar.valuation_date.as_of
-    fixing_dates = daily_fixings.dates
+    fixing_dates = futures_fixings.dates
     late = fixing_dates >= as_of
     if late.any():
         k = int(late.argmax())  # the dates increase, so the first late date is the earliest
         raise ValueError(
-            f"daily_fixings date {fixing_dates[k]} is on or after valuation date {as_of}, "
+            f"futures_fixings date {fixing_dates[k]} is on or after valuation date {as_of}, "
             "expected dates before the valuation date"
         )
     dates = calendar.dates
@@ -65,7 +65,7 @@ def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHis
     if closed.any():
         k = int(closed.argmax())  # rows[k] is the first row the calendar closes with a fixing
         raise ValueError(
-            f"daily_fixings date {dates[rows[k]]} is a non-business day in calendar, "
+            f"futures_fixings date {dates[rows[k]]} is a non-business day in calendar, "
             "expected no fixing"
         )
     covered = np.zeros(dates.size, dtype=bool)
@@ -74,10 +74,10 @@ def market_history(calendar: Calendar, daily_fixings: DailyFixings) -> MarketHis
     if missing.any():
         k = int(missing.argmax())  # dates[k] is the first past business day without a fixing
         raise ValueError(
-            f"daily_fixings has no fixing for {dates[k]}, "
+            f"futures_fixings has no fixing for {dates[k]}, "
             "expected a fixing for every past business day in calendar"
         )
-    prices = daily_fixings.settles[inside]
+    prices = futures_fixings.settles[inside]
     rows.setflags(write=False)
     prices.setflags(write=False)
     return MarketHistory(calendar, rows, prices)

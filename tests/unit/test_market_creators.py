@@ -20,7 +20,6 @@ MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 4602
 HANDLE = re.compile(r"market_history:[0-9a-f]{6}:([0-9]{6})")
 HEADERS = ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"]
 TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
-FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
 SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
 
 
@@ -63,9 +62,11 @@ def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str
 
 
 def the_fixings(body: list[list[float]] = SAMPLE, holidays: str | None = None) -> str:
-    args = [FIXINGS_HEADERS, Cells.from_rows(body), holidays or a_holiday_calendar(MAY_25)]
-    text = bridge.call("_CreateDailyFixings", args)
-    assert isinstance(text, str) and text.startswith("daily_fixings:"), text
+    days = Cells.from_rows([[day] for day, _ in body])
+    settles = Cells.from_rows([[settle] for _, settle in body])
+    args = [days, settles, holidays or a_holiday_calendar(MAY_25)]
+    text = bridge.call("_CreateFuturesFixings", args)
+    assert isinstance(text, str) and text.startswith("futures_fixings:"), text
     return text
 
 
@@ -157,22 +158,22 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
     [
         (
             [THE_CALENDAR, ([*SAMPLE, [MAY_26, 71.5]], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or "
+            "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-26 is on or "
             "after valuation date 2026-05-26, expected dates before the valuation date",
         ),
         (
             [THE_CALENDAR, ([*SAMPLE, [MAY_25, 71.4]], JAN_1)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a "
+            "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-25 is a "
             "non-business day in calendar, expected no fixing",
         ),
         (
             [THE_CALENDAR, (SAMPLE[:2], MAY_25)],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
+            "#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for "
             "2026-05-22, expected a fixing for every past business day in calendar",
         ),
         (
             [JAN_1, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for "
+            "#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for "
             "2026-05-25, expected a fixing for every past business day in calendar",
         ),
         (
@@ -194,26 +195,29 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
         ),
         (
             [THE_CALENDAR, MISSING],
-            "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle",
+            "#ERROR _CreateMarketHistory: futures_fixings is missing, "
+            "expected futures fixings handle",
         ),
         (
             [THE_CALENDAR, None],
-            "#ERROR _CreateMarketHistory: daily_fixings is blank, expected daily fixings handle",
+            "#ERROR _CreateMarketHistory: futures_fixings is blank, "
+            "expected futures fixings handle",
         ),
         (
             [THE_CALENDAR, 70.85],
-            "#ERROR _CreateMarketHistory: daily_fixings is number 70.85, "
-            "expected daily fixings handle",
+            "#ERROR _CreateMarketHistory: futures_fixings is number 70.85, "
+            "expected futures fixings handle",
         ),
         (
-            [THE_CALENDAR, "daily_fixings:000000:000001"],
-            "#ERROR _CreateMarketHistory: daily_fixings is text 'daily_fixings:000000:000001' "
-            "naming no live object, expected daily fixings handle",
+            [THE_CALENDAR, "futures_fixings:000000:000001"],
+            "#ERROR _CreateMarketHistory: futures_fixings is text 'futures_fixings:000000:000001' "
+            "naming no live object, expected futures fixings handle",
         ),
         (
-            [THE_CALENDAR, "#ERROR _CreateDailyFixings: table is blank, expected table"],
-            "#ERROR _CreateMarketHistory: daily_fixings is the creator's failure, expected daily "
-            "fixings handle: #ERROR _CreateDailyFixings: table is blank, expected table",
+            [THE_CALENDAR, "#ERROR _CreateFuturesFixings: date is blank, expected column of dates"],
+            "#ERROR _CreateMarketHistory: futures_fixings is the creator's failure, "
+            "expected futures fixings handle: #ERROR _CreateFuturesFixings: date is blank, "
+            "expected column of dates",
         ),
     ],
     ids=[
@@ -250,12 +254,12 @@ def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
     calendar, fixings = a_calendar(), the_fixings()
     made = a_history(calendar, fixings)
     assert bridge.call("_CreateMarketHistory", [fixings, fixings]) == (
-        f"#ERROR _CreateMarketHistory: calendar is daily fixings handle {fixings!r}, "
+        f"#ERROR _CreateMarketHistory: calendar is futures fixings handle {fixings!r}, "
         "expected calendar handle"
     )
     assert bridge.call("_CreateMarketHistory", [calendar, calendar]) == (
-        f"#ERROR _CreateMarketHistory: daily_fixings is calendar handle {calendar!r}, "
-        "expected daily fixings handle"
+        f"#ERROR _CreateMarketHistory: futures_fixings is calendar handle {calendar!r}, "
+        "expected futures fixings handle"
     )
     assert bridge.call("_CreateMarketHistory", [made, fixings]) == (
         f"#ERROR _CreateMarketHistory: calendar is market history handle {made!r}, "
@@ -268,7 +272,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     short = the_fixings(SAMPLE[:2])
     before = number(a_history(calendar, fixings))
     assert bridge.call("_CreateMarketHistory", [calendar, short]) == (
-        "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-22, "
+        "#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for 2026-05-22, "
         "expected a fixing for every past business day in calendar"
     )
     assert number(a_history(calendar, fixings)) == before + 1

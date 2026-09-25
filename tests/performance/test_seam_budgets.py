@@ -1019,65 +1019,61 @@ def test_cells_from_buffers_copies_each_buffer_once(
     }
 
 
-# --- the daily fixings: a table and a calendar's handle in, one publication out ---------------
+# --- the futures fixings: two columns and a calendar's handle in, one publication out -----------
 
 
-FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
-
-
-def fixings_body(rows: int, holidays: int) -> Cells:
-    """That many daily fixings as the sheet sends them, a serial and a settle per row, one per
-    business day from Friday 1 May 2026 under a calendar of that many Thursdays a week apart,
-    the calendar holiday_column makes."""
+def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
+    """That many futures fixings as the sheet sends them, a column of serials and a column of
+    settles, one per business day from Friday 1 May 2026 under a calendar of that many Thursdays
+    a week apart, the calendar holiday_column makes."""
     epoch = np.datetime64("1899-12-30")
     closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
     days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
     serials = (days - epoch).astype(np.int64)
-    return Cells.from_rows([[float(serials[i]), 100.0 + i % 7] for i in range(rows)])
+    return (
+        Cells.from_rows([[float(serials[i])] for i in range(rows)]),
+        Cells.from_rows([[100.0 + i % 7] for i in range(rows)]),
+    )
 
 
-# A year of fixings at the table path, with the market's calendar by handle: the header row as
-# any row of text, the body admitted as a mixed range and bound, one look per column, the date
-# column converted to days, the handle's text rule and its one lookup, then the builder's three
-# looks, the order of the dates, the days the market is closed and the business days without a
-# fixing, its two copies, and one publication. Twenty-two calls across twenty functions, the
-# accept rule once per argument; before the calendar, nineteen across eighteen. The three
-# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
-# fixture reads, so only their looks are in its count.
-def test_daily_fixings_are_a_table_and_a_calendar_in_and_one_publication_out(
+# A year of fixings at the column path, with the market's calendar by handle: the date column
+# through its look and its conversion to days, the settle column accepted on the host's summary
+# alone, the handle's text rule and its one lookup, then the builder's count, its three looks,
+# the order of the dates, the days the market is closed and the business days without a fixing,
+# its two copies, and one publication. Twenty calls across sixteen functions, the accept rule
+# once per argument; at the table path, twenty-two across twenty. The three business-day calls,
+# the calendar, is_busday and busday_offset, raise no event the numpy fixture reads, so only
+# their looks are in its count.
+def test_futures_fixings_are_two_columns_and_a_calendar_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     calendar = PATH["_CreateHolidayCalendar"](holiday_column(100))
-    body = fixings_body(260, 100)
-    PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)
-    assert call_profile(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)) == {
+    days, settles = fixings_columns(260, 100)
+    PATH["_CreateFuturesFixings"](days, settles, calendar)
+    assert call_profile(lambda: PATH["_CreateFuturesFixings"](days, settles, calendar)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
-        "_text_row": 1,
-        "_one_row": 1,
-        "_shape": 1,
-        "_texts": 1,
-        "_mixed": 1,
-        "MixedArray.shape": 1,
-        "_refine": 1,
-        "_bind": 1,
-        "_dates_of": 1,  # no column of text, so no text places are made
+        "_date_column": 1,
+        "_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_dates": 1,
         "_not_dates": 1,
         "_as_days": 1,
-        "_numbers_of": 1,
+        "_numbers": 1,
         "_text": 1,  # the handle's text rule
         "_resolve": 1,  # and its one lookup
-        "_CreateDailyFixings": 1,
-        "daily_fixings": 1,
+        "_CreateFuturesFixings": 1,
+        "futures_fixings": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar)) == {
-        "ndarray.any": 5,  # one look per column, then the builder's: order, days closed, gaps
+    assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, calendar)) == {
+        "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
         "ndarray.setflags": 2,  # frozen
-        "ufunc.reduce": 5,
+        "ufunc.reduce": 4,
     }
 
 
@@ -1173,7 +1169,7 @@ def history_sources(contracts: int) -> tuple[object, object]:
     made = PATH["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
     return made, fixings
 
 
@@ -1266,7 +1262,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     made = PATH["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = PATH["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
     history = PATH["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])

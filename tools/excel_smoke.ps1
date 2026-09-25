@@ -136,24 +136,27 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
     "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
     "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
-    # The daily fixings: a creator over a header row, a welded body and the calendar in AM1, read
-    # back through util_ReadHandle; the days newest first, a business day without a fixing, a
-    # Saturday and a listed holiday, the library's words; the headers where the body should be, a
-    # header the table does not have, the calendar left out and a number in its place, the seam's.
-    "=LEFT(BK1,14)"               = "daily_fixings:"
+    # The futures fixings: a creator over a column of four days and a column of their settles and
+    # the calendar in AM1, and over the first row alone, read back through util_ReadHandle; a
+    # settle column one row short, the days newest first, a business day without a fixing, a
+    # Saturday and a listed holiday, the library's words; the header where a day should be, the
+    # calendar left out and a number in its place, the seam's.
+    "=LEFT(BK1,16)"               = "futures_fixings:"
+    "=LEFT(BK2,16)"               = "futures_fixings:"
     "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
     "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(BK1),3,1)" = "46143"
     "=INDEX(util_ReadHandle(BK1),6,2)" = "95.08"
     "=ROWS(util_ReadHandle(BK1))"      = "6"
-    "=_CreateDailyFixings(BI1:BJ1,BL2:BM3,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
-    "=_CreateDailyFixings(BI1:BJ1,BL4:BM5,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01"
-    "=_CreateDailyFixings(BI1:BJ1,BL6:BM6,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day"
-    "=_CreateDailyFixings(BI1:BJ1,BL7:BM7,AM1)" = "#ERROR _CreateDailyFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day"
-    "=_CreateDailyFixings(BI1:BJ1,BI1:BJ3,AM1)" = "#ERROR _CreateDailyFixings: table cell (1, 1) is text 'date', expected date"
-    "=_CreateDailyFixings(L1:M1,BI2:BJ5,AM1)" = "#ERROR _CreateDailyFixings: header_row cell (1, 2) is text 'product', expected one of date or settle"
-    "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5)" = "#ERROR _CreateDailyFixings: holiday_calendar is missing, expected holiday calendar handle"
-    "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,BJ2)" = "#ERROR _CreateDailyFixings: holiday_calendar is number 101.94, expected holiday calendar handle"
+    "=ROWS(util_ReadHandle(BK2))"      = "3"
+    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ4,AM1)" = "#ERROR _CreateFuturesFixings: ValueError: settle has 3 settles, expected 4, one per date"
+    "=_CreateFuturesFixings(BL2:BL3,BM2:BM3,AM1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
+    "=_CreateFuturesFixings(BL4:BL5,BM4:BM5,AM1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01"
+    "=_CreateFuturesFixings(BL6,BM6,AM1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day"
+    "=_CreateFuturesFixings(BL7,BM7,AM1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day"
+    "=_CreateFuturesFixings(BI1:BI2,BJ1:BJ2,AM1)" = "#ERROR _CreateFuturesFixings: date cell (1, 1) is text 'date', expected date"
+    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5)" = "#ERROR _CreateFuturesFixings: holiday_calendar is missing, expected holiday calendar handle"
+    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,BJ2)" = "#ERROR _CreateFuturesFixings: holiday_calendar is number 101.94, expected holiday calendar handle"
     # The IFERC fixings: a creator over a column of contract codes and a column of indices, read
     # back through util_ReadHandle; a price column one row short and a code given twice, the
     # library's words; a blank among the prices, a number among the codes, the prices left out
@@ -209,10 +212,10 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(CT7),36,5)" = "unfixed"
     "=ROWS(util_ReadHandle(CT7))"      = "36"
     "=COLUMNS(util_ReadHandle(CT7))"   = "5"
-    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
-    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
-    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: daily_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
-    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: daily_fixings is missing, expected daily fixings handle"
+    "=_CreateMarketHistory(CT5,CT8)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date"
+    "=_CreateMarketHistory(CT5,CT9)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings has no fixing for 2026-05-25, expected a fixing for every past business day in calendar"
+    "=_CreateMarketHistory(CT11,CT6)" = "#ERROR _CreateMarketHistory: ValueError: futures_fixings date 2026-05-25 is a non-business day in calendar, expected no fixing"
+    "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: futures_fixings is missing, expected futures fixings handle"
     # The price vector: a creator over one column of prices, read back through util_ReadHandle
     # under its header and type, a zero and a negative price kept in their places, and one over
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
@@ -402,10 +405,11 @@ $cells = [ordered]@{
     # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"
-    # Daily fixings: a header row and four rows, a date and a settle each, 1, 4, 5 and 6 May
-    # 2026, every business day of that stretch; a second body with the days newest first, one
-    # missing the Monday, one of a Saturday and one of a holiday AM1 lists; and one creator cell,
-    # which takes the calendar in AM1.
+    # Futures fixings: a header row the function never sees, then four days and a settle beside
+    # each, 1, 4, 5 and 6 May 2026, every business day of that stretch; a second pair of columns
+    # with the days newest first, one missing the Monday, one of a Saturday and one of a holiday
+    # AM1 lists; and two creator cells, over the four days and over the first alone, which take
+    # the calendar in AM1.
     "BI1" = "date"; "BJ1" = "settle"
     "BI2" = "1-May-2026"; "BJ2" = "101.94"
     "BI3" = "4-May-2026"; "BJ3" = "106.42"
@@ -417,7 +421,8 @@ $cells = [ordered]@{
     "BL5" = "5-May-2026"; "BM5" = "102.27"
     "BL6" = "2-May-2026"; "BM6" = "100"
     "BL7" = "19-Jan-2026"; "BM7" = "100"
-    "BK1" = "=_CreateDailyFixings(BI1:BJ1,BI2:BJ5,AM1)"
+    "BK1" = "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,AM1)"
+    "BK2" = "=_CreateFuturesFixings(BI2,BJ2,AM1)"
     # IFERC fixings: four contract months of Waha, January to April 2026, and an illustrative
     # index beside each; a pair of codes with one given twice; a code over a number; the first
     # price over a blank; and one creator cell over the four months.
@@ -455,10 +460,10 @@ $cells = [ordered]@{
     "CT3" = "=_CreateValuationDate(CT2,0.5)"
     "CT4" = "=_CreateExpirySchedule(AE2:AE3,AF2:AF3)"
     "CT5" = "=_CreateCalendar(CT3,CT4,AM1)"
-    "CT6" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR5,AM1)"
+    "CT6" = "=_CreateFuturesFixings(CQ2:CQ5,CR2:CR5,AM1)"
     "CT7" = "=_CreateMarketHistory(CT5,CT6)"
-    "CT8" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR6,AM1)"
-    "CT9" = "=_CreateDailyFixings(BI1:BJ1,CQ2:CR4,AM1)"
+    "CT8" = "=_CreateFuturesFixings(CQ2:CQ6,CR2:CR6,AM1)"
+    "CT9" = "=_CreateFuturesFixings(CQ2:CQ4,CR2:CR4,AM1)"
     "CT10" = "=_CreateHolidayCalendar(CQ5)"
     "CT11" = "=_CreateCalendar(CT3,CT4,CT10)"
     # The price vector: a header over four prices, a zero and a negative among them and the

@@ -324,32 +324,32 @@ def test_owning_a_range_peaks_at_the_two_copies() -> None:
     assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "", 1)) <= 9 * N + SLACK
 
 
-FIXINGS_HEADERS = Cells.from_rows([["date", "settle"]])
-
-
-def fixings_body(rows: int, holidays: int) -> Cells:
-    """That many daily fixings as the sheet sends them, a serial and a settle per row, one per
-    business day from Friday 1 May 2026 under a calendar of that many Thursdays a week apart,
-    the calendar holiday_column makes."""
+def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
+    """That many futures fixings as the sheet sends them, a column of serials and a column of
+    settles, one per business day from Friday 1 May 2026 under a calendar of that many Thursdays
+    a week apart, the calendar holiday_column makes."""
     epoch = np.datetime64("1899-12-30")
     closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
     days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
     serials = (days - epoch).astype(np.int64)
-    return Cells.from_rows([[float(serials[i]), 100.0 + i % 7] for i in range(rows)])
+    return (
+        Cells.from_rows([[float(serials[i])] for i in range(rows)]),
+        Cells.from_rows([[100.0 + i % 7] for i in range(rows)]),
+    )
 
 
-# Daily fixings keep a copy of each column, 16 bytes per row, and on the way pay the table path,
-# the date column's masks and its arrays on the way to days, and the builder's three looks, the
-# order, the days closed and the gaps, the last over the business day after each date, a
-# full-size temporary: measured 11,482 bytes at 260 rows on 2026-09-17, about 44 bytes per row,
-# up from 7,563 before the calendar was checked; 93,326 at 2,600 and 912,278 at 26,000, 35
-# bytes per row.
-def test_daily_fixings_keep_a_copy_of_each_column() -> None:
+# Futures fixings keep a copy of each column, 16 bytes per row, and on the way pay the date
+# column's masks and its arrays on the way to days, and the builder's three looks, the order,
+# the days closed and the gaps, the last over the business day after each date, a full-size
+# temporary: measured 11,202 bytes at 260 rows on 2026-09-24, about 43 bytes per row, 280 below
+# the table path's 11,482, the header row and its binding; 93,102 at 2,600 and 912,102 at
+# 26,000, 35 bytes per row, so the ceiling of 45 per row stands.
+def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
     calendar = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
-    body = fixings_body(rows, 100)
+    days, settles = fixings_columns(rows, 100)
     assert (
-        least_peak(lambda: ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, body, calendar))
+        least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, calendar))
         <= 45 * rows + SLACK
     )
 
@@ -391,7 +391,7 @@ def history_sources(contracts: int) -> tuple[object, object]:
     made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
     return made, fixings
 
 
@@ -496,7 +496,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = ENTRY["_CreateDailyFixings"](FIXINGS_HEADERS, fixings_body(rows, 100), holidays)
+    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
