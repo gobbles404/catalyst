@@ -29,7 +29,7 @@ Two handles, both required, neither with a default: the index's calendar and its
 
 `=util_ReadHandle(C9)` on the history above shows the calendar's four columns, every row the calendar has in its order, and a fifth, `fixing_price`; among its rows:
 
-| date | prompt_contract | is_business_day | is_past | fixing_price |
+| date | contract | is_priced | is_fixed | fixing_price |
 |---|---|---|---|---|
 | datetime64[D] | str | bool | bool | float64 |
 | 20-May-2026 | n26 | TRUE | TRUE | 70.85 |

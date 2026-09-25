@@ -91,15 +91,15 @@ def test_the_sample_prices_the_three_past_business_days_and_no_other_day() -> No
 # days after it.
 def test_the_rows_the_page_shows() -> None:
     made = a_history()
-    codes: list[str] = [SCHEDULE.codes[int(row)] for row in made.calendar.prompt]
+    codes: list[str] = [SCHEDULE.codes[int(row)] for row in made.calendar.contract]
     prices = priced(made)
     shown: dict[str, tuple[str, bool, bool, float | str]] = {
         str(date): (code, bool(open_), bool(past), prices.get(str(date), "-"))
         for date, code, open_, past in zip(
             made.calendar.dates,
             codes,
-            made.calendar.is_business_day,
-            made.calendar.is_past,
+            made.calendar.is_priced,
+            made.calendar.is_fixed,
             strict=True,
         )
     }
@@ -154,8 +154,8 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
     fixings = whole_fixings("2026-05-20", "2026-07-31")
     made = market_history(past, fixings)
     assert made.calendar is past
-    assert past.is_past.all()
-    assert made.fixed_rows.tolist() == np.flatnonzero(past.is_business_day).tolist()
+    assert past.is_fixed.all()
+    assert made.fixed_rows.tolist() == np.flatnonzero(past.is_priced).tolist()
     assert made.fixed_rows.size == 44
     assert str(past.dates[made.fixed_rows][-1]) == "2026-07-21"
     where = np.searchsorted(fixings.dates, past.dates[made.fixed_rows])
@@ -318,7 +318,7 @@ def test_a_calendar_whose_past_days_are_all_closed_is_a_history_without_a_price(
     closed = calendar(
         MAY_26, a_schedule(("m26", "2026-05-22"), ("n26", "2026-05-25")), CLOSED_MAY_25
     )
-    assert closed.is_past.all() and not closed.is_business_day.any()
+    assert closed.is_fixed.all() and not closed.is_priced.any()
     made = market_history(closed, FIXINGS)
     assert made.fixed_rows.size == 0 and made.fixing_prices.size == 0
     assert closed.dates.tolist() == [day("2026-05-23"), day("2026-05-24"), day("2026-05-25")]
@@ -353,6 +353,7 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     data: st.DataObject,
 ) -> None:
     made = any_calendar(data)
+    assert made.holiday_calendar is not None
     as_of = made.valuation_date.as_of
     # Fixings on every business day, under the calendar's own list, from before the calendar's
     # first day to the day before the valuation date: whole over every past business day.
@@ -362,7 +363,7 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     settles = data.draw(st.floats(-100, 100)) + np.arange(days.size, dtype=np.float64)
     fixings = futures_fixings(days, settles, made.holiday_calendar.holiday)
     history = market_history(made, fixings)
-    required = np.flatnonzero(made.is_past & made.is_business_day)
+    required = np.flatnonzero(made.is_fixed & made.is_priced)
     assert history.calendar is made
     assert history.fixed_rows.tolist() == required.tolist()
     where = np.searchsorted(fixings.dates, made.dates[required])
@@ -378,7 +379,7 @@ def test_the_history_keeps_the_calendar_itself_and_its_columns_read_only() -> No
     made = a_history()
     assert made.calendar is CALENDAR
     assert made.calendar.dates is CALENDAR.dates
-    assert made.calendar.is_business_day is CALENDAR.is_business_day
+    assert made.calendar.is_priced is CALENDAR.is_priced
     assert not made.fixed_rows.flags.writeable
     assert not made.fixing_prices.flags.writeable
     with pytest.raises(ValueError):
@@ -391,7 +392,7 @@ def test_the_history_keeps_the_calendar_itself_and_its_columns_read_only() -> No
 def test_making_a_history_changes_neither_input_and_a_second_history_shares_the_calendar() -> None:
     columns_before = tuple(
         column.copy()
-        for column in (CALENDAR.dates, CALENDAR.prompt, CALENDAR.is_business_day, CALENDAR.is_past)
+        for column in (CALENDAR.dates, CALENDAR.contract, CALENDAR.is_priced, CALENDAR.is_fixed)
     )
     dates_before, settles_before = FIXINGS.dates.copy(), FIXINGS.settles.copy()
     first = a_history()
@@ -399,7 +400,7 @@ def test_making_a_history_changes_neither_input_and_a_second_history_shares_the_
         fixings=fixings_on("2026-05-20", "2026-05-21", "2026-05-22", prices=(1.0, 2.0, 3.0))
     )
     for column, before in zip(
-        (CALENDAR.dates, CALENDAR.prompt, CALENDAR.is_business_day, CALENDAR.is_past),
+        (CALENDAR.dates, CALENDAR.contract, CALENDAR.is_priced, CALENDAR.is_fixed),
         columns_before,
         strict=True,
     ):

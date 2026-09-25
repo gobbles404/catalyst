@@ -72,7 +72,7 @@ No interpolation, averaging, carrying forward or business-day adjustment happens
 
 `=util_ReadHandle(A13)` on a market valued on 22 June 2026, n26's expiry day, with 19 June a holiday and the quotes `72.10` and `72.80`, shows among its rows:
 
-| date | prompt_contract | is_business_day | is_past | price |
+| date | contract | is_priced | is_fixed | price |
 |---|---|---|---|---|
 | datetime64[D] | str | bool | bool | float64 |
 | 18-Jun-2026 | n26 | TRUE | TRUE | 71.6 |

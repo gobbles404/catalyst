@@ -3,11 +3,12 @@ its past business days, taken from the index's futures fixings, one price for ev
 none for any other. docs/library/market/market-history.md is the page."""
 
 from dataclasses import dataclass
+from typing import assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar
+from goosedove.calendar.calendar import Calendar, Kind, described
 from goosedove.market_data.futures_fixings import FuturesFixings
 
 
@@ -16,8 +17,8 @@ class MarketHistory:
     """The calendar, the object itself and not a copy, and two columns aligned by position,
     both read-only: fixed_rows[k] is the row of the calendar whose day the k-th price was fixed
     on, increasing, and fixing_prices[k] the settle fixed on it, any number, zero and below
-    included. The rows are exactly the calendar's past business days, is_past and
-    is_business_day both, every one and no other, so a day absent from fixed_rows has no price,
+    included. The rows are exactly the calendar's past business days, is_fixed and
+    is_priced both, every one and no other, so a day absent from fixed_rows has no price,
     a weekend, a holiday, the valuation day or a day to come, and no number stands for
     absence."""
 
@@ -27,8 +28,9 @@ class MarketHistory:
 
 
 def market_history(calendar: Calendar, futures_fixings: FuturesFixings) -> MarketHistory:
-    """The one way to make a MarketHistory: three rules on the fixings against the calendar,
-    checked once, in this order, the first failure being the message; then the two columns.
+    """The one way to make a MarketHistory: the calendar a futures calendar, until the history
+    reads every kind, then three rules on the fixings against it, checked once, in this order,
+    the first failure being the message; then the two columns.
 
     The calendar decides the days and the fixings supply the prices on them. Every fixing is
     historical: none is dated on or after the valuation date's day, inside the calendar or out,
@@ -48,6 +50,13 @@ def market_history(calendar: Calendar, futures_fixings: FuturesFixings) -> Marke
     prices copied out of the fixings' column, and both are frozen. Nothing is sorted and no
     calendar is rebuilt.
     """
+    match calendar.kind:
+        case Kind.FUTURES:
+            pass
+        case Kind.IFERC | Kind.GAS_DAILY:
+            raise ValueError(f"calendar is {described(calendar.kind)}, expected a futures calendar")
+        case _:
+            assert_never(calendar.kind)
     as_of = calendar.valuation_date.as_of
     fixing_dates = futures_fixings.dates
     late = fixing_dates >= as_of
@@ -61,7 +70,7 @@ def market_history(calendar: Calendar, futures_fixings: FuturesFixings) -> Marke
     offset = (fixing_dates - dates[0]).astype(np.intp)
     inside = (offset >= 0) & (offset < dates.size)
     rows = offset[inside]
-    closed = ~calendar.is_business_day[rows]
+    closed = ~calendar.is_priced[rows]
     if closed.any():
         k = int(closed.argmax())  # rows[k] is the first row the calendar closes with a fixing
         raise ValueError(
@@ -70,7 +79,7 @@ def market_history(calendar: Calendar, futures_fixings: FuturesFixings) -> Marke
         )
     covered = np.zeros(dates.size, dtype=bool)
     covered[rows] = True
-    missing = calendar.is_past & calendar.is_business_day & ~covered
+    missing = calendar.is_fixed & calendar.is_priced & ~covered
     if missing.any():
         k = int(missing.argmax())  # dates[k] is the first past business day without a fixing
         raise ValueError(

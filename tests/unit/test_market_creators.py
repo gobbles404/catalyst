@@ -18,7 +18,7 @@ from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE
 MAY_18, MAY_19, MAY_20, MAY_21, MAY_22 = 46160.0, 46161.0, 46162.0, 46163.0, 46164.0
 MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 46023.0
 HANDLE = re.compile(r"market_history:[0-9a-f]{6}:([0-9]{6})")
-HEADERS = ["date", "prompt_contract", "is_business_day", "is_past", "fixing_price"]
+HEADERS = ["date", "contract", "is_priced", "is_fixed", "fixing_price"]
 TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
 SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
 
@@ -296,7 +296,7 @@ def test_a_dead_history_handle_cannot_be_read() -> None:
 
 
 MARKET = re.compile(r"market:[0-9a-f]{6}:([0-9]{6})")
-MARKET_HEADERS = ["date", "prompt_contract", "is_business_day", "is_past", "price"]
+MARKET_HEADERS = ["date", "contract", "is_priced", "is_fixed", "price"]
 JUN_18, JUN_19, JUN_23 = 46191.0, 46192.0, 46196.0
 
 

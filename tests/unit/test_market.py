@@ -99,7 +99,7 @@ def test_the_valuation_days_prompt_is_the_first_contract_quoted(
     history = a_history(as_of)
     made = market(history, a_vector(*(72.0 + i for i in range(quotes))))
     assert made.first_contract == first_contract
-    assert history.calendar.prompt[history.calendar.dates == day(as_of)].tolist() == [
+    assert history.calendar.contract[history.calendar.dates == day(as_of)].tolist() == [
         first_contract
     ]
     assert len(SCHEDULE.codes) - first_contract == quotes
@@ -116,7 +116,7 @@ def test_the_fraction_of_the_valuation_day_changes_nothing() -> None:
 def test_a_contract_prompt_on_closed_days_alone_still_takes_a_quote() -> None:
     closed = holiday_calendar(dates("2026-05-25", "2026-07-21"))
     history = a_history("2026-07-21", holidays=closed)
-    assert not history.calendar.is_business_day[-1]
+    assert not history.calendar.is_priced[-1]
     made = market(history, a_vector(72.80))
     assert made.first_contract == 2
     with pytest.raises(ValueError) as failure:
@@ -134,7 +134,7 @@ def test_a_contract_whose_days_are_all_closed_keeps_its_place_in_the_vector() ->
     made = market(history, a_vector(1.0, 2.0))
     assert made.first_contract == 1
     assert history.calendar.dates[0] == day("2026-05-23")
-    assert not history.calendar.is_business_day[:2].any()
+    assert not history.calendar.is_priced[:2].any()
     sunday = market(
         a_history("2026-05-24", schedule=schedule, holidays=ELSEWHERE), a_vector(1.0, 2.0)
     )
@@ -168,7 +168,7 @@ def test_many_past_contracts_and_one_quote() -> None:
     history = a_history("2026-06-10", schedule=schedule)
     made = market(history, a_vector(72.80))
     assert made.first_contract == 4
-    past_prompts = history.calendar.prompt[history.calendar.is_past]
+    past_prompts = history.calendar.contract[history.calendar.is_fixed]
     assert (past_prompts - made.first_contract).min() < 0  # what the reader must not index
 
 
@@ -266,16 +266,16 @@ def test_every_live_business_day_has_its_prompts_quote_and_no_past_day_reads_one
     history = any_history(data)
     made = history.calendar
     as_of = made.valuation_date.as_of
-    first = int(made.prompt[made.dates == as_of][0])
-    quotes = a_vector(*(100.0 + i for i in range(len(made.futures_schedule.codes) - first)))
+    first = int(made.contract[made.dates == as_of][0])
+    quotes = a_vector(*(100.0 + i for i in range(len(made.schedule.codes) - first)))
     view = market(history, quotes)
     assert view.first_contract == first
     assert view.market_history is history and view.price_vector is quotes
-    live = made.is_business_day & ~made.is_past
-    places = made.prompt[live] - first
+    live = made.is_priced & ~made.is_fixed
+    places = made.contract[live] - first
     assert places.size == 0 or (places.min() >= 0 and places.max() < quotes.prices.size)
-    assert np.all(made.prompt[~made.is_past] >= first)
-    assert set(np.flatnonzero(made.is_business_day & made.is_past).tolist()) == set(
+    assert np.all(made.contract[~made.is_fixed] >= first)
+    assert set(np.flatnonzero(made.is_priced & made.is_fixed).tolist()) == set(
         history.fixed_rows.tolist()
     )
     with pytest.raises(ValueError):

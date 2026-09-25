@@ -167,13 +167,16 @@ $formulas = [ordered]@{
     "=_CreateIfercFixings(BS2:BS3,BP2:BP3)" = "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateIfercFixings(BO2:BO5)" = "#ERROR _CreateIfercFixings: price is missing, expected column of numbers"
     "=_CreateIfercFixings(BO2:BO5,BP2:BQ2)" = "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers"
-    # The calendar: a creator over the valuation date in AA2, the schedule in AI1 and the holiday
-    # calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20 October 2026
-    # with the contract prompt on it, whether the market is open and whether the day is past; a
-    # schedule of one contract, a code given twice, expiries backwards and a span no sheet could
-    # show, the library's words; the holiday calendar left out, the seam's.
+    # The calendar: a creator over the valuation date in AA2, the futures schedule in AI1 and the
+    # holiday calendar in AM1, read back through util_ReadHandle, every day from 20 May to 20
+    # October 2026 with the contract on it, whether it prices and whether it has fixed; one over
+    # the Gas Daily schedule in DK1 and one over the IFERC schedule in DE1, the holiday calendar
+    # left out; a schedule of one contract, a code given twice, expiries backwards, a span no sheet
+    # could show, a Gas Daily gap, the holiday calendar left out with a futures schedule and given
+    # with a Gas Daily one, and a holiday calendar where the schedule should be, the library's
+    # words.
     "=LEFT(AR1,9)"                = "calendar:"
-    "=INDEX(util_ReadHandle(AR1),1,2)" = "prompt_contract"
+    "=INDEX(util_ReadHandle(AR1),1,2)" = "contract"
     "=INDEX(util_ReadHandle(AR1),2,4)" = "bool"
     "=INDEX(util_ReadHandle(AR1),3,1)" = "46162"
     "=INDEX(util_ReadHandle(AR1),3,2)" = "n26"
@@ -183,11 +186,26 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AR1),156,2)" = "X26"
     "=INDEX(util_ReadHandle(AR1),156,4)" = "FALSE"
     "=ROWS(util_ReadHandle(AR1))"      = "156"
-    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: futures_schedule has 1 contract, expected at least 2"
+    "=_CreateCalendar(AA2,AR2,AM1)" = "#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2"
     "=_CreateCalendar(AA2,AR3,AM1)" = "#ERROR _CreateCalendar: ValueError: contract_code row 2 is 'm26', already given at row 1"
     "=_CreateCalendar(AA2,AR4,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
     "=_CreateCalendar(AA2,AR5,AM1)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
-    "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: holiday_calendar is missing, expected holiday calendar handle"
+    "=_CreateCalendar(AA2,AI1)" = "#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+    "=LEFT(AR6,9)"                = "calendar:"
+    "=ROWS(util_ReadHandle(AR6))"      = "93"
+    "=INDEX(util_ReadHandle(AR6),3,2)" = "U26"
+    "=INDEX(util_ReadHandle(AR6),3,3)" = "TRUE"
+    "=INDEX(util_ReadHandle(AR6),13,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(AR6),14,4)" = "FALSE"
+    "=INDEX(util_ReadHandle(AR6),93,2)" = "X26"
+    "=LEFT(AR7,9)"                = "calendar:"
+    "=ROWS(util_ReadHandle(AR7))"      = "5"
+    "=INDEX(util_ReadHandle(AR7),3,1)" = "46296"
+    "=INDEX(util_ReadHandle(AR7),3,2)" = "V26"
+    "=INDEX(util_ReadHandle(AR7),5,4)" = "FALSE"
+    "=_CreateCalendar(AA2,DK1,AM1)" = "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    "=_CreateCalendar(AA2,AM1)" = "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
+    "=_CreateCalendar(AA2,DK3)" = "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, expected 2026-10-01, the day after row 1's last_date 2026-09-30"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, read back
     # through util_ReadHandle, the calendar's four columns and the fixing price, a number on a past
     # business day, closed on a weekend and unfixed on the valuation day and after; a fixing on
@@ -436,6 +454,8 @@ $cells = [ordered]@{
     "AR4" = "=_CreateFuturesSchedule(AE2:AE3,AT2:AT3)"
     "AT4" = "19-May-2026"; "AT5" = "12-Apr-4897"
     "AR5" = "=_CreateFuturesSchedule(AE2:AE3,AT4:AT5)"
+    "AR6" = "=_CreateCalendar(AA2,DK1)"
+    "AR7" = "=_CreateCalendar(AA2,DE1)"
     # The market history: a valuation date, 26-May-2026 at midday, a schedule of the first two
     # contracts, a calendar over them with the holiday calendar in AM1, which closes no day of
     # May, and the fixings on its four past business days, 20 to 22 May and the 25th, under the
@@ -492,6 +512,9 @@ $cells = [ordered]@{
     "DG6" = "U26"; "DG7" = "46023"
     "DK1" = "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4,DI2:DI4)"
     "DK2" = "=_CreateGasDailySchedule(DG2,DH2,DI2)"
+    # A second pair of first days for the calendar to refuse, the second month starting a day late.
+    "DL2" = "1-Sep-2026"; "DL3" = "2-Oct-2026"
+    "DK3" = "=_CreateGasDailySchedule(DG2:DG3,DL2:DL3,DI2:DI3)"
     # The Gas Daily fixings: six flow days of Henry Hub over Labor Day week 2026 and the midpoint
     # printed for each, Friday 4 September's print carrying Saturday to Tuesday; the first two
     # prices with the second blank; a pair of days with one skipped; a pair newest first; a day

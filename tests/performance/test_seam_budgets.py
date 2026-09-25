@@ -1034,7 +1034,7 @@ def test_futures_fixings_are_two_columns_and_a_calendar_in_and_one_publication_o
     }
 
 
-# --- the calendar: three handles in, four columns made once, one publication out ------------
+# --- the calendar: a schedule of any kind in, four columns made once, one publication out --
 
 
 def calendar_sources(contracts: int) -> tuple[object, object, object]:
@@ -1049,10 +1049,11 @@ def calendar_sources(contracts: int) -> tuple[object, object, object]:
 
 
 # A year of days from thirteen contracts: three handles, each the text rule and one lookup,
-# the builder's one look at the order of the expiries, its days in one arange, the prompt row
-# of each in one searchsorted, the two flags, and one publication. Fourteen calls across eight
-# functions, the accept rule once per argument; is_busday and the comparison against the
-# valuation date raise no event the numpy fixture reads.
+# the schedule's kind choosing the futures builder, its one look at the order of the expiries,
+# its days in one arange, the prompt row of each in one searchsorted, the two flags, and one
+# publication. Seventeen calls across eleven functions, the accept rule once per argument;
+# is_busday and the comparison against the valuation date raise no event the numpy fixture
+# reads.
 def test_a_calendar_is_three_handles_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1066,6 +1067,9 @@ def test_a_calendar_is_three_handles_in_and_four_columns_out(
         "_resolve": 3,  # and its one lookup
         "_CreateCalendar": 1,
         "calendar": 1,
+        "futures_calendar": 1,
+        "_each_code_once": 1,
+        "_frozen": 1,
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, holidays)) == {
@@ -1113,6 +1117,92 @@ def test_reading_a_calendar_back_rebuilds_nothing(
         "ufunc.reduce": 5,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
+    """Codes and the first and last day of that many calendar months from January 2026, laid
+    end to end, as the sheet sends them."""
+    firsts = np.arange("2026-01", "2126-01", dtype="datetime64[M]")[: months + 1]
+    starts = firsts[:-1].astype("datetime64[D]")
+    ends = firsts[1:].astype("datetime64[D]") - np.timedelta64(1, "D")
+    # Days since 1970 to the sheet's serials: 1 January 1970 is serial 25569.
+    first = starts.astype(np.int64) + 25569
+    last = ends.astype(np.int64) + 25569
+    return (
+        Cells.from_rows([[f"c{i}"] for i in range(months)]),
+        Cells.from_rows([[float(first[i])] for i in range(months)]),
+        Cells.from_rows([[float(last[i])] for i in range(months)]),
+    )
+
+
+# A year of flow days from twelve months: two handles, each the text rule and one lookup, the
+# holiday calendar left out at the accept rule's one call, the Gas Daily builder's two looks, a
+# month's last day before its first and a gap between months, its days in one arange, the month
+# of each in one searchsorted, the priced flag in one empty, the fixed flag, and one publication.
+# Seventeen calls across thirteen functions, the accept rule once per argument.
+def test_a_gas_daily_calendar_is_a_schedule_and_a_valuation_date_in_and_four_columns_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+    PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateCalendar": 1,
+        "calendar": 1,
+        "gas_daily_calendar": 1,
+        "_no_holidays": 1,
+        "_at_least_one": 1,
+        "_each_code_once": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+        "ndarray.any": 2,
+        "numpy.arange": 1,
+        "ndarray.searchsorted": 1,
+        "numpy.empty": 1,  # the priced flag, true throughout
+        "ndarray.setflags": 4,
+        "ufunc.reduce": 2,
+    }
+
+
+# Ten years of IFERC months: two handles as above, the IFERC builder's one look at the order of
+# the publication days, its one copy of them, the months' rows in one arange, the priced flag
+# in one empty, the fixed flag, and one publication. Seventeen calls across thirteen functions.
+def test_an_iferc_calendar_is_a_schedule_and_a_valuation_date_in_and_four_columns_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
+    schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
+    PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 2,
+        "_resolve": 2,
+        "_CreateCalendar": 1,
+        "calendar": 1,
+        "iferc_calendar": 1,
+        "_no_holidays": 1,
+        "_at_least_one": 1,
+        "_each_code_once": 1,
+        "_frozen": 1,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+        "ndarray.any": 1,
+        "numpy.array": 1,
+        "numpy.arange": 1,
+        "numpy.empty": 1,  # the priced flag, true throughout
+        "ndarray.setflags": 4,
+        "ufunc.reduce": 1,
+    }
 
 
 # --- the market history: two handles in, the calendar kept, its past business days priced ------
