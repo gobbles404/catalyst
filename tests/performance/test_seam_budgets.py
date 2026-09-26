@@ -976,6 +976,109 @@ def test_cells_from_buffers_copies_each_buffer_once(
     }
 
 
+# --- the index: text and four handles in, one publication out -------------------------------
+
+
+def index_parts() -> tuple[object, object, object, object]:
+    """The four handles an index takes: a futures schedule of thirteen contracts, the
+    conventions of gas, a dozen contracts' specifications and a calendar of a hundred holidays."""
+    codes, futures, _, _ = schedule_columns(13)
+    return (
+        PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
+        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(12)),
+        PATH["_CreateHolidayCalendar"](holiday_column(100)),
+    )
+
+
+# Text through its rule and four handles, each through the text rule and one lookup, the
+# builder's dispatch to the futures index, its holiday rule and one publication: twenty-one
+# calls across ten functions, and not one numpy call, no copy and no scan, whatever the
+# schedule's length. An IFERC index leaves the holiday calendar out, one handle fewer through
+# the text rule and the lookup, and runs the other holiday rule: nineteen calls across ten
+# functions.
+def test_an_index_is_text_and_four_handles_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    schedule, conventions, specifications, holidays = index_parts()
+    PATH["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert call_profile(
+        lambda: PATH["_CreateIndex"](
+            "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+        )
+    ) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 5,
+        "_text": 5,  # the name's rule, and each handle's text rule
+        "_resolve": 4,  # each handle's one lookup
+        "_CreateIndex": 1,
+        "index": 1,
+        "futures_index": 1,
+        "with_holiday_calendar": 1,
+        "_publish": 1,
+    }
+    assert (
+        numpy_calls(
+            lambda: PATH["_CreateIndex"](
+                "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+            )
+        )
+        == {}
+    )
+    months = PATH["_CreateIfercSchedule"](*iferc_columns(120))
+    PATH["_CreateIndex"]("Henry Hub IFERC", months, conventions, specifications, MISSING)
+    assert call_profile(
+        lambda: PATH["_CreateIndex"](
+            "Henry Hub IFERC", months, conventions, specifications, MISSING
+        )
+    ) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 5,
+        "_text": 4,
+        "_resolve": 3,
+        "_CreateIndex": 1,
+        "index": 1,
+        "iferc_index": 1,
+        "without_holiday_calendar": 1,
+        "_publish": 1,
+    }
+
+
+# Reading an index back: the handle's text rule and one lookup, then one row of five cells
+# through the mixed road, two lengths read off the parts and nothing else of them touched.
+def test_reading_an_index_back_costs_one_row(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    schedule, conventions, specifications, holidays = index_parts()
+    made = PATH["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    PATH["util_ReadHandle"](made)
+    assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadHandle": 1,
+        "index_table": 1,
+        "MixedArray.table": 1,
+        "_table_column": 3,
+        "_beyond_exact": 2,  # the two counts, whole numbers the sheet can hold exactly
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ReadHandle"](made)) == {
+        "numpy.array": 4,  # the three text columns gathered, and the table's texts
+        "ndarray.ravel": 1,  # the texts in sheet order
+        "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
+        "numpy.asarray": 1,
+        "ndarray.any": 5,  # the two counts' exactness looks, then the mixed road's three
+        "numpy.ascontiguousarray": 2,
+        "ufunc.reduce": 5,
+    }
+
+
 # --- the futures fixings: two columns and a calendar's handle in, one publication out -----------
 
 
@@ -1051,7 +1154,7 @@ def calendar_sources(contracts: int) -> tuple[object, object, object]:
 # A year of days from thirteen contracts: three handles, each the text rule and one lookup,
 # the schedule's kind choosing the futures builder, its one look at the order of the expiries,
 # its days in one arange, the prompt row of each in one searchsorted, the two flags, and one
-# publication. Seventeen calls across eleven functions, the accept rule once per argument;
+# publication. Eighteen calls across twelve functions, the accept rule once per argument;
 # is_busday and the comparison against the valuation date raise no event the numpy fixture
 # reads.
 def test_a_calendar_is_three_handles_in_and_four_columns_out(
@@ -1068,6 +1171,7 @@ def test_a_calendar_is_three_handles_in_and_four_columns_out(
         "_CreateCalendar": 1,
         "calendar": 1,
         "futures_calendar": 1,
+        "with_holiday_calendar": 1,
         "_each_code_once": 1,
         "_frozen": 1,
         "_publish": 1,
@@ -1155,7 +1259,7 @@ def test_a_gas_daily_calendar_is_a_schedule_and_a_valuation_date_in_and_four_col
         "_CreateCalendar": 1,
         "calendar": 1,
         "gas_daily_calendar": 1,
-        "_no_holidays": 1,
+        "without_holiday_calendar": 1,
         "_at_least_one": 1,
         "_each_code_once": 1,
         "_frozen": 1,
@@ -1189,7 +1293,7 @@ def test_an_iferc_calendar_is_a_schedule_and_a_valuation_date_in_and_four_column
         "_CreateCalendar": 1,
         "calendar": 1,
         "iferc_calendar": 1,
-        "_no_holidays": 1,
+        "without_holiday_calendar": 1,
         "_at_least_one": 1,
         "_each_code_once": 1,
         "_frozen": 1,

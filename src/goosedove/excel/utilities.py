@@ -27,6 +27,7 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
+from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
@@ -235,6 +236,24 @@ def index_conventions_table(obj: IndexConventions) -> MixedArray:
         (obj.currency_unit,),
         (obj.quantity_type,),
         (obj.quantity_unit,),
+    )
+
+
+@shown.register
+def index_table(obj: Index) -> MixedArray:
+    # What the index holds, one row: its name, its kind, how many contracts its schedule has,
+    # how many the specifications name, and whether a holiday calendar was given. The parts
+    # spill through their own handles; nothing of them is read here but two lengths.
+    return MixedArray.table(
+        [
+            ("name", "kind", "contracts", "specifications", "has_holiday_calendar"),
+            ("str", "str", "int64", "int64", "bool"),
+        ],
+        (obj.name,),
+        (obj.kind.value,),
+        np.array([len(obj.schedule.codes)], dtype=np.int64),
+        np.array([len(obj.specifications.names)], dtype=np.int64),
+        np.array([obj.holiday_calendar is not None], dtype=bool),
     )
 
 

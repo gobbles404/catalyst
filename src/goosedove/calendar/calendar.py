@@ -5,11 +5,8 @@ last expires, the prompt future on each; a Gas Daily schedule every flow day fro
 month's first day to its last month's last, the month on each; and an IFERC schedule one row per
 month, dated by the day its index is published. docs/library/calendar/calendar.md is the page."""
 
-import re
 from dataclasses import dataclass
-from enum import Enum
 from functools import singledispatch
-from typing import assert_never
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,36 +17,12 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
-
-
-class Kind(Enum):
-    """The market a calendar is the calendar of, read off the schedule it was made from."""
-
-    FUTURES = "futures"
-    IFERC = "IFERC"
-    GAS_DAILY = "Gas Daily"
-
-
-def described(kind: Kind) -> str:
-    """A calendar of that kind named in a message: a futures calendar, an IFERC calendar."""
-    match kind:
-        case Kind.FUTURES:
-            return "a futures calendar"
-        case Kind.IFERC:
-            return "an IFERC calendar"
-        case Kind.GAS_DAILY:
-            return "a Gas Daily calendar"
-        case _:
-            assert_never(kind)
-
-
-def named(obj: object) -> str:
-    """An object of no expected kind named in a message by its class, in the words the seam gives
-    a handle's kind: a holiday calendar, futures fixings, an iferc schedule."""
-    words = re.sub(r"(?<!^)(?=[A-Z])", " ", type(obj).__name__).lower()
-    if words.endswith("s"):
-        return words
-    return f"{'an' if words[0] in 'aeiou' else 'a'} {words}"
+from goosedove.index_definitions.kind import (
+    Kind,
+    named,
+    with_holiday_calendar,
+    without_holiday_calendar,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,10 +107,7 @@ def futures_calendar(
     date's day, one comparison, the day itself not fixed whatever fraction of it has elapsed,
     and a valuation date before the calendar fixing no day, after it every day.
     """
-    if holiday_calendar is None:
-        raise ValueError(
-            "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
-        )
+    holidays = with_holiday_calendar(holiday_calendar)
     codes = schedule.codes
     expiries = schedule.future_expiry
     if len(codes) < 2:
@@ -159,12 +129,12 @@ def futures_calendar(
     day = np.timedelta64(1, "D")
     dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
     contract = np.searchsorted(expiries, dates, side="left")
-    is_priced = np.is_busday(dates, holidays=holiday_calendar.holiday)
+    is_priced = np.is_busday(dates, holidays=holidays.holiday)
     is_fixed = dates < valuation_date.as_of
     return _frozen(
         valuation_date,
         schedule,
-        holiday_calendar,
+        holidays,
         Kind.FUTURES,
         dates,
         contract,
@@ -192,7 +162,7 @@ def gas_daily_calendar(
     fixed when the flow day is on or before the valuation date's day, since its print preceded
     the day, one comparison.
     """
-    _no_holidays(holiday_calendar, "a Gas Daily schedule")
+    without_holiday_calendar(holiday_calendar, Kind.GAS_DAILY)
     codes = schedule.codes
     first = schedule.first_date
     last = schedule.last_date
@@ -242,7 +212,7 @@ def iferc_calendar(
     index is a price for its whole month; and fixed when the publication day is before the
     valuation date's day, since the index prints during that day, one comparison.
     """
-    _no_holidays(holiday_calendar, "an IFERC schedule")
+    without_holiday_calendar(holiday_calendar, Kind.IFERC)
     codes = schedule.codes
     published = schedule.publication_date
     _at_least_one(codes)
@@ -259,13 +229,6 @@ def iferc_calendar(
     is_priced = np.ones(dates.size, dtype=bool)
     is_fixed = dates < valuation_date.as_of
     return _frozen(valuation_date, schedule, None, Kind.IFERC, dates, contract, is_priced, is_fixed)
-
-
-def _no_holidays(holiday_calendar: HolidayCalendar | None, with_what: str) -> None:
-    """A holiday calendar given with a schedule whose every period prices is refused, since
-    nothing reads it: fail loudly rather than ignore."""
-    if holiday_calendar is not None:
-        raise ValueError(f"holiday_calendar is a holiday calendar, expected none with {with_what}")
 
 
 def _at_least_one(codes: tuple[str, ...]) -> None:

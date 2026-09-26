@@ -60,6 +60,7 @@ What each kind shows:
 | `gas_daily_schedule` | `contract_code`, `first_date`, `last_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_specifications` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `float64`, `float64` | one per contract |
+| `index` | `name`, `kind`, `contracts`, `specifications`, `has_holiday_calendar` | `str`, `str`, `int64`, `int64`, `bool` | one, a summary of what the index holds, the kind spelled `futures`, `IFERC` or `Gas Daily`; the parts spill through their own handles |
 | `futures_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `iferc_fixings` | `contract_code`, `price` | `str`, `float64` | one per month published |
 | `gas_daily_fixings` | `flow_date`, `price` | `datetime64[D]`, `float64` | one per calendar day, weekends and holidays included |
@@ -105,6 +106,7 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | the Gas Daily schedule: three headers, three types, then a code as text and a month's first and last day as serials per contract month | example |
 | index conventions: one row of five texts under its two heading rows | example |
 | contract specifications: one row per contract, the name as text and the lot size and fees as numbers, under its two heading rows | example |
+| the index: one row, the name and the kind as text, the two counts as numbers and the holiday flag a boolean, with a holiday calendar and without | example |
 | futures fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
 | IFERC fixings: two columns, codes as text and prices exactly, a zero and a negative in their places, one row per month under its two heading rows | example |
 | Gas Daily fixings: two columns, flow days as serials and prices exactly, a Friday and the three rows its print covers, under its two heading rows | example |
