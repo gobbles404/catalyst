@@ -9,9 +9,10 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
+from test_utilities import read, rows
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle
+from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
@@ -896,3 +897,289 @@ def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept_and_read_back(
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
     assert slots[2, 1] == lot_size
+
+
+# --- _CreateIndex -------------------------------------------------------------------
+
+
+INDEX = re.compile(r"index:[0-9a-f]{6}:([0-9]{6})")
+# The IFERC and Gas Daily schedule pages' samples as the sheet sends them: three months each,
+# with the days each month's future stops trading and its index is published, and the first and
+# last day of gas of each.
+INDEX_IFERC_CODES = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
+INDEX_IFERC_LAST_TRADING = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
+INDEX_IFERC_PUBLISHED = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
+INDEX_GAS_DAILY_CODES = Cells.from_rows([["U26"], ["V26"], ["X26"]])
+INDEX_GAS_DAILY_FIRST = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
+INDEX_GAS_DAILY_LAST = Cells.from_rows([[46295.0], [46326.0], [46356.0]])
+INDEX_HEADERS = ["name", "kind", "contracts", "specifications", "has_holiday_calendar"]
+INDEX_TYPES = ["str", "str", "int64", "int64", "bool"]
+
+
+def the_parts() -> tuple[str, str, str, str]:
+    """A futures schedule of the sample's three contracts, its holiday calendar, the conventions
+    and the specifications, each a handle."""
+    return (
+        a_schedule(CODES, FUTURES, OPTIONS),
+        a_calendar(HOLIDAYS),
+        the_conventions(*UNITS),
+        the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY),
+    )
+
+
+def an_index(*args: object) -> str:
+    text = bridge.call("_CreateIndex", list(args))
+    assert isinstance(text, str) and INDEX.fullmatch(text), text
+    return text
+
+
+def test_a_futures_index_is_created_from_text_and_four_handles_and_read_back_as_one_row() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    kinds, slots, joined = read(made)
+    assert rows((kinds, slots, joined)) == [
+        INDEX_HEADERS,
+        INDEX_TYPES,
+        ["Henry Hub NYMEX", "futures", 3.0, 2.0, 1.0],
+    ]
+    assert kinds[2].tolist() == [TEXT_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE, BOOLEAN_CODE]
+    spaced = an_index(" Henry Hub NYMEX ", schedule, conventions, specifications, holidays)
+    assert rows(read(spaced))[2][0] == " Henry Hub NYMEX "
+
+
+def test_an_iferc_and_a_gas_daily_index_are_created_without_a_holiday_calendar() -> None:
+    _, _, conventions, specifications = the_parts()
+    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
+    monthly = an_index("Henry Hub IFERC", iferc, conventions, specifications, MISSING)
+    assert rows(read(monthly))[2] == ["Henry Hub IFERC", "IFERC", 3.0, 2.0, 0.0]
+    gas_daily = a_gas_daily_schedule(
+        INDEX_GAS_DAILY_CODES, INDEX_GAS_DAILY_FIRST, INDEX_GAS_DAILY_LAST
+    )
+    daily = an_index("Henry Hub Gas Daily", gas_daily, conventions, specifications, MISSING)
+    kinds, slots, joined = read(daily)
+    assert rows((kinds, slots, joined)) == [
+        INDEX_HEADERS,
+        INDEX_TYPES,
+        ["Henry Hub Gas Daily", "Gas Daily", 3.0, 2.0, 0.0],
+    ]
+    assert kinds[2].tolist() == [TEXT_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE, BOOLEAN_CODE]
+
+
+def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, MISSING]
+    ) == (
+        "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, "
+        "expected holiday calendar handle with a futures schedule"
+    )
+    gas_daily = a_gas_daily_schedule(
+        INDEX_GAS_DAILY_CODES, INDEX_GAS_DAILY_FIRST, INDEX_GAS_DAILY_LAST
+    )
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub Gas Daily", gas_daily, conventions, specifications, holidays]
+    ) == (
+        "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
+        "expected none with a Gas Daily schedule"
+    )
+    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub IFERC", iferc, conventions, specifications, holidays]
+    ) == (
+        "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
+        "expected none with an IFERC schedule"
+    )
+    for wrong, what in (
+        (holidays, "a holiday calendar"),
+        (conventions, "index conventions"),
+        (specifications, "contract specifications"),
+    ):
+        assert bridge.call(
+            "_CreateIndex", ["Henry Hub NYMEX", wrong, conventions, specifications, holidays]
+        ) == (
+            f"#ERROR _CreateIndex: ValueError: schedule is {what}, "
+            "expected a futures, IFERC or Gas Daily schedule"
+        )
+    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", made, conventions, specifications, MISSING]
+    ) == (
+        "#ERROR _CreateIndex: ValueError: schedule is an index, "
+        "expected a futures, IFERC or Gas Daily schedule"
+    )
+
+
+THE_SCHEDULE, THE_HOLIDAYS = object(), object()
+THE_CONVENTIONS, THE_SPECIFICATIONS = object(), object()
+
+
+# Each argument alone, left to right: the first bad one is named, in the seam's words.
+@pytest.mark.parametrize(
+    ("args", "text"),
+    [
+        (
+            [None, THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: name is blank, expected text",
+        ),
+        (
+            [MISSING, THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: name is missing, expected text",
+        ),
+        (
+            [1.0, THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: name is number 1.0, expected text",
+        ),
+        (
+            ["", THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: name is empty text, expected text",
+        ),
+        (
+            [
+                Cells.from_rows([["Henry Hub NYMEX"]]),
+                THE_SCHEDULE,
+                THE_CONVENTIONS,
+                THE_SPECIFICATIONS,
+                THE_HOLIDAYS,
+            ],
+            "#ERROR _CreateIndex: name is 1x1 array, expected text",
+        ),
+        (
+            ["Henry Hub NYMEX", MISSING, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: schedule is missing, expected a handle",
+        ),
+        (
+            ["Henry Hub NYMEX", None, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: schedule is blank, expected a handle",
+        ),
+        (
+            ["Henry Hub NYMEX", 46161.0, THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle",
+        ),
+        (
+            ["Henry Hub NYMEX", "x", THE_CONVENTIONS, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: schedule is text 'x' naming no live object, expected a handle",
+        ),
+        (
+            [
+                "Henry Hub NYMEX",
+                "#ERROR _CreateFuturesSchedule: contract_code is blank, expected column of text",
+                THE_CONVENTIONS,
+                THE_SPECIFICATIONS,
+                THE_HOLIDAYS,
+            ],
+            "#ERROR _CreateIndex: schedule is the creator's failure, expected a handle: "
+            "#ERROR _CreateFuturesSchedule: contract_code is blank, expected column of text",
+        ),
+        (
+            ["Henry Hub NYMEX", THE_SCHEDULE, MISSING, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: index_conventions is missing, expected index conventions handle",
+        ),
+        (
+            ["Henry Hub NYMEX", THE_SCHEDULE, None, THE_SPECIFICATIONS, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: index_conventions is blank, expected index conventions handle",
+        ),
+        (
+            ["Henry Hub NYMEX", THE_SCHEDULE, THE_CONVENTIONS, MISSING, THE_HOLIDAYS],
+            "#ERROR _CreateIndex: contract_specifications is missing, "
+            "expected contract specifications handle",
+        ),
+        (
+            [
+                "Henry Hub NYMEX",
+                THE_SCHEDULE,
+                THE_CONVENTIONS,
+                "contract_specifications:000000:000001",
+                THE_HOLIDAYS,
+            ],
+            "#ERROR _CreateIndex: contract_specifications is text "
+            "'contract_specifications:000000:000001' naming no live object, "
+            "expected contract specifications handle",
+        ),
+        (
+            ["Henry Hub NYMEX", THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, None],
+            "#ERROR _CreateIndex: holiday_calendar is blank, expected holiday calendar handle",
+        ),
+        (
+            ["Henry Hub NYMEX", THE_SCHEDULE, THE_CONVENTIONS, THE_SPECIFICATIONS, 46167.0],
+            "#ERROR _CreateIndex: holiday_calendar is number 46167.0, "
+            "expected holiday calendar handle",
+        ),
+    ],
+    ids=[
+        "a blank where the name should be",
+        "the name left out",
+        "a number where the name should be",
+        "empty text for the name",
+        "a one-cell range for the name",
+        "the schedule left out",
+        "a blank where the schedule should be",
+        "a number where the schedule should be",
+        "text naming no live schedule",
+        "the schedule creator's failure relayed",
+        "the conventions left out",
+        "a blank where the conventions should be",
+        "the specifications left out",
+        "text naming no live specifications",
+        "a blank where the holiday calendar should be",
+        "a number where the holiday calendar should be",
+    ],
+)
+def test_an_index_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    stand_ins = {
+        id(THE_SCHEDULE): schedule,
+        id(THE_HOLIDAYS): holidays,
+        id(THE_CONVENTIONS): conventions,
+        id(THE_SPECIFICATIONS): specifications,
+    }
+    given = [stand_ins.get(id(arg), arg) for arg in args]
+    assert bridge.call("_CreateIndex", given) == text
+
+
+def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_name() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, holidays, specifications, holidays]
+    ) == (
+        f"#ERROR _CreateIndex: index_conventions is holiday calendar handle {holidays!r}, "
+        "expected index conventions handle"
+    )
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, conventions, holidays]
+    ) == (
+        f"#ERROR _CreateIndex: contract_specifications is index conventions handle "
+        f"{conventions!r}, expected contract specifications handle"
+    )
+    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, made]
+    ) == (
+        f"#ERROR _CreateIndex: holiday_calendar is index handle {made!r}, "
+        "expected holiday calendar handle"
+    )
+
+
+def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    before = number(
+        an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays), INDEX
+    )
+    refused = bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, MISSING]
+    )
+    assert cast(str, refused).startswith(
+        "#ERROR _CreateIndex: ValueError: holiday_calendar is missing"
+    )
+    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert number(made, INDEX) == before + 1
+    read(made)
+    read(made)
+    again = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert number(again, INDEX) == before + 2
+
+
+def test_a_dead_index_handle_cannot_be_read() -> None:
+    assert bridge.call("util_ReadHandle", ["index:000000:000001"]) == (
+        "#ERROR util_ReadHandle: handle is text 'index:000000:000001' naming no live object, "
+        "expected a handle"
+    )

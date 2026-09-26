@@ -341,7 +341,7 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the market's creators | `src/goosedove/excel/market.py` |
 | `util_ReadHandle`, and the table each kind shows | `src/goosedove/excel/utilities.py` |
 | the library's first objects, a valuation date, a discount curve and the unit conversions, and their builders | `src/goosedove/globals/` |
-| the index definitions, a futures schedule, a holiday calendar, index conventions and contract specifications, and their builders | `src/goosedove/index_definitions/` |
+| the index definitions, a futures, an IFERC and a Gas Daily schedule, a holiday calendar, index conventions, contract specifications and the index that binds them, with their builders and the kinds they share | `src/goosedove/index_definitions/` |
 | the market data, futures fixings, IFERC fixings, Gas Daily fixings and the price vector, and their builders | `src/goosedove/market_data/` |
 | the calendar, every period of an index with its contract and two flags, from any of the three schedules, and its builder | `src/goosedove/calendar/` |
 | the market history, an index's calendar bound to the price fixed on each of its periods that has fixed, from the fixings of the calendar's market, and the market, the history with the quotes of its periods to come, and their builders | `src/goosedove/market/` |

@@ -305,6 +305,28 @@ def test_contract_specifications_keep_a_copy_of_each_numeric_column() -> None:
     )
 
 
+# An index is its record, a name and five references, and its reader a three-row table of five
+# cells: measured 241 and 1,131 bytes on 2026-09-25, which twice the slack covers.
+def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
+    codes, futures, _, _ = schedule_columns(13)
+    schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU")
+    specifications = ENTRY["_CreateContractSpecifications"](
+        SPECIFICATION_HEADERS, specification_body(12)
+    )
+    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    assert (
+        least_peak(
+            lambda: ENTRY["_CreateIndex"](
+                "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+            )
+        )
+        <= 2 * SLACK
+    )
+    made = ENTRY["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 2 * SLACK
+
+
 def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])

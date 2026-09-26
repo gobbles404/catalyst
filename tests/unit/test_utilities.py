@@ -29,6 +29,7 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
+from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory
@@ -537,6 +538,47 @@ def test_a_kind_without_a_table_fails_rather_than_guessing_its_columns() -> None
     )
 
 
+# One row of what an index holds: the name and the kind as text, the two counts as numbers and
+# the holiday flag a boolean, for a futures index with its calendar and an IFERC one without.
+def test_an_index_spills_one_row_of_what_it_holds() -> None:
+    schedule = bridge.call(
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "energy", "MMBTU"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0]]),
+        ],
+    )
+    made = bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, holidays]
+    )
+    kinds, slots, joined = read(made)
+    assert rows((kinds, slots, joined)) == [
+        ["name", "kind", "contracts", "specifications", "has_holiday_calendar"],
+        ["str", "str", "int64", "int64", "bool"],
+        ["Henry Hub NYMEX", "futures", 2.0, 1.0, 1.0],
+    ]
+    assert kinds[2].tolist() == [TEXT_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE, BOOLEAN_CODE]
+    month = bridge.call(
+        "_CreateIfercSchedule",
+        [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
+    )
+    kinds, slots, joined = read(
+        bridge.call(
+            "_CreateIndex", ["Henry Hub IFERC", month, conventions, specifications, MISSING]
+        )
+    )
+    assert rows((kinds, slots, joined))[2] == ["Henry Hub IFERC", "IFERC", 1.0, 1.0, 0.0]
+    assert kinds[2, 4] == BOOLEAN_CODE
+
+
 def test_every_kind_a_creator_publishes_has_a_table() -> None:
     assert {
         Calendar,
@@ -548,6 +590,7 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
         IfercSchedule,
         IndexConventions,
         ContractSpecifications,
+        Index,
         FuturesFixings,
         GasDailyFixings,
         IfercFixings,

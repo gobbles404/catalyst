@@ -26,6 +26,7 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule, future
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
 
 # The worksheet functions this module registers, named here so that their leading underscore
@@ -36,6 +37,7 @@ __all__ = [
     "_CreateGasDailySchedule",
     "_CreateHolidayCalendar",
     "_CreateIfercSchedule",
+    "_CreateIndex",
     "_CreateIndexConventions",
 ]
 
@@ -136,6 +138,39 @@ def _CreateIndexConventions(
     return index_conventions(
         quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
     )
+
+
+@excel_function
+def _CreateIndex(
+    name: Annotated[
+        str, "The index's name as the desk calls it, such as Henry Hub NYMEX, kept as typed."
+    ],
+    schedule: Annotated[
+        Handle[object],
+        "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its creator's "
+        "result, such as B2, or a name for it.",
+    ],
+    index_conventions: Annotated[
+        Handle[IndexConventions],
+        "The index-conventions handle: the cell showing _CreateIndexConventions's result, such "
+        "as B4, or a name for it.",
+    ],
+    contract_specifications: Annotated[
+        Handle[ContractSpecifications],
+        "The contract-specifications handle: the cell showing _CreateContractSpecifications's "
+        "result, such as B5, or a name for it.",
+    ],
+    holiday_calendar: Annotated[
+        Handle[HolidayCalendar] | None,
+        "The market's holiday-calendar handle with a futures schedule: the cell showing "
+        "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an IFERC "
+        "or Gas Daily schedule.",
+    ] = None,
+) -> Handle[Index]:
+    """Creates the index behind one reference price, its name with its schedule, conventions,
+    contract specifications and, for a futures index, holiday calendar, and shows its handle,
+    the text other formulas take as the index."""
+    return index(name, schedule, index_conventions, contract_specifications, holiday_calendar)
 
 
 class ContractSpecificationsTable(Table):

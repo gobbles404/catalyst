@@ -7,12 +7,13 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar, Kind, calendar
+from goosedove.calendar.calendar import Calendar, calendar
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from goosedove.index_definitions.kind import Kind
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:

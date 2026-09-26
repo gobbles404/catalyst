@@ -9,7 +9,8 @@ from typing import assert_never
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import Calendar, Kind, described, named
+from goosedove.calendar.calendar import Calendar
+from goosedove.index_definitions.kind import Kind, described, named
 from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings

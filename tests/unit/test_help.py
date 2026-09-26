@@ -311,6 +311,43 @@ def test_the_market_creator_explains_itself() -> None:
     ]
 
 
+def test_the_index_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateIndex"]
+    assert not hidden
+    assert description == (
+        "Creates the index behind one reference price, its name with its schedule, conventions, "
+        "contract specifications and, for a futures index, holiday calendar, and shows its "
+        "handle, the text other formulas take as the index."
+    )
+    assert arguments == [
+        (
+            "name",
+            "The index's name as the desk calls it, such as Henry Hub NYMEX, kept as typed.",
+        ),
+        (
+            "schedule",
+            "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its "
+            "creator's result, such as B2, or a name for it.",
+        ),
+        (
+            "index_conventions",
+            "The index-conventions handle: the cell showing _CreateIndexConventions's result, "
+            "such as B4, or a name for it.",
+        ),
+        (
+            "contract_specifications",
+            "The contract-specifications handle: the cell showing "
+            "_CreateContractSpecifications's result, such as B5, or a name for it.",
+        ),
+        (
+            "[holiday_calendar]",
+            "The market's holiday-calendar handle with a futures schedule: the cell showing "
+            "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an "
+            "IFERC or Gas Daily schedule.",
+        ),
+    ]
+
+
 def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden

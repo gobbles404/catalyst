@@ -142,6 +142,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "NYMEX NG", 2500.0, 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
+            // The index: text and four handles. A blank where the name should be, a number and text naming no live object where the schedule should be, and the specifications left out fail in the seam's words; the library's rules, which need live handles, are in the fact below.
+            yield return new object[] { "_CreateIndex", new object[] { ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: name is blank, expected text" };
+            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", 46161.0, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle" };
+            yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "x", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is text 'x' naming no live object, expected a handle" };
             // The futures fixings: a column of days, a column of settles and the market's calendar by handle. The calendar left out, a number in its place and text naming no live object fail in the seam's words, as do a blank among the settles and a row where a column is expected; the library's rules, which need a live calendar, are in the fact below.
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, 106.42), ExcelMissing.Value }, "#ERROR _CreateFuturesFixings: holiday_calendar is missing, expected holiday calendar handle" };
             yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, 106.42), 101.94 }, "#ERROR _CreateFuturesFixings: holiday_calendar is number 101.94, expected holiday calendar handle" };
@@ -317,6 +321,43 @@ namespace Goosedove.Host.Tests
             Assert.Equal("ICE NG", spill[3, 0]);
             Assert.Equal(2500.0, spill[3, 1]);
             Assert.Equal(0.75, spill[3, 2]);
+        }
+
+        // The index: a name, a futures schedule of three contracts, the conventions, the
+        // specifications and a holiday calendar make one, and util_ReadHandle spills it back as one
+        // row, the name, the kind, three contracts, two specifications and TRUE; an IFERC schedule
+        // without a holiday calendar makes one whose row says IFERC and FALSE. The library's rules
+        // answer through the same objects: the futures schedule without its holiday calendar, the
+        // Gas Daily schedule with one, a holiday calendar where the schedule should be, and a handle
+        // of another kind where the conventions should be.
+        [Fact]
+        public void an_index_is_created_from_text_and_four_handles_and_read_back_through_its_handle()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
+            var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, conventions, specifications, holidays);
+            Assert.StartsWith("index:", handle);
+            var spill = (object[,])Seam.Call("util_ReadHandle", handle);
+            Assert.Equal(3, spill.GetLength(0));
+            Assert.Equal(5, spill.GetLength(1));
+            Assert.Equal("kind", spill[0, 1]);
+            Assert.Equal("int64", spill[1, 2]);
+            Assert.Equal("Henry Hub NYMEX", spill[2, 0]);
+            Assert.Equal("futures", spill[2, 1]);
+            Assert.Equal(3.0, spill[2, 2]);
+            Assert.Equal(2.0, spill[2, 3]);
+            Assert.Equal(true, spill[2, 4]);
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var monthly = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub IFERC", iferc, conventions, specifications, ExcelMissing.Value));
+            Assert.Equal("IFERC", monthly[2, 1]);
+            Assert.Equal(false, monthly[2, 4]);
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, conventions, specifications, ExcelMissing.Value));
+            var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub Gas Daily", gasDaily, conventions, specifications, holidays));
+            Assert.Equal("#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule", Seam.Call("_CreateIndex", "Henry Hub NYMEX", holidays, conventions, specifications, ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateIndex: index_conventions is holiday calendar handle '" + holidays + "', expected index conventions handle", Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, holidays, specifications, holidays));
         }
 
         // Futures fixings: a column of days, a column of settles and the market's calendar make one,

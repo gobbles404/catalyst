@@ -129,6 +129,30 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
     "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
     "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
+    # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
+    # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
+    # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
+    # row; the futures schedule without its holiday calendar, the Gas Daily schedule with one and a
+    # holiday calendar where the schedule should be, the library's words; the specifications left
+    # out and a blank where the name should be, the seam's.
+    "=LEFT(EB1,6)"                = "index:"
+    "=ROWS(util_ReadHandle(EB1))"      = "3"
+    "=INDEX(util_ReadHandle(EB1),1,5)" = "has_holiday_calendar"
+    "=INDEX(util_ReadHandle(EB1),2,3)" = "int64"
+    "=INDEX(util_ReadHandle(EB1),3,1)" = "Henry Hub NYMEX"
+    "=INDEX(util_ReadHandle(EB1),3,2)" = "futures"
+    "=INDEX(util_ReadHandle(EB1),3,3)" = "6"
+    "=INDEX(util_ReadHandle(EB1),3,4)" = "2"
+    "=INDEX(util_ReadHandle(EB1),3,5)" = "TRUE"
+    "=INDEX(util_ReadHandle(EB2),3,2)" = "IFERC"
+    "=INDEX(util_ReadHandle(EB2),3,5)" = "FALSE"
+    "=INDEX(util_ReadHandle(EB3),3,2)" = "Gas Daily"
+    "=INDEX(util_ReadHandle(EB3),3,3)" = "3"
+    "=_CreateIndex(EC2,AI1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+    "=_CreateIndex(EC4,DK1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    "=_CreateIndex(EC2,AM1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
+    "=_CreateIndex(EC2,AI1,AP1)" = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
+    "=_CreateIndex(C2,AI1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: name is blank, expected text"
     # The futures fixings: a creator over a column of four days and a column of their settles and
     # the calendar in AM1, and over the first row alone, read back through util_ReadHandle; a
     # settle column one row short, the days newest first, a business day without a fixing, a
@@ -617,6 +641,13 @@ $cells = [ordered]@{
     "DX7" = "Z26"; "DY7" = "2.2"
     "EA7" = "=_CreateIfercFixings(DX5:DX7,DY5:DY7)"
     "EA8" = "=_CreateMarketHistory(EA6,EA7)"
+    # The index: three names, and creator cells over the futures schedule in AI1 with the holiday
+    # calendar in AM1, the IFERC schedule in DE1 and the Gas Daily schedule in DK1, each with the
+    # conventions in AP1 and the specifications in BY1.
+    "EC2" = "Henry Hub NYMEX"; "EC3" = "Henry Hub IFERC"; "EC4" = "Henry Hub Gas Daily"
+    "EB1" = "=_CreateIndex(EC2,AI1,AP1,BY1,AM1)"
+    "EB2" = "=_CreateIndex(EC3,DE1,AP1,BY1)"
+    "EB3" = "=_CreateIndex(EC4,DK1,AP1,BY1)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
