@@ -292,6 +292,18 @@ def specification_body(contracts: int) -> Cells:
     return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
 
 
+def an_index(schedule: object, holidays: object = MISSING) -> object:
+    """The index handle of that schedule handle and holiday calendar handle, with the conventions
+    of gas and one lot, since nothing measured here reads either."""
+    return ENTRY["_CreateIndex"](
+        "sample",
+        schedule,
+        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
+        holidays,
+    )
+
+
 # Contract specifications keep a copy of each numeric column, 24 bytes per contract, and on the
 # way pay the table path, the names gathered and the builder's look at the lot sizes: measured
 # 12,163 bytes at 120 contracts on 2026-09-17, about 76 bytes per contract beyond a creator's
@@ -356,23 +368,25 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 # 26,000, 35 bytes per row, so the ceiling of 45 per row stands.
 def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
-    calendar = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    codes, futures, _, _ = schedule_columns(2)
+    index = an_index(
+        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+    )
     days, settles = fixings_columns(rows, 100)
     assert (
-        least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, calendar))
+        least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
         <= 45 * rows + SLACK
     )
 
 
-def calendar_sources(contracts: int) -> tuple[object, object, object]:
-    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
-    contracts a month apart, and a calendar of a hundred holidays a week apart."""
+def calendar_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a calendar takes: the valuation date, and the index of a schedule of that
+    many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
-    return (
-        ENTRY["_CreateValuationDate"](46276.0, 0.5),
-        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
-        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
-    )
+    schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
+    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+    return ENTRY["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
 # A calendar keeps four columns, 18 bytes per day, the days and the prompt rows 8 each and the
@@ -384,12 +398,9 @@ def calendar_sources(contracts: int) -> tuple[object, object, object]:
 # bytes per cell; 251,938 at 3,630 days.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
-    valuation, schedule, holidays = calendar_sources(13)
-    assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, schedule, holidays))
-        <= 25 * days + 2 * SLACK
-    )
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    valuation, index = calendar_sources(13)
+    assert least_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 25 * days + 2 * SLACK
+    made = ENTRY["_CreateCalendar"](valuation, index)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
 
 
@@ -420,14 +431,17 @@ def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
 def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     gas_daily = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+    gas_daily_index = an_index(gas_daily)
+    gas_daily_index = gas_daily_index
     assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily, MISSING))
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily_index))
         <= 25 * 365 + 2 * SLACK
     )
     iferc = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    iferc_index = an_index(iferc)
+    iferc_index = iferc_index
     assert (
-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc, MISSING))
-        <= 80 * 120 + 2 * SLACK
+        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index)) <= 80 * 120 + 2 * SLACK
     )
 
 
@@ -435,11 +449,11 @@ def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
     before, under the same hundred Thursdays, so every fixed business day has one."""
-    valuation, schedule, holidays = calendar_sources(contracts)
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    valuation, index = calendar_sources(contracts)
+    made = ENTRY["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
+    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), index)
     return made, fixings
 
 
@@ -467,7 +481,9 @@ def gas_daily_history_sources() -> tuple[object, object]:
     that every fixed day has one."""
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
-    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = ENTRY["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
     fixings = ENTRY["_CreateGasDailyFixings"](
         Cells.from_rows([[46023.0 + i] for i in range(days)]),
@@ -482,7 +498,9 @@ def iferc_history_sources() -> tuple[object, object]:
     has fixed, and an index for each of them."""
     valuation = ENTRY["_CreateValuationDate"](49740.0, 0.5)
     schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
-    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = ENTRY["_CreateCalendar"](valuation, index)
     fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(120))
     return made, fixings
 
@@ -592,11 +610,11 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
-    made = ENTRY["_CreateCalendar"](valuation, schedule, holidays)
+    index = an_index(schedule, ENTRY["_CreateHolidayCalendar"](holiday_column(100)))
+    made = ENTRY["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
+    fixings = ENTRY["_CreateFuturesFixings"](*fixings_columns(rows, 100), index)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
@@ -632,7 +650,9 @@ def iferc_market_sources() -> tuple[object, object]:
     for each, and a vector of 116 quotes, one per month still to publish."""
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
-    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = ENTRY["_CreateCalendar"](valuation, index)
     fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4))
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))

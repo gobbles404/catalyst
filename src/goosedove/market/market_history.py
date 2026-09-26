@@ -76,10 +76,10 @@ def fixings_of(kind: Kind) -> str:
 def _of_the_market(calendar: Calendar, kind: Kind, arrived: str) -> None:
     """The fixings are the calendar's market's, else refused naming what arrived and what the
     calendar takes."""
-    if calendar.kind is not kind:
+    if calendar.index.kind is not kind:
         raise ValueError(
-            f"fixings is {arrived}, expected {fixings_of(calendar.kind)} "
-            f"with {described(calendar.kind)}"
+            f"fixings is {arrived}, expected {fixings_of(calendar.index.kind)} "
+            f"with {described(calendar.index.kind)}"
         )
 
 
@@ -140,7 +140,7 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
     holds, for a month already fixed, and every fixed month has its index; the rows come out in
     the calendar's order whatever order the indices came in."""
     _of_the_market(calendar, Kind.IFERC, "IFERC fixings")
-    codes = calendar.schedule.codes
+    codes = calendar.index.schedule.codes
     place = {code: row for row, code in enumerate(codes)}
     found: list[int] = []
     for code in fixings.codes:

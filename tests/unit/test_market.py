@@ -11,10 +11,13 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from goosedove.index_definitions.index import Index, index
+from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -46,6 +49,19 @@ SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "202
 CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL")
+SPECIFICATIONS = contract_specifications(
+    ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
+)
+
+
+def an_index(
+    schedule: object = SCHEDULE, holidays: HolidayCalendar | None = CLOSED_MAY_25
+) -> Index:
+    """The index of that schedule and holiday calendar, with one set of conventions and
+    specifications throughout, since nothing here reads either."""
+    return index("sample", schedule, CONVENTIONS, SPECIFICATIONS, holidays)
+
 
 def a_history(
     as_of: str = "2026-05-26",
@@ -55,11 +71,13 @@ def a_history(
 ) -> MarketHistory:
     """The history of that calendar, with a fixing on every business day from ten days before
     the calendar's first day to the day before the valuation date."""
-    made = calendar(valuation_date(day(as_of), fraction), schedule, holidays)
+    made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, holidays))
     first = made.dates[0] - np.timedelta64(10, "D")
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
-    fixings = futures_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
+    fixings = futures_fixings(
+        days, 70.0 + np.arange(days.size, dtype=np.float64), an_index(schedule, holidays)
+    )
     return market_history(made, fixings)
 
 
@@ -86,7 +104,7 @@ def a_gas_daily_history(
     """The Gas Daily history of that calendar, with a print on every flow day from ten days
     before the calendar's first day, or from the valuation day when that is earlier, through
     the valuation day."""
-    made = calendar(valuation_date(day(as_of), fraction), schedule, None)
+    made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     start = min(made.dates[0] - np.timedelta64(10, "D"), day(as_of))
     days = np.arange(start, day(as_of) + np.timedelta64(1, "D"), dtype="datetime64[D]")
     prints = gas_daily_fixings(days, 2.8 + np.arange(days.size, dtype=np.float64) / 100)
@@ -98,7 +116,7 @@ def an_iferc_history(
 ) -> MarketHistory:
     """The IFERC history of that calendar, with an index for every month published before the
     valuation day."""
-    made = calendar(valuation_date(day(as_of), fraction), schedule, None)
+    made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     codes = tuple(schedule.codes[int(row)] for row in np.flatnonzero(made.is_fixed))
     indices = iferc_fixings(codes, 1.8 + np.arange(len(codes), dtype=np.float64) / 10)
     return market_history(made, indices)
@@ -438,11 +456,14 @@ def any_history(data: st.DataObject) -> MarketHistory:
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, span)), "D")
     made = calendar(
-        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))), schedule, holidays
+        valuation_date(as_of, data.draw(st.sampled_from((0.0, 0.5, 1.0)))),
+        an_index(schedule, holidays),
     )
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]
-    fixings = futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), listed)
+    fixings = futures_fixings(
+        days, 60.0 + np.arange(days.size, dtype=np.float64), an_index(schedule, holidays)
+    )
     return market_history(made, fixings)
 
 
@@ -454,7 +475,7 @@ def test_every_live_business_day_has_its_prompts_quote_and_no_past_day_reads_one
     history = any_history(data)
     made = history.calendar
     first = int(made.contract[int(np.count_nonzero(made.is_fixed))])
-    quotes = a_vector(*(100.0 + i for i in range(len(made.schedule.codes) - first)))
+    quotes = a_vector(*(100.0 + i for i in range(len(made.index.schedule.codes) - first)))
     view = market(history, quotes)
     assert view.first_contract == first
     if made.valuation_date.as_of >= made.dates[0]:
@@ -487,7 +508,7 @@ def any_gas_daily_history(data: st.DataObject) -> MarketHistory:
     firsts = lasts - lengths.astype("timedelta64[D]") + one_day
     schedule = gas_daily_schedule(tuple(f"c{i}" for i in range(count)), firsts, lasts)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(lengths.sum()) - 2)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     days = np.arange(min(firsts[0], as_of) - one_day, as_of + one_day, dtype="datetime64[D]")
     prints = gas_daily_fixings(days, 1.0 + np.arange(days.size, dtype=np.float64))
     return market_history(made, prints)
@@ -508,7 +529,7 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     codes = tuple(f"c{i}" for i in range(count))
     schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
     as_of = published[0] + np.timedelta64(data.draw(st.integers(-10, int(gaps[1:].sum()))), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed)
     indices = iferc_fixings(
         tuple(codes[int(i)] for i in fixed), 100.0 + np.arange(fixed.size, dtype=np.float64)
@@ -527,7 +548,7 @@ def test_every_unfixed_period_of_the_other_two_kinds_has_its_contracts_quote(
     fixed = int(np.count_nonzero(made.is_fixed))
     assert made.is_fixed[:fixed].all() and not made.is_fixed[fixed:].any()
     first = int(made.contract[fixed])
-    quotes = a_vector(*(100.0 + i for i in range(len(made.schedule.codes) - first)))
+    quotes = a_vector(*(100.0 + i for i in range(len(made.index.schedule.codes) - first)))
     view = market(history, quotes)
     assert view.first_contract == first
     assert view.market_history is history and view.price_vector is quotes

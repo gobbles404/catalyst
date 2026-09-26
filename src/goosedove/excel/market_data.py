@@ -18,7 +18,7 @@ from goosedove.excel.bridge import (
     TextColumn,
     excel_function,
 )
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.index import Index
 from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
 from goosedove.market_data.iferc_fixings import IfercFixings, iferc_fixings
@@ -45,16 +45,16 @@ def _CreateFuturesFixings(
         NumberColumn,
         "The column of settles beside the days, such as B2:B5, one per day.",
     ],
-    holiday_calendar: Annotated[
-        Handle[HolidayCalendar],
-        "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
-        "result, such as D2, or a name for it.",
+    index: Annotated[
+        Handle[Index],
+        "The index handle: the cell showing _CreateIndex's result, such as D3, or a name for "
+        "it; a futures index, whose holiday calendar the days are checked against.",
     ],
 ) -> Handle[FuturesFixings]:
     """Creates the futures fixings of one index from the days it fixed and their settles, checked
-    against its market's holiday calendar, and shows its handle, the text other formulas take as
-    the fixings."""
-    return futures_fixings(date, settle, holiday_calendar.holiday)
+    against the holiday calendar of its index, and shows its handle, the text other formulas
+    take as the fixings."""
+    return futures_fixings(date, settle, index)
 
 
 @excel_function

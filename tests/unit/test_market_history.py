@@ -10,10 +10,13 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar, calendar
 from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
+from goosedove.index_definitions.index import Index, index
+from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import FuturesFixings, futures_fixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings, gas_daily_fixings
@@ -41,14 +44,29 @@ MAY_26 = valuation_date(day("2026-05-26"), 0.5)
 CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
-CALENDAR = calendar(MAY_26, SCHEDULE, CLOSED_MAY_25)
+
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL")
+SPECIFICATIONS = contract_specifications(
+    ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
+)
+
+
+def an_index(
+    schedule: object = SCHEDULE, holidays: HolidayCalendar | None = CLOSED_MAY_25
+) -> Index:
+    """The index of that schedule and holiday calendar, with one set of conventions and
+    specifications throughout, since nothing here reads either."""
+    return index("sample", schedule, CONVENTIONS, SPECIFICATIONS, holidays)
+
+
+CALENDAR = calendar(MAY_26, an_index(SCHEDULE, CLOSED_MAY_25))
 
 
 def fixings_on(
     *days: str, prices: tuple[float, ...] = (), holidays: HolidayCalendar = CLOSED_MAY_25
 ) -> FuturesFixings:
     settles = np.array(prices or tuple(70.0 + i for i in range(len(days))), dtype=np.float64)
-    return futures_fixings(dates(*days), settles, holidays.holiday)
+    return futures_fixings(dates(*days), settles, an_index(SCHEDULE, holidays))
 
 
 FIXINGS = fixings_on("2026-05-20", "2026-05-21", "2026-05-22", prices=(70.85, 71.10, 71.25))
@@ -75,7 +93,9 @@ def whole_fixings(
 ) -> FuturesFixings:
     """A fixing on every business day from the first day to the last, priced by position."""
     days = business_days(first, last, holidays)
-    return futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), holidays.holiday)
+    return futures_fixings(
+        days, 60.0 + np.arange(days.size, dtype=np.float64), an_index(SCHEDULE, holidays)
+    )
 
 
 # --- the sample ---------------------------------------------------------------
@@ -123,8 +143,7 @@ def test_the_rows_the_page_shows() -> None:
 def test_a_single_required_fixing_is_a_history() -> None:
     one_day = calendar(
         valuation_date(day("2026-05-21"), 0.5),
-        a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-20")),
-        CLOSED_MAY_25,
+        an_index(a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-20")), CLOSED_MAY_25),
     )
     made = market_history(one_day, fixings_on("2026-05-20", prices=(71.0,)))
     assert made.fixed_rows.tolist() == [0]
@@ -155,7 +174,7 @@ def test_fixings_before_the_calendars_first_day_are_allowed_and_unused() -> None
 # A calendar entirely in the past, valued on 1 August 2026: every business day from 20 May to
 # 21 July needs a fixing, and the fixings running on to the end of July are allowed and unused.
 def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
-    past = calendar(valuation_date(day("2026-08-01"), 0.0), SCHEDULE, CLOSED_MAY_25)
+    past = calendar(valuation_date(day("2026-08-01"), 0.0), an_index(SCHEDULE, CLOSED_MAY_25))
     fixings = whole_fixings("2026-05-20", "2026-07-31")
     made = market_history(past, fixings)
     assert made.calendar is past
@@ -188,7 +207,8 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
         ),
         (
             calendar(
-                MAY_26, a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-22")), CLOSED_MAY_25
+                MAY_26,
+                an_index(a_schedule(("m26", "2026-05-19"), ("n26", "2026-05-22")), CLOSED_MAY_25),
             ),
             fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27"),
             "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
@@ -200,7 +220,9 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
             "fixings date 2026-05-25 is a closed day in calendar, expected no fixing",
         ),
         (
-            calendar(MAY_26, SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22"))),
+            calendar(
+                MAY_26, an_index(SCHEDULE, holiday_calendar(dates("2026-05-21", "2026-05-22")))
+            ),
             FIXINGS,
             "fixings date 2026-05-21 is a closed day in calendar, expected no fixing",
         ),
@@ -229,13 +251,13 @@ def test_fixings_after_the_calendars_last_day_are_allowed_and_unused() -> None:
             "expected a fixing for every fixed day in calendar",
         ),
         (
-            calendar(MAY_26, SCHEDULE, ELSEWHERE),
+            calendar(MAY_26, an_index(SCHEDULE, ELSEWHERE)),
             FIXINGS,
             "fixings has no fixing for 2026-05-25, "
             "expected a fixing for every fixed day in calendar",
         ),
         (
-            calendar(valuation_date(day("2026-08-01"), 0.0), SCHEDULE, CLOSED_MAY_25),
+            calendar(valuation_date(day("2026-08-01"), 0.0), an_index(SCHEDULE, CLOSED_MAY_25)),
             FIXINGS,
             "fixings has no fixing for 2026-05-26, "
             "expected a fixing for every fixed day in calendar",
@@ -293,7 +315,9 @@ def test_a_history_that_cannot_be_made_says_why(
 def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
     late = fixings_on("2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26")
     for fraction in (0.0, 0.5, 1.0):
-        made = calendar(valuation_date(day("2026-05-26"), fraction), SCHEDULE, CLOSED_MAY_25)
+        made = calendar(
+            valuation_date(day("2026-05-26"), fraction), an_index(SCHEDULE, CLOSED_MAY_25)
+        )
         with pytest.raises(ValueError) as failure:
             market_history(made, late)
         assert str(failure.value).startswith("fixings date 2026-05-26 is on or after")
@@ -307,7 +331,7 @@ def test_the_fraction_of_the_valuation_day_admits_no_fixing_on_it() -> None:
 # the fixings, the last week of April, are before the valuation date, outside the calendar and
 # unused.
 def test_a_calendar_entirely_to_come_is_a_history_without_a_price() -> None:
-    future = calendar(valuation_date(day("2026-05-01"), 0.5), SCHEDULE, CLOSED_MAY_25)
+    future = calendar(valuation_date(day("2026-05-01"), 0.5), an_index(SCHEDULE, CLOSED_MAY_25))
     made = market_history(future, whole_fixings("2026-04-27", "2026-04-30"))
     assert made.calendar is future
     assert made.fixed_rows.size == 0
@@ -321,7 +345,7 @@ def test_a_calendar_entirely_to_come_is_a_history_without_a_price() -> None:
 # a business day, so nothing is required; the fixings, on the days before, are unused.
 def test_a_calendar_whose_past_days_are_all_closed_is_a_history_without_a_price() -> None:
     closed = calendar(
-        MAY_26, a_schedule(("m26", "2026-05-22"), ("n26", "2026-05-25")), CLOSED_MAY_25
+        MAY_26, an_index(a_schedule(("m26", "2026-05-22"), ("n26", "2026-05-25")), CLOSED_MAY_25)
     )
     assert closed.is_fixed.all() and not closed.is_priced.any()
     made = market_history(closed, FIXINGS)
@@ -349,7 +373,7 @@ def any_calendar(data: st.DataObject) -> Calendar:
     span = int(offsets[-1] - offsets[0])
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, span + 10)), "D")
     fraction = data.draw(st.sampled_from((0.0, 0.5, 1.0)))
-    return calendar(valuation_date(as_of, fraction), schedule, holiday_calendar(listed))
+    return calendar(valuation_date(as_of, fraction), an_index(schedule, holiday_calendar(listed)))
 
 
 @settings(deadline=None)
@@ -358,15 +382,15 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     data: st.DataObject,
 ) -> None:
     made = any_calendar(data)
-    assert made.holiday_calendar is not None
+    assert made.index.holiday_calendar is not None
     as_of = made.valuation_date.as_of
     # Fixings on every business day, under the calendar's own list, from before the calendar's
     # first day to the day before the valuation date: whole over every past business day.
     span = made.dates.size + 20 + data.draw(st.integers(0, 10))
     days = np.arange(as_of - np.timedelta64(span, "D"), as_of, dtype="datetime64[D]")
-    days = days[np.is_busday(days, holidays=made.holiday_calendar.holiday)]
+    days = days[np.is_busday(days, holidays=made.index.holiday_calendar.holiday)]
     settles = data.draw(st.floats(-100, 100)) + np.arange(days.size, dtype=np.float64)
-    fixings = futures_fixings(days, settles, made.holiday_calendar.holiday)
+    fixings = futures_fixings(days, settles, made.index)
     history = market_history(made, fixings)
     required = np.flatnonzero(made.is_fixed & made.is_priced)
     assert history.calendar is made
@@ -429,7 +453,7 @@ def a_gas_daily_calendar(as_of: str = "2026-09-25", fraction: float = 0.5) -> Ca
         dates("2026-09-01", "2026-10-01", "2026-11-01"),
         dates("2026-09-30", "2026-10-31", "2026-11-30"),
     )
-    return calendar(valuation_date(day(as_of), fraction), schedule, None)
+    return calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
 
 
 def prints_on(first: str, last: str) -> GasDailyFixings:
@@ -550,7 +574,7 @@ IFERC_SCHEDULE = iferc_schedule(
 
 def an_iferc_calendar(as_of: str = "2026-11-15") -> Calendar:
     """The IFERC schedule page's three months, valued on the given day."""
-    return calendar(valuation_date(day(as_of), 0.5), IFERC_SCHEDULE, None)
+    return calendar(valuation_date(day(as_of), 0.5), an_index(IFERC_SCHEDULE, None))
 
 
 def indices_for(*pairs: tuple[str, float]) -> IfercFixings:
@@ -577,8 +601,7 @@ def test_iferc_indices_come_back_in_the_calendars_order_whatever_order_they_came
 def test_an_iferc_calendar_of_one_month_and_one_with_nothing_published() -> None:
     one = calendar(
         valuation_date(day("2026-11-15"), 0.5),
-        iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")),
-        None,
+        an_index(iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")), None),
     )
     made = market_history(one, indices_for(("V26", 1.85)))
     assert made.fixed_rows.tolist() == [0] and made.fixing_prices.tolist() == [1.85]
@@ -724,7 +747,7 @@ def test_every_fixed_flow_day_takes_its_own_print_and_no_other_day_takes_one(
     firsts = lasts - lengths.astype("timedelta64[D]") + one_day
     schedule = gas_daily_schedule(tuple(f"c{i}" for i in range(count)), firsts, lasts)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(lengths.sum()) + 10)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     before = data.draw(st.integers(0, 10))
     days = np.arange(
         firsts[0] - np.timedelta64(before, "D"), as_of + one_day, dtype="datetime64[D]"
@@ -753,7 +776,7 @@ def test_every_fixed_month_takes_its_own_index_in_the_calendars_order(
     codes = tuple(f"c{i}" for i in range(count))
     schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(gaps.sum()) + 10)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed).tolist()
     order = data.draw(st.permutations(fixed))
     fixings = iferc_fixings(

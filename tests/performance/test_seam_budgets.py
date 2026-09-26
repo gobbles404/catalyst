@@ -904,6 +904,18 @@ def specification_body(contracts: int) -> Cells:
     return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
 
 
+def an_index(schedule: object, holidays: object = MISSING) -> object:
+    """The index handle of that schedule handle and holiday calendar handle, with the conventions
+    of gas and one lot, since nothing measured here reads either."""
+    return PATH["_CreateIndex"](
+        "sample",
+        schedule,
+        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
+        holidays,
+    )
+
+
 # A dozen contracts at the table path: the header row as any row of text, the body admitted as
 # a mixed range and bound, then each column through its rule, the names gathered and the three
 # number columns as views, the builder's look at the lot sizes for a fraction, its three copies
@@ -1096,21 +1108,25 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
     )
 
 
-# A year of fixings at the column path, with the market's calendar by handle: the date column
-# through its look and its conversion to days, the settle column accepted on the host's summary
-# alone, the handle's text rule and its one lookup, then the builder's count, its three looks,
-# the order of the dates, the days the market is closed and the business days without a fixing,
-# its two copies, and one publication. Twenty calls across sixteen functions, the accept rule
-# once per argument; at the table path, twenty-two across twenty. The three business-day calls,
-# the calendar, is_busday and busday_offset, raise no event the numpy fixture reads, so only
-# their looks are in its count.
-def test_futures_fixings_are_two_columns_and_a_calendar_in_and_one_publication_out(
+# A year of fixings at the column path, with the index by handle: the date column through its
+# look and its conversion to days, the settle column accepted on the host's summary alone, the
+# handle's text rule and its one lookup, then the builder's kind check, the holiday calendar
+# read off the index, its count, its three looks, the order of the dates, the days the market
+# is closed and the business days without a fixing, its two copies, and one publication.
+# Twenty-one calls across seventeen functions, the accept rule once per argument. The three
+# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
+# fixture reads, so only their looks are in its count.
+def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    calendar = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    codes, futures, _, _ = schedule_columns(2)
+    index = an_index(
+        PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
+        PATH["_CreateHolidayCalendar"](holiday_column(100)),
+    )
     days, settles = fixings_columns(260, 100)
-    PATH["_CreateFuturesFixings"](days, settles, calendar)
-    assert call_profile(lambda: PATH["_CreateFuturesFixings"](days, settles, calendar)) == {
+    PATH["_CreateFuturesFixings"](days, settles, index)
+    assert call_profile(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
@@ -1126,9 +1142,10 @@ def test_futures_fixings_are_two_columns_and_a_calendar_in_and_one_publication_o
         "_resolve": 1,  # and its one lookup
         "_CreateFuturesFixings": 1,
         "futures_fixings": 1,
+        "with_holiday_calendar": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, calendar)) == {
+    assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
         "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
@@ -1140,43 +1157,41 @@ def test_futures_fixings_are_two_columns_and_a_calendar_in_and_one_publication_o
 # --- the calendar: a schedule of any kind in, four columns made once, one publication out --
 
 
-def calendar_sources(contracts: int) -> tuple[object, object, object]:
-    """The three handles a calendar takes: the valuation date, a schedule of that many monthly
-    contracts a month apart, and a calendar of a hundred holidays a week apart."""
+def calendar_sources(contracts: int) -> tuple[object, object]:
+    """The two handles a calendar takes: the valuation date, and the index of a schedule of that
+    many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
     codes, futures, _, _ = schedule_columns(contracts)
-    return (
-        PATH["_CreateValuationDate"](46276.0, 0.5),
-        PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
-        PATH["_CreateHolidayCalendar"](holiday_column(100)),
-    )
+    schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
+    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
+    return PATH["_CreateValuationDate"](46276.0, 0.5), an_index(schedule, holidays)
 
 
-# A year of days from thirteen contracts: three handles, each the text rule and one lookup,
-# the schedule's kind choosing the futures builder, its one look at the order of the expiries,
-# its days in one arange, the prompt row of each in one searchsorted, the two flags, and one
-# publication. Eighteen calls across twelve functions, the accept rule once per argument;
-# is_busday and the comparison against the valuation date raise no event the numpy fixture
-# reads.
-def test_a_calendar_is_three_handles_in_and_four_columns_out(
+# A year of days from thirteen contracts: two handles, each the text rule and one lookup, the
+# index's kind choosing the futures builder, the holiday calendar read off the index, its one
+# look at the order of the expiries, its days in one arange, the prompt row of each in one
+# searchsorted, the two flags, and one publication. Fifteen calls across twelve functions, the
+# accept rule once per argument; is_busday and the comparison against the valuation date raise
+# no event the numpy fixture reads.
+def test_a_calendar_is_two_handles_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    valuation, schedule, holidays = calendar_sources(13)
-    PATH["_CreateCalendar"](valuation, schedule, holidays)
-    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, holidays)) == {
+    valuation, index = calendar_sources(13)
+    PATH["_CreateCalendar"](valuation, index)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
-        "_text": 3,  # each handle's text rule
-        "_resolve": 3,  # and its one lookup
+        "_validate": 2,
+        "_text": 2,  # each handle's text rule
+        "_resolve": 2,  # and its one lookup
         "_CreateCalendar": 1,
         "calendar": 1,
-        "futures_calendar": 1,
+        "_futures_calendar": 1,
         "with_holiday_calendar": 1,
         "_each_code_once": 1,
         "_frozen": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, holidays)) == {
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "ndarray.any": 1,  # the builder's look at the order of the expiries
         "numpy.arange": 1,  # every day, once
         "ndarray.searchsorted": 1,  # the prompt row of every day, once
@@ -1240,32 +1255,33 @@ def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
 
 
 # A year of flow days from twelve months: two handles, each the text rule and one lookup, the
-# holiday calendar left out at the accept rule's one call, the Gas Daily builder's two looks, a
+# index's kind choosing the Gas Daily builder, its two looks, a
 # month's last day before its first and a gap between months, its days in one arange, the month
 # of each in one searchsorted, the priced flag in one empty, the fixed flag, and one publication.
-# Seventeen calls across thirteen functions, the accept rule once per argument.
-def test_a_gas_daily_calendar_is_a_schedule_and_a_valuation_date_in_and_four_columns_out(
+# Fifteen calls across twelve functions, the accept rule once per argument.
+def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
-    PATH["_CreateCalendar"](valuation, schedule, MISSING)
-    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+    index = an_index(schedule)
+    index = index
+    PATH["_CreateCalendar"](valuation, index)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
+        "_validate": 2,
         "_text": 2,
         "_resolve": 2,
         "_CreateCalendar": 1,
         "calendar": 1,
-        "gas_daily_calendar": 1,
-        "without_holiday_calendar": 1,
+        "_gas_daily_calendar": 1,
         "_at_least_one": 1,
         "_each_code_once": 1,
         "_frozen": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "ndarray.any": 2,
         "numpy.arange": 1,
         "ndarray.searchsorted": 1,
@@ -1277,29 +1293,30 @@ def test_a_gas_daily_calendar_is_a_schedule_and_a_valuation_date_in_and_four_col
 
 # Ten years of IFERC months: two handles as above, the IFERC builder's one look at the order of
 # the publication days, its one copy of them, the months' rows in one arange, the priced flag
-# in one empty, the fixed flag, and one publication. Seventeen calls across thirteen functions.
-def test_an_iferc_calendar_is_a_schedule_and_a_valuation_date_in_and_four_columns_out(
+# in one empty, the fixed flag, and one publication. Fifteen calls across twelve functions.
+def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    PATH["_CreateCalendar"](valuation, schedule, MISSING)
-    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+    index = an_index(schedule)
+    index = index
+    PATH["_CreateCalendar"](valuation, index)
+    assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
+        "_validate": 2,
         "_text": 2,
         "_resolve": 2,
         "_CreateCalendar": 1,
         "calendar": 1,
-        "iferc_calendar": 1,
-        "without_holiday_calendar": 1,
+        "_iferc_calendar": 1,
         "_at_least_one": 1,
         "_each_code_once": 1,
         "_frozen": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, schedule, MISSING)) == {
+    assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "ndarray.any": 1,
         "numpy.array": 1,
         "numpy.arange": 1,
@@ -1316,11 +1333,11 @@ def history_sources(contracts: int) -> tuple[object, object]:
     """The two handles a history takes: the calendar calendar_sources makes, valued on 11
     September 2026, and fixings on every business day from Friday 1 May 2026 to the day
     before, under the same hundred Thursdays, so every past business day has one."""
-    valuation, schedule, holidays = calendar_sources(contracts)
-    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    valuation, index = calendar_sources(contracts)
+    made = PATH["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
+    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), index)
     return made, fixings
 
 
@@ -1367,7 +1384,9 @@ def gas_daily_history_sources() -> tuple[object, object]:
     that every fixed day has one."""
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
-    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = PATH["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
     fixings = PATH["_CreateGasDailyFixings"](
         Cells.from_rows([[46023.0 + i] for i in range(days)]),
@@ -1418,7 +1437,9 @@ def iferc_history_sources() -> tuple[object, object]:
     has fixed, and an index for each of them."""
     valuation = PATH["_CreateValuationDate"](49740.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = PATH["_CreateCalendar"](valuation, index)
     fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(120))
     return made, fixings
 
@@ -1513,11 +1534,11 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     futures = Cells.from_rows([[46161.0 + days_apart * i] for i in range(contracts)])
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateFuturesSchedule"](codes, futures, MISSING)
-    holidays = PATH["_CreateHolidayCalendar"](holiday_column(100))
-    made = PATH["_CreateCalendar"](valuation, schedule, holidays)
+    index = an_index(schedule, PATH["_CreateHolidayCalendar"](holiday_column(100)))
+    made = PATH["_CreateCalendar"](valuation, index)
     closed = np.datetime64("1899-12-30") + (46023 + 7 * np.arange(100)).astype("timedelta64[D]")
     rows = int(np.busday_count("2026-05-01", "2026-09-11", holidays=closed))
-    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), holidays)
+    fixings = PATH["_CreateFuturesFixings"](*fixings_columns(rows, 100), index)
     history = PATH["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
@@ -1538,7 +1559,9 @@ def iferc_market_sources() -> tuple[object, object]:
     for each, and a vector of 116 quotes, one per month still to publish."""
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    made = PATH["_CreateCalendar"](valuation, schedule, MISSING)
+    index = an_index(schedule)
+    index = index
+    made = PATH["_CreateCalendar"](valuation, index)
     fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4))
     history = PATH["_CreateMarketHistory"](made, fixings)
     return history, PATH["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))

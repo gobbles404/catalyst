@@ -22,14 +22,15 @@ def _CreateMarketHistory(
 | 5 | 21-May-2026 | 71.10 | | |
 | 6 | 22-May-2026 | 71.25 | | |
 | 7 | `=_CreateValuationDate(B1, 0.5)` | shows `valuation_date:3f9a1c:000001` | `=_CreateFuturesSchedule(C2:C4, D2:D4)` | shows `futures_schedule:3f9a1c:000004` |
-| 8 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | `=_CreateCalendar(A7, C7, A8)` | shows `calendar:3f9a1c:000012` |
-| 9 | `=_CreateFuturesFixings(A4:A6, B4:B6, A8)` | shows `futures_fixings:3f9a1c:000015` | `=_CreateMarketHistory(C8, A9)` | shows `market_history:3f9a1c:000019` |
-| 10 | `=_CreateMarketHistory(B20, B21)` | shows `market_history:3f9a1c:000020`, B20 a Gas Daily calendar and B21 Gas Daily fixings | | |
-| 11 | `=_CreateMarketHistory(B30, B31)` | shows `market_history:3f9a1c:000021`, B30 an IFERC calendar and B31 IFERC fixings | | |
+| 8 | `=_CreateHolidayCalendar(B2)` | shows `holiday_calendar:3f9a1c:000007` | `=_CreateIndex("WTI NYMEX", C7, B15, B16, A8)` | shows `index:3f9a1c:000010`, B15 and B16 holding the conventions and the specifications |
+| 9 | `=_CreateCalendar(A7, C8)` | shows `calendar:3f9a1c:000012` | `=_CreateFuturesFixings(A4:A6, B4:B6, C8)` | shows `futures_fixings:3f9a1c:000015` |
+| 10 | `=_CreateMarketHistory(A9, C9)` | shows `market_history:3f9a1c:000019` | | |
+| 11 | `=_CreateMarketHistory(B20, B21)` | shows `market_history:3f9a1c:000020`, B20 a Gas Daily calendar and B21 Gas Daily fixings | | |
+| 12 | `=_CreateMarketHistory(B30, B31)` | shows `market_history:3f9a1c:000021`, B30 an IFERC calendar and B31 IFERC fixings | | |
 
 Two handles, both required, neither with a default: the index's calendar and the fixings of its market, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. There is no valuation date to give: the calendar carries its own, and its fixed flag says which periods have fixed. The calendar is declared `Handle[Calendar]`, one kind, and a cell that is not a calendar's handle fails in the seam's words, `calendar is futures fixings handle 'futures_fixings:3f9a1c:000015', expected calendar handle`, before the function runs. The fixings are declared `Handle[object]`, the form decision 40 gave `util_ReadHandle` and the calendar took for its schedule: the seam resolves the handle and hands over whatever object it finds, naming no kind, and the library says whether it is fixings and whether it is the calendar's market's. The result is a handle: text in the cell that stands for the history the seam keeps, declared `Handle[MarketHistory]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the history: the calendar itself, and the row and the price of each fixed period.
 
-`=util_ReadHandle(C9)` on the futures history above shows the calendar's four columns, every row the calendar has in its order, and a fifth, `fixing_price`; among its rows:
+`=util_ReadHandle(A10)` on the futures history above shows the calendar's four columns, every row the calendar has in its order, and a fifth, `fixing_price`; among its rows:
 
 | date | contract | is_priced | is_fixed | fixing_price |
 |---|---|---|---|---|
@@ -45,7 +46,7 @@ Two handles, both required, neither with a default: the index's calendar and the
 | … | … | … | … | … |
 | 21-Jul-2026 | q26 | TRUE | FALSE | unfixed |
 
-`=util_ReadHandle(A10)` on a Gas Daily history, the calendar of the schedule page's three months valued on 25 September 2026 with the fixings of every flow day through the 25th, shows every flow day, the valuation day itself fixed and priced since its print preceded it:
+`=util_ReadHandle(A11)` on a Gas Daily history, the calendar of the schedule page's three months valued on 25 September 2026 with the fixings of every flow day through the 25th, shows every flow day, the valuation day itself fixed and priced since its print preceded it:
 
 | date | contract | is_priced | is_fixed | fixing_price |
 |---|---|---|---|---|
@@ -57,7 +58,7 @@ Two handles, both required, neither with a default: the index's calendar and the
 | … | … | … | … | … |
 | 30-Nov-2026 | X26 | TRUE | FALSE | unfixed |
 
-`=util_ReadHandle(A11)` on an IFERC history, the calendar of the schedule page's three months valued on 15 November 2026 with the indices of the two months published by then, November's pasted first, shows one row per month, the indices in the calendar's order:
+`=util_ReadHandle(A12)` on an IFERC history, the calendar of the schedule page's three months valued on 15 November 2026 with the indices of the two months published by then, November's pasted first, shows one row per month, the indices in the calendar's order:
 
 | date | contract | is_priced | is_fixed | fixing_price |
 |---|---|---|---|---|
