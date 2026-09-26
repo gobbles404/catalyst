@@ -384,7 +384,7 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
         [Cells.from_rows([[46266.0], [46267.0]]), Cells.from_rows([[2.91], [2.92]]), gas],
     )
     history = bridge.call("_CreateMarketHistory", [gas_daily, prints])
-    balance = bridge.call("_CreatePriceVector", [2.95])
+    balance = bridge.call("_CreatePriceVector", ["sample", 2.95])
     kinds, slots, joined = read(bridge.call("_CreateMarket", [history, balance]))
     shown_rows = rows((kinds, slots, joined))
     assert len(shown_rows) == 32
@@ -413,7 +413,7 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
         "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]]), henry]
     )
     history = bridge.call("_CreateMarketHistory", [iferc, indices])
-    quote = bridge.call("_CreatePriceVector", [2.20])
+    quote = bridge.call("_CreatePriceVector", ["sample", 2.20])
     kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
     assert rows((kinds, slots, joined)) == [
         ["date", "contract", "is_priced", "is_fixed", "price"],
@@ -434,7 +434,7 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     valuation = bridge.call("_CreateValuationDate", [46162.0, 0.5])
-    quote = bridge.call("_CreatePriceVector", [72.10])
+    quote = bridge.call("_CreatePriceVector", ["sample", 72.10])
     for holiday, flag, cell, kind in (
         (46167.0, 1.0, 72.10, NUMBER_CODE),
         (46162.0, 0.0, "closed", TEXT_CODE),
@@ -454,9 +454,12 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
 
 
 # Four prices selected without a header, a zero and a negative among them and the first
-# repeated: the spill puts the header and the type over them, each price a number in its place.
+# repeated, under the index's name: the spill puts the header and the type over the prices,
+# each a number in its place, and shows no name, which the sheet holds beside the creator.
 def test_a_price_vector_spills_one_column_of_prices_under_two_heading_rows() -> None:
-    handle = bridge.call("_CreatePriceVector", [Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])])
+    handle = bridge.call(
+        "_CreatePriceVector", ["WTI NYMEX", Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])]
+    )
     kinds, slots, joined = read(handle)
     assert rows((kinds, slots, joined)) == [
         ["price"],

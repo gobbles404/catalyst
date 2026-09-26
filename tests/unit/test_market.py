@@ -1,5 +1,6 @@
-"""The market: two rules on the history and the price vector, one number found, and nothing
-built; the daily price it implies is read through util_ReadHandle, tested with the utilities."""
+"""The market: three rules on the history and the price vector, one number found, and
+nothing built; the daily price it implies is read through util_ReadHandle, tested with the
+utilities."""
 
 import dataclasses
 
@@ -40,8 +41,10 @@ def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
     return futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
 
 
-def a_vector(*prices: float) -> PriceVector:
-    return price_vector(np.array(prices, dtype=np.float64))
+def a_vector(*prices: float, name: str = "sample") -> PriceVector:
+    """A vector of those quotes named for the index every history here is over, sample,
+    unless named otherwise."""
+    return price_vector(name, np.array(prices, dtype=np.float64))
 
 
 # The page's sample: three contracts of one index, the valuation date 26 May 2026, the Monday
@@ -282,6 +285,63 @@ def test_a_market_that_cannot_be_made_says_why(
     with pytest.raises(ValueError) as failure:
         market(a_history(as_of), a_vector(*quotes))
     assert str(failure.value) == message
+
+
+# The name is the first rule: a vector named for another index is refused before the unfixed
+# period and the count are looked at, on each kind of calendar, with the right count and with
+# a wrong one; the name is compared as text, so another case, a space at either end or no name
+# at all is another name, and the message quotes the name given and the name wanted.
+@pytest.mark.parametrize(
+    ("history", "quotes"),
+    [
+        (HISTORY, (72.10, 72.80)),
+        (HISTORY, (72.10,)),
+        (a_history("2026-07-22"), (72.80,)),
+        (a_gas_daily_history("2026-09-10"), (2.95, 3.10, 3.40)),
+        (a_gas_daily_history("2026-11-30"), (3.40,)),
+        (an_iferc_history("2026-11-15"), (2.20,)),
+        (an_iferc_history("2026-12-02"), (2.20,)),
+    ],
+    ids=[
+        "the futures sample with its two quotes",
+        "the futures sample with one quote too few",
+        "the futures sample valued after its calendar",
+        "the Gas Daily sample with its three quotes",
+        "the Gas Daily sample on its last flow day",
+        "the IFERC sample with its one quote",
+        "the IFERC sample after its last month published",
+    ],
+)
+@pytest.mark.parametrize(
+    "name",
+    ["Brent", "Sample", "sample ", " sample", ""],
+    ids=["another index", "another case", "a space after", "a space before", "no name"],
+)
+def test_a_vector_named_for_another_index_is_refused_first(
+    history: MarketHistory, quotes: tuple[float, ...], name: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(*quotes, name=name))
+    assert str(failure.value) == (
+        f"price_vector names index {name!r}, expected market_history's index 'sample'"
+    )
+
+
+# The name is a label, not a lookup: the three sample histories are over three indices that
+# share the name sample, and a vector named sample serves each, given its count of quotes.
+def test_two_indices_of_one_name_take_a_vector_of_that_name() -> None:
+    daily = a_gas_daily_history("2026-09-10")
+    monthly = an_iferc_history("2026-11-15")
+    assert HISTORY.calendar.index is not daily.calendar.index
+    assert daily.calendar.index is not monthly.calendar.index
+    assert {h.calendar.index.name for h in (HISTORY, daily, monthly)} == {"sample"}
+    made = (
+        market(HISTORY, a_vector(72.10, 72.80)),
+        market(daily, a_vector(2.95, 3.10, 3.40)),
+        market(monthly, a_vector(2.20)),
+    )
+    assert [m.price_vector.index_name for m in made] == ["sample"] * 3
+    assert [m.first_contract for m in made] == [1, 0, 2]
 
 
 # A calendar fixed through its last period has nothing to quote, whatever its kind: the futures

@@ -190,13 +190,19 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateMarketHistory", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is missing, expected calendar handle" };
             yield return new object[] { "_CreateMarketHistory", new object[] { "x", ExcelMissing.Value }, "#ERROR _CreateMarketHistory: calendar is text 'x' naming no live object, expected calendar handle" };
             // The price vector: one column of numbers. A row where a column is expected, a header taken with the prices, numeric text, a boolean, a blank and the column left out fail in the seam's words; an Excel error in the column is passed through, as any is.
-            yield return new object[] { "_CreatePriceVector", new object[] { Row(74.25, 0.0, -0.5) }, "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers" };
-            yield return new object[] { "_CreatePriceVector", new object[] { Column("price", 74.25) }, "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number" };
-            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, "74.25") }, "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number" };
-            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, true) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number" };
-            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelEmpty.Value) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreatePriceVector", new object[] { ExcelMissing.Value }, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers" };
-            yield return new object[] { "_CreatePriceVector", new object[] { Column(74.25, ExcelError.ExcelErrorNA) }, ExcelError.ExcelErrorNA };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Row(74.25, 0.0, -0.5) }, "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Column("price", 74.25) }, "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Column(74.25, "74.25") }, "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Column(74.25, true) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Column(74.25, ExcelEmpty.Value) }, "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", ExcelMissing.Value }, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers" };
+            yield return new object[] { "_CreatePriceVector", new object[] { ExcelMissing.Value, Column(74.25) }, "#ERROR _CreatePriceVector: index_name is missing, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { ExcelEmpty.Value, Column(74.25) }, "#ERROR _CreatePriceVector: index_name is blank, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "", Column(74.25) }, "#ERROR _CreatePriceVector: index_name is empty text, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { 74.25, Column(74.25) }, "#ERROR _CreatePriceVector: index_name is number 74.25, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { true, Column(74.25) }, "#ERROR _CreatePriceVector: index_name is boolean TRUE, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { Column("WTI NYMEX", "Brent"), Column(74.25) }, "#ERROR _CreatePriceVector: index_name is 2x1 array, expected text" };
+            yield return new object[] { "_CreatePriceVector", new object[] { "sample", Column(74.25, ExcelError.ExcelErrorNA) }, ExcelError.ExcelErrorNA };
             // The market: two handles, the market history and the price vector. A number, a missing argument and text naming no live object where the history should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
             yield return new object[] { "_CreateMarket", new object[] { 72.10, ExcelMissing.Value }, "#ERROR _CreateMarket: market_history is number 72.1, expected market history handle" };
             yield return new object[] { "_CreateMarket", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateMarket: market_history is missing, expected market history handle" };
@@ -559,14 +565,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a market history, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", september, daily));
         }
 
-        // The price vector: one column of prices makes one, a single cell makes one of one price,
-        // and util_ReadHandle spills it back, the header, the type, then each price as a number,
-        // a zero and a negative price kept in their places; a second call over the same prices
-        // publishes its own handle, and the first still reads the same.
+        // The price vector: the index's name and one column of prices make one, the name and a
+        // single cell make one of one price, and util_ReadHandle spills it back, the header, the
+        // type, then each price as a number, a zero and a negative price kept in their places and
+        // no name; a second call over the same prices publishes its own handle, and the first
+        // still reads the same.
         [Fact]
-        public void a_price_vector_is_created_from_a_column_and_read_back_through_its_handle()
+        public void a_price_vector_is_created_from_a_name_and_a_column_and_read_back_through_its_handle()
         {
-            var handle = (string)Seam.Call("_CreatePriceVector", Column(74.25, 0.0, -0.5, 74.25));
+            var handle = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", Column(74.25, 0.0, -0.5, 74.25));
             Assert.StartsWith("price_vector:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
@@ -577,20 +584,21 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, spill[3, 0]);
             Assert.Equal(-0.5, spill[4, 0]);
             Assert.Equal(74.25, spill[5, 0]);
-            var one = (string)Seam.Call("_CreatePriceVector", 74.25);
+            var one = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", 74.25);
             Assert.StartsWith("price_vector:", one);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
-            var again = (string)Seam.Call("_CreatePriceVector", Column(74.25, 0.0, -0.5, 74.25));
+            var again = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", Column(74.25, 0.0, -0.5, 74.25));
             Assert.NotEqual(handle, again);
             Assert.Equal(-0.5, ((object[,])Seam.Call("util_ReadHandle", handle))[4, 0]);
         }
 
         // The market: the history of the market-history fact, valued on 26 May 2026 with the 25th
         // a holiday and the three past business days fixed, and a vector of two quotes, n26's and
-        // q26's, make one, and util_ReadHandle spills it back, the calendar's four columns and
-        // price, a fixing on a past business day, closed on the weekend and the holiday, n26's
-        // quote from the valuation day to its expiry and q26's from the day after. The library's
-        // rules answer through the same objects: a quote too few and one too many; a history
+        // q26's, named for the index, make one, and util_ReadHandle spills it back, the calendar's
+        // four columns and price, a fixing on a past business day, closed on the weekend and the
+        // holiday, n26's quote from the valuation day to its expiry and q26's from the day after.
+        // The library's rules answer through the same objects: a vector named for another index,
+        // refused before its count is looked at; a quote too few and one too many; a history
         // valued before its calendar begins is a market from the calendar's first day; and a
         // handle of another kind in either slot.
         [Fact]
@@ -602,7 +610,7 @@ namespace Goosedove.Host.Tests
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0), Column(70.85, 71.10, 71.25), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
-            var quotes = (string)Seam.Call("_CreatePriceVector", Column(72.10, 72.80));
+            var quotes = (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80));
             var handle = (string)Seam.Call("_CreateMarket", history, quotes);
             Assert.StartsWith("market:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
@@ -620,8 +628,9 @@ namespace Goosedove.Host.Tests
             Assert.Equal("q26", spill[36, 1]);
             Assert.Equal(72.80, spill[36, 4]);
             Assert.Equal(72.80, spill[64, 4]);
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", 72.10)));
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", Column(72.10, 72.80, 73.0))));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector names index 'Brent', expected market_history's index 'sample'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "Brent", 72.10)));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", 72.10)));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80, 73.0))));
             var early = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46161.0, 0.5), index);
             var earlyHistory = (string)Seam.Call("_CreateMarketHistory", early, (string)Seam.Call("_CreateFuturesFixings", 46160.0, 70.0, index));
             var earlyMarket = (string)Seam.Call("_CreateMarket", earlyHistory, quotes);
@@ -640,9 +649,11 @@ namespace Goosedove.Host.Tests
         // the print on the valuation day, the balance-of-month quote the day after, October's quote
         // on its first day and November's on the last; the IFERC history of October to December
         // valued on 15 November with two months published, and one quote, December's, make one,
-        // the two indices and the quote on their rows. The library's rules answer through the same
-        // objects: one quote where three are required, and a history with no unfixed period, the
-        // IFERC calendar valued on 15 December with all three indices.
+        // the two indices and the quote on their rows, each vector named for its index. The
+        // library's rules answer through the same objects: the IFERC vector given with the Gas
+        // Daily history, named for the other index; one quote where three are required; and a
+        // history with no unfixed period, the IFERC calendar valued on 15 December with all three
+        // indices.
         [Fact]
         public void a_gas_daily_and_an_iferc_market_are_created_from_two_handles_each_and_read_back()
         {
@@ -651,7 +662,7 @@ namespace Goosedove.Host.Tests
             var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasIndex);
             var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0), gasIndex);
             var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
-            var threeQuotes = (string)Seam.Call("_CreatePriceVector", Column(2.95, 3.10, 3.40));
+            var threeQuotes = (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", Column(2.95, 3.10, 3.40));
             var dailyMarket = (string)Seam.Call("_CreateMarket", daily, threeQuotes);
             Assert.StartsWith("market:", dailyMarket);
             var days = (object[,])Seam.Call("util_ReadHandle", dailyMarket);
@@ -670,7 +681,7 @@ namespace Goosedove.Host.Tests
             var ifercIndex = Index(iferc, ExcelMissing.Value, "Henry Hub IFERC");
             var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), ifercIndex);
             var monthly = (string)Seam.Call("_CreateMarketHistory", november, (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85), ifercIndex));
-            var oneQuote = (string)Seam.Call("_CreatePriceVector", 2.20);
+            var oneQuote = (string)Seam.Call("_CreatePriceVector", "Henry Hub IFERC", 2.20);
             var monthlyMarket = (string)Seam.Call("_CreateMarket", monthly, oneQuote);
             Assert.StartsWith("market:", monthlyMarket);
             var months = (object[,])Seam.Call("util_ReadHandle", monthlyMarket);
@@ -679,7 +690,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal(2.10, months[3, 4]);
             Assert.Equal(46357.0, months[4, 0]);
             Assert.Equal(2.20, months[4, 4]);
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'", Seam.Call("_CreateMarket", daily, oneQuote));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', expected market_history's index 'Henry Hub Gas Daily'", Seam.Call("_CreateMarket", daily, oneQuote));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'", Seam.Call("_CreateMarket", daily, (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", 2.20)));
             var december = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5), ifercIndex);
             var published = (string)Seam.Call("_CreateMarketHistory", december, (string)Seam.Call("_CreateIfercFixings", Column("V26", "X26", "Z26"), Column(1.85, 2.10, 2.20), ifercIndex));
             Assert.Equal("#ERROR _CreateMarket: ValueError: market_history has no unfixed period, expected at least one to quote", Seam.Call("_CreateMarket", published, oneQuote));

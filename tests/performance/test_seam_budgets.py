@@ -1544,7 +1544,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     history = PATH["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
-    return history, PATH["_CreatePriceVector"](quotes)
+    return history, PATH["_CreatePriceVector"]("sample", quotes)
 
 
 def gas_daily_market_sources() -> tuple[object, object]:
@@ -1552,7 +1552,9 @@ def gas_daily_market_sources() -> tuple[object, object]:
     the twelve months of 2026 valued on 11 September, and a vector of four quotes, the balance
     of September and the three months after it."""
     history = PATH["_CreateMarketHistory"](*gas_daily_history_sources())
-    return history, PATH["_CreatePriceVector"](Cells.from_rows([[3.0 + i] for i in range(4)]))
+    return history, PATH["_CreatePriceVector"](
+        "sample", Cells.from_rows([[3.0 + i] for i in range(4)])
+    )
 
 
 def iferc_market_sources() -> tuple[object, object]:
@@ -1565,7 +1567,9 @@ def iferc_market_sources() -> tuple[object, object]:
     made = PATH["_CreateCalendar"](valuation, index)
     fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
     history = PATH["_CreateMarketHistory"](made, fixings)
-    return history, PATH["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
+    return history, PATH["_CreatePriceVector"](
+        "sample", Cells.from_rows([[2.0 + i] for i in range(116)])
+    )
 
 
 MARKET_LEDGER = {
@@ -1764,7 +1768,7 @@ def test_iferc_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     }
 
 
-# --- the price vector: one column of numbers in, one copy kept, one publication out -----------
+# --- the price vector: a name and one column of numbers in, one copy kept, one publication out --
 
 
 def price_column(prices: int) -> Cells:
@@ -1772,18 +1776,21 @@ def price_column(prices: int) -> Cells:
     return Cells.from_rows([[74.25 + i % 7 - 3.0] for i in range(prices)])
 
 
-# The hot column: accepted on the host's summary, no look, then the builder's one copy and its
-# freeze, and one publication. Ten calls across ten functions, the accept rule once, and on
-# numpy the copy and the freeze alone; nothing is sorted, checked or converted.
-def test_a_price_vector_is_one_column_in_and_one_copy_out(
+# The name and the hot column: the name's text rule, the column accepted on the host's summary,
+# no look, then the builder's one copy and its freeze, and one publication. Twelve calls across
+# eleven functions, the text rule and the accept rule once each, and on numpy the copy and the
+# freeze alone; nothing is sorted, checked, looked up or converted, and the name costs the
+# library nothing.
+def test_a_price_vector_is_a_name_and_one_column_in_and_one_copy_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     column = price_column(120)
-    PATH["_CreatePriceVector"](column)
-    assert call_profile(lambda: PATH["_CreatePriceVector"](column)) == {
+    PATH["_CreatePriceVector"]("sample", column)
+    assert call_profile(lambda: PATH["_CreatePriceVector"]("sample", column)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 1,
+        "_validate": 2,
+        "_text": 1,  # the name's rule
         "_column": 1,
         "_one_column": 1,
         "_shape": 1,
@@ -1792,7 +1799,7 @@ def test_a_price_vector_is_one_column_in_and_one_copy_out(
         "price_vector": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreatePriceVector"](column)) == {
+    assert numpy_calls(lambda: PATH["_CreatePriceVector"]("sample", column)) == {
         "numpy.array": 1,  # the one copy the vector keeps
         "ndarray.setflags": 1,  # frozen
     }
