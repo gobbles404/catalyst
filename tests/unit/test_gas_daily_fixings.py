@@ -7,6 +7,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
+from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
@@ -27,7 +28,7 @@ def prices(*values: float) -> NDArray[np.float64]:
     return np.array(values, dtype=np.float64)
 
 
-CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU")
+CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("ICE",), np.array([2500.0]), np.array([0.0]), np.array([0.0])
 )

@@ -173,20 +173,29 @@ def test_the_conventions_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Creates the index conventions of one index, the units it is quoted, settled and "
-        "measured in, and shows its handle, the text other formulas take as the conventions."
+        "measured in, checked against the library's unit tables, and shows its handle, the text "
+        "other formulas take as the conventions."
+    )
+    units = (
+        "GAL, BBL, L or M3 for volume; KG, LB, MT, ST, LT, G, OZT or CWT_US for mass; MMBTU, BTU, "
+        "THERM, GJ, MWH or KWH for energy."
     )
     assert arguments == [
         (
             "quote_currency_unit",
-            "The currency unit a price of the index is quoted in, such as USD.",
+            "The currency unit a price of the index is quoted in: USD or CENT.",
         ),
         (
             "quote_quantity_unit",
-            "The quantity unit a price of the index is quoted per, such as BBL for USD per barrel.",
+            "The quantity unit a price of the index is quoted per, a unit of the quantity type: "
+            + units,
         ),
-        ("currency_unit", "The currency unit the index settles in, such as USD."),
-        ("quantity_type", "What a quantity of the index measures, such as volume."),
-        ("quantity_unit", "The unit a quantity of the index is stated in, such as BBL."),
+        ("currency_unit", "The currency unit the index settles in: USD or CENT."),
+        ("quantity_type", "What a quantity of the index measures: volume, mass or energy."),
+        (
+            "quantity_unit",
+            "The unit a quantity of the index is stated in, a unit of the quantity type: " + units,
+        ),
     ]
 
 
@@ -206,8 +215,8 @@ def test_the_specifications_creator_explains_itself() -> None:
         ),
         (
             "table",
-            "The rows under the headers, such as A2:D3: one contract per row, its name, lot size "
-            "and the two fees per lot, each name once.",
+            "The rows under the headers, such as A2:D3: one contract per row, its name, a whole "
+            "lot size of 1 or more and the two fees per lot, 0 or more, each name once.",
         ),
     ]
 

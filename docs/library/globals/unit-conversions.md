@@ -196,4 +196,4 @@ last place, the tests allowing 1e-15 relative. Display rounding must never chang
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
 USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
-category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units, noted at that builder, its own pull request. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.
+category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units: that builder's since #110, reading this collection by key, `usd` the currency category and the other three the measures a quantity type may name. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.

@@ -305,7 +305,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
 
 
 # Contract specifications keep a copy of each numeric column, 24 bytes per contract, and on the
-# way pay the table path, the names gathered and the builder's look at the lot sizes: measured
+# way pay the table path, the names gathered and the builder's four looks, one mask each: measured
 # 12,163 bytes at 120 contracts on 2026-09-17, about 76 bytes per contract beyond a creator's
 # small objects; 3,037 at two contracts and 3,327 at a dozen.
 def test_contract_specifications_keep_a_copy_of_each_numeric_column() -> None:

@@ -666,7 +666,7 @@ def test_a_handle_of_another_kind_is_not_a_gas_daily_schedule() -> None:
 # --- _CreateIndexConventions ----------------------------------------------------
 
 
-# The library has no consumer of the conventions yet, so this hidden reader proves that a handle
+# The index holds the conventions, but this hidden reader proves on its own that a handle
 # resolves to the conventions the seam kept, the five codes in their fields.
 @probe
 def ReadIndexConventions(conventions: Handle[IndexConventions]) -> str:
@@ -743,12 +743,44 @@ def test_a_handle_of_another_kind_is_not_index_conventions() -> None:
     )
 
 
+# The library's rules reach the sheet in its words: a code nobody defined, one in another case
+# and a unit of another category; and two units of one category are accepted, cents a gallon
+# quoted and dollars a barrel settled.
+def test_the_conventions_rules_reach_the_sheet_in_the_librarys_words() -> None:
+    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "Volume", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', "
+        "expected volume, mass or energy"
+    )
+    assert bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "volume", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', "
+        "expected a volume unit, GAL, BBL, L or M3"
+    )
+    assert bridge.call("_CreateIndexConventions", ["usd", "BBL", "USD", "volume", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', "
+        "expected USD or CENT"
+    )
+    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "EUR", "volume", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: currency_unit is 'EUR', expected USD or CENT"
+    )
+    gasoline = the_conventions("CENT", "GAL", "USD", "volume", "BBL")
+    assert bridge.call("ReadIndexConventions", [gasoline]) == "CENT GAL USD volume BBL"
+
+
+def test_a_failed_conventions_construction_publishes_no_object_and_no_handle() -> None:
+    before = number(the_conventions(*UNITS), CONVENTIONS)
+    assert bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "weight", "BBL"]) == (
+        "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'weight', "
+        "expected volume, mass or energy"
+    )
+    assert number(the_conventions(*UNITS), CONVENTIONS) == before + 1
+
+
 # --- _CreateContractSpecifications ----------------------------------------------------------
 
 
-# The library has no consumer of the specifications yet, so this hidden reader proves that a
-# handle resolves to the specifications the seam kept, typed: names as text, lot sizes whole, fees
-# as numbers.
+# The index holds the specifications, but this hidden reader proves on its own that a handle
+# resolves to the specifications the seam kept, typed: names as text, lot sizes whole, fees as
+# numbers.
 @probe
 def ReadContractSpecifications(specifications: Handle[ContractSpecifications]) -> str:
     lots = specifications.lot_sizes
@@ -822,6 +854,18 @@ def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -
         ),
         (
             SPECIFICATION_HEADERS,
+            Cells.from_rows([["NYMEX NG", 0.0, 3.0, 2.0]]),
+            "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, "
+            "expected 1 or more",
+        ),
+        (
+            SPECIFICATION_HEADERS,
+            Cells.from_rows([["NYMEX NG", 10000.0, -0.5, 2.0]]),
+            "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is "
+            "-0.5, expected 0 or more",
+        ),
+        (
+            SPECIFICATION_HEADERS,
             Cells.from_rows([["NYMEX NG", 10000.0, 3.0]]),
             "#ERROR _CreateContractSpecifications: header_row has 4 headers, expected 3, "
             "one per column of table",
@@ -844,6 +888,8 @@ def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -
         "text where a fee is expected",
         "a number where a name is expected",
         "a name given twice",
+        "a lot size of zero",
+        "a negative fee",
         "a body one column narrower than its headers",
         "a blank cell where the body should be",
         "the body left out",
@@ -877,9 +923,9 @@ def test_a_handle_of_another_kind_is_not_contract_specifications() -> None:
 
 
 # A lot size crosses as the double the cell holds and goes back out as it came: every whole number
-# from -2^53 to 2^53 is read back exactly, and a whole double beyond, 1E16 say, is kept as it is.
-# A double with a fraction is the builder's to refuse.
-@given(lot_size=st.integers(-(2**53), 2**53))
+# from 1 to 2^53 is read back exactly, and a whole double beyond, 1E16 say, is kept as it is. A
+# double with a fraction, and one below one, are the builder's to refuse.
+@given(lot_size=st.integers(1, 2**53))
 def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
     body = Cells.from_rows([["NYMEX NG", float(lot_size), 3.0, 2.0]])
     spill = bridge.call("util_ReadHandle", [the_specifications(SPECIFICATION_HEADERS, body)])
@@ -888,7 +934,7 @@ def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: in
     assert slots[2, 1] == float(lot_size)
 
 
-@pytest.mark.parametrize("lot_size", [1e16, 1e20, -1e16])
+@pytest.mark.parametrize("lot_size", [1e16, 1e20])
 def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept_and_read_back(
     lot_size: float,
 ) -> None:

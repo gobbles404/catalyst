@@ -873,7 +873,8 @@ def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
 
 
 # Five scalars, each through the text rule, the builder and one publication: nothing is asked of
-# numpy, and the builder has no rule of its own to run.
+# numpy, and the builder's five rules are lookups in the unit tables by key, which the profiler
+# does not see as calls.
 def test_index_conventions_are_five_texts_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -918,8 +919,9 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
 
 # A dozen contracts at the table path: the header row as any row of text, the body admitted as
 # a mixed range and bound, then each column through its rule, the names gathered and the three
-# number columns as views, the builder's look at the lot sizes for a fraction, its three copies
-# and one publication. Twenty-one calls across eighteen functions.
+# number columns as views, the builder's four looks, a fraction and a lot below one among the lot
+# sizes and a fee below zero in each fee column, its three copies and one publication.
+# Twenty-one calls across eighteen functions.
 def test_contract_specifications_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -950,12 +952,12 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
     assert numpy_calls(
         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
     ) == {
-        "ndarray.any": 5,  # one look per column, then the builder's, for a lot size with a fraction
+        "ndarray.any": 8,  # one look per column, then the builder's four
         "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
         "ndarray.cumsum": 1,  # the text cells above each row
         "ndarray.sum": 2,  # text cells per row, and to the left
         "ndarray.setflags": 3,  # frozen
-        "ufunc.reduce": 7,
+        "ufunc.reduce": 10,
     }
 
 

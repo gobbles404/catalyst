@@ -1,15 +1,24 @@
 """The index conventions of one index: the units its price is quoted in and per, the currency
-it settles in, and what its quantity measures and is stated in.
-docs/library/index-definitions/index-conventions.md is the page."""
+it settles in, and what its quantity measures and is stated in, five codes checked against the
+library's unit tables. docs/library/index-definitions/index-conventions.md is the page."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+from goosedove.globals.unit_conversions import UnitConversions
+
+# The tables' one currency category: its units are the currency units an index is quoted and
+# settled in, and it is not a category a quantity measures. Another currency is another category
+# there, when one arrives.
+CURRENCY = "usd"
 
 
 @dataclass(frozen=True, slots=True)
 class IndexConventions:
-    """Five codes, as the desk typed them: the currency unit and the quantity unit a price is
-    quoted in, USD per BBL say; the currency unit the index settles in; and what a quantity
-    measures, volume say, with the unit it is stated in, BBL."""
+    """Five codes, as the desk typed them and as the unit tables spell them: the currency unit and
+    the quantity unit a price is quoted in, USD per BBL say; the currency unit the index settles
+    in; and what a quantity measures, volume say, with the unit it is stated in, BBL, the two
+    quantity units both of that category."""
 
     quote_currency_unit: str
     quote_quantity_unit: str
@@ -24,15 +33,50 @@ def index_conventions(
     currency_unit: str,
     quantity_type: str,
     quantity_unit: str,
+    units: UnitConversions,
 ) -> IndexConventions:
-    """The one way to make a IndexConventions: the five codes kept as typed.
+    """The one way to make an IndexConventions: five rules of meaning against the unit tables,
+    checked once, in this order, the first failure being the message.
 
-    Nothing is checked yet, and that is a task for later, noted here rather than on a backlog:
-    which codes are allowed, the unit codes and the categories of
-    docs/library/globals/unit-conversions.md, and that a quantity unit belongs to its quantity
-    type, is built when the first consumer needs the codes to mean something. Until then a
-    code is text as typed, never trimmed or re-cased.
+    The two currency units first, which depend on nothing else: each is a unit of the tables'
+    currency category, USD or CENT. Then the quantity type, a category a quantity can measure,
+    volume, mass or energy, and not the currency category, which scales money. Then the two
+    quantity units, judged by it: each a unit of that category, so that a price quoted per gallon
+    and a quantity stated in barrels are two units of one measure, and the two may differ, as may
+    the two currency units, so long as each pair is of one category. Each code is matched
+    exactly, spelling and case as typed, never trimmed or re-cased, since a code is an identifier
+    and not prose; a message names the argument, what arrived and the codes that would have done,
+    in the tables' order. Nothing is converted or computed: the factor between two units is the
+    instrument's to look up once when it is made, and the record holds the five codes and nothing
+    derived. The tables are the collection passed in, read by key and never copied.
     """
+    money = units.categories[CURRENCY].sizes
+    if quote_currency_unit not in money:
+        raise ValueError(
+            f"quote_currency_unit is {quote_currency_unit!r}, expected {_listed(money)}"
+        )
+    if currency_unit not in money:
+        raise ValueError(f"currency_unit is {currency_unit!r}, expected {_listed(money)}")
+    measures = [name for name in units.categories if name != CURRENCY]
+    if quantity_type not in measures:
+        raise ValueError(f"quantity_type is {quantity_type!r}, expected {_listed(measures)}")
+    measure = units.categories[quantity_type].sizes
+    for argument, code in (
+        ("quote_quantity_unit", quote_quantity_unit),
+        ("quantity_unit", quantity_unit),
+    ):
+        if code not in measure:
+            article = "an" if quantity_type[0] in "aeiou" else "a"
+            raise ValueError(
+                f"{argument} is {code!r}, expected {article} {quantity_type} unit, "
+                f"{_listed(measure)}"
+            )
     return IndexConventions(
         quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
     )
+
+
+def _listed(codes: Iterable[str]) -> str:
+    """The codes a message offers, in the tables' order: USD or CENT; GAL, BBL, L or M3."""
+    *head, last = codes
+    return f"{', '.join(head)} or {last}" if head else last

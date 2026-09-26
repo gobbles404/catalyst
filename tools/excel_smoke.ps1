@@ -108,8 +108,10 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(AM2))"      = "3"
     "=_CreateHolidayCalendar(AL2:AL4)" = "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
     "=_CreateHolidayCalendar(AK2:AL2)" = "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates"
-    # The index conventions: a creator over five text cells, read back through util_ReadHandle, a
-    # blank and a number where a code is expected, and a code left out.
+    # The index conventions: a creator over five text cells, read back through util_ReadHandle, and
+    # one over the gasoline index, cents a gallon quoted and dollars a barrel settled; a category in
+    # another case and an energy unit where a volume unit should be, the library's words; a blank
+    # and a number where a code is expected, and a code left out, the seam's.
     "=LEFT(AP1,18)"               = "index_conventions:"
     "=INDEX(util_ReadHandle(AP1),1,4)" = "quantity_type"
     "=INDEX(util_ReadHandle(AP1),3,4)" = "volume"
@@ -117,9 +119,14 @@ $formulas = [ordered]@{
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5)" = "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text"
+    "=LEFT(AP2,18)"               = "index_conventions:"
+    "=INDEX(util_ReadHandle(AP2),3,1)" = "CENT"
+    "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
+    "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy"
+    "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
     # The contract specifications: a creator over a header row and a table of two contracts, read back
-    # through util_ReadHandle, a lot size with a fraction, text where a fee is expected, and a
-    # name given twice.
+    # through util_ReadHandle; a lot size with a fraction, a lot size of zero, a negative fee and a
+    # name given twice, the library's words; text where a fee is expected, the seam's.
     "=LEFT(BY1,24)"               = "contract_specifications:"
     "=INDEX(util_ReadHandle(BY1),1,3)" = "brokerage_rate_per_lot"
     "=INDEX(util_ReadHandle(BY1),2,2)" = "float64"
@@ -129,6 +136,8 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
     "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
     "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
+    "=_CreateContractSpecifications(BU1:BX1,CD2:CG2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
+    "=_CreateContractSpecifications(BU1:BX1,CD3:CG3)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -459,12 +468,18 @@ $cells = [ordered]@{
     "AK4" = "16-Feb-2026"; "AL4" = "16-Feb-2026"
     "AM1" = "=_CreateHolidayCalendar(AK2:AK4)"
     "AM2" = "=_CreateHolidayCalendar(AK2)"
-    # The index conventions: five codes as the desk types them, and one creator cell.
+    # The index conventions: five codes as the desk types them and one creator cell; a category in
+    # another case and an energy unit, for the conventions to refuse; and the gasoline index's
+    # quoted units, cents a gallon, with a second creator cell settling in dollars a barrel.
     "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
+    "AO8" = "Volume"; "AO9" = "MMBTU"
+    "AO10" = "CENT"; "AO11" = "GAL"
+    "AP2" = "=_CreateIndexConventions(AO10,AO11,AO4,AO5,AO6)"
     # Contract specifications: a header row and two contracts, NYMEX and ICE lots of gas, and one creator
     # cell; then a row with a lot size with a fraction, one with text where a fee is expected,
-    # and two rows naming one contract twice.
+    # two rows naming one contract twice, a row with a lot size of zero and one with a negative
+    # brokerage rate.
     "BU1" = "name"; "BV1" = "lot_size"; "BW1" = "brokerage_rate_per_lot"; "BX1" = "clearing_rate_per_lot"
     "BU2" = "NYMEX NG"; "BV2" = "10000"; "BW2" = "3"; "BX2" = "2"
     "BU3" = "ICE NG"; "BV3" = "2500"; "BW3" = "0.75"; "BX3" = "0.5"
@@ -473,6 +488,8 @@ $cells = [ordered]@{
     "CH2" = "NYMEX NG"; "CI2" = "10000"; "CJ2" = "three"; "CK2" = "2"
     "CL2" = "NYMEX NG"; "CM2" = "10000"; "CN2" = "3"; "CO2" = "2"
     "CL3" = "NYMEX NG"; "CM3" = "2500"; "CN3" = "0.75"; "CO3" = "0.5"
+    "CD2" = "NYMEX NG"; "CE2" = "0"; "CF2" = "3"; "CG2" = "2"
+    "CD3" = "NYMEX NG"; "CE3" = "10000"; "CF3" = "-0.5"; "CG3" = "2"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
