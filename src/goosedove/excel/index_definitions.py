@@ -18,6 +18,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
+from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import (
     ContractSpecifications,
     contract_specifications,
@@ -123,20 +124,33 @@ def _CreateGasDailySchedule(
 @excel_function
 def _CreateIndexConventions(
     quote_currency_unit: Annotated[
-        str, "The currency unit a price of the index is quoted in, such as USD."
+        str, "The currency unit a price of the index is quoted in: USD or CENT."
     ],
     quote_quantity_unit: Annotated[
-        str, "The quantity unit a price of the index is quoted per, such as BBL for USD per barrel."
+        str,
+        "The quantity unit a price of the index is quoted per, a unit of the quantity type: GAL, "
+        "BBL, L or M3 for volume; KG, LB, MT, ST, LT, G, OZT or CWT_US for mass; MMBTU, BTU, "
+        "THERM, GJ, MWH or KWH for energy.",
     ],
-    currency_unit: Annotated[str, "The currency unit the index settles in, such as USD."],
-    quantity_type: Annotated[str, "What a quantity of the index measures, such as volume."],
-    quantity_unit: Annotated[str, "The unit a quantity of the index is stated in, such as BBL."],
+    currency_unit: Annotated[str, "The currency unit the index settles in: USD or CENT."],
+    quantity_type: Annotated[str, "What a quantity of the index measures: volume, mass or energy."],
+    quantity_unit: Annotated[
+        str,
+        "The unit a quantity of the index is stated in, a unit of the quantity type: GAL, BBL, L "
+        "or M3 for volume; KG, LB, MT, ST, LT, G, OZT or CWT_US for mass; MMBTU, BTU, THERM, GJ, "
+        "MWH or KWH for energy.",
+    ],
 ) -> Handle[IndexConventions]:
     """Creates the index conventions of one index, the units it is quoted, settled and measured
-    in, and shows its handle, the text other formulas take as the conventions."""
-    # The five codes are not checked yet: which are allowed is a later task, noted in the builder.
+    in, checked against the library's unit tables, and shows its handle, the text other formulas
+    take as the conventions."""
     return index_conventions(
-        quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
+        quote_currency_unit,
+        quote_quantity_unit,
+        currency_unit,
+        quantity_type,
+        quantity_unit,
+        UNITS,
     )
 
 
@@ -192,15 +206,13 @@ def _CreateContractSpecifications(
     ],
     table: Annotated[
         ContractSpecificationsTable,
-        "The rows under the headers, such as A2:D3: one contract per row, its name, lot size and "
-        "the two fees per lot, each name once.",
+        "The rows under the headers, such as A2:D3: one contract per row, its name, a whole lot "
+        "size of 1 or more and the two fees per lot, 0 or more, each name once.",
     ],
 ) -> Handle[ContractSpecifications]:
     """Creates the contract specifications of one index, the name, lot size and fees per lot of
     each contract it trades as, and shows its handle, the text other formulas take as the
     specifications."""
-    # Beyond each name once and each lot size whole, the facts are not checked yet: a later task,
-    # noted in the builder.
     return contract_specifications(
         table.name, table.lot_size, table.brokerage_rate_per_lot, table.clearing_rate_per_lot
     )

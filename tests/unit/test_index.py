@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import calendar
+from goosedove.globals.unit_conversions import UNITS
 from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.contract_specifications import (
     ContractSpecifications,
@@ -64,7 +65,7 @@ GAS_DAILY = gas_daily_schedule(
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
 HOLIDAYS = holiday_calendar(dates("2026-01-01", "2026-01-19", "2026-02-16"))
-CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU")
+CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX NG", "ICE NG"),
     np.array([10000.0, 2500.0]),

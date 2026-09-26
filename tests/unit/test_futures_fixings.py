@@ -7,6 +7,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
+from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
@@ -53,7 +54,7 @@ ELSEWHERE = dates("2026-01-01")
 # The index the fixings are of: a futures schedule of two contracts, one set of conventions and
 # specifications, and whatever holiday calendar a test names.
 SCHEDULE = futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None)
-CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL")
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
 )

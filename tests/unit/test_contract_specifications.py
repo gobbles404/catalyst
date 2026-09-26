@@ -1,5 +1,5 @@
-"""The contract specifications: each contract named once and each lot size whole, the rest kept
-as given, and the columns aligned."""
+"""The contract specifications: each contract named once, each lot size whole and 1 or more, each
+fee 0 or more, the rest kept as given, and the columns aligned."""
 
 import numpy as np
 import pytest
@@ -43,15 +43,15 @@ def test_one_contract_is_a_set_of_specifications() -> None:
     assert specifications.lot_sizes.tolist() == [10000]
 
 
-# A lot size of zero, a negative fee, a fee with a fraction, a name with spaces in it: kept as
-# given, because what must hold beyond each name once is a task for later, noted at the builder.
-def test_nothing_else_is_checked_yet() -> None:
+# A lot size of one, a fee of zero, a fee with a fraction, a name with spaces in it: kept as
+# given, since nothing else is checked.
+def test_a_lot_of_one_a_fee_of_zero_a_fee_with_a_fraction_and_a_name_with_spaces_are_kept() -> None:
     specifications = contract_specifications(
-        ("Brent, dated", "WTI"), wholes(0, -5), numbers(-0.5, 2.125), numbers(0.0, 1.0)
+        ("Brent, dated", "WTI"), wholes(1, 5), numbers(0.0, 2.125), numbers(0.0, 1.0)
     )
     assert specifications.names == ("Brent, dated", "WTI")
-    assert specifications.lot_sizes.tolist() == [0, -5]
-    assert specifications.brokerage_rates_per_lot.tolist() == [-0.5, 2.125]
+    assert specifications.lot_sizes.tolist() == [1, 5]
+    assert specifications.brokerage_rates_per_lot.tolist() == [0.0, 2.125]
     assert specifications.clearing_rates_per_lot.tolist() == [0.0, 1.0]
 
 
@@ -91,6 +91,88 @@ def test_a_lot_size_with_a_fraction_is_rejected(lots: NDArray[np.float64], messa
     assert str(failure.value) == message
 
 
+@pytest.mark.parametrize(
+    ("lots", "message"),
+    [
+        (wholes(0, 2500), "lot_size row 1 is 0.0, expected 1 or more"),
+        (wholes(10000, 0), "lot_size row 2 is 0.0, expected 1 or more"),
+        (wholes(10000, -0.0), "lot_size row 2 is -0.0, expected 1 or more"),
+        (wholes(10000, -5), "lot_size row 2 is -5.0, expected 1 or more"),
+        (wholes(0, -5), "lot_size row 1 is 0.0, expected 1 or more"),
+    ],
+    ids=[
+        "zero in the first row",
+        "zero in the last row",
+        "negative zero",
+        "a negative whole",
+        "two rows below one, the first named",
+    ],
+)
+def test_a_lot_size_below_one_is_rejected(lots: NDArray[np.float64], message: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        contract_specifications(NAMES, lots, BROKERAGE, CLEARING)
+    assert str(failure.value) == message
+
+
+# A negative lot size with a fraction is named as a fraction, a negative whole as below one: the
+# fraction rule runs first, over the whole column.
+def test_a_negative_fraction_is_a_fraction_and_a_negative_whole_is_below_one() -> None:
+    with pytest.raises(ValueError, match=r"^lot_size row 1 is -2.25, expected a whole number$"):
+        contract_specifications(NAMES, wholes(-2.25, 2500), BROKERAGE, CLEARING)
+    with pytest.raises(ValueError, match=r"^lot_size row 1 is -2.0, expected 1 or more$"):
+        contract_specifications(NAMES, wholes(-2, 2500), BROKERAGE, CLEARING)
+    with pytest.raises(ValueError, match=r"^lot_size row 2 is 2.5, expected a whole number$"):
+        contract_specifications(NAMES, wholes(0, 2.5), BROKERAGE, CLEARING)
+
+
+@pytest.mark.parametrize(
+    ("brokerage", "clearing", "message"),
+    [
+        (numbers(-0.5, 0.75), CLEARING, "brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"),
+        (
+            numbers(3.0, -0.75),
+            CLEARING,
+            "brokerage_rate_per_lot row 2 is -0.75, expected 0 or more",
+        ),
+        (BROKERAGE, numbers(-2.0, 0.5), "clearing_rate_per_lot row 1 is -2.0, expected 0 or more"),
+        (
+            BROKERAGE,
+            numbers(2.0, -0.25),
+            "clearing_rate_per_lot row 2 is -0.25, expected 0 or more",
+        ),
+        (
+            numbers(-1.0, -1.0),
+            numbers(-1.0, -1.0),
+            "brokerage_rate_per_lot row 1 is -1.0, expected 0 or more",
+        ),
+        (
+            BROKERAGE,
+            numbers(-2.0, -0.25),
+            "clearing_rate_per_lot row 1 is -2.0, expected 0 or more",
+        ),
+    ],
+    ids=[
+        "a negative brokerage rate in the first row",
+        "a negative brokerage rate in the last row",
+        "a negative clearing rate in the first row",
+        "a negative clearing rate in the last row",
+        "every fee negative, brokerage named first",
+        "two negative clearing rates, the first named",
+    ],
+)
+def test_a_negative_fee_is_rejected_naming_the_column_and_the_row(
+    brokerage: NDArray[np.float64], clearing: NDArray[np.float64], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        contract_specifications(NAMES, LOTS, brokerage, clearing)
+    assert str(failure.value) == message
+
+
+def test_the_lot_sizes_are_checked_before_the_fees() -> None:
+    with pytest.raises(ValueError, match=r"^lot_size row 1 is 0.0, expected 1 or more$"):
+        contract_specifications(NAMES, wholes(0, 2500), numbers(-1.0, -1.0), numbers(-1.0, -1.0))
+
+
 # A whole double beyond 2^53 is a lot size a cell holds: it is kept as it is, and goes back out
 # as it came. The one-contract form's line at 2^53 belonged to a Python int, not to a double.
 def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept() -> None:
@@ -116,22 +198,46 @@ def test_any_distinct_names_and_their_columns_are_kept_aligned(
         )
     )
     lots = np.array(
-        data.draw(st.lists(st.integers(-(2**53), 2**53), min_size=count, max_size=count)),
+        data.draw(st.lists(st.integers(1, 2**53), min_size=count, max_size=count)),
         dtype=np.float64,
     )
+    fees = st.floats(min_value=0.0, allow_nan=False, allow_infinity=False)
     brokerage = np.array(
-        data.draw(st.lists(st.floats(allow_nan=False), min_size=count, max_size=count)),
-        dtype=np.float64,
+        data.draw(st.lists(fees, min_size=count, max_size=count)), dtype=np.float64
     )
-    clearing = np.array(
-        data.draw(st.lists(st.floats(allow_nan=False), min_size=count, max_size=count)),
-        dtype=np.float64,
-    )
+    clearing = np.array(data.draw(st.lists(fees, min_size=count, max_size=count)), dtype=np.float64)
     specifications = contract_specifications(names, lots, brokerage, clearing)
     assert specifications.names == names
     assert np.array_equal(specifications.lot_sizes, lots)
     assert np.array_equal(specifications.brokerage_rates_per_lot, brokerage)
     assert np.array_equal(specifications.clearing_rates_per_lot, clearing)
+
+
+# One bad row among good ones: the rule that fails names that row, wherever it is.
+@given(count=st.integers(1, 40), data=st.data())
+def test_one_row_below_the_line_is_named_wherever_it_is(count: int, data: st.DataObject) -> None:
+    names = tuple(f"contract {i}" for i in range(count))
+    row = data.draw(st.integers(0, count - 1))
+    lots = np.full(count, 1000.0)
+    brokerage = np.full(count, 3.0)
+    clearing = np.full(count, 2.0)
+    which = data.draw(
+        st.sampled_from(("lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"))
+    )
+    if which == "lot_size":
+        lots[row] = data.draw(st.integers(-(2**53), 0))
+        bad, wanted = lots[row], "1 or more"
+    elif which == "brokerage_rate_per_lot":
+        brokerage[row] = data.draw(
+            st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False)
+        )
+        bad, wanted = brokerage[row], "0 or more"
+    else:
+        clearing[row] = data.draw(st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False))
+        bad, wanted = clearing[row], "0 or more"
+    with pytest.raises(ValueError) as failure:
+        contract_specifications(names, lots, brokerage, clearing)
+    assert str(failure.value) == f"{which} row {row + 1} is {float(bad)!r}, expected {wanted}"
 
 
 # --- ownership ----------------------------------------------------------------

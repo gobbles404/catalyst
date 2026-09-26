@@ -1,33 +1,209 @@
-"""The index conventions: five codes kept as typed, and nothing checked yet."""
+"""The index conventions: five codes checked against the unit tables, in order, and kept as
+typed."""
 
 import dataclasses
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.index_definitions.index_conventions import index_conventions
+from goosedove.globals.unit_conversions import UNITS
+from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
 
-# The page's sample: an index quoted in dollars per barrel, settled in dollars, its quantity a
-# volume stated in barrels.
+# The page's samples: WTI quoted in dollars per barrel, settled in dollars, its quantity a volume
+# stated in barrels; gasoline quoted in cents per gallon and settled in dollars per barrel; gas
+# in dollars per MMBTU; a metal quoted per pound and stated in tonnes.
 SAMPLE = ("USD", "BBL", "USD", "volume", "BBL")
+GASOLINE = ("CENT", "GAL", "USD", "volume", "BBL")
+GAS = ("USD", "MMBTU", "USD", "energy", "MMBTU")
+METAL = ("USD", "LB", "USD", "mass", "MT")
+MEASURES = ("volume", "mass", "energy")
+CURRENCY_UNITS = ("USD", "CENT")
+VOLUME = "expected a volume unit, GAL, BBL, L or M3"
+MASS = "expected a mass unit, KG, LB, MT, ST, LT, G, OZT or CWT_US"
+ENERGY = "expected an energy unit, MMBTU, BTU, THERM, GJ, MWH or KWH"
+
+
+def conventions(
+    quote_currency_unit: str,
+    quote_quantity_unit: str,
+    currency_unit: str,
+    quantity_type: str,
+    quantity_unit: str,
+) -> IndexConventions:
+    return index_conventions(
+        quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit, UNITS
+    )
+
+
+# --- what is kept -------------------------------------------------------------
 
 
 def test_the_sample_keeps_every_code_in_its_own_field() -> None:
-    conventions = index_conventions(*SAMPLE)
-    assert conventions.quote_currency_unit == "USD"
-    assert conventions.quote_quantity_unit == "BBL"
-    assert conventions.currency_unit == "USD"
-    assert conventions.quantity_type == "volume"
-    assert conventions.quantity_unit == "BBL"
+    made = conventions(*SAMPLE)
+    assert made.quote_currency_unit == "USD"
+    assert made.quote_quantity_unit == "BBL"
+    assert made.currency_unit == "USD"
+    assert made.quantity_type == "volume"
+    assert made.quantity_unit == "BBL"
 
 
-# Another case, a code nobody defined, a trailing space, words with a space in them: all kept
-# as typed, because which codes are allowed is a task for later, noted at the builder.
-def test_nothing_is_checked_yet() -> None:
-    codes = ("usd", "bbl ", "GBP", "volume", "not a unit")
-    assert dataclasses.astuple(index_conventions(*codes)) == codes
+# Two units of one category, in either pair: the codes are kept, and nothing is converted.
+def test_different_units_of_one_category_are_accepted() -> None:
+    for codes in (GASOLINE, GAS, METAL):
+        assert dataclasses.astuple(conventions(*codes)) == codes
 
 
-@given(codes=st.tuples(*(st.text(min_size=1, max_size=12) for _ in range(5))))
-def test_any_five_texts_are_kept_in_order(codes: tuple[str, str, str, str, str]) -> None:
-    assert dataclasses.astuple(index_conventions(*codes)) == codes
+def test_every_unit_of_a_category_and_every_currency_unit_is_accepted_in_either_slot() -> None:
+    for name in MEASURES:
+        units = list(UNITS.categories[name].sizes)
+        reference = units[0]
+        for unit in units:
+            assert conventions("USD", unit, "USD", name, reference).quote_quantity_unit == unit
+            assert conventions("USD", reference, "USD", name, unit).quantity_unit == unit
+    for quoted in CURRENCY_UNITS:
+        for settled in CURRENCY_UNITS:
+            made = conventions(quoted, "BBL", settled, "volume", "BBL")
+            assert (made.quote_currency_unit, made.currency_unit) == (quoted, settled)
+
+
+# --- what is rejected, naming the argument and the codes that would have done ------------
+
+
+@pytest.mark.parametrize(
+    ("codes", "message"),
+    [
+        (
+            ("usd", "BBL", "USD", "volume", "BBL"),
+            "quote_currency_unit is 'usd', expected USD or CENT",
+        ),
+        (
+            ("EUR", "BBL", "USD", "volume", "BBL"),
+            "quote_currency_unit is 'EUR', expected USD or CENT",
+        ),
+        (
+            ("USD ", "BBL", "USD", "volume", "BBL"),
+            "quote_currency_unit is 'USD ', expected USD or CENT",
+        ),
+        (
+            ("BBL", "BBL", "USD", "volume", "BBL"),
+            "quote_currency_unit is 'BBL', expected USD or CENT",
+        ),
+        (("USD", "BBL", "cent", "volume", "BBL"), "currency_unit is 'cent', expected USD or CENT"),
+        (("USD", "BBL", "GBP", "volume", "BBL"), "currency_unit is 'GBP', expected USD or CENT"),
+        (("USD", "BBL", " USD", "volume", "BBL"), "currency_unit is ' USD', expected USD or CENT"),
+        (
+            ("USD", "BBL", "MMBTU", "volume", "BBL"),
+            "currency_unit is 'MMBTU', expected USD or CENT",
+        ),
+        (
+            ("USD", "BBL", "USD", "Volume", "BBL"),
+            "quantity_type is 'Volume', expected volume, mass or energy",
+        ),
+        (
+            ("USD", "BBL", "USD", "weight", "BBL"),
+            "quantity_type is 'weight', expected volume, mass or energy",
+        ),
+        (
+            ("USD", "BBL", "USD", "volume ", "BBL"),
+            "quantity_type is 'volume ', expected volume, mass or energy",
+        ),
+        (
+            ("USD", "BBL", "USD", "usd", "BBL"),
+            "quantity_type is 'usd', expected volume, mass or energy",
+        ),
+        (("USD", "MMBTU", "USD", "volume", "BBL"), f"quote_quantity_unit is 'MMBTU', {VOLUME}"),
+        (("USD", "bbl", "USD", "volume", "BBL"), f"quote_quantity_unit is 'bbl', {VOLUME}"),
+        (("USD", "BBL ", "USD", "volume", "BBL"), f"quote_quantity_unit is 'BBL ', {VOLUME}"),
+        (("USD", "BARREL", "USD", "volume", "BBL"), f"quote_quantity_unit is 'BARREL', {VOLUME}"),
+        (("USD", "BBL", "USD", "volume", "MT"), f"quantity_unit is 'MT', {VOLUME}"),
+        (("USD", "BBL", "USD", "volume", "bbl"), f"quantity_unit is 'bbl', {VOLUME}"),
+        (("USD", "BBL", "USD", "volume", "GALLON"), f"quantity_unit is 'GALLON', {VOLUME}"),
+        (("USD", "BBL", "USD", "mass", "MT"), f"quote_quantity_unit is 'BBL', {MASS}"),
+        (("USD", "MT", "USD", "mass", "kg"), f"quantity_unit is 'kg', {MASS}"),
+        (("USD", "M3", "USD", "energy", "MMBTU"), f"quote_quantity_unit is 'M3', {ENERGY}"),
+        (("USD", "MMBTU", "USD", "energy", "GAL"), f"quantity_unit is 'GAL', {ENERGY}"),
+    ],
+    ids=[
+        "a quoted currency unit in another case",
+        "a quoted currency unit nobody defined",
+        "a quoted currency unit with a space",
+        "a quantity unit where the quoted currency unit should be",
+        "a settlement currency unit in another case",
+        "a settlement currency unit nobody defined",
+        "a settlement currency unit with a space",
+        "a quantity unit where the settlement currency unit should be",
+        "a quantity type in another case",
+        "a quantity type nobody defined",
+        "a quantity type with a space",
+        "usd where the quantity type should be",
+        "a quoted quantity unit of another category",
+        "a quoted quantity unit in another case",
+        "a quoted quantity unit with a space",
+        "a quoted quantity unit nobody defined",
+        "a stated quantity unit of another category",
+        "a stated quantity unit in another case",
+        "a stated quantity unit nobody defined",
+        "a volume unit quoted for a mass",
+        "a mass unit in another case",
+        "a volume unit quoted for an energy",
+        "a volume unit stated for an energy",
+    ],
+)
+def test_conventions_that_cannot_be_made_say_why(
+    codes: tuple[str, str, str, str, str], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        conventions(*codes)
+    assert str(failure.value) == message
+
+
+# The two currency units before the quantity type, and the type before the quantity units, which
+# it judges: with several wrong, the earlier in that order is named.
+def test_the_rules_run_in_order_and_the_earlier_failure_is_named() -> None:
+    for codes, named in (
+        (("usd", "MMBTU", "EUR", "Volume", "MT"), "quote_currency_unit is 'usd'"),
+        (("USD", "MMBTU", "EUR", "Volume", "MT"), "currency_unit is 'EUR'"),
+        (("USD", "MMBTU", "USD", "Volume", "MT"), "quantity_type is 'Volume'"),
+        (("USD", "MMBTU", "USD", "volume", "MT"), "quote_quantity_unit is 'MMBTU'"),
+    ):
+        with pytest.raises(ValueError) as failure:
+            conventions(*codes)
+        assert str(failure.value).startswith(named)
+
+
+# --- the general rules ----------------------------------------------------------
+
+
+@given(data=st.data())
+def test_any_two_units_of_a_category_and_any_two_currency_units_are_kept_as_typed(
+    data: st.DataObject,
+) -> None:
+    name = data.draw(st.sampled_from(MEASURES))
+    units = list(UNITS.categories[name].sizes)
+    codes = (
+        data.draw(st.sampled_from(CURRENCY_UNITS)),
+        data.draw(st.sampled_from(units)),
+        data.draw(st.sampled_from(CURRENCY_UNITS)),
+        name,
+        data.draw(st.sampled_from(units)),
+    )
+    assert dataclasses.astuple(conventions(*codes)) == codes
+
+
+CODES = frozenset(UNITS.categories) | frozenset(
+    unit for found in UNITS.categories.values() for unit in found.sizes
+)
+
+
+@given(
+    codes=st.tuples(
+        *(st.text(min_size=1, max_size=12).filter(lambda text: text not in CODES) for _ in range(5))
+    )
+)
+def test_five_texts_none_of_which_is_a_code_fail_at_the_quoted_currency_unit(
+    codes: tuple[str, str, str, str, str],
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        conventions(*codes)
+    assert str(failure.value) == (f"quote_currency_unit is {codes[0]!r}, expected USD or CENT")
