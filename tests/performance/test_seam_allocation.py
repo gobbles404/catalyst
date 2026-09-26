@@ -539,7 +539,7 @@ def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
 # per month, and on the way pay the set of the index's months the codes are struck off, one set
 # checking membership and repeats alike, which is most of the peak at a small count: measured
 # 10,600 bytes at 120 months on 2026-09-24 with the set of the codes, and the same shape with the
-# set of the months since #NN, about 80 bytes per month at that size on top of a creator's small
+# set of the months since #109, about 80 bytes per month at that size on top of a creator's small
 # objects, which twice the slack covers, and 41,348 at 1,200, 34 bytes per month, the set growing
 # slower than the count.
 def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
