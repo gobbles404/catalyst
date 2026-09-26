@@ -2,7 +2,7 @@
 
 Built in #68.
 
-The index conventions of one index: the currency unit and the quantity unit its price is quoted in, the currency unit it settles in, and what its quantity measures with the unit it is stated in, five codes kept as typed and reached by handle. Since #NN the [index](index.md) holds the conventions, and nothing checks the codes yet; that check is a task for later, noted at the builder rather than on a backlog. The code is `src/goosedove/index_definitions/index_conventions.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
+The index conventions of one index: the currency unit and the quantity unit its price is quoted in, the currency unit it settles in, and what its quantity measures with the unit it is stated in, five codes kept as typed and reached by handle. Since #107 the [index](index.md) holds the conventions, and nothing checks the codes yet; that check is a task for later, noted at the builder rather than on a backlog. The code is `src/goosedove/index_definitions/index_conventions.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 
 ## Worksheet contract
 

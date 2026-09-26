@@ -1,6 +1,6 @@
 # _CreateIndex
 
-Built in #NN.
+Built in #107.
 
 The index behind one reference price: its name, its schedule, the conventions its price is quoted in, the contract specifications it trades as and, for a futures index, the holiday calendar of its market, four objects the sheet already holds and a name, bound once and reached by handle. Henry Hub NYMEX, Henry Hub IFERC and Henry Hub Gas Daily are three indices, each with a schedule of its own kind, and the kind of the schedule is the kind of the index. Nothing is read out of the objects and nothing in them is checked again: each was checked when it was made, and the index binds them so that what is downstream can refer to one thing. Nothing reads it yet. The [calendar](../calendar/calendar.md)'s next ticket takes the index in place of its schedule and holiday calendar, the [futures fixings](../market-data/futures-fixings.md) take the holiday calendar through it, and the instruments read units and lots through the market they price against, as the market reads its calendar. The code is `src/goosedove/index_definitions/index.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function; the kinds and the words that name an object's kind move beside it from `src/goosedove/calendar/calendar.py`, so that the index and the calendar read a schedule's kind from one place and the calendar, once it takes the index, reads the kind the index holds.
 

@@ -2,7 +2,7 @@
 calculation starts from; today a futures schedule, the contract months of one index and their
 expiry dates, a holiday calendar, the days one market is closed, the index conventions, the
 units one index is quoted, settled and measured in, and contract specifications, the name, lot
-size and fees per lot of each contract an index trades as; and, since #NN, the index itself,
+size and fees per lot of each contract an index trades as; and, since #107, the index itself,
 which binds a name to its schedule, conventions, specifications and, for a futures index, holiday
 calendar, with the kinds and the holiday rule the index and the calendar share.
 
