@@ -25,7 +25,9 @@ namespace Goosedove.Host.Tests
         {
             var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 } });
-            return (string)Seam.Call("_CreateIndex", name, schedule, conventions, specifications, holidays);
+            var handle = (string)Seam.Call("_CreateIndex", name, schedule, conventions, specifications, holidays);
+            Assert.StartsWith("index:" + name + ":", handle);
+            return handle;
         }
 
         private static object[,] Row(params object[] cells)
@@ -363,7 +365,7 @@ namespace Goosedove.Host.Tests
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
             var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, conventions, specifications, holidays);
-            Assert.StartsWith("index:", handle);
+            Assert.StartsWith("index:Henry Hub NYMEX:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
@@ -398,7 +400,7 @@ namespace Goosedove.Host.Tests
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
             var index = Index(Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 46195.0), ExcelMissing.Value), holidays);
             var handle = (string)Seam.Call("_CreateFuturesFixings", Column(46143.0, 46146.0), Column(101.94, 106.42), index);
-            Assert.StartsWith("futures_fixings:", handle);
+            Assert.StartsWith("futures_fixings:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
@@ -433,7 +435,7 @@ namespace Goosedove.Host.Tests
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
             var index = Index(schedule, holidays);
             var handle = (string)Seam.Call("_CreateCalendar", valuation, index);
-            Assert.StartsWith("calendar:", handle);
+            Assert.StartsWith("calendar:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(65, spill.GetLength(0));
             Assert.Equal(4, spill.GetLength(1));
@@ -491,7 +493,7 @@ namespace Goosedove.Host.Tests
             var calendar = (string)Seam.Call("_CreateCalendar", valuation, index);
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0), Column(70.85, 71.10, 71.25), index);
             var handle = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
-            Assert.StartsWith("market_history:", handle);
+            Assert.StartsWith("market_history:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(65, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
@@ -534,7 +536,7 @@ namespace Goosedove.Host.Tests
             var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasIndex);
             var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0), gasIndex);
             var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
-            Assert.StartsWith("market_history:", daily);
+            Assert.StartsWith("market_history:Henry Hub Gas Daily:", daily);
             var days = (object[,])Seam.Call("util_ReadHandle", daily);
             Assert.Equal(93, days.GetLength(0));
             Assert.Equal(5, days.GetLength(1));
@@ -549,7 +551,7 @@ namespace Goosedove.Host.Tests
             var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), ifercIndex);
             var indices = (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85), ifercIndex);
             var monthly = (string)Seam.Call("_CreateMarketHistory", november, indices);
-            Assert.StartsWith("market_history:", monthly);
+            Assert.StartsWith("market_history:Henry Hub IFERC:", monthly);
             var months = (object[,])Seam.Call("util_ReadHandle", monthly);
             Assert.Equal(5, months.GetLength(0));
             Assert.Equal(46296.0, months[2, 0]);
@@ -574,7 +576,7 @@ namespace Goosedove.Host.Tests
         public void a_price_vector_is_created_from_a_name_and_a_column_and_read_back_through_its_handle()
         {
             var handle = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", Column(74.25, 0.0, -0.5, 74.25));
-            Assert.StartsWith("price_vector:", handle);
+            Assert.StartsWith("price_vector:WTI NYMEX:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
             Assert.Equal(1, spill.GetLength(1));
@@ -585,7 +587,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(-0.5, spill[4, 0]);
             Assert.Equal(74.25, spill[5, 0]);
             var one = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", 74.25);
-            Assert.StartsWith("price_vector:", one);
+            Assert.StartsWith("price_vector:WTI NYMEX:", one);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
             var again = (string)Seam.Call("_CreatePriceVector", "WTI NYMEX", Column(74.25, 0.0, -0.5, 74.25));
             Assert.NotEqual(handle, again);
@@ -612,7 +614,7 @@ namespace Goosedove.Host.Tests
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var quotes = (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80));
             var handle = (string)Seam.Call("_CreateMarket", history, quotes);
-            Assert.StartsWith("market:", handle);
+            Assert.StartsWith("market:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(65, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
@@ -634,7 +636,7 @@ namespace Goosedove.Host.Tests
             var early = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46161.0, 0.5), index);
             var earlyHistory = (string)Seam.Call("_CreateMarketHistory", early, (string)Seam.Call("_CreateFuturesFixings", 46160.0, 70.0, index));
             var earlyMarket = (string)Seam.Call("_CreateMarket", earlyHistory, quotes);
-            Assert.StartsWith("market:", earlyMarket);
+            Assert.StartsWith("market:sample:", earlyMarket);
             var earlySpill = (object[,])Seam.Call("util_ReadHandle", earlyMarket);
             Assert.Equal(46162.0, earlySpill[2, 0]);
             Assert.Equal(72.10, earlySpill[2, 4]);
@@ -664,7 +666,7 @@ namespace Goosedove.Host.Tests
             var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
             var threeQuotes = (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", Column(2.95, 3.10, 3.40));
             var dailyMarket = (string)Seam.Call("_CreateMarket", daily, threeQuotes);
-            Assert.StartsWith("market:", dailyMarket);
+            Assert.StartsWith("market:Henry Hub Gas Daily:", dailyMarket);
             var days = (object[,])Seam.Call("util_ReadHandle", dailyMarket);
             Assert.Equal(93, days.GetLength(0));
             Assert.Equal(5, days.GetLength(1));
@@ -683,7 +685,7 @@ namespace Goosedove.Host.Tests
             var monthly = (string)Seam.Call("_CreateMarketHistory", november, (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85), ifercIndex));
             var oneQuote = (string)Seam.Call("_CreatePriceVector", "Henry Hub IFERC", 2.20);
             var monthlyMarket = (string)Seam.Call("_CreateMarket", monthly, oneQuote);
-            Assert.StartsWith("market:", monthlyMarket);
+            Assert.StartsWith("market:Henry Hub IFERC:", monthlyMarket);
             var months = (object[,])Seam.Call("util_ReadHandle", monthlyMarket);
             Assert.Equal(5, months.GetLength(0));
             Assert.Equal(1.85, months[2, 4]);
@@ -710,7 +712,7 @@ namespace Goosedove.Host.Tests
             var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("F26", "G26", "H26", "J26"), Column(46022.0, 46052.0, 46080.0, 46112.0), Column(46027.0, 46055.0, 46083.0, 46113.0));
             var index = Index(schedule, ExcelMissing.Value, "Waha IFERC");
             var handle = (string)Seam.Call("_CreateIfercFixings", Column("F26", "G26", "H26", "J26"), Column(1.85, 2.10, 1.95, 1.60), index);
-            Assert.StartsWith("iferc_fixings:", handle);
+            Assert.StartsWith("iferc_fixings:Waha IFERC:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
@@ -745,7 +747,7 @@ namespace Goosedove.Host.Tests
             var schedule = (string)Seam.Call("_CreateGasDailySchedule", "U26", 46266.0, 46295.0);
             var index = Index(schedule, ExcelMissing.Value, "Henry Hub Gas Daily");
             var handle = (string)Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0, 46271.0, 46272.0), Column(2.93, 2.875, 2.875, 2.875), index);
-            Assert.StartsWith("gas_daily_fixings:", handle);
+            Assert.StartsWith("gas_daily_fixings:Henry Hub Gas Daily:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));

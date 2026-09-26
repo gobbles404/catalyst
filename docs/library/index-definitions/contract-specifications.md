@@ -24,7 +24,7 @@ def _CreateContractSpecifications(
 | 1 | name | lot_size | brokerage_rate_per_lot | clearing_rate_per_lot |
 | 2 | NYMEX NG | 10000 | 3.00 | 2.00 |
 | 3 | ICE NG | 2500 | 0.75 | 0.50 |
-| 4 | `=_CreateContractSpecifications(A1:D1, A2:D3)` | shows `contract_specifications:3f9a1c:000009` |
+| 4 | `=_CreateContractSpecifications(A1:D1, A2:D3)` | shows `contract_specifications:9` |
 
 The input is a table: a header row, then a body with one row per contract, its name, lot size and the two fees per lot. The owner changed the one-contract form of #69, four scalars, for this one after use: an index needs more than one contract's terms, and a table's header binding and one body range keep each row's four facts together. The name is text, any text with a character in it; the lot size is a number the library requires whole and 1 or more, so 10000 passes and 2.5 or 0 fails, in the library's words, while a whole double beyond 2^53, 1E16 say, passes and goes back out as it came, since the lot sizes stay the doubles the cells hold and the one-contract form's line at 2^53 ([inputs.md](../../seam/inputs.md) decision 41) belonged to a Python int; the two fees are numbers with any fraction, 0 or more. The headers bind in either order and capital letters do not matter; the spelling must match, and `brokerage` is not a header. Both arguments required, no defaults. The seam binds the headers and checks the columns; nothing here restates that. The result is a handle: text in the cell that stands for the specifications the seam keeps, declared `Handle[ContractSpecifications]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the specifications.
 

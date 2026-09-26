@@ -648,7 +648,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
 
 
 def test_a_dead_handle_is_refused_after_one_lookup(call_profile: CallProfile) -> None:
-    dead = "discount_curve:000000:000001"
+    dead = "discount_curve:9999999"
     assert call_profile(lambda: PATH["util_ReadHandle"](dead)) == {
         "Registered.run": 1,
         "_arguments": 1,

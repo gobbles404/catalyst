@@ -29,7 +29,7 @@ def a_curve() -> str:
 def test_a_valuation_date_is_created_and_shown_as_a_handle() -> None:
     text = bridge.call("_CreateValuationDate", [SEP_11, 0.5])
     assert isinstance(text, str)
-    assert re.fullmatch(r"valuation_date:[0-9a-f]{6}:[0-9]{6}", text)
+    assert re.fullmatch(r"valuation_date:[0-9]+", text)
 
 
 @pytest.mark.parametrize(

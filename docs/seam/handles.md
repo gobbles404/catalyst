@@ -2,14 +2,14 @@
 
 Open: release and reuse, below.
 
-A handle is text in a cell that stands for an object the add-in holds in memory, such as a curve. Excel owns the worksheet's dependency graph; the seam owns the retained objects and resolves the current handle value to the Python object; the library builds and consumes objects and never sees the text. Built in #53: the declaration `Handle[Kind]`, one store, the three-part text, publishing on the way out and resolving on the way in, with every failure as text in the cell. Those parts now live where the seam's built things live, [inputs.md](inputs.md) decisions 34 to 37, [outputs.md](outputs.md) decisions 10 to 12 and [bridge.md](bridge.md#a-handle-one-store-and-the-text), and this page keeps what a workbook author may rely on and what is still open: release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and batches of one handle per row. Today every creator call publishes a new object, and the store holds it until Excel closes. The evidence behind the ways of building release is [excel-dna-handles.md](excel-dna-handles.md). When release is built, the rest of this page moves the same way and the page goes.
+A handle is text in a cell that stands for an object the add-in holds in memory, such as a curve. Excel owns the worksheet's dependency graph; the seam owns the retained objects and resolves the current handle value to the Python object; the library builds and consumes objects and never sees the text. Built in #53: the declaration `Handle[Kind]`, one store, the handle's text, publishing on the way out and resolving on the way in, with every failure as text in the cell. Those parts now live where the seam's built things live, [inputs.md](inputs.md) decisions 34 to 37, [outputs.md](outputs.md) decisions 10 to 12 and [bridge.md](bridge.md#a-handle-one-store-and-the-text), and this page keeps what a workbook author may rely on and what is still open: release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and batches of one handle per row. Today every creator call publishes a new object, and the store holds it until Excel closes. The evidence behind the ways of building release is [excel-dna-handles.md](excel-dna-handles.md). When release is built, the rest of this page moves the same way and the page goes.
 
 ## A small object first
 
 ```excel
 A2   11-Sep-2026
 B2   0.5
-C2   =_CreateValuationDate(A2, B2)      displays valuation_date:3f9a1c:000001
+C2   =_CreateValuationDate(A2, B2)      displays valuation_date:1
 ```
 
 The shared workbook `workbooks/handles.xlsx` holds this sheet, the curve's, and a block for each creator built since, its inputs and creator on the left and `util_ReadHandle` spilling the object on the right, with a `notes` column for whoever is looking at it: `.\tools\excel_dev.ps1 workbooks\handles.xlsx` opens it with the add-in, and `.\tools\excel_show.ps1 workbooks\handles.xlsx` prints it as its cells show.
@@ -25,7 +25,7 @@ Data!A1:B1    date / discount_factor headers
 Data!A2:B15   the daily table
 
 Inputs!B2     =_CreateDiscountCurve(Data!A1:B1, Data!A2:B15)
-              displays discount_curve:3f9a1c:000017
+              displays discount_curve:17
 
 Defined name  DeskCurve refers to =Inputs!$B$2
 ```
@@ -36,20 +36,61 @@ Supported: cell references, and defined names referring to cells. An ordinary fo
 
 ## The handle's text
 
-Three colon-separated parts, all lowercase: `kind:session:number`.
+Built in #53 as `kind:session:number`; `kind:index-name:count` and `kind:count` since #NN, the name of the index where the object carries one and the publication count alone, the session part gone.
+
+Two forms, the tags lowercase, colons between the parts:
+
+```text
+kind:index-name:count
+kind:count
+```
 
 | Part | Meaning |
 |---|---|
-| `kind` | the kind's tag, its class name in lowercase words joined by underscores: `valuation_date`, `discount_curve`; Python types and worksheet functions keep their PascalCase names |
-| `session` | six hex characters drawn once when Python starts, so text saved in a workbook never names an object of a later session |
-| `number` | one running publication number starting at 1, six digits at least, shared by every kind and workbook using the store |
+| `kind` | the kind's tag, its class name in lowercase words joined by underscores: `valuation_date`, `market_history`; Python types and worksheet functions keep their PascalCase names |
+| `index-name` | the name the index was created with, `_CreateIndex`'s first argument, read off the stored object when it is published and written whole as typed: case, spaces, punctuation, colons and any character kept, nothing trimmed, re-cased or shortened; present for the eight kinds below, absent for the rest |
+| `count` | the runtime's publication count, a plain number with no padding: 1 for the first object published after Python starts, then 2, shared by every kind and every workbook open in that Excel, never reset and never repeated while Python runs |
 
-```text
-valuation_date:3f9a1c:000001
-discount_curve:3f9a1c:000002
-```
+| Object | Shows | The name read from |
+|---|---|---|
+| index | `index:WTI:31` | its own `name` |
+| calendar | `calendar:WTI:32` | `index.name` |
+| futures fixings | `futures_fixings:WTI:33` | `index.name` |
+| IFERC fixings | `iferc_fixings:HNG:41` | `index.name` |
+| Gas Daily fixings | `gas_daily_fixings:HNG:45` | `index.name` |
+| market history | `market_history:WTI:34` | `calendar.index.name` |
+| price vector | `price_vector:WTI:35` | `index_name`, the text typed to `_CreatePriceVector` since #112 |
+| market | `market:WTI:36` | `market_history.calendar.index.name` |
+| valuation date, discount curve | `valuation_date:1`, `discount_curve:2` | none |
+| the three schedules, the holiday calendar, the conventions, the contract specifications | `futures_schedule:12`, `holiday_calendar:13`, `index_conventions:14`, `contract_specifications:15` | none: an index uses them, which names them nothing, and their creators gain no argument |
 
-The number is a publication number, not a version, an array index, a per-kind sequence or a count of live objects. A new publication takes the next number; removing entries never recycles numbers; closing a workbook does not reset the number of a runtime that stays open; six digits is a minimum width, and the number grows past it without wrapping. The full, exact text is the lookup key: a consumer neither looks up a part alone nor normalizes a supplied handle, and the stored, verified kind establishes the object's type; the visible tag describes it and proves nothing. The readable label the earlier direction carried was dropped by the owner on 2026-09-13: nothing supplies one, and one can be added when a need appears. The short forms `curve:17` and `curve:18` below abbreviate this text to explain ownership; they are not accepted formats.
+A name is written as it was typed, so `market_history:Henry Hub NYMEX:34` keeps its space, the workbook's `market_history:Sample futures index, closed 25 May:212` its comma, `index:Henry Hub: Gas Daily:50` its colon, three in that text, and `index:Brent Dated €/bbl:51` its characters. Two indices of one name are `index:WTI:7` and `index:WTI:9`, told apart by the count alone. A price vector shows the name it was typed with, so `price_vector:wti nymex:37` beside `market_history:WTI NYMEX:34` shows the mismatch the [market](../library/market/market.md) will refuse, before it does.
+
+The count is a publication count, not a version, an array index, a per-kind sequence or a count of live objects. A new publication takes the next number; a failed creator moves it not at all; reading a handle publishes nothing and moves nothing; removing entries never recycles numbers; closing a workbook does not reset the count of a runtime that stays open. The full, exact text is the lookup key: a consumer neither looks up a part alone nor normalizes a supplied handle, nothing in the seam or the library splits the text, and the stored, verified kind establishes the object's type; the visible tag and the name describe the object and prove nothing. An edited name, an edited count or a number not yet published fails as text naming no live object, `market_history is text 'market_history:Brent:34' naming no live object, expected market history handle`, and a live handle of another kind fails by its stored kind, `market_history is price vector handle 'price_vector:WTI:35', expected market history handle`. The readable label dropped on 2026-09-13, when nothing supplied one, returns as the index's name, which #107 and #112 supply. The short forms `curve:17` and `curve:18` below shorten the tag to explain ownership; a real text reads `discount_curve:17`.
+
+The seam formats the text once, at publication, in the one publication path. Registration reads the declared result kind and prepares, once, the path to that kind's name, `index.name` for a calendar, `market_history.calendar.index.name` for a market, none for a schedule, so publishing reads two or three attributes and builds one string, with no scan, no hash of contents and no search of the store; the library's records hold their data and learn nothing of handles. Before the entry is stored, the whole text is measured as Excel counts text, in UTF-16 units, against the 32,767 the text-out rule already holds ([outputs.md](outputs.md)); a longer text fails in the result voice, `returned handle of 32790 characters, expected at most 32767`, nothing truncated, nothing stored and the count unmoved. Only a name of some 32,740 characters reaches it.
+
+The standing assumption, in place of the session part: a text from an earlier runtime names nothing until today's count passes its number, and after that it could only select an object of the same kind and name at that number, which one history per index in one workbook never produces. Two workbooks open in one Excel share the store and the count, each creator cell publishing its own object; a second Excel started as its own program is a second Python with a store of its own. Recalculation on open, which removes stale text as a state altogether, belongs to release, below.
+
+### Tests
+
+The texts are pinned in `tests/unit/test_handles.py` with the seam's own two kinds and in each creator's test file with its own; the reader's are in `tests/unit/test_utilities.py`; the ledgers are `tests/performance/test_seam_budgets.py` and the ceilings `tests/performance/test_seam_allocation.py`; the smoke rows are `tools/excel_smoke.ps1` and their replay `host/Goosedove.Host.Tests/CallTests.cs`; `workbooks/handles.xlsx` shows its named indices side by side with their fixings, calendars, histories, vectors and markets.
+
+| Case | Kind |
+|---|---|
+| each of the eight kinds shows its index's name as typed, and every other kind its tag and count alone | example, through the seam |
+| a name in another case, with spaces, with a colon, with Unicode: shown whole; two publications with one label differ by count | example, through the seam |
+| the count starts at 1, rises by one per publication across kinds, and moves on no failed creator and no read | example, through the seam |
+| an edited name, an edited count and a number not yet published fail as text naming no live object; a handle of another kind fails by its stored kind; a creator's failure is relayed; a failed creator publishes nothing | example, through the seam |
+| a name long enough to take the text past 32,767 units fails in the result voice, with no store entry and the count unmoved | example, through the seam |
+| every creator's ledger keeps its calls, or gains one for the name, and keeps its numpy calls; every ceiling unchanged, the text growing by the name's length only | work and allocation budget |
+| a direct reference, a defined name and `util_ReadHandle` resolve the same objects as before, and every spill is unchanged | Excel smoke and host replay |
+
+#NN rewrote the text where it was written: [bridge.md](bridge.md#a-handle-one-store-and-the-text), [outputs.md](outputs.md) decisions 8 and 11 and [inputs.md](inputs.md) decision 35's sample, the handle row of [conventions.md](../library/conventions.md), [history.md](history.md), the sample handle on every library page, fifteen patterns and four count-reading helpers in the tests, and `test_handles.py`'s three-part reader. The smoke's rows read a handle's start with `LEFT` and stand; the workbook's handle cells are formulas and rewrite themselves on a full calculation, its notes' sample texts refreshed by hand. No alias for the old text: a saved workbook shows the new text after its first calculation.
+
+### Not here
+
+Enforcing one index per name: separate work, when the owner wants it; the label helps the eye and checks nothing. Persisting the store, reconnecting saved text, release when a creator is deleted or its workbook closes, reuse on an unchanged recalculation, recalculation on open: release, below. No label for the schedules, the holiday calendar, the conventions or the specifications, and no argument added to any creator. No change to `Handle[object]`, to `util_ReadHandle` or to any spill.
 
 ## Separate objects and shared dependencies
 
@@ -78,7 +119,7 @@ A live creator owns its currently published object or batch. A lookup, or anothe
 
 Cleanup must not delete an object a live creator owns or a retained dependency needs; no age or capacity limit evicts the object behind a valid handle to admit another, and if a capacity policy is ever introduced, failed new construction leaves existing owned objects valid. Excel sees the value in the creator cell, not the store: removing the object behind `curve:17` neither changes that cell nor asks Excel to rebuild the curve, so a missing object where this contract promises one is a runtime failure, reported, never substituted, never answered from a previous result. Collecting objects proven unused is a different thing from evicting live ones, and an optional cache of calculated results may discard an answer that can be recomputed from available inputs but never the input objects: construction reuse, calculation reuse and object lifetime are three separate responsibilities.
 
-Saving a workbook preserves formulas, names, inputs and possibly the displayed handle text; it does not persist the store. Reopening rebuilds fresh objects through creator execution, never by reconnecting saved tokens, and handle text from a previous runtime never resolves to an unrelated new object: the session part of the text sees to that today. When that calculation runs, including in manual mode, is open.
+Saving a workbook preserves formulas, names, inputs and possibly the displayed handle text; it does not persist the store. Reopening rebuilds fresh objects through creator execution, never by reconnecting saved text, and handle text from a previous runtime names nothing until the count passes its number, the standing assumption in [the handle's text](#the-handles-text) covering what follows. When that calculation runs, including in manual mode, and whether the add-in requests it when a workbook opens, is open.
 
 ## Publication and release
 
@@ -107,7 +148,7 @@ What remains is host lifecycle integration, so that a creator's deletion or its 
 
 ## Acceptance scenarios
 
-Held by tests today: a direct reference supplies the current handle and resolves the typed object (the smoke rows); duplicate creators give distinct handles and distinct objects; a pasted literal, an old-session token and a handle of another kind fail, named; a creator's failure is relayed as the creator's; a failed creator publishes nothing. The rest wait for release. Deterministic counts for construction, transport, copies, lookup, publication and release; retained bytes with shared ownership counted once; timing as evidence, never a gate.
+Held by tests today: a direct reference supplies the current handle and resolves the typed object (the smoke rows); duplicate creators give distinct handles and distinct objects; a pasted literal, a text from an earlier runtime and a handle of another kind fail, named; a creator's failure is relayed as the creator's; a failed creator publishes nothing. The rest wait for release. Deterministic counts for construction, transport, copies, lookup, publication and release; retained bytes with shared ownership counted once; timing as evidence, never a gate.
 
 | Scenario | What must hold |
 |---|---|
@@ -122,7 +163,7 @@ Held by tests today: a direct reference supplies the current handle and resolves
 | replace or delete a creator while another retained object uses its old curve | the dependent keeps valid immutable data; release happens when its final owner is gone |
 | repeated replacements with fixed input sizes and no retained old dependencies | old entries do not accumulate; live objects and retained data return to the expected level |
 | a live object's store entry is deliberately removed in a diagnostic test | the failure is visible; any promised recovery is verified |
-| a pasted literal, an old-session token, a diagnostic display | none acquires ownership by appearing as text; unknown, expired and wrong-kind values fail |
+| a pasted literal, a text from an earlier runtime, a diagnostic display | none acquires ownership by appearing as text; unknown, expired and wrong-kind values fail |
 | close one of several workbooks | that book's creator ownership is released promptly; other creators and retained dependencies stay valid |
 | reopen a workbook | creator execution builds fresh objects; old tokens do not reconnect |
 | undo and interrupted calculation | promises agreed first, then exercised in Excel |
@@ -138,4 +179,4 @@ Concurrent calls must not multiply ownership, and no publication scans the store
 
 ## Open
 
-Every open question here is release, decided by the next handle pull request with counts: creator tracking and callback timing, including safe shutdown; the batch spill's declaration, row errors, blocked spill, resizing and partial reuse; the equality key and the preparation work for unchanged-creator reuse; whether moving a creator may rebuild its objects or must keep their handles; reopen calculation timing, interrupted calculation, undo and unexpected loss.
+Every open question here is release, decided by the next handle pull request with counts: creator tracking and callback timing, including safe shutdown; the batch spill's declaration, row errors, blocked spill, resizing and partial reuse; the equality key and the preparation work for unchanged-creator reuse; whether moving a creator may rebuild its objects or must keep their handles; whether the add-in requests a full calculation when a workbook opens, which would remove stale text as a state, and reopen calculation timing otherwise; interrupted calculation, undo and unexpected loss.

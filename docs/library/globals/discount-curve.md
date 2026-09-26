@@ -24,7 +24,7 @@ def _CreateDiscountCurve(
 | 3 | 23-May-2026 | 0.9999 |
 | 4 | 24-May-2026 | 0.9998 |
 | 5 | 29-May-2026 | 0.99929 |
-| 6 | `=_CreateDiscountCurve(A1:B1, A2:B5)` | shows `discount_curve:3f9a1c:000002`, a curve of eight days |
+| 6 | `=_CreateDiscountCurve(A1:B1, A2:B5)` | shows `discount_curve:2`, a curve of eight days |
 
 The input is a table: a header row, then a body with one row per anchor, the date and its discount factor, the first row the curve's start at exactly 1, dates increasing with any gaps between them. The curve is daily whatever the anchors are: every calendar day from the first anchor to the last, an anchor keeping its factor and a day between two anchors taking the straight line between their factors, weighted by calendar days, as The interpolation below says. A daily table is anchors with no gaps, and makes the curve it always did. The headers bind in either order and capital letters do not matter; the spelling must match, and `df` is not a header. Both arguments required, no defaults. There is no separate valuation-date argument: the first anchor is the curve's start. The seam binds the headers, checks the columns and converts the dates; nothing here restates that. The result is a handle: text in the cell that stands for the curve the seam keeps, declared `Handle[DiscountCurve]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the daily curve; `=util_ReadHandle(B6)` spills its eight days. What is still open about handles, release above all, is [handles.md](../../seam/handles.md).
 

@@ -558,8 +558,8 @@ def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
         (3.0, "#ERROR util_ReadHandle: handle is number 3.0, expected a handle"),
         (None, "#ERROR util_ReadHandle: handle is blank, expected a handle"),
         (
-            "discount_curve:000000:000001",
-            "#ERROR util_ReadHandle: handle is text 'discount_curve:000000:000001' naming no live "
+            "discount_curve:9999999",
+            "#ERROR util_ReadHandle: handle is text 'discount_curve:9999999' naming no live "
             "object, expected a handle",
         ),
         (

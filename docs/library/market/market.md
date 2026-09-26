@@ -15,14 +15,14 @@ def _CreateMarket(
 
 | | A | B |
 |---|---|---|
-| 10 | the futures history of [market-history.md](market-history.md), valued on 26-May-2026 | `=_CreateMarketHistory(A9, C9)` shows `market_history:3f9a1c:000019` |
+| 10 | the futures history of [market-history.md](market-history.md), valued on 26-May-2026 | `=_CreateMarketHistory(A9, C9)` shows `market_history:WTI NYMEX:19` |
 | 11 | 72.10 | |
-| 12 | 72.80 | `=_CreatePriceVector("WTI NYMEX", A11:A12)` shows `price_vector:3f9a1c:000021`, named for the history's index |
-| 13 | `=_CreateMarket(B10, B12)` | shows `market:3f9a1c:000022` |
-| 14 | `=_CreateMarket(B20, B24)` | shows `market:3f9a1c:000023`, B20 the Gas Daily history of that page, valued on 25-Sep-2026, and B24 a vector named `Henry Hub Gas Daily` of three quotes, 2.95 for the balance of September, 3.10 for October and 3.40 for November |
-| 15 | `=_CreateMarket(B30, B31)` | shows `market:3f9a1c:000024`, B30 the IFERC history of that page, valued on 15-Nov-2026, and B31 a vector named `Henry Hub IFERC` of one quote, 2.20 for December |
+| 12 | 72.80 | `=_CreatePriceVector("WTI NYMEX", A11:A12)` shows `price_vector:WTI NYMEX:21`, named for the history's index |
+| 13 | `=_CreateMarket(B10, B12)` | shows `market:WTI NYMEX:22` |
+| 14 | `=_CreateMarket(B20, B24)` | shows `market:Henry Hub Gas Daily:23`, B20 the Gas Daily history of that page, valued on 25-Sep-2026, and B24 a vector named `Henry Hub Gas Daily` of three quotes, 2.95 for the balance of September, 3.10 for October and 3.40 for November |
+| 15 | `=_CreateMarket(B30, B31)` | shows `market:Henry Hub IFERC:24`, B30 the IFERC history of that page, valued on 15-Nov-2026, and B31 a vector named `Henry Hub IFERC` of one quote, 2.20 for December |
 
-Two handles, both required, neither with a default: the index's market history and the price vector, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. There is no valuation date, calendar, holiday calendar, kind, layout or index to give: the history carries its calendar, the calendar its valuation date, its kind and its index, and the vector the name of the index it was made for. The function receives the two objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `market_history is price vector handle 'price_vector:3f9a1c:000021', expected market history handle`, before the function runs. The seam resolves the two handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the market the seam keeps, declared `Handle[Market]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Each successful call publishes a new market and a fresh handle, a call with unchanged inputs included; earlier markets keep their own price vector, and neither input is changed.
+Two handles, both required, neither with a default: the index's market history and the price vector, each the cell showing its creator's result or a defined name referring to it, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say. There is no valuation date, calendar, holiday calendar, kind, layout or index to give: the history carries its calendar, the calendar its valuation date, its kind and its index, and the vector the name of the index it was made for. The function receives the two objects the seam keeps, never the text, and a cell that is not the right kind's handle fails in the seam's words, `market_history is price vector handle 'price_vector:WTI NYMEX:21', expected market history handle`, before the function runs. The seam resolves the two handles and nothing else; nothing here restates that. The result is a handle: text in the cell that stands for the market the seam keeps, declared `Handle[Market]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Each successful call publishes a new market and a fresh handle, a call with unchanged inputs included; earlier markets keep their own price vector, and neither input is changed.
 
 ## The price vector's order
 
