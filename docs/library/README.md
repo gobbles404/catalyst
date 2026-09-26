@@ -10,6 +10,7 @@ These pages are for an engineer building a function and for the owner reviewing 
 |---|---|
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [time.md](time.md) | the decisions on contract months, their codes, calendar days and business days, recorded ahead of the functions that need them |
+| [follow-ups.md](follow-ups.md) | the consolidation follow-ups pinned on 26 September 2026: the pending decisions on the index conventions and the contract specifications, ahead of pricing |
 | [globals/valuation-date.md](globals/valuation-date.md) | `_CreateValuationDate`, a date and progress through that day |
 | [globals/discount-curve.md](globals/discount-curve.md) | `_CreateDiscountCurve`, a daily curve from anchors, the days between filled by a straight line, and its upper date bound |
 | [globals/unit-conversions.md](globals/unit-conversions.md) | `UnitConversions`, the shipped unit definitions and the conversion between them |
