@@ -1076,7 +1076,12 @@ class _Held:
 
 
 _HANDLES: Final[dict[str, _Held]] = {}
-_published = 0  # the runtime's publication count, shared by every kind, never reset while it runs
+# The runtime's publication count, shared by every kind and never reset while Python runs. It
+# starts again with the next Python, so a handle text a workbook saved can equal a later
+# runtime's publication of the same kind, name and count, and a consumer calculated before its
+# creator has run again would read that object: docs/seam/handles.md records the case under
+# the known limitation, with the Excel reproduction, accepted until the handle-lifecycle work.
+_published = 0
 
 # The kinds whose text carries an index's name, and where each keeps it. Registration prepares
 # the path once, so publishing reads two or three attributes and builds one string; the
