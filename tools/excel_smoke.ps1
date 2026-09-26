@@ -74,7 +74,7 @@ $formulas = [ordered]@{
     "=util_ReadHandle(Y2)"             = "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle"
     "=util_ReadHandle(AA3)"            = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=util_ReadHandle(AA4)"            = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    '=util_ReadHandle("discount_curve:000000:000001")' = "#ERROR util_ReadHandle: handle is text 'discount_curve:000000:000001' naming no live object, expected a handle"
+    '=util_ReadHandle("discount_curve:9999999")' = "#ERROR util_ReadHandle: handle is text 'discount_curve:9999999' naming no live object, expected a handle"
     "=_CreateValuationDate(Y2,1.5)" = "#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
     "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=_CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR _CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
@@ -145,6 +145,20 @@ $formulas = [ordered]@{
     # holiday calendar where the schedule should be, the library's words; the specifications left
     # out and a blank where the name should be, the seam's.
     "=LEFT(EB1,6)"                = "index:"
+    # The handle's text: the index's name between the kind and the count on the eight kinds
+    # whose object carries one, as typed in EC2 to EC4 or in the formula, and the count a plain
+    # number after the tag on a kind that carries none.
+    "=LEFT(EB1,22)"               = "index:Henry Hub NYMEX:"
+    "=LEFT(CT5,25)"               = "calendar:Henry Hub NYMEX:"
+    "=LEFT(CT6,32)"               = "futures_fixings:Henry Hub NYMEX:"
+    "=LEFT(CT7,31)"               = "market_history:Henry Hub NYMEX:"
+    "=LEFT(CV1,29)"               = "price_vector:Henry Hub NYMEX:"
+    "=LEFT(CW8,19)"               = "price_vector:Brent:"
+    "=LEFT(CW1,23)"               = "market:Henry Hub NYMEX:"
+    "=LEFT(DW3,30)"               = "iferc_fixings:Henry Hub IFERC:"
+    "=LEFT(DU1,38)"               = "gas_daily_fixings:Henry Hub Gas Daily:"
+    "=ISNUMBER(--MID(AI1,18,20))" = "TRUE"
+    "=ISNUMBER(--MID(EB1,23,20))" = "TRUE"
     "=ROWS(util_ReadHandle(EB1))"      = "3"
     "=INDEX(util_ReadHandle(EB1),1,5)" = "has_holiday_calendar"
     "=INDEX(util_ReadHandle(EB1),2,3)" = "int64"

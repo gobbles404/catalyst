@@ -18,7 +18,7 @@ from goosedove.market_data.price_vector import PriceVector
 
 
 def number(text: str, handle: re.Pattern[str]) -> int:
-    """The running publication number a handle carries; it moves only when an object is stored."""
+    """The publication count a handle carries; it moves only when an object is stored."""
     match = handle.fullmatch(text)
     assert match, text
     return int(match.group(1))
@@ -37,7 +37,7 @@ def a_valuation_date() -> str:
 MAY_1, MAY_2, MAY_4, MAY_5, MAY_6 = 46143.0, 46144.0, 46146.0, 46147.0, 46148.0
 DATES = Cells.from_rows([[MAY_1], [MAY_4], [MAY_5], [MAY_6]])
 SETTLES = Cells.from_rows([[101.94], [106.42], [102.27], [95.08]])
-FIXINGS = re.compile(r"futures_fixings:[0-9a-f]{6}:([0-9]{6})")
+FIXINGS = re.compile(r"futures_fixings:.+:([0-9]+)")
 
 # The calendar page's sample as the sheet sends it, the ten days one market is closed in 2026,
 # one serial per row; the one in May is the 25th, a Monday. Made once into the handle every
@@ -60,7 +60,7 @@ HOLIDAYS = Cells.from_rows(
         )
     ]
 )
-CALENDAR = re.compile(r"holiday_calendar:[0-9a-f]{6}:([0-9]{6})")
+CALENDAR = re.compile(r"holiday_calendar:([0-9]+)")
 THE_CALENDAR = object()  # in a case's arguments: the calendar's handle, made below
 
 
@@ -117,6 +117,13 @@ def test_fixings_are_created_from_two_columns_and_a_calendar_and_read_back() -> 
     assert bridge.call("ReadFuturesFixings", [the_fixings(DATES, SETTLES)]) == (
         "2026-05-01 2026-05-04 2026-05-05 2026-05-06 | 101.94 106.42 102.27 95.08"
     )
+
+
+# The fixings' handle carries their index's name, sample, between the tag and the count.
+def test_a_fixings_handle_carries_its_indexs_name() -> None:
+    made = the_fixings(DATES, SETTLES)
+    assert made.startswith("futures_fixings:sample:")
+    assert made[len("futures_fixings:sample:") :].isdigit()
 
 
 # A single cell is a column of one, so the fixings of one day need no range.
@@ -265,9 +272,9 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
         (
             DATES,
             SETTLES,
-            "holiday_calendar:000000:000001",
+            "holiday_calendar:9999999",
             "#ERROR _CreateFuturesFixings: index is text "
-            "'holiday_calendar:000000:000001' naming no live object, expected index handle",
+            "'holiday_calendar:9999999' naming no live object, expected index handle",
         ),
         (
             DATES,
@@ -375,7 +382,7 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
 # codes, and an illustrative index beside each.
 IFERC_CODES = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
 IFERC_PRICES = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
-IFERC_HANDLE = re.compile(r"iferc_fixings:[0-9a-f]{6}:([0-9]{6})")
+IFERC_HANDLE = re.compile(r"iferc_fixings:.+:([0-9]+)")
 # ICE's last trading days and Platts' publication days for those four months, as serials.
 IFERC_LAST_TRADING = Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]])
 IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
@@ -404,9 +411,9 @@ def iferc(codes: object, prices: object) -> str:
 
 
 def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
-    assert bridge.call("ReadIfercFixings", [iferc(IFERC_CODES, IFERC_PRICES)]) == (
-        "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
-    )
+    made = iferc(IFERC_CODES, IFERC_PRICES)
+    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
+    assert made.startswith("iferc_fixings:Waha IFERC:")  # the index's name, as typed
 
 
 # A single cell is a column of one, so the fixings of one month need no range.
@@ -584,7 +591,7 @@ def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
         (MISSING, "is missing"),
         (None, "is blank"),
         (1.85, "is number 1.85"),
-        ("index:000000:000001", "is text 'index:000000:000001' naming no live object"),
+        ("index:9999999", "is text 'index:9999999' naming no live object"),
     ):
         assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, wrong]) == (
             f"#ERROR _CreateIfercFixings: index {what}, expected index handle"
@@ -614,7 +621,7 @@ def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
 SEP_4, SEP_5, SEP_6, SEP_7, SEP_8, SEP_9 = 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0
 FLOW_DAYS = Cells.from_rows([[SEP_4], [SEP_5], [SEP_6], [SEP_7], [SEP_8], [SEP_9]])
 MIDPOINTS = Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875], [2.900]])
-GAS_DAILY_HANDLE = re.compile(r"gas_daily_fixings:[0-9a-f]{6}:([0-9]{6})")
+GAS_DAILY_HANDLE = re.compile(r"gas_daily_fixings:.+:([0-9]+)")
 
 
 @functools.cache
@@ -642,10 +649,12 @@ def gas_daily(flow_days: object, prices: object) -> str:
 
 
 def test_gas_daily_fixings_are_created_from_two_columns_and_read_back() -> None:
-    assert bridge.call("ReadGasDailyFixings", [gas_daily(FLOW_DAYS, MIDPOINTS)]) == (
+    made = gas_daily(FLOW_DAYS, MIDPOINTS)
+    assert bridge.call("ReadGasDailyFixings", [made]) == (
         "2026-09-04 2026-09-05 2026-09-06 2026-09-07 2026-09-08 2026-09-09 | "
         "2.93 2.875 2.875 2.875 2.875 2.9"
     )
+    assert made.startswith("gas_daily_fixings:Henry Hub Gas Daily:")  # the index's name
 
 
 # A single cell is a column of one, so the fixings of one day need no range.
@@ -833,7 +842,7 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
         (MISSING, "is missing"),
         (None, "is blank"),
         (2.93, "is number 2.93"),
-        ("index:000000:000001", "is text 'index:000000:000001' naming no live object"),
+        ("index:9999999", "is text 'index:9999999' naming no live object"),
     ):
         assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, wrong]) == (
             f"#ERROR _CreateGasDailyFixings: index {what}, expected index handle"
@@ -860,7 +869,7 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
 # a negative among them and the first repeated, selected without a header.
 NAME = "WTI NYMEX"
 PRICES = Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])
-VECTOR = re.compile(r"price_vector:[0-9a-f]{6}:([0-9]{6})")
+VECTOR = re.compile(r"price_vector:.+:([0-9]+)")
 
 
 def a_vector(prices: object = PRICES, name: object = NAME) -> str:
@@ -888,14 +897,17 @@ def test_one_cell_is_a_vector_of_one_price() -> None:
 
 # The name is kept as typed and checked by nothing here: another case, a space at the end, a name
 # no index bears and a name of one character make vectors alike, a literal in the formula and
-# the cell holding it arriving as the same text.
+# the cell holding it arriving as the same text; the handle carries the name between the tag and
+# the count.
 @pytest.mark.parametrize(
     "name",
     ["wti nymex", "WTI NYMEX ", "Brent", "x"],
     ids=["another case", "a space at the end", "a name no index bears", "one character"],
 )
 def test_any_text_names_a_vector_and_is_kept_as_typed(name: str) -> None:
-    assert bridge.call("ReadPriceVectorName", [a_vector(name=name)]) == name
+    made = a_vector(name=name)
+    assert bridge.call("ReadPriceVectorName", [made]) == name
+    assert made.startswith(f"price_vector:{name}:")
 
 
 # Each call publishes anew, over the same prices or a different number of them, and an earlier

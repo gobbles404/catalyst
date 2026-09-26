@@ -23,8 +23,8 @@ def _CreateHolidayCalendar(holiday: DateColumn) -> Handle[HolidayCalendar]: ...
 | 9 | 7-Sep-2026 | |
 | 10 | 26-Nov-2026 | |
 | 11 | 25-Dec-2026 | |
-| 12 | `=_CreateHolidayCalendar(A2:A11)` | shows `holiday_calendar:3f9a1c:000006` |
-| 13 | `=_CreateHolidayCalendar(A2)` | shows `holiday_calendar:3f9a1c:000007`, a market closed on one day |
+| 12 | `=_CreateHolidayCalendar(A2:A11)` | shows `holiday_calendar:6` |
+| 13 | `=_CreateHolidayCalendar(A2)` | shows `holiday_calendar:7`, a market closed on one day |
 
 One column of dates, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. It is the second function to take a column of one kind without headers, after `_CreateFuturesSchedule` ([inputs.md](../../seam/inputs.md) decision 38), and the cost that page states, two columns selected one row out of step, does not arise with one. A single cell is a column of one, so a market closed on one day needs no range. The seam checks the column alone, dates one column wide, no blank cells, and hands over an array of days; nothing here restates that. The result is a handle: text in the cell that stands for the calendar the seam keeps, declared `Handle[HolidayCalendar]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the calendar.
 

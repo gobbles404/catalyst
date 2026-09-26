@@ -23,8 +23,8 @@ def _CreateFuturesSchedule(
 | 5 | u26 | 20-Aug-2026 | 17-Aug-2026 |
 | 6 | V26 | 22-Sep-2026 | 17-Sep-2026 |
 | 7 | X26 | 20-Oct-2026 | 15-Oct-2026 |
-| 8 | `=_CreateFuturesSchedule(A2:A7, B2:B7, C2:C7)` | shows `futures_schedule:3f9a1c:000004` |
-| 9 | `=_CreateFuturesSchedule(A2:A7, B2:B7)` | shows `futures_schedule:3f9a1c:000005`, an index with no options |
+| 8 | `=_CreateFuturesSchedule(A2:A7, B2:B7, C2:C7)` | shows `futures_schedule:4` |
+| 9 | `=_CreateFuturesSchedule(A2:A7, B2:B7)` | shows `futures_schedule:5`, an index with no options |
 
 Three columns of one kind each, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The form is the family's, columns paired by position, at the cost [inputs.md](../../seam/inputs.md) decision 38 states: two columns can be selected one row out of step, and equal lengths cannot catch it. The third column is left out for an index that has no options, declared `DateColumn | None = None`, the seam's form for an argument that may be left out with nothing in its place ([inputs.md](../../seam/inputs.md) decision 39): the function receives `None` only when the argument is left out, and a blank cell in that slot fails as a blank. The seam checks each column alone, text one column wide, dates one column wide, no blank cells, and hands over a tuple of texts and arrays of days; nothing here restates that. A single cell is a column of one, so a schedule of one contract needs no range. The result is a handle: text in the cell that stands for the schedule the seam keeps, declared `Handle[FuturesSchedule]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the schedule. `=util_ReadHandle(A8)` shows the three columns as they went in under the two heading rows, `contract_code`, `future_expiry` and `option_expiry`, and two columns for a schedule without options.
 

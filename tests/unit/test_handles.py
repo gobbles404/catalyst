@@ -55,15 +55,16 @@ def ReadCurve(curve: Handle[Curve]) -> float:
     return curve.level
 
 
-TEXT = re.compile(r"(curve|other):([0-9a-f]{6}):([0-9]{6})")
+TEXT = re.compile(r"(curve|other):([0-9]+)")
 
 
-def parts(text: object) -> tuple[str, str, int]:
-    """The three parts of a handle's text, or a failed assertion naming what came instead."""
+def parts(text: object) -> tuple[str, int]:
+    """The two parts of a handle's text, the tag and the count, or a failed assertion naming
+    what came instead. A kind of the test's own carries no index's name."""
     assert isinstance(text, str)
     match = TEXT.fullmatch(text)
     assert match, text
-    return match.group(1), match.group(2), int(match.group(3))
+    return match.group(1), int(match.group(2))
 
 
 # --- the way out: publishing ------------------------------------------------
@@ -75,18 +76,17 @@ def read(text: str) -> object:
     return _seen["curve"]
 
 
-def test_a_creator_publishes_text_of_three_parts() -> None:
-    tag, session, number = parts(bridge.call("MakeCurve", [1.0]))
-    tag_again, session_again, number_again = parts(bridge.call("MakeCurve", [1.0]))
+def test_a_creator_publishes_its_tag_and_the_count() -> None:
+    tag, count = parts(bridge.call("MakeCurve", [1.0]))
+    tag_again, count_again = parts(bridge.call("MakeCurve", [1.0]))
     assert (tag, tag_again) == ("curve", "curve")
-    assert session == session_again  # one session id for the life of this Python
-    assert (number, number_again) == (number, number + 1)
+    assert count_again == count + 1
 
 
-def test_the_number_runs_across_kinds_and_never_repeats() -> None:
-    _, _, first = parts(bridge.call("MakeCurve", [1.0]))
-    _, _, second = parts(bridge.call("MakeOther", []))
-    _, _, third = parts(bridge.call("MakeCurve", [1.0]))
+def test_the_count_runs_across_kinds_and_never_repeats() -> None:
+    _, first = parts(bridge.call("MakeCurve", [1.0]))
+    _, second = parts(bridge.call("MakeOther", []))
+    _, third = parts(bridge.call("MakeCurve", [1.0]))
     assert (second, third) == (first + 1, first + 2)
 
 
@@ -97,12 +97,34 @@ def test_equal_calls_give_distinct_objects_and_distinct_text() -> None:
     assert read(a) is not read(b)
 
 
-# The number moves only when an object is stored, so an unmoved number is an empty publication.
-def test_a_failing_creator_publishes_nothing_and_moves_no_number() -> None:
-    _, _, before = parts(bridge.call("MakeCurve", [1.0]))
+# The count moves only when an object is stored, so an unmoved count is an empty publication.
+def test_a_failing_creator_publishes_nothing_and_moves_no_count() -> None:
+    _, before = parts(bridge.call("MakeCurve", [1.0]))
     assert bridge.call("FailToMake", []) == "#ERROR FailToMake: ValueError: as asked"
-    _, _, after = parts(bridge.call("MakeCurve", [1.0]))
+    _, after = parts(bridge.call("MakeCurve", [1.0]))
     assert after == before + 1
+
+
+# Reading a handle publishes nothing and moves no count.
+def test_reading_a_handle_moves_no_count() -> None:
+    text = cast(str, bridge.call("MakeCurve", [1.0]))
+    _, before = parts(text)
+    assert bridge.call("ReadCurve", [text]) == 1.0
+    assert bridge.call("ReadCurve", [text]) == 1.0
+    _, after = parts(bridge.call("MakeCurve", [1.0]))
+    assert after == before + 1
+
+
+# The whole text is the key: a count edited to one not yet published, or to a live one under
+# another tag, names nothing.
+def test_an_edited_count_names_nothing() -> None:
+    tag, count = parts(bridge.call("MakeCurve", [1.0]))
+    _, live = parts(bridge.call("MakeOther", []))
+    for edited in (f"{tag}:{count + 9_000_000}", f"{tag}:{live}"):
+        assert bridge.call("ReadCurve", [edited]) == (
+            f"#ERROR ReadCurve: curve is text {edited!r} naming no live object, "
+            "expected curve handle"
+        )
 
 
 @pytest.mark.parametrize(
@@ -112,8 +134,8 @@ def test_a_failing_creator_publishes_nothing_and_moves_no_number() -> None:
         (None, "#ERROR MakeWhatever: returned nothing, expected curve"),
         (1.0, "#ERROR MakeWhatever: returned number 1.0, expected curve"),
         (
-            "curve:000000:000001",
-            "#ERROR MakeWhatever: returned text 'curve:000000:000001', expected curve",
+            "curve:9999999",
+            "#ERROR MakeWhatever: returned text 'curve:9999999', expected curve",
         ),
         (Steeper(1.0), "#ERROR MakeWhatever: returned a Python Steeper, expected curve"),
     ],
@@ -121,10 +143,10 @@ def test_a_failing_creator_publishes_nothing_and_moves_no_number() -> None:
 def test_a_creator_returning_the_wrong_thing_fails_and_publishes_nothing(
     value: object, text: str
 ) -> None:
-    _, _, before = parts(bridge.call("MakeCurve", [1.0]))
+    _, before = parts(bridge.call("MakeCurve", [1.0]))
     _returns["value"] = value
     assert bridge.call("MakeWhatever", []) == text
-    _, _, after = parts(bridge.call("MakeCurve", [1.0]))
+    _, after = parts(bridge.call("MakeCurve", [1.0]))
     assert after == before + 1
 
 
@@ -150,8 +172,8 @@ def test_a_handle_resolves_to_the_same_object_every_time() -> None:
         ("", "#ERROR ReadCurve: curve is empty text, expected curve handle"),
         (Cells.from_rows([["x"]]), "#ERROR ReadCurve: curve is 1x1 array, expected curve handle"),
         (
-            "curve:000000:000001",
-            "#ERROR ReadCurve: curve is text 'curve:000000:000001' naming no live object, "
+            "curve:9999999",
+            "#ERROR ReadCurve: curve is text 'curve:9999999' naming no live object, "
             "expected curve handle",
         ),
         (
@@ -241,8 +263,8 @@ def test_a_handle_that_may_be_left_out_still_fails_in_the_handles_words() -> Non
         bridge.call("MaybeCurve", [3.0])
         == "#ERROR MaybeCurve: curve is number 3.0, expected curve handle"
     )
-    assert bridge.call("MaybeCurve", ["curve:000000:000001"]) == (
-        "#ERROR MaybeCurve: curve is text 'curve:000000:000001' naming no live object, "
+    assert bridge.call("MaybeCurve", ["curve:9999999"]) == (
+        "#ERROR MaybeCurve: curve is text 'curve:9999999' naming no live object, "
         "expected curve handle"
     )
     other = cast(str, bridge.call("MakeOther", []))
@@ -339,8 +361,8 @@ def test_a_handle_of_any_kind_resolves_whatever_the_key_finds() -> None:
         ("", "#ERROR ReadAny: handle is empty text, expected a handle"),
         (Cells.from_rows([["x"]]), "#ERROR ReadAny: handle is 1x1 array, expected a handle"),
         (
-            "curve:000000:000001",
-            "#ERROR ReadAny: handle is text 'curve:000000:000001' naming no live object, "
+            "curve:9999999",
+            "#ERROR ReadAny: handle is text 'curve:9999999' naming no live object, "
             "expected a handle",
         ),
         (

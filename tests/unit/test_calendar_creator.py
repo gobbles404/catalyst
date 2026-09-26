@@ -13,7 +13,7 @@ from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE
 # The page's sample as the sheet sends it: serials for 19 May, 20 May, 25 May, 22 June and
 # 21 July 2026.
 MAY_19, MAY_20, MAY_25, JUN_22, JUL_21 = 46161.0, 46162.0, 46167.0, 46195.0, 46224.0
-HANDLE = re.compile(r"calendar:[0-9a-f]{6}:([0-9]{6})")
+HANDLE = re.compile(r"calendar:.+:([0-9]+)")
 HEADERS = ["date", "contract", "is_priced", "is_fixed"]
 TYPES = ["datetime64[D]", "str", "bool", "bool"]
 
@@ -75,6 +75,13 @@ def number(text: str) -> int:
     match = HANDLE.fullmatch(text)
     assert match, text
     return int(match.group(1))
+
+
+# The calendar's handle carries its index's name, sample, between the tag and the count.
+def test_a_calendar_handle_carries_its_indexs_name() -> None:
+    made = a_calendar()
+    assert made.startswith("calendar:sample:")
+    assert made[len("calendar:sample:") :].isdigit()
 
 
 def test_a_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
@@ -191,8 +198,8 @@ THE_VALUATION, THE_INDEX = object(), object()
             "#ERROR _CreateCalendar: index is number 3.0, expected index handle",
         ),
         (
-            [THE_VALUATION, "index:000000:000001"],
-            "#ERROR _CreateCalendar: index is text 'index:000000:000001' naming no live object, "
+            [THE_VALUATION, "index:9999999"],
+            "#ERROR _CreateCalendar: index is text 'index:9999999' naming no live object, "
             "expected index handle",
         ),
         (
@@ -264,8 +271,8 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
 
 
 def test_a_dead_calendar_handle_cannot_be_read() -> None:
-    assert bridge.call("util_ReadHandle", ["calendar:000000:000001"]) == (
-        "#ERROR util_ReadHandle: handle is text 'calendar:000000:000001' naming no live object, "
+    assert bridge.call("util_ReadHandle", ["calendar:9999999"]) == (
+        "#ERROR util_ReadHandle: handle is text 'calendar:9999999' naming no live object, "
         "expected a handle"
     )
 

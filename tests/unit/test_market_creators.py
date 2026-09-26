@@ -18,7 +18,7 @@ from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE
 # 21 July 2026, and 1 January.
 MAY_18, MAY_19, MAY_20, MAY_21, MAY_22 = 46160.0, 46161.0, 46162.0, 46163.0, 46164.0
 MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 46023.0
-HANDLE = re.compile(r"market_history:[0-9a-f]{6}:([0-9]{6})")
+HANDLE = re.compile(r"market_history:.+:([0-9]+)")
 HEADERS = ["date", "contract", "is_priced", "is_fixed", "fixing_price"]
 TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
 SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
@@ -231,8 +231,8 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
             "#ERROR _CreateMarketHistory: fixings is number 70.85, expected a handle",
         ),
         (
-            [THE_CALENDAR, "futures_fixings:000000:000001"],
-            "#ERROR _CreateMarketHistory: fixings is text 'futures_fixings:000000:000001' "
+            [THE_CALENDAR, "futures_fixings:9999999"],
+            "#ERROR _CreateMarketHistory: fixings is text 'futures_fixings:9999999' "
             "naming no live object, expected a handle",
         ),
         (
@@ -328,8 +328,8 @@ def test_an_index_remade_is_another_index_until_the_calendar_and_the_fixings_are
 
 
 def test_a_dead_history_handle_cannot_be_read() -> None:
-    assert bridge.call("util_ReadHandle", ["market_history:000000:000001"]) == (
-        "#ERROR util_ReadHandle: handle is text 'market_history:000000:000001' naming no live "
+    assert bridge.call("util_ReadHandle", ["market_history:9999999"]) == (
+        "#ERROR util_ReadHandle: handle is text 'market_history:9999999' naming no live "
         "object, expected a handle"
     )
 
@@ -337,7 +337,7 @@ def test_a_dead_history_handle_cannot_be_read() -> None:
 # --- _CreateMarket -----------------------------------------------------------------
 
 
-MARKET = re.compile(r"market:[0-9a-f]{6}:([0-9]{6})")
+MARKET = re.compile(r"market:.+:([0-9]+)")
 MARKET_HEADERS = ["date", "contract", "is_priced", "is_fixed", "price"]
 JUN_18, JUN_19, JUN_23 = 46191.0, 46192.0, 46196.0
 
@@ -527,8 +527,8 @@ THE_HISTORY, THE_VECTOR = object(), object()
             "#ERROR _CreateMarket: price_vector is number 72.1, expected price vector handle",
         ),
         (
-            [THE_HISTORY, "price_vector:000000:000001"],
-            "#ERROR _CreateMarket: price_vector is text 'price_vector:000000:000001' naming no "
+            [THE_HISTORY, "price_vector:9999999"],
+            "#ERROR _CreateMarket: price_vector is text 'price_vector:9999999' naming no "
             "live object, expected price vector handle",
         ),
         (
@@ -609,6 +609,15 @@ def test_a_failed_market_publishes_no_object_and_no_handle() -> None:
     assert market_number(a_market(history, vector)) == before + 1
 
 
+# The history's and the market's handles carry their index's name between the tag and the count.
+def test_history_and_market_handles_carry_their_indexs_name() -> None:
+    history = a_history()
+    assert history.startswith("market_history:WTI NYMEX:")
+    made = a_market(history)
+    assert made.startswith("market:WTI NYMEX:")
+    assert made[len("market:WTI NYMEX:") :].isdigit()
+
+
 def test_repeated_market_calls_publish_fresh_handles_and_the_earlier_ones_stand() -> None:
     history, vector = a_history(), a_vector(72.10, 72.80)
     first = a_market(history, vector)
@@ -618,8 +627,8 @@ def test_repeated_market_calls_publish_fresh_handles_and_the_earlier_ones_stand(
 
 
 def test_a_dead_market_handle_cannot_be_read() -> None:
-    assert bridge.call("util_ReadHandle", ["market:000000:000001"]) == (
-        "#ERROR util_ReadHandle: handle is text 'market:000000:000001' naming no live object, "
+    assert bridge.call("util_ReadHandle", ["market:9999999"]) == (
+        "#ERROR util_ReadHandle: handle is text 'market:9999999' naming no live object, "
         "expected a handle"
     )
 
@@ -781,6 +790,8 @@ def test_a_gas_daily_market_is_created_from_two_handles_and_read_back_day_by_day
         "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
     )
     made = a_market(cast(str, history), a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily"))
+    assert cast(str, history).startswith("market_history:Henry Hub Gas Daily:")
+    assert made.startswith("market:Henry Hub Gas Daily:")
     shown = rows(read(made))
     assert len(shown) == 93
     assert shown[0] == MARKET_HEADERS and shown[1] == TYPES
@@ -803,6 +814,8 @@ def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_mont
         "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     made = a_market(cast(str, history), a_vector(2.20, name="Henry Hub IFERC"))
+    assert cast(str, history).startswith("market_history:Henry Hub IFERC:")
+    assert made.startswith("market:Henry Hub IFERC:")
     assert rows(read(made)) == [
         MARKET_HEADERS,
         TYPES,

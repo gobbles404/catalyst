@@ -29,12 +29,12 @@ import inspect
 import itertools
 import math
 import re
-import secrets
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
 from enum import IntEnum
 from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
+from operator import attrgetter
 from types import NoneType, UnionType
 from typing import (
     Annotated,
@@ -53,6 +53,14 @@ import numpy as np
 from numpy.typing import NDArray
 
 import goosedove
+from goosedove.calendar.calendar import Calendar
+from goosedove.index_definitions.index import Index
+from goosedove.market.market import Market
+from goosedove.market.market_history import MarketHistory
+from goosedove.market_data.futures_fixings import FuturesFixings
+from goosedove.market_data.gas_daily_fixings import GasDailyFixings
+from goosedove.market_data.iferc_fixings import IfercFixings
+from goosedove.market_data.price_vector import PriceVector
 
 # --- what a function may declare, beyond float, int, str, and bool ----------
 
@@ -1068,8 +1076,27 @@ class _Held:
 
 
 _HANDLES: Final[dict[str, _Held]] = {}
-_SESSION: Final = secrets.token_hex(3)  # six hex characters, new at every Python start
-_PUBLICATIONS: Final = itertools.count(1)  # one running number, shared by every kind
+# The runtime's publication count, shared by every kind and never reset while Python runs. It
+# starts again with the next Python, so a handle text a workbook saved can equal a later
+# runtime's publication of the same kind, name and count, and a consumer calculated before its
+# creator has run again would read that object: docs/seam/handles.md records the case under
+# the known limitation, with the Excel reproduction, accepted until the handle-lifecycle work.
+_published = 0
+
+# The kinds whose text carries an index's name, and where each keeps it. Registration prepares
+# the path once, so publishing reads two or three attributes and builds one string; the
+# library's records learn nothing of handles, and a kind absent here shows its tag and the
+# count alone. docs/seam/handles.md is the page.
+_NAMED: Final[dict[type[object], str]] = {
+    Index: "name",
+    Calendar: "index.name",
+    FuturesFixings: "index.name",
+    IfercFixings: "index.name",
+    GasDailyFixings: "index.name",
+    MarketHistory: "calendar.index.name",
+    PriceVector: "index_name",
+    Market: "market_history.calendar.index.name",
+}
 
 
 def _is_handle(annotation: object) -> bool:
@@ -1095,15 +1122,30 @@ def _words(kind: type[object]) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", " ", kind.__name__).lower()
 
 
-def _publish(kind: type[object], tag: str, words: str, value: object) -> str:
-    """Retain the object a creator returned and hand back the text that stands for it.
+def _publish(
+    kind: type[object],
+    tag: str,
+    words: str,
+    name: Callable[[object], str] | None,
+    value: object,
+) -> str:
+    """Retain the object a creator returned and hand back the text that stands for it: the tag,
+    the index's name where the kind carries one, and the runtime's publication count.
 
-    A creator that raised never reaches here, so a failure is never published and the number
-    does not move. The tag names the kind for a reader of the sheet; the entry's kind proves it.
+    A creator that raised never reaches here, so a failure is never published and the count
+    does not move; nor does it move for a text longer than a cell holds, refused before
+    anything is stored. The tag and the name describe the object for a reader of the sheet;
+    the entry's kind proves it, and nothing ever parses the text.
     """
+    global _published
     if type(value) is not kind:
         raise _returned(value, words)
-    text = f"{tag}:{_SESSION}:{next(_PUBLICATIONS):06d}"
+    count = _published + 1
+    text = f"{tag}:{count}" if name is None else f"{tag}:{name(value)}:{count}"
+    units = len(text.encode("utf-16-le")) // 2  # Excel counts UTF-16 units, as LEN does
+    if units > MAX_TEXT:
+        raise _BadResult(f"returned handle of {units} characters, expected at most {MAX_TEXT}")
+    _published = count
     _HANDLES[text] = _Held(kind, value)
     return text
 
@@ -1492,7 +1534,9 @@ def _result(function: str, annotation: object) -> Callable[[object], object]:
             )
         if kind is not None:
             words = _words(kind)
-            return partial(_publish, kind, words.replace(" ", "_"), words)
+            path = _NAMED.get(kind)
+            name = None if path is None else attrgetter(path)
+            return partial(_publish, kind, words.replace(" ", "_"), words, name)
     if convert is None:
         raise TypeError(
             f"{function} declares {annotation!r} as its result, which the seam cannot send"
