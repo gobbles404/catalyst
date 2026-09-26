@@ -1265,7 +1265,6 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
     index = an_index(schedule)
-    index = index
     PATH["_CreateCalendar"](valuation, index)
     assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "Registered.run": 1,
@@ -1300,7 +1299,6 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
     index = an_index(schedule)
-    index = index
     PATH["_CreateCalendar"](valuation, index)
     assert call_profile(lambda: PATH["_CreateCalendar"](valuation, index)) == {
         "Registered.run": 1,
@@ -1342,12 +1340,13 @@ def history_sources(contracts: int) -> tuple[object, object]:
 
 
 # A year of days and the fixings on its fixed business days: two handles, each the text rule and
-# one lookup, the builder's dispatch to the futures binder, its check of the calendar's kind, its
-# three looks, a fixing on or after the valuation date, a fixing on a day the calendar closes and
-# a fixed day without one, its rows from one subtraction over the fixings' days, the days covered
-# in one zeros, the two columns frozen, and one publication. Fifteen calls across twelve
-# functions, the accept rule once per argument; no arange, no searchsorted and no look at a
-# holiday, since the calendar is taken as it is and nothing of it is made again.
+# one lookup, the builder's dispatch to the futures binder, its one comparison of the fixings'
+# index with the calendar's, its two looks, a fixing on or after the valuation date and a fixed
+# day without one, its rows from one subtraction over the fixings' days, the days covered in one
+# zeros, the two columns frozen, and one publication. Fifteen calls across twelve functions, the
+# accept rule once per argument; no arange, no searchsorted and no look at a holiday, since the
+# calendar is taken as it is and nothing of it is made again, and no look for a closed day, both
+# having been checked against one holiday calendar.
 def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1362,18 +1361,18 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
         "_CreateMarketHistory": 1,
         "market_history": 1,
         "futures_history": 1,
-        "_of_the_market": 1,
+        "_over_the_calendars_index": 1,
         "_every_fixed_day": 1,
         "_frozen": 1,
         "_publish": 1,
     }
     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
     assert calls == {
-        "ndarray.any": 3,  # the builder's three looks
+        "ndarray.any": 2,  # the builder's two looks
         "ndarray.astype": 1,  # the fixings' days to rows of the calendar
         "numpy.zeros": 1,  # the rows covered
         "ndarray.setflags": 2,  # the two columns frozen
-        "ufunc.reduce": 3,
+        "ufunc.reduce": 2,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
@@ -1385,20 +1384,21 @@ def gas_daily_history_sources() -> tuple[object, object]:
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
     index = an_index(schedule)
-    index = index
     made = PATH["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
     fixings = PATH["_CreateGasDailyFixings"](
         Cells.from_rows([[46023.0 + i] for i in range(days)]),
         Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+        index,
     )
     return made, fixings
 
 
 # A year of flow days and the prints on those that have fixed: two handles as above, the
-# builder's dispatch to the Gas Daily binder, its check of the calendar's kind, its two looks, a
-# print after the valuation day and a fixed day without one, its rows from one subtraction over
-# the flow days, the days covered in one zeros, the two columns frozen, and one publication.
+# builder's dispatch to the Gas Daily binder, its one comparison of the fixings' index with the
+# calendar's, its two looks, a print after the valuation day and a fixed day without one, its
+# rows from one subtraction over the flow days, the days covered in one zeros, the two columns
+# frozen, and one publication.
 # Fifteen calls across twelve functions, the accept rule once per argument; no arange, no
 # searchsorted and no look at a holiday.
 def test_a_gas_daily_history_is_two_handles_in_and_the_calendar_kept(
@@ -1415,7 +1415,7 @@ def test_a_gas_daily_history_is_two_handles_in_and_the_calendar_kept(
         "_CreateMarketHistory": 1,
         "market_history": 1,
         "gas_daily_history": 1,
-        "_of_the_market": 1,
+        "_over_the_calendars_index": 1,
         "_every_fixed_day": 1,
         "_frozen": 1,
         "_publish": 1,
@@ -1438,17 +1438,17 @@ def iferc_history_sources() -> tuple[object, object]:
     valuation = PATH["_CreateValuationDate"](49740.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
     index = an_index(schedule)
-    index = index
     made = PATH["_CreateCalendar"](valuation, index)
-    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(120))
+    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(120), index)
     return made, fixings
 
 
 # Ten years of months, every one published, and their indices: two handles as above, the
-# builder's dispatch to the IFERC binder, its check of the calendar's kind, one pass over the
-# codes against the calendar's, the rows of the months in one array, two looks, an index for a
-# month not yet fixed and a fixed month without one, the months covered in one zeros, the rows
-# put in the calendar's order by one argsort, the two columns frozen, and one publication.
+# builder's dispatch to the IFERC binder, its one comparison of the fixings' index with the
+# calendar's, one pass over the codes for their rows, every code a month of the index since the
+# fixings' creator refused any other, the rows of the months in one array, two looks, an index
+# for a month not yet fixed and a fixed month without one, the months covered in one zeros, the
+# rows put in the calendar's order by one argsort, the two columns frozen, and one publication.
 # Fourteen calls across eleven functions, the accept rule once per argument; no arange and no
 # searchsorted.
 def test_an_iferc_history_is_two_handles_in_and_the_calendar_kept(
@@ -1465,7 +1465,7 @@ def test_an_iferc_history_is_two_handles_in_and_the_calendar_kept(
         "_CreateMarketHistory": 1,
         "market_history": 1,
         "iferc_history": 1,
-        "_of_the_market": 1,
+        "_over_the_calendars_index": 1,
         "_frozen": 1,
         "_publish": 1,
     }
@@ -1560,9 +1560,8 @@ def iferc_market_sources() -> tuple[object, object]:
     valuation = PATH["_CreateValuationDate"](46276.0, 0.5)
     schedule = PATH["_CreateIfercSchedule"](*iferc_columns(120))
     index = an_index(schedule)
-    index = index
     made = PATH["_CreateCalendar"](valuation, index)
-    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4))
+    fixings = PATH["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
     history = PATH["_CreateMarketHistory"](made, fixings)
     return history, PATH["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
 
@@ -1681,19 +1680,23 @@ def flow_day_columns(count: int) -> tuple[Cells, Cells]:
 
 
 # A year of flow days: the date column through its look and its conversion to days, the number
-# column accepted on the host's summary alone, the builder's one look over the days for the day
-# after each, its two copies and one publication. Seventeen calls across fourteen functions, the
-# accept rule once per argument; on numpy one look for the calendar and one for the days, the
-# column's two conversions, the two copies and their freezes.
-def test_gas_daily_fixings_are_two_columns_in_and_one_publication_out(
+# column accepted on the host's summary alone, the index by handle through its text rule and one
+# lookup, the builder's kind check, its one look over the days for the day after each, its two
+# copies and one publication. Twenty calls across sixteen functions, the accept rule once per
+# argument; on numpy one look for the calendar and one for the days, the column's two
+# conversions, the two copies and their freezes.
+def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     flow_days, prices = flow_day_columns(365)
-    PATH["_CreateGasDailyFixings"](flow_days, prices)
-    assert call_profile(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices)) == {
+    index = an_index(PATH["_CreateGasDailySchedule"](*gas_daily_month_columns(12)))
+    PATH["_CreateGasDailyFixings"](flow_days, prices, index)
+    assert call_profile(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,
+        "_validate": 3,
+        "_text": 1,  # the handle's text rule
+        "_resolve": 1,  # and its one lookup
         "_date_column": 1,
         "_column": 1,
         "_one_column": 2,
@@ -1706,7 +1709,7 @@ def test_gas_daily_fixings_are_two_columns_in_and_one_publication_out(
         "gas_daily_fixings": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices)) == {
+    assert numpy_calls(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices, index)) == {
         "ndarray.any": 2,  # the column's look for the calendar, then the look over the days
         "ndarray.astype": 2,  # the column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
@@ -1726,18 +1729,23 @@ def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
 
 
 # Ten years of monthly indices: the text column handed over as it is, the number column accepted
-# on the host's summary alone, the builder's count, its one pass over the codes as a set, its one
-# copy of the prices, and one publication. Fifteen calls across twelve functions, the accept rule
-# once per argument; nothing is asked of numpy but the copy and its freeze.
-def test_iferc_fixings_are_two_columns_in_and_one_publication_out(
+# on the host's summary alone, the index by handle through its text rule and one lookup, the
+# builder's kind check and count, its one pass over the codes against the index's months and for
+# repeats, its one copy of the prices, and one publication. Eighteen calls across fourteen
+# functions, the accept rule once per argument; nothing is asked of numpy but the copy and its
+# freeze.
+def test_iferc_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     codes, prices = iferc_fixing_columns(120)
-    PATH["_CreateIfercFixings"](codes, prices)
-    assert call_profile(lambda: PATH["_CreateIfercFixings"](codes, prices)) == {
+    index = an_index(PATH["_CreateIfercSchedule"](*iferc_columns(120)))
+    PATH["_CreateIfercFixings"](codes, prices, index)
+    assert call_profile(lambda: PATH["_CreateIfercFixings"](codes, prices, index)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,
+        "_validate": 3,
+        "_text": 1,  # the handle's text rule
+        "_resolve": 1,  # and its one lookup
         "_text_column": 1,
         "_column": 1,
         "_one_column": 2,
@@ -1748,7 +1756,7 @@ def test_iferc_fixings_are_two_columns_in_and_one_publication_out(
         "iferc_fixings": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateIfercFixings"](codes, prices)) == {
+    assert numpy_calls(lambda: PATH["_CreateIfercFixings"](codes, prices, index)) == {
         "numpy.array": 1,  # the one copy the fixings keep
         "ndarray.setflags": 1,  # frozen
     }

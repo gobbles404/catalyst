@@ -75,9 +75,7 @@ def a_history(
     first = made.dates[0] - np.timedelta64(10, "D")
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
-    fixings = futures_fixings(
-        days, 70.0 + np.arange(days.size, dtype=np.float64), an_index(schedule, holidays)
-    )
+    fixings = futures_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), made.index)
     return market_history(made, fixings)
 
 
@@ -107,7 +105,7 @@ def a_gas_daily_history(
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     start = min(made.dates[0] - np.timedelta64(10, "D"), day(as_of))
     days = np.arange(start, day(as_of) + np.timedelta64(1, "D"), dtype="datetime64[D]")
-    prints = gas_daily_fixings(days, 2.8 + np.arange(days.size, dtype=np.float64) / 100)
+    prints = gas_daily_fixings(days, 2.8 + np.arange(days.size, dtype=np.float64) / 100, made.index)
     return market_history(made, prints)
 
 
@@ -118,7 +116,7 @@ def an_iferc_history(
     valuation day."""
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     codes = tuple(schedule.codes[int(row)] for row in np.flatnonzero(made.is_fixed))
-    indices = iferc_fixings(codes, 1.8 + np.arange(len(codes), dtype=np.float64) / 10)
+    indices = iferc_fixings(codes, 1.8 + np.arange(len(codes), dtype=np.float64) / 10, made.index)
     return market_history(made, indices)
 
 
@@ -461,9 +459,7 @@ def any_history(data: st.DataObject) -> MarketHistory:
     )
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]
-    fixings = futures_fixings(
-        days, 60.0 + np.arange(days.size, dtype=np.float64), an_index(schedule, holidays)
-    )
+    fixings = futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), made.index)
     return market_history(made, fixings)
 
 
@@ -510,7 +506,7 @@ def any_gas_daily_history(data: st.DataObject) -> MarketHistory:
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(lengths.sum()) - 2)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     days = np.arange(min(firsts[0], as_of) - one_day, as_of + one_day, dtype="datetime64[D]")
-    prints = gas_daily_fixings(days, 1.0 + np.arange(days.size, dtype=np.float64))
+    prints = gas_daily_fixings(days, 1.0 + np.arange(days.size, dtype=np.float64), made.index)
     return market_history(made, prints)
 
 
@@ -532,7 +528,9 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed)
     indices = iferc_fixings(
-        tuple(codes[int(i)] for i in fixed), 100.0 + np.arange(fixed.size, dtype=np.float64)
+        tuple(codes[int(i)] for i in fixed),
+        100.0 + np.arange(fixed.size, dtype=np.float64),
+        made.index,
     )
     return market_history(made, indices)
 

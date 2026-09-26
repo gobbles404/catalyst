@@ -1,7 +1,7 @@
 """The worksheet functions of the market data: the fixings of one index, a settle on each business
 day, Inside FERC's index for each contract month or Gas Daily's midpoint for each flow day, each
-series created once, and its futures prices, a column snapped as often as the sheet
-recalculates, each reached by handle.
+series created once over the index it belongs to, and its futures prices, a column snapped as
+often as the sheet recalculates, each reached by handle.
 docs/library/market-data/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
@@ -67,11 +67,16 @@ def _CreateIfercFixings(
         NumberColumn,
         "The column of published indices beside the codes, such as B2:B5, one per code.",
     ],
+    index: Annotated[
+        Handle[Index],
+        "The index handle: the cell showing _CreateIndex's result, such as E3, or a name for "
+        "it; an IFERC index, whose months the codes are checked against.",
+    ],
 ) -> Handle[IfercFixings]:
     """Creates the IFERC fixings of one index from the contract months whose index has been
-    published and the index printed for each, and shows its handle, the text other formulas
-    take as the fixings."""
-    return iferc_fixings(contract_code, price)
+    published and the index printed for each, checked against the months of its index, and
+    shows its handle, the text other formulas take as the fixings."""
+    return iferc_fixings(contract_code, price, index)
 
 
 @excel_function
@@ -85,11 +90,16 @@ def _CreateGasDailyFixings(
         NumberColumn,
         "The column of midpoints beside the flow days, such as B2:B7, one per day.",
     ],
+    index: Annotated[
+        Handle[Index],
+        "The index handle: the cell showing _CreateIndex's result, such as C4, or a name for "
+        "it; a Gas Daily index, the one these fixings belong to.",
+    ],
 ) -> Handle[GasDailyFixings]:
     """Creates the Gas Daily fixings of one index from the days gas flowed and the midpoint
     printed for each, one for every calendar day from the first to the last, and shows its
     handle, the text other formulas take as the fixings."""
-    return gas_daily_fixings(flow_date, price)
+    return gas_daily_fixings(flow_date, price, index)
 
 
 @excel_function

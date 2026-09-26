@@ -1,4 +1,5 @@
-"""The Gas Daily fixings: two rules of meaning, and the flow days and prices retained."""
+"""The Gas Daily fixings: three rules of meaning, the flow days and prices retained, and the index
+kept."""
 
 import numpy as np
 import pytest
@@ -6,6 +7,13 @@ from hypothesis import given
 from hypothesis import strategies as st
 from numpy.typing import NDArray
 
+from goosedove.index_definitions.contract_specifications import contract_specifications
+from goosedove.index_definitions.futures_schedule import futures_schedule
+from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
+from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.iferc_schedule import iferc_schedule
+from goosedove.index_definitions.index import Index, index
+from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.market_data.gas_daily_fixings import gas_daily_fixings
 
 EPOCH = np.datetime64("1899-12-30")
@@ -19,17 +27,42 @@ def prices(*values: float) -> NDArray[np.float64]:
     return np.array(values, dtype=np.float64)
 
 
+CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU")
+SPECIFICATIONS = contract_specifications(
+    ("ICE",), np.array([2500.0]), np.array([0.0]), np.array([0.0])
+)
+
+
+def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
+    """The index of that schedule with one set of conventions and specifications throughout,
+    since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
+    has none."""
+    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None)
+
+
 # The page's sample: Henry Hub Gas Daily over Labor Day week 2026, Friday 4 September's print
-# covering Saturday 5 to Tuesday 8, the four rows carrying one number.
+# covering Saturday 5 to Tuesday 8, the four rows carrying one number, over the index of the one
+# month of September.
 DAYS = dates("2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09")
 PRICES = prices(2.930, 2.875, 2.875, 2.875, 2.875, 2.900)
+INDEX = an_index(gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")))
+FUTURES_INDEX = index(
+    "WTI NYMEX",
+    futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None),
+    CONVENTIONS,
+    SPECIFICATIONS,
+    holiday_calendar(dates("2026-05-25")),
+)
+IFERC_INDEX = an_index(
+    iferc_schedule(("F26",), dates("2025-12-31"), dates("2026-01-05")), "Waha IFERC"
+)
 
 
 # --- what is kept -------------------------------------------------------------
 
 
-def test_the_sample_keeps_every_day_and_every_price_aligned() -> None:
-    fixings = gas_daily_fixings(DAYS, PRICES)
+def test_the_sample_keeps_every_day_and_every_price_aligned_and_the_index() -> None:
+    fixings = gas_daily_fixings(DAYS, PRICES, INDEX)
     assert np.array_equal(fixings.dates, DAYS)
     assert np.array_equal(fixings.prices, PRICES)
     assert fixings.dates.dtype == np.dtype("datetime64[D]")
@@ -37,10 +70,11 @@ def test_the_sample_keeps_every_day_and_every_price_aligned() -> None:
     assert fixings.dates.ndim == fixings.prices.ndim == 1
     # The weekend and the holiday are rows like any other, carrying Friday's number.
     assert fixings.prices[1:5].tolist() == [2.875] * 4
+    assert fixings.index is INDEX
 
 
 def test_the_fixings_of_one_day_are_a_series() -> None:
-    fixings = gas_daily_fixings(DAYS[:1], PRICES[:1])
+    fixings = gas_daily_fixings(DAYS[:1], PRICES[:1], INDEX)
     assert np.array_equal(fixings.dates, dates("2026-09-04"))
     assert np.array_equal(fixings.prices, prices(2.930))
 
@@ -48,26 +82,36 @@ def test_the_fixings_of_one_day_are_a_series() -> None:
 def test_a_whole_month_is_kept_in_its_order() -> None:
     days = np.arange("2026-09-01", "2026-10-01", dtype="datetime64[D]")
     given_prices = prices(*(2.8 + i / 100 for i in range(30)))
-    fixings = gas_daily_fixings(days, given_prices)
+    fixings = gas_daily_fixings(days, given_prices, INDEX)
     assert fixings.dates.size == 30
     assert np.array_equal(fixings.dates, days)
     assert np.array_equal(fixings.prices, given_prices)
 
 
 def test_a_price_below_zero_and_a_zero_are_kept_as_given() -> None:
-    fixings = gas_daily_fixings(DAYS[:3], prices(-1.25, 0.0, 1.95))
+    fixings = gas_daily_fixings(DAYS[:3], prices(-1.25, 0.0, 1.95), INDEX)
     assert np.array_equal(fixings.prices, prices(-1.25, 0.0, 1.95))
 
 
-# A run across a month end and one across a year end: no month or year is looked at.
+# A run across a month end and one across a year end: no month or year is looked at, and days
+# outside the index's schedule, September alone, are kept, since a series may run past the
+# calendar on either side.
 def test_a_run_across_a_month_end_and_a_year_end_is_kept_as_given() -> None:
     month_end = dates("2026-09-30", "2026-10-01", "2026-10-02")
-    assert np.array_equal(gas_daily_fixings(month_end, PRICES[:3]).dates, month_end)
+    assert np.array_equal(gas_daily_fixings(month_end, PRICES[:3], INDEX).dates, month_end)
     year_end = dates("2026-12-31", "2027-01-01", "2027-01-02")
-    assert np.array_equal(gas_daily_fixings(year_end, PRICES[:3]).dates, year_end)
+    assert np.array_equal(gas_daily_fixings(year_end, PRICES[:3], INDEX).dates, year_end)
 
 
 # --- what is rejected ---------------------------------------------------------
+
+
+# The kind is the first rule: a count the columns would refuse is not reached.
+def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() -> None:
+    for other, what in ((FUTURES_INDEX, "a futures index"), (IFERC_INDEX, "an IFERC index")):
+        with pytest.raises(ValueError) as failure:
+            gas_daily_fixings(DAYS, PRICES[:5], other)
+        assert str(failure.value) == f"index is {what}, expected a Gas Daily index"
 
 
 @pytest.mark.parametrize(
@@ -129,7 +173,7 @@ def test_fixings_that_cannot_be_made_say_why(
     days: NDArray[np.datetime64], given_prices: NDArray[np.float64], message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
-        gas_daily_fixings(days, given_prices)
+        gas_daily_fixings(days, given_prices, INDEX)
     assert str(failure.value) == message
 
 
@@ -151,9 +195,10 @@ def test_any_run_of_consecutive_days_with_one_price_each_is_kept_aligned(
         ),
         dtype=np.float64,
     )
-    fixings = gas_daily_fixings(days, given_prices)
+    fixings = gas_daily_fixings(days, given_prices, INDEX)
     assert np.array_equal(fixings.dates, days)
     assert np.array_equal(fixings.prices, given_prices)
+    assert fixings.index is INDEX
 
 
 # With one day left out of a run, the row after the gap is refused, naming the day expected.
@@ -165,7 +210,7 @@ def test_a_day_left_out_of_a_run_is_refused_at_the_row_after_the_gap(
     days = EPOCH + (first + np.arange(count)).astype("timedelta64[D]")
     days = np.delete(days, left_out)
     with pytest.raises(ValueError) as failure:
-        gas_daily_fixings(days, np.zeros(days.size))
+        gas_daily_fixings(days, np.zeros(days.size), INDEX)
     expected = EPOCH + np.timedelta64(first + left_out, "D")
     before = EPOCH + np.timedelta64(first + left_out - 1, "D")
     after = EPOCH + np.timedelta64(first + left_out + 1, "D")
@@ -178,9 +223,9 @@ def test_a_day_left_out_of_a_run_is_refused_at_the_row_after_the_gap(
 # --- ownership ----------------------------------------------------------------
 
 
-def test_the_fixings_own_their_columns() -> None:
+def test_the_fixings_own_their_columns_and_keep_the_index_that_arrived() -> None:
     days, given_prices = DAYS.copy(), PRICES.copy()
-    fixings = gas_daily_fixings(days, given_prices)
+    fixings = gas_daily_fixings(days, given_prices, INDEX)
     days[0] = np.datetime64("2030-01-01")
     given_prices[0] = 9.99
     assert fixings.dates[0] == np.datetime64("2026-09-04")
@@ -191,3 +236,4 @@ def test_the_fixings_own_their_columns() -> None:
         fixings.dates[0] = np.datetime64("2030-01-01")
     with pytest.raises(ValueError):
         fixings.prices[0] = 9.99
+    assert fixings.index is INDEX
