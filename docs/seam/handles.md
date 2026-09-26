@@ -32,7 +32,7 @@ Defined name  DeskCurve refers to =Inputs!$B$2
 
 A consumer's curve argument may be `Inputs!$B$2` or `DeskCurve`. Excel tracks the dependency either way and passes that cell's current value to the seam, which resolves it once. The library never receives, parses or looks up a worksheet address or name. `DeskCurve` is an Excel name for a cell, not a second object registry, a permanent alias, or the curve's content identity.
 
-Supported: cell references, and defined names referring to cells. An ordinary formula relaying a creator's value is still an Excel dependency, not an independent owner. Renaming a name, inserting rows or moving formulas follows Excel's own reference behaviour. Not supported: pasting a handle as a value, typing one into a formula, assigning the literal text to a defined name, or carrying one outside the workbook's dependency chain; none of these acquires ownership or a persistence promise. This is a usage contract, not a claim that the seam can reject every literal: a live handle resolves however it reached the argument, since rejecting on worksheet provenance would need host information that does not exist. What is required, and built, is that unknown, expired and wrong-kind values fail visibly, and matching-looking text never selects an unrelated object.
+Supported: cell references, and defined names referring to cells. An ordinary formula relaying a creator's value is still an Excel dependency, not an independent owner. Renaming a name, inserting rows or moving formulas follows Excel's own reference behaviour. Not supported: pasting a handle as a value, typing one into a formula, assigning the literal text to a defined name, or carrying one outside the workbook's dependency chain; none of these acquires ownership or a persistence promise. This is a usage contract, not a claim that the seam can reject every literal: a live handle resolves however it reached the argument, since rejecting on worksheet provenance would need host information that does not exist. Text absent from the store and handles of the wrong stored kind fail visibly. A saved handle can equal a different object's handle after a runtime restart; see [the known limitation](#known-limitation-saved-handles-after-restart).
 
 ## The handle's text
 
@@ -70,7 +70,23 @@ The count is a publication count, not a version, an array index, a per-kind sequ
 
 The seam formats the text once, at publication, in the one publication path. Registration reads the declared result kind and prepares, once, the path to that kind's name, `index.name` for a calendar, `market_history.calendar.index.name` for a market, none for a schedule, so publishing reads two or three attributes and builds one string, with no scan, no hash of contents and no search of the store; the library's records hold their data and learn nothing of handles. Before the entry is stored, the whole text is measured as Excel counts text, in UTF-16 units, against the 32,767 the text-out rule already holds ([outputs.md](outputs.md)); a longer text fails in the result voice, `returned handle of 32790 characters, expected at most 32767`, nothing truncated, nothing stored and the count unmoved. Only a name of some 32,740 characters reaches it.
 
-The standing assumption, in place of the session part: a text from an earlier runtime names nothing until today's count passes its number, and after that it could only select an object of the same kind and name at that number, which one history per index in one workbook never produces. Two workbooks open in one Excel share the store and the count, each creator cell publishing its own object; a second Excel started as its own program is a second Python with a store of its own. Recalculation on open, which removes stale text as a state altogether, belongs to release, below.
+The count starts again when Python starts, so handle text can repeat between runtimes. A saved text names nothing unless the new runtime publishes the same kind, name where present, and count. If that happens, lookup cannot distinguish the saved text from the new publication. Two workbooks open in one Excel share the store and the count, each creator cell publishing its own object; a second Excel started as its own program is a second Python with a store of its own. Recalculation on open belongs to release, below.
+
+### Known limitation: saved handles after restart
+
+Recorded during review of #113 on 26 September 2026, at `c687940`. The owner chose to retain the shorter handle format and document this case for future handle-lifecycle work. No immediate behavior change is requested.
+
+The reproduced case requires a creator formula to retain its saved handle after a runtime restart, a new publication to acquire exactly the same handle text, and a consumer to calculate before the saved creator is recalculated. Manual calculation permits that ordering. Within one runtime the publication count does not repeat; merely creating two vectors for one index does not collide.
+
+Native Excel reproduction, using that revision's `workbooks/handles.xlsx` opened read-only in a fresh Excel process with manual calculation selected before opening it:
+
+1. Leave `handles!B677` uncalculated. Its saved formula is `_CreatePriceVector(B1231,A672:A675)`, its cached handle is `price_vector:Sample futures index:6`, and its first source price in `A672` is `74.25`.
+2. On a temporary sheet put `999` in `A1` and `_CreatePriceVector(handles!B1231,A1)` in `B1`. Calculate this second creator until it publishes `price_vector:Sample futures index:6`, keeping the original creator uncalculated.
+3. Calculate `=INDEX(util_ReadHandle(handles!B677),3,1)` on the temporary sheet. It returns `999`, the new vector's price, although it references the original creator whose source price is `74.25`.
+
+No handle was pasted or typed as a value. The test deliberately arranged a second vector with the same index name and advanced the count to match; it establishes that a collision is possible, not how often it occurs in desk use. One history per index does not prevent this case. Unnamed kinds, such as valuation dates, need only the same kind and count to match across runtimes.
+
+When diagnosing a wrong object after a restart, check calculation mode, whether the referenced creator has run in the current runtime, and whether another publication has acquired its saved text. Recalculate the creators and their consumers before relying on their results. Automatic handling of saved creator results, including manual calculation and partial-sheet calculation, remains a decision for the handle-lifecycle work; this note does not choose a mechanism or add a startup hook.
 
 ### Tests
 
@@ -119,7 +135,7 @@ A live creator owns its currently published object or batch. A lookup, or anothe
 
 Cleanup must not delete an object a live creator owns or a retained dependency needs; no age or capacity limit evicts the object behind a valid handle to admit another, and if a capacity policy is ever introduced, failed new construction leaves existing owned objects valid. Excel sees the value in the creator cell, not the store: removing the object behind `curve:17` neither changes that cell nor asks Excel to rebuild the curve, so a missing object where this contract promises one is a runtime failure, reported, never substituted, never answered from a previous result. Collecting objects proven unused is a different thing from evicting live ones, and an optional cache of calculated results may discard an answer that can be recomputed from available inputs but never the input objects: construction reuse, calculation reuse and object lifetime are three separate responsibilities.
 
-Saving a workbook preserves formulas, names, inputs and possibly the displayed handle text; it does not persist the store. Reopening rebuilds fresh objects through creator execution, never by reconnecting saved text, and handle text from a previous runtime names nothing until the count passes its number, the standing assumption in [the handle's text](#the-handles-text) covering what follows. When that calculation runs, including in manual mode, and whether the add-in requests it when a workbook opens, is open.
+Saving a workbook preserves formulas, names, inputs and possibly the displayed handle text; it does not persist the store. Creator execution after reopening builds fresh objects. Until a creator runs, its saved text may fail lookup or resolve to a different publication as described in [the known limitation](#known-limitation-saved-handles-after-restart). When that calculation runs, including in manual mode, and whether the add-in requests it when a workbook opens, is open.
 
 ## Publication and release
 
@@ -148,7 +164,7 @@ What remains is host lifecycle integration, so that a creator's deletion or its 
 
 ## Acceptance scenarios
 
-Held by tests today: a direct reference supplies the current handle and resolves the typed object (the smoke rows); duplicate creators give distinct handles and distinct objects; a pasted literal, a text from an earlier runtime and a handle of another kind fail, named; a creator's failure is relayed as the creator's; a failed creator publishes nothing. The rest wait for release. Deterministic counts for construction, transport, copies, lookup, publication and release; retained bytes with shared ownership counted once; timing as evidence, never a gate.
+Held by tests today: a direct reference supplies the current handle and resolves the typed object (the smoke rows); duplicate creators give distinct handles and distinct objects; text naming no live entry and a handle of another kind fail, named; a creator's failure is relayed as the creator's; a failed creator publishes nothing. These tests do not establish that saved text cannot resolve to a different publication after restarting; the manual-calculation reproduction above records that limitation. The rest wait for release. Deterministic counts for construction, transport, copies, lookup, publication and release; retained bytes with shared ownership counted once; timing as evidence, never a gate.
 
 | Scenario | What must hold |
 |---|---|
@@ -165,7 +181,7 @@ Held by tests today: a direct reference supplies the current handle and resolves
 | a live object's store entry is deliberately removed in a diagnostic test | the failure is visible; any promised recovery is verified |
 | a pasted literal, a text from an earlier runtime, a diagnostic display | none acquires ownership by appearing as text; unknown, expired and wrong-kind values fail |
 | close one of several workbooks | that book's creator ownership is released promptly; other creators and retained dependencies stay valid |
-| reopen a workbook | creator execution builds fresh objects; old tokens do not reconnect |
+| reopen a workbook | creator execution builds fresh objects; handling uncalculated saved creator results remains open, with the collision case recorded above |
 | undo and interrupted calculation | promises agreed first, then exercised in Excel |
 
 ## The first proof
