@@ -432,14 +432,12 @@ def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     gas_daily = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
     gas_daily_index = an_index(gas_daily)
-    gas_daily_index = gas_daily_index
     assert (
         least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily_index))
         <= 25 * 365 + 2 * SLACK
     )
     iferc = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
     iferc_index = an_index(iferc)
-    iferc_index = iferc_index
     assert (
         least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index)) <= 80 * 120 + 2 * SLACK
     )
@@ -482,12 +480,12 @@ def gas_daily_history_sources() -> tuple[object, object]:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
     index = an_index(schedule)
-    index = index
     made = ENTRY["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
     fixings = ENTRY["_CreateGasDailyFixings"](
         Cells.from_rows([[46023.0 + i] for i in range(days)]),
         Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+        index,
     )
     return made, fixings
 
@@ -499,9 +497,8 @@ def iferc_history_sources() -> tuple[object, object]:
     valuation = ENTRY["_CreateValuationDate"](49740.0, 0.5)
     schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
     index = an_index(schedule)
-    index = index
     made = ENTRY["_CreateCalendar"](valuation, index)
-    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(120))
+    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(120), index)
     return made, fixings
 
 
@@ -539,14 +536,20 @@ def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
 
 
 # IFERC fixings keep the seam's tuple of codes as it is and a copy of the price column, 8 bytes
-# per month, and on the way pay the set the codes are checked for repeats through, which is
-# most of the peak at a small count: measured 10,600 bytes at 120 months on 2026-09-24, about
-# 80 bytes per month at that size on top of a creator's small objects, which twice the slack
-# covers, and 41,348 at 1,200, 34 bytes per month, the set growing slower than the count.
+# per month, and on the way pay the set of the index's months the codes are struck off, one set
+# checking membership and repeats alike, which is most of the peak at a small count: measured
+# 10,600 bytes at 120 months on 2026-09-24 with the set of the codes, and the same shape with the
+# set of the months since #109, about 80 bytes per month at that size on top of a creator's small
+# objects, which twice the slack covers, and 41,348 at 1,200, 34 bytes per month, the set growing
+# slower than the count.
 def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
     count = 120
     codes, prices = iferc_fixing_columns(count)
-    assert least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices)) <= 80 * count + 2 * SLACK
+    index = an_index(ENTRY["_CreateIfercSchedule"](*iferc_columns(count)))
+    assert (
+        least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices, index))
+        <= 80 * count + 2 * SLACK
+    )
 
 
 def flow_day_columns(count: int) -> tuple[Cells, Cells]:
@@ -566,8 +569,9 @@ def flow_day_columns(count: int) -> tuple[Cells, Cells]:
 def test_gas_daily_fixings_keep_a_copy_of_each_column() -> None:
     count = 365
     flow_days, prices = flow_day_columns(count)
+    index = an_index(ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12)))
     assert (
-        least_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices))
+        least_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices, index))
         <= 40 * count + 2 * SLACK
     )
 
@@ -651,9 +655,8 @@ def iferc_market_sources() -> tuple[object, object]:
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
     index = an_index(schedule)
-    index = index
     made = ENTRY["_CreateCalendar"](valuation, index)
-    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4))
+    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
 

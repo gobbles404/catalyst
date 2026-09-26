@@ -70,13 +70,9 @@ def the_calendar() -> str:
     return text
 
 
-@functools.cache
-def the_index() -> str:
-    """A futures index of two contracts whose holiday calendar is the_calendar's, made once."""
-    schedule = bridge.call(
-        "_CreateFuturesSchedule",
-        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46195.0]]), MISSING],
-    )
+def an_index_of(name: str, schedule: object, holidays: object) -> str:
+    """The index handle of that schedule handle and holiday calendar handle, with one set of
+    conventions and specifications, since nothing here reads either."""
     conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
@@ -87,11 +83,19 @@ def the_index() -> str:
             Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
         ],
     )
-    text = bridge.call(
-        "_CreateIndex", ["sample", schedule, conventions, specifications, the_calendar()]
-    )
+    text = bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays])
     assert isinstance(text, str) and text.startswith("index:"), text
     return text
+
+
+@functools.cache
+def the_index() -> str:
+    """A futures index of two contracts whose holiday calendar is the_calendar's, made once."""
+    schedule = bridge.call(
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46195.0]]), MISSING],
+    )
+    return an_index_of("sample", schedule, the_calendar())
 
 
 # The market history reads futures fixings, but this hidden reader proves on its own that a
@@ -371,9 +375,21 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
 IFERC_CODES = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
 IFERC_PRICES = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
 IFERC_HANDLE = re.compile(r"iferc_fixings:[0-9a-f]{6}:([0-9]{6})")
+# ICE's last trading days and Platts' publication days for those four months, as serials.
+IFERC_LAST_TRADING = Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]])
+IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
 
 
-# The library has no consumer of IFERC fixings yet, so this hidden reader proves that a handle
+@functools.cache
+def the_iferc_index() -> str:
+    """The IFERC index of the four months the codes name, made once."""
+    schedule = bridge.call(
+        "_CreateIfercSchedule", [IFERC_CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION]
+    )
+    return an_index_of("Waha IFERC", schedule, MISSING)
+
+
+# The market history reads IFERC fixings, but this hidden reader proves on its own that a handle
 # resolves to the fixings the seam kept, the codes as typed and the prices as numbers.
 @probe
 def ReadIfercFixings(fixings: Handle[IfercFixings]) -> str:
@@ -381,7 +397,7 @@ def ReadIfercFixings(fixings: Handle[IfercFixings]) -> str:
 
 
 def iferc(codes: object, prices: object) -> str:
-    text = bridge.call("_CreateIfercFixings", [codes, prices])
+    text = bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()])
     assert isinstance(text, str) and IFERC_HANDLE.fullmatch(text), text
     return text
 
@@ -496,25 +512,36 @@ def test_two_single_cells_make_the_fixings_of_one_month() -> None:
 def test_iferc_fixings_that_cannot_be_made_say_why(
     codes: object, prices: object, text: str
 ) -> None:
-    assert bridge.call("_CreateIfercFixings", [codes, prices]) == text
+    assert bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()]) == text
 
 
 # The publication number moves only when an object is stored, so a failed creator leaves no gap,
 # whether the library or the seam refused the call.
 def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None:
     before = number(iferc(IFERC_CODES, IFERC_PRICES), IFERC_HANDLE)
-    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85]])]) == (
+    index = the_iferc_index()
+    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85]]), index]) == (
         "#ERROR _CreateIfercFixings: ValueError: price has 1 price, expected 4, "
         "one per contract_code"
     )
     twice = Cells.from_rows([["F26"], ["F26"]])
-    assert bridge.call("_CreateIfercFixings", [twice, Cells.from_rows([[1.85], [2.10]])]) == (
+    assert bridge.call(
+        "_CreateIfercFixings", [twice, Cells.from_rows([[1.85], [2.10]]), index]
+    ) == (
         "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', "
         "already given at row 1"
     )
+    unknown = Cells.from_rows([["F26"], ["K26"]])
+    assert bridge.call(
+        "_CreateIfercFixings", [unknown, Cells.from_rows([[1.85], [2.10]]), index]
+    ) == (
+        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'K26', "
+        "expected one of the index's months"
+    )
     assert (
         bridge.call(
-            "_CreateIfercFixings", [IFERC_CODES, Cells.from_rows([[1.85], [None], [1.95], [1.60]])]
+            "_CreateIfercFixings",
+            [IFERC_CODES, Cells.from_rows([[1.85], [None], [1.95], [1.60]]), index],
         )
         == "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
     )
@@ -542,6 +569,39 @@ def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
         f"#ERROR ReadIfercFixings: fixings is iferc schedule handle {schedule!r}, "
         "expected iferc fixings handle"
     )
+    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, schedule]) == (
+        f"#ERROR _CreateIfercFixings: index is iferc schedule handle {schedule!r}, "
+        "expected index handle"
+    )
+
+
+# The index by handle: left out, blank, a number, text naming no live object and a handle of
+# another kind fail in the seam's words; an index of another kind and a code the index does not
+# hold, in the library's.
+def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (1.85, "is number 1.85"),
+        ("index:000000:000001", "is text 'index:000000:000001' naming no live object"),
+    ):
+        assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, wrong]) == (
+            f"#ERROR _CreateIfercFixings: index {what}, expected index handle"
+        )
+    other = the_fixings(DATES, SETTLES)
+    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, other]) == (
+        f"#ERROR _CreateIfercFixings: index is futures fixings handle {other!r}, "
+        "expected index handle"
+    )
+    assert bridge.call("_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, the_index()]) == (
+        "#ERROR _CreateIfercFixings: ValueError: index is a futures index, expected an IFERC index"
+    )
+    assert bridge.call(
+        "_CreateIfercFixings", [IFERC_CODES, IFERC_PRICES, the_gas_daily_index()]
+    ) == (
+        "#ERROR _CreateIfercFixings: ValueError: index is a Gas Daily index, "
+        "expected an IFERC index"
+    )
 
 
 # --- _CreateGasDailyFixings ------------------------------------------------------
@@ -556,6 +616,16 @@ MIDPOINTS = Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875], [2.900
 GAS_DAILY_HANDLE = re.compile(r"gas_daily_fixings:[0-9a-f]{6}:([0-9]{6})")
 
 
+@functools.cache
+def the_gas_daily_index() -> str:
+    """The Gas Daily index of one month, September 2026, made once."""
+    schedule = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    return an_index_of("Henry Hub Gas Daily", schedule, MISSING)
+
+
 # The library has no consumer of Gas Daily fixings yet, so this hidden reader proves that a
 # handle resolves to the fixings the seam kept, the flow days as days and the prices as numbers.
 @probe
@@ -565,7 +635,7 @@ def ReadGasDailyFixings(fixings: Handle[GasDailyFixings]) -> str:
 
 
 def gas_daily(flow_days: object, prices: object) -> str:
-    text = bridge.call("_CreateGasDailyFixings", [flow_days, prices])
+    text = bridge.call("_CreateGasDailyFixings", [flow_days, prices, the_gas_daily_index()])
     assert isinstance(text, str) and GAS_DAILY_HANDLE.fullmatch(text), text
     return text
 
@@ -693,20 +763,23 @@ def test_two_single_cells_make_the_fixings_of_one_day() -> None:
 def test_gas_daily_fixings_that_cannot_be_made_say_why(
     flow_days: object, prices: object, text: str
 ) -> None:
-    assert bridge.call("_CreateGasDailyFixings", [flow_days, prices]) == text
+    assert bridge.call("_CreateGasDailyFixings", [flow_days, prices, the_gas_daily_index()]) == text
 
 
 # The publication number moves only when an object is stored, so a failed creator leaves no gap,
 # whether the library or the seam refused the call.
 def test_a_failed_gas_daily_construction_publishes_no_object_and_no_handle() -> None:
     before = number(gas_daily(FLOW_DAYS, MIDPOINTS), GAS_DAILY_HANDLE)
-    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, Cells.from_rows([[2.930]])]) == (
+    index = the_gas_daily_index()
+    assert bridge.call(
+        "_CreateGasDailyFixings", [FLOW_DAYS, Cells.from_rows([[2.930]]), index]
+    ) == (
         "#ERROR _CreateGasDailyFixings: ValueError: price has 1 price, expected 6, "
         "one per flow_date"
     )
     skipped = Cells.from_rows([[SEP_4], [SEP_6]])
     assert bridge.call(
-        "_CreateGasDailyFixings", [skipped, Cells.from_rows([[2.930], [2.875]])]
+        "_CreateGasDailyFixings", [skipped, Cells.from_rows([[2.930], [2.875]]), index]
     ) == (
         "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, "
         "expected 2026-09-05, the day after row 1's 2026-09-04"
@@ -714,7 +787,11 @@ def test_a_failed_gas_daily_construction_publishes_no_object_and_no_handle() -> 
     assert (
         bridge.call(
             "_CreateGasDailyFixings",
-            [FLOW_DAYS, Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]])],
+            [
+                FLOW_DAYS,
+                Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]]),
+                index,
+            ],
         )
         == "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number"
     )
@@ -741,6 +818,37 @@ def test_a_handle_of_another_kind_is_not_gas_daily_fixings() -> None:
     assert bridge.call("ReadGasDailyFixings", [schedule]) == (
         f"#ERROR ReadGasDailyFixings: fixings is gas daily schedule handle {schedule!r}, "
         "expected gas daily fixings handle"
+    )
+    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, schedule]) == (
+        f"#ERROR _CreateGasDailyFixings: index is gas daily schedule handle {schedule!r}, "
+        "expected index handle"
+    )
+
+
+# The index by handle: left out, blank, a number, text naming no live object and a handle of
+# another kind fail in the seam's words; an index of another kind in the library's.
+def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (2.93, "is number 2.93"),
+        ("index:000000:000001", "is text 'index:000000:000001' naming no live object"),
+    ):
+        assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, wrong]) == (
+            f"#ERROR _CreateGasDailyFixings: index {what}, expected index handle"
+        )
+    other = the_fixings(DATES, SETTLES)
+    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, other]) == (
+        f"#ERROR _CreateGasDailyFixings: index is futures fixings handle {other!r}, "
+        "expected index handle"
+    )
+    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, the_index()]) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: index is a futures index, "
+        "expected a Gas Daily index"
+    )
+    assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, the_iferc_index()]) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, "
+        "expected a Gas Daily index"
     )
 
 

@@ -3,6 +3,7 @@ its handle spills, the calendar's four columns and a fixing price on each day, a
 word; then the market, the history and a price vector in, and the table its handle spills, a
 price on every business day."""
 
+import functools
 import re
 from typing import cast
 
@@ -48,9 +49,10 @@ def a_holiday_calendar(*serials: float) -> str:
 SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 
 
-def an_index(schedule: object, holidays: object = MISSING) -> str:
+def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYMEX") -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
-    conventions and specifications, since nothing here reads either."""
+    conventions and specifications, since nothing here reads either. Each call publishes a new
+    index, as each _CreateIndex cell does; a calendar and the fixings it binds share one."""
     conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
@@ -61,25 +63,33 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
             Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
         ],
     )
-    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    text = bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays])
     assert isinstance(text, str) and text.startswith("index:"), text
     return text
 
 
-def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str:
-    args = [
-        valuation or a_valuation(),
-        an_index(a_schedule(*SCHEDULE), holidays or a_holiday_calendar(MAY_25)),
-    ]
+@functools.cache
+def index_closed_on(*serials: float) -> str:
+    """The futures index of the sample's schedule with those holidays, made once per list, so
+    that a calendar and fixings made over it share one object."""
+    return an_index(a_schedule(*SCHEDULE), a_holiday_calendar(*serials))
+
+
+def the_index() -> str:
+    return index_closed_on(MAY_25)
+
+
+def a_calendar(valuation: str | None = None, index: str | None = None) -> str:
+    args = [valuation or a_valuation(), index or the_index()]
     text = bridge.call("_CreateCalendar", args)
     assert isinstance(text, str) and text.startswith("calendar:"), text
     return text
 
 
-def the_fixings(body: list[list[float]] = SAMPLE, holidays: str | None = None) -> str:
+def the_fixings(body: list[list[float]] = SAMPLE, index: str | None = None) -> str:
     days = Cells.from_rows([[day] for day, _ in body])
     settles = Cells.from_rows([[settle] for _, settle in body])
-    args = [days, settles, an_index(a_schedule(*SCHEDULE), holidays or a_holiday_calendar(MAY_25))]
+    args = [days, settles, index or the_index()]
     text = bridge.call("_CreateFuturesFixings", args)
     assert isinstance(text, str) and text.startswith("futures_fixings:"), text
     return text
@@ -178,8 +188,8 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
         ),
         (
             [THE_CALENDAR, ([*SAMPLE, [MAY_25, 71.4]], JAN_1)],
-            "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-25 is a closed day "
-            "in calendar, expected no fixing",
+            "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
+            "'WTI NYMEX', expected the calendar's, 'WTI NYMEX'",
         ),
         (
             [THE_CALENDAR, (SAMPLE[:2], MAY_25)],
@@ -188,8 +198,8 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
         ),
         (
             [JAN_1, THE_FIXINGS],
-            "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for "
-            "2026-05-25, expected a fixing for every fixed day in calendar",
+            "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
+            "'WTI NYMEX', expected the calendar's, 'WTI NYMEX'",
         ),
         (
             [MISSING, THE_FIXINGS],
@@ -233,9 +243,9 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
     ],
     ids=[
         "a fixing on the valuation date",
-        "a fixing on the holiday the calendar closes",
+        "fixings over another index of the same name, closed elsewhere",
         "the last fixed day without a fixing",
-        "a calendar open on the holiday the fixings skip",
+        "a calendar over another index of the same name",
         "the calendar left out",
         "a blank cell where the calendar should be",
         "a number where the calendar should be",
@@ -252,12 +262,12 @@ def test_a_history_that_cannot_be_made_says_why(args: list[object], text: str) -
     if calendar is THE_CALENDAR:
         calendar = a_calendar()
     elif calendar == JAN_1:
-        calendar = a_calendar(holidays=a_holiday_calendar(JAN_1))
+        calendar = a_calendar(index=index_closed_on(JAN_1))
     if fixings is THE_FIXINGS:
         fixings = the_fixings()
     elif isinstance(fixings, tuple):
         body, holiday = cast(tuple[list[list[float]], float], fixings)
-        fixings = the_fixings(body, a_holiday_calendar(holiday))
+        fixings = the_fixings(body, index_closed_on(holiday))
     assert bridge.call("_CreateMarketHistory", [calendar, fixings]) == text
 
 
@@ -304,6 +314,19 @@ def test_two_histories_from_one_calendar_each_read_their_own_prices() -> None:
     assert [row[:4] for row in rows(read(first))] == [row[:4] for row in rows(read(second))]
 
 
+# A _CreateIndex cell recalculated is a new index: the calendar over the old one with fixings
+# over the new is refused, the name shown twice, and both remade over the new one read as before.
+def test_an_index_remade_is_another_index_until_the_calendar_and_the_fixings_are_remade() -> None:
+    before = rows(read(a_history()))
+    remade = an_index(a_schedule(*SCHEDULE), a_holiday_calendar(MAY_25))
+    fixings = the_fixings(index=remade)
+    assert bridge.call("_CreateMarketHistory", [a_calendar(), fixings]) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'WTI NYMEX', "
+        "expected the calendar's, 'WTI NYMEX'"
+    )
+    assert rows(read(a_history(a_calendar(index=remade), fixings))) == before
+
+
 def test_a_dead_history_handle_cannot_be_read() -> None:
     assert bridge.call("util_ReadHandle", ["market_history:000000:000001"]) == (
         "#ERROR util_ReadHandle: handle is text 'market_history:000000:000001' naming no live "
@@ -348,7 +371,7 @@ def whole_fixings(first: float, last: float, *listed: float) -> str:
     kept = serials[np.is_busday(days, holidays=closed)].tolist()
     body = [[float(s), 70.0 + i * 0.05] for i, s in enumerate(kept)]
     body[-1][1] = 71.60
-    return the_fixings(body, a_holiday_calendar(*listed))
+    return the_fixings(body, index_closed_on(*listed))
 
 
 # The sample: the history of the tests above, valued on 26 May with the 25th a holiday, and two
@@ -380,7 +403,7 @@ def test_a_market_is_created_from_two_handles_and_read_back_day_by_day() -> None
 def test_the_expiring_contract_is_quoted_on_its_expiry_day_and_the_next_from_the_day_after() -> (
     None
 ):
-    calendar = a_calendar(valuation=a_valuation(JUN_22, 1.0), holidays=a_holiday_calendar(JUN_19))
+    calendar = a_calendar(valuation=a_valuation(JUN_22, 1.0), index=index_closed_on(JUN_19))
     history = bridge.call("_CreateMarketHistory", [calendar, whole_fixings(MAY_20, JUN_18, JUN_19)])
     assert isinstance(history, str) and history.startswith("market_history:")
     shown = rows(read(a_market(history)))
@@ -608,12 +631,18 @@ SEP_1, SEP_25, SEP_30, OCT_1, OCT_31 = 46266.0, 46290.0, 46295.0, 46296.0, 46326
 NOV_1, NOV_30, OCT_30, NOV_2, NOV_15, DEC_1 = 46327.0, 46356.0, 46325.0, 46328.0, 46341.0, 46357.0
 
 
-def a_gas_daily_calendar(as_of: float = SEP_25) -> str:
+@functools.cache
+def the_gas_daily_index() -> str:
+    """The Gas Daily index of the schedule page's three months, made once."""
     schedule = bridge.call(
         "_CreateGasDailySchedule",
         [column("U26", "V26", "X26"), column(SEP_1, OCT_1, NOV_1), column(SEP_30, OCT_31, NOV_30)],
     )
-    text = bridge.call("_CreateCalendar", [a_valuation(as_of), an_index(schedule, MISSING)])
+    return an_index(schedule, MISSING, "Henry Hub Gas Daily")
+
+
+def a_gas_daily_calendar(as_of: float = SEP_25) -> str:
+    text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_gas_daily_index()])
     assert isinstance(text, str) and text.startswith("calendar:"), text
     return text
 
@@ -622,17 +651,24 @@ def prints_through(first: float, last: float) -> str:
     """A print on every flow day from the first serial to the last, 2.80 rising by a cent."""
     serials = [first + i for i in range(int(last - first) + 1)]
     prices = [2.80 + i / 100 for i in range(len(serials))]
-    text = bridge.call("_CreateGasDailyFixings", [column(*serials), column(*prices)])
+    args = [column(*serials), column(*prices), the_gas_daily_index()]
+    text = bridge.call("_CreateGasDailyFixings", args)
     assert isinstance(text, str) and text.startswith("gas_daily_fixings:"), text
     return text
 
 
-def an_iferc_calendar(as_of: float = NOV_15) -> str:
+@functools.cache
+def the_iferc_index() -> str:
+    """The IFERC index of the schedule page's three months, made once."""
     schedule = bridge.call(
         "_CreateIfercSchedule",
         [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
     )
-    text = bridge.call("_CreateCalendar", [a_valuation(as_of), an_index(schedule, MISSING)])
+    return an_index(schedule, MISSING, "Henry Hub IFERC")
+
+
+def an_iferc_calendar(as_of: float = NOV_15) -> str:
+    text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_iferc_index()])
     assert isinstance(text, str) and text.startswith("calendar:"), text
     return text
 
@@ -640,7 +676,7 @@ def an_iferc_calendar(as_of: float = NOV_15) -> str:
 def indices_for(*pairs: tuple[str, float]) -> str:
     codes = column(*(code for code, _ in pairs))
     prices = column(*(price for _, price in pairs))
-    text = bridge.call("_CreateIfercFixings", [codes, prices])
+    text = bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()])
     assert isinstance(text, str) and text.startswith("iferc_fixings:"), text
     return text
 
@@ -679,20 +715,20 @@ def test_an_iferc_history_is_created_from_two_handles_and_read_back_month_by_mon
     assert kinds[2:, 4].tolist() == [NUMBER_CODE, NUMBER_CODE, TEXT_CODE]
 
 
-def test_fixings_of_another_market_are_refused_through_the_seam() -> None:
+def test_fixings_over_another_index_are_refused_through_the_seam() -> None:
     futures, gas_daily = the_fixings(), prints_through(SEP_1, SEP_25)
     iferc = indices_for(("V26", 1.85))
     assert bridge.call("_CreateMarketHistory", [a_calendar(), gas_daily]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is Gas Daily fixings, "
-        "expected futures fixings with a futures calendar"
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
+        "'Henry Hub Gas Daily', expected the calendar's, 'WTI NYMEX'"
     )
     assert bridge.call("_CreateMarketHistory", [a_gas_daily_calendar(), iferc]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is IFERC fixings, "
-        "expected Gas Daily fixings with a Gas Daily calendar"
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
+        "'Henry Hub IFERC', expected the calendar's, 'Henry Hub Gas Daily'"
     )
     assert bridge.call("_CreateMarketHistory", [an_iferc_calendar(), futures]) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings is futures fixings, "
-        "expected IFERC fixings with an IFERC calendar"
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
+        "'WTI NYMEX', expected the calendar's, 'Henry Hub IFERC'"
     )
     assert bridge.call("_CreateMarketHistory", [a_calendar(), a_holiday_calendar(MAY_25)]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings is a holiday calendar, "
@@ -714,12 +750,6 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words() -> None:
         "expected a fixing for every fixed day in calendar"
     )
     assert bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("K26", 1.0))]
-    ) == (
-        "#ERROR _CreateMarketHistory: ValueError: fixings contract_code 'K26' is not a month "
-        "of calendar, expected one of its codes"
-    )
-    assert bridge.call(
         "_CreateMarketHistory",
         [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10), ("Z26", 2.2))],
     ) == (
@@ -739,7 +769,7 @@ def test_a_failed_construction_of_the_other_kinds_publishes_no_object_and_no_han
     indices = indices_for(("V26", 1.85))
     before = number(cast(str, bridge.call("_CreateMarketHistory", [made, prints])))
     assert cast(str, bridge.call("_CreateMarketHistory", [made, indices])).startswith(
-        "#ERROR _CreateMarketHistory: ValueError: fixings is IFERC fixings"
+        "#ERROR _CreateMarketHistory: ValueError: fixings is over another index"
     )
     assert number(cast(str, bridge.call("_CreateMarketHistory", [made, prints]))) == before + 1
 
