@@ -1,5 +1,5 @@
-"""The calendar: the schedule's kind choosing which is made, each kind's rules, and the four
-columns made once."""
+"""The calendar: the index's kind choosing which is made, each kind's rules on the index's
+schedule, and the four columns made once."""
 
 import numpy as np
 import pytest
@@ -9,10 +9,13 @@ from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar, calendar
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
+from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
+from goosedove.index_definitions.index import Index, index
+from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.index_definitions.kind import Kind
 
 
@@ -30,7 +33,7 @@ def a_schedule(*contracts: tuple[str, str]) -> FuturesSchedule:
 
 
 def codes_of(made: Calendar) -> list[str]:
-    return [made.schedule.codes[row] for row in made.contract.tolist()]
+    return [made.index.schedule.codes[row] for row in made.contract.tolist()]
 
 
 # The page's sample: three contracts of one index, the valuation date 25 May 2026 at midday,
@@ -41,13 +44,26 @@ CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL")
+SPECIFICATIONS = contract_specifications(
+    ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
+)
+
+
+def an_index(
+    schedule: object = SCHEDULE, holidays: HolidayCalendar | None = CLOSED_MAY_25
+) -> Index:
+    """The index of that schedule and holiday calendar, with one set of conventions and
+    specifications throughout, since nothing here reads either."""
+    return index("sample", schedule, CONVENTIONS, SPECIFICATIONS, holidays)
+
 
 def a_calendar(
     valuation: ValuationDate = MAY_25,
     schedule: FuturesSchedule = SCHEDULE,
     holidays: HolidayCalendar | None = CLOSED_MAY_25,
 ) -> Calendar:
-    return calendar(valuation, schedule, holidays)
+    return calendar(valuation, an_index(schedule, holidays))
 
 
 # --- the sample ---------------------------------------------------------------
@@ -64,6 +80,7 @@ def test_the_sample_runs_from_the_day_after_the_first_expiry_to_the_last() -> No
     assert made.is_priced.dtype == np.dtype(bool)
     assert made.is_fixed.dtype == np.dtype(bool)
     assert made.contract.size == made.is_priced.size == made.is_fixed.size == 63
+    assert made.index.kind is Kind.FUTURES
     assert made.first_unfixed == 5  # the days before the valuation day, 25 May
 
 
@@ -125,10 +142,10 @@ def test_two_expiries_a_day_apart_make_one_row_for_the_second_contract() -> None
 @pytest.mark.parametrize(
     ("schedule", "message"),
     [
-        (a_schedule(("m26", "2026-05-19")), "schedule has 1 contract, expected at least 2"),
+        (a_schedule(("m26", "2026-05-19")), "index has 1 contract, expected at least 2"),
         (
             futures_schedule((), dates(), None),
-            "schedule has 0 contracts, expected at least 2",
+            "index has 0 contracts, expected at least 2",
         ),
         (
             a_schedule(("m26", "2026-05-19"), ("m26", "2026-06-22")),
@@ -419,7 +436,7 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
         data.draw(st.lists(st.integers(-10, 2500), max_size=30)), dtype="timedelta64[D]"
     )
     as_of = expiries[0] + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, holiday_calendar(listed))
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, holiday_calendar(listed)))
     span = int((expiries[-1] - expiries[0]).astype(np.int64))
     assert made.dates.size == span
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
@@ -444,8 +461,10 @@ def test_every_day_between_the_first_expiry_and_the_last_is_one_row_with_one_pro
 def test_the_calendar_keeps_its_sources_by_reference_and_its_columns_read_only() -> None:
     made = a_calendar()
     assert made.valuation_date is MAY_25
-    assert made.schedule is SCHEDULE
-    assert made.holiday_calendar is CLOSED_MAY_25
+    assert made.index.schedule is SCHEDULE
+    assert made.index.holiday_calendar is CLOSED_MAY_25
+    the_index = an_index()
+    assert calendar(MAY_25, the_index).index is the_index
     for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
         assert not column.flags.writeable
     with pytest.raises(ValueError):
@@ -495,8 +514,8 @@ SEP_25 = valuation_date(day("2026-09-25"), 0.5)
 
 
 def test_the_gas_daily_sample_runs_from_the_first_months_first_day_to_the_lasts_last() -> None:
-    made = calendar(SEP_25, GAS_DAILY, None)
-    assert made.kind is Kind.GAS_DAILY
+    made = calendar(SEP_25, an_index(GAS_DAILY, None))
+    assert made.index.kind is Kind.GAS_DAILY
     assert made.dates.size == 91
     assert made.dates[0] == day("2026-09-01") and made.dates[-1] == day("2026-11-30")
     assert np.all(np.diff(made.dates) == np.timedelta64(1, "D"))
@@ -507,46 +526,36 @@ def test_the_gas_daily_sample_runs_from_the_first_months_first_day_to_the_lasts_
     assert made.is_fixed.tolist() == [bool(date <= day("2026-09-25")) for date in made.dates]
     assert int(made.is_fixed.sum()) == 25
     assert made.first_unfixed == 25
-    assert made.schedule is GAS_DAILY and made.holiday_calendar is None
+    assert made.index.schedule is GAS_DAILY and made.index.holiday_calendar is None
     assert made.valuation_date is SEP_25
 
 
 def test_a_gas_daily_schedule_of_one_month_or_of_one_day_is_a_calendar() -> None:
-    one = calendar(SEP_25, a_gas_daily_schedule(U26), None)
+    one = calendar(SEP_25, an_index(a_gas_daily_schedule(U26), None))
     assert one.dates.size == 30 and codes_of(one) == ["U26"] * 30
-    day_long = calendar(SEP_25, a_gas_daily_schedule(("U26", "2026-09-01", "2026-09-01")), None)
+    day_long = calendar(
+        SEP_25, an_index(a_gas_daily_schedule(("U26", "2026-09-01", "2026-09-01")), None)
+    )
     assert day_long.dates.tolist() == [day("2026-09-01")] and codes_of(day_long) == ["U26"]
 
 
 def test_gas_daily_months_across_a_month_end_and_a_year_end_are_a_row_per_day() -> None:
-    made = calendar(
-        SEP_25,
-        a_gas_daily_schedule(Z26, F27),
-        None,
-    )
+    made = calendar(SEP_25, an_index(a_gas_daily_schedule(Z26, F27), None))
     assert made.dates.size == 62
     assert codes_of(made)[30:32] == ["Z26", "F27"]
     assert not made.is_fixed.any()
 
 
 def test_a_gas_daily_calendar_prices_every_day_wherever_the_valuation_date_falls() -> None:
-    before = calendar(valuation_date(day("2026-01-01"), 0.5), GAS_DAILY, None)
+    before = calendar(valuation_date(day("2026-01-01"), 0.5), an_index(GAS_DAILY, None))
     assert before.is_priced.all() and not before.is_fixed.any()
     assert before.first_unfixed == 0
-    after = calendar(valuation_date(day("2027-01-01"), 0.0), GAS_DAILY, None)
+    after = calendar(valuation_date(day("2027-01-01"), 0.0), an_index(GAS_DAILY, None))
     assert after.is_priced.all() and after.is_fixed.all()
     assert after.first_unfixed == 91
-    on_the_first = calendar(valuation_date(day("2026-09-01"), 0.0), GAS_DAILY, None)
+    on_the_first = calendar(valuation_date(day("2026-09-01"), 0.0), an_index(GAS_DAILY, None))
     assert on_the_first.is_fixed.tolist()[:2] == [True, False]
     assert on_the_first.first_unfixed == 1
-
-
-def test_a_holiday_calendar_given_with_a_gas_daily_schedule_is_refused() -> None:
-    with pytest.raises(ValueError) as failure:
-        calendar(SEP_25, GAS_DAILY, CLOSED_MAY_25)
-    assert str(failure.value) == (
-        "holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
-    )
 
 
 @pytest.mark.parametrize(
@@ -581,7 +590,7 @@ def test_a_holiday_calendar_given_with_a_gas_daily_schedule_is_refused() -> None
             "last_date row 2 is 4897-07-26, "
             "expected within 1048573 days of row 1's first_date 2026-09-01",
         ),
-        (gas_daily_schedule((), dates(), dates()), "schedule has 0 contracts, expected at least 1"),
+        (gas_daily_schedule((), dates(), dates()), "index has 0 contracts, expected at least 1"),
     ],
     ids=[
         "a code twice",
@@ -597,7 +606,7 @@ def test_a_gas_daily_schedule_that_cannot_make_a_calendar_says_why(
     schedule: GasDailySchedule, message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
-        calendar(SEP_25, schedule, None)
+        calendar(SEP_25, an_index(schedule, None))
     assert str(failure.value) == message
 
 
@@ -606,11 +615,11 @@ def test_a_gas_daily_schedule_that_cannot_make_a_calendar_says_why(
 def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made_and_one_day_longer_is_refused() -> (
     None
 ):
-    made = calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-24")), None)
+    made = calendar(SEP_25, an_index(a_gas_daily_schedule(("a", "2026-09-01", "4897-07-24")), None))
     assert made.dates.size == 1_048_574
     assert codes_of(made)[-1] == "a"
     with pytest.raises(ValueError) as failure:
-        calendar(SEP_25, a_gas_daily_schedule(("a", "2026-09-01", "4897-07-25")), None)
+        calendar(SEP_25, an_index(a_gas_daily_schedule(("a", "2026-09-01", "4897-07-25")), None))
     assert str(failure.value) == (
         "last_date row 1 is 4897-07-25, expected within 1048573 days of row 1's first_date "
         "2026-09-01"
@@ -640,39 +649,31 @@ NOV_15 = valuation_date(day("2026-11-15"), 0.5)
 
 
 def test_the_iferc_sample_is_one_row_per_month_dated_by_its_publication_day() -> None:
-    made = calendar(NOV_15, IFERC, None)
-    assert made.kind is Kind.IFERC
+    made = calendar(NOV_15, an_index(IFERC, None))
+    assert made.index.kind is Kind.IFERC
     assert [str(date) for date in made.dates] == ["2026-10-01", "2026-11-02", "2026-12-01"]
     assert codes_of(made) == ["V26", "X26", "Z26"]
     assert made.contract.tolist() == [0, 1, 2]
     assert made.is_priced.all()
     assert made.is_fixed.tolist() == [True, True, False]
     assert made.first_unfixed == 2
-    assert made.schedule is IFERC and made.holiday_calendar is None
+    assert made.index.schedule is IFERC and made.index.holiday_calendar is None
 
 
 def test_an_iferc_month_is_fixed_the_day_after_its_publication_day() -> None:
-    on_the_day = calendar(valuation_date(day("2026-11-02"), 1.0), IFERC, None)
+    on_the_day = calendar(valuation_date(day("2026-11-02"), 1.0), an_index(IFERC, None))
     assert on_the_day.is_fixed.tolist() == [True, False, False]
     assert on_the_day.first_unfixed == 1
-    the_day_after = calendar(valuation_date(day("2026-11-03"), 0.0), IFERC, None)
+    the_day_after = calendar(valuation_date(day("2026-11-03"), 0.0), an_index(IFERC, None))
     assert the_day_after.is_fixed.tolist() == [True, True, False]
-    before_any = calendar(valuation_date(day("2026-10-01"), 0.5), IFERC, None)
+    before_any = calendar(valuation_date(day("2026-10-01"), 0.5), an_index(IFERC, None))
     assert not before_any.is_fixed.any()
 
 
 def test_an_iferc_schedule_of_one_month_is_a_calendar() -> None:
-    one = calendar(NOV_15, an_iferc_schedule(V26_IFERC), None)
+    one = calendar(NOV_15, an_index(an_iferc_schedule(V26_IFERC), None))
     assert codes_of(one) == ["V26"] and one.is_fixed.tolist() == [True]
     assert one.dates.tolist() == [day("2026-10-01")]
-
-
-def test_a_holiday_calendar_given_with_an_iferc_schedule_is_refused() -> None:
-    with pytest.raises(ValueError) as failure:
-        calendar(NOV_15, IFERC, CLOSED_MAY_25)
-    assert str(failure.value) == (
-        "holiday_calendar is a holiday calendar, expected none with an IFERC schedule"
-    )
 
 
 @pytest.mark.parametrize(
@@ -690,7 +691,7 @@ def test_a_holiday_calendar_given_with_an_iferc_schedule_is_refused() -> None:
             an_iferc_schedule(V26_IFERC, ("X26", "2026-10-30", "2026-10-01")),
             "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-10-01",
         ),
-        (iferc_schedule((), dates(), dates()), "schedule has 0 contracts, expected at least 1"),
+        (iferc_schedule((), dates(), dates()), "index has 0 contracts, expected at least 1"),
     ],
     ids=["a code twice", "publication days out of order", "two publication days equal", "no month"],
 )
@@ -698,33 +699,8 @@ def test_an_iferc_schedule_that_cannot_make_a_calendar_says_why(
     schedule: IfercSchedule, message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
-        calendar(NOV_15, schedule, None)
+        calendar(NOV_15, an_index(schedule, None))
     assert str(failure.value) == message
-
-
-# --- the schedule's kind chooses the calendar, and nothing else is one -----------------
-
-
-def test_an_object_of_no_schedule_kind_is_refused_naming_what_it_is() -> None:
-    for wrong, named in (
-        (CLOSED_MAY_25, "a holiday calendar"),
-        (MAY_25, "a valuation date"),
-        (a_calendar(), "a calendar"),
-    ):
-        with pytest.raises(ValueError) as failure:
-            calendar(MAY_25, wrong, None)
-        assert str(failure.value) == (
-            f"schedule is {named}, expected a futures, IFERC or Gas Daily schedule"
-        )
-
-
-def test_a_futures_schedule_brings_the_holiday_calendar() -> None:
-    with pytest.raises(ValueError) as failure:
-        calendar(MAY_25, SCHEDULE, None)
-    assert str(failure.value) == (
-        "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
-    )
-    assert a_calendar().kind is Kind.FUTURES
 
 
 # --- the general rules of the two new kinds ---------------------------------------------
@@ -752,7 +728,7 @@ def test_every_flow_day_of_gas_daily_months_laid_end_to_end_is_one_row_on_its_mo
     firsts = lasts - lengths.astype("timedelta64[D]") + one_day
     schedule = gas_daily_schedule(codes, firsts, lasts)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, 2000)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     assert made.dates.size == int(lengths.sum())
     assert np.all(np.diff(made.dates) == one_day)
     assert made.dates[0] == firsts[0] and made.dates[-1] == lasts[-1]
@@ -780,7 +756,7 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
     schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
-    made = calendar(valuation_date(as_of, 0.5), schedule, None)
+    made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     assert np.array_equal(made.dates, published)
     assert made.dates is not schedule.publication_date
     assert made.contract.tolist() == list(range(count))

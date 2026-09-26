@@ -1,5 +1,5 @@
-"""The calendar through the seam: a valuation date, any schedule and, with a futures schedule, a
-holiday calendar in, one handle out, and the table it spills."""
+"""The calendar through the seam: a valuation date and an index in, one handle out, and the table
+it spills."""
 
 import re
 from typing import cast
@@ -40,16 +40,33 @@ def a_holiday_calendar(*serials: float) -> str:
     return text
 
 
+def an_index(schedule: object, holidays: object = MISSING) -> str:
+    """The index handle of that schedule handle and holiday calendar handle, with one set of
+    conventions and specifications, since the calendar reads neither."""
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+        ],
+    )
+    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    assert isinstance(text, str) and text.startswith("index:"), text
+    return text
+
+
 SAMPLE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 
 
-def a_calendar(valuation: object = None, schedule: object = None, holidays: object = None) -> str:
-    args = [
-        valuation or a_valuation(),
-        schedule or a_schedule(*SAMPLE),
-        holidays or a_holiday_calendar(MAY_25),
-    ]
-    text = bridge.call("_CreateCalendar", args)
+def a_futures_index(schedule: object = None, holidays: object = None) -> str:
+    return an_index(schedule or a_schedule(*SAMPLE), holidays or a_holiday_calendar(MAY_25))
+
+
+def a_calendar(valuation: object = None, index: object = None) -> str:
+    text = bridge.call("_CreateCalendar", [valuation or a_valuation(), index or a_futures_index()])
     assert isinstance(text, str) and HANDLE.fullmatch(text), text
     return text
 
@@ -60,7 +77,7 @@ def number(text: str) -> int:
     return int(match.group(1))
 
 
-def test_a_calendar_is_created_from_three_handles_and_read_back_day_by_day() -> None:
+def test_a_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
     shown = rows(read(a_calendar()))
     assert len(shown) == 65
     assert shown[0] == HEADERS
@@ -88,12 +105,14 @@ def test_the_flags_reach_the_sheet_as_booleans() -> None:
 
 
 def test_two_expiries_a_day_apart_spill_one_row() -> None:
-    made = a_calendar(schedule=a_schedule(("m26", "n26"), (MAY_19, MAY_20)))
+    made = a_calendar(index=a_futures_index(a_schedule(("m26", "n26"), (MAY_19, MAY_20))))
     assert rows(read(made)) == [HEADERS, TYPES, [MAY_20, "n26", 1.0, 1.0]]
 
 
 def test_the_codes_come_back_exactly_as_typed() -> None:
-    made = a_calendar(schedule=a_schedule(("M26", "n 26", "Q26 "), (MAY_19, JUN_22, JUL_21)))
+    made = a_calendar(
+        index=a_futures_index(a_schedule(("M26", "n 26", "Q26 "), (MAY_19, JUN_22, JUL_21)))
+    )
     shown = rows(read(made))
     assert shown[2][1] == "n 26"
     assert shown[36][1] == "Q26 "
@@ -106,76 +125,84 @@ def test_a_valuation_date_on_the_first_day_and_the_fraction_change_the_past_flag
         assert shown[2][:3] == [MAY_20, "n26", 1.0]
 
 
-THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
+THE_VALUATION, THE_INDEX = object(), object()
 
 
 @pytest.mark.parametrize(
     ("args", "text"),
     [
         (
-            [THE_VALUATION, (("m26",), (MAY_19,)), THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2",
+            [THE_VALUATION, (("m26",), (MAY_19,))],
+            "#ERROR _CreateCalendar: ValueError: index has 1 contract, expected at least 2",
         ),
         (
-            [THE_VALUATION, (("m26", "m26"), (MAY_19, JUN_22)), THE_HOLIDAYS],
+            [THE_VALUATION, (("m26", "m26"), (MAY_19, JUN_22))],
             "#ERROR _CreateCalendar: ValueError: "
             "contract_code row 2 is 'm26', already given at row 1",
         ),
         (
-            [THE_VALUATION, (("m26", "n26", "n26"), (MAY_19, JUN_22, JUL_21)), THE_HOLIDAYS],
+            [THE_VALUATION, (("m26", "n26", "n26"), (MAY_19, JUN_22, JUL_21))],
             "#ERROR _CreateCalendar: ValueError: "
             "contract_code row 3 is 'n26', already given at row 2",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (JUN_22, MAY_19)), THE_HOLIDAYS],
+            [THE_VALUATION, (("m26", "n26"), (JUN_22, MAY_19))],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, "
             "expected a date after row 1's 2026-06-22",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (MAY_19, MAY_19)), THE_HOLIDAYS],
+            [THE_VALUATION, (("m26", "n26"), (MAY_19, MAY_19))],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, "
             "expected a date after row 1's 2026-05-19",
         ),
         (
-            [THE_VALUATION, (("m26", "n26"), (MAY_19, 1094736.0)), THE_HOLIDAYS],
+            [THE_VALUATION, (("m26", "n26"), (MAY_19, 1094736.0))],
             "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, "
             "expected within 1048574 days of row 1's 2026-05-19",
         ),
         (
-            [MISSING, THE_SCHEDULE, THE_HOLIDAYS],
+            [MISSING, THE_INDEX],
             "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle",
         ),
         (
-            [None, THE_SCHEDULE, THE_HOLIDAYS],
+            [None, THE_INDEX],
             "#ERROR _CreateCalendar: valuation_date is blank, expected valuation date handle",
         ),
         (
-            [MAY_25, THE_SCHEDULE, THE_HOLIDAYS],
+            [MAY_25, THE_INDEX],
             "#ERROR _CreateCalendar: valuation_date is number 46167.0, "
             "expected valuation date handle",
         ),
         (
-            ["x", THE_SCHEDULE, THE_HOLIDAYS],
+            ["x", THE_INDEX],
             "#ERROR _CreateCalendar: valuation_date is text 'x' naming no live object, "
             "expected valuation date handle",
         ),
         (
-            [THE_VALUATION, MISSING, THE_HOLIDAYS],
-            "#ERROR _CreateCalendar: schedule is missing, expected a handle",
+            [THE_VALUATION, MISSING],
+            "#ERROR _CreateCalendar: index is missing, expected index handle",
         ),
         (
-            [THE_VALUATION, THE_SCHEDULE, MISSING],
-            "#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, expected holiday "
-            "calendar handle with a futures schedule",
+            [THE_VALUATION, None],
+            "#ERROR _CreateCalendar: index is blank, expected index handle",
         ),
         (
-            [THE_VALUATION, THE_SCHEDULE, "calendar:000000:000001"],
-            "#ERROR _CreateCalendar: holiday_calendar is text 'calendar:000000:000001' naming "
-            "no live object, expected holiday calendar handle",
+            [THE_VALUATION, 3.0],
+            "#ERROR _CreateCalendar: index is number 3.0, expected index handle",
+        ),
+        (
+            [THE_VALUATION, "index:000000:000001"],
+            "#ERROR _CreateCalendar: index is text 'index:000000:000001' naming no live object, "
+            "expected index handle",
+        ),
+        (
+            [THE_VALUATION, "#ERROR _CreateIndex: name is blank, expected text"],
+            "#ERROR _CreateCalendar: index is the creator's failure, expected index handle: "
+            "#ERROR _CreateIndex: name is blank, expected text",
         ),
     ],
     ids=[
-        "a schedule of one contract",
+        "an index of one contract",
         "the boundary code given again",
         "a code given twice after the boundary",
         "expiries backwards",
@@ -185,9 +212,11 @@ THE_VALUATION, THE_SCHEDULE, THE_HOLIDAYS = object(), object(), object()
         "a blank cell where the valuation date should be",
         "a number where the valuation date should be",
         "text naming no live valuation date",
-        "the schedule left out",
-        "the holiday calendar left out",
-        "a dead handle where the holiday calendar should be",
+        "the index left out",
+        "a blank cell where the index should be",
+        "a number where the index should be",
+        "a dead handle where the index should be",
+        "the index creator's failure relayed",
     ],
 )
 def test_a_calendar_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
@@ -195,43 +224,43 @@ def test_a_calendar_that_cannot_be_made_says_why(args: list[object], text: str) 
     for arg in args:
         if arg is THE_VALUATION:
             given.append(a_valuation())
-        elif arg is THE_SCHEDULE:
-            given.append(a_schedule(*SAMPLE))
-        elif arg is THE_HOLIDAYS:
-            given.append(a_holiday_calendar(MAY_25))
+        elif arg is THE_INDEX:
+            given.append(a_futures_index())
         elif isinstance(arg, tuple):
             codes, expiries = cast(tuple[tuple[str, ...], tuple[float, ...]], arg)
-            given.append(a_schedule(codes, expiries))
+            given.append(a_futures_index(a_schedule(codes, expiries)))
         else:
             given.append(arg)
     assert bridge.call("_CreateCalendar", given) == text
 
 
-def test_a_handle_of_another_kind_in_any_slot_is_refused_by_name() -> None:
+def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
     valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
-    made = a_calendar(valuation, schedule, holidays)
-    assert bridge.call("_CreateCalendar", [schedule, schedule, holidays]) == (
-        f"#ERROR _CreateCalendar: valuation_date is futures schedule handle {schedule!r}, "
+    index = an_index(schedule, holidays)
+    made = a_calendar(valuation, index)
+    assert bridge.call("_CreateCalendar", [index, index]) == (
+        f"#ERROR _CreateCalendar: valuation_date is index handle {index!r}, "
         "expected valuation date handle"
     )
-    assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, "
-        "expected a futures, IFERC or Gas Daily schedule"
-    )
-    assert bridge.call("_CreateCalendar", [valuation, schedule, made]) == (
-        f"#ERROR _CreateCalendar: holiday_calendar is calendar handle {made!r}, "
-        "expected holiday calendar handle"
-    )
+    for wrong, word in (
+        (schedule, "futures schedule"),
+        (holidays, "holiday calendar"),
+        (valuation, "valuation date"),
+        (made, "calendar"),
+    ):
+        assert bridge.call("_CreateCalendar", [valuation, wrong]) == (
+            f"#ERROR _CreateCalendar: index is {word} handle {wrong!r}, expected index handle"
+        )
 
 
 def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
-    valuation, schedule, holidays = a_valuation(), a_schedule(*SAMPLE), a_holiday_calendar(MAY_25)
-    one = a_schedule(("m26",), (MAY_19,))
-    before = number(a_calendar(valuation, schedule, holidays))
-    assert bridge.call("_CreateCalendar", [valuation, one, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: schedule has 1 contract, expected at least 2"
+    valuation, index = a_valuation(), a_futures_index()
+    one = a_futures_index(a_schedule(("m26",), (MAY_19,)))
+    before = number(a_calendar(valuation, index))
+    assert bridge.call("_CreateCalendar", [valuation, one]) == (
+        "#ERROR _CreateCalendar: ValueError: index has 1 contract, expected at least 2"
     )
-    assert number(a_calendar(valuation, schedule, holidays)) == before + 1
+    assert number(a_calendar(valuation, index)) == before + 1
 
 
 def test_a_dead_calendar_handle_cannot_be_read() -> None:
@@ -241,7 +270,7 @@ def test_a_dead_calendar_handle_cannot_be_read() -> None:
     )
 
 
-# --- the two other schedules through the seam, the holiday calendar left out -------------
+# --- the two other kinds of index through the seam -----------------------------------------
 
 # Serials for the two schedule pages' samples: 1 September, 30 September, 1 October, 31 October,
 # 1 November and 30 November 2026 for the Gas Daily months; the last trading and publication
@@ -271,15 +300,11 @@ def an_iferc_schedule() -> str:
 
 
 def a_gas_daily_calendar() -> str:
-    text = bridge.call("_CreateCalendar", [a_valuation(SEP_25), a_gas_daily_schedule(), MISSING])
-    assert isinstance(text, str) and HANDLE.fullmatch(text), text
-    return text
+    return a_calendar(a_valuation(SEP_25), an_index(a_gas_daily_schedule()))
 
 
 def an_iferc_calendar() -> str:
-    text = bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_iferc_schedule(), MISSING])
-    assert isinstance(text, str) and HANDLE.fullmatch(text), text
-    return text
+    return a_calendar(a_valuation(NOV_15), an_index(an_iferc_schedule()))
 
 
 def test_a_gas_daily_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
@@ -314,57 +339,12 @@ def test_the_flags_of_the_two_other_kinds_reach_the_sheet_as_booleans() -> None:
         assert (kinds[2:, 2:] == BOOLEAN_CODE).all()
 
 
-def test_the_holiday_calendar_is_taken_with_a_futures_schedule_alone() -> None:
-    holidays = a_holiday_calendar(MAY_25)
-    assert bridge.call(
-        "_CreateCalendar", [a_valuation(SEP_25), a_gas_daily_schedule(), holidays]
-    ) == (
-        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
-        "expected none with a Gas Daily schedule"
-    )
-    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_iferc_schedule(), holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
-        "expected none with an IFERC schedule"
-    )
-    assert bridge.call("_CreateCalendar", [a_valuation(), a_schedule(*SAMPLE), MISSING]) == (
-        "#ERROR _CreateCalendar: ValueError: holiday_calendar is missing, "
-        "expected holiday calendar handle with a futures schedule"
-    )
-    # Blank and left out are different facts: a blank cell in the slot is a blank.
-    assert bridge.call("_CreateCalendar", [a_valuation(), a_schedule(*SAMPLE), None]) == (
-        "#ERROR _CreateCalendar: holiday_calendar is blank, expected holiday calendar handle"
-    )
-
-
-def test_a_handle_of_no_schedule_kind_where_the_schedule_should_be_is_refused_by_name() -> None:
-    valuation, holidays = a_valuation(), a_holiday_calendar(MAY_25)
-    made = a_calendar(valuation, a_schedule(*SAMPLE), holidays)
-    assert bridge.call("_CreateCalendar", [valuation, holidays, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: schedule is a holiday calendar, "
-        "expected a futures, IFERC or Gas Daily schedule"
-    )
-    assert bridge.call("_CreateCalendar", [valuation, made, MISSING]) == (
-        "#ERROR _CreateCalendar: ValueError: schedule is a calendar, "
-        "expected a futures, IFERC or Gas Daily schedule"
-    )
-    assert bridge.call("_CreateCalendar", [valuation, valuation, MISSING]) == (
-        "#ERROR _CreateCalendar: ValueError: schedule is a valuation date, "
-        "expected a futures, IFERC or Gas Daily schedule"
-    )
-    assert bridge.call("_CreateCalendar", [valuation, MISSING, MISSING]) == (
-        "#ERROR _CreateCalendar: schedule is missing, expected a handle"
-    )
-    assert bridge.call("_CreateCalendar", [valuation, 3.0, MISSING]) == (
-        "#ERROR _CreateCalendar: schedule is number 3.0, expected a handle"
-    )
-
-
 def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librarys_words() -> None:
     gapped = bridge.call(
         "_CreateGasDailySchedule",
         [column("U26", "V26"), column(SEP_1, OCT_1 + 1), column(SEP_30, OCT_31)],
     )
-    assert bridge.call("_CreateCalendar", [a_valuation(SEP_25), gapped, MISSING]) == (
+    assert bridge.call("_CreateCalendar", [a_valuation(SEP_25), an_index(gapped)]) == (
         "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, "
         "expected 2026-10-01, the day after row 1's last_date 2026-09-30"
     )
@@ -372,20 +352,22 @@ def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librar
         "_CreateIfercSchedule",
         [column("X26", "V26"), column(OCT_30, SEP_30), column(NOV_2, OCT_1)],
     )
-    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), backwards, MISSING]) == (
+    assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_index(backwards)]) == (
         "#ERROR _CreateCalendar: ValueError: publication_date row 2 is 2026-10-01, "
         "expected a date after row 1's 2026-11-02"
     )
 
 
 def test_a_failed_construction_of_the_other_kinds_publishes_no_object_and_no_handle() -> None:
-    valuation, schedule = a_valuation(SEP_25), a_gas_daily_schedule()
-    holidays = a_holiday_calendar(MAY_25)
-    before = number(cast(str, bridge.call("_CreateCalendar", [valuation, schedule, MISSING])))
-    assert bridge.call("_CreateCalendar", [valuation, schedule, holidays]) == (
-        "#ERROR _CreateCalendar: ValueError: holiday_calendar is a holiday calendar, "
-        "expected none with a Gas Daily schedule"
+    valuation, index = a_valuation(SEP_25), an_index(a_gas_daily_schedule())
+    gapped = an_index(
+        bridge.call(
+            "_CreateGasDailySchedule",
+            [column("U26", "V26"), column(SEP_1, OCT_1 + 1), column(SEP_30, OCT_31)],
+        )
     )
-    assert number(cast(str, bridge.call("_CreateCalendar", [valuation, schedule, MISSING]))) == (
-        before + 1
+    before = number(a_calendar(valuation, index))
+    assert cast(str, bridge.call("_CreateCalendar", [valuation, gapped])).startswith(
+        "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02"
     )
+    assert number(a_calendar(valuation, index)) == before + 1

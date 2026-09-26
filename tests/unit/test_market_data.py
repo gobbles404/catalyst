@@ -70,6 +70,30 @@ def the_calendar() -> str:
     return text
 
 
+@functools.cache
+def the_index() -> str:
+    """A futures index of two contracts whose holiday calendar is the_calendar's, made once."""
+    schedule = bridge.call(
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46195.0]]), MISSING],
+    )
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+        ],
+    )
+    text = bridge.call(
+        "_CreateIndex", ["sample", schedule, conventions, specifications, the_calendar()]
+    )
+    assert isinstance(text, str) and text.startswith("index:"), text
+    return text
+
+
 # The market history reads futures fixings, but this hidden reader proves on its own that a
 # handle resolves to the fixings the seam kept, with their columns as they arrived.
 @probe
@@ -79,7 +103,7 @@ def ReadFuturesFixings(fixings: Handle[FuturesFixings]) -> str:
 
 
 def the_fixings(days: object, settles: object) -> str:
-    text = bridge.call("_CreateFuturesFixings", [days, settles, the_calendar()])
+    text = bridge.call("_CreateFuturesFixings", [days, settles, the_index()])
     assert isinstance(text, str) and FIXINGS.fullmatch(text), text
     return text
 
@@ -219,38 +243,33 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             DATES,
             SETTLES,
             3.0,
-            "#ERROR _CreateFuturesFixings: holiday_calendar is number 3.0, "
-            "expected holiday calendar handle",
+            "#ERROR _CreateFuturesFixings: index is number 3.0, expected index handle",
         ),
         (
             DATES,
             SETTLES,
             None,
-            "#ERROR _CreateFuturesFixings: holiday_calendar is blank, "
-            "expected holiday calendar handle",
+            "#ERROR _CreateFuturesFixings: index is blank, expected index handle",
         ),
         (
             DATES,
             SETTLES,
             MISSING,
-            "#ERROR _CreateFuturesFixings: holiday_calendar is missing, "
-            "expected holiday calendar handle",
+            "#ERROR _CreateFuturesFixings: index is missing, expected index handle",
         ),
         (
             DATES,
             SETTLES,
             "holiday_calendar:000000:000001",
-            "#ERROR _CreateFuturesFixings: holiday_calendar is text "
-            "'holiday_calendar:000000:000001' naming no live object, "
-            "expected holiday calendar handle",
+            "#ERROR _CreateFuturesFixings: index is text "
+            "'holiday_calendar:000000:000001' naming no live object, expected index handle",
         ),
         (
             DATES,
             SETTLES,
             "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date",
-            "#ERROR _CreateFuturesFixings: holiday_calendar is the creator's failure, "
-            "expected holiday calendar handle: #ERROR _CreateHolidayCalendar: holiday cell "
-            "(2, 1) is blank, expected date",
+            "#ERROR _CreateFuturesFixings: index is the creator's failure, expected index "
+            "handle: #ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date",
         ),
     ],
     ids=[
@@ -271,33 +290,33 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
         "a blank cell where the days should be",
         "a blank cell where the settles should be",
         "both columns wrong, the days named first",
-        "a number where the calendar should be",
-        "a blank cell where the calendar should be",
-        "the calendar left out",
-        "text naming no live calendar",
-        "the calendar creator's failure relayed",
+        "a number where the index should be",
+        "a blank cell where the index should be",
+        "the index left out",
+        "text naming no live index",
+        "a creator's failure where the index should be",
     ],
 )
 def test_fixings_that_cannot_be_made_say_why(
     days: object, settles: object, calendar: object, text: str
 ) -> None:
-    calendar = the_calendar() if calendar is THE_CALENDAR else calendar
+    calendar = the_index() if calendar is THE_CALENDAR else calendar
     assert bridge.call("_CreateFuturesFixings", [days, settles, calendar]) == text
 
 
 def test_a_failed_fixings_construction_publishes_no_object_and_no_handle() -> None:
     before = number(the_fixings(DATES, SETTLES), FIXINGS)
     gap = Cells.from_rows([[MAY_1], [MAY_5]])
-    assert bridge.call("_CreateFuturesFixings", [gap, SETTLES, the_calendar()]) == (
+    assert bridge.call("_CreateFuturesFixings", [gap, SETTLES, the_index()]) == (
         "#ERROR _CreateFuturesFixings: ValueError: settle has 4 settles, expected 2, one per date"
     )
     two = Cells.from_rows([[101.94], [102.27]])
-    assert bridge.call("_CreateFuturesFixings", [gap, two, the_calendar()]) == (
+    assert bridge.call("_CreateFuturesFixings", [gap, two, the_index()]) == (
         "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, "
         "expected 2026-05-04, the business day after row 1's 2026-05-01"
     )
     saturday = Cells.from_rows([[MAY_1], [MAY_2]])
-    assert bridge.call("_CreateFuturesFixings", [saturday, two, the_calendar()]) == (
+    assert bridge.call("_CreateFuturesFixings", [saturday, two, the_index()]) == (
         "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
         "expected a business day"
     )
@@ -312,11 +331,35 @@ def test_a_handle_of_another_kind_is_not_futures_fixings() -> None:
     )
 
 
-def test_a_handle_of_another_kind_is_not_a_holiday_calendar() -> None:
+def test_a_handle_of_another_kind_is_not_an_index() -> None:
     other = a_valuation_date()
     assert bridge.call("_CreateFuturesFixings", [DATES, SETTLES, other]) == (
-        f"#ERROR _CreateFuturesFixings: holiday_calendar is valuation date handle {other!r}, "
-        "expected holiday calendar handle"
+        f"#ERROR _CreateFuturesFixings: index is valuation date handle {other!r}, "
+        "expected index handle"
+    )
+
+
+def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
+    schedule = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "energy", "MMBTU"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["ICE", 2500.0, 0.0, 0.0]]),
+        ],
+    )
+    gas_daily = bridge.call(
+        "_CreateIndex", ["Henry Hub Gas Daily", schedule, conventions, specifications, MISSING]
+    )
+    assert bridge.call("_CreateFuturesFixings", [DATES, SETTLES, gas_daily]) == (
+        "#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, "
+        "expected a futures index"
     )
 
 

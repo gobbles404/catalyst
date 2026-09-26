@@ -149,13 +149,40 @@ def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() 
     assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
 
 
+def an_index(schedule: object, holidays: object = MISSING) -> str:
+    """The index handle of that schedule handle and holiday calendar handle, with one set of
+    conventions and specifications, since nothing here reads either."""
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+        ],
+    )
+    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    assert isinstance(text, str) and text.startswith("index:"), text
+    return text
+
+
+def a_two_contract_schedule() -> object:
+    return bridge.call(
+        "_CreateFuturesSchedule",
+        [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
+    )
+
+
 # Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
 # one day, 1 January.
 def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_exactly() -> None:
     days = Cells.from_rows([[46143.0], [46146.0]])
     settles = Cells.from_rows([[101.94], [106.42]])
     calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]])])
-    handle = bridge.call("_CreateFuturesFixings", [days, settles, calendar])
+    handle = bridge.call(
+        "_CreateFuturesFixings", [days, settles, an_index(a_two_contract_schedule(), calendar)]
+    )
     assert rows(read(handle)) == [
         ["date", "settle"],
         ["datetime64[D]", "float64"],
@@ -174,7 +201,7 @@ def test_a_calendar_spills_four_columns_with_the_flags_as_booleans() -> None:
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
-    handle = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
+    handle = bridge.call("_CreateCalendar", [valuation, an_index(schedule, holidays)])
     kinds, slots, joined = read(handle)
     assert rows((kinds, slots, joined)) == [
         ["date", "contract", "is_priced", "is_fixed"],
@@ -200,9 +227,12 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         [
             bridge.call(
                 "_CreateCalendar",
-                [bridge.call("_CreateValuationDate", [46163.0, 0.5]), schedule, holidays],
+                [bridge.call("_CreateValuationDate", [46163.0, 0.5]), an_index(schedule, holidays)],
             ),
-            bridge.call("_CreateFuturesFixings", [46162.0, 70.85, holidays]),
+            bridge.call(
+                "_CreateFuturesFixings",
+                [46162.0, 70.85, an_index(a_two_contract_schedule(), holidays)],
+            ),
         ],
     )
     kinds, slots, joined = read(fixed)
@@ -217,9 +247,12 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
         [
             bridge.call(
                 "_CreateCalendar",
-                [bridge.call("_CreateValuationDate", [46162.0, 0.5]), schedule, holidays],
+                [bridge.call("_CreateValuationDate", [46162.0, 0.5]), an_index(schedule, holidays)],
             ),
-            bridge.call("_CreateFuturesFixings", [46161.0, 70.0, holidays]),
+            bridge.call(
+                "_CreateFuturesFixings",
+                [46161.0, 70.0, an_index(a_two_contract_schedule(), holidays)],
+            ),
         ],
     )
     kinds, slots, joined = read(unfixed)
@@ -237,7 +270,8 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
         [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
     )
     gas_daily = bridge.call(
-        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), month, MISSING]
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46267.0, 0.5]), an_index(month, MISSING)],
     )
     prints = bridge.call(
         "_CreateGasDailyFixings",
@@ -265,7 +299,8 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
         ],
     )
     iferc = bridge.call(
-        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), months, MISSING]
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46310.0, 0.5]), an_index(months, MISSING)],
     )
     indices = bridge.call(
         "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]])]
@@ -326,7 +361,8 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
         [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
     )
     gas_daily = bridge.call(
-        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), month, MISSING]
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46267.0, 0.5]), an_index(month, MISSING)],
     )
     prints = bridge.call(
         "_CreateGasDailyFixings",
@@ -355,7 +391,8 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
         ],
     )
     iferc = bridge.call(
-        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), months, MISSING]
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46310.0, 0.5]), an_index(months, MISSING)],
     )
     indices = bridge.call(
         "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]])]
@@ -388,8 +425,10 @@ def test_a_market_spills_the_calendar_and_a_price_by_kind() -> None:
         (46162.0, 0.0, "closed", TEXT_CODE),
     ):
         holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[holiday]])])
-        calendar = bridge.call("_CreateCalendar", [valuation, schedule, holidays])
-        fixings = bridge.call("_CreateFuturesFixings", [46161.0, 70.0, holidays])
+        calendar = bridge.call("_CreateCalendar", [valuation, an_index(schedule, holidays)])
+        fixings = bridge.call(
+            "_CreateFuturesFixings", [46161.0, 70.0, an_index(a_two_contract_schedule(), holidays)]
+        )
         history = bridge.call("_CreateMarketHistory", [calendar, fixings])
         kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
         assert rows((kinds, slots, joined)) == [
@@ -616,7 +655,7 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     history = any_history(data)
     calendar = history.calendar
     first = int(calendar.contract[int(np.count_nonzero(calendar.is_fixed))])
-    quotes = a_vector(*(100.0 + i for i in range(len(calendar.schedule.codes) - first)))
+    quotes = a_vector(*(100.0 + i for i in range(len(calendar.index.schedule.codes) - first)))
     made = market(history, quotes)
     table = shown(made)
     body = rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))[2:]

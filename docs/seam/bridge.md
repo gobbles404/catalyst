@@ -343,7 +343,7 @@ No keyword arguments, because the host passes every argument by position. No `No
 | the library's first objects, a valuation date, a discount curve and the unit conversions, and their builders | `src/goosedove/globals/` |
 | the index definitions, a futures, an IFERC and a Gas Daily schedule, a holiday calendar, index conventions, contract specifications and the index that binds them, with their builders and the kinds they share | `src/goosedove/index_definitions/` |
 | the market data, futures fixings, IFERC fixings, Gas Daily fixings and the price vector, and their builders | `src/goosedove/market_data/` |
-| the calendar, every period of an index with its contract and two flags, from any of the three schedules, and its builder | `src/goosedove/calendar/` |
+| the calendar, every period of an index with its contract and two flags, from the index of any of the three kinds, and its builder | `src/goosedove/calendar/` |
 | the market history, an index's calendar bound to the price fixed on each of its periods that has fixed, from the fixings of the calendar's market, and the market, the history with the quotes of its periods to come, and their builders | `src/goosedove/market/` |
 | the catalogue | `src/goosedove/excel/__init__.py` |
 | every handle rejection, the text's parts, and what registration refuses on a handle | `tests/unit/test_handles.py` |

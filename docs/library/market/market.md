@@ -15,7 +15,7 @@ def _CreateMarket(
 
 | | A | B |
 |---|---|---|
-| 10 | the futures history of [market-history.md](market-history.md), valued on 26-May-2026 | `=_CreateMarketHistory(C8, A9)` shows `market_history:3f9a1c:000019` |
+| 10 | the futures history of [market-history.md](market-history.md), valued on 26-May-2026 | `=_CreateMarketHistory(A9, C9)` shows `market_history:3f9a1c:000019` |
 | 11 | 72.10 | |
 | 12 | 72.80 | `=_CreatePriceVector(A11:A12)` shows `price_vector:3f9a1c:000021` |
 | 13 | `=_CreateMarket(B10, B12)` | shows `market:3f9a1c:000022` |

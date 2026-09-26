@@ -107,8 +107,9 @@ def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
 @shown.register
 def calendar_table(obj: Calendar) -> MixedArray:
     # The dates and the flags were made when the calendar was; the prompt contract's code is
-    # read from the schedule the calendar keeps, one take over the rows, and nothing is rebuilt.
-    codes = np.array(obj.schedule.codes, dtype=object)[obj.contract]
+    # read from the schedule of the index the calendar keeps, one take over the rows, and
+    # nothing is rebuilt.
+    codes = np.array(obj.index.schedule.codes, dtype=object)[obj.contract]
     return MixedArray.table(
         [
             ("date", "contract", "is_priced", "is_fixed"),

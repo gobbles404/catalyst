@@ -1,12 +1,11 @@
 """The kinds of index, and the words that name a kind or an object in a message: which market an
-index is of, read off its schedule, the schedule and the calendar of each kind named, and the
-holiday calendar each kind takes. The index, the calendar and the history read a kind from here
-and nowhere else. docs/library/index-definitions/index.md and docs/library/calendar/calendar.md
-are the pages."""
+index is of, read off its schedule, a schedule, a calendar or an index of a kind named, and the
+holiday calendar each kind takes. The index, the calendar, the fixings and the history read a
+kind from here and nowhere else. docs/library/index-definitions/index.md and
+docs/library/calendar/calendar.md are the pages."""
 
 import re
 from enum import Enum
-from typing import assert_never
 
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 
@@ -19,30 +18,11 @@ class Kind(Enum):
     GAS_DAILY = "Gas Daily"
 
 
-def described(kind: Kind) -> str:
-    """A calendar of that kind named in a message: a futures calendar, an IFERC calendar."""
-    match kind:
-        case Kind.FUTURES:
-            return "a futures calendar"
-        case Kind.IFERC:
-            return "an IFERC calendar"
-        case Kind.GAS_DAILY:
-            return "a Gas Daily calendar"
-        case _:
-            assert_never(kind)
-
-
-def schedule_of(kind: Kind) -> str:
-    """A schedule of that kind named in a message: a futures schedule, an IFERC schedule."""
-    match kind:
-        case Kind.FUTURES:
-            return "a futures schedule"
-        case Kind.IFERC:
-            return "an IFERC schedule"
-        case Kind.GAS_DAILY:
-            return "a Gas Daily schedule"
-        case _:
-            assert_never(kind)
+def described(kind: Kind, what: str = "calendar") -> str:
+    """A calendar, a schedule or an index of that kind named in a message: a futures calendar,
+    an IFERC schedule, a Gas Daily index."""
+    article = "an" if kind is Kind.IFERC else "a"
+    return f"{article} {kind.value} {what}"
 
 
 def named(obj: object) -> str:
@@ -56,7 +36,8 @@ def named(obj: object) -> str:
 
 def with_holiday_calendar(holiday_calendar: HolidayCalendar | None) -> HolidayCalendar:
     """A futures index's holiday calendar, required: its market closes on days its schedule does
-    not say, so a calendar left out is refused rather than guessed."""
+    not say, so a calendar left out is refused rather than guessed. Read through an index, it
+    is the calendar the index was made with, never missing, and this is the one way to say so."""
     if holiday_calendar is None:
         raise ValueError(
             "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
@@ -69,5 +50,6 @@ def without_holiday_calendar(holiday_calendar: HolidayCalendar | None, kind: Kin
     prices; one given is refused, since nothing reads it: fail loudly rather than ignore."""
     if holiday_calendar is not None:
         raise ValueError(
-            f"holiday_calendar is a holiday calendar, expected none with {schedule_of(kind)}"
+            "holiday_calendar is a holiday calendar, "
+            f"expected none with {described(kind, 'schedule')}"
         )

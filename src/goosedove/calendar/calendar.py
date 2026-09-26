@@ -1,12 +1,12 @@
-"""A calendar: the periods one index prices, made once from its schedule, each with the contract
-it belongs to, whether it prices and whether it is on the fixed side of the valuation date. A
-futures schedule gives every day from the day after its first contract expires to the day its
-last expires, the prompt future on each; a Gas Daily schedule every flow day from its first
-month's first day to its last month's last, the month on each; and an IFERC schedule one row per
-month, dated by the day its index is published. docs/library/calendar/calendar.md is the page."""
+"""A calendar: the periods one index prices, made once from the index, each with the contract it
+belongs to, whether it prices and whether it is on the fixed side of the valuation date. A
+futures index gives every day from the day after its first contract expires to the day its last
+expires, the prompt future on each; a Gas Daily index every flow day from its first month's
+first day to its last month's last, the month on each; and an IFERC index one row per month,
+dated by the day its index is published. docs/library/calendar/calendar.md is the page."""
 
 from dataclasses import dataclass
-from functools import singledispatch
+from typing import assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,36 +15,30 @@ from goosedove.globals.discount_curve import MAX_DAYS
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
-from goosedove.index_definitions.kind import (
-    Kind,
-    named,
-    with_holiday_calendar,
-    without_holiday_calendar,
-)
+from goosedove.index_definitions.index import Index
+from goosedove.index_definitions.kind import Kind, with_holiday_calendar
 
 
 @dataclass(frozen=True, slots=True)
 class Calendar:
-    """The objects the calendar was built from, kept by reference, its kind, and four columns
-    aligned by position, all read-only: dates[i] is one period's day, the calendar day itself
-    on a futures or a Gas Daily calendar and the publication day on an IFERC one; contract[i]
-    the row of the schedule whose contract the period belongs to, the prompt future, never row
-    0, on a futures calendar and the month otherwise; is_priced[i] whether the period has a
-    price of its own, Monday to Friday and not a holiday on a futures calendar and every row on
-    the other two; and is_fixed[i] whether the period is on the fixed side of the valuation
-    date, a futures day before it, a Gas Daily flow day on or before it, an IFERC month
-    published before it. The contract's code is the schedule's, read through the row. And one
-    number, first_unfixed: the row of the first period not yet fixed, which is the count of
-    the fixed periods, since the periods are in date order and the fixed side is the earlier
-    one, and the calendar's length when every period has fixed; the market reads it, so that
-    a market is made with no look along the calendar."""
+    """The valuation date and the index the calendar was built from, kept by reference, and
+    four columns aligned by position, all read-only: dates[i] is one period's day, the calendar
+    day itself on a futures or a Gas Daily calendar and the publication day on an IFERC one;
+    contract[i] the row of the schedule whose contract the period belongs to, the prompt future,
+    never row 0, on a futures calendar and the month otherwise; is_priced[i] whether the period
+    has a price of its own, Monday to Friday and not a holiday on a futures calendar and every
+    row on the other two; and is_fixed[i] whether the period is on the fixed side of the
+    valuation date, a futures day before it, a Gas Daily flow day on or before it, an IFERC
+    month published before it. The kind, the schedule and the holiday calendar are the index's,
+    read through it and held nowhere else; the contract's code is the schedule's, read through
+    the row. And one number, first_unfixed: the row of the first period not yet fixed, which is
+    the count of the fixed periods, since the periods are in date order and the fixed side is
+    the earlier one, and the calendar's length when every period has fixed; the market reads
+    it, so that a market is made with no look along the calendar."""
 
     valuation_date: ValuationDate
-    schedule: FuturesSchedule | IfercSchedule | GasDailySchedule
-    holiday_calendar: HolidayCalendar | None
-    kind: Kind
+    index: Index
     dates: NDArray[np.datetime64]
     contract: NDArray[np.intp]
     is_priced: NDArray[np.bool_]
@@ -52,39 +46,34 @@ class Calendar:
     first_unfixed: int
 
 
-def calendar(
-    valuation_date: ValuationDate, schedule: object, holiday_calendar: HolidayCalendar | None
-) -> Calendar:
-    """The one way to make a Calendar: the schedule's kind chooses which calendar is made, the
-    holiday calendar is checked against it, then that kind's rules run, in order, the first
-    failure being the message, and its four columns and the row of its first unfixed period
-    are made once, here and never again.
+def calendar(valuation_date: ValuationDate, index: Index) -> Calendar:
+    """The one way to make a Calendar: the index's kind chooses which calendar is made, then that
+    kind's rules on the index's schedule run, in order, the first failure being the message,
+    and its four columns and the row of its first unfixed period are made once, here and never
+    again.
 
-    The kind is read off the object the seam hands over, the one way the library tells kinds
-    apart, as util_ReadHandle chooses a table for a handle; an object of no schedule kind is
-    refused here in the library's words, since the seam names no kind for it. A futures
-    schedule brings the holiday calendar, and the other two leave it out, since nothing reads
-    it there. The sources are kept by reference and not copied, the record holds which kind it
-    is, and the columns are frozen. Rows count as the sheet counts them, the schedule's first
-    row being row 1.
+    The kind is the one the index read off its schedule when it was made, and the holiday
+    calendar was checked against it then, so neither is checked here: a futures index brings
+    its holiday calendar, and the other two have none. The cast in each arm states what the
+    kind already says, which schedule the index holds. The valuation date and the index are
+    kept by reference and not copied, and the columns are frozen. Rows count as the sheet
+    counts them, the schedule's first row being row 1.
     """
-    return _of(schedule, valuation_date, holiday_calendar)
+    match index.kind:
+        case Kind.FUTURES:
+            return _futures_calendar(valuation_date, index, cast(FuturesSchedule, index.schedule))
+        case Kind.GAS_DAILY:
+            return _gas_daily_calendar(
+                valuation_date, index, cast(GasDailySchedule, index.schedule)
+            )
+        case Kind.IFERC:
+            return _iferc_calendar(valuation_date, index, cast(IfercSchedule, index.schedule))
+        case _:
+            assert_never(index.kind)
 
 
-@singledispatch
-def _of(
-    schedule: object, valuation_date: ValuationDate, holiday_calendar: HolidayCalendar | None
-) -> Calendar:
-    raise ValueError(
-        f"schedule is {named(schedule)}, expected a futures, IFERC or Gas Daily schedule"
-    )
-
-
-@_of.register
-def futures_calendar(
-    schedule: FuturesSchedule,
-    valuation_date: ValuationDate,
-    holiday_calendar: HolidayCalendar | None,
+def _futures_calendar(
+    valuation_date: ValuationDate, index: Index, schedule: FuturesSchedule
 ) -> Calendar:
     """Every day from the day after the first contract expires to the day the last expires.
 
@@ -102,17 +91,17 @@ def futures_calendar(
     The columns: every calendar day from the day after the first expiry to the last expiry,
     one np.arange; the row prompt on each day, one np.searchsorted over the expiries, each day
     finding the first expiry on or after it; whether the market is open, np.is_busday over the
-    days with the holiday calendar's list, Monday to Friday, a day listed twice or on a weekend
-    or outside the calendar changing nothing; and whether the day is before the valuation
-    date's day, one comparison, the day itself not fixed whatever fraction of it has elapsed,
-    and a valuation date before the calendar fixing no day, after it every day.
+    days with the index's holiday calendar's list, Monday to Friday, a day listed twice or on a
+    weekend or outside the calendar changing nothing; and whether the day is before the
+    valuation date's day, one comparison, the day itself not fixed whatever fraction of it has
+    elapsed, and a valuation date before the calendar fixing no day, after it every day.
     """
-    holidays = with_holiday_calendar(holiday_calendar)
+    holidays = with_holiday_calendar(index.holiday_calendar)  # a futures index always has one
     codes = schedule.codes
     expiries = schedule.future_expiry
     if len(codes) < 2:
         have = f"{len(codes)} {'contract' if len(codes) == 1 else 'contracts'}"
-        raise ValueError(f"schedule has {have}, expected at least 2")
+        raise ValueError(f"index has {have}, expected at least 2")
     _each_code_once(codes)
     unordered = expiries[1:] <= expiries[:-1]
     if unordered.any():
@@ -131,23 +120,11 @@ def futures_calendar(
     contract = np.searchsorted(expiries, dates, side="left")
     is_priced = np.is_busday(dates, holidays=holidays.holiday)
     is_fixed = dates < valuation_date.as_of
-    return _frozen(
-        valuation_date,
-        schedule,
-        holidays,
-        Kind.FUTURES,
-        dates,
-        contract,
-        is_priced,
-        is_fixed,
-    )
+    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
 
 
-@_of.register
-def gas_daily_calendar(
-    schedule: GasDailySchedule,
-    valuation_date: ValuationDate,
-    holiday_calendar: HolidayCalendar | None,
+def _gas_daily_calendar(
+    valuation_date: ValuationDate, index: Index, schedule: GasDailySchedule
 ) -> Calendar:
     """Every flow day from the first month's first day to the last month's last, each on the
     month it flows in; one month is a calendar.
@@ -162,7 +139,6 @@ def gas_daily_calendar(
     fixed when the flow day is on or before the valuation date's day, since its print preceded
     the day, one comparison.
     """
-    without_holiday_calendar(holiday_calendar, Kind.GAS_DAILY)
     codes = schedule.codes
     first = schedule.first_date
     last = schedule.last_date
@@ -192,16 +168,11 @@ def gas_daily_calendar(
     contract = np.searchsorted(last, dates, side="left")
     is_priced = np.ones(dates.size, dtype=bool)
     is_fixed = dates <= valuation_date.as_of
-    return _frozen(
-        valuation_date, schedule, None, Kind.GAS_DAILY, dates, contract, is_priced, is_fixed
-    )
+    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
 
 
-@_of.register
-def iferc_calendar(
-    schedule: IfercSchedule,
-    valuation_date: ValuationDate,
-    holiday_calendar: HolidayCalendar | None,
+def _iferc_calendar(
+    valuation_date: ValuationDate, index: Index, schedule: IfercSchedule
 ) -> Calendar:
     """One row per contract month, dated by the day its index is published; one month is a
     calendar.
@@ -212,7 +183,6 @@ def iferc_calendar(
     index is a price for its whole month; and fixed when the publication day is before the
     valuation date's day, since the index prints during that day, one comparison.
     """
-    without_holiday_calendar(holiday_calendar, Kind.IFERC)
     codes = schedule.codes
     published = schedule.publication_date
     _at_least_one(codes)
@@ -228,12 +198,12 @@ def iferc_calendar(
     contract = np.arange(dates.size, dtype=np.intp)
     is_priced = np.ones(dates.size, dtype=bool)
     is_fixed = dates < valuation_date.as_of
-    return _frozen(valuation_date, schedule, None, Kind.IFERC, dates, contract, is_priced, is_fixed)
+    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
 
 
 def _at_least_one(codes: tuple[str, ...]) -> None:
     if not codes:
-        raise ValueError("schedule has 0 contracts, expected at least 1")
+        raise ValueError("index has 0 contracts, expected at least 1")
 
 
 def _each_code_once(codes: tuple[str, ...]) -> None:
@@ -251,9 +221,7 @@ def _each_code_once(codes: tuple[str, ...]) -> None:
 
 def _frozen(
     valuation_date: ValuationDate,
-    schedule: FuturesSchedule | IfercSchedule | GasDailySchedule,
-    holiday_calendar: HolidayCalendar | None,
-    kind: Kind,
+    index: Index,
     dates: NDArray[np.datetime64],
     contract: NDArray[np.intp],
     is_priced: NDArray[np.bool_],
@@ -262,14 +230,4 @@ def _frozen(
     for column in (dates, contract, is_priced, is_fixed):
         column.setflags(write=False)
     first_unfixed = int(np.count_nonzero(is_fixed))  # the fixed periods come first
-    return Calendar(
-        valuation_date,
-        schedule,
-        holiday_calendar,
-        kind,
-        dates,
-        contract,
-        is_priced,
-        is_fixed,
-        first_unfixed,
-    )
+    return Calendar(valuation_date, index, dates, contract, is_priced, is_fixed, first_unfixed)

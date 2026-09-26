@@ -51,7 +51,7 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
     if first == calendar.dates.size:
         raise ValueError("market_history has no unfixed period, expected at least one to quote")
     first_contract = int(calendar.contract[first])
-    codes = calendar.schedule.codes
+    codes = calendar.index.schedule.codes
     expected = len(codes) - first_contract
     given = price_vector.prices.size
     if given != expected:

@@ -48,11 +48,28 @@ def a_holiday_calendar(*serials: float) -> str:
 SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 
 
+def an_index(schedule: object, holidays: object = MISSING) -> str:
+    """The index handle of that schedule handle and holiday calendar handle, with one set of
+    conventions and specifications, since nothing here reads either."""
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    specifications = bridge.call(
+        "_CreateContractSpecifications",
+        [
+            Cells.from_rows(
+                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+            ),
+            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+        ],
+    )
+    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    assert isinstance(text, str) and text.startswith("index:"), text
+    return text
+
+
 def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str:
     args = [
         valuation or a_valuation(),
-        a_schedule(*SCHEDULE),
-        holidays or a_holiday_calendar(MAY_25),
+        an_index(a_schedule(*SCHEDULE), holidays or a_holiday_calendar(MAY_25)),
     ]
     text = bridge.call("_CreateCalendar", args)
     assert isinstance(text, str) and text.startswith("calendar:"), text
@@ -62,7 +79,7 @@ def a_calendar(valuation: str | None = None, holidays: str | None = None) -> str
 def the_fixings(body: list[list[float]] = SAMPLE, holidays: str | None = None) -> str:
     days = Cells.from_rows([[day] for day, _ in body])
     settles = Cells.from_rows([[settle] for _, settle in body])
-    args = [days, settles, holidays or a_holiday_calendar(MAY_25)]
+    args = [days, settles, an_index(a_schedule(*SCHEDULE), holidays or a_holiday_calendar(MAY_25))]
     text = bridge.call("_CreateFuturesFixings", args)
     assert isinstance(text, str) and text.startswith("futures_fixings:"), text
     return text
@@ -596,7 +613,7 @@ def a_gas_daily_calendar(as_of: float = SEP_25) -> str:
         "_CreateGasDailySchedule",
         [column("U26", "V26", "X26"), column(SEP_1, OCT_1, NOV_1), column(SEP_30, OCT_31, NOV_30)],
     )
-    text = bridge.call("_CreateCalendar", [a_valuation(as_of), schedule, MISSING])
+    text = bridge.call("_CreateCalendar", [a_valuation(as_of), an_index(schedule, MISSING)])
     assert isinstance(text, str) and text.startswith("calendar:"), text
     return text
 
@@ -615,7 +632,7 @@ def an_iferc_calendar(as_of: float = NOV_15) -> str:
         "_CreateIfercSchedule",
         [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
     )
-    text = bridge.call("_CreateCalendar", [a_valuation(as_of), schedule, MISSING])
+    text = bridge.call("_CreateCalendar", [a_valuation(as_of), an_index(schedule, MISSING)])
     assert isinstance(text, str) and text.startswith("calendar:"), text
     return text
 

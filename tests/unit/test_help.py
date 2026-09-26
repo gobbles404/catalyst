@@ -217,8 +217,8 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Creates the futures fixings of one index from the days it fixed and their settles, "
-        "checked against its market's holiday calendar, and shows its handle, the text other "
-        "formulas take as the fixings."
+        "checked against the holiday calendar of its index, and shows its handle, the text "
+        "other formulas take as the fixings."
     )
     assert arguments == [
         (
@@ -228,9 +228,9 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
         ),
         ("settle", "The column of settles beside the days, such as B2:B5, one per day."),
         (
-            "holiday_calendar",
-            "The market's holiday-calendar handle: the cell showing _CreateHolidayCalendar's "
-            "result, such as D2, or a name for it.",
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as D3, or a name for "
+            "it; a futures index, whose holiday calendar the days are checked against.",
         ),
     ]
 
@@ -352,9 +352,9 @@ def test_the_calendar_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateCalendar"]
     assert not hidden
     assert description == (
-        "Creates the calendar of one index from its schedule, one row per day it prices, or per "
-        "month for an index published monthly, each with its contract and whether it has fixed, "
-        "and shows its handle, the text other formulas take as the calendar."
+        "Creates the calendar of one index, one row per day it prices, or per month for an "
+        "index published monthly, each with its contract and whether it has fixed, and shows "
+        "its handle, the text other formulas take as the calendar."
     )
     assert arguments == [
         (
@@ -363,16 +363,9 @@ def test_the_calendar_creator_explains_itself() -> None:
             "B2, or a name for it.",
         ),
         (
-            "schedule",
-            "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its "
-            "creator's result, such as B8, or a name for it; a futures schedule needs two "
-            "contracts or more.",
-        ),
-        (
-            "[holiday_calendar]",
-            "The market's holiday-calendar handle with a futures schedule: the cell showing "
-            "_CreateHolidayCalendar's result, such as B12, or a name for it; left out for an "
-            "IFERC or Gas Daily schedule.",
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as B10, or a name "
+            "for it; a futures index needs two contracts or more.",
         ),
     ]
 
