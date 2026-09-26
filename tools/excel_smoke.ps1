@@ -270,8 +270,7 @@ $formulas = [ordered]@{
     # on the valuation day and the last contract of that schedule, read back through
     # util_ReadHandle, a fixing on a past business day, closed on a weekend, the quote on the
     # valuation day and after; the four-price vector, one for every contract but the one
-    # required, and a history valued before its calendar begins, the library's words; the
-    # vector left out, the seam's.
+    # required, the library's words; the vector left out, the seam's.
     "=LEFT(CW1,7)"                = "market:"
     "=INDEX(util_ReadHandle(CW1),1,5)" = "price"
     "=INDEX(util_ReadHandle(CW1),2,5)" = "float64"
@@ -283,8 +282,28 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(CW1))"      = "36"
     "=COLUMNS(util_ReadHandle(CW1))"   = "5"
     "=_CreateMarket(CT7,CV1)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected 1, one per contract from 'n26' through 'n26'"
-    "=_CreateMarket(CW5,CW2)" = "#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-26, expected a date from 2026-06-23 through 2026-07-21"
     "=_CreateMarket(CT7)" = "#ERROR _CreateMarket: price_vector is missing, expected price vector handle"
+    # The market over the other two histories, and a futures history valued before its calendar:
+    # the Gas Daily market in EA2 read back, the valuation day's print, the balance-of-month quote
+    # the day after, October's quote on its first day and November's on the last; the IFERC market
+    # in EA4, October's index and December's quote; the market in CW6 over the history in CW5,
+    # valued on 26-May before its calendar begins on 23-Jun, its one quote on the calendar's
+    # first day; one quote where three are required and a history with no unfixed period, the
+    # library's words.
+    "=LEFT(EA2,7)"                = "market:"
+    "=ROWS(util_ReadHandle(EA2))"      = "93"
+    "=INDEX(util_ReadHandle(EA2),13,5)" = "3"
+    "=INDEX(util_ReadHandle(EA2),14,5)" = "2.95"
+    "=INDEX(util_ReadHandle(EA2),33,5)" = "3.1"
+    "=INDEX(util_ReadHandle(EA2),93,5)" = "3.4"
+    "=LEFT(EA4,7)"                = "market:"
+    "=INDEX(util_ReadHandle(EA4),3,5)" = "1.85"
+    "=INDEX(util_ReadHandle(EA4),5,5)" = "2.2"
+    "=LEFT(CW6,7)"                = "market:"
+    "=ROWS(util_ReadHandle(CW6))"      = "31"
+    "=INDEX(util_ReadHandle(CW6),3,5)" = "74.25"
+    "=_CreateMarket(DU2,EA3)" = "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'"
+    "=_CreateMarket(EA8,EA3)" = "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, expected at least one to quote"
     # The IFERC schedule: a creator over three contract months, their codes, the day each month's
     # future stops trading and the day its index is published, in DA to DC, and over the first row
     # alone, read back through util_ReadHandle; a last trading column one row long and a
@@ -502,13 +521,14 @@ $cells = [ordered]@{
     "CV1" = "=_CreatePriceVector(CU2:CU5)"
     # The market: a vector of one quote and one creator cell over the history in CT7; then a
     # schedule of the two contracts after m26, a calendar over them valued on 26-May, before it
-    # begins, and its history over the fixings in CT6, none of them required, for the market to
-    # refuse.
+    # begins, its history over the fixings in CT6, none of them required, and its market over the
+    # one quote, q26 being the first unfixed day's contract.
     "CW2" = "=_CreatePriceVector(CU2)"
     "CW1" = "=_CreateMarket(CT7,CW2)"
     "CW3" = "=_CreateFuturesSchedule(AE3:AE4,AF3:AF4)"
     "CW4" = "=_CreateCalendar(CT3,CW3,AM1)"
     "CW5" = "=_CreateMarketHistory(CW4,CT6)"
+    "CW6" = "=_CreateMarket(CW5,CW2)"
     # The IFERC schedule: three contract months of the Waha basis, the day each month's future
     # stops trading and the day its index is published, a fourth last trading date for a column
     # one row long, a copy of the publication column with a blank, a code over a number, and two
@@ -578,6 +598,25 @@ $cells = [ordered]@{
     "DV5" = "10-Sep-2026"
     "DW5" = "=_CreateValuationDate(DV5,0.5)"
     "DW6" = "=_CreateCalendar(DW5,DK1)"
+    # The market over the other two histories: a vector of three quotes, the balance of
+    # September, October and November, and the Gas Daily market of the history in DU2, valued on
+    # 11-Sep-2026; a vector of one quote, December's, and the IFERC market of the history in
+    # DW4, valued on 15-Nov-2026; and the IFERC calendar over DE1 valued on 15-Dec-2026 with all
+    # three indices, a history with no unfixed period, for the market to refuse.
+    "DZ2" = "2.95"; "DZ3" = "3.1"; "DZ4" = "3.4"
+    "EA1" = "=_CreatePriceVector(DZ2:DZ4)"
+    "EA2" = "=_CreateMarket(DU2,EA1)"
+    "DZ6" = "2.2"
+    "EA3" = "=_CreatePriceVector(DZ6)"
+    "EA4" = "=_CreateMarket(DW4,EA3)"
+    "DZ8" = "15-Dec-2026"
+    "EA5" = "=_CreateValuationDate(DZ8,0.5)"
+    "EA6" = "=_CreateCalendar(EA5,DE1)"
+    "DX5" = "V26"; "DY5" = "1.85"
+    "DX6" = "X26"; "DY6" = "2.1"
+    "DX7" = "Z26"; "DY7" = "2.2"
+    "EA7" = "=_CreateIfercFixings(DX5:DX7,DY5:DY7)"
+    "EA8" = "=_CreateMarketHistory(EA6,EA7)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

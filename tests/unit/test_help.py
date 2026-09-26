@@ -293,8 +293,8 @@ def test_the_market_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateMarket"]
     assert not hidden
     assert description == (
-        "Creates the daily market of one index from its history and current futures prices and "
-        "shows its handle, the text other formulas take as the market."
+        "Creates the market of one index from its history and the quotes of the periods still "
+        "to come, and shows its handle, the text other formulas take as the market."
     )
     assert arguments == [
         (
@@ -304,8 +304,9 @@ def test_the_market_creator_explains_itself() -> None:
         ),
         (
             "price_vector",
-            "The price-vector handle from _CreatePriceVector, such as B12, with prices in "
-            "schedule order from the valuation day's prompt through the last contract.",
+            "The price-vector handle from _CreatePriceVector, such as B12, with one quote per "
+            "contract in schedule order, from the first period not yet fixed through the last "
+            "contract.",
         ),
     ]
 

@@ -524,8 +524,9 @@ namespace Goosedove.Host.Tests
         // q26's, make one, and util_ReadHandle spills it back, the calendar's four columns and
         // price, a fixing on a past business day, closed on the weekend and the holiday, n26's
         // quote from the valuation day to its expiry and q26's from the day after. The library's
-        // rules answer through the same objects: a quote too few and one too many, and a history
-        // valued before its calendar begins; and a handle of another kind in either slot.
+        // rules answer through the same objects: a quote too few and one too many; a history
+        // valued before its calendar begins is a market from the calendar's first day; and a
+        // handle of another kind in either slot.
         [Fact]
         public void a_market_is_created_from_two_handles_and_read_back_through_its_handle()
         {
@@ -556,9 +557,63 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", Column(72.10, 72.80, 73.0))));
             var early = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46161.0, 0.5), schedule, holidays);
             var earlyHistory = (string)Seam.Call("_CreateMarketHistory", early, (string)Seam.Call("_CreateFuturesFixings", 46160.0, 70.0, holidays));
-            Assert.Equal("#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-19, expected a date from 2026-05-20 through 2026-07-21", Seam.Call("_CreateMarket", earlyHistory, quotes));
+            var earlyMarket = (string)Seam.Call("_CreateMarket", earlyHistory, quotes);
+            Assert.StartsWith("market:", earlyMarket);
+            var earlySpill = (object[,])Seam.Call("util_ReadHandle", earlyMarket);
+            Assert.Equal(46162.0, earlySpill[2, 0]);
+            Assert.Equal(72.10, earlySpill[2, 4]);
+            Assert.Equal(72.80, earlySpill[36, 4]);
             Assert.Equal("#ERROR _CreateMarket: market_history is price vector handle '" + quotes + "', expected market history handle", Seam.Call("_CreateMarket", quotes, quotes));
             Assert.Equal("#ERROR _CreateMarket: price_vector is market history handle '" + history + "', expected price vector handle", Seam.Call("_CreateMarket", history, history));
+        }
+
+        // The market over the other two histories: the Gas Daily history of September to November
+        // 2026 valued on 11 September with the prints through the 11th, and three quotes, the
+        // balance of September, October and November, make one, and util_ReadHandle spills it back,
+        // the print on the valuation day, the balance-of-month quote the day after, October's quote
+        // on its first day and November's on the last; the IFERC history of October to December
+        // valued on 15 November with two months published, and one quote, December's, make one,
+        // the two indices and the quote on their rows. The library's rules answer through the same
+        // objects: one quote where three are required, and a history with no unfixed period, the
+        // IFERC calendar valued on 15 December with all three indices.
+        [Fact]
+        public void a_gas_daily_and_an_iferc_market_are_created_from_two_handles_each_and_read_back()
+        {
+            var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
+            var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasDaily, ExcelMissing.Value);
+            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0));
+            var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
+            var threeQuotes = (string)Seam.Call("_CreatePriceVector", Column(2.95, 3.10, 3.40));
+            var dailyMarket = (string)Seam.Call("_CreateMarket", daily, threeQuotes);
+            Assert.StartsWith("market:", dailyMarket);
+            var days = (object[,])Seam.Call("util_ReadHandle", dailyMarket);
+            Assert.Equal(93, days.GetLength(0));
+            Assert.Equal(5, days.GetLength(1));
+            Assert.Equal("price", days[0, 4]);
+            Assert.Equal(2.91, days[2, 4]);
+            Assert.Equal(3.0, days[12, 4]);
+            Assert.Equal(2.95, days[13, 4]);
+            Assert.Equal(2.95, days[31, 4]);
+            Assert.Equal("V26", days[32, 1]);
+            Assert.Equal(3.10, days[32, 4]);
+            Assert.Equal(3.40, days[63, 4]);
+            Assert.Equal(3.40, days[92, 4]);
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), iferc, ExcelMissing.Value);
+            var monthly = (string)Seam.Call("_CreateMarketHistory", november, (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85)));
+            var oneQuote = (string)Seam.Call("_CreatePriceVector", 2.20);
+            var monthlyMarket = (string)Seam.Call("_CreateMarket", monthly, oneQuote);
+            Assert.StartsWith("market:", monthlyMarket);
+            var months = (object[,])Seam.Call("util_ReadHandle", monthlyMarket);
+            Assert.Equal(5, months.GetLength(0));
+            Assert.Equal(1.85, months[2, 4]);
+            Assert.Equal(2.10, months[3, 4]);
+            Assert.Equal(46357.0, months[4, 0]);
+            Assert.Equal(2.20, months[4, 4]);
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'", Seam.Call("_CreateMarket", daily, oneQuote));
+            var december = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5), iferc, ExcelMissing.Value);
+            var published = (string)Seam.Call("_CreateMarketHistory", december, (string)Seam.Call("_CreateIfercFixings", Column("V26", "X26", "Z26"), Column(1.85, 2.10, 2.20)));
+            Assert.Equal("#ERROR _CreateMarket: ValueError: market_history has no unfixed period, expected at least one to quote", Seam.Call("_CreateMarket", published, oneQuote));
         }
 
         // IFERC fixings: a column of contract codes and a column of indices make one, two single

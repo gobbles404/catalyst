@@ -596,10 +596,50 @@ def test_a_market_keeps_one_small_record_whatever_the_sizes(
     assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
 
 
+def gas_daily_market_sources() -> tuple[object, object]:
+    """The two handles a Gas Daily market takes: the history gas_daily_history_sources makes,
+    the twelve months of 2026 valued on 11 September, and a vector of four quotes, the balance
+    of September and the three months after it."""
+    history = ENTRY["_CreateMarketHistory"](*gas_daily_history_sources())
+    return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[3.0 + i] for i in range(4)]))
+
+
+def iferc_market_sources() -> tuple[object, object]:
+    """The two handles an IFERC market takes: the calendar of the ten years of months
+    iferc_columns lays out, valued on 11 September 2026 with four months published and an index
+    for each, and a vector of 116 quotes, one per month still to publish."""
+    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    made = ENTRY["_CreateCalendar"](valuation, schedule, MISSING)
+    fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4))
+    history = ENTRY["_CreateMarketHistory"](made, fixings)
+    return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
+
+
+# The same record over the other two histories, a year of flow days with four quotes and ten
+# years of months with 116, the row of the first unfixed period read off the calendar.
+@pytest.mark.parametrize(
+    "sources",
+    [gas_daily_market_sources, iferc_market_sources],
+    ids=["a Gas Daily market", "an IFERC market"],
+)
+def test_a_market_over_the_other_two_calendars_keeps_the_same_record(
+    sources: Callable[[], tuple[object, object]],
+) -> None:
+    history, quotes = sources()
+    assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
+
+
 # Reading a market back pays the calendar's table and then the fifth column through the
 # history's helper, with the live rows, their prompts and their quotes on top: measured 50,931
-# bytes at 360 days on 2026-09-19, about 28 bytes per cell, and 501,307 at 3,600.
+# bytes at 360 days on 2026-09-19, about 28 bytes per cell, and 501,307 at 3,600. A Gas Daily
+# market reads back the same way, 48,612 bytes at 365 days on 2026-09-25, 27 per cell, and an
+# IFERC market 20,163 at 120 months, 34 bytes per cell at that small count.
 def test_reading_a_market_back_pays_per_cell() -> None:
-    days = 360
+    days, months = 360, 120
     made = ENTRY["_CreateMarket"](*market_sources(13, 30))
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 30 * 5 * days + 2 * SLACK
+    daily = ENTRY["_CreateMarket"](*gas_daily_market_sources())
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * 365 + 2 * SLACK
+    monthly = ENTRY["_CreateMarket"](*iferc_market_sources())
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK

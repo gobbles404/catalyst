@@ -315,6 +315,62 @@ def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
     assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 4
 
 
+# A Gas Daily market over one month, September 2026, valued on the 2nd with two prints and the
+# balance-of-month quote: the prints on the 1st and 2nd, the quote on every later day, every
+# cell a number. An IFERC market over two months valued on 15 October with October's index and
+# November's quote: the index on the published row and the quote on the other.
+def test_the_other_two_markets_spill_the_same_five_columns() -> None:
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    gas_daily = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), month, MISSING]
+    )
+    prints = bridge.call(
+        "_CreateGasDailyFixings",
+        [Cells.from_rows([[46266.0], [46267.0]]), Cells.from_rows([[2.91], [2.92]])],
+    )
+    history = bridge.call("_CreateMarketHistory", [gas_daily, prints])
+    balance = bridge.call("_CreatePriceVector", [2.95])
+    kinds, slots, joined = read(bridge.call("_CreateMarket", [history, balance]))
+    shown_rows = rows((kinds, slots, joined))
+    assert len(shown_rows) == 32
+    assert shown_rows[:5] == [
+        ["date", "contract", "is_priced", "is_fixed", "price"],
+        ["datetime64[D]", "str", "bool", "bool", "float64"],
+        [46266.0, "U26", 1.0, 1.0, 2.91],
+        [46267.0, "U26", 1.0, 1.0, 2.92],
+        [46268.0, "U26", 1.0, 0.0, 2.95],
+    ]
+    assert {row[4] for row in shown_rows[4:]} == {2.95}
+    assert (kinds[2:, 4] == NUMBER_CODE).all()
+    months = bridge.call(
+        "_CreateIfercSchedule",
+        [
+            Cells.from_rows([["V26"], ["X26"]]),
+            Cells.from_rows([[46295.0], [46325.0]]),
+            Cells.from_rows([[46296.0], [46328.0]]),
+        ],
+    )
+    iferc = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46310.0, 0.5]), months, MISSING]
+    )
+    indices = bridge.call(
+        "_CreateIfercFixings", [Cells.from_rows([["V26"]]), Cells.from_rows([[1.85]])]
+    )
+    history = bridge.call("_CreateMarketHistory", [iferc, indices])
+    quote = bridge.call("_CreatePriceVector", [2.20])
+    kinds, slots, joined = read(bridge.call("_CreateMarket", [history, quote]))
+    assert rows((kinds, slots, joined)) == [
+        ["date", "contract", "is_priced", "is_fixed", "price"],
+        ["datetime64[D]", "str", "bool", "bool", "float64"],
+        [46296.0, "V26", 1.0, 1.0, 1.85],
+        [46328.0, "X26", 1.0, 0.0, 2.20],
+    ]
+    assert kinds[2:, 4].tolist() == [NUMBER_CODE, NUMBER_CODE]
+
+
 # Serials for 19 and 20 May 2026: a market over a one-day calendar valued on its day, with a
 # fixing on the 19th, before it, and one quote, spills the calendar's four columns and price, the
 # quote a number on the open day; with the day a holiday, the same market shows closed, text, and
@@ -504,11 +560,11 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
 # --- the market's daily view, for any calendar -------------------------------------
 
 
-# For any history of two to eight contracts, any holidays and any valuation day inside its
-# calendar, with the quotes it requires: every row of the calendar's own spill stands, and the
-# fifth cell is the day's fixing where the day is past and open, its prompt contract's quote
-# where it is open and not past, and the word closed where the market is shut; no cell is
-# unfixed, and no past day reads a quote.
+# For any history of two to eight contracts, any holidays and any valuation day from before its
+# calendar to its last day, with the quotes it requires: every row of the calendar's own spill
+# stands, and the fifth cell is the day's fixing where the day is past and open, its prompt
+# contract's quote where it is open and not past, and the word closed where the market is shut;
+# no cell is unfixed, and no past day reads a quote.
 @settings(deadline=None)
 @given(data=st.data())
 def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
@@ -516,7 +572,7 @@ def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
 ) -> None:
     history = any_history(data)
     calendar = history.calendar
-    first = int(calendar.contract[calendar.dates == calendar.valuation_date.as_of][0])
+    first = int(calendar.contract[int(np.count_nonzero(calendar.is_fixed))])
     quotes = a_vector(*(100.0 + i for i in range(len(calendar.schedule.codes) - first)))
     made = market(history, quotes)
     table = shown(made)

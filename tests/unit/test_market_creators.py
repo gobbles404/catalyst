@@ -451,14 +451,9 @@ THE_HISTORY, THE_VECTOR = object(), object()
             "one per contract from 'n26' through 'q26'",
         ),
         (
-            [MAY_19, THE_VECTOR],
-            "#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-05-19, "
-            "expected a date from 2026-05-20 through 2026-07-21",
-        ),
-        (
             [JUL_21 + 1, (72.80,)],
-            "#ERROR _CreateMarket: ValueError: market_history valuation date is 2026-07-22, "
-            "expected a date from 2026-05-20 through 2026-07-21",
+            "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
+            "expected at least one to quote",
         ),
         (
             [MISSING, THE_VECTOR],
@@ -503,7 +498,6 @@ THE_HISTORY, THE_VECTOR = object(), object()
     ids=[
         "one quote too few",
         "one quote too many",
-        "valued the day before the calendar",
         "valued the day after the calendar, the count unchecked",
         "the history left out",
         "a blank cell where the history should be",
@@ -520,11 +514,6 @@ def test_a_market_that_cannot_be_made_says_why(args: list[object], text: str) ->
     history, vector = args
     if history is THE_HISTORY:
         history = a_history()
-    elif history == MAY_19:
-        history = a_history(
-            calendar=a_calendar(valuation=a_valuation(MAY_19)),
-            fixings=the_fixings([[MAY_18, 70.0]]),
-        )
     elif history == JUL_21 + 1:
         history = a_history(
             calendar=a_calendar(valuation=a_valuation(JUL_21 + 1)),
@@ -535,6 +524,20 @@ def test_a_market_that_cannot_be_made_says_why(args: list[object], text: str) ->
     elif isinstance(vector, tuple):
         vector = a_vector(*cast(tuple[float, ...], vector))
     assert bridge.call("_CreateMarket", [history, vector]) == text
+
+
+# Valued on 19 May 2026, m26's expiry day and the day before the calendar begins, with a fixing
+# on the 18th, before it: nothing is fixed, and two quotes make a market from the 20th on, n26's
+# quote on every business day through its expiry and q26's after.
+def test_a_history_valued_before_its_calendar_is_a_market_from_the_calendars_first_day() -> None:
+    history = a_history(
+        calendar=a_calendar(valuation=a_valuation(MAY_19)), fixings=the_fixings([[MAY_18, 70.0]])
+    )
+    shown = rows(read(a_market(history)))
+    assert shown[2] == [MAY_20, "n26", 1.0, 0.0, 72.10]
+    assert shown[35] == [JUN_22, "n26", 1.0, 0.0, 72.10]
+    assert shown[36] == [JUN_22 + 1, "q26", 1.0, 0.0, 72.80]
+    assert {row[4] for row in shown[2:]} == {72.10, 72.80, "closed"}
 
 
 def test_a_handle_of_another_kind_in_either_market_slot_is_refused_by_name() -> None:
@@ -724,16 +727,64 @@ def test_a_failed_construction_of_the_other_kinds_publishes_no_object_and_no_han
     assert number(cast(str, bridge.call("_CreateMarketHistory", [made, prints]))) == before + 1
 
 
-def test_the_market_takes_a_futures_history_alone_for_now() -> None:
+def test_a_gas_daily_market_is_created_from_two_handles_and_read_back_day_by_day() -> None:
+    history = bridge.call(
+        "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
+    )
+    made = a_market(cast(str, history), a_vector(2.95, 3.10, 3.40))
+    shown = rows(read(made))
+    assert len(shown) == 93
+    assert shown[0] == MARKET_HEADERS and shown[1] == TYPES
+    assert shown[2] == [SEP_1, "U26", 1.0, 1.0, 2.80]
+    assert shown[26][:4] == [SEP_25, "U26", 1.0, 1.0] and shown[26][4] == pytest.approx(3.04)
+    assert shown[27] == [SEP_25 + 1, "U26", 1.0, 0.0, 2.95]
+    assert shown[31] == [SEP_30, "U26", 1.0, 0.0, 2.95]
+    assert shown[32] == [OCT_1, "V26", 1.0, 0.0, 3.10]
+    assert shown[62] == [OCT_31, "V26", 1.0, 0.0, 3.10]
+    assert shown[63] == [NOV_1, "X26", 1.0, 0.0, 3.40]
+    assert shown[92] == [NOV_30, "X26", 1.0, 0.0, 3.40]
+    kinds, _, _ = read(made)
+    assert (kinds[2:, 4] == NUMBER_CODE).all()
+    assert "closed" not in {row[4] for row in shown[2:]}
+    assert "unfixed" not in {row[4] for row in shown[2:]}
+
+
+def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_month() -> None:
+    history = bridge.call(
+        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
+    )
+    made = a_market(cast(str, history), a_vector(2.20))
+    assert rows(read(made)) == [
+        MARKET_HEADERS,
+        TYPES,
+        [OCT_1, "V26", 1.0, 1.0, 1.85],
+        [NOV_2, "X26", 1.0, 1.0, 2.10],
+        [DEC_1, "Z26", 1.0, 0.0, 2.20],
+    ]
+    kinds, _, _ = read(made)
+    assert (kinds[2:, 4] == NUMBER_CODE).all()
+
+
+def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_market() -> None:
     gas_daily = cast(
         str,
         bridge.call(
             "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
         ),
     )
-    assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.9, 3.0, 3.1)]) == (
-        "#ERROR _CreateMarket: ValueError: market_history is over a Gas Daily calendar, "
-        "expected a futures calendar"
+    assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.95)]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, "
+        "one per contract from 'U26' through 'X26'"
+    )
+    ended = cast(
+        str,
+        bridge.call(
+            "_CreateMarketHistory", [a_gas_daily_calendar(NOV_30), prints_through(SEP_1, NOV_30)]
+        ),
+    )
+    assert bridge.call("_CreateMarket", [ended, a_vector(3.40)]) == (
+        "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
+        "expected at least one to quote"
     )
     iferc = cast(
         str,
@@ -741,7 +792,21 @@ def test_the_market_takes_a_futures_history_alone_for_now() -> None:
             "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10))]
         ),
     )
-    assert bridge.call("_CreateMarket", [iferc, a_vector(2.2)]) == (
-        "#ERROR _CreateMarket: ValueError: market_history is over an IFERC calendar, "
-        "expected a futures calendar"
+    assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20)]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected 1, "
+        "one per contract from 'Z26' through 'Z26'"
+    )
+    published = cast(
+        str,
+        bridge.call(
+            "_CreateMarketHistory",
+            [
+                an_iferc_calendar(DEC_1 + 14),
+                indices_for(("V26", 1.85), ("X26", 2.10), ("Z26", 2.2)),
+            ],
+        ),
+    )
+    assert bridge.call("_CreateMarket", [published, a_vector(2.20)]) == (
+        "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
+        "expected at least one to quote"
     )
