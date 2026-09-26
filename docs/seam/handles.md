@@ -36,7 +36,7 @@ Supported: cell references, and defined names referring to cells. An ordinary fo
 
 ## The handle's text
 
-Built in #53 as `kind:session:number`; `kind:index-name:count` and `kind:count` since #NN, the name of the index where the object carries one and the publication count alone, the session part gone.
+Built in #53 as `kind:session:number`; `kind:index-name:count` and `kind:count` since #113, the name of the index where the object carries one and the publication count alone, the session part gone.
 
 Two forms, the tags lowercase, colons between the parts:
 
@@ -86,7 +86,7 @@ The texts are pinned in `tests/unit/test_handles.py` with the seam's own two kin
 | every creator's ledger keeps its calls, or gains one for the name, and keeps its numpy calls; every ceiling unchanged, the text growing by the name's length only | work and allocation budget |
 | a direct reference, a defined name and `util_ReadHandle` resolve the same objects as before, and every spill is unchanged | Excel smoke and host replay |
 
-#NN rewrote the text where it was written: [bridge.md](bridge.md#a-handle-one-store-and-the-text), [outputs.md](outputs.md) decisions 8 and 11 and [inputs.md](inputs.md) decision 35's sample, the handle row of [conventions.md](../library/conventions.md), [history.md](history.md), the sample handle on every library page, fifteen patterns and four count-reading helpers in the tests, and `test_handles.py`'s three-part reader. The smoke's rows read a handle's start with `LEFT` and stand; the workbook's handle cells are formulas and rewrite themselves on a full calculation, its notes' sample texts refreshed by hand. No alias for the old text: a saved workbook shows the new text after its first calculation.
+#113 rewrote the text where it was written: [bridge.md](bridge.md#a-handle-one-store-and-the-text), [outputs.md](outputs.md) decisions 8 and 11 and [inputs.md](inputs.md) decision 35's sample, the handle row of [conventions.md](../library/conventions.md), [history.md](history.md), the sample handle on every library page, fifteen patterns and four count-reading helpers in the tests, and `test_handles.py`'s three-part reader. The smoke's rows read a handle's start with `LEFT` and stand; the workbook's handle cells are formulas and rewrite themselves on a full calculation, its notes' sample texts refreshed by hand. No alias for the old text: a saved workbook shows the new text after its first calculation.
 
 ### Not here
 
