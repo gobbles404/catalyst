@@ -7,7 +7,7 @@ from goosedove.excel import bridge
 
 
 def test_ping_is_registered() -> None:
-    names = [name for name, _, _, _ in bridge.function_specs()]
+    names = [name for name, *_ in bridge.function_specs()]
     assert "Ping" in names
 
 
@@ -18,7 +18,9 @@ def test_call_ping_reports_version_and_location() -> None:
 
 
 def test_specs_carry_name_description_parameters_and_hidden() -> None:
-    specs = {name: (doc, params, hidden) for name, doc, params, hidden in bridge.function_specs()}
+    specs = {
+        name: (doc, params, hidden) for name, doc, params, hidden, _ in bridge.function_specs()
+    }
     assert specs["Add"] == (
         "Probe: a number in and a number out; the reference for the cost of one call.",
         [("a", ""), ("b", "")],  # a hidden probe says nothing of its arguments
@@ -85,7 +87,7 @@ def test_a_kept_mixed_range_survives_the_host_refilling_and_growing_its_buffers(
 
 
 def test_every_probe_is_hidden_and_ping_is_not() -> None:
-    hidden = {name for name, _, _, hidden in bridge.function_specs() if hidden}
+    hidden = {name for name, _, _, hidden, _ in bridge.function_specs() if hidden}
     assert hidden >= {
         "Zero",
         "Add",

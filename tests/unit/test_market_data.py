@@ -1008,6 +1008,16 @@ def test_a_vector_that_cannot_be_made_says_why(args: list[object], text: str) ->
     assert bridge.call("_CreatePriceVector", args) == text
 
 
+# The store's diagnostic read counts the bytes of prices the live vectors hold, and a release
+# takes them out; nothing per call reads it.
+def test_the_live_count_carries_the_price_bytes_of_live_vectors() -> None:
+    live, held = bridge.live_handles()
+    made = a_vector()
+    assert bridge.live_handles() == (live + 1, held + 4 * 8)
+    assert bridge.release(made) is True
+    assert bridge.live_handles() == (live, held)
+
+
 def test_a_failed_vector_publishes_no_object_and_no_handle() -> None:
     before = number(a_vector(), VECTOR)
     assert bridge.call("_CreatePriceVector", [NAME, Cells.from_rows([[74.25], [None]])]) == (

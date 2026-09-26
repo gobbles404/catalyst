@@ -38,7 +38,9 @@ namespace Goosedove.Host
 
         public void AutoClose()
         {
-            // Excel-DNA calls this on explicit add-in removal, not when Excel quits.
+            // Excel-DNA calls this on explicit add-in removal, not when Excel quits. A release
+            // that arrives after this is skipped: the process is on its way out.
+            Lifetime.Closing = true;
             StopHelp();
         }
 
@@ -59,6 +61,7 @@ namespace Goosedove.Host
         public static void GoosedovePrepareToQuit()
         {
             if (preparedToQuit) return;
+            Lifetime.Closing = true;
             StopHelp();
             // IntelliSense obtained Excel-DNA's cached Application wrapper. Releasing the script's
             // COM objects cannot release this in-process reference, which keeps automated Excel
@@ -120,10 +123,104 @@ namespace Goosedove.Host
             }
         }
 
+        /// <summary>A creator's prepared path for the observed delegate, fetched from the seam once, by name.</summary>
+        public static Prepared PreparePublisher(string name)
+        {
+            using (Py.GIL())
+            using (var pyName = new PyString(name))
+            {
+                return new Prepared(name, Module.InvokeMethod("publisher", pyName));
+            }
+        }
+
         /// <summary>The worksheet path: what every registered delegate calls, with no counter.</summary>
         public static object Call(Prepared prepared, params object[] args)
         {
             return Call(null, prepared, args);
+        }
+
+        /// <summary>
+        /// The observed path a creator's publication takes: the cell's value and whether this call
+        /// published it, as the seam says in one result. An Excel error in any argument is the
+        /// value, unchanged and owning nothing, as on the plain path.
+        /// </summary>
+        public static Outcome Publish(Prepared prepared, params object[] args)
+        {
+            if (Module == null)
+            {
+                return new Outcome("#ERROR python did not start: " + StartupError, false);
+            }
+            try
+            {
+                using (Py.GIL())
+                {
+                    var pyArgs = new PyObject[args.Length];
+                    try
+                    {
+                        for (var i = 0; i < args.Length; i++)
+                        {
+                            object inputError;
+                            pyArgs[i] = Marshal.ToPython(args[i], out inputError);
+                            if (inputError != null)
+                            {
+                                return new Outcome(inputError, false);
+                            }
+                        }
+                        using (var pair = prepared.Entry.Invoke(pyArgs))
+                        using (var value = pair[0])
+                        using (var owned = pair[1])
+                        {
+                            return new Outcome(Marshal.FromPython(value, prepared.Name), owned.As<bool>());
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var arg in pyArgs)
+                        {
+                            Marshal.Release(arg);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new Outcome("#ERROR host: " + ex.Message, false);
+            }
+        }
+
+        /// <summary>
+        /// Lets one publication go when Excel has disconnected its last subscriber: released, or
+        /// missing when the seam found no entry. Skipped once the add-in is closing or Python is
+        /// gone; a call into a finalized interpreter is never made.
+        /// </summary>
+        public static Release Release(string text)
+        {
+            if (Lifetime.Closing || Module == null || !PythonEngine.IsInitialized)
+            {
+                return Goosedove.Host.Release.Skipped;
+            }
+            using (Py.GIL())
+            using (var pyText = new PyString(text))
+            using (var result = Module.InvokeMethod("release", pyText))
+            {
+                return result.As<bool>() ? Goosedove.Host.Release.Released : Goosedove.Host.Release.Missing;
+            }
+        }
+
+        /// <summary>The store's live count and the bytes of prices its live vectors hold: a diagnostic read.</summary>
+        public static (long Live, long PriceBytes) LiveHandles()
+        {
+            if (Module == null)
+            {
+                return (-1, -1);
+            }
+            using (Py.GIL())
+            using (var pair = Module.InvokeMethod("live_handles"))
+            using (var live = pair[0])
+            using (var bytes = pair[1])
+            {
+                return (live.As<long>(), bytes.As<long>());
+            }
         }
 
         /// <summary>The same call, reporting what it did to the observer's counter.</summary>
@@ -573,8 +670,13 @@ namespace Goosedove.Host
                         arguments.Add(new ExcelArgumentAttribute { Name = argument[0].As<string>(), Description = argument[1].As<string>() });
                     }
                     var hidden = spec[3].As<bool>();
+                    var publishes = spec[4].As<bool>();
 
-                    delegates.Add(MakeDelegate(Bridge.Prepare(name), arguments.Count));
+                    // A creator's call is observed, so Excel's live-data subscription owns its
+                    // publication; every other function takes the plain path.
+                    delegates.Add(publishes
+                        ? MakeObservedDelegate(Bridge.PreparePublisher(name), arguments.Count)
+                        : MakeDelegate(Bridge.Prepare(name), arguments.Count));
                     attributes.Add(new ExcelFunctionAttribute { Name = name, Description = description, IsHidden = hidden });
                     argumentAttributes.Add(arguments);
                 }
@@ -598,6 +700,21 @@ namespace Goosedove.Host
                 Expression.NewArrayInit(typeof(object), parameters));
             return Expression.Lambda(call, parameters).Compile();
         }
+
+        // The same delegate for a creator, handing its arguments to the observed path.
+        internal static Delegate MakeObservedDelegate(Prepared prepared, int parameterCount)
+        {
+            var parameters = new ParameterExpression[parameterCount];
+            for (var i = 0; i < parameterCount; i++)
+            {
+                parameters[i] = Expression.Parameter(typeof(object), "arg" + i);
+            }
+            var call = Expression.Call(
+                typeof(Lifetime).GetMethod(nameof(Lifetime.Observe), new[] { typeof(Prepared), typeof(object[]) }),
+                Expression.Constant(prepared),
+                Expression.NewArrayInit(typeof(object), parameters));
+            return Expression.Lambda(call, parameters).Compile();
+        }
     }
 
     /// <summary>Always registered, even when Python failed to start, so the failure is visible.</summary>
@@ -607,6 +724,13 @@ namespace Goosedove.Host
         public static string GoosedoveStatus()
         {
             return Bridge.StartupError ?? "ok: python started and functions registered";
+        }
+
+        [ExcelFunction(IsHidden = true, Description = "Reports the handle store's live count and what the observed path did: published, reused, released.")]
+        public static string GoosedoveHandles()
+        {
+            var (live, priceBytes) = Bridge.LiveHandles();
+            return Lifetime.Report(live, priceBytes);
         }
     }
 

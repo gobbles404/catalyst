@@ -1076,11 +1076,12 @@ class _Held:
 
 
 _HANDLES: Final[dict[str, _Held]] = {}
-# The runtime's publication count, shared by every kind and never reset while Python runs. It
-# starts again with the next Python, so a handle text a workbook saved can equal a later
-# runtime's publication of the same kind, name and count, and a consumer calculated before its
-# creator has run again would read that object: docs/seam/handles.md records the case under
-# the known limitation, with the Excel reproduction, accepted until the handle-lifecycle work.
+# The runtime's publication count, shared by every kind and never reset while Python runs; a
+# release moves it not at all. It starts again with the next Python, so a handle text a
+# workbook saved can equal a later runtime's publication of the same kind, name and count, and
+# a consumer calculated before its creator has run again would read that object:
+# docs/seam/handles.md records the case under the known limitation, with the Excel
+# reproduction, accepted by the owner.
 _published = 0
 
 # The kinds whose text carries an index's name, and where each keeps it. Registration prepares
@@ -1207,6 +1208,7 @@ class Registered:
     hidden: bool  # absent from Excel's function wizard, still callable by name
     convert: Callable[[object], object]  # the declared result's rule, from _RESULTS
     tables: tuple[tuple[int, Schema], ...]  # each table parameter's position and its schema
+    publishes: bool  # the declared result is a handle, so the host observes the call
 
     def run(self, *args: object) -> object:
         """The prepared path: validate the arguments, run the function, convert the result.
@@ -1224,6 +1226,15 @@ class Registered:
             return f"#ERROR {name}: {bad.text}"
         except Exception as exc:
             return f"#ERROR {name}: {type(exc).__name__}: {exc}"
+
+    def publish(self, *args: object) -> tuple[object, bool]:
+        """The prepared path of a creator, for the host's observed delegate: the cell's value,
+        and whether this call published it, told by the count having moved, since the store gains
+        an entry exactly when a creator succeeds. Nothing parses the text and nothing looks the
+        store up; a failure's text comes back with no, as does a consumer's value."""
+        before = _published
+        value = self.run(*args)
+        return value, _published != before
 
 
 _FUNCTIONS: dict[str, Registered] = {}
@@ -1563,7 +1574,8 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
         for p, (_, authored) in zip(parameters, declared, strict=True)
     )
     description = _description(name, fn, hidden)
-    _FUNCTIONS[name] = Registered(fn, description, parameters, hidden, convert, tables)
+    publishes = _is_handle(signature.return_annotation)
+    _FUNCTIONS[name] = Registered(fn, description, parameters, hidden, convert, tables, publishes)
     return fn
 
 
@@ -1572,15 +1584,17 @@ def excel_function[F: Callable[..., object]](fn: F) -> F:
     return register(fn, hidden=False)
 
 
-def function_specs() -> list[tuple[str, str, list[tuple[str, str]], bool]]:
-    """Name, description, each argument's label and help, and whether hidden, for every
-    registered function: what the host registers with Excel."""
+def function_specs() -> list[tuple[str, str, list[tuple[str, str]], bool, bool]]:
+    """Name, description, each argument's label and help, whether hidden, and whether it creates
+    a handle, for every registered function: what the host registers with Excel, the last
+    choosing the observed path for a creator."""
     return [
         (
             name,
             registered.description,
             [(p.label, p.help) for p in registered.parameters],
             registered.hidden,
+            registered.publishes,
         )
         for name, registered in _FUNCTIONS.items()
     ]
@@ -1623,9 +1637,41 @@ def entry(name: str) -> Callable[..., object]:
     return _FUNCTIONS[name].run
 
 
+def publisher(name: str) -> Callable[..., tuple[object, bool]]:
+    """A creator's prepared path for the host's observed delegate, fetched once and kept: the
+    value and whether the call published."""
+    return _FUNCTIONS[name].publish
+
+
+def release(text: str) -> bool:
+    """Lets one publication go, by its whole text, when Excel has disconnected the last creator
+    subscribed to it: the entry leaves the store and its reference with it, and nothing else is
+    touched, so an object another live object holds lives on through that object's own
+    reference while the text names nothing. Whether an entry went; a text already gone, or never
+    published, is nothing to do. The count does not move."""
+    return _HANDLES.pop(text, None) is not None
+
+
+def live_handles() -> tuple[int, int]:
+    """The store's live count and the bytes of prices the live price vectors hold, for the host's
+    status function and the lifetime tests: a diagnostic read, never part of a call."""
+    prices = sum(
+        cast(PriceVector, held.value).prices.nbytes
+        for held in _HANDLES.values()
+        if held.kind is PriceVector
+    )
+    return len(_HANDLES), prices
+
+
 def call(name: str, args: Sequence[object]) -> object:
     """The prepared path reached by name, for callers that hold no entry: the tests."""
     return _FUNCTIONS[name].run(*args)
+
+
+def publish(name: str, args: Sequence[object]) -> tuple[object, bool]:
+    """A creator's observed path reached by name, for the tests: the value and whether it
+    published."""
+    return _FUNCTIONS[name].publish(*args)
 
 
 # --- the bridge's own worksheet function; the probes live in probes.py --------

@@ -24,7 +24,7 @@ Five things are fetched or made at start and held for the life of the process. T
 
 Registration happens once, at the end of start-up, and is where the host learns what functions exist and prepares each one's path, so that a call does nothing but call. It asks the bridge for `function_specs`: for every registered function, its name, its docstring, the text written at the top of the function to describe it, as the description, one pair per argument holding the label Excel shows and the help written beside that parameter, and whether it is hidden. For each one it does three things.
 
-First it fetches the function's prepared path: `Registered.run`, the Python function that checks the arguments, runs the worksheet function and converts the result. For Add, the prepared path is fetched once when Excel starts and called on every recalculation. The host fetches it by name with `entry(name)` and keeps it beside the name, which is used only for messages; a name the bridge does not know fails here, at registration, not at the first call.
+First it fetches the function's prepared path: `Registered.run`, the Python function that checks the arguments, runs the worksheet function and converts the result. For Add, the prepared path is fetched once when Excel starts and called on every recalculation. The host fetches it by name with `entry(name)` and keeps it beside the name, which is used only for messages; a name the bridge does not know fails here, at registration, not at the first call. A creator, a function whose spec says it creates a handle, gets `publisher(name)` instead, the path that returns the value and whether the call published, and its delegate takes the observed path below.
 
 Second it builds a delegate: a C# function value with a fixed number of parameters, which Excel-DNA needs one of per worksheet function. Add's delegate has two parameters and calls the host with Add's prepared path built in. The host compiles each one with one parameter per declared argument; the delegate packs its arguments into an array and hands them to the prepared path, baked in as a constant, so a call never looks the function up by name. Excel-DNA reads the delegate's own signature to learn how many arguments the function takes: none for Ping, two for Add.
 
@@ -54,6 +54,10 @@ Explicit exports is a setting in the project file under which only methods marke
 HostAdd is the floor: a C# worksheet function with the host's argument shape and no Python at all, so what Excel and Excel-DNA charge for any call can be measured beside what the seam adds. `=HostAdd(1,2)` shows 3 without Python running, and it is hidden like the probes. HostAdd is timed beside Add in [baseline.md](baseline.md), so Excel's and Excel-DNA's own share of a call is measured, not inferred.
 
 The registration says nothing about threads, so Excel calls these functions on one thread, its main calculation thread. The test suite and the host runner each call on one thread of their own.
+
+## The observed path
+
+Since #NN a creator's delegate calls `Lifetime.Observe` in `Lifetime.cs` instead of `Bridge.Call`. An Excel error among the arguments is returned first, as on the plain path, and owns nothing. Otherwise the host hands Excel-DNA's `ExcelAsyncUtil.Observe` the function's name, the argument values and a factory: Excel-DNA finds the live call with the same name and values, in any open workbook, and returns its value, or calls the factory for a `Publication`, the one small class of the observed path. Its `Subscribe` runs the publisher's path once through `Bridge.Publish`, which unpacks the pair the seam returns, hands the value to Excel before it returns so a new publication never shows `#N/A` while Excel waits for its next update, and keeps the handle when the call published; the subscription never completes on its own. Excel-DNA calls its `Dispose` when Excel disconnects the last subscriber, after a delay of Excel's, and it calls `Bridge.Release` for the one handle it owns, once however often it is called, counting a release the seam found, a miss it did not, or a failure it reports through `GoosedoveHandles` and never throws at Excel. `Bridge.Release` takes the GIL and skips, counting, once the add-in is closing or Python is gone, so no call reaches a finalized interpreter. `=GoosedoveHandles()`, hidden, reports the store's live count and the bytes of prices its vectors hold, from `live_handles()`, beside the host's counts: published, reused, released, release misses, disposal errors, skipped at close. `host/Goosedove.Host.Tests/LifetimeTests.cs` drives the publication with a fake observer; `tools/excel_lifetime.ps1` drives Excel.
 
 ## When a hidden Excel quits
 
@@ -211,15 +215,16 @@ The host runner is the program that times each probe through the host, with Pyth
 |---|---|
 | start-up: the config file, starting Python, the five things held | `AddIn.AutoOpen`, `Bridge.Start`, `Config.Load` in `host/Goosedove.Host/AddIn.cs` |
 | what a cell shows when Python did not start | `Bridge.StartupError`, `Status.GoosedoveStatus` in `AddIn.cs` |
-| registration and the delegate | `Registration.RegisterAll`, `Registration.MakeDelegate`, `Bridge.Prepare`, `Prepared` in `AddIn.cs` |
+| registration and the delegate | `Registration.RegisterAll`, `Registration.MakeDelegate`, `Registration.MakeObservedDelegate`, `Bridge.Prepare`, `Bridge.PreparePublisher`, `Prepared` in `AddIn.cs` |
+| the observed path: the publication, its release and the counts | `Publication`, `Outcome`, `Lifetime` in `host/Goosedove.Host/Lifetime.cs`; `Bridge.Publish`, `Bridge.Release`, `Bridge.LiveHandles` in `AddIn.cs` |
 | one call, the lock, the error catch | `Bridge.Call` in `AddIn.cs` |
 | the way in, the scan and the range trip | `Marshal.ToPython`, `Marshal.Range`, `Marshal.CellsFromBuffers` in `AddIn.cs` |
 | the kept buffers and their growth | `Marshal.Reserve` in `AddIn.cs` |
 | the way out and the one copy | `Marshal.FromPython` in `AddIn.cs` |
-| the two C# worksheet functions | `Status.GoosedoveStatus`, `Floor.HostAdd` in `AddIn.cs` |
+| the three C# worksheet functions | `Status.GoosedoveStatus`, `Status.GoosedoveHandles`, `Floor.HostAdd` in `AddIn.cs` |
 | the counter's names | `host/Goosedove.Host/WorkCounter.cs` |
 | the project settings: framework, packages, explicit exports, unsafe code | `host/Goosedove.Host/Goosedove.Host.csproj` |
-| the four names the host uses from Python | `function_specs`, `entry`, `cells_from_buffers`, `MISSING` in `src/goosedove/excel/bridge.py`; `Registered.run` is the prepared path, and `Ping` sits beside it; `describe` is what the marshal tests ask |
+| the seven names the host uses from Python | `function_specs`, `entry`, `publisher`, `release`, `live_handles`, `cells_from_buffers`, `MISSING` in `src/goosedove/excel/bridge.py`; `Registered.run` is the prepared path and `Registered.publish` a creator's, and `Ping` sits beside them; `describe` is what the marshal tests ask |
 | the probes | `src/goosedove/excel/probes.py` |
 | the tests without Excel | `Python.cs`, `StartupTests.cs`, `CallTests.cs`, `MarshalTests.cs` in `host/Goosedove.Host.Tests/` |
 | the pins | `tests/performance/HostWorkBudgets.cs` |

@@ -201,8 +201,9 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 4. `uv run pytest -n auto`
 5. `dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q`
 6. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1`
+7. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core`
 
-The last step needs Excel installed: it builds the add-in, opens a hidden Excel of its own, types the input cells, places one formula per row and compares each cell's displayed text with the text expected. It then closes the workbook, asks the add-in to prepare for quitting, and verifies that its Excel process exits, releasing the add-in file for the next build. A process that remains is stopped and the check fails. The process is identified from that Excel's window handle, never by selecting all Excel processes. Without Excel it stops and says so, and the check fails. It never touches an Excel you have open. The workbook reader and Excel timing runner use the same cleanup; [host.md](host.md#when-a-hidden-excel-quits) explains why it is needed.
+The last two steps need Excel installed. The lifetime script's core group builds a chain of creators in a hidden Excel and checks that a creator's cell shows its handle at once, that an unchanged recalculation publishes nothing, that a changed price releases the old vector and market once Excel disconnects them, that equal creators share, that a failure owns nothing and that closing the workbook empties the store; run it with no group named before merging a change to ownership or registration, for its `edits`, `books` and `quit` groups too. The smoke it builds the add-in, opens a hidden Excel of its own, types the input cells, places one formula per row and compares each cell's displayed text with the text expected. It then closes the workbook, asks the add-in to prepare for quitting, and verifies that its Excel process exits, releasing the add-in file for the next build. A process that remains is stopped and the check fails. The process is identified from that Excel's window handle, never by selecting all Excel processes. Without Excel it stops and says so, and the check fails. It never touches an Excel you have open. The workbook reader and Excel timing runner use the same cleanup; [host.md](host.md#when-a-hidden-excel-quits) explains why it is needed.
 
 CI runs everything but that step, on a Windows runner, in three jobs. One runs format, lint, types and the Python tests, with `ruff format --check .` so CI never rewrites a file. One builds the host, runs the host's tests, and builds the host runner so that it keeps compiling. The third runs `.\measure.ps1` and uploads `profiles\`, and gates nothing.
 
@@ -216,6 +217,8 @@ uv run pytest -n auto                             # every Python test
 uv run pytest tests\performance                   # the pins alone
 dotnet test host\Goosedove.Host.Tests -c Release  # the host's tests, no Excel needed
 .\tools\excel_smoke.ps1                           # the add-in in a hidden Excel
+.\tools\excel_lifetime.ps1 -Groups core             # handles living and dying in a hidden Excel
+.\tools\excel_lifetime.ps1                          # every lifetime group, before merging ownership changes
 ```
 
 `uv run pytest -n auto` already runs the pins; the fifth line is for when they are what you are working on. The host's tests start Python themselves, finding the project's own with `uv run python`, so they need no config file and no Excel. Never add `# type: ignore` or `# noqa` to get a step green; fix the code. And after pulling:

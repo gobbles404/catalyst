@@ -626,6 +626,21 @@ def test_repeated_market_calls_publish_fresh_handles_and_the_earlier_ones_stand(
     assert rows(read(first)) == rows(read(second))
 
 
+# Releasing the vector's entry leaves the market whole: it holds the vector by its own reference,
+# so its spill still reads the quotes while the vector's text names nothing.
+def test_a_market_outlives_the_release_of_its_vectors_entry() -> None:
+    history, vector = a_history(), a_vector(72.10, 72.80)
+    made = a_market(history, vector)
+    shown = rows(read(made))
+    assert bridge.release(vector) is True
+    assert rows(read(made)) == shown
+    assert bridge.call("util_ReadHandle", [vector]) == (
+        f"#ERROR util_ReadHandle: handle is text {vector!r} naming no live object, "
+        "expected a handle"
+    )
+    assert bridge.release(made) is True
+
+
 def test_a_dead_market_handle_cannot_be_read() -> None:
     assert bridge.call("util_ReadHandle", ["market:9999999"]) == (
         "#ERROR util_ReadHandle: handle is text 'market:9999999' naming no live object, "

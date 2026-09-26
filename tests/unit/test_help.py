@@ -17,7 +17,7 @@ from goosedove.excel.probes import probe
 
 SPECS = {
     name: (description, arguments, hidden)
-    for name, description, arguments, hidden in bridge.function_specs()
+    for name, description, arguments, hidden, _ in bridge.function_specs()
 }
 
 
@@ -457,7 +457,7 @@ def Defaults(
 def test_a_default_is_shown_in_the_words_of_the_sheet() -> None:
     _, arguments, _ = {
         name: (description, arguments, hidden)
-        for name, description, arguments, hidden in bridge.function_specs()
+        for name, description, arguments, hidden, _ in bridge.function_specs()
     }["Defaults"]
     assert arguments == [
         ("[number]", "A number. 1 when omitted."),
@@ -483,7 +483,7 @@ def LeftOut(
 def test_an_argument_that_may_be_left_out_shows_its_sentence_alone() -> None:
     _, arguments, _ = {
         name: (description, arguments, hidden)
-        for name, description, arguments, hidden in bridge.function_specs()
+        for name, description, arguments, hidden, _ in bridge.function_specs()
     }["LeftOut"]
     assert arguments == [("x", "A number."), ("[dates]", "A column of dates.")]
 

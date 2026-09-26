@@ -5,7 +5,8 @@ $steps = @(
   "uv run pyright",
   "uv run pytest -n auto",
   "dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q",
-  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1"
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1",
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core"
 )
 foreach ($s in $steps) {
   Write-Host ">> $s"

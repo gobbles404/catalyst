@@ -38,11 +38,11 @@ manual call does not itself provide construction reuse.
 
 ## Retention, identity, and memory limits
 
-The spec requires distinct objects and handles for separate creator formulas and for
-separate trade rows within a batch, even with equal inputs, so native
-function-and-argument sharing cannot be adopted unchanged, and a Python-store adapter
-keyed the same way has the same limit; the native return transformation gives no per-row
-handle spill either. That changes what must be tested, not the source facts below.
+The spec once required distinct objects and handles for separate creator formulas even
+with equal inputs; since the handles page's #NN it accepts native function-and-argument
+sharing between creator cells, while separate trade rows within a batch stay separate
+objects, which the native return transformation's per-row spill does not give. That
+changes what must be tested, not the source facts below.
 
 Native lookup does not add a subscription or ownership count. Pasted text is
 outside our supported worksheet workflow. Ordinary consumers refer to creator
@@ -169,13 +169,49 @@ agreed Excel workflow excludes independently managed pasted handle strings.
 It also follows this repository's existing no-reload and explicit-dependency
 rules; another project's singleton/reload machinery is not a requirement here.
 
+## The live tests of 26 September 2026
+
+Two rounds of tests in hidden Excel processes, on Excel 16.0.20326.20158 with Excel-DNA 1.9.0,
+Python.NET 3.1.0 and Python 3.13, Excel's live-data throttle left at 2,000 ms: the first
+against `ffbbd43`, the second against main at `68f95d9`, with the index's name and the new
+handle text. Both drove the real creators and the real bridge beneath an experimental adapter
+built on `ExcelAsyncUtil.Observe`: a publication object whose `Subscribe` runs the prepared
+call once, hands the value to Excel before returning and never completes on its own, and whose
+`Dispose` asks the seam to release the one text it owns. The adapter, its second lookup of the
+store and its test-only release are evidence of the approach, not the production change;
+nothing in the repository changed for them.
+
+| What was tested | What held |
+|---|---|
+| a thousand changed updates of a 150-price vector and its market, in bursts | at every settled checkpoint, 250 to 1,000, three store entries, one live quote array of 1,200 bytes and one history and calendar; all 2,003 publications released when the last workbook closed, none twice, with Python still running; a new workbook in the same process then worked and the count went on |
+| a thousand updates of a two-price vector, unchanged recalculation, equal creators sharing then diverging, a retained old market, invalid inputs and recovery, nested and conditional creators, manual calculation without a move | 93 checks held; 2,019 publications released at the last close, none twice |
+| the first result handed over inside `Subscribe`, against 50 ms after the first return, twenty inputs a second apart | inside: a handle on every first return and the market current on all 80 observations; after: `#N/A` on every first return and on 76 of 80 observations, catching up now and then and fully once the feed stopped |
+| a creator cut to another cell in manual calculation mode | about 0.4 s after the cut Excel called `DisconnectData` for the moved creator's topic and others on the sheet, then `ServerTerminate`; the old texts named nothing while the cells still showed them; F9, Ctrl+Alt+F9 and Ctrl+Alt+Shift+F9 each rebuilt the chain, and later prices propagated through two such recoveries; the same happened with Excel-DNA's own handles and no Python |
+| the same cut in automatic calculation mode, and manual mode without a move | the publications stayed valid |
+| two sheets, and two workbooks, one creator cut in one of them | the other kept its publications and the shared history alive; a full calculation restored the cut one's |
+| quitting Excel with three live publications | every disposal arrived and the process exited normally, once; not a guarantee that a disconnect arrives for every topic at quit |
+
+The correction to the first round: it read the cells too soon. Excel's callbacks arrive after
+the edit returns, so an immediate successful lookup said nothing about the subscription's
+survival, and the long editing sequence the first explanation named was never needed; a single
+cut in manual mode reproduces the disconnects. Three entries and 1,200 bytes are the fixture's
+baseline after it removed eight setup publications no formula owned, not a target for a real
+workbook; the transient peak of 293 entries in the first round is neither a bound nor an
+acceptable steady state, since it settled.
+
+The research's scripts and logs stayed in the owner's Codex workspace, `work/lifecycle-validation`
+and the temporary folders its findings name. What the repository keeps is the build's own:
+`tools/excel_lifetime.ps1`, whose groups replay the scenarios above through the production
+registration, and `tools/performance/handle_retention.ps1`, the thousand-update run.
+
 ## Verification status
 
-The [acceptance scenarios](handles.md#acceptance-scenarios) still need an implementation
-and live Excel verification. Upstream Excel-DNA [reuse tests][reuse-tests] and
-[disposal tests][dispose-tests] establish intended native behavior but were inspected
-rather than run here; the repository's checks exercise the current seam and not this
-integration.
+The [acceptance scenarios](handles.md#acceptance-scenarios) are built in #NN and verified
+through the production registration by `tools/excel_lifetime.ps1`, whose `core` group runs in
+`check.ps1` and whose other groups ran before the merge, and by
+`tools/performance/handle_retention.ps1`; the pull request records the counts and the Excel
+build. Upstream Excel-DNA [reuse tests][reuse-tests] and [disposal tests][dispose-tests]
+establish intended native behavior but were inspected rather than run here.
 
 [release]: https://excel-dna.net/docs/release-notes-1-9/#object-handle-support-with-excelhandle
 [guide]: https://excel-dna.net/docs/guides-basic/extended-registration/#object-handles
