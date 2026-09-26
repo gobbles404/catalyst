@@ -39,7 +39,7 @@ manual call does not itself provide construction reuse.
 ## Retention, identity, and memory limits
 
 The spec once required distinct objects and handles for separate creator formulas even
-with equal inputs; since the handles page's #NN it accepts native function-and-argument
+with equal inputs; since the handles page's #114 it accepts native function-and-argument
 sharing between creator cells, while separate trade rows within a batch stay separate
 objects, which the native return transformation's per-row spill does not give. That
 changes what must be tested, not the source facts below.
@@ -206,7 +206,7 @@ registration, and `tools/performance/handle_retention.ps1`, the thousand-update 
 
 ## Verification status
 
-The [acceptance scenarios](handles.md#acceptance-scenarios) are built in #NN and verified
+The [acceptance scenarios](handles.md#acceptance-scenarios) are built in #114 and verified
 through the production registration by `tools/excel_lifetime.ps1`, whose `core` group runs in
 `check.ps1` and whose other groups ran before the merge, and by
 `tools/performance/handle_retention.ps1`; the pull request records the counts and the Excel
