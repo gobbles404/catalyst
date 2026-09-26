@@ -14,6 +14,7 @@ from goosedove.excel.probes import probe
 from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
+from goosedove.market_data.price_vector import PriceVector
 
 
 def number(text: str, handle: re.Pattern[str]) -> int:
@@ -855,24 +856,46 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
 # --- _CreatePriceVector -----------------------------------------------------------
 
 
-# The page's sample as the sheet sends it: four prices, a zero and a negative among them and the
-# first repeated, selected without a header.
+# The page's sample as the sheet sends it: the index's name as typed and four prices, a zero and
+# a negative among them and the first repeated, selected without a header.
+NAME = "WTI NYMEX"
 PRICES = Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])
 VECTOR = re.compile(r"price_vector:[0-9a-f]{6}:([0-9]{6})")
 
 
-def a_vector(prices: object = PRICES) -> str:
-    text = bridge.call("_CreatePriceVector", [prices])
+def a_vector(prices: object = PRICES, name: object = NAME) -> str:
+    text = bridge.call("_CreatePriceVector", [name, prices])
     assert isinstance(text, str) and VECTOR.fullmatch(text), text
     return text
 
 
-def test_a_price_vector_is_created_from_a_column_and_read_back_in_order() -> None:
-    assert rows(read(a_vector())) == [["price"], ["float64"], [74.25], [0.0], [-0.5], [74.25]]
+# The spill shows the prices and no name, so this hidden reader proves on its own that a handle
+# resolves to the vector the seam kept, its name as typed.
+@probe
+def ReadPriceVectorName(price_vector: Handle[PriceVector]) -> str:
+    return price_vector.index_name
+
+
+def test_a_price_vector_is_created_from_a_name_and_a_column_and_read_back_in_order() -> None:
+    made = a_vector()
+    assert rows(read(made)) == [["price"], ["float64"], [74.25], [0.0], [-0.5], [74.25]]
+    assert bridge.call("ReadPriceVectorName", [made]) == "WTI NYMEX"
 
 
 def test_one_cell_is_a_vector_of_one_price() -> None:
     assert rows(read(a_vector(74.25))) == [["price"], ["float64"], [74.25]]
+
+
+# The name is kept as typed and checked by nothing here: another case, a space at the end, a name
+# no index bears and a name of one character make vectors alike, a literal in the formula and
+# the cell holding it arriving as the same text.
+@pytest.mark.parametrize(
+    "name",
+    ["wti nymex", "WTI NYMEX ", "Brent", "x"],
+    ids=["another case", "a space at the end", "a name no index bears", "one character"],
+)
+def test_any_text_names_a_vector_and_is_kept_as_typed(name: str) -> None:
+    assert bridge.call("ReadPriceVectorName", [a_vector(name=name)]) == name
 
 
 # Each call publishes anew, over the same prices or a different number of them, and an earlier
@@ -889,36 +912,63 @@ def test_every_vector_call_publishes_a_fresh_handle_and_the_earlier_ones_stand()
 
 
 @pytest.mark.parametrize(
-    ("prices", "text"),
+    ("args", "text"),
     [
         (
-            Cells.from_rows([[74.25, 0.0, -0.5]]),
+            [NAME, Cells.from_rows([[74.25, 0.0, -0.5]])],
             "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers",
         ),
         (
-            Cells.from_rows([[74.25, 1.0], [0.0, 2.0]]),
+            [NAME, Cells.from_rows([[74.25, 1.0], [0.0, 2.0]])],
             "#ERROR _CreatePriceVector: prices is 2x2 array, expected column of numbers",
         ),
         (
-            Cells.from_rows([["price"], [74.25]]),
+            [NAME, Cells.from_rows([["price"], [74.25]])],
             "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number",
         ),
         (
-            Cells.from_rows([[74.25], ["74.25"]]),
+            [NAME, Cells.from_rows([[74.25], ["74.25"]])],
             "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number",
         ),
         (
-            Cells.from_rows([[74.25], [True]]),
+            [NAME, Cells.from_rows([[74.25], [True]])],
             "#ERROR _CreatePriceVector: prices cell (2, 1) is boolean TRUE, expected number",
         ),
         (
-            Cells.from_rows([[74.25], [None]]),
+            [NAME, Cells.from_rows([[74.25], [None]])],
             "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number",
         ),
-        (None, "#ERROR _CreatePriceVector: prices is blank, expected column of numbers"),
-        (MISSING, "#ERROR _CreatePriceVector: prices is missing, expected column of numbers"),
-        ("74.25", "#ERROR _CreatePriceVector: prices is text '74.25', expected column of numbers"),
-        (True, "#ERROR _CreatePriceVector: prices is boolean TRUE, expected column of numbers"),
+        (
+            [NAME, None],
+            "#ERROR _CreatePriceVector: prices is blank, expected column of numbers",
+        ),
+        (
+            [NAME, MISSING],
+            "#ERROR _CreatePriceVector: prices is missing, expected column of numbers",
+        ),
+        (
+            [NAME, "74.25"],
+            "#ERROR _CreatePriceVector: prices is text '74.25', expected column of numbers",
+        ),
+        (
+            [NAME, True],
+            "#ERROR _CreatePriceVector: prices is boolean TRUE, expected column of numbers",
+        ),
+        ([None, PRICES], "#ERROR _CreatePriceVector: index_name is blank, expected text"),
+        ([MISSING, PRICES], "#ERROR _CreatePriceVector: index_name is missing, expected text"),
+        (["", PRICES], "#ERROR _CreatePriceVector: index_name is empty text, expected text"),
+        ([74.25, PRICES], "#ERROR _CreatePriceVector: index_name is number 74.25, expected text"),
+        ([True, PRICES], "#ERROR _CreatePriceVector: index_name is boolean TRUE, expected text"),
+        (
+            [Cells.from_rows([["WTI NYMEX"]]), PRICES],
+            "#ERROR _CreatePriceVector: index_name is 1x1 array, expected text",
+        ),
+        (
+            [Cells.from_rows([["WTI NYMEX"], ["Brent"]]), PRICES],
+            "#ERROR _CreatePriceVector: index_name is 2x1 array, expected text",
+        ),
+        ([None, None], "#ERROR _CreatePriceVector: index_name is blank, expected text"),
+        ([MISSING, MISSING], "#ERROR _CreatePriceVector: index_name is missing, expected text"),
     ],
     ids=[
         "a row where a column is expected",
@@ -931,15 +981,27 @@ def test_every_vector_call_publishes_a_fresh_handle_and_the_earlier_ones_stand()
         "the column left out",
         "numeric text where the column should be",
         "a boolean where the column should be",
+        "a blank cell where the name should be",
+        "the name left out",
+        "empty text where the name should be",
+        "a number where the name should be",
+        "a boolean where the name should be",
+        "a one-cell range where the name should be",
+        "two names",
+        "both blank, the name named first",
+        "both left out, the name named first",
     ],
 )
-def test_a_vector_that_cannot_be_made_says_why(prices: object, text: str) -> None:
-    assert bridge.call("_CreatePriceVector", [prices]) == text
+def test_a_vector_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
+    assert bridge.call("_CreatePriceVector", args) == text
 
 
 def test_a_failed_vector_publishes_no_object_and_no_handle() -> None:
     before = number(a_vector(), VECTOR)
-    assert bridge.call("_CreatePriceVector", [Cells.from_rows([[74.25], [None]])]) == (
+    assert bridge.call("_CreatePriceVector", [NAME, Cells.from_rows([[74.25], [None]])]) == (
         "#ERROR _CreatePriceVector: prices cell (2, 1) is blank, expected number"
+    )
+    assert bridge.call("_CreatePriceVector", [None, PRICES]) == (
+        "#ERROR _CreatePriceVector: index_name is blank, expected text"
     )
     assert number(a_vector(), VECTOR) == before + 1

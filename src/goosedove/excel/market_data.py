@@ -104,10 +104,15 @@ def _CreateGasDailyFixings(
 
 @excel_function
 def _CreatePriceVector(
+    index_name: Annotated[
+        str,
+        'The name the index was created with, such as A1 or "WTI NYMEX", typed as '
+        "_CreateIndex was given it; the market checks it against its history's index.",
+    ],
     prices: Annotated[
         NumberColumn, "The column of futures prices, such as B2:B101, without a header."
     ],
 ) -> Handle[PriceVector]:
-    """Creates a price vector from one column of prices and shows its handle, the text other
-    formulas take as the price vector."""
-    return price_vector(prices)
+    """Creates a price vector of one index from the index's name and one column of prices, and
+    shows its handle, the text other formulas take as the price vector."""
+    return price_vector(index_name, prices)

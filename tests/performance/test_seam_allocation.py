@@ -584,25 +584,26 @@ def price_column(prices: int) -> Cells:
 def price_vector_peaks(prices: int) -> tuple[int, int]:
     """The least peak of creating a vector of that many prices, and of reading it back."""
     column = price_column(prices)
-    made = ENTRY["_CreatePriceVector"](column)
+    made = ENTRY["_CreatePriceVector"]("sample", column)
     return (
-        least_peak(lambda: ENTRY["_CreatePriceVector"](column)),
+        least_peak(lambda: ENTRY["_CreatePriceVector"]("sample", column)),
         least_peak(lambda: ENTRY["util_ReadHandle"](made)),
     )
 
 
 # A price vector keeps one copy of its column, 8 bytes per price, and nothing else per price:
-# the column is accepted on the host's summary, so no look and no temporary. Measured 1,273
-# bytes at 120 prices on 2026-09-19, the copy plus a creator's small objects, which twice the
-# slack covers, and 80,314 at 10,000, 8 bytes per price; 392 for a single cell. Reading it back
-# pays the table's kinds and slots and the mixed road's masks: measured 2,492 at 120 prices,
-# about 20 bytes per cell, and 140,812 at 10,000, 14.
+# the column is accepted on the host's summary, so no look and no temporary, and the name is
+# the text the seam already holds. Measured 1,273 bytes at 120 prices on 2026-09-19, the copy
+# plus a creator's small objects, which twice the slack covers, and 80,314 at 10,000, 8 bytes
+# per price; 392 for a single cell; with the name, on 2026-09-26, 1,281, 80,322 and 408, the
+# record's one more slot. Reading it back pays the table's kinds and slots and the mixed road's
+# masks: measured 2,492 at 120 prices, about 20 bytes per cell, and 140,812 at 10,000, 14.
 def test_a_price_vector_keeps_one_copy_of_its_column_and_nothing_per_price_beyond() -> None:
     for prices in (120, 10_000):
         created, read = price_vector_peaks(prices)
         assert created <= 8 * prices + 2 * SLACK
         assert read <= 21 * (prices + 2) + SLACK
-    assert least_peak(lambda: ENTRY["_CreatePriceVector"](74.25)) <= SLACK
+    assert least_peak(lambda: ENTRY["_CreatePriceVector"]("sample", 74.25)) <= SLACK
 
 
 def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
@@ -622,7 +623,7 @@ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     first = int(np.searchsorted(46161.0 + days_apart * np.arange(contracts), 46276.0))
     quotes = Cells.from_rows([[70.0 + i % 5] for i in range(contracts - first)])
-    return history, ENTRY["_CreatePriceVector"](quotes)
+    return history, ENTRY["_CreatePriceVector"]("sample", quotes)
 
 
 # A market keeps its record, two references and one number, and makes no array: measured 984
@@ -645,7 +646,9 @@ def gas_daily_market_sources() -> tuple[object, object]:
     the twelve months of 2026 valued on 11 September, and a vector of four quotes, the balance
     of September and the three months after it."""
     history = ENTRY["_CreateMarketHistory"](*gas_daily_history_sources())
-    return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[3.0 + i] for i in range(4)]))
+    return history, ENTRY["_CreatePriceVector"](
+        "sample", Cells.from_rows([[3.0 + i] for i in range(4)])
+    )
 
 
 def iferc_market_sources() -> tuple[object, object]:
@@ -658,7 +661,9 @@ def iferc_market_sources() -> tuple[object, object]:
     made = ENTRY["_CreateCalendar"](valuation, index)
     fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
-    return history, ENTRY["_CreatePriceVector"](Cells.from_rows([[2.0 + i] for i in range(116)]))
+    return history, ENTRY["_CreatePriceVector"](
+        "sample", Cells.from_rows([[2.0 + i] for i in range(116)])
+    )
 
 
 # The same record over the other two histories, a year of flow days with four quotes and ten

@@ -50,9 +50,9 @@ def _CreateMarket(
     ],
     price_vector: Annotated[
         Handle[PriceVector],
-        "The price-vector handle from _CreatePriceVector, such as B12, with one quote per "
-        "contract in schedule order, from the first period not yet fixed through the last "
-        "contract.",
+        "The price-vector handle from _CreatePriceVector, such as B12, named for this "
+        "index, with one quote per contract in schedule order, from the first period not "
+        "yet fixed through the last contract.",
     ],
 ) -> Handle[Market]:
     """Creates the market of one index from its history and the quotes of the periods still to

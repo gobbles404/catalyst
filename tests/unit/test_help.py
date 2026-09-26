@@ -300,10 +300,15 @@ def test_the_price_vector_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreatePriceVector"]
     assert not hidden
     assert description == (
-        "Creates a price vector from one column of prices and shows its handle, the text other "
-        "formulas take as the price vector."
+        "Creates a price vector of one index from the index's name and one column of prices, "
+        "and shows its handle, the text other formulas take as the price vector."
     )
     assert arguments == [
+        (
+            "index_name",
+            'The name the index was created with, such as A1 or "WTI NYMEX", typed as '
+            "_CreateIndex was given it; the market checks it against its history's index.",
+        ),
         ("prices", "The column of futures prices, such as B2:B101, without a header."),
     ]
 
@@ -323,9 +328,9 @@ def test_the_market_creator_explains_itself() -> None:
         ),
         (
             "price_vector",
-            "The price-vector handle from _CreatePriceVector, such as B12, with one quote per "
-            "contract in schedule order, from the first period not yet fixed through the last "
-            "contract.",
+            "The price-vector handle from _CreatePriceVector, such as B12, named for this "
+            "index, with one quote per contract in schedule order, from the first period not "
+            "yet fixed through the last contract.",
         ),
     ]
 

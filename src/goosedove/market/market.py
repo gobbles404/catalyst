@@ -25,10 +25,15 @@ class Market:
 
 
 def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
-    """The one way to make a Market: two rules, checked once, in this order, the first failure
-    being the message; then one number, and nothing built.
+    """The one way to make a Market: three rules, checked once, in this order, the first
+    failure being the message; then one number, and nothing built.
 
-    The calendar has a period not yet fixed, since a market is the history with the quotes of
+    The vector names the history's index: the text it was made with is the text the index
+    was created with, compared exactly, so a vector labelled for another index is refused
+    whatever its length, and another case or a space at the end is another name. The name
+    is a label the sheet keeps, never a lookup: two indices of one name pass, and so does a
+    column labelled wrongly, since the label is all the vector carries. Then the calendar
+    has a period not yet fixed, since a market is the history with the quotes of
     the periods to come and a calendar fixed through its last period has nothing to quote. And
     the vector holds exactly one price per contract from that period's contract through the
     schedule's last, in the schedule's order: the contracts whose periods have all fixed are
@@ -47,6 +52,11 @@ def market(market_history: MarketHistory, price_vector: PriceVector) -> Market:
     whose index has not published. The two objects are kept as they are.
     """
     calendar = market_history.calendar
+    if price_vector.index_name != calendar.index.name:
+        raise ValueError(
+            f"price_vector names index {price_vector.index_name!r}, "
+            f"expected market_history's index {calendar.index.name!r}"
+        )
     first = calendar.first_unfixed  # counted once when the calendar was made
     if first == calendar.dates.size:
         raise ValueError("market_history has no unfixed period, expected at least one to quote")

@@ -342,8 +342,10 @@ MARKET_HEADERS = ["date", "contract", "is_priced", "is_fixed", "price"]
 JUN_18, JUN_19, JUN_23 = 46191.0, 46192.0, 46196.0
 
 
-def a_vector(*prices: float) -> str:
-    text = bridge.call("_CreatePriceVector", [column(*prices)])
+def a_vector(*prices: float, name: str = "WTI NYMEX") -> str:
+    """The handle of a vector of those quotes, named for the futures index every history here
+    is over unless named otherwise."""
+    text = bridge.call("_CreatePriceVector", [name, column(*prices)])
     assert isinstance(text, str) and text.startswith("price_vector:"), text
     return text
 
@@ -778,7 +780,7 @@ def test_a_gas_daily_market_is_created_from_two_handles_and_read_back_day_by_day
     history = bridge.call(
         "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
     )
-    made = a_market(cast(str, history), a_vector(2.95, 3.10, 3.40))
+    made = a_market(cast(str, history), a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily"))
     shown = rows(read(made))
     assert len(shown) == 93
     assert shown[0] == MARKET_HEADERS and shown[1] == TYPES
@@ -800,7 +802,7 @@ def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_mont
     history = bridge.call(
         "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
-    made = a_market(cast(str, history), a_vector(2.20))
+    made = a_market(cast(str, history), a_vector(2.20, name="Henry Hub IFERC"))
     assert rows(read(made)) == [
         MARKET_HEADERS,
         TYPES,
@@ -819,7 +821,9 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
             "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
         ),
     )
-    assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.95)]) == (
+    assert bridge.call(
+        "_CreateMarket", [gas_daily, a_vector(2.95, name="Henry Hub Gas Daily")]
+    ) == (
         "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, "
         "one per contract from 'U26' through 'X26'"
     )
@@ -829,7 +833,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
             "_CreateMarketHistory", [a_gas_daily_calendar(NOV_30), prints_through(SEP_1, NOV_30)]
         ),
     )
-    assert bridge.call("_CreateMarket", [ended, a_vector(3.40)]) == (
+    assert bridge.call("_CreateMarket", [ended, a_vector(3.40, name="Henry Hub Gas Daily")]) == (
         "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
         "expected at least one to quote"
     )
@@ -839,7 +843,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
             "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10))]
         ),
     )
-    assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20)]) == (
+    assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20, name="Henry Hub IFERC")]) == (
         "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected 1, "
         "one per contract from 'Z26' through 'Z26'"
     )
@@ -853,7 +857,38 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
             ],
         ),
     )
-    assert bridge.call("_CreateMarket", [published, a_vector(2.20)]) == (
+    assert bridge.call("_CreateMarket", [published, a_vector(2.20, name="Henry Hub IFERC")]) == (
         "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, "
         "expected at least one to quote"
+    )
+
+
+# The vector's name is the market's first rule and reaches the sheet in the library's words:
+# a vector named for another index refused on each kind of history before the count is looked
+# at, another case being another name; the vector of one kind's sample given to another's.
+def test_a_vector_named_for_another_index_reaches_the_sheet_in_the_librarys_words() -> None:
+    history = a_history()
+    assert bridge.call("_CreateMarket", [history, a_vector(72.10, name="Brent")]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector names index 'Brent', "
+        "expected market_history's index 'WTI NYMEX'"
+    )
+    assert bridge.call("_CreateMarket", [history, a_vector(72.10, 72.80, name="wti nymex")]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector names index 'wti nymex', "
+        "expected market_history's index 'WTI NYMEX'"
+    )
+    gas_daily = bridge.call(
+        "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
+    )
+    iferc = bridge.call(
+        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10))]
+    )
+    assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.20, name="Henry Hub IFERC")]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', "
+        "expected market_history's index 'Henry Hub Gas Daily'"
+    )
+    assert bridge.call(
+        "_CreateMarket", [iferc, a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily")]
+    ) == (
+        "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub Gas Daily', "
+        "expected market_history's index 'Henry Hub IFERC'"
     )
