@@ -30,6 +30,16 @@ namespace Goosedove.Host.Tests
             public void OnCompleted() => throw new InvalidOperationException("a publication never completes");
         }
 
+        private static object[,] Column(params object[] cells)
+        {
+            var column = new object[cells.Length, 1];
+            for (var i = 0; i < cells.Length; i++)
+            {
+                column[i, 0] = cells[i];
+            }
+            return column;
+        }
+
         private static Func<Outcome> Once(Outcome outcome, List<string> log)
         {
             return () => { log.Add("create"); return outcome; };
@@ -56,6 +66,18 @@ namespace Goosedove.Host.Tests
             Assert.False(error.Owned);
             Assert.Equal(ExcelError.ExcelErrorNA, error.Value);
             Assert.Equal(Release.Released, Bridge.Release((string)made.Value));
+        }
+
+        // The observed path finds an Excel error as the plain path does, in argument order and cell
+        // order: a range holding #N/A first beats a scalar #DIV/0! after it, on both paths alike.
+        [Fact]
+        public void an_excel_error_is_found_in_the_plain_paths_order()
+        {
+            var dates = Column(46161.0, ExcelError.ExcelErrorNA);
+            var outcome = Bridge.Publish(Bridge.PreparePublisher("_CreateFuturesFixings"), dates, ExcelError.ExcelErrorDiv0, ExcelMissing.Value);
+            Assert.Equal(ExcelError.ExcelErrorNA, outcome.Value);
+            Assert.False(outcome.Owned);
+            Assert.Equal(ExcelError.ExcelErrorNA, Seam.Call("_CreateFuturesFixings", dates, ExcelError.ExcelErrorDiv0, ExcelMissing.Value));
         }
 
         // Release takes the one entry: the text then names nothing, a second release finds nothing,

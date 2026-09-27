@@ -137,19 +137,13 @@ namespace Goosedove.Host
         public static volatile bool Closing;
 
         /// <summary>
-        /// A creator's call: an Excel error among the arguments is the result before any
-        /// subscription, as the plain path has it, and owns nothing; otherwise Excel-DNA finds
-        /// the live call with this function and these argument values, or asks for a new one.
+        /// A creator's call: Excel-DNA finds the live call with this function and these argument
+        /// values, or asks for a new one. An Excel error among the arguments becomes the value the
+        /// subscription holds, found as the plain path finds it, in argument order and cell order,
+        /// and owns nothing.
         /// </summary>
         public static object Observe(Prepared prepared, object[] args)
         {
-            foreach (var arg in args)
-            {
-                if (arg is ExcelError)
-                {
-                    return arg;
-                }
-            }
             Interlocked.Increment(ref Observed);
             return ExcelAsyncUtil.Observe(prepared.Name, args, () =>
             {
