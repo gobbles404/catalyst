@@ -2,8 +2,8 @@
 # hidden Excel, the market's first quote read back as a number after every update, the store's
 # live count and the bytes of prices it holds read at settled checkpoints, and everything
 # released when the workbook closes. Evidence for a pull request, never a gate in check.ps1, with
-# a verdict of its own: every reading, taken once Excel reports its calculation done, must be the
-# expected number, every checkpoint must settle
+# a verdict of its own: every reading must be taken once Excel reports its calculation done,
+# within the patience, and be the expected number, every checkpoint must settle
 # at the baseline within the patience, the store must be empty after the close, and no release
 # may miss or fail, or the run exits nonzero after its cleanup. What the cell's text showed and
 # how long the run took are reported beside, and decide nothing. -Fault expects the wrong price
@@ -66,17 +66,19 @@ function Wait-Calculated {
     return $false
 }
 # The market's first quote read once as a number, once Excel's calculation is done: that read is
-# the verdict, and the text beside it is for the eye. When it is not the expected number the cell
-# is read again within the patience, so that the failure can say whether the number arrived late
-# or never; those later reads change nothing.
+# the verdict, and it holds only when the wait ended with Excel done and the number is the
+# expected one; a wait that ran out fails the update whatever the cell held, since the read was
+# not a settled one. The text beside the number is for the eye. When the number is not the
+# expected one the cell is read again within the patience, so that the failure can say whether
+# the number arrived late or never; those later reads change nothing.
 function Read-Quote($Cell, [double]$Expected) {
     $calculated = Wait-Calculated
     $value = $Cell.Value2
     $text = [string]$Cell.Text
-    $ok = ($value -is [double] -and $value -eq $Expected)
-    $afterwards = ""
-    if (-not $calculated) { $afterwards = "Excel still calculating after $Patience s; " }
-    if (-not $ok) {
+    $right = ($value -is [double] -and $value -eq $Expected)
+    $notes = [Collections.Generic.List[string]]::new()
+    if (-not $calculated) { $notes.Add("Excel still calculating after $Patience s, so the read is not a settled one") }
+    if (-not $right) {
         $outcome = "never the expected number within $Patience s"
         $deadline = (Get-Date).AddSeconds($Patience)
         $reads = 1
@@ -86,9 +88,9 @@ function Read-Quote($Cell, [double]$Expected) {
             $again = $Cell.Value2
             if ($again -is [double] -and $again -eq $Expected) { $outcome = "the expected number on read $reads"; break }
         } while ((Get-Date) -lt $deadline)
-        $afterwards += $outcome
+        $notes.Add($outcome)
     }
-    return [pscustomobject]@{ Value = $value; Text = $text; Ok = $ok; Afterwards = $afterwards }
+    return [pscustomobject]@{ Value = $value; Text = $text; Ok = ($calculated -and $right); Afterwards = ($notes -join "; ") }
 }
 
 $session = Start-HiddenExcel
@@ -149,7 +151,7 @@ try {
     $counts = Settle $watch $baseline
     Assert-Counts "at the baseline" $counts $baseline
     $read = Read-Quote $reader 70.0
-    if (-not $read.Ok) { Fail ("at the baseline: the market shows {0} (text '{1}'), expected 70; afterwards {2}" -f (Describe $read.Value), $read.Text, $read.Afterwards) }
+    if (-not $read.Ok) { Fail ("at the baseline: the market shows {0} (text '{1}'), expected 70; {2}" -f (Describe $read.Value), $read.Text, $read.Afterwards) }
     Write-Host ("baseline: {0}; market shows {1}" -f $counts.Text, $read.Text)
     $rows.Add([pscustomobject]@{ Updates = 0; Live = $counts.Live; PriceBytes = $counts.PriceBytes; Published = $counts.Published; Released = $counts.Released; Seconds = 0.0 })
 
@@ -167,7 +169,7 @@ try {
         if ($Fault -and $n -eq 1) { $expected = $first + 1 }
         $read = Read-Quote $reader $expected
         if (-not $read.Ok) {
-            Fail ("update {0}: the market shows {1} (text '{2}'), expected {3}; afterwards {4}" -f $n, (Describe $read.Value), $read.Text, $expected, $read.Afterwards)
+            Fail ("update {0}: the market shows {1} (text '{2}'), expected {3}; {4}" -f $n, (Describe $read.Value), $read.Text, $expected, $read.Afterwards)
         }
         if ($read.Ok -and $read.Text -ne "$expected") {
             $textDiffers++
