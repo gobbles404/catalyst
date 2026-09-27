@@ -11,7 +11,8 @@
 #          workbook reopened and calculated as a desk would.
 #   processes  two Excels at once, each its own process, Python and store: the same chain in each
 #          under two process IDs; a handle of one read in the other; every workbook closed
-#          in one; a workbook saved by one and fully calculated in the other.
+#          in one; a workbook saved by one and fully calculated in the other. check.ps1 runs
+#          this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
