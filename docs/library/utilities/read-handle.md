@@ -18,7 +18,7 @@ def util_ReadHandle(handle: Handle[object]) -> MixedArray: ...
 | 2 | 11-Sep-2026 | 1 |
 | 3 | 12-Sep-2026 | 0.9999 |
 | 4 | 13-Sep-2026 | 0.9998 |
-| 5 | `=_CreateDiscountCurve(A1:B1, A2:B4)` | shows `discount_curve:2` |
+| 5 | `=_CreateDiscountCurve(A1:B1, A2:B4)` | shows `30512:discount_curve:2` |
 | 7 | `=util_ReadHandle(B5)` | spills A7:B11, below |
 
 | | A | B |

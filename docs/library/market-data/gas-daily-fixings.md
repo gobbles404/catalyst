@@ -20,13 +20,13 @@ Henry Hub Gas Daily over Labor Day week 2026, with the prices illustrative and n
 |---|---|---|---|---|---|
 | 1 | flow_date | price | contract_code | first_date | last_date |
 | 2 | 4-Sep-2026 | 2.930 | U26 | 1-Sep-2026 | 30-Sep-2026 |
-| 3 | 5-Sep-2026 | 2.875 | `=_CreateGasDailySchedule(C2, D2, E2)` shows `gas_daily_schedule:44` | | |
-| 4 | 6-Sep-2026 | 2.875 | `=_CreateIndex("Henry Hub Gas Daily", C3, B12, B13)` shows `index:Henry Hub Gas Daily:45`, B12 and B13 holding the conventions and the specifications | | |
+| 3 | 5-Sep-2026 | 2.875 | `=_CreateGasDailySchedule(C2, D2, E2)` shows `30512:gas_daily_schedule:44` | | |
+| 4 | 6-Sep-2026 | 2.875 | `=_CreateIndex("Henry Hub Gas Daily", C3, B12, B13)` shows `30512:index:Henry Hub Gas Daily:45`, B12 and B13 holding the conventions and the specifications | | |
 | 5 | 7-Sep-2026 | 2.875 | | | |
 | 6 | 8-Sep-2026 | 2.875 | | | |
 | 7 | 9-Sep-2026 | 2.900 | | | |
-| 8 | `=_CreateGasDailyFixings(A2:A7, B2:B7, C4)` | shows `gas_daily_fixings:Henry Hub Gas Daily:55` | | | |
-| 9 | `=_CreateGasDailyFixings(A2, B2, C4)` | shows `gas_daily_fixings:Henry Hub Gas Daily:56`, the fixings of one day | | | |
+| 8 | `=_CreateGasDailyFixings(A2:A7, B2:B7, C4)` | shows `30512:gas_daily_fixings:Henry Hub Gas Daily:55` | | | |
+| 9 | `=_CreateGasDailyFixings(A2, B2, C4)` | shows `30512:gas_daily_fixings:Henry Hub Gas Daily:56`, the fixings of one day | | | |
 
 Two columns of one kind each and a handle, all three required, none with a default, the columns selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The form is the IFERC fixings', columns paired by position, so that the fixings of a family are typed the same way, at the cost [inputs.md](../../seam/inputs.md) decision 38 states: two columns can be selected one row out of step, and equal lengths cannot catch it. A price is any number a cell holds, zero and below included, and Waha has printed below zero. The index comes by handle because it is an object the sheet already holds, made once by [_CreateIndex](../index-definitions/index.md) and named by its cell, as decisions 34 to 37 say: the function receives the index the seam keeps, never the text; a cell that is not an index's handle fails in the seam's words, `index is number 2.93, expected index handle`, before the function runs, and an index of another kind in the library's words, below. The seam checks each column alone, dates one column wide, numbers one column wide, no blank cells, resolves the handle, and hands over an array of days, an array of numbers and the index; nothing here restates that. A single cell is a column of one, so the fixings of one day need no range. The result is a handle: text in the cell that stands for the fixings the seam keeps, declared `Handle[GasDailyFixings]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the fixings, their index by reference and their two columns. The index is one object: the fixings and the calendar of their market refer to the same `_CreateIndex` cell, or a name for it, and are remade together when the index is.
 

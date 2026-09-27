@@ -1,5 +1,6 @@
 """The globals through the seam: what each worksheet function shows for a right and a wrong call."""
 
+import os
 import re
 from typing import cast
 
@@ -10,6 +11,8 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells
 
+PID = os.getpid()  # leads every handle this Python publishes
+
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
 
@@ -19,7 +22,7 @@ BODY = Cells.from_rows([[SEP_11, 1.0], [SEP_12, 0.9999], [SEP_13, 0.9998]])
 
 def a_curve() -> str:
     text = bridge.call("_CreateDiscountCurve", [HEADERS, BODY])
-    assert isinstance(text, str) and text.startswith("discount_curve:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:discount_curve:"), text
     return text
 
 
@@ -29,7 +32,7 @@ def a_curve() -> str:
 def test_a_valuation_date_is_created_and_shown_as_a_handle() -> None:
     text = bridge.call("_CreateValuationDate", [SEP_11, 0.5])
     assert isinstance(text, str)
-    assert re.fullmatch(r"valuation_date:[0-9]+", text)
+    assert re.fullmatch(r"[0-9]+:valuation_date:[0-9]+", text)
 
 
 @pytest.mark.parametrize(

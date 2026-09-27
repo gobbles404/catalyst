@@ -2,6 +2,7 @@
 that its handle resolves to the object the seam kept."""
 
 import functools
+import os
 import re
 from typing import cast
 
@@ -15,6 +16,8 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+
+PID = os.getpid()  # leads every handle this Python publishes
 
 
 def number(text: str, handle: re.Pattern[str]) -> int:
@@ -37,7 +40,7 @@ def a_valuation_date() -> str:
 MAY_1, MAY_2, MAY_4, MAY_5, MAY_6 = 46143.0, 46144.0, 46146.0, 46147.0, 46148.0
 DATES = Cells.from_rows([[MAY_1], [MAY_4], [MAY_5], [MAY_6]])
 SETTLES = Cells.from_rows([[101.94], [106.42], [102.27], [95.08]])
-FIXINGS = re.compile(r"futures_fixings:.+:([0-9]+)")
+FIXINGS = re.compile(r"[0-9]+:futures_fixings:.+:([0-9]+)")
 
 # The calendar page's sample as the sheet sends it, the ten days one market is closed in 2026,
 # one serial per row; the one in May is the 25th, a Monday. Made once into the handle every
@@ -60,7 +63,7 @@ HOLIDAYS = Cells.from_rows(
         )
     ]
 )
-CALENDAR = re.compile(r"holiday_calendar:([0-9]+)")
+CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
 THE_CALENDAR = object()  # in a case's arguments: the calendar's handle, made below
 
 
@@ -85,7 +88,7 @@ def an_index_of(name: str, schedule: object, holidays: object) -> str:
         ],
     )
     text = bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays])
-    assert isinstance(text, str) and text.startswith("index:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 
 
@@ -122,8 +125,8 @@ def test_fixings_are_created_from_two_columns_and_a_calendar_and_read_back() -> 
 # The fixings' handle carries their index's name, sample, between the tag and the count.
 def test_a_fixings_handle_carries_its_indexs_name() -> None:
     made = the_fixings(DATES, SETTLES)
-    assert made.startswith("futures_fixings:sample:")
-    assert made[len("futures_fixings:sample:") :].isdigit()
+    assert made.startswith(f"{PID}:futures_fixings:sample:")
+    assert made[len(f"{PID}:futures_fixings:sample:") :].isdigit()
 
 
 # A single cell is a column of one, so the fixings of one day need no range.
@@ -382,7 +385,7 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
 # codes, and an illustrative index beside each.
 IFERC_CODES = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
 IFERC_PRICES = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
-IFERC_HANDLE = re.compile(r"iferc_fixings:.+:([0-9]+)")
+IFERC_HANDLE = re.compile(r"[0-9]+:iferc_fixings:.+:([0-9]+)")
 # ICE's last trading days and Platts' publication days for those four months, as serials.
 IFERC_LAST_TRADING = Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]])
 IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
@@ -413,7 +416,7 @@ def iferc(codes: object, prices: object) -> str:
 def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
     made = iferc(IFERC_CODES, IFERC_PRICES)
     assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
-    assert made.startswith("iferc_fixings:Waha IFERC:")  # the index's name, as typed
+    assert made.startswith(f"{PID}:iferc_fixings:Waha IFERC:")  # the index's name, as typed
 
 
 # A single cell is a column of one, so the fixings of one month need no range.
@@ -621,7 +624,7 @@ def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
 SEP_4, SEP_5, SEP_6, SEP_7, SEP_8, SEP_9 = 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0
 FLOW_DAYS = Cells.from_rows([[SEP_4], [SEP_5], [SEP_6], [SEP_7], [SEP_8], [SEP_9]])
 MIDPOINTS = Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875], [2.900]])
-GAS_DAILY_HANDLE = re.compile(r"gas_daily_fixings:.+:([0-9]+)")
+GAS_DAILY_HANDLE = re.compile(r"[0-9]+:gas_daily_fixings:.+:([0-9]+)")
 
 
 @functools.cache
@@ -654,7 +657,7 @@ def test_gas_daily_fixings_are_created_from_two_columns_and_read_back() -> None:
         "2026-09-04 2026-09-05 2026-09-06 2026-09-07 2026-09-08 2026-09-09 | "
         "2.93 2.875 2.875 2.875 2.875 2.9"
     )
-    assert made.startswith("gas_daily_fixings:Henry Hub Gas Daily:")  # the index's name
+    assert made.startswith(f"{PID}:gas_daily_fixings:Henry Hub Gas Daily:")  # the index's name
 
 
 # A single cell is a column of one, so the fixings of one day need no range.
@@ -869,7 +872,7 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
 # a negative among them and the first repeated, selected without a header.
 NAME = "WTI NYMEX"
 PRICES = Cells.from_rows([[74.25], [0.0], [-0.5], [74.25]])
-VECTOR = re.compile(r"price_vector:.+:([0-9]+)")
+VECTOR = re.compile(r"[0-9]+:price_vector:.+:([0-9]+)")
 
 
 def a_vector(prices: object = PRICES, name: object = NAME) -> str:
@@ -907,7 +910,7 @@ def test_one_cell_is_a_vector_of_one_price() -> None:
 def test_any_text_names_a_vector_and_is_kept_as_typed(name: str) -> None:
     made = a_vector(name=name)
     assert bridge.call("ReadPriceVectorName", [made]) == name
-    assert made.startswith(f"price_vector:{name}:")
+    assert made.startswith(f"{PID}:price_vector:{name}:")
 
 
 # Each call publishes anew, over the same prices or a different number of them, and an earlier

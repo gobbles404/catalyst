@@ -1,5 +1,6 @@
 # Runs the built add-in in a hidden Excel and checks what each formula shows.
-# One row per formula: the exact text its cell must display. Add a row to add a check.
+# One row per formula: the exact text its cell must display. Add a row to add a check. In an
+# expected text, {pid} stands for the hidden Excel's process ID, which leads every handle.
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
 
@@ -58,11 +59,11 @@ $formulas = [ordered]@{
     "=Grid(2.5,3)"                = "#ERROR Grid: rows is number 2.5, expected whole number"
     "=Fail()"                     = "#ERROR Fail: ValueError: as asked"
     "=RegisterAll()"              = "#NAME?"
-    # Handles. A creator cell shows its handle, whose session part changes every start, so LEFT
-    # pins the kind; the reader rows refer to creator cells the way a sheet does, and read the
-    # spill one cell at a time with INDEX.
-    "=LEFT(AA1,15)"               = "discount_curve:"
-    "=LEFT(AA2,15)"               = "valuation_date:"
+    # Handles. A creator cell shows its handle, the process ID first, so MID reads the kind after
+    # the first colon and LEFT reads the process ID before it; the reader rows refer to creator
+    # cells the way a sheet does, and read the spill one cell at a time with INDEX.
+    '=MID(AA1,FIND(":",AA1)+1,15)' = "discount_curve:"
+    '=MID(AA2,FIND(":",AA2)+1,15)' = "valuation_date:"
     "=INDEX(util_ReadHandle(AA1),1,1)" = "date"
     "=INDEX(util_ReadHandle(AA1),2,2)" = "float64"
     "=INDEX(util_ReadHandle(AA1),3,1)" = "46276"
@@ -91,8 +92,8 @@ $formulas = [ordered]@{
     # The futures schedule: a creator with three columns and one with two, read back through
     # util_ReadHandle with the options last; a futures column one row short and a blank in the
     # options column.
-    "=LEFT(AI1,17)"               = "futures_schedule:"
-    "=LEFT(AI2,17)"               = "futures_schedule:"
+    '=MID(AI1,FIND(":",AI1)+1,17)' = "futures_schedule:"
+    '=MID(AI2,FIND(":",AI2)+1,17)' = "futures_schedule:"
     "=COLUMNS(util_ReadHandle(AI1))"   = "3"
     "=INDEX(util_ReadHandle(AI1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(AI1),1,3)" = "option_expiry"
@@ -101,8 +102,8 @@ $formulas = [ordered]@{
     "=_CreateFuturesSchedule(AE2:AE7,AF2:AF7,AH2:AH7)" = "#ERROR _CreateFuturesSchedule: option_expiry cell (3, 1) is blank, expected date"
     # The holiday calendar: a creator over three days and one over a single cell, the first read
     # back through util_ReadHandle, a blank in the column, and a row where a column is expected.
-    "=LEFT(AM1,17)"               = "holiday_calendar:"
-    "=LEFT(AM2,17)"               = "holiday_calendar:"
+    '=MID(AM1,FIND(":",AM1)+1,17)' = "holiday_calendar:"
+    '=MID(AM2,FIND(":",AM2)+1,17)' = "holiday_calendar:"
     "=INDEX(util_ReadHandle(AM1),1,1)" = "holiday"
     "=INDEX(util_ReadHandle(AM1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(AM1),4,1)" = "46041"
@@ -113,14 +114,14 @@ $formulas = [ordered]@{
     # one over the gasoline index, cents a gallon quoted and dollars a barrel settled; a category in
     # another case and an energy unit where a volume unit should be, the library's words; a blank
     # and a number where a code is expected, and a code left out, the seam's.
-    "=LEFT(AP1,18)"               = "index_conventions:"
+    '=MID(AP1,FIND(":",AP1)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP1),1,4)" = "quantity_type"
     "=INDEX(util_ReadHandle(AP1),3,4)" = "volume"
     "=COLUMNS(util_ReadHandle(AP1))"   = "5"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5)" = "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text"
-    "=LEFT(AP2,18)"               = "index_conventions:"
+    '=MID(AP2,FIND(":",AP2)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP2),3,1)" = "CENT"
     "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy"
@@ -128,7 +129,7 @@ $formulas = [ordered]@{
     # The contract specifications: a creator over a header row and a table of two contracts, read back
     # through util_ReadHandle; a lot size with a fraction, a lot size of zero, a negative fee and a
     # name given twice, the library's words; text where a fee is expected, the seam's.
-    "=LEFT(BY1,24)"               = "contract_specifications:"
+    '=MID(BY1,FIND(":",BY1)+1,24)' = "contract_specifications:"
     "=INDEX(util_ReadHandle(BY1),1,3)" = "brokerage_rate_per_lot"
     "=INDEX(util_ReadHandle(BY1),2,2)" = "float64"
     "=INDEX(util_ReadHandle(BY1),3,2)" = "10000"
@@ -145,21 +146,27 @@ $formulas = [ordered]@{
     # row; the futures schedule without its holiday calendar, the Gas Daily schedule with one and a
     # holiday calendar where the schedule should be, the library's words; the specifications left
     # out and a blank where the name should be, the seam's.
-    "=LEFT(EB1,6)"                = "index:"
+    '=MID(EB1,FIND(":",EB1)+1,6)' = "index:"
     # The handle's text: the index's name between the kind and the count on the eight kinds
     # whose object carries one, as typed in EC2 to EC4 or in the formula, and the count a plain
     # number after the tag on a kind that carries none.
-    "=LEFT(EB1,22)"               = "index:Henry Hub NYMEX:"
-    "=LEFT(CT5,25)"               = "calendar:Henry Hub NYMEX:"
-    "=LEFT(CT6,32)"               = "futures_fixings:Henry Hub NYMEX:"
-    "=LEFT(CT7,31)"               = "market_history:Henry Hub NYMEX:"
-    "=LEFT(CV1,29)"               = "price_vector:Henry Hub NYMEX:"
-    "=LEFT(CW8,19)"               = "price_vector:Brent:"
-    "=LEFT(CW1,23)"               = "market:Henry Hub NYMEX:"
-    "=LEFT(DW3,30)"               = "iferc_fixings:Henry Hub IFERC:"
-    "=LEFT(DU1,38)"               = "gas_daily_fixings:Henry Hub Gas Daily:"
-    "=ISNUMBER(--MID(AI1,18,20))" = "TRUE"
-    "=ISNUMBER(--MID(EB1,23,20))" = "TRUE"
+    '=MID(EB1,FIND(":",EB1)+1,22)' = "index:Henry Hub NYMEX:"
+    '=MID(CT5,FIND(":",CT5)+1,25)' = "calendar:Henry Hub NYMEX:"
+    '=MID(CT6,FIND(":",CT6)+1,32)' = "futures_fixings:Henry Hub NYMEX:"
+    '=MID(CT7,FIND(":",CT7)+1,31)' = "market_history:Henry Hub NYMEX:"
+    '=MID(CV1,FIND(":",CV1)+1,29)' = "price_vector:Henry Hub NYMEX:"
+    '=MID(CW8,FIND(":",CW8)+1,19)' = "price_vector:Brent:"
+    '=MID(CW1,FIND(":",CW1)+1,23)' = "market:Henry Hub NYMEX:"
+    '=MID(DW3,FIND(":",DW3)+1,30)' = "iferc_fixings:Henry Hub IFERC:"
+    '=MID(DU1,FIND(":",DU1)+1,38)' = "gas_daily_fixings:Henry Hub Gas Daily:"
+    '=ISNUMBER(--MID(AI1,FIND(":",AI1)+18,20))' = "TRUE"
+    '=ISNUMBER(--MID(EB1,FIND(":",EB1)+23,20))' = "TRUE"
+    # The process ID leads every handle: the part before the first colon is this hidden Excel's,
+    # which the driver puts in place of {pid}.
+    '=LEFT(EB1,FIND(":",EB1)-1)'  = "{pid}"
+    '=LEFT(AA1,FIND(":",AA1)-1)'  = "{pid}"
+    '=LEFT(AI1,FIND(":",AI1)-1)'  = "{pid}"
+    '=LEFT(CW1,FIND(":",CW1)-1)'  = "{pid}"
     "=ROWS(util_ReadHandle(EB1))"      = "3"
     "=INDEX(util_ReadHandle(EB1),1,5)" = "has_holiday_calendar"
     "=INDEX(util_ReadHandle(EB1),2,3)" = "int64"
@@ -182,8 +189,8 @@ $formulas = [ordered]@{
     # a settle column one row short, the days newest first, a business day without a fixing, a
     # Saturday, a listed holiday and a Gas Daily index, the library's words; the header where a
     # day should be, the index left out and a number in its place, the seam's.
-    "=LEFT(BK1,16)"               = "futures_fixings:"
-    "=LEFT(BK2,16)"               = "futures_fixings:"
+    '=MID(BK1,FIND(":",BK1)+1,16)' = "futures_fixings:"
+    '=MID(BK2,FIND(":",BK2)+1,16)' = "futures_fixings:"
     "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
     "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(BK1),3,1)" = "46143"
@@ -205,7 +212,7 @@ $formulas = [ordered]@{
     # futures index where the IFERC index should be, the library's words; a blank among the
     # prices, a number among the codes, the prices left out, the index left out and a row where
     # a column is expected, the seam's.
-    "=LEFT(BQ1,14)"               = "iferc_fixings:"
+    '=MID(BQ1,FIND(":",BQ1)+1,14)' = "iferc_fixings:"
     "=INDEX(util_ReadHandle(BQ1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(BQ1),2,2)" = "float64"
     "=INDEX(util_ReadHandle(BQ1),3,1)" = "F26"
@@ -229,7 +236,7 @@ $formulas = [ordered]@{
     # could show, a Gas Daily gap, the holiday calendar left out with a futures schedule and given
     # with a Gas Daily one, and a holiday calendar where the schedule should be, the library's
     # words.
-    "=LEFT(AR1,9)"                = "calendar:"
+    '=MID(AR1,FIND(":",AR1)+1,9)' = "calendar:"
     "=INDEX(util_ReadHandle(AR1),1,2)" = "contract"
     "=INDEX(util_ReadHandle(AR1),2,4)" = "bool"
     "=INDEX(util_ReadHandle(AR1),3,1)" = "46162"
@@ -245,14 +252,14 @@ $formulas = [ordered]@{
     "=_CreateCalendar(AA2,ED6)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22"
     "=_CreateCalendar(AA2,ED7)" = "#ERROR _CreateCalendar: ValueError: future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19"
     "=_CreateCalendar(AA2)" = "#ERROR _CreateCalendar: index is missing, expected index handle"
-    "=LEFT(AR6,9)"                = "calendar:"
+    '=MID(AR6,FIND(":",AR6)+1,9)' = "calendar:"
     "=ROWS(util_ReadHandle(AR6))"      = "93"
     "=INDEX(util_ReadHandle(AR6),3,2)" = "U26"
     "=INDEX(util_ReadHandle(AR6),3,3)" = "TRUE"
     "=INDEX(util_ReadHandle(AR6),13,4)" = "TRUE"
     "=INDEX(util_ReadHandle(AR6),14,4)" = "FALSE"
     "=INDEX(util_ReadHandle(AR6),93,2)" = "X26"
-    "=LEFT(AR7,9)"                = "calendar:"
+    '=MID(AR7,FIND(":",AR7)+1,9)' = "calendar:"
     "=ROWS(util_ReadHandle(AR7))"      = "5"
     "=INDEX(util_ReadHandle(AR7),3,1)" = "46296"
     "=INDEX(util_ReadHandle(AR7),3,2)" = "V26"
@@ -265,7 +272,7 @@ $formulas = [ordered]@{
     # valuation day and after; a fixing on the valuation date, a fixed day without a fixing and
     # fixings over another index of the same name, the library's words; the fixings left out,
     # the seam's.
-    "=LEFT(CT7,15)"               = "market_history:"
+    '=MID(CT7,FIND(":",CT7)+1,15)' = "market_history:"
     "=INDEX(util_ReadHandle(CT7),1,5)" = "fixing_price"
     "=INDEX(util_ReadHandle(CT7),2,5)" = "float64"
     "=INDEX(util_ReadHandle(CT7),3,1)" = "46162"
@@ -287,12 +294,12 @@ $formulas = [ordered]@{
     # order the indices came in and December unfixed; a print for the day after the valuation
     # day, IFERC fixings over another index than the Gas Daily calendar's and a history where the
     # fixings should be, the library's words.
-    "=LEFT(DU2,15)"               = "market_history:"
+    '=MID(DU2,FIND(":",DU2)+1,15)' = "market_history:"
     "=ROWS(util_ReadHandle(DU2))"      = "93"
     "=INDEX(util_ReadHandle(DU2),3,5)" = "2.91"
     "=INDEX(util_ReadHandle(DU2),13,5)" = "3"
     "=INDEX(util_ReadHandle(DU2),14,5)" = "unfixed"
-    "=LEFT(DW4,15)"               = "market_history:"
+    '=MID(DW4,FIND(":",DW4)+1,15)' = "market_history:"
     "=ROWS(util_ReadHandle(DW4))"      = "5"
     "=INDEX(util_ReadHandle(DW4),3,5)" = "1.85"
     "=INDEX(util_ReadHandle(DW4),4,5)" = "2.1"
@@ -305,15 +312,15 @@ $formulas = [ordered]@{
     # a single cell; a row where a column is expected, the header taken with the prices, numeric
     # text, a boolean, a blank and the column left out, the seam's words; an Excel error in the
     # column, passed through as any is.
-    "=LEFT(CV1,13)"               = "price_vector:"
+    '=MID(CV1,FIND(":",CV1)+1,13)' = "price_vector:"
     "=INDEX(util_ReadHandle(CV1),1,1)" = "price"
     "=INDEX(util_ReadHandle(CV1),2,1)" = "float64"
     "=INDEX(util_ReadHandle(CV1),3,1)" = "74.25"
     "=INDEX(util_ReadHandle(CV1),4,1)" = "0"
     "=INDEX(util_ReadHandle(CV1),5,1)" = "-0.5"
     "=ROWS(util_ReadHandle(CV1))"      = "6"
-    "=LEFT(_CreatePriceVector(EC2,CU2),13)" = "price_vector:"
-    '=LEFT(_CreatePriceVector("Henry Hub NYMEX",CU2:CU5),13)' = "price_vector:"
+    '=ISNUMBER(FIND(":price_vector:",_CreatePriceVector(EC2,CU2)))' = "TRUE"
+    '=ISNUMBER(FIND(":price_vector:",_CreatePriceVector("Henry Hub NYMEX",CU2:CU5)))' = "TRUE"
     "=_CreatePriceVector(EC2,{74.25,0,-0.5})" = "#ERROR _CreatePriceVector: prices is 1x3 array, expected column of numbers"
     "=_CreatePriceVector(EC2,CU1:CU5)" = "#ERROR _CreatePriceVector: prices cell (1, 1) is text 'price', expected number"
     "=_CreatePriceVector(EC2,CU5:CU6)" = "#ERROR _CreatePriceVector: prices cell (2, 1) is text '74.25', expected number"
@@ -334,7 +341,7 @@ $formulas = [ordered]@{
     # valuation day and after; the four-price vector, one for every contract but the one
     # required, and the vector in CW8 named for another index, Brent, the library's words; the
     # vector left out, the seam's.
-    "=LEFT(CW1,7)"                = "market:"
+    '=MID(CW1,FIND(":",CW1)+1,7)' = "market:"
     "=INDEX(util_ReadHandle(CW1),1,5)" = "price"
     "=INDEX(util_ReadHandle(CW1),2,5)" = "float64"
     "=INDEX(util_ReadHandle(CW1),3,5)" = "70.85"
@@ -355,16 +362,16 @@ $formulas = [ordered]@{
     # first day; the IFERC vector given with the Gas Daily history, named for the other index,
     # one quote where three are required and a history with no unfixed period, the library's
     # words.
-    "=LEFT(EA2,7)"                = "market:"
+    '=MID(EA2,FIND(":",EA2)+1,7)' = "market:"
     "=ROWS(util_ReadHandle(EA2))"      = "93"
     "=INDEX(util_ReadHandle(EA2),13,5)" = "3"
     "=INDEX(util_ReadHandle(EA2),14,5)" = "2.95"
     "=INDEX(util_ReadHandle(EA2),33,5)" = "3.1"
     "=INDEX(util_ReadHandle(EA2),93,5)" = "3.4"
-    "=LEFT(EA4,7)"                = "market:"
+    '=MID(EA4,FIND(":",EA4)+1,7)' = "market:"
     "=INDEX(util_ReadHandle(EA4),3,5)" = "1.85"
     "=INDEX(util_ReadHandle(EA4),5,5)" = "2.2"
-    "=LEFT(CW6,7)"                = "market:"
+    '=MID(CW6,FIND(":",CW6)+1,7)' = "market:"
     "=ROWS(util_ReadHandle(CW6))"      = "31"
     "=INDEX(util_ReadHandle(CW6),3,5)" = "74.25"
     "=_CreateMarket(DU2,EA3)" = "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', expected market_history's index 'Henry Hub Gas Daily'"
@@ -376,8 +383,8 @@ $formulas = [ordered]@{
     # publication column one row short, the library's words; a blank among the publication dates,
     # a number among the codes, the publication dates left out and a row where a column is
     # expected, the seam's.
-    "=LEFT(DE1,15)"               = "iferc_schedule:"
-    "=LEFT(DE2,15)"               = "iferc_schedule:"
+    '=MID(DE1,FIND(":",DE1)+1,15)' = "iferc_schedule:"
+    '=MID(DE2,FIND(":",DE2)+1,15)' = "iferc_schedule:"
     "=INDEX(util_ReadHandle(DE1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(DE1),1,3)" = "publication_date"
     "=INDEX(util_ReadHandle(DE1),2,2)" = "datetime64[D]"
@@ -397,8 +404,8 @@ $formulas = [ordered]@{
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
     # library's words; a blank among the last dates, a number among the codes, the last dates left
     # out and a row where a column is expected, the seam's.
-    "=LEFT(DK1,19)"               = "gas_daily_schedule:"
-    "=LEFT(DK2,19)"               = "gas_daily_schedule:"
+    '=MID(DK1,FIND(":",DK1)+1,19)' = "gas_daily_schedule:"
+    '=MID(DK2,FIND(":",DK2)+1,19)' = "gas_daily_schedule:"
     "=INDEX(util_ReadHandle(DK1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(DK1),1,3)" = "last_date"
     "=INDEX(util_ReadHandle(DK1),2,2)" = "datetime64[D]"
@@ -419,8 +426,8 @@ $formulas = [ordered]@{
     # series pasted newest first and an IFERC index where the Gas Daily index should be, the
     # library's words; a blank among the prices, text among the days, the prices left out and the
     # index left out, the seam's.
-    "=LEFT(DR1,18)"               = "gas_daily_fixings:"
-    "=LEFT(DR2,18)"               = "gas_daily_fixings:"
+    '=MID(DR1,FIND(":",DR1)+1,18)' = "gas_daily_fixings:"
+    '=MID(DR2,FIND(":",DR2)+1,18)' = "gas_daily_fixings:"
     "=INDEX(util_ReadHandle(DR1),1,1)" = "flow_date"
     "=INDEX(util_ReadHandle(DR1),2,2)" = "float64"
     "=INDEX(util_ReadHandle(DR1),3,1)" = "46269"
@@ -771,10 +778,11 @@ try {
         $cell = Own $sheet.Range("K$row")
         $cell.Formula = $formula
         $shown = $cell.Text
-        $ok = ($shown -eq $formulas[$formula])
+        $expected = $formulas[$formula].Replace("{pid}", [string]$session.Process.Id)
+        $ok = ($shown -eq $expected)
         if (-not $ok) { $failures++ }
         Write-Host ("{0} {1,-28} {2}" -f $(if ($ok) { "ok  " } else { "FAIL" }), $formula, $shown)
-        if (-not $ok) { Write-Host ("     expected                    {0}" -f $formulas[$formula]) }
+        if (-not $ok) { Write-Host ("     expected                    {0}" -f $expected) }
         $row++
     }
 }

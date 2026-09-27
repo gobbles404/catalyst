@@ -11,7 +11,7 @@ def _CreateValuationDate(as_of: Date, day_fraction_elapsed: float) -> Handle[Val
 ```
 
 ```excel
-Inputs!B2   =_CreateValuationDate(A2, 0.5)     A2 holds 11-Sep-2026; B2 shows valuation_date:1
+Inputs!B2   =_CreateValuationDate(A2, 0.5)     A2 holds 11-Sep-2026; B2 shows 30512:valuation_date:1
 ```
 
 Two scalars, both required, neither with a default. A single-cell reference is a scalar; an array is not, even a 1×1 one. The seam checks both against their declared types and hands over a numpy day and a float; nothing here restates that. The result is a handle: text in the cell that stands for the object the seam keeps, declared `Handle[ValuationDate]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the object. What is still open about handles, release above all, is [handles.md](../../seam/handles.md).

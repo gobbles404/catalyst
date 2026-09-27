@@ -1,6 +1,7 @@
 """The index definitions through the seam: what each creator shows for a right and a wrong
 call, and that its handle resolves to the object the seam kept."""
 
+import os
 import re
 from typing import cast
 
@@ -21,22 +22,24 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
 
+PID = os.getpid()  # leads every handle this Python publishes
+
 # The first three contracts of the page's sample as the sheet sends them: codes as text, dates as
 # serials, 19 May, 22 June and 21 July 2026 for the futures and a few days earlier for the options.
 CODES = Cells.from_rows([["m26"], ["n26"], ["q26"]])
 FUTURES = Cells.from_rows([[46161.0], [46195.0], [46224.0]])
 OPTIONS = Cells.from_rows([[46156.0], [46189.0], [46219.0]])
-HANDLE = re.compile(r"futures_schedule:([0-9]+)")
+HANDLE = re.compile(r"[0-9]+:futures_schedule:([0-9]+)")
 
 # The first three days of the calendar page's sample as the sheet sends them: serials for
 # 1 January, 19 January and 16 February 2026.
 HOLIDAYS = Cells.from_rows([[46023.0], [46041.0], [46069.0]])
-CALENDAR = re.compile(r"holiday_calendar:([0-9]+)")
+CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
 
 # The conventions page's sample as the sheet sends it: five texts, an index quoted in dollars per
 # barrel, settled in dollars, its quantity a volume stated in barrels.
 UNITS = ["USD", "BBL", "USD", "volume", "BBL"]
-CONVENTIONS = re.compile(r"index_conventions:([0-9]+)")
+CONVENTIONS = re.compile(r"[0-9]+:index_conventions:([0-9]+)")
 
 # The specifications page's sample as the sheet sends it: the header row, then one row per
 # contract, gas traded as NYMEX lots and as ICE lots, the name as text and the lot size and fees
@@ -47,7 +50,7 @@ SPECIFICATION_HEADERS = Cells.from_rows(
 SPECIFICATION_BODY = Cells.from_rows(
     [["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]]
 )
-SPECIFICATIONS = re.compile(r"contract_specifications:([0-9]+)")
+SPECIFICATIONS = re.compile(r"[0-9]+:contract_specifications:([0-9]+)")
 
 
 def days_or_none(days: NDArray[np.datetime64] | None) -> str:
@@ -283,7 +286,7 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
 IFERC_CODES = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
 LAST_TRADING = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
 IFERC_PUBLICATIONS = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
-IFERC = re.compile(r"iferc_schedule:([0-9]+)")
+IFERC = re.compile(r"[0-9]+:iferc_schedule:([0-9]+)")
 
 
 # The library has no consumer of an IFERC schedule yet, so this hidden reader proves that a
@@ -483,7 +486,7 @@ def test_a_handle_of_another_kind_is_not_an_iferc_schedule() -> None:
 GAS_CODES = Cells.from_rows([["U26"], ["V26"], ["X26"]])
 FIRST_DATES = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
 LAST_DATES = Cells.from_rows([[46295.0], [46326.0], [46356.0]])
-GAS_DAILY = re.compile(r"gas_daily_schedule:([0-9]+)")
+GAS_DAILY = re.compile(r"[0-9]+:gas_daily_schedule:([0-9]+)")
 
 
 # The library has no consumer of a Gas Daily schedule yet, so this hidden reader proves that a
@@ -948,7 +951,7 @@ def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept_and_read_back(
 # --- _CreateIndex -------------------------------------------------------------------
 
 
-INDEX = re.compile(r"index:.+:([0-9]+)")
+INDEX = re.compile(r"[0-9]+:index:.+:([0-9]+)")
 # The IFERC and Gas Daily schedule pages' samples as the sheet sends them: three months each,
 # with the days each month's future stops trading and its index is published, and the first and
 # last day of gas of each.
@@ -1249,10 +1252,10 @@ def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() 
 def test_an_index_handle_carries_its_name_as_typed(name: str) -> None:
     schedule, holidays, conventions, specifications = the_parts()
     made = an_index(name, schedule, conventions, specifications, holidays)
-    assert made.startswith(f"index:{name}:")
-    assert made[len(f"index:{name}:") :].isdigit()
+    assert made.startswith(f"{PID}:index:{name}:")
+    assert made[len(f"{PID}:index:{name}:") :].isdigit()
     again = an_index(name, schedule, conventions, specifications, holidays)
-    assert again.startswith(f"index:{name}:")
+    assert again.startswith(f"{PID}:index:{name}:")
     assert number(again, INDEX) == number(made, INDEX) + 1
 
 
@@ -1270,7 +1273,7 @@ def test_a_name_too_long_for_a_cell_fails_before_the_index_is_stored(name: str, 
         an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays), INDEX
     )
     count = before + 1  # the count the refused text would have carried
-    total = len("index:") + units + len(":") + len(str(count))
+    total = len(f"{PID}:index:") + units + len(":") + len(str(count))
     assert bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays]) == (
         f"#ERROR _CreateIndex: returned handle of {total} characters, expected at most 32767"
     )
