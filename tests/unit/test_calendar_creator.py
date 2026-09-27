@@ -1,6 +1,7 @@
 """The calendar through the seam: a valuation date and an index in, one handle out, and the table
 it spills."""
 
+import os
 import re
 from typing import cast
 
@@ -10,10 +11,12 @@ from test_utilities import read, rows
 from goosedove.excel import bridge
 from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells
 
+PID = os.getpid()  # leads every handle this Python publishes
+
 # The page's sample as the sheet sends it: serials for 19 May, 20 May, 25 May, 22 June and
 # 21 July 2026.
 MAY_19, MAY_20, MAY_25, JUN_22, JUL_21 = 46161.0, 46162.0, 46167.0, 46195.0, 46224.0
-HANDLE = re.compile(r"calendar:.+:([0-9]+)")
+HANDLE = re.compile(r"[0-9]+:calendar:.+:([0-9]+)")
 HEADERS = ["date", "contract", "is_priced", "is_fixed"]
 TYPES = ["datetime64[D]", "str", "bool", "bool"]
 
@@ -24,19 +27,19 @@ def column(*cells: object) -> Cells:
 
 def a_valuation(serial: float = MAY_25, fraction: float = 0.5) -> str:
     text = bridge.call("_CreateValuationDate", [serial, fraction])
-    assert isinstance(text, str) and text.startswith("valuation_date:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:valuation_date:"), text
     return text
 
 
 def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
     text = bridge.call("_CreateFuturesSchedule", [column(*codes), column(*expiries), MISSING])
-    assert isinstance(text, str) and text.startswith("futures_schedule:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:futures_schedule:"), text
     return text
 
 
 def a_holiday_calendar(*serials: float) -> str:
     text = bridge.call("_CreateHolidayCalendar", [column(*serials)])
-    assert isinstance(text, str) and text.startswith("holiday_calendar:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:holiday_calendar:"), text
     return text
 
 
@@ -62,7 +65,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
         ],
     )
     text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
-    assert isinstance(text, str) and text.startswith("index:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 
 
@@ -88,8 +91,8 @@ def number(text: str) -> int:
 # The calendar's handle carries its index's name, sample, between the tag and the count.
 def test_a_calendar_handle_carries_its_indexs_name() -> None:
     made = a_calendar()
-    assert made.startswith("calendar:sample:")
-    assert made[len("calendar:sample:") :].isdigit()
+    assert made.startswith(f"{PID}:calendar:sample:")
+    assert made[len(f"{PID}:calendar:sample:") :].isdigit()
 
 
 def test_a_calendar_is_created_from_two_handles_and_read_back_day_by_day() -> None:
@@ -301,7 +304,7 @@ def a_gas_daily_schedule() -> str:
         "_CreateGasDailySchedule",
         [column("U26", "V26", "X26"), column(SEP_1, OCT_1, NOV_1), column(SEP_30, OCT_31, NOV_30)],
     )
-    assert isinstance(text, str) and text.startswith("gas_daily_schedule:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:gas_daily_schedule:"), text
     return text
 
 
@@ -310,7 +313,7 @@ def an_iferc_schedule() -> str:
         "_CreateIfercSchedule",
         [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
     )
-    assert isinstance(text, str) and text.startswith("iferc_schedule:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:iferc_schedule:"), text
     return text
 
 

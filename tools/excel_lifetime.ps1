@@ -9,11 +9,15 @@
 #          known limitation, a creator cut in manual calculation mode, and its recovery.
 #   books  two workbooks sharing what is equal and keeping what is not; closing either; a saved
 #          workbook reopened and calculated as a desk would.
+#   processes  two Excels at once, each its own process, Python and store: the same chain in each
+#          under two process IDs; a handle of one read in the other; every workbook closed
+#          in one; a workbook saved by one and fully calculated in the other. check.ps1 runs
+#          this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
 # read inside a bounded wait, and a wait that runs out prints what it last saw.
-param([string[]]$Groups = @("core", "edits", "books", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -63,6 +67,9 @@ function Sheet($State, $Book) { return Own $State (Own $State $Book.Worksheets).
 function Cell($State, $Sheet, [string]$Address) { return Own $State $Sheet.Range($Address) }
 function Put($State, $Sheet, [string]$Address, [string]$Formula) { (Cell $State $Sheet $Address).Formula = $Formula }
 function Text($State, $Sheet, [string]$Address) { return [string](Cell $State $Sheet $Address).Text }
+# The hidden Excel's process ID, read from its window when the session started: it leads every
+# handle that Excel publishes.
+function Id($State) { return [string]$State.Session.Process.Id }
 
 # --- the store's counts, read through GoosedoveHandles in a scratch cell ----------------------
 
@@ -140,11 +147,14 @@ $core = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     $vector = Text $state $sheet "D10"
-    Check "the vector's cell shows its handle at once, no #N/A" ($vector.StartsWith("price_vector:WTI NYMEX:")) $vector
+    Check "the vector's cell shows its handle at once, no #N/A" ($vector.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $vector
     Check "the market reads the valuation day's quote" ((Text $state $sheet "D12") -eq "72.1") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "eleven creators, eleven live publications, eleven published" ($c.Live -eq 11 -and $c.Published -eq 11) $c.Text
     Check "nothing released, no misses, no disposal errors" ($c.Released -eq 0 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    $id = Id $state
+    $led = @(1..$ChainCreators | Where-Object { (Text $state $sheet "D$_").StartsWith("${id}:") }).Count
+    Check "every handle begins with this Excel's process ID" ($led -eq $ChainCreators) "$id leads $(Text $state $sheet 'D5')"
 
     # Unchanged recalculation: every creator runs again, none publishes, the texts stay.
     $state.Excel.CalculateFull()
@@ -157,7 +167,7 @@ $core = {
     # publications go once Excel disconnects them.
     Put $state $sheet "A10" "73.5"
     $changed = Text $state $sheet "D10"
-    Check "a changed price gives the vector a new handle" ($changed -ne $vector -and $changed.StartsWith("price_vector:WTI NYMEX:")) $changed
+    Check "a changed price gives the vector a new handle" ($changed -ne $vector -and $changed.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $changed
     Check "the market reads the new quote" ((Text $state $sheet "D12") -eq "73.5") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators -and $c.Released -ge 2 }
     Check "the old vector and market are released and the store is back to eleven" ($c.Live -eq 11 -and $c.Released -eq 2 -and $c.Published -eq 13) $c.Text
@@ -176,7 +186,7 @@ $core = {
     Put $state $sheet "A13" "80"; Put $state $sheet "A14" "81"
     Put $state $sheet "F10" "=_CreatePriceVector(A1,A13:A14)"
     $other = Text $state $sheet "F10"
-    Check "a creator with other inputs is its own publication" ($other -ne $changed -and $other.StartsWith("price_vector:WTI NYMEX:")) $other
+    Check "a creator with other inputs is its own publication" ($other -ne $changed -and $other.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $other
     $c = Counts $state $sheet
     Check "and published" ($c.Published -eq 14 -and $c.Live -eq 12) $c.Text
     (Cell $state $sheet "F10").ClearContents()
@@ -192,7 +202,7 @@ $core = {
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators - 2) }
     Check "the failed chain owns nothing: two fewer live, nothing published" ($c.Live -eq 9 -and $c.Published -eq 14) $c.Text
     Put $state $sheet "A10" "73.5"
-    Check "a valid price again rebuilds the vector" ((Text $state $sheet "D10").StartsWith("price_vector:WTI NYMEX:")) (Text $state $sheet "D10")
+    Check "a valid price again rebuilds the vector" ((Text $state $sheet "D10").StartsWith("$(Id $state):price_vector:WTI NYMEX:")) (Text $state $sheet "D10")
     Check "and the market reads it" ((Text $state $sheet "D12") -eq "73.5") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "the store is back to eleven, two more published" ($c.Live -eq 11 -and $c.Published -eq 16) $c.Text
@@ -225,7 +235,7 @@ $edits = {
     (Cell $state $sheet "D10").Cut((Cell $state $sheet "F10")) | Out-Null
     Start-Sleep -Seconds 3
     $moved = Text $state $sheet "F10"
-    Check "a creator cut to another cell under automatic calculation keeps a live handle" ($moved.StartsWith("price_vector:WTI NYMEX:")) $moved
+    Check "a creator cut to another cell under automatic calculation keeps a live handle" ($moved.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $moved
     Check "and its market still reads the quote" ((Text $state $sheet "D12") -eq "72.1") (Text $state $sheet "D12")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "with eleven live after the callbacks" ($c.Live -eq 11) $c.Text
@@ -328,7 +338,7 @@ $books = {
     $state.Books.Add($reopened)
     $reopenedSheet = Sheet $state $reopened
     $state.Excel.CalculateFull()
-    Check "reopened and fully calculated, the vector has a live handle" ((Text $state $reopenedSheet "D10").StartsWith("price_vector:WTI NYMEX:")) (Text $state $reopenedSheet "D10")
+    Check "reopened and fully calculated, the vector has a live handle" ((Text $state $reopenedSheet "D10").StartsWith("$(Id $state):price_vector:WTI NYMEX:")) (Text $state $reopenedSheet "D10")
     Check "and the market reads the quote" ((Text $state $reopenedSheet "D12") -eq "72.1") (Text $state $reopenedSheet "D12")
     Put $state $reopenedSheet "A10" "76"
     Check "a later price propagates" ((Text $state $reopenedSheet "D12") -eq "76") (Text $state $reopenedSheet "D12")
@@ -337,6 +347,102 @@ $books = {
     $reopened.Saved = $true
     Close-Book $state $reopened
     Remove-Item $path -ErrorAction SilentlyContinue
+}
+
+# --- processes ----------------------------------------------------------------------------------
+
+$processes = {
+    param($state)
+    # A second Excel started as its own program: its own process ID, Python and store, beside the
+    # group's own. Both build the same chain, the second over other prices, so that a handle of the
+    # first read in the second would show the second's prices if it resolved there.
+    $other = Open-Session
+    $failed = $null
+    try {
+        $mine = Id $state
+        $theirs = Id $other
+        Check "two Excels, two process IDs" ($mine -ne $theirs) "$mine and $theirs"
+        $book = New-Book $state
+        $sheet = Sheet $state $book
+        Build-Chain $state $sheet
+        $otherBook = New-Book $other
+        $otherSheet = Sheet $other $otherBook
+        Build-Chain $other $otherSheet -First 999 -Second 1000
+        $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
+        $d = Settle $other $otherSheet { param($c) $c.Live -eq $ChainCreators }
+        Check "the chain is live in both" ($c.Live -eq 11 -and $d.Live -eq 11) "$($c.Text); $($d.Text)"
+        $own = 0
+        $shared = 0
+        foreach ($row in 1..$ChainCreators) {
+            $a = Text $state $sheet "D$row"
+            $b = Text $other $otherSheet "D$row"
+            if ($a.StartsWith("${mine}:") -and $b.StartsWith("${theirs}:") -and $a.Substring($mine.Length) -eq $b.Substring($theirs.Length)) { $own++ }
+            if ($a -eq $b) { $shared++ }
+        }
+        Check "each handle carries its own Excel's process ID before the same kind, name and count" ($own -eq $ChainCreators) "$(Text $state $sheet 'D10') and $(Text $other $otherSheet 'D10')"
+        Check "and no text is shared between the two" ($shared -eq 0) "$shared shared"
+        Check "each market reads its own quote" ((Text $state $sheet "D12") -eq "72.1" -and (Text $other $otherSheet "D12") -eq "999") "$(Text $state $sheet 'D12') and $(Text $other $otherSheet 'D12')"
+
+        # The first Excel's vector read in the second, whole and without its process ID, and the
+        # bare text read at home: text naming no live object every time, never the other's prices.
+        $vector = Text $state $sheet "D10"
+        $bare = $vector.Substring($mine.Length + 1)
+        Put $other $otherSheet "J1" "=util_ReadHandle(""$vector"")"
+        Check "the first Excel's vector read in the second names nothing" ((Text $other $otherSheet "J1") -eq "#ERROR util_ReadHandle: handle is text '$vector' naming no live object, expected a handle") (Text $other $otherSheet "J1")
+        Put $other $otherSheet "J2" "=util_ReadHandle(""$bare"")"
+        Check "the same text without its process ID names nothing there" ((Text $other $otherSheet "J2") -eq "#ERROR util_ReadHandle: handle is text '$bare' naming no live object, expected a handle") (Text $other $otherSheet "J2")
+        Put $state $sheet "J2" "=util_ReadHandle(""$bare"")"
+        Check "nor at home" ((Text $state $sheet "J2") -eq "#ERROR util_ReadHandle: handle is text '$bare' naming no live object, expected a handle") (Text $state $sheet "J2")
+
+        # Every workbook closed while the first Excel runs: its process ID and its count stay.
+        $lastCount = [int](Text $state $sheet "D11").Split(":")[-1]
+        Close-Book $state $book
+        $scratch = New-Book $state
+        $watch = Sheet $state $scratch
+        $c = Settle $state $watch { param($c) $c.Live -eq 0 }
+        Check "closing the first Excel's only workbook empties its store" ($c.Live -eq 0) $c.Text
+        Put $state $watch "A1" "=_CreateValuationDate(DATE(2026,9,11),0.5)"
+        $fresh = Text $state $watch "A1"
+        Check "a publication after that carries the same process ID and a later count" ($fresh.StartsWith("${mine}:valuation_date:") -and [int]$fresh.Split(":")[-1] -gt $lastCount) "$fresh after $lastCount"
+
+        # A workbook saved by the first Excel, opened in the second and fully calculated: every
+        # handle recreated under the second's process ID, none of the saved texts surviving; the
+        # nine creators equal to the second's own chain share, the vector and the market are new.
+        # The scratch valuation date goes first, so that the saved chain is all the first Excel holds.
+        (Cell $state $watch "A1").ClearContents()
+        $c = Settle $state $watch { param($c) $c.Live -eq 0 }
+        Check "clearing the scratch creator empties the first Excel's store again" ($c.Live -eq 0) $c.Text
+        $path = Join-Path ([IO.Path]::GetTempPath()) ("goosedove-processes-" + [guid]::NewGuid().ToString("N") + ".xlsx")
+        $saved = New-Book $state
+        $savedSheet = Sheet $state $saved
+        Build-Chain $state $savedSheet
+        $c = Settle $state $savedSheet { param($c) $c.Live -eq $ChainCreators }
+        Check "the chain to be saved is live in the first Excel, and nothing else" ($c.Live -eq $ChainCreators) $c.Text
+        $savedTexts = @(1..$ChainCreators | ForEach-Object { Text $state $savedSheet "D$_" })
+        $saved.SaveAs($path, 51)  # xlOpenXMLWorkbook
+        Close-Book $state $saved
+        $reopened = Own $other (Own $other $other.Excel.Workbooks).Open($path)
+        $other.Books.Add($reopened)
+        $reopenedSheet = Sheet $other $reopened
+        $other.Excel.CalculateFull()
+        $under = 0
+        $survived = 0
+        foreach ($row in 1..$ChainCreators) {
+            $t = Text $other $reopenedSheet "D$row"
+            if ($t.StartsWith("${theirs}:")) { $under++ }
+            if ($savedTexts -contains $t) { $survived++ }
+        }
+        Check "reopened in the second Excel and fully calculated, every handle carries the second's process ID" ($under -eq $ChainCreators) (Text $other $reopenedSheet "D10")
+        Check "and none of the texts saved by the first survived" ($survived -eq 0) "$survived survived"
+        Check "and the market reads the quote" ((Text $other $reopenedSheet "D12") -eq "72.1") (Text $other $reopenedSheet "D12")
+        $d = Settle $other $reopenedSheet { param($c) $c.Live -eq ($ChainCreators + 2) }
+        Check "thirteen live in the second: its eleven, and the reopened book's own vector and market" ($d.Live -eq 13 -and $d.Misses -eq 0 -and $d.DisposalErrors -eq 0) $d.Text
+        $reopened.Saved = $true
+        Close-Book $other $reopened
+        Remove-Item $path -ErrorAction SilentlyContinue
+    }
+    catch { $failed = $_; throw }
+    finally { Close-Session $other -FailureInFlight:($null -ne $failed) }
 }
 
 # --- quit ---------------------------------------------------------------------------------------
@@ -359,7 +465,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

@@ -22,8 +22,8 @@ Waha basis, on ICE's listed last trading days and Platts' first publication days
 | 2 | V26 | 30-Sep-2026 | 1-Oct-2026 |
 | 3 | X26 | 30-Oct-2026 | 2-Nov-2026 |
 | 4 | Z26 | 30-Nov-2026 | 1-Dec-2026 |
-| 5 | `=_CreateIfercSchedule(A2:A4, B2:B4, C2:C4)` | shows `iferc_schedule:41` | |
-| 6 | `=_CreateIfercSchedule(A2, B2, C2)` | shows `iferc_schedule:42`, a schedule of one contract month | |
+| 5 | `=_CreateIfercSchedule(A2:A4, B2:B4, C2:C4)` | shows `30512:iferc_schedule:41` | |
+| 6 | `=_CreateIfercSchedule(A2, B2, C2)` | shows `30512:iferc_schedule:42`, a schedule of one contract month | |
 
 Three columns of one kind each, all required, none with a default, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The form is the futures schedule's, columns paired by position rather than a table, and its cost stands as [inputs.md](../../seam/inputs.md) decision 38 states it: two columns can be selected one row out of step, and equal lengths cannot catch it. The code column is `contract_code`, as the futures schedule's is since #102, because the code labels the delivery month the index is for, and the same text also names the future on that month; nothing here reads it. The last trading date is the exchange's fact, the day the future on that month stops trading, which for the ICE basis futures is the last business day before the month; the publication date is Platts', the day the index for that month prints, which the desk takes from Platts' calendar, since a holiday moves it, January 2026's index having printed on the 5th. The seam checks each column alone, text one column wide, dates one column wide, no blank cells, and hands over a tuple of texts and two arrays of days; nothing here restates that. A single cell is a column of one, so a schedule of one contract month needs no range. The result is a handle: text in the cell that stands for the schedule the seam keeps, declared `Handle[IfercSchedule]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the schedule.
 

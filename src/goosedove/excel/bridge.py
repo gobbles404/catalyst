@@ -28,6 +28,7 @@ import ctypes
 import inspect
 import itertools
 import math
+import os
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
@@ -1076,12 +1077,14 @@ class _Held:
 
 
 _HANDLES: Final[dict[str, _Held]] = {}
-# The runtime's publication count, shared by every kind and never reset while Python runs; a
-# release moves it not at all. It starts again with the next Python, so a handle text a
-# workbook saved can equal a later runtime's publication of the same kind, name and count, and
-# a consumer calculated before its creator has run again would read that object:
-# docs/seam/handles.md records the case under the known limitation, with the Excel
-# reproduction, accepted by the owner.
+# The process ID of the Excel this Python runs inside, read once: it leads every handle's text,
+# so two Excels running at once never publish one text for two objects, and a text from one
+# names nothing in the other. The runtime's publication count follows it, shared by every kind
+# and never reset while Python runs; a release moves it not at all. Both start again with the
+# next Python, so a handle text a workbook saved can equal a later runtime's publication only
+# when Windows has reused the process ID and that runtime publishes the same kind, name and
+# count: docs/seam/handles.md records the case under the known limitation, accepted by the owner.
+_PID: Final = os.getpid()
 _published = 0
 
 # The kinds whose text carries an index's name, and where each keeps it. Registration prepares
@@ -1130,19 +1133,21 @@ def _publish(
     name: Callable[[object], str] | None,
     value: object,
 ) -> str:
-    """Retain the object a creator returned and hand back the text that stands for it: the tag,
-    the index's name where the kind carries one, and the runtime's publication count.
+    """Retain the object a creator returned and hand back the text that stands for it: the
+    process ID, the tag, the index's name where the kind carries one, and the runtime's
+    publication count.
 
     A creator that raised never reaches here, so a failure is never published and the count
     does not move; nor does it move for a text longer than a cell holds, refused before
-    anything is stored. The tag and the name describe the object for a reader of the sheet;
+    anything is stored. The process ID, the tag and the name describe the object for a reader
+    of the sheet;
     the entry's kind proves it, and nothing ever parses the text.
     """
     global _published
     if type(value) is not kind:
         raise _returned(value, words)
     count = _published + 1
-    text = f"{tag}:{count}" if name is None else f"{tag}:{name(value)}:{count}"
+    text = f"{_PID}:{tag}:{count}" if name is None else f"{_PID}:{tag}:{name(value)}:{count}"
     units = len(text.encode("utf-16-le")) // 2  # Excel counts UTF-16 units, as LEN does
     if units > MAX_TEXT:
         raise _BadResult(f"returned handle of {units} characters, expected at most {MAX_TEXT}")

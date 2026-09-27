@@ -13,7 +13,7 @@ def _CreatePriceVector(index_name: str, prices: NumberColumn) -> Handle[PriceVec
 | | A | B | C |
 |---|---|---|---|
 | 1 | WTI NYMEX | 74.25 | `=_CreatePriceVector(A1, B1:B4)` |
-| 2 | | 0 | shows a handle such as `price_vector:WTI NYMEX:12` |
+| 2 | | 0 | shows a handle such as `30512:price_vector:WTI NYMEX:12` |
 | 3 | | -0.50 | |
 | 4 | | 74.25 | `=_CreatePriceVector("WTI NYMEX", B1:B4)` shows a second handle, the name typed |
 

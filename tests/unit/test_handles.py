@@ -1,5 +1,6 @@
 """Handles: the store, the text, and the two rules that publish and resolve, pinned exactly."""
 
+import os
 import re
 from typing import cast
 
@@ -8,6 +9,8 @@ import pytest
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells, Handle, Table, TextRow, excel_function
 from goosedove.excel.probes import probe
+
+PID = os.getpid()  # leads every handle this Python publishes
 
 
 class Curve:
@@ -72,16 +75,18 @@ def HeldLevel(holder: Handle[Holder]) -> float:
     return holder.curve.level
 
 
-TEXT = re.compile(r"(curve|other):([0-9]+)")
+TEXT = re.compile(r"([0-9]+):(curve|other):([0-9]+)")
 
 
 def parts(text: object) -> tuple[str, int]:
-    """The two parts of a handle's text, the tag and the count, or a failed assertion naming
-    what came instead. A kind of the test's own carries no index's name."""
+    """The tag and the count of a handle's text, after the process ID, which is this process's
+    own, or a failed assertion naming what came instead. A kind of the test's own carries no
+    index's name."""
     assert isinstance(text, str)
     match = TEXT.fullmatch(text)
     assert match, text
-    return match.group(1), int(match.group(2))
+    assert int(match.group(1)) == PID, text
+    return match.group(2), int(match.group(3))
 
 
 # --- the way out: publishing ------------------------------------------------
@@ -105,6 +110,30 @@ def test_the_count_runs_across_kinds_and_never_repeats() -> None:
     _, second = parts(bridge.call("MakeOther", []))
     _, third = parts(bridge.call("MakeCurve", [1.0]))
     assert (second, third) == (first + 1, first + 2)
+
+
+# The process ID leads every text: the one this Python runs inside, read once, the same for
+# every kind and every publication, so two Excels running at once never publish one text for
+# two objects.
+def test_the_process_id_leads_every_text_and_is_this_processs_own() -> None:
+    curve = cast(str, bridge.call("MakeCurve", [1.0]))
+    other = cast(str, bridge.call("MakeOther", []))
+    assert curve.startswith(f"{os.getpid()}:curve:")
+    assert other.startswith(f"{os.getpid()}:other:")
+
+
+# The whole text is the key, so a live text under another process's ID, or with none, names
+# nothing: what a handle from a second Excel, or one saved before the process ID led the text,
+# meets here.
+def test_a_text_under_another_process_id_or_none_names_nothing() -> None:
+    text = cast(str, bridge.call("MakeCurve", [1.0]))
+    tag, count = parts(text)
+    assert bridge.call("ReadCurve", [text]) == 1.0
+    for foreign in (f"{PID + 1}:{tag}:{count}", f"{tag}:{count}"):
+        assert bridge.call("ReadCurve", [foreign]) == (
+            f"#ERROR ReadCurve: curve is text {foreign!r} naming no live object, "
+            "expected curve handle"
+        )
 
 
 def test_equal_calls_give_distinct_objects_and_distinct_text() -> None:
@@ -137,7 +166,7 @@ def test_reading_a_handle_moves_no_count() -> None:
 def test_an_edited_count_names_nothing() -> None:
     tag, count = parts(bridge.call("MakeCurve", [1.0]))
     _, live = parts(bridge.call("MakeOther", []))
-    for edited in (f"{tag}:{count + 9_000_000}", f"{tag}:{live}"):
+    for edited in (f"{PID}:{tag}:{count + 9_000_000}", f"{PID}:{tag}:{live}"):
         assert bridge.call("ReadCurve", [edited]) == (
             f"#ERROR ReadCurve: curve is text {edited!r} naming no live object, "
             "expected curve handle"
@@ -184,7 +213,7 @@ def test_the_specs_say_which_functions_create_a_handle() -> None:
 # and a consumer's value says no.
 def test_a_creators_publisher_says_whether_it_published() -> None:
     text, owned = bridge.publish("MakeCurve", [2.5])
-    assert owned and isinstance(text, str) and text.startswith("curve:")
+    assert owned and isinstance(text, str) and text.startswith(f"{PID}:curve:")
     assert bridge.publish("FailToMake", []) == ("#ERROR FailToMake: ValueError: as asked", False)
     _returns["value"] = 1.0
     assert bridge.publish("MakeWhatever", []) == (

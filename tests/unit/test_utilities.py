@@ -1,6 +1,7 @@
 """util_ReadHandle through the seam: each kind spilled as its creator's table, a spill fed back to a
 creator, and the seam's words for a handle that does not resolve."""
 
+import os
 from typing import cast
 
 import numpy as np
@@ -37,6 +38,8 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+
+PID = os.getpid()  # leads every handle this Python publishes
 
 # Serials for 11, 12 and 13 September 2026.
 SEP_11, SEP_12, SEP_13 = 46276.0, 46277.0, 46278.0
@@ -171,7 +174,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
         ],
     )
     text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
-    assert isinstance(text, str) and text.startswith("index:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 
 

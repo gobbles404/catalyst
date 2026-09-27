@@ -58,7 +58,7 @@ namespace Goosedove.Host.Tests
             var prepared = Bridge.PreparePublisher("_CreateValuationDate");
             var made = Bridge.Publish(prepared, 46276.0, 0.5);
             Assert.True(made.Owned);
-            Assert.StartsWith("valuation_date:", (string)made.Value);
+            Assert.StartsWith(System.Diagnostics.Process.GetCurrentProcess().Id + ":valuation_date:", (string)made.Value);
             var failed = Bridge.Publish(prepared, 46276.0, 1.5);
             Assert.False(failed.Owned);
             Assert.Equal("#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1", failed.Value);

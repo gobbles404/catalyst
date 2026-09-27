@@ -4,6 +4,7 @@ word; then the market, the history and a price vector in, and the table its hand
 price on every business day."""
 
 import functools
+import os
 import re
 from typing import cast
 
@@ -14,11 +15,13 @@ from test_utilities import read, rows
 from goosedove.excel import bridge
 from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE, Cells
 
+PID = os.getpid()  # leads every handle this Python publishes
+
 # The page's sample as the sheet sends it: serials for 18 to 22 May, 25 and 26 May, 22 June and
 # 21 July 2026, and 1 January.
 MAY_18, MAY_19, MAY_20, MAY_21, MAY_22 = 46160.0, 46161.0, 46162.0, 46163.0, 46164.0
 MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 46023.0
-HANDLE = re.compile(r"market_history:.+:([0-9]+)")
+HANDLE = re.compile(r"[0-9]+:market_history:.+:([0-9]+)")
 HEADERS = ["date", "contract", "is_priced", "is_fixed", "fixing_price"]
 TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
 SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
@@ -30,19 +33,19 @@ def column(*cells: object) -> Cells:
 
 def a_valuation(serial: float = MAY_26, fraction: float = 0.5) -> str:
     text = bridge.call("_CreateValuationDate", [serial, fraction])
-    assert isinstance(text, str) and text.startswith("valuation_date:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:valuation_date:"), text
     return text
 
 
 def a_schedule(codes: tuple[str, ...], expiries: tuple[float, ...]) -> str:
     text = bridge.call("_CreateFuturesSchedule", [column(*codes), column(*expiries), MISSING])
-    assert isinstance(text, str) and text.startswith("futures_schedule:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:futures_schedule:"), text
     return text
 
 
 def a_holiday_calendar(*serials: float) -> str:
     text = bridge.call("_CreateHolidayCalendar", [column(*serials)])
-    assert isinstance(text, str) and text.startswith("holiday_calendar:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:holiday_calendar:"), text
     return text
 
 
@@ -72,7 +75,7 @@ def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYME
         ],
     )
     text = bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays])
-    assert isinstance(text, str) and text.startswith("index:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 
 
@@ -90,7 +93,7 @@ def the_index() -> str:
 def a_calendar(valuation: str | None = None, index: str | None = None) -> str:
     args = [valuation or a_valuation(), index or the_index()]
     text = bridge.call("_CreateCalendar", args)
-    assert isinstance(text, str) and text.startswith("calendar:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:calendar:"), text
     return text
 
 
@@ -99,7 +102,7 @@ def the_fixings(body: list[list[float]] = SAMPLE, index: str | None = None) -> s
     settles = Cells.from_rows([[settle] for _, settle in body])
     args = [days, settles, index or the_index()]
     text = bridge.call("_CreateFuturesFixings", args)
-    assert isinstance(text, str) and text.startswith("futures_fixings:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:futures_fixings:"), text
     return text
 
 
@@ -345,7 +348,7 @@ def test_a_dead_history_handle_cannot_be_read() -> None:
 # --- _CreateMarket -----------------------------------------------------------------
 
 
-MARKET = re.compile(r"market:.+:([0-9]+)")
+MARKET = re.compile(r"[0-9]+:market:.+:([0-9]+)")
 MARKET_HEADERS = ["date", "contract", "is_priced", "is_fixed", "price"]
 JUN_18, JUN_19, JUN_23 = 46191.0, 46192.0, 46196.0
 
@@ -354,7 +357,7 @@ def a_vector(*prices: float, name: str = "WTI NYMEX") -> str:
     """The handle of a vector of those quotes, named for the futures index every history here
     is over unless named otherwise."""
     text = bridge.call("_CreatePriceVector", [name, column(*prices)])
-    assert isinstance(text, str) and text.startswith("price_vector:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:price_vector:"), text
     return text
 
 
@@ -415,7 +418,7 @@ def test_the_expiring_contract_is_quoted_on_its_expiry_day_and_the_next_from_the
 ):
     calendar = a_calendar(valuation=a_valuation(JUN_22, 1.0), index=index_closed_on(JUN_19))
     history = bridge.call("_CreateMarketHistory", [calendar, whole_fixings(MAY_20, JUN_18, JUN_19)])
-    assert isinstance(history, str) and history.startswith("market_history:")
+    assert isinstance(history, str) and history.startswith(f"{PID}:market_history:")
     shown = rows(read(a_market(history)))
     by_day = {row[0]: row[1:] for row in shown[2:]}
     assert by_day[JUN_18] == ["n26", 1.0, 1.0, 71.60]
@@ -620,10 +623,10 @@ def test_a_failed_market_publishes_no_object_and_no_handle() -> None:
 # The history's and the market's handles carry their index's name between the tag and the count.
 def test_history_and_market_handles_carry_their_indexs_name() -> None:
     history = a_history()
-    assert history.startswith("market_history:WTI NYMEX:")
+    assert history.startswith(f"{PID}:market_history:WTI NYMEX:")
     made = a_market(history)
-    assert made.startswith("market:WTI NYMEX:")
-    assert made[len("market:WTI NYMEX:") :].isdigit()
+    assert made.startswith(f"{PID}:market:WTI NYMEX:")
+    assert made[len(f"{PID}:market:WTI NYMEX:") :].isdigit()
 
 
 def test_repeated_market_calls_publish_fresh_handles_and_the_earlier_ones_stand() -> None:
@@ -677,7 +680,7 @@ def the_gas_daily_index() -> str:
 
 def a_gas_daily_calendar(as_of: float = SEP_25) -> str:
     text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_gas_daily_index()])
-    assert isinstance(text, str) and text.startswith("calendar:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:calendar:"), text
     return text
 
 
@@ -687,7 +690,7 @@ def prints_through(first: float, last: float) -> str:
     prices = [2.80 + i / 100 for i in range(len(serials))]
     args = [column(*serials), column(*prices), the_gas_daily_index()]
     text = bridge.call("_CreateGasDailyFixings", args)
-    assert isinstance(text, str) and text.startswith("gas_daily_fixings:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:gas_daily_fixings:"), text
     return text
 
 
@@ -703,7 +706,7 @@ def the_iferc_index() -> str:
 
 def an_iferc_calendar(as_of: float = NOV_15) -> str:
     text = bridge.call("_CreateCalendar", [a_valuation(as_of), the_iferc_index()])
-    assert isinstance(text, str) and text.startswith("calendar:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:calendar:"), text
     return text
 
 
@@ -711,7 +714,7 @@ def indices_for(*pairs: tuple[str, float]) -> str:
     codes = column(*(code for code, _ in pairs))
     prices = column(*(price for _, price in pairs))
     text = bridge.call("_CreateIfercFixings", [codes, prices, the_iferc_index()])
-    assert isinstance(text, str) and text.startswith("iferc_fixings:"), text
+    assert isinstance(text, str) and text.startswith(f"{PID}:iferc_fixings:"), text
     return text
 
 
@@ -813,8 +816,8 @@ def test_a_gas_daily_market_is_created_from_two_handles_and_read_back_day_by_day
         "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
     )
     made = a_market(cast(str, history), a_vector(2.95, 3.10, 3.40, name="Henry Hub Gas Daily"))
-    assert cast(str, history).startswith("market_history:Henry Hub Gas Daily:")
-    assert made.startswith("market:Henry Hub Gas Daily:")
+    assert cast(str, history).startswith(f"{PID}:market_history:Henry Hub Gas Daily:")
+    assert made.startswith(f"{PID}:market:Henry Hub Gas Daily:")
     shown = rows(read(made))
     assert len(shown) == 93
     assert shown[0] == MARKET_HEADERS and shown[1] == TYPES
@@ -837,8 +840,8 @@ def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_mont
         "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     made = a_market(cast(str, history), a_vector(2.20, name="Henry Hub IFERC"))
-    assert cast(str, history).startswith("market_history:Henry Hub IFERC:")
-    assert made.startswith("market:Henry Hub IFERC:")
+    assert cast(str, history).startswith(f"{PID}:market_history:Henry Hub IFERC:")
+    assert made.startswith(f"{PID}:market:Henry Hub IFERC:")
     assert rows(read(made)) == [
         MARKET_HEADERS,
         TYPES,

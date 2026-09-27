@@ -22,8 +22,8 @@ Henry Hub Gas Daily, three contract months of 2026:
 | 2 | U26 | 1-Sep-2026 | 30-Sep-2026 |
 | 3 | V26 | 1-Oct-2026 | 31-Oct-2026 |
 | 4 | X26 | 1-Nov-2026 | 30-Nov-2026 |
-| 5 | `=_CreateGasDailySchedule(A2:A4, B2:B4, C2:C4)` | shows `gas_daily_schedule:51` | |
-| 6 | `=_CreateGasDailySchedule(A2, B2, C2)` | shows `gas_daily_schedule:52`, a schedule of one contract month | |
+| 5 | `=_CreateGasDailySchedule(A2:A4, B2:B4, C2:C4)` | shows `30512:gas_daily_schedule:51` | |
+| 6 | `=_CreateGasDailySchedule(A2, B2, C2)` | shows `30512:gas_daily_schedule:52`, a schedule of one contract month | |
 
 Three columns of one kind each, all required, none with a default, selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The form is the IFERC schedule's, columns paired by position rather than a table, and its cost stands as [inputs.md](../../seam/inputs.md) decision 38 states it: two columns can be selected one row out of step, and equal lengths cannot catch it. The code column is `contract_code`, as the IFERC schedule's is, because the code labels the month the gas flows in. The two dates are that month's first and last days, 1-Sep-2026 and 30-Sep-2026 for U26; the desk types them though the code implies them, so that this creator takes what the other schedules take and no code is read for its month before [time.md](../time.md) says how. The seam checks each column alone, text one column wide, dates one column wide, no blank cells, and hands over a tuple of texts and two arrays of days; nothing here restates that. A single cell is a column of one, so a schedule of one contract month needs no range. The result is a handle: text in the cell that stands for the schedule the seam keeps, declared `Handle[GasDailySchedule]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the schedule.
 

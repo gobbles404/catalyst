@@ -25,8 +25,8 @@ The signature does not change, and neither do the record and its read-back. Two 
 | 3 | currency_unit | USD | USD |
 | 4 | quantity_type | volume | volume |
 | 5 | quantity_unit | BBL | BBL |
-| 6 | `=_CreateIndexConventions(B1, B2, B3, B4, B5)` | shows `index_conventions:8` | |
-| 7 | `=_CreateIndexConventions(C1, C2, C3, C4, C5)` | shows `index_conventions:9`, cents and dollars two units of one currency, gallons and barrels two units of one measure | |
+| 6 | `=_CreateIndexConventions(B1, B2, B3, B4, B5)` | shows `30512:index_conventions:8` | |
+| 7 | `=_CreateIndexConventions(C1, C2, C3, C4, C5)` | shows `30512:index_conventions:9`, cents and dollars two units of one currency, gallons and barrels two units of one measure | |
 
 Five text scalars, all required, in this order, which is fixed: the sheet passes them by position, and the code downstream takes the record's fields by name. A single-cell reference is a scalar; an array is not, even a 1×1 one, and empty text is not text. The seam checks each argument alone, left to right, against its declared type and hands over five texts; nothing here restates that. Each code is one the [unit tables](../globals/unit-conversions.md) define, spelt as they spell it: a currency unit is `USD` or `CENT`, the units of the tables' one currency; a quantity type is `volume`, `mass` or `energy`, the categories a quantity can measure; and the two quantity units are units of that category, GAL, BBL, L or M3 for a volume, so that a price quoted per gallon and a quantity stated in barrels are two units of one measure, and the conversion between them is one factor. The result is a handle: text in the cell that stands for the conventions the seam keeps, declared `Handle[IndexConventions]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the conventions, the five codes.
 

@@ -207,7 +207,7 @@ registration, and `tools/performance/handle_retention.ps1`, the thousand-update 
 ## Verification status
 
 The [acceptance scenarios](handles.md#acceptance-scenarios) are built in #114 and verified
-through the production registration by `tools/excel_lifetime.ps1`, whose `core` group runs in
+through the production registration by `tools/excel_lifetime.ps1`, whose `core` group, and since #116 its `processes` group, runs in
 `check.ps1` and whose other groups ran before the merge, and by
 `tools/performance/handle_retention.ps1`; the pull request records the counts and the Excel
 build. Upstream Excel-DNA [reuse tests][reuse-tests] and [disposal tests][dispose-tests]
