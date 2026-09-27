@@ -125,20 +125,29 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy"
     "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
-    # The contract specifications: a creator over a header row and a table of two contracts, read back
-    # through util_ReadHandle; a lot size with a fraction, a lot size of zero, a negative fee and a
-    # name given twice, the library's words; text where a fee is expected, the seam's.
+    # The contract specifications: a creator over a header row and a table of two words for a
+    # quantity of WTI, a thousand-barrel lot and the bare gallon, read back through util_ReadHandle
+    # with the lot units as text; a lot size with a fraction, a lot size of zero, a negative fee, a
+    # name given twice and a unit that is no quantity unit, the library's words; text where a fee
+    # is expected, the seam's; and an MMBTU word under the volume conventions in AP1, refused at
+    # the index in the library's words.
     "=LEFT(BY1,24)"               = "contract_specifications:"
-    "=INDEX(util_ReadHandle(BY1),1,3)" = "brokerage_rate_per_lot"
+    "=INDEX(util_ReadHandle(BY1),1,3)" = "lot_unit"
     "=INDEX(util_ReadHandle(BY1),2,2)" = "float64"
-    "=INDEX(util_ReadHandle(BY1),3,2)" = "10000"
-    "=INDEX(util_ReadHandle(BY1),4,1)" = "ICE NG"
+    "=INDEX(util_ReadHandle(BY1),2,3)" = "str"
+    "=INDEX(util_ReadHandle(BY1),3,2)" = "1000"
+    "=INDEX(util_ReadHandle(BY1),3,3)" = "BBL"
+    "=INDEX(util_ReadHandle(BY1),4,1)" = "gal"
+    "=INDEX(util_ReadHandle(BY1),4,3)" = "GAL"
     "=ROWS(util_ReadHandle(BY1))"      = "4"
-    "=_CreateContractSpecifications(BU1:BX1,BZ2:CC2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
-    "=_CreateContractSpecifications(BU1:BX1,CH2:CK2)" = "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number"
-    "=_CreateContractSpecifications(BU1:BX1,CL2:CO3)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1"
-    "=_CreateContractSpecifications(BU1:BX1,CD2:CG2)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
-    "=_CreateContractSpecifications(BU1:BX1,CD3:CG3)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
+    "=COLUMNS(util_ReadHandle(BY1))"   = "5"
+    "=_CreateContractSpecifications(EI1:EM1,EI5:EM5)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number"
+    "=_CreateContractSpecifications(EI1:EM1,EI6:EM6)" = "#ERROR _CreateContractSpecifications: table cell (1, 4) is text 'three', expected number"
+    "=_CreateContractSpecifications(EI1:EM1,EI7:EM8)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'lots', already given at row 1"
+    "=_CreateContractSpecifications(EI1:EM1,EI9:EM9)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
+    "=_CreateContractSpecifications(EI1:EM1,EI10:EM10)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
+    "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a volume, mass or energy unit"
+    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -503,20 +512,25 @@ $cells = [ordered]@{
     "AO8" = "Volume"; "AO9" = "MMBTU"
     "AO10" = "CENT"; "AO11" = "GAL"
     "AP2" = "=_CreateIndexConventions(AO10,AO11,AO4,AO5,AO6)"
-    # Contract specifications: a header row and two contracts, NYMEX and ICE lots of gas, and one creator
-    # cell; then a row with a lot size with a fraction, one with text where a fee is expected,
-    # two rows naming one contract twice, a row with a lot size of zero and one with a negative
-    # brokerage rate.
-    "BU1" = "name"; "BV1" = "lot_size"; "BW1" = "brokerage_rate_per_lot"; "BX1" = "clearing_rate_per_lot"
-    "BU2" = "NYMEX NG"; "BV2" = "10000"; "BW2" = "3"; "BX2" = "2"
-    "BU3" = "ICE NG"; "BV3" = "2500"; "BW3" = "0.75"; "BX3" = "0.5"
-    "BY1" = "=_CreateContractSpecifications(BU1:BX1,BU2:BX3)"
-    "BZ2" = "NYMEX NG"; "CA2" = "2.5"; "CB2" = "3"; "CC2" = "2"
-    "CH2" = "NYMEX NG"; "CI2" = "10000"; "CJ2" = "three"; "CK2" = "2"
-    "CL2" = "NYMEX NG"; "CM2" = "10000"; "CN2" = "3"; "CO2" = "2"
-    "CL3" = "NYMEX NG"; "CM3" = "2500"; "CN3" = "0.75"; "CO3" = "0.5"
-    "CD2" = "NYMEX NG"; "CE2" = "0"; "CF2" = "3"; "CG2" = "2"
-    "CD3" = "NYMEX NG"; "CE3" = "10000"; "CF3" = "-0.5"; "CG3" = "2"
+    # Contract specifications: a header row and two words for a quantity of WTI, a lot of a
+    # thousand barrels and the bare gallon, in EI to EM, and one creator cell, BY1, that the
+    # indices below take; then rows the creator refuses, a lot size with a fraction, text where a
+    # fee is expected, one word twice, a lot size of zero, a negative brokerage rate and a unit
+    # that is no quantity unit; and a table of one MMBTU word, made in EN12, that the volume
+    # conventions in AP1 refuse at the index.
+    "EI1" = "name"; "EJ1" = "lot_size"; "EK1" = "lot_unit"; "EL1" = "brokerage_rate_per_lot"; "EM1" = "clearing_rate_per_lot"
+    "EI2" = "lots"; "EJ2" = "1000"; "EK2" = "BBL"; "EL2" = "3"; "EM2" = "2"
+    "EI3" = "gal"; "EJ3" = "1"; "EK3" = "GAL"; "EL3" = "0"; "EM3" = "0"
+    "BY1" = "=_CreateContractSpecifications(EI1:EM1,EI2:EM3)"
+    "EI5" = "lots"; "EJ5" = "2.5"; "EK5" = "BBL"; "EL5" = "3"; "EM5" = "2"
+    "EI6" = "lots"; "EJ6" = "1000"; "EK6" = "BBL"; "EL6" = "three"; "EM6" = "2"
+    "EI7" = "lots"; "EJ7" = "1000"; "EK7" = "BBL"; "EL7" = "3"; "EM7" = "2"
+    "EI8" = "lots"; "EJ8" = "500"; "EK8" = "BBL"; "EL8" = "1"; "EM8" = "1"
+    "EI9" = "lots"; "EJ9" = "0"; "EK9" = "BBL"; "EL9" = "3"; "EM9" = "2"
+    "EI10" = "lots"; "EJ10" = "1000"; "EK10" = "BBL"; "EL10" = "-0.5"; "EM10" = "2"
+    "EI11" = "lots"; "EJ11" = "1000"; "EK11" = "usd"; "EL11" = "3"; "EM11" = "2"
+    "EI12" = "mmbtu"; "EJ12" = "1"; "EK12" = "MMBTU"; "EL12" = "0"; "EM12" = "0"
+    "EN12" = "=_CreateContractSpecifications(EI1:EM1,EI12:EM12)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

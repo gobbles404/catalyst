@@ -53,30 +53,41 @@ def index_conventions(
     money = units.categories[CURRENCY].sizes
     if quote_currency_unit not in money:
         raise ValueError(
-            f"quote_currency_unit is {quote_currency_unit!r}, expected {_listed(money)}"
+            f"quote_currency_unit is {quote_currency_unit!r}, expected {listed(money)}"
         )
     if currency_unit not in money:
-        raise ValueError(f"currency_unit is {currency_unit!r}, expected {_listed(money)}")
-    measures = [name for name in units.categories if name != CURRENCY]
+        raise ValueError(f"currency_unit is {currency_unit!r}, expected {listed(money)}")
+    measures = measures_of(units)
     if quantity_type not in measures:
-        raise ValueError(f"quantity_type is {quantity_type!r}, expected {_listed(measures)}")
+        raise ValueError(f"quantity_type is {quantity_type!r}, expected {listed(measures)}")
     measure = units.categories[quantity_type].sizes
     for argument, code in (
         ("quote_quantity_unit", quote_quantity_unit),
         ("quantity_unit", quantity_unit),
     ):
         if code not in measure:
-            article = "an" if quantity_type[0] in "aeiou" else "a"
             raise ValueError(
-                f"{argument} is {code!r}, expected {article} {quantity_type} unit, "
-                f"{_listed(measure)}"
+                f"{argument} is {code!r}, expected {a_unit_of(quantity_type, measure)}"
             )
     return IndexConventions(
         quote_currency_unit, quote_quantity_unit, currency_unit, quantity_type, quantity_unit
     )
 
 
-def _listed(codes: Iterable[str]) -> str:
+def listed(codes: Iterable[str]) -> str:
     """The codes a message offers, in the tables' order: USD or CENT; GAL, BBL, L or M3."""
     *head, last = codes
     return f"{', '.join(head)} or {last}" if head else last
+
+
+def measures_of(units: UnitConversions) -> list[str]:
+    """The categories a quantity can measure, volume, mass and energy: every category but the
+    currency's, in the tables' order."""
+    return [name for name in units.categories if name != CURRENCY]
+
+
+def a_unit_of(quantity_type: str, measure: Iterable[str]) -> str:
+    """What a message wants of a unit of one category: `a volume unit, GAL, BBL, L or M3`, or
+    `an energy unit, MMBTU, BTU, THERM, GJ, MWH or KWH`."""
+    article = "an" if quantity_type[0] in "aeiou" else "a"
+    return f"{article} {quantity_type} unit, {listed(measure)}"

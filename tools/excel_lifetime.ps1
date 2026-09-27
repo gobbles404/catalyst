@@ -92,7 +92,7 @@ function Settle($State, $Sheet, [scriptblock]$Until, [string]$Address = "Z1") {
 
 # --- the sample chain: an index, its calendar and history, a vector and a market ----------------
 
-# Eleven creators in column D, rows 1 to 11, over inputs in A to C and E to H, the market's
+# Eleven creators in column D, rows 1 to 11, over inputs in A to C and E to I, the market's
 # valuation-day quote read in D12. The name in A1 labels the index; prices in A10:A11 feed the
 # vector, one per contract from n26, prompt on 26-May-2026, through q26.
 function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First = 72.1, [double]$Second = 72.8) {
@@ -101,8 +101,8 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "A3" "n26"; Put $State $Sheet "B3" "22-Jun-2026"
     Put $State $Sheet "A4" "q26"; Put $State $Sheet "B4" "21-Jul-2026"
     Put $State $Sheet "C2" "25-May-2026"
-    Put $State $Sheet "E1" "name"; Put $State $Sheet "F1" "lot_size"; Put $State $Sheet "G1" "brokerage_rate_per_lot"; Put $State $Sheet "H1" "clearing_rate_per_lot"
-    Put $State $Sheet "E2" "NYMEX"; Put $State $Sheet "F2" "1000"; Put $State $Sheet "G2" "0"; Put $State $Sheet "H2" "0"
+    Put $State $Sheet "E1" "name"; Put $State $Sheet "F1" "lot_size"; Put $State $Sheet "G1" "brokerage_rate_per_lot"; Put $State $Sheet "H1" "clearing_rate_per_lot"; Put $State $Sheet "I1" "lot_unit"
+    Put $State $Sheet "E2" "NYMEX"; Put $State $Sheet "F2" "1000"; Put $State $Sheet "G2" "0"; Put $State $Sheet "H2" "0"; Put $State $Sheet "I2" "BBL"
     Put $State $Sheet "A6" "26-May-2026"
     Put $State $Sheet "A7" "20-May-2026"; Put $State $Sheet "B7" "70.85"
     Put $State $Sheet "A8" "21-May-2026"; Put $State $Sheet "B8" "71.1"
@@ -111,7 +111,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "D1" "=_CreateFuturesSchedule(A2:A4,B2:B4)"
     Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
     Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","volume","BBL")'
-    Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:H1,E2:H2)"
+    Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I2)"
     Put $State $Sheet "D5" "=_CreateIndex(A1,D1,D3,D4,D2)"
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"
     Put $State $Sheet "D7" "=_CreateCalendar(D6,D5)"

@@ -283,13 +283,15 @@ def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
 
 
 SPECIFICATION_HEADERS = Cells.from_rows(
-    [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+    [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 
 
 def specification_body(contracts: int) -> Cells:
     """That many contracts as the sheet sends them: a name, a whole lot size and two fees."""
-    return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
+    return Cells.from_rows(
+        [[f"contract {i}", 1000.0 + i, "MMBTU", 3.0, 2.0] for i in range(contracts)]
+    )
 
 
 def an_index(schedule: object, holidays: object = MISSING) -> object:

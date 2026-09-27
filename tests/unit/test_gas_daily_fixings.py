@@ -30,7 +30,7 @@ def prices(*values: float) -> NDArray[np.float64]:
 
 CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
-    ("ICE",), np.array([2500.0]), np.array([0.0]), np.array([0.0])
+    ("ICE",), np.array([2500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
 )
 
 
@@ -38,7 +38,7 @@ def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None)
+    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, UNITS)
 
 
 # The page's sample: Henry Hub Gas Daily over Labor Day week 2026, Friday 4 September's print
@@ -53,6 +53,7 @@ FUTURES_INDEX = index(
     CONVENTIONS,
     SPECIFICATIONS,
     holiday_calendar(dates("2026-05-25")),
+    UNITS,
 )
 IFERC_INDEX = an_index(
     iferc_schedule(("F26",), dates("2025-12-31"), dates("2026-01-05")), "Waha IFERC"

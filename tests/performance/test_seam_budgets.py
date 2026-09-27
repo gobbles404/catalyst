@@ -887,6 +887,7 @@ def test_index_conventions_are_five_texts_in_and_one_publication_out(
         "_text": 5,
         "_CreateIndexConventions": 1,
         "index_conventions": 1,
+        "measures_of": 1,  # the categories a quantity measures, read once
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateIndexConventions"](*codes)) == {}
@@ -896,13 +897,15 @@ def test_index_conventions_are_five_texts_in_and_one_publication_out(
 
 
 SPECIFICATION_HEADERS = Cells.from_rows(
-    [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+    [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 
 
 def specification_body(contracts: int) -> Cells:
     """That many contracts as the sheet sends them: a name, a whole lot size and two fees."""
-    return Cells.from_rows([[f"contract {i}", 1000.0 + i, 3.0, 2.0] for i in range(contracts)])
+    return Cells.from_rows(
+        [[f"contract {i}", 1000.0 + i, "MMBTU", 3.0, 2.0] for i in range(contracts)]
+    )
 
 
 def an_index(schedule: object, holidays: object = MISSING) -> object:
@@ -917,11 +920,12 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
     )
 
 
-# A dozen contracts at the table path: the header row as any row of text, the body admitted as
-# a mixed range and bound, then each column through its rule, the names gathered and the three
-# number columns as views, the builder's four looks, a fraction and a lot below one among the lot
-# sizes and a fee below zero in each fee column, its three copies and one publication.
-# Twenty-one calls across eighteen functions.
+# A dozen words at the table path: the header row as any row of text, the body admitted as a
+# mixed range and bound, then each column through its rule, the names and the lot units gathered
+# and the three number columns as views, the builder's four looks, a fraction and a lot below one
+# among the lot sizes and a fee below zero in each fee column, the measures read once and the one
+# set of their units the lot units are looked up in, its three copies and one publication.
+# Twenty-three calls across nineteen functions; the set of units is built inline and is no call.
 def test_contract_specifications_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -943,21 +947,22 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
         "_bind": 1,
         "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
         "_text_places": 1,
-        "_texts_of": 1,
+        "_texts_of": 2,  # the names, then the lot units
         "_numbers_of": 3,
         "_CreateContractSpecifications": 1,
         "contract_specifications": 1,
+        "measures_of": 1,
         "_publish": 1,
     }
     assert numpy_calls(
         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
     ) == {
-        "ndarray.any": 8,  # one look per column, then the builder's four
+        "ndarray.any": 9,  # one look per column, five of them, then the builder's four
         "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
         "ndarray.cumsum": 1,  # the text cells above each row
-        "ndarray.sum": 2,  # text cells per row, and to the left
+        "ndarray.sum": 3,  # text cells per row, and to the left of each of the two text columns
         "ndarray.setflags": 3,  # frozen
-        "ufunc.reduce": 10,
+        "ufunc.reduce": 12,
     }
 
 
