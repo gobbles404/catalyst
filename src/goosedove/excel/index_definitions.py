@@ -184,15 +184,18 @@ def _CreateIndex(
     """Creates the index behind one reference price, its name with its schedule, conventions,
     contract specifications and, for a futures index, holiday calendar, and shows its handle,
     the text other formulas take as the index."""
-    return index(name, schedule, index_conventions, contract_specifications, holiday_calendar)
+    return index(
+        name, schedule, index_conventions, contract_specifications, holiday_calendar, UNITS
+    )
 
 
 class ContractSpecificationsTable(Table):
-    """The contracts' table: one row per contract an index trades as, its name, lot size and the
-    two fees per lot."""
+    """The specifications' table: one row per word the desk states a quantity of the index in, a
+    contract or a bare unit, its name, lot size, the lot's unit and the two fees per lot."""
 
     name: TextColumn
     lot_size: NumberColumn
+    lot_unit: TextColumn
     brokerage_rate_per_lot: NumberColumn
     clearing_rate_per_lot: NumberColumn
 
@@ -201,18 +204,24 @@ class ContractSpecificationsTable(Table):
 def _CreateContractSpecifications(
     header_row: Annotated[
         TextRow,
-        "The header cells of your contract table, such as A1:D1, reading name, lot_size, "
-        "brokerage_rate_per_lot and clearing_rate_per_lot in any order.",
+        "The header cells of your specifications table, such as A1:E1, reading name, lot_size, "
+        "lot_unit, brokerage_rate_per_lot and clearing_rate_per_lot in any order.",
     ],
     table: Annotated[
         ContractSpecificationsTable,
-        "The rows under the headers, such as A2:D3: one contract per row, its name, a whole lot "
-        "size of 1 or more and the two fees per lot, 0 or more, each name once.",
+        "The rows under the headers, such as A2:E4: one row per word for a quantity of the index, "
+        "a contract or a bare unit, its name, a whole lot size of 1 or more, the unit that lot "
+        "size is in and the two fees per lot, 0 or more, each name once.",
     ],
 ) -> Handle[ContractSpecifications]:
-    """Creates the contract specifications of one index, the name, lot size and fees per lot of
-    each contract it trades as, and shows its handle, the text other formulas take as the
-    specifications."""
+    """Creates the contract specifications of one index, the desk's words for a quantity of it,
+    each with its lot size, the lot's unit and the fees per lot, and shows its handle, the text
+    other formulas take as the specifications."""
     return contract_specifications(
-        table.name, table.lot_size, table.brokerage_rate_per_lot, table.clearing_rate_per_lot
+        table.name,
+        table.lot_size,
+        table.lot_unit,
+        table.brokerage_rate_per_lot,
+        table.clearing_rate_per_lot,
+        UNITS,
     )

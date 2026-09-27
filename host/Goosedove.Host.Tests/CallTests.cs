@@ -24,7 +24,7 @@ namespace Goosedove.Host.Tests
         private static string Index(object schedule, object holidays, string name = "sample")
         {
             var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
-            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 } });
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 } });
             var handle = (string)Seam.Call("_CreateIndex", name, schedule, conventions, specifications, holidays);
             Assert.StartsWith("index:" + name + ":", handle);
             return handle;
@@ -153,12 +153,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "Volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "MMBTU", "USD", "volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3" };
             yield return new object[] { "_CreateIndexConventions", new object[] { "usd", "BBL", "USD", "volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', expected USD or CENT" };
-            // The contract specifications: a header row and a table of contracts; a lot size with a fraction, text where a fee is expected, and a name given twice.
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', expected number" };
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "NYMEX NG", 2500.0, 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 0.0, 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more" };
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, -0.5, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more" };
+            // The contract specifications: a header row and a table of words for a quantity; a lot size with a fraction, text where a fee is expected, a name given twice, and a unit that is no quantity unit.
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "usd", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a volume, mass or energy unit" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, "MMBTU", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 4) is text 'three', expected number" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "NYMEX NG", 2500.0, "MMBTU", 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 0.0, "MMBTU", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", -0.5, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more" };
             // The index: text and four handles. A blank where the name should be, a number and text naming no live object where the schedule should be, and the specifications left out fail in the seam's words; the library's rules, which need live handles, are in the fact below.
             yield return new object[] { "_CreateIndex", new object[] { ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: name is blank, expected text" };
             yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", 46161.0, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle" };
@@ -338,16 +339,19 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void contract_specifications_are_created_from_a_table_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
+            var handle = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "ICE NG", 2500.0, "MMBTU", 0.75, 0.5 } });
             Assert.StartsWith("contract_specifications:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
-            Assert.Equal(4, spill.GetLength(1));
+            Assert.Equal(5, spill.GetLength(1));
             Assert.Equal("lot_size", spill[0, 1]);
+            Assert.Equal("lot_unit", spill[0, 2]);
             Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal("str", spill[1, 2]);
             Assert.Equal("ICE NG", spill[3, 0]);
             Assert.Equal(2500.0, spill[3, 1]);
-            Assert.Equal(0.75, spill[3, 2]);
+            Assert.Equal("MMBTU", spill[3, 2]);
+            Assert.Equal(0.75, spill[3, 3]);
         }
 
         // The index: a name, a futures schedule of three contracts, the conventions, the
@@ -363,9 +367,12 @@ namespace Goosedove.Host.Tests
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
-            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, 3.0, 2.0 }, { "ICE NG", 2500.0, 0.75, 0.5 } });
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "ICE NG", 2500.0, "MMBTU", 0.75, 0.5 } });
             var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, conventions, specifications, holidays);
             Assert.StartsWith("index:Henry Hub NYMEX:", handle);
+            // The lot units are units of the conventions' quantity type: the same MMBTU lots under volume conventions are refused, naming the row and the units that would have done.
+            var volume = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "volume", "BBL");
+            Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", schedule, volume, specifications, holidays));
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));

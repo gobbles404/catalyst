@@ -262,11 +262,12 @@ def index_table(obj: Index) -> MixedArray:
 def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
     return MixedArray.table(
         [
-            ("name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
-            ("str", "float64", "float64", "float64"),
+            ("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
+            ("str", "float64", "str", "float64", "float64"),
         ],
         obj.names,
         obj.lot_sizes,
+        obj.lot_units,
         obj.brokerage_rates_per_lot,
         obj.clearing_rates_per_lot,
     )

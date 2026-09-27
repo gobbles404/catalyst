@@ -48,7 +48,7 @@ ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
 CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
-    ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
+    ("NYMEX",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
 )
 
 
@@ -60,7 +60,7 @@ def an_index(
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either. Each call is a new index, as
     each _CreateIndex cell is; a calendar and the fixings it binds must share one."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, holidays)
+    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, holidays, UNITS)
 
 
 INDEX = an_index()
