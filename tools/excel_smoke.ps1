@@ -5,6 +5,7 @@ $root = Split-Path $PSScriptRoot -Parent
 
 $formulas = [ordered]@{
     "=GoosedoveStatus()"          = "ok: python started and functions registered"
+    "=LEFT(GoosedoveHandles(),5)" = "live "
     "=HostAdd(1,2)"               = "3"
     "=Zero()"                     = "0"
     "=Add(1,2)"                   = "3"
@@ -326,6 +327,7 @@ $formulas = [ordered]@{
     "=_CreatePriceVector(TRUE,CU2:CU5)" = "#ERROR _CreatePriceVector: index_name is boolean TRUE, expected text"
     "=_CreatePriceVector(EC2:EC3,CU2:CU5)" = "#ERROR _CreatePriceVector: index_name is 2x1 array, expected text"
     "=_CreatePriceVector(EC2,D1:D3)"   = "#N/A"
+    "=_CreateFuturesFixings(D1:D3,1/0,ED1)" = "#N/A"
     # The market: a creator over the history in CT7 and a vector of one quote, n26 being prompt
     # on the valuation day and the last contract of that schedule, read back through
     # util_ReadHandle, a fixing on a past business day, closed on a weekend, the quote on the

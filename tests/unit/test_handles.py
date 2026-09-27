@@ -25,6 +25,13 @@ class Steeper(Curve):
     """A subclass: not the declared kind, so a creator returning one fails."""
 
 
+class Holder:
+    """An object holding a curve by its own reference, as a market holds its vector."""
+
+    def __init__(self, curve: Curve) -> None:
+        self.curve = curve
+
+
 _returns: dict[str, object] = {}
 _seen: dict[str, object] = {}
 
@@ -53,6 +60,16 @@ def FailToMake() -> Handle[Curve]:
 def ReadCurve(curve: Handle[Curve]) -> float:
     _seen["curve"] = curve
     return curve.level
+
+
+@probe
+def HoldCurve(curve: Handle[Curve]) -> Handle[Holder]:
+    return Holder(curve)
+
+
+@probe
+def HeldLevel(holder: Handle[Holder]) -> float:
+    return holder.curve.level
 
 
 TEXT = re.compile(r"(curve|other):([0-9]+)")
@@ -148,6 +165,54 @@ def test_a_creator_returning_the_wrong_thing_fails_and_publishes_nothing(
     assert bridge.call("MakeWhatever", []) == text
     _, after = parts(bridge.call("MakeCurve", [1.0]))
     assert after == before + 1
+
+
+# --- the observed path: the creator's flag, the combined result, release ----------------
+
+
+# The seam tells the host which functions create a handle, read off the declared result alone,
+# so the host observes those calls and no other.
+def test_the_specs_say_which_functions_create_a_handle() -> None:
+    publishes = {name: flag for name, _, _, _, flag in bridge.function_specs()}
+    assert publishes["MakeCurve"] and publishes["MakeOther"] and publishes["HoldCurve"]
+    assert publishes["_CreateValuationDate"] and publishes["_CreatePriceVector"]
+    assert not publishes["ReadCurve"] and not publishes["Add"] and not publishes["util_ReadHandle"]
+
+
+# The observed path's result is the cell's value and whether this call published, told by the
+# count having moved and never by the text: a creator's success says yes, its failure says no,
+# and a consumer's value says no.
+def test_a_creators_publisher_says_whether_it_published() -> None:
+    text, owned = bridge.publish("MakeCurve", [2.5])
+    assert owned and isinstance(text, str) and text.startswith("curve:")
+    assert bridge.publish("FailToMake", []) == ("#ERROR FailToMake: ValueError: as asked", False)
+    _returns["value"] = 1.0
+    assert bridge.publish("MakeWhatever", []) == (
+        "#ERROR MakeWhatever: returned number 1.0, expected curve",
+        False,
+    )
+    assert bridge.publish("ReadCurve", [text]) == (2.5, False)
+
+
+# Release takes one entry out of the store, by its whole text, and nothing else: the text then
+# names nothing, releasing it again or releasing a text never published does nothing, the count
+# does not move, and a curve a live holder keeps by its own reference lives on through it.
+def test_release_takes_one_entry_and_leaves_what_others_hold() -> None:
+    curve = cast(str, bridge.call("MakeCurve", [2.5]))
+    holder = cast(str, bridge.call("HoldCurve", [curve]))
+    _, before = parts(bridge.call("MakeCurve", [1.0]))
+    live, _ = bridge.live_handles()
+    assert bridge.release(curve) is True
+    assert bridge.live_handles()[0] == live - 1
+    assert bridge.call("ReadCurve", [curve]) == (
+        f"#ERROR ReadCurve: curve is text {curve!r} naming no live object, expected curve handle"
+    )
+    assert bridge.release(curve) is False
+    assert bridge.release("curve:9999999") is False
+    assert bridge.call("HeldLevel", [holder]) == 2.5
+    _, after = parts(bridge.call("MakeCurve", [1.0]))
+    assert after == before + 1
+    assert bridge.release(holder) is True
 
 
 # --- the way in: resolving --------------------------------------------------
@@ -299,7 +364,7 @@ def test_the_form_around_a_handle_takes_none_and_nothing_else() -> None:
 
 # Excel sees the name in brackets and nothing after the help, as for any argument left out.
 def test_a_handle_that_may_be_left_out_is_shown_in_brackets() -> None:
-    specs = {name: arguments for name, _, arguments, _ in bridge.function_specs()}
+    specs = {name: arguments for name, _, arguments, _, _ in bridge.function_specs()}
     assert specs["MaybeCurve"] == [("[curve]", "")]
     assert specs["ReadCurve"] == [("curve", "")]
 
