@@ -47,19 +47,20 @@ def index(
 ) -> Index:
     """The one way to make an Index: the schedule's kind chooses which index is made, the
     holiday calendar is checked against it, the specifications' lot units against the
-    conventions' quantity type, and the record is made, nothing else.
+    conventions' quantity type, and the record is returned once all three hold, nothing else.
 
     The kind is read off the object the seam hands over, the one way the library tells kinds
-    apart, as the calendar reads it; an object of no schedule kind is refused here in the
-    library's words, since the seam names no kind for it. A futures index brings its holiday
-    calendar, and the other two leave it out, the calendar's rules of #104 in the calendar's
-    words. Then each lot unit of the specifications is a unit of the conventions' quantity
-    type, read from the tables passed in: a barrel row and a gallon row both stand under a
-    volume index, and an MMBTU row does not, the one fact that lives across two of the
+    apart, as the market history reads its fixings'; an object of no schedule kind is refused
+    here in the library's words, since the seam names no kind for it. A futures index brings
+    its holiday calendar, and the other two leave it out, the calendar's rules of #104 in the
+    calendar's words. Then each lot unit of the specifications is a unit of the conventions'
+    quantity type, read from the tables passed in: a barrel row and a gallon row both stand
+    under a volume index, and an MMBTU row does not, the one fact that lives across two of the
     definitions and so is checked where they meet. The name is a label, kept as typed, neither
     unique nor looked up; whether the four objects are one index's is otherwise the desk's to
-    keep right, since nothing in any of them says which index it belongs to. Nothing is copied,
-    scanned or built: the index is the small record.
+    keep right, since nothing in any of them says which index it belongs to. Nothing is copied
+    and nothing is built but the small record; the one pass is over the specifications' lot
+    units, one lookup per row, and nothing of the schedule is looked at.
     """
     made = _of(schedule, name, conventions, specifications, holiday_calendar)
     measure = units.categories[conventions.quantity_type].sizes

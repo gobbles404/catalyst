@@ -30,10 +30,11 @@ def gas_daily_schedule(
 
     Each date column is copied and then frozen, so the schedule owns its data: a Python caller
     keeps whatever it passed, and a later change to an input never changes a schedule. The codes
-    are the seam's tuple, kept as they are. Nothing else is checked: whether codes repeat,
-    whether a month's last day is on or after its first, whether the two are a calendar
-    month's, whether the months follow one another and what a code means are a reader's rules,
-    written when the reader is.
+    are the seam's tuple, kept as they are. Nothing else is checked: each code once, each
+    month's last day on or after its first and the months following one another are the
+    calendar's rules, checked when a calendar is made over an index holding this schedule;
+    whether the two dates are a calendar month's and what a code means are no reader's rule,
+    since no reader needs them.
     """
     count = len(codes)
     return GasDailySchedule(

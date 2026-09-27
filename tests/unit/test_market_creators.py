@@ -55,7 +55,9 @@ SCHEDULE = (("m26", "n26", "q26"), (MAY_19, JUN_22, JUL_21))
 def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYMEX") -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
     conventions and specifications, since nothing here reads either. Each call publishes a new
-    index, as each _CreateIndex cell does; a calendar and the fixings it binds share one."""
+    index, as the prepared path does on every run; in Excel two equal _CreateIndex cells share
+    one while both are live (docs/seam/handles.md). A calendar and the fixings it binds share
+    one."""
     conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
@@ -325,8 +327,10 @@ def test_two_histories_from_one_calendar_each_read_their_own_prices() -> None:
     assert [row[:4] for row in rows(read(first))] == [row[:4] for row in rows(read(second))]
 
 
-# A _CreateIndex cell recalculated is a new index: the calendar over the old one with fixings
-# over the new is refused, the name shown twice, and both remade over the new one read as before.
+# An index published again from unchanged inputs, as the prepared path does on every run and a
+# worksheet does once the first was released, is a new index: the calendar over the old one
+# with fixings over the new is refused, the name shown twice, and both remade over the new one
+# read as before.
 def test_an_index_remade_is_another_index_until_the_calendar_and_the_fixings_are_remade() -> None:
     before = rows(read(a_history()))
     remade = an_index(a_schedule(*SCHEDULE), a_holiday_calendar(MAY_25))

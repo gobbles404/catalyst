@@ -116,7 +116,7 @@ The second line rebuilds the add-in; `.\tools\excel_dev.ps1` does the same and o
 .\check.ps1
 ```
 
-Six steps in order, stopping at the first failure: formatting, lint, types, the Python tests, the host's own tests, and the add-in in a hidden Excel of its own, one formula per row compared with the text it must show. It takes a few minutes. Without Excel installed, the first five pass and the last stops and says so.
+Seven steps in order, stopping at the first failure: formatting, lint, types, the Python tests, the host's own tests, the add-in in a hidden Excel of its own, one formula per row compared with the text it must show, and last the handles' lifetime in hidden Excels, a chain of creators built, changed and closed while the handles they own are counted. It takes a few minutes. Without Excel installed, the first five pass and the sixth stops and says so.
 
 ## When something fails
 

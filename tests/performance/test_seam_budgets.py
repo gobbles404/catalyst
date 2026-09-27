@@ -1012,10 +1012,11 @@ def index_parts() -> tuple[object, object, object, object]:
 
 # Text through its rule and four handles, each through the text rule and one lookup, the
 # builder's dispatch to the futures index, its holiday rule and one publication: twenty-one
-# calls across ten functions, and not one numpy call, no copy and no scan, whatever the
-# schedule's length. An IFERC index leaves the holiday calendar out, one handle fewer through
-# the text rule and the lookup, and runs the other holiday rule: nineteen calls across ten
-# functions.
+# calls across ten functions, and not one numpy call, no copy and no look at the schedule,
+# whatever its length. The lot-unit rule of #115 is one lookup per row of the specifications and
+# calls nothing the ledger counts. An IFERC index leaves the holiday calendar out, one handle
+# fewer through the text rule and the lookup, and runs the other holiday rule: nineteen calls
+# across ten functions.
 def test_an_index_is_text_and_four_handles_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
