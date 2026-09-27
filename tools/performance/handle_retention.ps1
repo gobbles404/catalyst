@@ -1,13 +1,22 @@
 # Retention under a feed: a thousand changed updates of a wide price vector and its market in a
-# hidden Excel, the store's live count and the bytes of prices it holds read at settled
-# checkpoints, and everything released when the workbook closes. Evidence for a pull request,
-# never a gate: run it and paste the table. docs/seam/handles.md is the page.
-param([int]$Updates = 1000, [int]$Prices = 150, [int]$Checkpoint = 250, [int]$Patience = 30)
+# hidden Excel, the market's first quote read back as a number after every update, the store's
+# live count and the bytes of prices it holds read at settled checkpoints, and everything
+# released when the workbook closes. Evidence for a pull request, never a gate in check.ps1, with
+# a verdict of its own: every reading must be the expected number, every checkpoint must settle
+# at the baseline within the patience, the store must be empty after the close, and no release
+# may miss or fail, or the run exits nonzero after its cleanup. What the cell's text showed and
+# how long the run took are reported beside, and decide nothing. -Fault expects the wrong price
+# at the first update and the wrong live count at the first checkpoint, to prove that the verdict
+# exits nonzero: run it with -Updates 1 -Checkpoint 1 -Patience 5. docs/seam/handles.md is the page.
+param([int]$Updates = 1000, [int]$Prices = 150, [int]$Checkpoint = 250, [int]$Patience = 30, [switch]$Fault)
 $ErrorActionPreference = "Stop"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root "tools\host_build.ps1")
 . (Join-Path $root "tools\hidden_excel.ps1")
 $xll = Build-HostAddIn -Root $root
+
+$failures = [Collections.Generic.List[string]]::new()
+function Fail([string]$What) { $failures.Add($What); Write-Host "FAIL $What" }
 
 function Counts($Cell) {
     $Cell.Formula = "=GoosedoveHandles()"
@@ -17,6 +26,8 @@ function Counts($Cell) {
     }
     return [pscustomobject]@{ Live = [int]$Matches[1]; PriceBytes = [int]$Matches[2]; Published = [int]$Matches[3]; Reused = [int]$Matches[4]; Released = [int]$Matches[5]; Misses = [int]$Matches[6]; DisposalErrors = [int]$Matches[7]; Text = $text }
 }
+# Waits, giving Excel time to deliver its callbacks, until the store holds that many live
+# publications or the patience runs out; either way the last counts come back.
 function Settle($Cell, [int]$Live) {
     $deadline = (Get-Date).AddSeconds($Patience)
     do {
@@ -25,6 +36,36 @@ function Settle($Cell, [int]$Live) {
         Start-Sleep -Milliseconds 250
     } while ((Get-Date) -lt $deadline)
     return (Counts $Cell)
+}
+# What a checkpoint must hold: the live count the wait was for, no release missed, none failed.
+function Assert-Counts([string]$When, $Counts, [int]$Live) {
+    if ($Counts.Live -ne $Live) { Fail ("{0}: live {1}, expected {2} within {3} s: {4}" -f $When, $Counts.Live, $Live, $Patience, $Counts.Text) }
+    if ($Counts.Misses -ne 0) { Fail ("{0}: release misses {1}, expected 0: {2}" -f $When, $Counts.Misses, $Counts.Text) }
+    if ($Counts.DisposalErrors -ne 0) { Fail ("{0}: disposal errors {1}, expected 0: {2}" -f $When, $Counts.DisposalErrors, $Counts.Text) }
+}
+# A cell's value in words: a number, a blank, text, or an Excel error, which Value2 hands over
+# as a whole number of its own type.
+function Describe($Value) {
+    if ($null -eq $Value) { return "blank" }
+    if ($Value -is [double]) { return "number $Value" }
+    if ($Value -is [int]) { return "Excel error $Value" }
+    return "text '$Value'"
+}
+# The market's first quote read as a number, and read again within the patience while it is not
+# yet the expected one, since a read can cross a recalculation; the text beside it, for the eye.
+function Read-Quote($Cell, [double]$Expected) {
+    $deadline = (Get-Date).AddSeconds($Patience)
+    $reads = 0
+    do {
+        $reads++
+        $value = $Cell.Value2
+        $text = [string]$Cell.Text
+        if ($value -is [double] -and $value -eq $Expected) {
+            return [pscustomobject]@{ Value = $value; Text = $text; Reads = $reads; Ok = $true }
+        }
+        Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $deadline)
+    return [pscustomobject]@{ Value = $value; Text = $text; Reads = $reads; Ok = $false }
 }
 
 $session = Start-HiddenExcel
@@ -83,21 +124,40 @@ try {
     $watch = Own $sheet.Range("O1")
     $baseline = 11
     $counts = Settle $watch $baseline
-    if ($counts.Live -ne $baseline) { throw "the chain did not settle at $baseline live: $($counts.Text); market shows $($reader.Text)" }
-    if ([string]$reader.Text -ne "70") { throw "the market shows $($reader.Text), expected 70" }
-    Write-Host ("baseline: {0}" -f $counts.Text)
+    Assert-Counts "at the baseline" $counts $baseline
+    $read = Read-Quote $reader 70.0
+    if (-not $read.Ok) { Fail ("at the baseline: the market shows {0} (text '{1}'), expected 70" -f (Describe $read.Value), $read.Text) }
+    Write-Host ("baseline: {0}; market shows {1}" -f $counts.Text, $read.Text)
     $rows.Add([pscustomobject]@{ Updates = 0; Live = $counts.Live; PriceBytes = $counts.PriceBytes; Published = $counts.Published; Released = $counts.Released; Seconds = 0.0 })
 
+    # The updates run only on a chain that built: a baseline failure is reported, and the close
+    # below is still checked.
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    $wrong = 0
-    for ($n = 1; $n -le $Updates; $n++) {
+    $late = 0
+    $textDiffers = 0
+    $samples = [Collections.Generic.List[string]]::new()
+    $ready = $failures.Count -eq 0
+    for ($n = 1; $n -le $Updates -and $ready; $n++) {
         $first = 70.0 + $n
         for ($i = 0; $i -lt $Prices; $i++) { $quotes[$i, 0] = $first + $i * 0.01 }
         $priceRange.Value2 = $quotes
-        if ([string]$reader.Text -ne "$first") { $wrong++ }
+        $expected = $first
+        if ($Fault -and $n -eq 1) { $expected = $first + 1 }
+        $read = Read-Quote $reader $expected
+        if (-not $read.Ok) {
+            Fail ("update {0}: the market shows {1} (text '{2}') after {3} reads within {4} s, expected {5}" -f $n, (Describe $read.Value), $read.Text, $read.Reads, $Patience, $expected)
+        }
+        elseif ($read.Reads -gt 1) { $late++ }
+        if ($read.Ok -and $read.Text -ne "$expected") {
+            $textDiffers++
+            if ($samples.Count -lt 5) { $samples.Add("update $n showed text '$($read.Text)' for the number $expected") }
+        }
         if ($n % $Checkpoint -eq 0) {
-            $counts = Settle $watch $baseline
-            Write-Host ("after {0} updates: {1}; wrong readings so far {2}" -f $n, $counts.Text, $wrong)
+            $expectedLive = $baseline
+            if ($Fault -and $n -eq $Checkpoint) { $expectedLive = $baseline + 1 }
+            $counts = Settle $watch $expectedLive
+            Assert-Counts "after $n updates" $counts $expectedLive
+            Write-Host ("after {0} updates: {1}; readings right on a later read so far {2}; text differing so far {3}" -f $n, $counts.Text, $late, $textDiffers)
             $rows.Add([pscustomobject]@{ Updates = $n; Live = $counts.Live; PriceBytes = $counts.PriceBytes; Published = $counts.Published; Released = $counts.Released; Seconds = [math]::Round($clock.Elapsed.TotalSeconds, 1) })
         }
     }
@@ -107,6 +167,7 @@ try {
     $book = $scratch
     $watch = Own (Own (Own $scratch.Worksheets).Item(1)).Range("A1")
     $counts = Settle $watch 0
+    Assert-Counts "after closing the workbook" $counts 0
     Write-Host ("after closing the workbook: {0}" -f $counts.Text)
     $rows.Add([pscustomobject]@{ Updates = "closed"; Live = $counts.Live; PriceBytes = $counts.PriceBytes; Published = $counts.Published; Released = $counts.Released; Seconds = [math]::Round($clock.Elapsed.TotalSeconds, 1) })
     Write-Host ""
@@ -114,9 +175,19 @@ try {
     Write-Host "|---|---|---|---|---|---|"
     foreach ($row in $rows) { Write-Host ("| {0} | {1} | {2} | {3} | {4} | {5} |" -f $row.Updates, $row.Live, $row.PriceBytes, $row.Published, $row.Released, $row.Seconds) }
     Write-Host ""
-    Write-Host ("wrong readings: {0} of {1}; misses {2}; disposal errors {3}" -f $wrong, $Updates, $counts.Misses, $counts.DisposalErrors)
+    # Diagnostics, deciding nothing: how often the number came on a later read, how often the
+    # cell's text was not the expected number's while the number was right, and the run's clock.
+    Write-Host ("readings right on a later read: {0} of {1}; text differing from the expected number while the number was right: {2}; {3} s in all" -f $late, $Updates, $textDiffers, [math]::Round($clock.Elapsed.TotalSeconds, 1))
+    foreach ($sample in $samples) { Write-Host "     $sample" }
 }
 catch { $scriptError = $_; throw }
 finally {
     Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
 }
+if ($failures.Count) {
+    Write-Host ("retention: {0} failed" -f $failures.Count)
+    foreach ($failure in $failures) { Write-Host "  $failure" }
+    exit 1
+}
+Write-Host "retention: every reading the expected number, every checkpoint at the baseline, the store empty after the close, no release missed or failed"
+exit 0
