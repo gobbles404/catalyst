@@ -407,11 +407,16 @@ $processes = {
         # A workbook saved by the first Excel, opened in the second and fully calculated: every
         # handle recreated under the second's process ID, none of the saved texts surviving; the
         # nine creators equal to the second's own chain share, the vector and the market are new.
+        # The scratch valuation date goes first, so that the saved chain is all the first Excel holds.
+        (Cell $state $watch "A1").ClearContents()
+        $c = Settle $state $watch { param($c) $c.Live -eq 0 }
+        Check "clearing the scratch creator empties the first Excel's store again" ($c.Live -eq 0) $c.Text
         $path = Join-Path ([IO.Path]::GetTempPath()) ("goosedove-processes-" + [guid]::NewGuid().ToString("N") + ".xlsx")
         $saved = New-Book $state
         $savedSheet = Sheet $state $saved
         Build-Chain $state $savedSheet
         $c = Settle $state $savedSheet { param($c) $c.Live -eq $ChainCreators }
+        Check "the chain to be saved is live in the first Excel, and nothing else" ($c.Live -eq $ChainCreators) $c.Text
         $savedTexts = @(1..$ChainCreators | ForEach-Object { Text $state $savedSheet "D$_" })
         $saved.SaveAs($path, 51)  # xlOpenXMLWorkbook
         Close-Book $state $saved
