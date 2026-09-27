@@ -31,9 +31,11 @@ def iferc_schedule(
 
     Each date column is copied and then frozen, so the schedule owns its data: a Python caller
     keeps whatever it passed, and a later change to an input never changes a schedule. The codes
-    are the seam's tuple, kept as they are. Nothing else is checked: whether codes repeat,
-    whether the dates increase, whether a month's index prints after its future stops trading
-    and what a code means are a reader's rules, written when the reader is.
+    are the seam's tuple, kept as they are. Nothing else is checked: each code once and the
+    publication days increasing are the calendar's rules, checked when a calendar is made over
+    an index holding this schedule; each fixing's code one of its months is the IFERC fixings'
+    rule; whether a month's index prints after its future stops trading and what a code means
+    are no reader's rule, since no reader needs them.
     """
     count = len(codes)
     return IfercSchedule(

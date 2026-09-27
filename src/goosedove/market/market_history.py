@@ -64,8 +64,10 @@ def _bind(fixings: object, calendar: Calendar) -> MarketHistory:
 
 def _over_the_calendars_index(calendar: Calendar, index: Index) -> None:
     """The fixings are over the calendar's index, the one object _CreateIndex made, else refused
-    naming the two: another index of the same name is another index, made by another cell or by
-    the same cell recalculated, and fixings of another kind are over another index."""
+    naming the two: another index of the same name is another index, made by a call with other
+    arguments or by an equal call made again after the first index was released, and fixings of
+    another kind are over another index. Two equal _CreateIndex cells live at once share one
+    index, so a calendar over one and fixings over the other pass."""
     if index is not calendar.index:
         raise ValueError(
             f"fixings is over another index, {index.name!r}, "

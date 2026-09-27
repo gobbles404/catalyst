@@ -59,7 +59,7 @@ def an_index(
 ) -> Index:
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either. Each call is a new index, as
-    each _CreateIndex cell is; a calendar and the fixings it binds must share one."""
+    every call of the library's builder is; a calendar and the fixings it binds must share one."""
     return index(name, schedule, CONVENTIONS, SPECIFICATIONS, holidays, UNITS)
 
 
@@ -706,9 +706,9 @@ def test_a_calendar_and_fixings_over_one_index_are_accepted_whatever_its_name() 
         assert made.fixed_rows.tolist() == [0, 1, 2]
 
 
-# The index remade from unchanged inputs, as a recalculated _CreateIndex cell remakes it: the
-# old calendar with fixings over the new index is refused, the name shown twice; with both remade
-# over the new index, the history is the same as before.
+# The index made twice from unchanged inputs, as the builder does on every call and a worksheet
+# does once the first was released: the old calendar with fixings over the new index is refused,
+# the name shown twice; with both remade over the new index, the history is the same as before.
 def test_an_index_remade_from_the_same_inputs_is_another_index_until_both_are_remade() -> None:
     remade = an_index(SCHEDULE, CLOSED_MAY_25)
     fixings = fixings_on(

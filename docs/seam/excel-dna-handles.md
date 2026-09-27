@@ -71,18 +71,25 @@ construction: the observable factory runs before the registration lock's second
 lookup in the tagged source. This is a source-derived concern, not an observed
 failure in our host.
 
-Workbook-close and Excel-quit cleanup remain unverified. Microsoft documents an
-RTD path in which `ServerTerminate` occurs without individual topic disconnects.
-The tagged observer-server termination method does not walk the subscriptions
-and dispose each object. Do not infer deterministic cleanup for that path from
-ordinary formula-deletion behavior. See [Microsoft's RTD explanation][rtd],
-[observer termination][observer], and [base server termination][server].
+Workbook-close and Excel-quit cleanup were unverified when the source was read.
+Microsoft documents an RTD path in which `ServerTerminate` occurs without
+individual topic disconnects. The tagged observer-server termination method does
+not walk the subscriptions and dispose each object. Do not infer deterministic
+cleanup for that path from ordinary formula-deletion behavior. See
+[Microsoft's RTD explanation][rtd], [observer termination][observer], and
+[base server termination][server]. Since then the live tests below and the
+`books` and `quit` groups of #114's lifetime script have verified workbook close
+through the production registration; at quit every disconnect arrived in the
+runs tested, which is evidence and not a guarantee, so nothing in the build
+depends on one ([handles.md](handles.md#publication-and-release)).
 
 ## Fit to the existing C# / Python seam
 
-The following are integration gaps, not implementation decisions:
+The seam as it stood on 2026-09-12, before #114. The following were integration
+gaps, not implementation decisions; how the build answered each is
+[handles.md](handles.md#the-seams-part) and [host.md](host.md#the-observed-path).
 
-| Current behavior | Question to resolve |
+| Behavior on 2026-09-12 | Question to resolve |
 |---|---|
 | [Registration](../../host/Goosedove.Host/AddIn.cs) builds all-`object` delegates and calls `ExcelIntegration.RegisterDelegates`. | Supply declared object argument/result metadata and apply native handle processing during prepared registration. The current low-level call does not activate it. |
 | [The bridge](../../src/goosedove/excel/bridge.py) declares `Handle[Kind]` since #53 and keeps the objects in one Python store, keyed by the handle's text, with the host carrying only that text. | A C# store would have to take over owned Python references from the store that already holds them; the Python store needs the host's lifecycle notifications and nothing else. |

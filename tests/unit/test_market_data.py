@@ -929,8 +929,10 @@ def test_any_text_names_a_vector_and_is_kept_as_typed(name: str) -> None:
     assert made.startswith(f"{PID}:price_vector:{name}:")
 
 
-# Each call publishes anew, over the same prices or a different number of them, and an earlier
-# handle still reads its own snapshot.
+# Each call through the prepared path publishes anew, over the same prices or a different number
+# of them, and an earlier handle still reads its own snapshot, since nothing releases here; in
+# Excel an equal live call shares the vector and Excel's disconnect releases it
+# (docs/seam/handles.md).
 def test_every_vector_call_publishes_a_fresh_handle_and_the_earlier_ones_stand() -> None:
     first = a_vector()
     same = a_vector()

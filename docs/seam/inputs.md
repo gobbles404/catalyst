@@ -221,6 +221,6 @@ Decided 2026-09-17, the whole number's bound.
 
 ## Parked
 
-Handles, built in part by #53: the way in, `Handle[Kind]`, is decisions 34 to 37 above, taken by a creator since #79, `_CreateFuturesFixings` and its calendar, where `util_ReadHandle` takes any handle by decision 40; the way out is [outputs.md](outputs.md), and the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text). Release when a creator is deleted or its workbook closes, reuse of the same handle on an unchanged recalculation, and columns of handles are open; the spec is [handles.md](handles.md).
+Handles, built in #53 and their lifecycle in #114: the way in, `Handle[Kind]`, is decisions 34 to 37 above, taken by a creator since #79, when the fixings of the day first took a holiday calendar, and by the index, the calendar, the fixings, the history and the market since, where `util_ReadHandle` takes any handle by decision 40; the way out is [outputs.md](outputs.md), the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text), and reuse and release are [handles.md](handles.md#publication-and-release). Columns of one handle per row are open; the spec is [handles.md](handles.md#open).
 
 The way out, results returning to the sheet, is [outputs.md](outputs.md).
