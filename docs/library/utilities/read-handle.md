@@ -59,7 +59,7 @@ What each kind shows:
 | `iferc_schedule` | `contract_code`, `last_trading_date`, `publication_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `gas_daily_schedule` | `contract_code`, `first_date`, `last_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
-| `contract_specifications` | `name`, `lot_size`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `float64`, `float64` | one per contract |
+| `contract_specifications` | `name`, `lot_size`, `lot_unit`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `str`, `float64`, `float64` | one per word for a quantity |
 | `index` | `name`, `kind`, `contracts`, `specifications`, `has_holiday_calendar` | `str`, `str`, `int64`, `int64`, `bool` | one, a summary of what the index holds, the kind spelled `futures`, `IFERC` or `Gas Daily`; the parts spill through their own handles |
 | `futures_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
 | `iferc_fixings` | `contract_code`, `price` | `str`, `float64` | one per month published |

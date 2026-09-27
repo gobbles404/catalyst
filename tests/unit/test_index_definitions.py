@@ -41,15 +41,16 @@ CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
 UNITS = ["USD", "BBL", "USD", "volume", "BBL"]
 CONVENTIONS = re.compile(r"[0-9]+:index_conventions:([0-9]+)")
 
-# The specifications page's sample as the sheet sends it: the header row, then one row per
-# contract, gas traded as NYMEX lots and as ICE lots, the name as text and the lot size and fees
-# as numbers.
+# The specifications page's sample as the sheet sends it: the header row, then one row per word
+# for a quantity of gas, NYMEX lots and ICE lots, the name and the lot's unit as text and the
+# lot size and fees as numbers.
 SPECIFICATION_HEADERS = Cells.from_rows(
-    [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+    [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 SPECIFICATION_BODY = Cells.from_rows(
-    [["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]]
+    [["NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0], ["ICE NG", 2500.0, "MMBTU", 0.75, 0.5]]
 )
+GAS = ["USD", "MMBTU", "USD", "energy", "MMBTU"]
 SPECIFICATIONS = re.compile(r"[0-9]+:contract_specifications:([0-9]+)")
 
 
@@ -788,7 +789,8 @@ def test_a_failed_conventions_construction_publishes_no_object_and_no_handle() -
 def ReadContractSpecifications(specifications: Handle[ContractSpecifications]) -> str:
     lots = specifications.lot_sizes
     return (
-        f"{' '.join(specifications.names)} | {lots.dtype} {lots.tolist()} | "
+        f"{' '.join(specifications.names)} | {lots.dtype} {lots.tolist()} "
+        f"{' '.join(specifications.lot_units)} | "
         f"{specifications.brokerage_rates_per_lot.tolist()} "
         f"{specifications.clearing_rates_per_lot.tolist()}"
     )
@@ -804,16 +806,16 @@ def test_contract_specifications_are_created_from_a_table_and_read_back_typed() 
     assert bridge.call(
         "ReadContractSpecifications",
         [the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY)],
-    ) == ("NYMEX NG ICE NG | float64 [10000.0, 2500.0] | [3.0, 0.75] [2.0, 0.5]")
+    ) == ("NYMEX NG ICE NG | float64 [10000.0, 2500.0] MMBTU MMBTU | [3.0, 0.75] [2.0, 0.5]")
 
 
 def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -> None:
     headers = Cells.from_rows(
-        [["CLEARING_RATE_PER_LOT", "Name", "lot_size", "brokerage_rate_per_lot"]]
+        [["CLEARING_RATE_PER_LOT", "Name", "Lot_Unit", "lot_size", "brokerage_rate_per_lot"]]
     )
-    body = Cells.from_rows([[2.0, "NYMEX NG", 10000.0, 3.0]])
+    body = Cells.from_rows([[2.0, "NYMEX NG", "MMBTU", 10000.0, 3.0]])
     assert bridge.call("ReadContractSpecifications", [the_specifications(headers, body)]) == (
-        "NYMEX NG | float64 [10000.0] | [3.0] [2.0]"
+        "NYMEX NG | float64 [10000.0] MMBTU | [3.0] [2.0]"
     )
 
 
@@ -821,56 +823,72 @@ def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -
     ("headers", "body", "text"),
     [
         (
-            Cells.from_rows([["name", "lot_size", "brokerage", "clearing_rate_per_lot"]]),
+            Cells.from_rows(
+                [["name", "lot_size", "lot_unit", "brokerage", "clearing_rate_per_lot"]]
+            ),
             SPECIFICATION_BODY,
-            "#ERROR _CreateContractSpecifications: header_row cell (1, 3) is text 'brokerage', "
-            "expected one of name, lot_size, brokerage_rate_per_lot or clearing_rate_per_lot",
+            "#ERROR _CreateContractSpecifications: header_row cell (1, 4) is text 'brokerage', "
+            "expected one of name, lot_size, lot_unit, brokerage_rate_per_lot or "
+            "clearing_rate_per_lot",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 2.5, 3.0, 2.0]]),
+            Cells.from_rows([["NYMEX NG", 2.5, "MMBTU", 3.0, 2.0]]),
             "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, "
             "expected a whole number",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", True, 3.0, 2.0]]),
+            Cells.from_rows([["NYMEX NG", True, "MMBTU", 3.0, 2.0]]),
             "#ERROR _CreateContractSpecifications: table cell (1, 2) is boolean TRUE, "
             "expected number",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 10000.0, "three", 2.0]]),
-            "#ERROR _CreateContractSpecifications: table cell (1, 3) is text 'three', "
+            Cells.from_rows([["NYMEX NG", 10000.0, "MMBTU", "three", 2.0]]),
+            "#ERROR _CreateContractSpecifications: table cell (1, 4) is text 'three', "
             "expected number",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([[1.0, 10000.0, 3.0, 2.0]]),
+            Cells.from_rows([[1.0, 10000.0, "MMBTU", 3.0, 2.0]]),
             "#ERROR _CreateContractSpecifications: table cell (1, 1) is number 1.0, expected text",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["NYMEX NG", 2500.0, 0.75, 0.5]]),
+            Cells.from_rows([["NYMEX NG", 10000.0, 42.0, 3.0, 2.0]]),
+            "#ERROR _CreateContractSpecifications: table cell (1, 3) is number 42.0, expected text",
+        ),
+        (
+            SPECIFICATION_HEADERS,
+            Cells.from_rows([["NYMEX NG", 10000.0, "usd", 3.0, 2.0]]),
+            "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', "
+            "expected a volume, mass or energy unit",
+        ),
+        (
+            SPECIFICATION_HEADERS,
+            Cells.from_rows(
+                [["NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0], ["NYMEX NG", 2500.0, "MMBTU", 0.75, 0.5]]
+            ),
             "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', "
             "already given at row 1",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 0.0, 3.0, 2.0]]),
+            Cells.from_rows([["NYMEX NG", 0.0, "MMBTU", 3.0, 2.0]]),
             "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, "
             "expected 1 or more",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 10000.0, -0.5, 2.0]]),
+            Cells.from_rows([["NYMEX NG", 10000.0, "MMBTU", -0.5, 2.0]]),
             "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is "
             "-0.5, expected 0 or more",
         ),
         (
             SPECIFICATION_HEADERS,
-            Cells.from_rows([["NYMEX NG", 10000.0, 3.0]]),
-            "#ERROR _CreateContractSpecifications: header_row has 4 headers, expected 3, "
+            Cells.from_rows([["NYMEX NG", 10000.0, "MMBTU", 3.0]]),
+            "#ERROR _CreateContractSpecifications: header_row has 5 headers, expected 4, "
             "one per column of table",
         ),
         (
@@ -890,6 +908,8 @@ def test_the_specifications_headers_bind_in_any_order_and_one_row_is_a_table() -
         "a boolean lot size",
         "text where a fee is expected",
         "a number where a name is expected",
+        "a number where the lot unit is expected",
+        "a currency unit in another case where the lot unit is expected",
         "a name given twice",
         "a lot size of zero",
         "a negative fee",
@@ -906,7 +926,9 @@ def test_contract_specifications_that_cannot_be_made_say_why(
 
 def test_a_failed_specifications_construction_publishes_no_object_and_no_handle() -> None:
     before = number(the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY), SPECIFICATIONS)
-    twice = Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["NYMEX NG", 2500.0, 0.75, 0.5]])
+    twice = Cells.from_rows(
+        [["NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0], ["NYMEX NG", 2500.0, "MMBTU", 0.75, 0.5]]
+    )
     assert bridge.call("_CreateContractSpecifications", [SPECIFICATION_HEADERS, twice]) == (
         "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', "
         "already given at row 1"
@@ -930,7 +952,7 @@ def test_a_handle_of_another_kind_is_not_contract_specifications() -> None:
 # double with a fraction, and one below one, are the builder's to refuse.
 @given(lot_size=st.integers(1, 2**53))
 def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: int) -> None:
-    body = Cells.from_rows([["NYMEX NG", float(lot_size), 3.0, 2.0]])
+    body = Cells.from_rows([["NYMEX NG", float(lot_size), "MMBTU", 3.0, 2.0]])
     spill = bridge.call("util_ReadHandle", [the_specifications(SPECIFICATION_HEADERS, body)])
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
@@ -941,7 +963,7 @@ def test_any_lot_size_a_cell_holds_exactly_is_created_and_read_back(lot_size: in
 def test_a_whole_double_beyond_two_to_the_fifty_three_is_kept_and_read_back(
     lot_size: float,
 ) -> None:
-    body = Cells.from_rows([["NYMEX NG", lot_size, 3.0, 2.0]])
+    body = Cells.from_rows([["NYMEX NG", lot_size, "MMBTU", 3.0, 2.0]])
     spill = bridge.call("util_ReadHandle", [the_specifications(SPECIFICATION_HEADERS, body)])
     assert isinstance(spill, tuple), spill
     _, slots, _ = cast(tuple[object, NDArray[np.float64], str], spill)
@@ -971,7 +993,7 @@ def the_parts() -> tuple[str, str, str, str]:
     return (
         a_schedule(CODES, FUTURES, OPTIONS),
         a_calendar(HOLIDAYS),
-        the_conventions(*UNITS),
+        the_conventions(*GAS),
         the_specifications(SPECIFICATION_HEADERS, SPECIFICATION_BODY),
     )
 
@@ -1206,6 +1228,24 @@ def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_nam
         f"#ERROR _CreateIndex: holiday_calendar is index handle {made!r}, "
         "expected holiday calendar handle"
     )
+
+
+# The index's own rule for the lot units reaches the sheet in the library's words: the volume
+# conventions of the conventions page with the gas specifications, and a table of barrels and
+# gallons under them accepted.
+def test_lot_units_of_another_measure_are_refused_by_the_index_in_the_librarys_words() -> None:
+    schedule, holidays, _, gas = the_parts()
+    volume = the_conventions(*UNITS)
+    assert bridge.call("_CreateIndex", ["WTI NYMEX", schedule, volume, gas, holidays]) == (
+        "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', "
+        "expected a volume unit, GAL, BBL, L or M3"
+    )
+    barrels_and_gallons = the_specifications(
+        SPECIFICATION_HEADERS,
+        Cells.from_rows([["lots", 1000.0, "BBL", 3.0, 2.0], ["gal", 1.0, "GAL", 0.0, 0.0]]),
+    )
+    made = an_index("WTI NYMEX", schedule, volume, barrels_and_gallons, holidays)
+    assert rows(read(made))[2] == ["WTI NYMEX", "futures", 3.0, 2.0, 1.0]
 
 
 def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() -> None:

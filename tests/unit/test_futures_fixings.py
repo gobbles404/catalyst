@@ -56,13 +56,13 @@ ELSEWHERE = dates("2026-01-01")
 SCHEDULE = futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None)
 CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
-    ("NYMEX",), np.array([1000.0]), np.array([0.0]), np.array([0.0])
+    ("NYMEX",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
 )
 
 
 def an_index(holidays: NDArray[np.datetime64]) -> Index:
     """A futures index whose holiday calendar lists those days."""
-    return index("sample", SCHEDULE, CONVENTIONS, SPECIFICATIONS, holiday_calendar(holidays))
+    return index("sample", SCHEDULE, CONVENTIONS, SPECIFICATIONS, holiday_calendar(holidays), UNITS)
 
 
 # --- what is kept -------------------------------------------------------------
@@ -129,6 +129,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
         CONVENTIONS,
         SPECIFICATIONS,
         None,
+        UNITS,
     )
     with pytest.raises(ValueError) as failure:
         futures_fixings(DATES, SETTLES[:2], gas_daily)
@@ -139,6 +140,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
         CONVENTIONS,
         SPECIFICATIONS,
         None,
+        UNITS,
     )
     with pytest.raises(ValueError) as failure:
         futures_fixings(DATES, SETTLES, iferc)

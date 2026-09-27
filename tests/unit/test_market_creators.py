@@ -61,9 +61,17 @@ def an_index(schedule: object, holidays: object = MISSING, name: str = "WTI NYME
         "_CreateContractSpecifications",
         [
             Cells.from_rows(
-                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+                [
+                    [
+                        "name",
+                        "lot_size",
+                        "lot_unit",
+                        "brokerage_rate_per_lot",
+                        "clearing_rate_per_lot",
+                    ]
+                ]
             ),
-            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+            Cells.from_rows([["NYMEX", 1000.0, "BBL", 0.0, 0.0]]),
         ],
     )
     text = bridge.call("_CreateIndex", [name, schedule, conventions, specifications, holidays])

@@ -160,9 +160,17 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
         "_CreateContractSpecifications",
         [
             Cells.from_rows(
-                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+                [
+                    [
+                        "name",
+                        "lot_size",
+                        "lot_unit",
+                        "brokerage_rate_per_lot",
+                        "clearing_rate_per_lot",
+                    ]
+                ]
             ),
-            Cells.from_rows([["NYMEX", 1000.0, 0.0, 0.0]]),
+            Cells.from_rows([["NYMEX", 1000.0, "BBL", 0.0, 0.0]]),
         ],
     )
     text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
@@ -503,18 +511,21 @@ def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() 
     ]
 
 
-# The lot sizes go out as numbers, as every whole number does on the sheet, one row per contract.
+# The lot sizes go out as numbers, as every whole number does on the sheet, the lot units as text,
+# one row per word.
 def test_contract_specifications_spill_one_row_per_contract_under_two_heading_rows() -> None:
     headers = Cells.from_rows(
-        [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+        [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
     )
-    body = Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0], ["ICE NG", 2500.0, 0.75, 0.5]])
+    body = Cells.from_rows(
+        [["lots", 10000.0, "MMBTU", 3.0, 2.0], ["ice_lots", 2500.0, "MMBTU", 0.75, 0.5]]
+    )
     handle = bridge.call("_CreateContractSpecifications", [headers, body])
     assert rows(read(handle)) == [
-        ["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"],
-        ["str", "float64", "float64", "float64"],
-        ["NYMEX NG", 10000.0, 3.0, 2.0],
-        ["ICE NG", 2500.0, 0.75, 0.5],
+        ["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"],
+        ["str", "float64", "str", "float64", "float64"],
+        ["lots", 10000.0, "MMBTU", 3.0, 2.0],
+        ["ice_lots", 2500.0, "MMBTU", 0.75, 0.5],
     ]
 
 
@@ -610,9 +621,17 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         "_CreateContractSpecifications",
         [
             Cells.from_rows(
-                [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+                [
+                    [
+                        "name",
+                        "lot_size",
+                        "lot_unit",
+                        "brokerage_rate_per_lot",
+                        "clearing_rate_per_lot",
+                    ]
+                ]
             ),
-            Cells.from_rows([["NYMEX NG", 10000.0, 3.0, 2.0]]),
+            Cells.from_rows([["NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0]]),
         ],
     )
     made = bridge.call(
