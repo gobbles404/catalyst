@@ -62,13 +62,16 @@ def compressed(terms: Terms, binding: Binding, counter: WorkCounter) -> Compress
     """The one way to make Compressed: one rule, that the binding covers every observation the
     terms read; then every term folded once, the unfixed ones summed by component and mark into
     the coefficients and the fixed ones, each times its print, summed by component into the
-    constants. The work is one term per term, counted on the counter. Nothing is timed."""
+    constants. The work is one term per term and one cell per cell of the view made, zeros
+    included, both counted on the counter: the view is components times marks whatever the
+    terms, and the count is what shows it. Nothing is timed."""
     _covers(terms, binding)
+    marks = binding.marks.size
     counter.hit(KERNEL)
     counter.hit(TERM, terms.coefficient.size)
+    counter.hit(CELL, terms.components * marks)
     fixed = binding.is_fixed[terms.observation]
     live = ~fixed
-    marks = binding.marks.size
     keys = terms.component[live] * marks + binding.mark_of[terms.observation[live]]
     coefficient = np.bincount(
         keys, weights=terms.coefficient[live], minlength=terms.components * marks

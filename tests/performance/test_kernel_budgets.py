@@ -5,6 +5,7 @@ hundred components, ten thousand terms, two thousand observations and forty mark
 hundred year-long averages; every number is synthetic."""
 
 from collections.abc import Callable
+from functools import partial
 
 import numpy as np
 from test_seam_allocation import SLACK, peak_bytes
@@ -42,13 +43,43 @@ def test_a_binding_counts_one_observation_per_row() -> None:
     assert counter.freeze().as_dict() == {OBSERVATION: OBS}
 
 
-def test_the_amounts_and_the_fold_count_one_term_per_term_and_one_kernel_call() -> None:
+def test_the_amounts_count_one_term_per_term_and_one_kernel_call() -> None:
     counter = WorkCounter()
     amounts(TERMS, BOUND, counter)
     assert counter.freeze().as_dict() == {KERNEL: 1, TERM: T}
+
+
+def test_the_fold_counts_one_term_per_term_and_one_cell_per_cell_of_the_view() -> None:
     counter = WorkCounter()
     compressed(TERMS, BOUND, counter)
-    assert counter.freeze().as_dict() == {KERNEL: 1, TERM: T}
+    assert counter.freeze().as_dict() == {KERNEL: 1, TERM: T, CELL: R * M}
+
+
+# The view is components times marks whatever the terms: a thousand components over a thousand
+# terms make a thousand cells against one mark and two million against two thousand, sixteen
+# megabytes, and the cell count is what shows it. Measured 43,065 and 16,035,097 bytes on
+# 2026-09-29.
+def test_the_folds_cells_grow_with_the_marks_while_the_terms_stay_fixed() -> None:
+    components, count, observations = 1_000, 1_000, 500
+    rng = np.random.default_rng(2)
+    made = terms(
+        rng.normal(size=components),
+        rng.integers(0, components, size=count).astype(np.intp),
+        rng.integers(0, observations, size=count).astype(np.intp),
+        rng.normal(size=count),
+    )
+    for marks, ceiling in ((1, 43_065), (2_000, 16_035_097)):
+        bound = binding(
+            np.zeros(observations, dtype=np.bool_),
+            np.full(observations, np.nan),
+            (np.arange(observations) * marks // observations).astype(np.intp),
+            np.full(marks, 50.0),
+            WorkCounter(),
+        )
+        counter = WorkCounter()
+        compressed(made, bound, counter)
+        assert counter.freeze().as_dict() == {KERNEL: 1, TERM: count, CELL: components * marks}
+        assert peak_bytes(partial(compressed, made, bound, WorkCounter())) <= ceiling + SLACK
 
 
 def test_a_tick_through_the_compressed_view_counts_one_cell_per_cell_zeros_included() -> None:
@@ -106,8 +137,8 @@ def test_the_fold_checks_one_rule_and_folds_every_term_once(
         "compressed": 1,
         "_covers": 1,
         "Binding.observations": 1,
-        "Terms.components": 3,
-        "WorkCounter.hit": 2,
+        "Terms.components": 4,
+        "WorkCounter.hit": 3,
     }
     assert numpy_calls(call) == {"ndarray.reshape": 1, "ndarray.setflags": 2}
 
