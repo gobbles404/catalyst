@@ -16,6 +16,11 @@ KERNEL: Final = "kernel"  # one vectorized pricing call over a whole group
 HASH: Final = "hash"  # one identity digest computed
 CACHE_HIT: Final = "cache_hit"
 CACHE_MISS: Final = "cache_miss"
+TERM: Final = "term"  # one coefficient times one price, added into its component
+CELL: Final = (
+    "cell"  # one cell of a rectangle: a compressed coefficient times a mark, or a dense cell made
+)
+OBSERVATION: Final = "observation"  # one observation priced in a binding
 
 
 @dataclass(frozen=True, slots=True)
