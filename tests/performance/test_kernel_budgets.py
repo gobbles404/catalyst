@@ -123,8 +123,9 @@ def test_the_amounts_check_one_rule_and_sum_the_runs_once(
     }
 
 
-# The fold is two grouped sums by bincount, which cProfile names as a plain built-in and does not
-# list, one reshape of the cells and the two freezes.
+# The fold is two grouped sums: the cells, zeros with each unfixed term added in by add.at, and the
+# constants by bincount, which cProfile names as a plain built-in and does not list; then one
+# reshape of the cells and the two freezes.
 def test_the_fold_checks_one_rule_and_folds_every_term_once(
     call_profile: CallProfile, numpy_calls: NumpyCalls
 ) -> None:
@@ -140,7 +141,12 @@ def test_the_fold_checks_one_rule_and_folds_every_term_once(
         "Terms.components": 4,
         "WorkCounter.hit": 3,
     }
-    assert numpy_calls(call) == {"ndarray.reshape": 1, "ndarray.setflags": 2}
+    assert numpy_calls(call) == {
+        "numpy.zeros": 1,
+        "ufunc.at": 1,
+        "ndarray.reshape": 1,
+        "ndarray.setflags": 2,
+    }
 
 
 # A tick is one rule and one multiply of the rectangle by the vector, by operator.

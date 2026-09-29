@@ -73,17 +73,18 @@ def compressed(terms: Terms, binding: Binding, counter: WorkCounter) -> Compress
     fixed = binding.is_fixed[terms.observation]
     live = ~fixed
     keys = terms.component[live] * marks + binding.mark_of[terms.observation[live]]
-    coefficient = np.bincount(
-        keys, weights=terms.coefficient[live], minlength=terms.components * marks
-    ).reshape(terms.components, marks)
+    # the cells start at zero and each unfixed term is added into its own, in the order given; so
+    # they hold numbers with a fraction even when no term is added, where bincount gives integers
+    cells = np.zeros(terms.components * marks)
+    np.add.at(cells, keys, terms.coefficient[live])
+    cells.setflags(write=False)  # the sum itself, so that the view cannot be made writable alone
     folded = binding.price[terms.observation[fixed]]
     folded *= terms.coefficient[fixed]
     constant = terms.constant + np.bincount(
         terms.component[fixed], weights=folded, minlength=terms.components
     )
     constant.setflags(write=False)
-    coefficient.setflags(write=False)
-    return Compressed(constant, coefficient)
+    return Compressed(constant, cells.reshape(terms.components, marks))
 
 
 def compressed_amounts(

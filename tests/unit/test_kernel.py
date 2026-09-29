@@ -217,9 +217,27 @@ def test_a_component_with_every_day_fixed_prices_with_no_mark_at_all() -> None:
         WorkCounter(),
     )
     view = compressed(made, bound, WorkCounter())
-    assert view.coefficient.shape == (1, 0)
+    assert view.coefficient.shape == (1, 0) and view.coefficient.dtype == np.float64
     got = three_ways(made, bound)
     assert abs(got[0] - 168.00) < 1e-9
+
+
+# With every day fixed and marks still quoted, no term lands in a cell; numpy's grouped sum gives
+# integers when it has nothing to add, and the view must still hold numbers with a fraction, or
+# every tick would convert the whole rectangle before multiplying.
+def test_a_view_with_no_unfixed_term_still_holds_fractional_numbers() -> None:
+    made = a_terms(average(2 * LOT, 24.90, span(0, 10)))
+    bound = binding(
+        np.ones(10, dtype=np.bool_),
+        floats(*MB_PRINTS),
+        np.zeros(10, dtype=np.intp),
+        floats(26.10, 25.80),
+        WorkCounter(),
+    )
+    view = compressed(made, bound, WorkCounter())
+    assert view.coefficient.shape == (1, 2) and view.coefficient.dtype == np.float64
+    np.testing.assert_array_equal(view.coefficient, [[0.0, 0.0]])
+    assert abs(compressed_amounts(view, bound.marks, WorkCounter())[0] - 168.00) < 1e-9
 
 
 def test_one_component_alone_and_in_the_batch_agree_through_the_same_path() -> None:
@@ -325,6 +343,8 @@ def test_the_compressed_view_is_frozen_and_every_result_is_a_new_array() -> None
     bound = binding(*ten_rows_market(), MARKS, WorkCounter())
     view = compressed(made, bound, WorkCounter())
     assert not view.constant.flags.writeable and not view.coefficient.flags.writeable
+    with pytest.raises(ValueError, match="cannot set WRITEABLE flag"):
+        view.coefficient.setflags(write=True)  # the rectangle's storage is frozen too
     first = amounts(made, bound, WorkCounter())
     second = amounts(made, bound, WorkCounter())
     assert first is not second and first.flags.writeable
