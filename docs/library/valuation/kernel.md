@@ -1,6 +1,6 @@
 # The kernel
 
-Built in #NNN.
+Built in #119.
 
 The arithmetic that turns what the trades require and the prices of what they read into amounts, one per component in the settlement currency, and what a move in each mark does to them: three records and one module of arithmetic, with no product, date, contract code or name in any of them. It has no worksheet surface yet and needs nothing from the seam. The code is `src/goosedove/valuation/`: `terms.py`, `binding.py` and `kernel.py`, each a record with its builder or the calculations, and `columns.py`, what the builders share.
 
