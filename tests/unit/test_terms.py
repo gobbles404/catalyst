@@ -19,22 +19,22 @@ def ints(*values: int) -> NDArray[np.intp]:
 # The page's sample: two components, an NG outright of 100,000 MMBtu bought at 3.10, reading
 # observation 0, and a three-day ethane average of three lots at 25.10, 63 USD per cent per gallon
 # on each day, reading observations 1 to 3.
-CONSTANT = floats(-310_000.0, -1_260.0 * 25.10)
+FIXED_LEG = floats(-310_000.0, -1_260.0 * 25.10)
 COMPONENT = ints(0, 1, 1, 1)
 OBSERVATION = ints(0, 1, 2, 3)
 COEFFICIENT = floats(100_000.0, 63.0, 63.0, 63.0)
 
 
 def test_the_sample_keeps_its_columns_and_finds_the_observations_read() -> None:
-    made = terms(CONSTANT, COMPONENT, OBSERVATION, COEFFICIENT)
+    made = terms(FIXED_LEG, COMPONENT, OBSERVATION, COEFFICIENT)
     assert made.components == 2
     assert made.observations == 4
-    np.testing.assert_array_equal(made.constant, CONSTANT)
+    np.testing.assert_array_equal(made.fixed_leg, FIXED_LEG)
     np.testing.assert_array_equal(made.component, COMPONENT)
     np.testing.assert_array_equal(made.observation, OBSERVATION)
     np.testing.assert_array_equal(made.coefficient, COEFFICIENT)
     np.testing.assert_array_equal(made.first, ints(0, 1, 4))
-    for column in (made.constant, made.component, made.observation, made.coefficient, made.first):
+    for column in (made.fixed_leg, made.component, made.observation, made.coefficient, made.first):
         assert not column.flags.writeable
 
 
@@ -50,13 +50,13 @@ def test_the_terms_are_grouped_by_component_in_the_order_given_and_the_runs_foun
 
 
 def test_the_columns_are_copies_so_the_caller_keeps_its_own() -> None:
-    constant, coefficient = CONSTANT.copy(), COEFFICIENT.copy()
-    made = terms(constant, COMPONENT, OBSERVATION, coefficient)
-    constant[0] = 1.0
+    fixed_leg, coefficient = FIXED_LEG.copy(), COEFFICIENT.copy()
+    made = terms(fixed_leg, COMPONENT, OBSERVATION, coefficient)
+    fixed_leg[0] = 1.0
     coefficient[0] = 2.0
-    assert made.constant[0] == -310_000.0
+    assert made.fixed_leg[0] == -310_000.0
     assert made.coefficient[0] == 100_000.0
-    assert constant.flags.writeable and coefficient.flags.writeable
+    assert fixed_leg.flags.writeable and coefficient.flags.writeable
 
 
 def test_a_component_with_no_term_is_allowed_and_so_are_no_terms_at_all() -> None:
@@ -74,24 +74,24 @@ def test_a_coefficient_of_zero_is_allowed() -> None:
 
 
 @pytest.mark.parametrize(
-    ("constant", "component", "observation", "coefficient", "message"),
+    ("fixed_leg", "component", "observation", "coefficient", "message"),
     [
         (
             floats(),
             ints(),
             ints(),
             floats(),
-            "constant has 0 rows, expected 1 or more, one per component",
+            "fixed_leg has 0 rows, expected 1 or more, one per component",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             ints(0, 1, 1),
             OBSERVATION,
             COEFFICIENT,
             "component has 3 rows, expected 4, one per term as coefficient has",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             COMPONENT,
             ints(0),
             COEFFICIENT,
@@ -102,31 +102,31 @@ def test_a_coefficient_of_zero_is_allowed() -> None:
             COMPONENT,
             OBSERVATION,
             COEFFICIENT,
-            "constant row 2 is nan, expected a finite number",
+            "fixed_leg row 2 is nan, expected a finite number",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             COMPONENT,
             OBSERVATION,
             floats(100_000.0, 63.0, np.inf, 63.0),
             "coefficient row 3 is inf, expected a finite number",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             ints(0, 2, 1, 1),
             OBSERVATION,
             COEFFICIENT,
             "component row 2 is 2, expected 0 through 1, the components counted from zero",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             ints(-1, 1, 1, 1),
             OBSERVATION,
             COEFFICIENT,
             "component row 1 is -1, expected 0 through 1, the components counted from zero",
         ),
         (
-            CONSTANT,
+            FIXED_LEG,
             COMPONENT,
             ints(0, 1, 2, -1),
             COEFFICIENT,
@@ -135,12 +135,12 @@ def test_a_coefficient_of_zero_is_allowed() -> None:
     ],
 )
 def test_a_rule_that_fails_names_the_row_and_what_was_wanted(
-    constant: NDArray[np.float64],
+    fixed_leg: NDArray[np.float64],
     component: NDArray[np.intp],
     observation: NDArray[np.intp],
     coefficient: NDArray[np.float64],
     message: str,
 ) -> None:
     with pytest.raises(ValueError) as caught:
-        terms(constant, component, observation, coefficient)
+        terms(fixed_leg, component, observation, coefficient)
     assert str(caught.value) == message
