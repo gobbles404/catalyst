@@ -1,0 +1,181 @@
+From bc318236155a9e29f52238c0a96d748e1e0d13a4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:37:31 +0000
+Subject: [PATCH] calendar-datetime64-loops-int64-views: datetime64 compares
+ and offsets on int64 views
+
+---
+ src/goosedove/calendar/calendar.py           |  9 +++++----
+ src/goosedove/globals/discount_curve.py      |  3 ++-
+ src/goosedove/market/market_history.py       | 11 +++++++----
+ src/goosedove/market_data/futures_fixings.py |  3 ++-
+ tests/performance/test_seam_budgets.py       | 16 ++++++++++++----
+ 5 files changed, 28 insertions(+), 14 deletions(-)
+
+diff --git a/src/goosedove/calendar/calendar.py b/src/goosedove/calendar/calendar.py
+index 30266c3..1eec2d8 100644
+--- a/src/goosedove/calendar/calendar.py
++++ b/src/goosedove/calendar/calendar.py
+@@ -105,7 +105,8 @@ def _futures_calendar(
+         have = f"{len(codes)} {'contract' if len(codes) == 1 else 'contracts'}"
+         raise ValueError(f"index has {have}, expected at least 2")
+     _each_code_once(codes)
+-    unordered = expiries[1:] <= expiries[:-1]
++    serial = expiries.view(np.int64)  # the days as counts: the same order, a plain integer loop
++    unordered = serial[1:] <= serial[:-1]
+     if unordered.any():
+         k = int(unordered.argmax())  # expiries[k + 1] is the first expiry not after the one before
+         raise ValueError(
+@@ -125,7 +126,7 @@ def _futures_calendar(
+         np.arange(1, expiries.size, dtype=np.intp), (expiries[1:] - expiries[:-1]).view(np.int64)
+     )
+     is_priced = np.is_busday(dates, holidays=holidays.holiday)
+-    is_fixed = dates < valuation_date.as_of
++    is_fixed = dates.view(np.int64) < int(valuation_date.as_of.astype(np.int64))
+     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+ 
+ 
+@@ -175,7 +176,7 @@ def _gas_daily_calendar(
+     # count in all, by the gap rule. The lengths are freed before the flags.
+     contract = np.repeat(np.arange(last.size, dtype=np.intp), (last - first).view(np.int64) + 1)
+     is_priced = np.ones(dates.size, dtype=bool)
+-    is_fixed = dates <= valuation_date.as_of
++    is_fixed = dates.view(np.int64) <= int(valuation_date.as_of.astype(np.int64))
+     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+ 
+ 
+@@ -205,7 +206,7 @@ def _iferc_calendar(
+     dates = np.array(published, dtype="datetime64[D]")
+     contract = np.arange(dates.size, dtype=np.intp)
+     is_priced = np.ones(dates.size, dtype=bool)
+-    is_fixed = dates < valuation_date.as_of
++    is_fixed = dates.view(np.int64) < int(valuation_date.as_of.astype(np.int64))
+     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+ 
+ 
+diff --git a/src/goosedove/globals/discount_curve.py b/src/goosedove/globals/discount_curve.py
+index d3aad09..180b1b5 100644
+--- a/src/goosedove/globals/discount_curve.py
++++ b/src/goosedove/globals/discount_curve.py
+@@ -68,7 +68,8 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64])
+         raise ValueError(
+             f"discount_factor row {factors.size} is {float(factors[-1])!r}, expected greater than 0"
+         )
+-    unordered = days[1:] <= days[:-1]
++    serial = days.view(np.int64)  # the days as counts: the same order, a plain integer loop
++    unordered = serial[1:] <= serial[:-1]
+     if unordered.any():
+         k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
+         raise ValueError(
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index a3ee152..f5f9a79 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -91,8 +91,10 @@ def futures_history(fixings: FuturesFixings, calendar: Calendar) -> MarketHistor
+             "expected dates before the valuation date"
+         )
+     dates = calendar.dates
+-    offset = (fixing_dates - dates[0]).astype(np.intp)
+-    inside = (offset >= 0) & (offset < dates.size)
++    # days since the calendar's first, on the days as counts: no timedelta, no cast
++    offset = fixing_dates.view(np.int64) - int(dates[0].astype(np.int64))
++    inside = offset >= 0
++    inside &= offset < dates.size
+     rows = offset[inside]
+     _every_fixed_day(calendar, rows)
+     return _frozen(calendar, rows, fixings.settles[inside])
+@@ -114,8 +116,9 @@ def gas_daily_history(fixings: GasDailyFixings, calendar: Calendar) -> MarketHis
+             "expected flow days on or before the valuation date"
+         )
+     dates = calendar.dates
+-    offset = (flow_dates - dates[0]).astype(np.intp)
+-    inside = (offset >= 0) & (offset < dates.size)
++    offset = flow_dates.view(np.int64) - int(dates[0].astype(np.int64))
++    inside = offset >= 0
++    inside &= offset < dates.size
+     rows = offset[inside]
+     _every_fixed_day(calendar, rows)
+     return _frozen(calendar, rows, fixings.prices[inside])
+diff --git a/src/goosedove/market_data/futures_fixings.py b/src/goosedove/market_data/futures_fixings.py
+index 207624c..3efc9ff 100644
+--- a/src/goosedove/market_data/futures_fixings.py
++++ b/src/goosedove/market_data/futures_fixings.py
+@@ -60,7 +60,8 @@ def futures_fixings(
+         have = f"{settles.size} {'settle' if settles.size == 1 else 'settles'}"
+         raise ValueError(f"settle has {have}, expected {dates.size}, one per date")
+     days = np.array(dates, dtype="datetime64[D]")
+-    unordered = days[1:] <= days[:-1]
++    serial = days.view(np.int64)  # the days as counts: the same order, a plain integer loop
++    unordered = serial[1:] <= serial[:-1]
+     if unordered.any():
+         k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
+         raise ValueError(
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 6c62c76..e7a1a13 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -592,6 +592,7 @@ CURVE_NUMPY = {
+     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
+     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
+     "ndarray.repeat": 1,  # the anchor each day runs to, which the line is held above
++    "ndarray.view": 1,  # the anchors' days as counts, for the order look
+     "ndarray.setflags": 2,  # frozen
+     "ufunc.reduce": 5,
+ }
+@@ -1157,6 +1158,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
+         "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
+         "ndarray.astype": 2,  # the date column on its way to days
+         "numpy.array": 2,  # the two copies the fixings keep
++        "ndarray.view": 1,  # the days as counts, for the order look
+         "ndarray.setflags": 2,  # frozen
+         "ufunc.reduce": 4,
+     }
+@@ -1202,7 +1204,8 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
+     assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
+         "ndarray.any": 1,  # the builder's look at the order of the expiries
+         "numpy.arange": 2,  # every day, and the rows after the first, once each
+-        "ndarray.view": 1,  # the gaps between expiries as day counts
++        "ndarray.view": 3,  # the expiries, their gaps and the days as day counts
++        "generic.astype": 1,  # the valuation day as a day count
+         "ndarray.repeat": 1,  # the prompt row of every day, once
+         "ndarray.setflags": 4,  # the four columns frozen
+         "ufunc.reduce": 1,
+@@ -1293,7 +1296,8 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
+     assert numpy_calls(lambda: PATH["_CreateCalendar"](valuation, index)) == {
+         "ndarray.any": 2,
+         "numpy.arange": 2,  # every day, and the months' rows
+-        "ndarray.view": 1,  # the months' lengths as day counts
++        "ndarray.view": 2,  # the months' lengths and the days as day counts
++        "generic.astype": 1,  # the valuation day as a day count
+         "ndarray.repeat": 1,  # the month of every day, once
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
+@@ -1329,6 +1333,8 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
+         "ndarray.any": 1,
+         "numpy.array": 1,
+         "numpy.arange": 1,
++        "ndarray.view": 1,  # the publication days as day counts
++        "generic.astype": 1,  # the valuation day as a day count
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
+         "ufunc.reduce": 1,
+@@ -1380,7 +1386,8 @@ def test_a_market_history_is_two_handles_in_and_the_calendar_kept(
+     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
+     assert calls == {
+         "ndarray.any": 2,  # the builder's two looks
+-        "ndarray.astype": 1,  # the fixings' days to rows of the calendar
++        "ndarray.view": 1,  # the fixings' days as day counts, rows of the calendar
++        "generic.astype": 1,  # the calendar's first day as a day count
+         "numpy.zeros": 1,  # the rows covered
+         "ndarray.setflags": 2,  # the two columns frozen
+         "ufunc.reduce": 2,
+@@ -1434,7 +1441,8 @@ def test_a_gas_daily_history_is_two_handles_in_and_the_calendar_kept(
+     calls = numpy_calls(lambda: PATH["_CreateMarketHistory"](made, fixings))
+     assert calls == {
+         "ndarray.any": 2,  # the builder's two looks
+-        "ndarray.astype": 1,  # the flow days to rows of the calendar
++        "ndarray.view": 1,  # the flow days as day counts, rows of the calendar
++        "generic.astype": 1,  # the calendar's first day as a day count
+         "numpy.zeros": 1,  # the rows covered
+         "ndarray.setflags": 2,  # the two columns frozen
+         "ufunc.reduce": 2,

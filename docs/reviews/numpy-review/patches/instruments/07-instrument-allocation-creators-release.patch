@@ -1,0 +1,253 @@
+From 5562821bf9f1f34bc840f0b2b2ee9fbb44bfd422 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:49:08 +0000
+Subject: [PATCH] instrument-allocation-creators-release: a creator's peak is
+ one call released inside it, not the least of three retained
+
+---
+ tests/performance/test_seam_allocation.py | 71 +++++++++++++++++++------------
+ 1 file changed, 44 insertions(+), 27 deletions(-)
+
+diff --git a/tests/performance/test_seam_allocation.py b/tests/performance/test_seam_allocation.py
+index a9135e4..72ad1a3 100644
+--- a/tests/performance/test_seam_allocation.py
++++ b/tests/performance/test_seam_allocation.py
+@@ -164,9 +164,9 @@ def test_a_mixed_array_out_peaks_at_its_masks_and_its_joined_text() -> None:
+ 
+ # --- handles ------------------------------------------------------------------
+ # A creator keeps what it makes: the record, its entry in the store and its text; a reader
+-# keeps nothing, and its numpy scalars are the small objects. Each is the least of three warm
+-# calls, so that a resize of the store's dictionary, which lands on one call in many, never
+-# lands on the pin.
++# keeps nothing, and its numpy scalars are the small objects. A creator's peak is one warm call
++# whose publication is released inside it, so the store never grows and a resize of its
++# dictionary never lands on the pin; a reader's is the least of three warm calls.
+ 
+ CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
+ 
+@@ -179,11 +179,21 @@ def least_peak(fn: Callable[[], object]) -> int:
+     return min(peak_bytes(fn) for _ in range(3))
+ 
+ 
++def creator_peak(create: Callable[[], object]) -> int:
++    """The peak of one warm creator call, its publication released inside the call: the release
++    comes after the peak and allocates nothing."""
++
++    def call() -> None:
++        bridge.release(cast(str, create()))
++
++    return peak_bytes(call)
++
++
+ # Measured 1,176 bytes for the valuation date on 2026-09-14, and 1,671 for reading it back as a
+ # three-row table on 2026-09-15: the record and its entry, then the kinds, the slots and the
+ # masks of six cells.
+ def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
+-    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
+     handle = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
+ 
+@@ -221,7 +231,8 @@ def test_a_discount_curve_from_a_daily_table_pays_its_looks_and_its_filling_once
+     days = 3_631
+     body = curve_body(days)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 60 * days + SLACK
++        creator_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body))
++        <= 60 * days + SLACK
+     )
+ 
+ 
+@@ -232,7 +243,8 @@ def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> N
+     days = 3_631
+     body = anchor_body(12, days - 1)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 25 * days + SLACK
++        creator_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body))
++        <= 25 * days + SLACK
+     )
+ 
+ 
+@@ -254,9 +266,9 @@ def schedule_columns(contracts: int) -> tuple[Cells, Cells, Cells, Cells]:
+ def test_a_futures_schedule_keeps_a_copy_of_each_date_column() -> None:
+     contracts = 120
+     codes, futures, options, _ = schedule_columns(contracts)
+-    with_options = least_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, options))
++    with_options = creator_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, options))
+     assert with_options <= 32 * contracts + 2 * SLACK
+-    without = least_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING))
++    without = creator_peak(lambda: ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING))
+     assert without <= 17 * contracts + 2 * SLACK
+ 
+ 
+@@ -272,7 +284,7 @@ def holiday_column(days: int) -> Cells:
+ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
+     days = 100
+     holidays = holiday_column(days)
+-    assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
+ 
+ 
+ def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
+@@ -292,7 +304,7 @@ def test_an_iferc_schedule_keeps_a_copy_of_each_date_column() -> None:
+     contracts = 120
+     codes, last_trading, publications = iferc_columns(contracts)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateIfercSchedule"](codes, last_trading, publications))
++        creator_peak(lambda: ENTRY["_CreateIfercSchedule"](codes, last_trading, publications))
+         <= 32 * contracts + 2 * SLACK
+     )
+ 
+@@ -312,7 +324,7 @@ def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
+     contracts = 120
+     codes, first, last = gas_daily_columns(contracts)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateGasDailySchedule"](codes, first, last))
++        creator_peak(lambda: ENTRY["_CreateGasDailySchedule"](codes, first, last))
+         <= 32 * contracts + 2 * SLACK
+     )
+ 
+@@ -321,7 +333,7 @@ def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
+ # and 1,162 for reading them back as a three-row table of fifteen text cells.
+ def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
+     codes = ("USD", "BBL", "USD", "volume", "BBL")
+-    assert least_peak(lambda: ENTRY["_CreateIndexConventions"](*codes)) <= 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateIndexConventions"](*codes)) <= 2 * SLACK
+     handle = ENTRY["_CreateIndexConventions"](*codes)
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
+ 
+@@ -358,7 +370,7 @@ def test_contract_specifications_keep_a_copy_of_each_numeric_column() -> None:
+     contracts = 120
+     body = specification_body(contracts)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body))
++        creator_peak(lambda: ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body))
+         <= 100 * contracts + 2 * SLACK
+     )
+ 
+@@ -374,7 +386,7 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
+     )
+     holidays = ENTRY["_CreateHolidayCalendar"](holiday_column(100))
+     assert (
+-        least_peak(
++        creator_peak(
+             lambda: ENTRY["_CreateIndex"](
+                 "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+             )
+@@ -421,7 +433,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
+     )
+     days, settles = fixings_columns(rows, 100)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
++        creator_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
+         <= 45 * rows + SLACK
+     )
+ 
+@@ -463,7 +475,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
+ def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
+     days = 360
+     valuation, index = calendar_sources(13)
+-    assert least_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 25 * days + 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 25 * days + 2 * SLACK
+     made = ENTRY["_CreateCalendar"](valuation, index)
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+ 
+@@ -503,13 +515,14 @@ def test_the_other_two_calendars_keep_four_columns_per_period() -> None:
+     gas_daily = ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12))
+     gas_daily_index = an_index(gas_daily)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily_index))
++        creator_peak(lambda: ENTRY["_CreateCalendar"](valuation, gas_daily_index))
+         <= 25 * 365 + 2 * SLACK
+     )
+     iferc = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+     iferc_index = an_index(iferc)
+     assert (
+-        least_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index)) <= 80 * 120 + 2 * SLACK
++        creator_peak(lambda: ENTRY["_CreateCalendar"](valuation, iferc_index))
++        <= 80 * 120 + 2 * SLACK
+     )
+ 
+ 
+@@ -538,7 +551,9 @@ def history_sources(contracts: int) -> tuple[object, object]:
+ def test_a_market_history_keeps_two_short_columns_and_its_reader_pays_per_cell() -> None:
+     days = 360
+     made, fixings = history_sources(13)
+-    assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 6 * days + 2 * SLACK
++    assert (
++        creator_peak(lambda: ENTRY["_CreateMarketHistory"](made, fixings)) <= 6 * days + 2 * SLACK
++    )
+     history = ENTRY["_CreateMarketHistory"](made, fixings)
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](history)) <= 30 * 5 * days + 2 * SLACK
+ 
+@@ -586,12 +601,14 @@ def iferc_history_sources() -> tuple[object, object]:
+ def test_the_other_two_histories_keep_two_short_columns_and_their_readers_pay_per_cell() -> None:
+     days, months = 365, 120
+     made, prints = gas_daily_history_sources()
+-    assert least_peak(lambda: ENTRY["_CreateMarketHistory"](made, prints)) <= 30 * days + 2 * SLACK
++    assert (
++        creator_peak(lambda: ENTRY["_CreateMarketHistory"](made, prints)) <= 30 * days + 2 * SLACK
++    )
+     daily = ENTRY["_CreateMarketHistory"](made, prints)
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * days + 2 * SLACK
+     calendar, indices = iferc_history_sources()
+     assert (
+-        least_peak(lambda: ENTRY["_CreateMarketHistory"](calendar, indices))
++        creator_peak(lambda: ENTRY["_CreateMarketHistory"](calendar, indices))
+         <= 100 * months + 2 * SLACK
+     )
+     monthly = ENTRY["_CreateMarketHistory"](calendar, indices)
+@@ -617,7 +634,7 @@ def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
+     codes, prices = iferc_fixing_columns(count)
+     index = an_index(ENTRY["_CreateIfercSchedule"](*iferc_columns(count)))
+     assert (
+-        least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices, index))
++        creator_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices, index))
+         <= 80 * count + 2 * SLACK
+     )
+ 
+@@ -641,7 +658,7 @@ def test_gas_daily_fixings_keep_a_copy_of_each_column() -> None:
+     flow_days, prices = flow_day_columns(count)
+     index = an_index(ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12)))
+     assert (
+-        least_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices, index))
++        creator_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices, index))
+         <= 40 * count + 2 * SLACK
+     )
+ 
+@@ -656,7 +673,7 @@ def price_vector_peaks(prices: int) -> tuple[int, int]:
+     column = price_column(prices)
+     made = ENTRY["_CreatePriceVector"]("sample", column)
+     return (
+-        least_peak(lambda: ENTRY["_CreatePriceVector"]("sample", column)),
++        creator_peak(lambda: ENTRY["_CreatePriceVector"]("sample", column)),
+         least_peak(lambda: ENTRY["util_ReadHandle"](made)),
+     )
+ 
+@@ -673,7 +690,7 @@ def test_a_price_vector_keeps_one_copy_of_its_column_and_nothing_per_price_beyon
+         created, read = price_vector_peaks(prices)
+         assert created <= 8 * prices + 2 * SLACK
+         assert read <= 21 * (prices + 2) + SLACK
+-    assert least_peak(lambda: ENTRY["_CreatePriceVector"]("sample", 74.25)) <= SLACK
++    assert creator_peak(lambda: ENTRY["_CreatePriceVector"]("sample", 74.25)) <= SLACK
+ 
+ 
+ def market_sources(contracts: int, days_apart: int) -> tuple[object, object]:
+@@ -708,7 +725,7 @@ def test_a_market_keeps_one_small_record_whatever_the_sizes(
+     contracts: int, days_apart: int
+ ) -> None:
+     history, quotes = market_sources(contracts, days_apart)
+-    assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
+ 
+ 
+ def gas_daily_market_sources() -> tuple[object, object]:
+@@ -747,7 +764,7 @@ def test_a_market_over_the_other_two_calendars_keeps_the_same_record(
+     sources: Callable[[], tuple[object, object]],
+ ) -> None:
+     history, quotes = sources()
+-    assert least_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
++    assert creator_peak(lambda: ENTRY["_CreateMarket"](history, quotes)) <= 2 * SLACK
+ 
+ 
+ # Reading a market back pays the calendar's table and then the fifth column through the

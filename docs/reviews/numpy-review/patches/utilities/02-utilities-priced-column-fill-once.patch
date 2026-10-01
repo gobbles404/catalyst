@@ -1,0 +1,25 @@
+From accc3f610e521ad85a767b952880c1fc93db3e2a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:02:13 +0000
+Subject: [PATCH] utilities-priced-column-fill-once: the fifth column's slots
+ from np.empty with one NaN column fill, not np.full under the base's copy
+
+---
+ src/goosedove/excel/utilities.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/goosedove/excel/utilities.py b/src/goosedove/excel/utilities.py
+index a8e4ff3..848ff42 100644
+--- a/src/goosedove/excel/utilities.py
++++ b/src/goosedove/excel/utilities.py
+@@ -148,8 +148,9 @@ def _priced_column(
+     kinds = np.empty((rows, width + 1), dtype=np.uint8)
+     kinds[:, :width] = base.kinds
+     kinds[:, width] = TEXT_CODE
+-    slots = np.full((rows, width + 1), np.nan)
++    slots = np.empty((rows, width + 1))
+     slots[:, :width] = base.numeric_slots
++    slots[:, width] = np.nan
+     pairs = np.empty((rows - 2, 2), dtype=object)
+     pairs[:, 0] = np.array(calendar.index.schedule.codes, dtype=object)[calendar.contract]
+     pairs[:, 1] = words

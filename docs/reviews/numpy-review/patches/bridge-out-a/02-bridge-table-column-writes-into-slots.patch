@@ -1,0 +1,115 @@
+From 84ce5a5a76d14892f83cc19ea441463bbcc6592c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:22:50 +0000
+Subject: [PATCH] bridge-table-column-writes-into-slots: The table builder
+ writes each date column straight into its strided slot column: no serials
+ temporary and no second view
+
+---
+ src/goosedove/excel/bridge.py | 64 +++++++++++++++++++++++++++----------------
+ 1 file changed, 40 insertions(+), 24 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index efd65a0..3bfc0fc 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -154,7 +154,7 @@ class MixedArray:
+             # cells behind the storage the copy below would take, as the array results refuse.
+             if type(column) is not np.ndarray or column.ndim != 1:
+                 raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
+-            kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
++            kinds[top:, j] = _table_column(column, top + 1, j + 1, slots[top:, j])
+         # Sheet order: the heading rows, then each body row's texts left to right, which is the
+         # transpose of the text columns laid side by side.
+         texts = tuple(itertools.chain.from_iterable(headings))
+@@ -852,22 +852,30 @@ FIRST_DAY: Final = FIRST_SERIAL + EPOCH_DAYS
+ LAST_DAY: Final = LAST_SERIAL + EPOCH_DAYS
+ 
+ 
++def _not_days(counted: NDArray[np.int64]) -> tuple[int, str] | None:
++    """The flat index and reason of the first of the days that is not a date in the calendar, or
++    None, read through their int64 view: NaT lies below the calendar, so a min and a max settle
++    both looks with no mask, and a mask is built only to name the cell, the first NaT before the
++    first day outside."""
++    if counted.size == 0:
++        return None
++    low = int(counted.min())
++    if low >= FIRST_DAY and int(counted.max()) <= LAST_DAY:
++        return None
++    if low == NAT_DAYS:
++        return int((counted == NAT_DAYS).argmax()), "is not a date"
++    outside = (counted < FIRST_DAY) | (counted > LAST_DAY)
++    return int(outside.argmax()), f"is a date outside {CALENDAR}"
++
++
+ def _serials(days: NDArray[Any]) -> tuple[NDArray[np.float64], int | None, str]:
+     """Serials for an array of days, or the flat index and reason of the first that is not one.
+-
+-    Read through the int64 view: NaT lies below the calendar, so a min and a max settle both
+-    looks with no mask, and a mask is built only to name the cell, the first NaT before the
+-    first day outside. The serials are one cast of the view shifted in place by the epoch,
+-    exact, since every day in the calendar is a whole number far below 2^53.
+-    """
++    The serials are one cast of the int64 view shifted in place by the epoch, exact, since every
++    day in the calendar is a whole number far below 2^53."""
+     counted = days.view(np.int64)
+-    if counted.size:
+-        low = int(counted.min())
+-        if low < FIRST_DAY or int(counted.max()) > LAST_DAY:
+-            if low == NAT_DAYS:
+-                return np.empty(0), int((counted == NAT_DAYS).argmax()), "is not a date"
+-            outside = (counted < FIRST_DAY) | (counted > LAST_DAY)
+-            return np.empty(0), int(outside.argmax()), f"is a date outside {CALENDAR}"
++    bad = _not_days(counted)
++    if bad is not None:
++        return np.empty(0), bad[0], bad[1]
+     serials = counted.astype(np.float64)
+     serials -= EPOCH_DAYS
+     return serials, None, ""
+@@ -902,18 +910,24 @@ def _beyond_exact(array: NDArray[Any]) -> NDArray[np.bool_]:
+     return (array > EXACT) | (array < -EXACT)
+ 
+ 
+-def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArray[Any]]:
+-    """A table column's kind code and what fills its slots, checked before the copy into the
+-    slots would hide what the rule could no longer see, as the array results check before their
+-    conversion; a bad cell is named as INDEX counts it, `row` being the first body row."""
++def _table_column(column: NDArray[Any], row: int, col: int, target: NDArray[np.float64]) -> int:
++    """A table column's kind code, its slots written into target, its column of the slots;
++    checked before the copy into the slots would hide what the rule could no longer see, as the
++    array results check before their conversion; a bad cell is named as INDEX counts it, `row`
++    being the first body row. Days are cast from their int64 view straight into the column and
++    shifted there by the epoch, so no serials are made on the way."""
+     kind = column.dtype.kind
+     if kind == "M" and _unit(column) == "D":
+-        serials, bad, reason = _serials(column)
++        counted = column.view(np.int64)
++        bad = _not_days(counted)
+         if bad is not None:
+-            raise _BadResult(f"result cell ({row + bad}, {col}) {reason}")
+-        return NUMBER_CODE, serials
++            raise _BadResult(f"result cell ({row + bad[0]}, {col}) {bad[1]}")
++        target[...] = counted
++        target -= EPOCH_DAYS
++        return NUMBER_CODE
+     if kind == "b":
+-        return BOOLEAN_CODE, column
++        target[...] = column
++        return BOOLEAN_CODE
+     if kind in "iu":
+         big = _beyond_exact(column)
+         if big.any():
+@@ -921,9 +935,11 @@ def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArra
+                 f"result cell ({row + int(big.argmax())}, {col}) "
+                 "is beyond what a cell holds exactly"
+             )
+-        return NUMBER_CODE, column
++        target[...] = column
++        return NUMBER_CODE
+     if kind == "f":
+-        return NUMBER_CODE, column
++        target[...] = column
++        return NUMBER_CODE
+     raise TypeError(f"column {col} is {describe(column)}, which a table cannot hold")
+ 
+ 

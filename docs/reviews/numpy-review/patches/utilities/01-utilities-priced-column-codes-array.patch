@@ -1,0 +1,82 @@
+From bb8585b7310de769379f233c74c8489c365c8af4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:57:23 +0000
+Subject: [PATCH] utilities-priced-column-codes-array: The fifth column's pairs
+ from the codes as an object array, not from the tuple slice; the scatters
+ through views, not on + 2 temporaries
+
+---
+ src/goosedove/excel/utilities.py | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/src/goosedove/excel/utilities.py b/src/goosedove/excel/utilities.py
+index 1e317ac..a8e4ff3 100644
+--- a/src/goosedove/excel/utilities.py
++++ b/src/goosedove/excel/utilities.py
+@@ -123,7 +123,7 @@ def calendar_table(obj: Calendar) -> MixedArray:
+ 
+ 
+ def _priced_column(
+-    base: MixedArray,
++    calendar: Calendar,
+     header: str,
+     words: NDArray[Any] | str,
+     *priced: tuple[NDArray[np.intp], NDArray[np.float64]],
+@@ -133,12 +133,17 @@ def _priced_column(
+     for every day or one per day, shows on the rest. The words are display, not values, and a
+     column holding numbers on some rows and words on others is not one the table builder takes,
+     so the column is written by kind: its kinds, its slots, and its words into the texts. The
+-    calendar's own table stands as it is, nothing rebuilt.
++    calendar's own table stands as it is, nothing rebuilt, made here as the calendar's reader
++    makes it.
+ 
+     The texts in sheet order: each heading row's four then this column's, and each day's code
+-    then, on a day without a price, its word; the calendar's body texts are its codes alone, one
+-    per day, in the same order.
++    then, on a day without a price, its word. Each day's code is gathered again from the
++    schedule's codes through the prompt rows, an array of references, rather than read off the
++    table's tuple of texts, which numpy would walk text by text to find its shape. The priced
++    rows are written through the column's body, a view under the two heading rows, so no row
++    is shifted into a new array.
+     """
++    base = calendar_table(calendar)
+     rows, width = base.shape
+     kinds = np.empty((rows, width + 1), dtype=np.uint8)
+     kinds[:, :width] = base.kinds
+@@ -146,12 +151,13 @@ def _priced_column(
+     slots = np.full((rows, width + 1), np.nan)
+     slots[:, :width] = base.numeric_slots
+     pairs = np.empty((rows - 2, 2), dtype=object)
+-    pairs[:, 0] = base.texts[2 * width :]
++    pairs[:, 0] = np.array(calendar.index.schedule.codes, dtype=object)[calendar.contract]
+     pairs[:, 1] = words
+     worded = np.ones((rows - 2, 2), dtype=bool)
++    body_kinds, body_slots = kinds[2:, width], slots[2:, width]
+     for on, prices in priced:  # the pairs, not the prices: one or two of them
+-        kinds[on + 2, width] = NUMBER_CODE
+-        slots[on + 2, width] = prices
++        body_kinds[on] = NUMBER_CODE
++        body_slots[on] = prices
+         worded[on, 1] = False
+     headings = (*base.texts[:width], header, *base.texts[width : 2 * width], "float64")
+     return MixedArray(kinds, slots, (*headings, *pairs[worded]))
+@@ -166,9 +172,7 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
+     words = np.empty(calendar.dates.size, dtype=object)
+     words[:] = "closed"
+     words[calendar.is_priced] = "unfixed"
+-    return _priced_column(
+-        calendar_table(calendar), "fixing_price", words, (obj.fixed_rows, obj.fixing_prices)
+-    )
++    return _priced_column(calendar, "fixing_price", words, (obj.fixed_rows, obj.fixing_prices))
+ 
+ 
+ @shown.register
+@@ -182,7 +186,7 @@ def market_table(obj: Market) -> MixedArray:
+     live = np.flatnonzero(calendar.is_priced & ~calendar.is_fixed)
+     quotes = obj.price_vector.prices[calendar.contract[live] - obj.first_contract]
+     return _priced_column(
+-        calendar_table(calendar),
++        calendar,
+         "price",
+         "closed",
+         (history.fixed_rows, history.fixing_prices),

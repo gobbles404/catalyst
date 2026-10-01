@@ -1,0 +1,41 @@
+From bf4f68dec9f61826ea532941a36101a18a2ca869 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:41:23 +0000
+Subject: [PATCH] bridge-one-cell-empty-not-nested-list: the promoted 1x1
+ ranges via np.empty and an item store
+
+---
+ src/goosedove/excel/bridge.py | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 1420752..bb8d236 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -421,7 +421,9 @@ def _numbers(value: object) -> NDArray[np.float64]:
+         if value.seen != ONLY_NUMBERS:
+             raise _first_bad(value, value.kinds != NUMBER_CODE, "number")
+         return value.numbers
+-    return np.array([[_number(value)]])
++    one = np.empty((1, 1))  # stored into, not discovered from a nested list
++    one[0, 0] = _number(value)
++    return one
+ 
+ 
+ def _not_dates(slots: NDArray[np.float64]) -> NDArray[np.bool_]:
+@@ -541,8 +543,13 @@ def _mixed_scalar(value: object) -> MixedArray:
+ 
+ 
+ def _one_cell(code: int, number: float, texts: tuple[str, ...]) -> MixedArray:
+-    """The one-cell storage a promoted scalar needs, laid out as the host lays out a range."""
+-    return MixedArray(np.array([[code]], dtype=np.uint8), np.array([[number]]), texts)
++    """The one-cell storage a promoted scalar needs, laid out as the host lays out a range: two
++    one-element arrays stored into, so numpy discovers no shape or type from a nested list."""
++    kinds = np.empty((1, 1), dtype=np.uint8)
++    kinds[0, 0] = code
++    slots = np.empty((1, 1))
++    slots[0, 0] = number
++    return MixedArray(kinds, slots, texts)
+ 
+ 
+ # --- one column or one row: the shape is checked before any cell is --------

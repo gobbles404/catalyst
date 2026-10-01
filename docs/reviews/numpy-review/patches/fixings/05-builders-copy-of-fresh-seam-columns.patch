@@ -1,0 +1,82 @@
+From 9e300f21eba4c3e854367915d95db8538f2fece3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:38:47 +0000
+Subject: [PATCH] builders-copy-of-fresh-seam-columns: PROTOTYPE (design fork)
+ the fixings keep the arrays they are given and freeze them
+
+---
+ src/goosedove/market_data/futures_fixings.py   | 11 ++++++-----
+ src/goosedove/market_data/gas_daily_fixings.py | 11 ++++++-----
+ 2 files changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/src/goosedove/market_data/futures_fixings.py b/src/goosedove/market_data/futures_fixings.py
+index 557c338..7c3726c 100644
+--- a/src/goosedove/market_data/futures_fixings.py
++++ b/src/goosedove/market_data/futures_fixings.py
+@@ -49,9 +49,10 @@ def futures_fixings(
+     only to name the first one missing. The first and last dates bound the check, so nothing is
+     asked for before the first or after the last, and a holiday outside them changes nothing.
+     The holidays are read as numpy reads them: a day listed twice counts once, and a day listed
+-    on a weekend adds nothing. Both columns are copied and then frozen, so the fixings own their
+-    data: a Python caller keeps whatever it passed, and a later change to an input never
+-    changes a fixing; the index is kept by reference, the one the desk paired the series with.
++    on a weekend adds nothing. Both columns are kept as given, converted only if not already
++    days and numbers, and then frozen: the seam's columns are its own per call, so no copy is
++    made, and a Python caller's arrays are frozen with them; the index is kept by reference,
++    the one the desk paired the series with.
+     Rows count as the sheet counts them, the first row of the column being row 1.
+     """
+     if index.kind is not Kind.FUTURES:
+@@ -60,7 +61,7 @@ def futures_fixings(
+     if settles.size != dates.size:
+         have = f"{settles.size} {'settle' if settles.size == 1 else 'settles'}"
+         raise ValueError(f"settle has {have}, expected {dates.size}, one per date")
+-    days = np.array(dates, dtype="datetime64[D]")
++    days = np.asarray(dates, dtype="datetime64[D]")
+     unordered = days[1:] <= days[:-1]
+     if unordered.any():
+         k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
+@@ -86,7 +87,7 @@ def futures_fixings(
+             f"date row {k + 2} is {days[k + 1]}, expected {following[k]}, "
+             f"the business day after row {k + 1}'s {days[k]}"
+         )
+-    prices = np.array(settles, dtype=np.float64)
++    prices = np.asarray(settles, dtype=np.float64)
+     days.setflags(write=False)
+     prices.setflags(write=False)
+     return FuturesFixings(index, days, prices)
+diff --git a/src/goosedove/market_data/gas_daily_fixings.py b/src/goosedove/market_data/gas_daily_fixings.py
+index 34465a4..0609f49 100644
+--- a/src/goosedove/market_data/gas_daily_fixings.py
++++ b/src/goosedove/market_data/gas_daily_fixings.py
+@@ -40,16 +40,17 @@ def gas_daily_fixings(
+     span, the first row that breaks it named with the day that was expected. Nothing is sorted,
+     filled or carried forward: a series pasted newest first fails at its second row, and a day
+     without a row is a row the desk did not paste. No weekday is looked at, no holiday list is
+-    taken and no month is read off a day. Both columns are copied and then frozen, so the
+-    fixings own their data, and the index is kept by reference, the one the desk paired the
+-    series with. Rows count as the sheet counts them, the first row of the column being row 1.
++    taken and no month is read off a day. Both columns are kept as given, converted only if not
++    already days and numbers, and then frozen, the seam's columns being its own per call, and
++    the index is kept by reference, the one the desk paired the series with. Rows count as the
++    sheet counts them, the first row of the column being row 1.
+     """
+     if index.kind is not Kind.GAS_DAILY:
+         raise ValueError(f"index is {described(index.kind, 'index')}, expected a Gas Daily index")
+     if price.size != flow_date.size:
+         have = f"{price.size} {'price' if price.size == 1 else 'prices'}"
+         raise ValueError(f"price has {have}, expected {flow_date.size}, one per flow_date")
+-    days = np.array(flow_date, dtype="datetime64[D]")
++    days = np.asarray(flow_date, dtype="datetime64[D]")
+     # The days are consecutive exactly when their day numbers increase and the last is one fewer
+     # than the rows after the first: one mask over the day numbers, a view of the column, and
+     # one subtraction of two Python integers. NaT's day number is the least an int64 holds, so a
+@@ -65,7 +66,7 @@ def gas_daily_fixings(
+             f"flow_date row {k + 2} is {days[k + 1]}, expected {following[k]}, "
+             f"the day after row {k + 1}'s {days[k]}"
+         )
+-    prices = np.array(price, dtype=np.float64)
++    prices = np.asarray(price, dtype=np.float64)
+     days.setflags(write=False)
+     prices.setflags(write=False)
+     return GasDailyFixings(index, days, prices)

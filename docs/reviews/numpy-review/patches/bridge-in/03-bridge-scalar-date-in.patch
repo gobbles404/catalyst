@@ -1,0 +1,23 @@
+From d028e5a5f9ccf3d1fbadf36046c8ab3887a4754b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:36:44 +0000
+Subject: [PATCH] bridge-scalar-date-in: a scalar date is one np.datetime64
+ from its day count
+
+---
+ src/goosedove/excel/bridge.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 468d619..f8902bb 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -409,7 +409,7 @@ def _date(value: object) -> np.datetime64:
+     serial = _number(value)
+     if not serial.is_integer() or not FIRST_SERIAL <= serial <= LAST_SERIAL:
+         raise _Rejected
+-    return EXCEL_EPOCH + np.timedelta64(int(serial), "D")
++    return np.datetime64(int(serial) + EPOCH_DAYS, "D")  # days since numpy's epoch, built once
+ 
+ 
+ # --- every cell of a range: no look when the host's summary settles it, one look otherwise ---

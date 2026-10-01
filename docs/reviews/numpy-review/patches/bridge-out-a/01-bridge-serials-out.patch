@@ -1,0 +1,57 @@
+From f63a8ac3d3c6d7064df2a5b5e4e21e360f65a634 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:19:24 +0000
+Subject: [PATCH] bridge-serials-out: Dates to serials: an int64 view and two
+ reductions replace the NaT mask, the timedelta temporary, the divide and the
+ two-sided mask
+
+---
+ src/goosedove/excel/bridge.py | 34 ++++++++++++++++++++++++++--------
+ 1 file changed, 26 insertions(+), 8 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 27a0646..efd65a0 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -843,15 +843,33 @@ def _boolean_out(value: object) -> bool:
+     return flag
+ 
+ 
++# Numpy stores a day as an int64, the days since 1970-01-01, and NaT as the int64 minimum, below
++# every day. Excel's epoch and calendar in those units let a column of days be read through its
++# int64 view, numpy's own storage and not a copy.
++EPOCH_DAYS: Final = int(EXCEL_EPOCH.astype(np.int64))
++NAT_DAYS: Final = int(np.datetime64("NaT", "D").astype(np.int64))
++FIRST_DAY: Final = FIRST_SERIAL + EPOCH_DAYS
++LAST_DAY: Final = LAST_SERIAL + EPOCH_DAYS
++
++
+ def _serials(days: NDArray[Any]) -> tuple[NDArray[np.float64], int | None, str]:
+-    """Serials for an array of days, or the flat index and reason of the first that is not one."""
+-    missing = np.isnat(days)
+-    if missing.any():
+-        return np.empty(0), int(missing.argmax()), "is not a date"
+-    serials = (days - EXCEL_EPOCH) / np.timedelta64(1, "D")
+-    outside = (serials < FIRST_SERIAL) | (serials > LAST_SERIAL)
+-    if outside.any():
+-        return np.empty(0), int(outside.argmax()), f"is a date outside {CALENDAR}"
++    """Serials for an array of days, or the flat index and reason of the first that is not one.
++
++    Read through the int64 view: NaT lies below the calendar, so a min and a max settle both
++    looks with no mask, and a mask is built only to name the cell, the first NaT before the
++    first day outside. The serials are one cast of the view shifted in place by the epoch,
++    exact, since every day in the calendar is a whole number far below 2^53.
++    """
++    counted = days.view(np.int64)
++    if counted.size:
++        low = int(counted.min())
++        if low < FIRST_DAY or int(counted.max()) > LAST_DAY:
++            if low == NAT_DAYS:
++                return np.empty(0), int((counted == NAT_DAYS).argmax()), "is not a date"
++            outside = (counted < FIRST_DAY) | (counted > LAST_DAY)
++            return np.empty(0), int(outside.argmax()), f"is a date outside {CALENDAR}"
++    serials = counted.astype(np.float64)
++    serials -= EPOCH_DAYS
+     return serials, None, ""
+ 
+ 

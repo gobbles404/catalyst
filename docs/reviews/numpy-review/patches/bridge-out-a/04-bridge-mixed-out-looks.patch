@@ -1,0 +1,61 @@
+From 3a5011ca81c0521794f8e846f4c1fa441a54cda9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:33:31 +0000
+Subject: [PATCH] bridge-mixed-out-looks: The mixed road's three looks in two
+ 1-byte masks reused with out=, and kinds.max() for the first look on the
+ success path
+
+---
+ src/goosedove/excel/bridge.py | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 3ea2659..71b4ef7 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -1037,24 +1037,35 @@ def _mixed_out(value: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], s
+     kinds, slots, texts = value.kinds, value.numeric_slots, value.texts
+     if kinds.size == 0:
+         raise _BadResult(f"returned {describe(value)}, expected mixed array with at least one cell")
+-    text_cells = int(np.count_nonzero(kinds == TEXT_CODE))
++    of_kind = kinds == TEXT_CODE
++    text_cells = int(np.count_nonzero(of_kind))
+     if len(texts) != text_cells:
+         raise _BadResult(f"result holds {len(texts)} texts for {text_cells} text cells")
+     empty = texts.index("") if "" in texts else -1
+-    bad = _bad_mixed(kinds, empty)
+-    if bad.any():
+-        r, c, i = _place(kinds, bad)
++    # The three mixed kinds are the three lowest codes, so the max settles the first look with no
++    # mask; the cells are flagged only to name the earliest.
++    if empty >= 0 or int(kinds.max()) > BOOLEAN_CODE:
++        r, c, i = _place(kinds, _bad_mixed(kinds, empty))
+         raise _BadResult(
+             f"result cell ({r}, {c}) is {describe(_cell(kinds, slots, texts, i))}, "
+             "expected number, nonempty text or boolean"
+         )
+-    unfinished = (kinds == NUMBER_CODE) & ~np.isfinite(slots)
+-    if unfinished.any():
+-        r, c, _ = _place(kinds, unfinished)
++    # The other two looks share two masks, one over the kinds and one over the slots, each
++    # compare written into one of them with out= rather than into a new array.
++    of_value = np.isfinite(slots)
++    np.not_equal(kinds, NUMBER_CODE, out=of_kind)
++    of_value |= of_kind  # finite, or not a number cell
++    if not of_value.all():
++        np.logical_not(of_value, out=of_value)
++        r, c, _ = _place(kinds, of_value)
+         raise _BadResult(f"result cell ({r}, {c}) is not a finite number")
+-    not_flags = (kinds == BOOLEAN_CODE) & (slots != 0.0) & (slots != 1.0)
+-    if not_flags.any():
+-        r, c, i = _place(kinds, not_flags)
++    np.equal(kinds, BOOLEAN_CODE, out=of_kind)
++    np.not_equal(slots, 0.0, out=of_value)
++    of_kind &= of_value
++    np.not_equal(slots, 1.0, out=of_value)
++    of_kind &= of_value  # a boolean cell holding neither 1.0 nor 0.0
++    if of_kind.any():
++        r, c, i = _place(kinds, of_kind)
+         raise _BadResult(
+             f"result cell ({r}, {c}) is {describe(float(slots.flat[i]))}, expected boolean"
+         )

@@ -1,0 +1,42 @@
+From 1c593a6c82301ee86830a104388a2190c6201603 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:59:12 +0000
+Subject: [PATCH] bridge-table-empty-not-full: np.full writes NaN into every
+ body cell that a numeric column then overwrites; np.empty plus a NaN fill of
+ the heading rows
+
+---
+ src/goosedove/excel/bridge.py | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index faf31e5..17a38b5 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -138,9 +138,16 @@ class MixedArray:
+                     f"heading row {r + 1} holds {len(row)} texts, expected {width}, one per column"
+                 )
+         kinds = np.empty((top + rows, width), dtype=np.uint8)
+-        slots = np.full((top + rows, width), np.nan)
+         kinds[:top] = TEXT_CODE
+-        text_columns: list[tuple[str, ...]] = []
++        text_columns = [column for column in columns if isinstance(column, tuple)]
++        if text_columns:
++            # A text column keeps NaN in its slots, and one fill of the whole rectangle costs
++            # less than a strided fill of each text column.
++            slots = np.full((top + rows, width), np.nan)
++        else:
++            # Every body slot is written below by its column, so only the heading rows are filled.
++            slots = np.empty((top + rows, width))
++            slots[:top] = np.nan
+         for j, column in enumerate(columns):
+             if len(column) != rows:
+                 raise ValueError(
+@@ -148,7 +155,6 @@ class MixedArray:
+                 )
+             if isinstance(column, tuple):
+                 kinds[top:, j] = TEXT_CODE
+-                text_columns.append(column)
+                 continue
+             # Exactly a plain one-dimensional array: a subclass, a masked array say, could hide
+             # cells behind the storage the copy below would take, as the array results refuse.

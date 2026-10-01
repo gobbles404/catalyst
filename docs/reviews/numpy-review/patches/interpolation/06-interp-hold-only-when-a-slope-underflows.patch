@@ -1,0 +1,49 @@
+From 4e62034c565b36b215248e47ea1d1aca05763c26 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:34:19 +0000
+Subject: [PATCH] interp-hold-only-when-a-slope-underflows: The hold runs only
+ when a segment's slope is subnormal
+
+---
+ src/goosedove/globals/interpolation.py | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/globals/interpolation.py b/src/goosedove/globals/interpolation.py
+index c8c5b65..2ca3ee3 100644
+--- a/src/goosedove/globals/interpolation.py
++++ b/src/goosedove/globals/interpolation.py
+@@ -10,6 +10,8 @@ import numpy as np
+ from numpy.typing import NDArray
+ 
+ ONE_DAY: Final = np.timedelta64(1, "D")
++# The smallest normal float64: a slope of smaller size, other than zero, has lost bits to underflow.
++TINY: Final = float(np.finfo(np.float64).tiny)
+ 
+ 
+ def interpolate_discount_factors(
+@@ -30,12 +32,21 @@ def interpolate_discount_factors(
+     that rose on its last day was a finding of the review of #70. The line never rises above the
+     anchor it runs from, since it adds a non-positive step to it, so the hold is the one bound
+     left to keep, and for any ordinary curve it changes nothing.
++
++    Precisely: with a slope that is zero or a normal float, the three roundings of the line, the
++    slope, its multiple and the sum, stay within a relative 2^-53 each, short of the whole fall
++    to the next anchor for any gap below 3e15 days, so the line cannot reach below that anchor.
++    Only a slope that underflows to a subnormal, with as little as one significant bit, can, so
++    the hold runs only when a slope does, computed as numpy's interp computes it.
+     """
+     days = np.arange(dates[0], dates[-1] + ONE_DAY, dtype="datetime64[D]")
+     offsets = (dates - dates[0]) / ONE_DAY
+     values = np.interp(np.arange(days.size, dtype=np.float64), offsets, factors)
+-    # The anchor each day runs to: the first anchor for its own day, then each later anchor for
+-    # every day since the one before it.
+-    counts = np.concatenate(([1], (dates[1:] - dates[:-1]).astype(np.int64)))
+-    np.maximum(values, np.repeat(factors, counts), out=values)
++    slopes = factors[1:] - factors[:-1]
++    slopes /= offsets[1:] - offsets[:-1]
++    if ((slopes != 0.0) & (slopes > -TINY)).any():  # a fall too small for a normal float
++        # The anchor each day runs to: the first anchor for its own day, then each later anchor
++        # for every day since the one before it.
++        counts = np.concatenate(([1], (dates[1:] - dates[:-1]).astype(np.int64)))
++        np.maximum(values, np.repeat(factors, counts), out=values)
+     return days, values

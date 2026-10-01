@@ -1,0 +1,30 @@
+From 6a6f47b9854707d4cd29f5013c3cf6450ebdb54f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:18:00 +0000
+Subject: [PATCH] interp-gapless-table-is-copied-not-filled: A table with no
+ gaps is its own curve: copy the factors instead of running np.interp
+
+---
+ src/goosedove/globals/interpolation.py | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/goosedove/globals/interpolation.py b/src/goosedove/globals/interpolation.py
+index c8c5b65..3381e42 100644
+--- a/src/goosedove/globals/interpolation.py
++++ b/src/goosedove/globals/interpolation.py
+@@ -30,8 +30,15 @@ def interpolate_discount_factors(
+     that rose on its last day was a finding of the review of #70. The line never rises above the
+     anchor it runs from, since it adds a non-positive step to it, so the hold is the one bound
+     left to keep, and for any ordinary curve it changes nothing.
++
++    Anchors with no gaps, a daily table, are every day already: numpy's interp would hand each
++    day its own anchor's factor exactly and the hold would change nothing, so the factors are
++    copied instead, one pass and no line. A factor count that differs from the date count still
++    reaches numpy's interp, which refuses it, as it does with gaps.
+     """
+     days = np.arange(dates[0], dates[-1] + ONE_DAY, dtype="datetime64[D]")
++    if days.size == dates.size == factors.size:  # increasing dates are every day only with no gaps
++        return days, factors.copy()
+     offsets = (dates - dates[0]) / ONE_DAY
+     values = np.interp(np.arange(days.size, dtype=np.float64), offsets, factors)
+     # The anchor each day runs to: the first anchor for its own day, then each later anchor for

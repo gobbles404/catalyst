@@ -1,0 +1,47 @@
+From 931e380a9a30d24957495a38f4c61cca9cd600aa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:21:03 +0000
+Subject: [PATCH] curve-order-and-span-on-int64-view: The ordering and span
+ checks on the int64 view
+
+---
+ src/goosedove/globals/discount_curve.py | 8 ++++++--
+ tests/performance/test_seam_budgets.py  | 1 +
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/goosedove/globals/discount_curve.py b/src/goosedove/globals/discount_curve.py
+index 510cf2f..1800496 100644
+--- a/src/goosedove/globals/discount_curve.py
++++ b/src/goosedove/globals/discount_curve.py
+@@ -68,13 +68,17 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64])
+         raise ValueError(
+             f"discount_factor row {factors.size} is {float(factors[-1])!r}, expected greater than 0"
+         )
+-    unordered = days[1:] <= days[:-1]
++    # The days as the whole numbers they are stored as, so that the order and the span are
++    # integer compares: a datetime64 compare checks every element for NaT, and the span would be
++    # two datetime scalars. The span is taken in Python ints, which cannot overflow.
++    whole = days.view(np.int64)
++    unordered = whole[1:] <= whole[:-1]
+     if unordered.any():
+         k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
+         raise ValueError(
+             f"date row {k + 2} is {days[k + 1]}, expected a date after row {k + 1}'s {days[k]}"
+         )
+-    if days[-1] - days[0] >= np.timedelta64(MAX_DAYS, "D"):
++    if int(whole[-1]) - int(whole[0]) >= MAX_DAYS:
+         raise ValueError(
+             f"date row {days.size} is {days[-1]}, "
+             f"expected within {MAX_DAYS - 1} days of row 1's {days[0]}"
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index ebf66ba..075a007 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -589,6 +589,7 @@ CURVE_LEDGER = {
+ CURVE_NUMPY = {
+     "ndarray.any": 4,  # one look per column, then rising and unordered, one look each
+     "ndarray.all": 1,  # every factor finite: the success path makes no inverted mask
++    "ndarray.view": 1,  # the days as whole numbers, for the order and the span
+     "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
+     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
+     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets

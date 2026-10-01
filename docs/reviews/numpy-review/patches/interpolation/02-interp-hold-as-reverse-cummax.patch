@@ -1,0 +1,29 @@
+From 172d613298b3107752a6773e1ac4529cfc85cf0c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:23:38 +0000
+Subject: [PATCH] interp-hold-as-reverse-cummax: The hold above the right
+ anchor is a reverse cumulative maximum in place
+
+---
+ src/goosedove/globals/interpolation.py | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/globals/interpolation.py b/src/goosedove/globals/interpolation.py
+index c8c5b65..54fdded 100644
+--- a/src/goosedove/globals/interpolation.py
++++ b/src/goosedove/globals/interpolation.py
+@@ -34,8 +34,10 @@ def interpolate_discount_factors(
+     days = np.arange(dates[0], dates[-1] + ONE_DAY, dtype="datetime64[D]")
+     offsets = (dates - dates[0]) / ONE_DAY
+     values = np.interp(np.arange(days.size, dtype=np.float64), offsets, factors)
+-    # The anchor each day runs to: the first anchor for its own day, then each later anchor for
+-    # every day since the one before it.
+-    counts = np.concatenate(([1], (dates[1:] - dates[:-1]).astype(np.int64)))
+-    np.maximum(values, np.repeat(factors, counts), out=values)
++    # The hold, as the greatest value from each day to the last, taken from the right in place:
++    # each day after it on its own line is no higher, the anchor it runs to is exact, and every
++    # day beyond that anchor is no higher than it, so that greatest value is the day's own or the
++    # anchor's, whichever is higher.
++    back = values[::-1]
++    np.maximum.accumulate(back, out=back)
+     return days, values

@@ -1,0 +1,111 @@
+From 9bfda53ae3311e96568ec2180531ebc6f8b8909e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:32:35 +0000
+Subject: [PATCH] bridge-table-text-column: a table's column of text is the
+ host's tuple sliced, not gathered
+
+---
+ docs/seam/bridge.md           |  2 +-
+ src/goosedove/excel/bridge.py | 42 ++++++++++++++++--------------------------
+ 2 files changed, 17 insertions(+), 27 deletions(-)
+
+diff --git a/docs/seam/bridge.md b/docs/seam/bridge.md
+index aaea72e..4a76ad6 100644
+--- a/docs/seam/bridge.md
++++ b/docs/seam/bridge.md
+@@ -209,7 +209,7 @@ Registration reads the schema once, as it reads a signature: each column's name
+ 
+ On each call the prepared path does what it always did first: every argument alone, left to right, the header row as a row of text and the body as a mixed range, so a blank in the body is the mixed rule's failure with the mixed rule's words. Then, for each table, it binds and refines. Binding matches the headers to the schema: the count against the body's width, then each header in order, either unknown or already given, then any name the headers left out; the earliest offending header wins. Four headers cost four lookups, and nothing is done per row. Refinement then takes the columns in sheet order and checks each against its column type with one look: the kinds settle a column of numbers, text or booleans, one compare of that column's kind codes, and the slots settle a column of dates, the same three tests the date rule makes over a whole range, because a text slot is NaN and a boolean slot is 1.0 or 0.0, and neither is a whole serial inside the calendar. The first flagged cell is named as INDEX counts within the whole body, with the column's own position, so `trades cell (2, 1) is number 46277.5, expected date` says which column and which row.
+ 
+-What the function receives is the schema's record, a frozen object with one typed attribute per column, aligned by row: `trades.date` is an array of numpy days, `trades.product` a tuple of texts, `trades.quantity` an array of numbers and `trades.cleared` an array of booleans. Nothing is rebuilt. A column of numbers is a view of the mixed storage. A column of dates is converted once, by the same two steps the date rule uses. A column of booleans is one conversion of its slots. A column of text is gathered once: the k-th text cell of the body is the k-th text, so each cell's place among the texts is the count of text cells above its row plus the count to its left, found for the whole body in one mask and one cumulative sum the first time a column of text is bound, and the texts are then picked out by those places from an array of them, with nothing made per row. The headers were consumed by the binding; the record does not carry them, and the header-row parameter receives the tuple it always did, which the function has no use for.
++What the function receives is the schema's record, a frozen object with one typed attribute per column, aligned by row: `trades.date` is an array of numpy days, `trades.product` a tuple of texts, `trades.quantity` an array of numbers and `trades.cleared` an array of booleans. Nothing is rebuilt. A column of numbers is a view of the mixed storage. A column of dates is converted once, by the same two steps the date rule uses. A column of booleans is one conversion of its slots. A column of text is a slice of the host's tuple: the record is built only once every column has passed, and then every text cell of the body lies in a column of text, since a column of numbers, dates or booleans refuses a text cell, so the texts in sheet order are the text columns' cells row by row, and a column's texts are every T-th text from its rank among the T columns of text. With one column of text the slice is the host's tuple itself, handed over as a `TextColumn` argument is, and nothing is made per row either way. The headers were consumed by the binding; the record does not carry them, and the header-row parameter receives the tuple it always did, which the function has no use for.
+ 
+ What that costs is pinned. `tests/performance/test_seam_budgets.py` pins a table of ten thousand cells, 2,500 rows of the four columns above, at every bridge function once, and on the numpy ledger at one look per column, three conversions, one array of the texts, one cumulative sum and three sums, whatever the number of rows. `tests/performance/test_seam_allocation.py` pins its peak at 14 bytes per cell plus the slack, measured 135,266 bytes on 2026-09-13: the conversions of the date column, the placing and gathering of the text column, the boolean column, and one 1-byte mask per column. A bad cell deep in a column is found by that column's look and named without a walk, and the columns after it are never looked at. On the host a table is two ranges in, the header row and the body, and `tests/performance/HostWorkBudgets.cs` pins it at three trips, eight objects and the cells and text cells of both; the host carries a table as it carries any two ranges, and knows nothing of schemas.
+ 
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 1c528a9..468d619 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -33,7 +33,7 @@ import re
+ from collections.abc import Callable, Sequence
+ from dataclasses import dataclass, fields, replace
+ from enum import IntEnum
+-from functools import cache, partial
++from functools import partial
+ from importlib.metadata import PackageNotFoundError, version
+ from operator import attrgetter
+ from types import NoneType, UnionType
+@@ -626,32 +626,14 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
+ # --- a table: a header row and a body, bound by name into typed columns -------------------
+ 
+ 
+-@dataclass(frozen=True, slots=True)
+-class _TextPlaces:
+-    """Where the body's text cells sit among its texts, found once per table when a column of
+-    text is bound: the mask of text cells, how many text cells the rows above each row hold, and
+-    the texts as an array, so a column's texts are gathered by index with nothing built per row.
+-    """
+-
+-    is_text: NDArray[np.bool_]
+-    above: NDArray[np.int64]
+-    texts: NDArray[np.object_]
+-
+-
+-def _text_places(body: MixedArray) -> _TextPlaces:
+-    is_text = body.kinds == TEXT_CODE
+-    per_row = is_text.sum(axis=1)
+-    return _TextPlaces(is_text, np.cumsum(per_row) - per_row, np.array(body.texts, dtype=object))
+-
+-
+ @dataclass(frozen=True, slots=True)
+ class _Body:
+     """One body under refinement: its storage, the table argument's name for messages, and the
+-    text places, made on first use, so a table with no column of text never pays for them."""
++    positions of the columns bound to text, in sheet order, which place each one's texts."""
+ 
+     mixed: MixedArray
+     argument: str
+-    places: Callable[[], _TextPlaces]
++    text_columns: tuple[int, ...]
+ 
+ 
+ def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> TypeValidationError:
+@@ -666,7 +648,8 @@ def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> Typ
+ 
+ # One rule per column type. Each takes one look at its column: the kinds settle number, text
+ # and boolean, and the slots settle a date, as the whole-range rules do. Number columns are
+-# views of the mixed storage; dates and booleans are converted once; text is gathered once.
++# views of the mixed storage; dates and booleans are converted once; text is a slice of the
++# host's tuple.
+ def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
+     bad = body.mixed.kinds[:, j] != NUMBER_CODE
+     if bad.any():
+@@ -686,9 +669,15 @@ def _texts_of(body: _Body, j: int) -> tuple[str, ...]:
+     bad = body.mixed.kinds[:, j] != TEXT_CODE
+     if bad.any():
+         raise _bad_cell(body, j, bad, "text")
+-    places = body.places()
+-    ranks = places.above + places.is_text[:, :j].sum(axis=1)  # text cells before each, in order
+-    return tuple(places.texts[ranks])
++    # A record is built only when every column has passed, and then every text cell of the body
++    # lies in a column bound to text: _bind binds every column, and each other column type
++    # refuses a text cell, the number and boolean columns by its kind and the date column by its
++    # NaN slot. The texts are in sheet order, so they are the text columns' cells row by row, and
++    # this column's are every T-th from its rank among the T. A slice taken while a later column
++    # will still refuse is never seen. A column type that accepted text would break this.
++    # With one text column the slice is the host's tuple itself, handed over as a TextColumn is.
++    columns = body.text_columns
++    return body.mixed.texts[columns.index(j) :: len(columns)]
+ 
+ 
+ def _booleans_of(body: _Body, j: int) -> NDArray[np.bool_]:
+@@ -776,7 +765,8 @@ def _bind(schema: Schema, headers: tuple[str, ...], cols: int) -> tuple[Column,
+ def _refine(schema: Schema, headers: tuple[str, ...], body: MixedArray) -> Table:
+     """Bind the headers, check each column against its type in sheet order, build the record."""
+     bound = _bind(schema, headers, body.shape[1])
+-    under = _Body(body, schema.table, cache(lambda: _text_places(body)))
++    text_columns = tuple([j for j, column in enumerate(bound) if column.refine is _texts_of])
++    under = _Body(body, schema.table, text_columns)
+     return schema.record(**{column.name: column.refine(under, j) for j, column in enumerate(bound)})
+ 
+ 

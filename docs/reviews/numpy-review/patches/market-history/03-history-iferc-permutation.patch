@@ -1,0 +1,64 @@
+From 0961572ea9843952075a234785c543162d13c445 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:06:41 +0000
+Subject: [PATCH] history-iferc-permutation: the IFERC binder checks by one
+ reduce and one count and puts each index on its month's row by one scatter
+
+---
+ src/goosedove/market/market_history.py | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index 8df10fa..58c4e62 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -51,8 +51,8 @@ def market_history(calendar: Calendar, fixings: object) -> MarketHistory:
+ 
+     The calendar is kept as it is, its periods, contracts and flags neither copied nor changed,
+     and the fixings are left as they were; the rows and the prices are the history's own, the
+-    prices copied out of the fixings' column, and both are frozen. Nothing is sorted but an
+-    index's place, which is its month's row, and no calendar is rebuilt.
++    prices copied out of the fixings' column, and both are frozen. Nothing is sorted, an index
++    being put on its month's row, and no calendar is rebuilt.
+     """
+     return _bind(fixings, calendar)
+ 
+@@ -122,24 +122,29 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
+     codes = calendar.index.schedule.codes
+     place = {code: row for row, code in enumerate(codes)}
+     rows = np.array([place[code] for code in fixings.codes], dtype=np.intp)
+-    unfixed = ~calendar.is_fixed[rows]
+-    if unfixed.any():
+-        k = int(rows[unfixed].min())  # the earliest month with an index it should not have
++    first_unfixed = calendar.first_unfixed  # the fixed months are the rows before it
++    if rows.max(initial=-1) >= first_unfixed:
++        k = int(rows[rows >= first_unfixed].min())  # the earliest month it should not have
+         raise ValueError(
+             f"fixings contract_code {codes[k]!r} is a month not yet fixed in calendar, "
+             "expected an index for fixed months alone"
+         )
+-    covered = np.zeros(calendar.dates.size, dtype=bool)
+-    covered[rows] = True
+-    missing = calendar.is_fixed & ~covered
+-    if missing.any():
++    # Every row is a fixed month and none repeats, the fixings' creator's rule, so every fixed
++    # month has its index exactly when the rows number the fixed months.
++    if rows.size != first_unfixed:
++        covered = np.zeros(calendar.dates.size, dtype=bool)
++        covered[rows] = True
++        missing = calendar.is_fixed & ~covered
+         k = int(missing.argmax())  # the first fixed month without an index
+         raise ValueError(
+             f"fixings has no index for {codes[k]}, "
+             "expected an index for every fixed month in calendar"
+         )
+-    order = np.argsort(rows)
+-    return _frozen(calendar, rows[order], fixings.prices[order])
++    # So the rows are the fixed months in some order: in the calendar's order they are the
++    # first rows, and each index is put on its month's row by one scatter, nothing sorted.
++    prices = np.empty(rows.size, dtype=np.float64)
++    prices[rows] = fixings.prices
++    return _frozen(calendar, np.arange(rows.size, dtype=np.intp), prices)
+ 
+ 
+ def _inside(

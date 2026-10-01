@@ -1,0 +1,66 @@
+From 91a574c743281a4c108512ec78a0702f45794dc1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:36:56 +0000
+Subject: [PATCH] bridge-mixed-out-ascii-units: Text length in Excel's units
+ without the UTF-16 encode when the joined text is ASCII, and the over-limit
+ split on one byte per unit with a max instead of a mask
+
+---
+ src/goosedove/excel/bridge.py | 35 +++++++++++++++++++++++------------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 71b4ef7..6f36ad6 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -1029,8 +1029,8 @@ def _mixed_out(value: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], s
+     The earliest cell holding no value, a blank, a missing or an empty text, is named as on the
+     way in. Then a number cell must hold a finite number and a boolean cell 1.0 or 0.0; no text
+     may hold a NUL, since NUL separates the texts on their way across; and every text is at
+-    most what a cell holds, counted as Excel counts, checked on the joined text in one encode
+-    and split per text only when the total runs past the limit.
++    most what a cell holds, counted as Excel counts, checked on the joined text, encoded only
++    when it is not ASCII, and split per text only when the total runs past the limit.
+     """
+     if type(value) is not MixedArray:
+         raise _returned(value, "mixed array")
+@@ -1076,18 +1076,29 @@ def _mixed_out(value: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], s
+         raise _BadResult(
+             f"result cell ({r}, {c}) is text {texts[k]!r}, expected text with no NUL character"
+         )
+-    encoded = joined.encode("utf-16-le")
+-    if len(encoded) // 2 - max(len(texts) - 1, 0) > MAX_TEXT:
+-        # Only now can any one text be too long: split the units at the separators, one look.
+-        units = np.frombuffer(encoded, dtype=np.uint16)
+-        separators = np.flatnonzero(units == 0)
+-        lengths = np.concatenate((separators, [units.size])) - np.concatenate(([0], separators + 1))
+-        over = lengths > MAX_TEXT
+-        if over.any():
+-            k = int(over.argmax())
++    # Excel counts UTF-16 units. ASCII text is one unit per character, and str.isascii reads a
++    # flag the string already carries, so the encode is paid only for text beyond ASCII.
++    ascii_only = joined.isascii()
++    encoded = b"" if ascii_only else joined.encode("utf-16-le")
++    total = len(joined) if ascii_only else len(encoded) // 2
++    if total - max(len(texts) - 1, 0) > MAX_TEXT:
++        # Only now can any one text be too long: split the units at the separators, one look,
++        # one byte a unit when ASCII and two otherwise. The gaps between the separators, with
++        # one before the first text and one after the last, are each text's length plus one.
++        if ascii_only:
++            units = np.frombuffer(joined.encode("ascii"), dtype=np.uint8)
++        else:
++            units = np.frombuffer(encoded, dtype=np.uint16)
++        edges = np.empty(len(texts) + 1, dtype=np.intp)
++        edges[0] = -1
++        edges[-1] = units.size
++        edges[1:-1] = np.flatnonzero(units == 0)
++        gaps = np.diff(edges)
++        if int(gaps.max()) > MAX_TEXT + 1:
++            k = int((gaps > MAX_TEXT + 1).argmax())
+             r, c = _text_place(kinds, k)
+             raise _BadResult(
+-                f"result cell ({r}, {c}) is text of {int(lengths[k])} characters, "
++                f"result cell ({r}, {c}) is text of {int(gaps[k]) - 1} characters, "
+                 f"expected at most {MAX_TEXT}"
+             )
+     return (

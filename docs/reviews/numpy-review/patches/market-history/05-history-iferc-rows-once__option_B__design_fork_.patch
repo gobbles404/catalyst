@@ -1,0 +1,69 @@
+From 27279abfad8f074635399ef8103753d517910cea Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:11:56 +0000
+Subject: [PATCH] history-iferc-rows-once (option B, design fork): the fixings
+ keep each code's month row, found once when the codes are struck off
+
+---
+ src/goosedove/market/market_history.py     |  3 +--
+ src/goosedove/market_data/iferc_fixings.py | 16 +++++++++++-----
+ 2 files changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index b4f029f..565d141 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -120,8 +120,7 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
+     the rows come out in the calendar's order whatever order the indices came in."""
+     _over_the_calendars_index(calendar, fixings.index)
+     codes = calendar.index.schedule.codes
+-    place = {code: row for row, code in enumerate(codes)}
+-    rows = np.fromiter(map(place.__getitem__, fixings.codes), np.intp, len(fixings.codes))
++    rows = fixings.rows  # each index's month, found when the fixings were made
+     first_unfixed = calendar.first_unfixed  # the fixed months are the rows before it
+     if rows.max(initial=-1) >= first_unfixed:
+         k = int(rows[rows >= first_unfixed].min())  # the earliest month it should not have
+diff --git a/src/goosedove/market_data/iferc_fixings.py b/src/goosedove/market_data/iferc_fixings.py
+index ef52150..61b0c2d 100644
+--- a/src/goosedove/market_data/iferc_fixings.py
++++ b/src/goosedove/market_data/iferc_fixings.py
+@@ -20,11 +20,13 @@ class IfercFixings:
+     the code labelling the month the index is for, one of the index's months, each once, and
+     the price the index as printed, any number, zero and below included. The codes are as the
+     desk typed them, in the order given; the day each index printed is the IFERC schedule's,
+-    not kept here."""
++    not kept here. And rows, read-only, aligned with them: rows[i] the schedule's row of the
++    month codes[i] names, found once, when each code was struck off."""
+ 
+     index: Index
+     codes: tuple[str, ...]
+     prices: NDArray[np.float64]
++    rows: NDArray[np.intp]
+ 
+ 
+ def iferc_fixings(
+@@ -56,10 +58,12 @@ def iferc_fixings(
+         have = f"{prices.size} {'price' if prices.size == 1 else 'prices'}"
+         raise ValueError(f"price has {have}, expected {count}, one per contract_code")
+     months = cast(IfercSchedule, index.schedule).codes  # an IFERC index has one
+-    waiting = set(months)  # the months no code has named yet
++    waiting = {code: month for month, code in enumerate(months)}  # the months not yet named
++    found: list[int] = []
+     for row, code in enumerate(codes, start=1):
+-        if code in waiting:
+-            waiting.remove(code)
++        month = waiting.pop(code, None)
++        if month is not None:
++            found.append(month)
+         elif code in months:  # a month of the index, so one already struck off
+             raise ValueError(
+                 f"contract_code row {row} is {code!r}, already given at row {codes.index(code) + 1}"
+@@ -69,5 +73,7 @@ def iferc_fixings(
+                 f"contract_code row {row} is {code!r}, expected one of the index's months"
+             )
+     kept = np.array(prices, dtype=np.float64)
++    rows = np.array(found, dtype=np.intp)
+     kept.setflags(write=False)
+-    return IfercFixings(index, codes, kept)
++    rows.setflags(write=False)
++    return IfercFixings(index, codes, kept, rows)

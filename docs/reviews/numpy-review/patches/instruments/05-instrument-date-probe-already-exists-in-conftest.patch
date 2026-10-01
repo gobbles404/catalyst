@@ -1,0 +1,205 @@
+From d91a5c3414e3419a6586873105771fea587cb7a7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:46:38 +0000
+Subject: [PATCH] instrument-date-probe-already-exists-in-conftest:
+ FirstOfDates and FirstOfNames become probes with runner rows
+
+---
+ docs/seam/bridge.md                    |  6 ++++--
+ docs/seam/host.md                      |  2 +-
+ docs/seam/working.md                   |  2 +-
+ src/goosedove/excel/probes.py          | 13 +++++++++++++
+ tests/performance/conftest.py          | 20 +++++---------------
+ tests/performance/test_seam_budgets.py |  6 ++++--
+ tools/performance/measure_python.py    | 25 +++++++++++++++++++++++++
+ 7 files changed, 53 insertions(+), 21 deletions(-)
+
+diff --git a/docs/seam/bridge.md b/docs/seam/bridge.md
+index aaea72e..903db3a 100644
+--- a/docs/seam/bridge.md
++++ b/docs/seam/bridge.md
+@@ -289,7 +289,7 @@ It is the only value that takes a default: `Rate(None)` is `x is blank, expected
+ 
+ ## The probes and what each proves
+ 
+-The probes are the sixteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
++The probes are the eighteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
+ 
+ | Probe | In and out | Proves |
+ |---|---|---|
+@@ -303,6 +303,8 @@ The probes are the sixteen hidden worksheet functions in the probes module. Each
+ | `CountMixed(values)` | a `MixedArray` in, a whole number out | a rectangle of three kinds arrives as one record, and its shape says how many cells |
+ | `SumQuantity(header_row, trades)` | a `TextRow` and a table of a date, a text, a number and a boolean column in, a number out | a header row and a body bind by name into typed columns, one of each column type; the sum of one column proves the binding |
+ | `Dot(a, b)` | two `NumberColumn`s in, a number out | two ranges in one call arrive as two ranges |
++| `FirstOfDates(dates)` | a `DateColumn` in, a text out | the date rule over a column, alone: a cell is a date when it holds a whole serial inside the calendar |
++| `FirstOfNames(names)` | a `TextColumn` in, a text out | the text rule over a column, alone, its scan for an empty text included |
+ | `EchoColumn(values)` | a `NumberColumn` in and out | a column in and the same column out, spilled down |
+ | `EchoRow(values)` | a `NumberRow` in and out | the same across; a row out costs what a column out costs |
+ | `EchoMixed(values)` | a `MixedArray` in and out | a rectangle of three kinds goes out as it came, one tagged value per cell: the mixed road out, read over numbers alone against `EchoColumn` and over a mixed column against that |
+@@ -312,7 +314,7 @@ The probes are the sixteen hidden worksheet functions in the probes module. Each
+ 
+ `Ping` is not a probe. It is the bridge's own worksheet function, listed in the wizard, and returns `goosedove <version> from <path>`, with `source checkout` in place of the version when the package is not installed.
+ 
+-The three looks, a column of numbers, of dates and of text, have no probe, because the host cannot tell those ranges from any other, so `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` live in `tests/performance/conftest.py` only to count the Python side; [history.md](history.md) lists the missing text and date probes as open. `CountMixed` is the exception that made the rule worth stating: the host cannot tell a mixed range apart either, but the rule that admits one is the whole point of the type, so it earns a probe and a control to be read against.
++The column look, a column of numbers, has no probe, because the host cannot tell that range from any other, so `FirstOfNumbers` lives in `tests/performance/conftest.py` only to count the Python side. The date and text looks are probes, `FirstOfDates` and `FirstOfNames`, for the rule each applies to what the host cannot tell apart, so the runners have rows for them. `CountMixed` is the exception that made the rule worth stating: the host cannot tell a mixed range apart either, but the rule that admits one is the whole point of the type, so it earns a probe and a control to be read against.
+ 
+ ## What is deliberately absent, and why
+ 
+diff --git a/docs/seam/host.md b/docs/seam/host.md
+index a4b4920..4346e4a 100644
+--- a/docs/seam/host.md
++++ b/docs/seam/host.md
+@@ -47,7 +47,7 @@ flowchart TD
+     Error -->|"nothing registered"| Name["Python functions are names Excel does not know, and GoosedoveStatus shows the error"]
+ ```
+ 
+-Every probe is hidden: `=Zero()` works, and the wizard never lists Zero. `=Add(1,2)` returns 3 and proves a number goes in and out, at the seam's cost alone. There are sixteen in `probes.py`; Ping and the library's functions, one module per group under `src/goosedove/excel/`, are the Python functions registered visibly. Because the description Excel-DNA is given is the docstring, a probe's "Probe: ..." line is what the wizard would show if it were not hidden.
++Every probe is hidden: `=Zero()` works, and the wizard never lists Zero. `=Add(1,2)` returns 3 and proves a number goes in and out, at the seam's cost alone. There are eighteen in `probes.py`; Ping and the library's functions, one module per group under `src/goosedove/excel/`, are the Python functions registered visibly. Because the description Excel-DNA is given is the docstring, a probe's "Probe: ..." line is what the wizard would show if it were not hidden.
+ 
+ Explicit exports is a setting in the project file under which only methods marked as worksheet functions reach the sheet by themselves; everything else the sheet can call is registered on purpose. Three C# methods are marked as worksheet functions, GoosedoveStatus, GoosedoveHandles and HostAdd, and one as a command, GoosedovePrepareToQuit. The Python functions arrive through the lists above. A public C# method that is not marked is not a worksheet function: `=RegisterAll()` shows `#NAME?`, and the smoke test, which runs in a real Excel, checks that it does.
+ 
+diff --git a/docs/seam/working.md b/docs/seam/working.md
+index 2c111f8..3f474d5 100644
+--- a/docs/seam/working.md
++++ b/docs/seam/working.md
+@@ -107,7 +107,7 @@ Registration refuses a function whose annotation is not one of the declared type
+ 5. Teach `describe` the new words only if a new shape of value can now arrive or come back. It already names numbers, text, booleans, blanks, missing arguments, ranges, numpy days by their unit, and numpy arrays by their dimensions and kind; a month held as a numpy day needs nothing.
+ 6. Add a row to [inputs.md](inputs.md)'s table of declared types, and to [outputs.md](outputs.md)'s if it can be returned; strike it from inputs.md's table of what is wanted next. If a question was decided on the way, add it to the numbered decisions there, dated. Then the two tables in [bridge.md](bridge.md), which name the rule behind each type.
+ 7. Pin the message texts in the three unit test files: the scalar words in `tests/unit/test_type_validation.py`, the range words and the property that the first bad cell is named in `tests/unit/test_range_validation.py`, the result words in `tests/unit/test_result_validation.py`. Each file registers its own small functions at the top; add one per new type and put your cases in the tables of exact texts.
+-8. Add a look-counting function to `tests/performance/conftest.py` when a probe would earn no place, which is whenever the host cannot tell the new range from one it already carries. `FirstOfNumbers`, `FirstOfDates` and `FirstOfNames` are there for exactly that reason: they are registered outside the package, so they are not themselves counted, and they exist only to count the Python side of each look. Then give it a ledger in `tests/performance/test_seam_budgets.py`, the exact list of which of the seam's functions ran and how many times, and a ceiling in `tests/performance/test_seam_allocation.py`, the most memory one warm call may hold at its peak, written as the measured figure plus the file's slack; warm means measured after a first call has set everything up.
++8. Add a look-counting function to `tests/performance/conftest.py` when a probe would earn no place, which is whenever the host cannot tell the new range from one it already carries. `FirstOfNumbers` is there for exactly that reason: it is registered outside the package, so it is not itself counted, and it exists only to count the Python side of its look. Then give it a ledger in `tests/performance/test_seam_budgets.py`, the exact list of which of the seam's functions ran and how many times, and a ceiling in `tests/performance/test_seam_allocation.py`, the most memory one warm call may hold at its peak, written as the measured figure plus the file's slack; warm means measured after a first call has set everything up.
+ 9. A new cell kind needs the host as well. A cell's kind is which of five things a cell holds, number, text, boolean, blank or missing, and the codes are shared: the `Kind` list in `bridge.py` and the byte constants and summary bits in `host/Goosedove.Host/AddIn.cs` are two halves of one agreement. A sixth kind means the host's scan, its summary of kinds, `cells_from_buffers`, and the counts in `tests/performance/HostWorkBudgets.cs`. A month is not a new kind: it arrives as a number, like every date.
+ 
+ A form of declaration rather than a type, such as `X | None = None` for an argument that may be left out with nothing in its place, follows the same steps without a rule of its own: registration and what it refuses, a row and a dated decision in [inputs.md](inputs.md), the pins in the unit tests, and the paragraphs of [bridge.md](bridge.md) that describe declaring a function. Nothing crosses the host differently, so it needs no probe and no runner row.
+diff --git a/src/goosedove/excel/probes.py b/src/goosedove/excel/probes.py
+index e70934f..8eac43b 100644
+--- a/src/goosedove/excel/probes.py
++++ b/src/goosedove/excel/probes.py
+@@ -109,6 +109,19 @@ def Dot(a: NumberColumn, b: NumberColumn) -> float:
+     return float(a @ b)
+ 
+ 
++@probe
++def FirstOfDates(dates: DateColumn) -> str:
++    """Probe: a column of dates in, the first as text out: the date rule's cost per cell alone."""
++    return str(dates[0])
++
++
++@probe
++def FirstOfNames(names: TextColumn) -> str:
++    """Probe: a column of text in, the first out: the text rule alone, its empty-text scan
++    included."""
++    return names[0]
++
++
+ @probe
+ def EchoColumn(values: NumberColumn) -> NumberColumn:
+     """Probe: a column in and the same column out, spilled down."""
+diff --git a/tests/performance/conftest.py b/tests/performance/conftest.py
+index a735795..3468308 100644
+--- a/tests/performance/conftest.py
++++ b/tests/performance/conftest.py
+@@ -11,31 +11,21 @@ import numpy as np
+ import pytest
+ 
+ import goosedove
+-from goosedove.excel.bridge import Cells, DateColumn, NumberColumn, TextColumn
++from goosedove.excel.bridge import Cells, NumberColumn
+ from goosedove.excel.probes import probe
+ 
+ PACKAGE_DIR = str(Path(goosedove.__file__).parent)
+ 
+ 
+-# The column, date, and text looks have no probe, because the host cannot tell those ranges
+-# from any other; these three exist only to count the Python side of each look. Defined
+-# here, outside the package, they are not themselves counted, and pytest registers them
+-# before any budget module builds its table of prepared paths.
++# The column look has no probe, because the host cannot tell a column of numbers from any
++# other range; this one exists only to count the Python side of the look. Defined here,
++# outside the package, it is not itself counted, and pytest registers it before any budget
++# module builds its table of prepared paths. The date and text looks are probes.
+ @probe
+ def FirstOfNumbers(values: NumberColumn) -> float:
+     return float(values[0])
+ 
+ 
+-@probe
+-def FirstOfDates(dates: DateColumn) -> str:
+-    return str(dates[0])
+-
+-
+-@probe
+-def FirstOfNames(names: TextColumn) -> str:
+-    return names[0]
+-
+-
+ def _call_profile(fn: Callable[[], object]) -> dict[str, int]:
+     """Which of the package's own functions ran, and how many times each."""
+     profiler = cProfile.Profile()
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 6ea5219..d25afd4 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -12,8 +12,8 @@ from goosedove.excel.bridge import MISSING, Cells
+ CallProfile = Callable[[Callable[[], object]], dict[str, int]]
+ 
+ # Each registered function's prepared path, fetched once as the host does at registration; the
+-# three looks in conftest.py (FirstOfNumbers, FirstOfDates, FirstOfNames) are registered
+-# when pytest loads it, so they are in it too.
++# column look in conftest.py, FirstOfNumbers, is registered when pytest loads it, so it is in
++# it too.
+ PATH = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
+ 
+ 
+@@ -86,6 +86,7 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
+         "_dates": 1,
+         "_not_dates": 1,  # the two helpers the date rule shares with a table's column of dates
+         "_as_days": 1,
++        "FirstOfDates": 1,  # the probe itself, in the package now
+         "_text_out": 1,
+         "_scalar": 1,
+     }
+@@ -124,6 +125,7 @@ def test_accepted_text_column_call_itemized(
+         "_one_column": 1,
+         "_shape": 1,
+         "_texts": 1,
++        "FirstOfNames": 1,
+         "_text_out": 1,
+         "_scalar": 1,
+     }
+diff --git a/tools/performance/measure_python.py b/tools/performance/measure_python.py
+index 41d4c4d..db45e93 100644
+--- a/tools/performance/measure_python.py
++++ b/tools/performance/measure_python.py
+@@ -365,6 +365,31 @@ def scenarios() -> list[Scenario]:
+                 equals(float(n)),
+             )
+         )
++    # A column of dates and a column of text, each look alone: the date rule's cost per cell,
++    # and the text rule with its scan for an empty text.
++    for n in SIZES:
++        dates = serials(n, 46276.0, 1.0)
++        names = Cells.from_rows([[f"name{i}"] for i in range(n)])
++        cases.append(
++            Scenario(
++                "FirstOfDates",
++                "a column of dates in",
++                n,
++                1,
++                lambda run=ENTRY["FirstOfDates"], c=dates: run(c),
++                equals("2026-09-11"),
++            )
++        )
++        cases.append(
++            Scenario(
++                "FirstOfNames",
++                "a column of text in",
++                n,
++                1,
++                lambda run=ENTRY["FirstOfNames"], c=names: run(c),
++                equals("name0"),
++            )
++        )
+     # Text count and text length, one at a time, because only the text costs anything per cell.
+     for label, cells in (
+         ("mixed: no text", column(10_000)),

@@ -1,0 +1,78 @@
+From cfc8e0697631ededc1ff30e88adbfaf5997d9382 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:39:21 +0000
+Subject: [PATCH] bridge-kind-column-looks-as-reductions: a table column's kind
+ look is its least and greatest code, the mask only to name the cell
+
+---
+ src/goosedove/excel/bridge.py       | 24 ++++++++++++------------
+ tests/unit/test_range_validation.py |  6 ++++++
+ 2 files changed, 18 insertions(+), 12 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index f8902bb..1420752 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -647,13 +647,13 @@ def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> Typ
+ 
+ 
+ # One rule per column type. Each takes one look at its column: the kinds settle number, text
+-# and boolean, and the slots settle a date, as the whole-range rules do. Number columns are
+-# views of the mixed storage; dates and booleans are converted once; text is a slice of the
+-# host's tuple.
++# and boolean, by their least and greatest code, with no mask unless a cell is bad, and the
++# slots settle a date, as the whole-range rules do. Number columns are views of the mixed
++# storage; dates and booleans are converted once; text is a slice of the host's tuple.
+ def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
+-    bad = body.mixed.kinds[:, j] != NUMBER_CODE
+-    if bad.any():
+-        raise _bad_cell(body, j, bad, "number")
++    kinds = body.mixed.kinds[:, j]
++    if kinds.max() != NUMBER_CODE:  # number is the lowest code: one reduction, no mask
++        raise _bad_cell(body, j, kinds != NUMBER_CODE, "number")
+     return body.mixed.numeric_slots[:, j]
+ 
+ 
+@@ -666,9 +666,9 @@ def _dates_of(body: _Body, j: int) -> NDArray[np.datetime64]:
+ 
+ 
+ def _texts_of(body: _Body, j: int) -> tuple[str, ...]:
+-    bad = body.mixed.kinds[:, j] != TEXT_CODE
+-    if bad.any():
+-        raise _bad_cell(body, j, bad, "text")
++    kinds = body.mixed.kinds[:, j]
++    if kinds.min() != TEXT_CODE or kinds.max() != TEXT_CODE:  # two reductions, no mask
++        raise _bad_cell(body, j, kinds != TEXT_CODE, "text")
+     # A record is built only when every column has passed, and then every text cell of the body
+     # lies in a column bound to text: _bind binds every column, and each other column type
+     # refuses a text cell, the number and boolean columns by its kind and the date column by its
+@@ -681,9 +681,9 @@ def _texts_of(body: _Body, j: int) -> tuple[str, ...]:
+ 
+ 
+ def _booleans_of(body: _Body, j: int) -> NDArray[np.bool_]:
+-    bad = body.mixed.kinds[:, j] != BOOLEAN_CODE
+-    if bad.any():
+-        raise _bad_cell(body, j, bad, "boolean")
++    kinds = body.mixed.kinds[:, j]
++    if kinds.min() != BOOLEAN_CODE or kinds.max() != BOOLEAN_CODE:  # two reductions, no mask
++        raise _bad_cell(body, j, kinds != BOOLEAN_CODE, "boolean")
+     return body.mixed.numeric_slots[:, j].astype(bool)
+ 
+ 
+diff --git a/tests/unit/test_range_validation.py b/tests/unit/test_range_validation.py
+index cbdee4a..25ecc2d 100644
+--- a/tests/unit/test_range_validation.py
++++ b/tests/unit/test_range_validation.py
+@@ -471,6 +471,12 @@ def test_a_promoted_scalar_is_a_one_cell_range() -> None:
+     assert bridge.call("Payload", [False]) == "(1, 1) [[2]] [[0.0]] ()"
+ 
+ 
++def test_a_number_is_the_lowest_code() -> None:
++    # A table's column of numbers is checked by one reduction, its greatest kind, which only holds
++    # while number is the lowest code. Reordering Kind must fail here, loudly.
++    assert min(bridge.Kind) == bridge.Kind.NUMBER == bridge.NUMBER_CODE
++
++
+ def test_the_three_mixed_kinds_are_the_lowest_codes() -> None:
+     # The rejection mask is one compare against the highest mixed code, which only holds while
+     # number, text and boolean are the three lowest. Reordering Kind must fail here, loudly.

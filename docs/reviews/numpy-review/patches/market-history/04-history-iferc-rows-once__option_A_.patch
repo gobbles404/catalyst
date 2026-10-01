@@ -1,0 +1,23 @@
+From 63f473c268fda89ea8d42af2cf494c51bf40451d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:09:53 +0000
+Subject: [PATCH] history-iferc-rows-once (option A): the IFERC rows read
+ straight into one array, no list
+
+---
+ src/goosedove/market/market_history.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index 58c4e62..b4f029f 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -121,7 +121,7 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
+     _over_the_calendars_index(calendar, fixings.index)
+     codes = calendar.index.schedule.codes
+     place = {code: row for row, code in enumerate(codes)}
+-    rows = np.array([place[code] for code in fixings.codes], dtype=np.intp)
++    rows = np.fromiter(map(place.__getitem__, fixings.codes), np.intp, len(fixings.codes))
+     first_unfixed = calendar.first_unfixed  # the fixed months are the rows before it
+     if rows.max(initial=-1) >= first_unfixed:
+         k = int(rows[rows >= first_unfixed].min())  # the earliest month it should not have

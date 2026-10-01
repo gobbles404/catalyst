@@ -1,0 +1,96 @@
+From dd32929952d561b75903eae98550030eccec7bc6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:17:29 +0000
+Subject: [PATCH] history-dated-binders-slices-and-count: the dated histories
+ place the late rule, the inside run and coverage by scalars, one slice and
+ one count
+
+---
+ src/goosedove/market/market_history.py | 48 ++++++++++++++++++++++------------
+ 1 file changed, 31 insertions(+), 17 deletions(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index a3ee152..8df10fa 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -83,19 +83,15 @@ def futures_history(fixings: FuturesFixings, calendar: Calendar) -> MarketHistor
+     _over_the_calendars_index(calendar, fixings.index)
+     as_of = calendar.valuation_date.as_of
+     fixing_dates = fixings.dates
+-    late = fixing_dates >= as_of
+-    if late.any():
+-        k = int(late.argmax())  # the dates increase, so the first late date is the earliest
++    if fixing_dates.size and fixing_dates[-1] >= as_of:  # the dates increase: the last is latest
++        k = int(fixing_dates.searchsorted(as_of))  # the earliest late date, by one search
+         raise ValueError(
+             f"fixings date {fixing_dates[k]} is on or after valuation date {as_of}, "
+             "expected dates before the valuation date"
+         )
+-    dates = calendar.dates
+-    offset = (fixing_dates - dates[0]).astype(np.intp)
+-    inside = (offset >= 0) & (offset < dates.size)
+-    rows = offset[inside]
++    first, last, rows = _inside(calendar, fixing_dates)
+     _every_fixed_day(calendar, rows)
+-    return _frozen(calendar, rows, fixings.settles[inside])
++    return _frozen(calendar, rows, fixings.settles[first:last].copy())
+ 
+ 
+ @_bind.register
+@@ -106,19 +102,15 @@ def gas_daily_history(fixings: GasDailyFixings, calendar: Calendar) -> MarketHis
+     _over_the_calendars_index(calendar, fixings.index)
+     as_of = calendar.valuation_date.as_of
+     flow_dates = fixings.dates
+-    late = flow_dates > as_of
+-    if late.any():
+-        k = int(late.argmax())  # the flow days increase, so the first late day is the earliest
++    if flow_dates.size and flow_dates[-1] > as_of:  # the flow days increase: the last is latest
++        k = int(flow_dates.searchsorted(as_of, side="right"))  # the earliest late day
+         raise ValueError(
+             f"fixings flow_date {flow_dates[k]} is after valuation date {as_of}, "
+             "expected flow days on or before the valuation date"
+         )
+-    dates = calendar.dates
+-    offset = (flow_dates - dates[0]).astype(np.intp)
+-    inside = (offset >= 0) & (offset < dates.size)
+-    rows = offset[inside]
++    first, last, rows = _inside(calendar, flow_dates)
+     _every_fixed_day(calendar, rows)
+-    return _frozen(calendar, rows, fixings.prices[inside])
++    return _frozen(calendar, rows, fixings.prices[first:last].copy())
+ 
+ 
+ @_bind.register
+@@ -150,9 +142,31 @@ def iferc_history(fixings: IfercFixings, calendar: Calendar) -> MarketHistory:
+     return _frozen(calendar, rows[order], fixings.prices[order])
+ 
+ 
++def _inside(
++    calendar: Calendar, fixing_dates: NDArray[np.datetime64]
++) -> tuple[int, int, NDArray[np.intp]]:
++    """The fixings inside the calendar's days, as the slice first:last of the series, and their
++    rows: the fixings' dates increase, their creator's rule, and the calendar's days run one
++    after another from its first, so the fixings inside are one run found by two searches, and
++    each one's row is its day count from the calendar's first day, one subtraction over that run
++    alone, viewed as whole numbers."""
++    start: np.datetime64 = calendar.dates[0]
++    end: np.datetime64 = calendar.dates[-1]
++    first = int(fixing_dates.searchsorted(start))
++    last = int(fixing_dates.searchsorted(end, side="right"))
++    return first, last, (fixing_dates[first:last] - start).view(np.intp)
++
++
+ def _every_fixed_day(calendar: Calendar, rows: NDArray[np.intp]) -> None:
+     """Every fixed and priced day of the calendar is among the rows, else the first without a
+-    fixing is named."""
++    fixing is named. The rows are distinct, the dates having increased; every one is fixed, by
++    the rule on the valuation date before, and fixed days are the calendar's first first_unfixed
++    rows; and every one is priced, the fixings' dates having been checked against the holiday
++    calendar the calendar closes on, and a Gas Daily calendar pricing every day. So the fixed
++    and priced days are all covered when the rows number them, one count over the fixed rows'
++    flags; otherwise the days covered and the masks decide, and name the first missing."""
++    if rows.size == np.count_nonzero(calendar.is_priced[: calendar.first_unfixed]):
++        return
+     covered = np.zeros(calendar.dates.size, dtype=bool)
+     covered[rows] = True
+     missing = calendar.is_fixed & calendar.is_priced & ~covered

@@ -1,0 +1,31 @@
+From 9e284e32ddae3afeedb025de8da4dc62cda5f2cd Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:05:11 +0000
+Subject: [PATCH] utilities-market-live-rows: the market's live rows from the
+ calendar's tail after first_unfixed
+
+---
+ src/goosedove/excel/utilities.py | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/goosedove/excel/utilities.py b/src/goosedove/excel/utilities.py
+index 848ff42..eac7cad 100644
+--- a/src/goosedove/excel/utilities.py
++++ b/src/goosedove/excel/utilities.py
+@@ -181,10 +181,14 @@ def market_table(obj: Market) -> MixedArray:
+     # The calendar's four columns, then price: the fixing on each fixed and priced period, the
+     # quote of its contract on each unfixed period, and closed on every other. The quotes are
+     # gathered for those live rows alone, since a fixed period's contract may precede the first
+-    # contract quoted and would index before the vector.
++    # contract quoted and would index before the vector. The fixed periods come first and the
++    # calendar counted them once when it was made, so the live rows are the priced rows after
++    # first_unfixed: one look over that tail, shifted back to calendar rows in place.
+     history = obj.market_history
+     calendar = history.calendar
+-    live = np.flatnonzero(calendar.is_priced & ~calendar.is_fixed)
++    first = calendar.first_unfixed
++    live = np.flatnonzero(calendar.is_priced[first:])
++    live += first
+     quotes = obj.price_vector.prices[calendar.contract[live] - obj.first_contract]
+     return _priced_column(
+         calendar,

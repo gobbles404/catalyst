@@ -1,0 +1,105 @@
+From 633e7de9b6ad4a1391bdde11b831837a239e58b9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:20:24 +0000
+Subject: [PATCH] bridge-date-column-in: dates in, three reductions on the
+ success path, converted in the floor's own buffer
+
+---
+ src/goosedove/excel/bridge.py | 61 +++++++++++++++++++++++++++++++------------
+ 1 file changed, 44 insertions(+), 17 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 27a0646..1c528a9 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -358,6 +358,7 @@ def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected
+ # --- one cell ---------------------------------------------------------------
+ 
+ EXCEL_EPOCH: Final = np.datetime64("1899-12-30", "D")
++EPOCH_DAYS: Final = -25569  # EXCEL_EPOCH as days since numpy's epoch, 1970-01-01
+ 
+ # A date is a whole serial inside Excel's own calendar. Serial 61 is 1 March
+ # 1900, the first day on which Excel's serial numbers and the real calendar
+@@ -424,28 +425,54 @@ def _numbers(value: object) -> NDArray[np.float64]:
+ 
+ 
+ def _not_dates(slots: NDArray[np.float64]) -> NDArray[np.bool_]:
+-    """Flags every slot that is not a whole serial inside the calendar, in one look.
++    """Flags every slot that is not a whole serial inside the calendar, in one look, so the
++    earliest bad cell is named whichever test it fails. Only a rejected range pays for it.
+ 
+-    A text or blank slot holds NaN and fails the first test; a boolean holds 1.0 or 0.0 and
+-    fails the second. So the slots alone find every cell that is not a date.
++    A text, blank or missing slot holds NaN and fails the first test, as the host and
++    Cells.from_rows write it; a boolean holds 1.0 or 0.0 and fails the second. So the slots alone
++    find every cell that is not a date.
+     """
+     return (slots != np.floor(slots)) | (slots < FIRST_SERIAL) | (slots > LAST_SERIAL)
+ 
+ 
+-def _as_days(serials: NDArray[np.float64]) -> NDArray[np.datetime64]:
+-    """Whole serials as numpy days, converted once."""
+-    return EXCEL_EPOCH + serials.astype(np.int64).astype("timedelta64[D]")
++def _whole_serials(slots: NDArray[np.float64]) -> NDArray[np.float64] | None:
++    """The slots floored, when every one is a whole serial inside the calendar, else None.
++
++    The three tests of _not_dates as three reductions, with no mask kept: a NaN slot, which a
++    text, blank or missing cell holds, makes the least floor NaN and fails the first comparison,
++    and a boolean's 1.0 or 0.0 fails it too; inf fails the second, and a fraction the third. The
++    floored copy is the caller's to convert in place; on a rejection it is dropped before the
++    mask is made, so naming the cell peaks no higher than it did.
++    """
++    whole = np.floor(slots)
++    if whole.min() >= FIRST_SERIAL and whole.max() <= LAST_SERIAL and (whole == slots).all():
++        return whole
++    return None
++
++
++def _as_days(whole: NDArray[np.float64]) -> NDArray[np.datetime64]:
++    """Whole serials the caller owns as numpy days, converted in their own buffer: shifted to
++    numpy's epoch, exact below 2^53, then cast to 64-bit integers over the same eight bytes and
++    viewed as days. numpy casts over an identical operand without a scratch copy only when both
++    are one-dimensional, so the cast runs over flat views in memory order."""
++    whole += EPOCH_DAYS
++    days = whole.view(np.int64)
++    np.copyto(days.ravel("K"), whole.ravel("K"), casting="unsafe")
++    return days.view("datetime64[D]")
+ 
+ 
+ def _dates(value: object) -> NDArray[np.datetime64]:
+-    """Every cell a date, kept in sheet order. A scalar is a 1x1 range."""
++    """Every cell a date, kept in sheet order. A scalar is a 1x1 range.
++
++    The mask that names the first bad cell is built only when a cell is bad. A cell that is not a
++    number needs no look at the kinds: its slot holds NaN, or 1.0 or 0.0, which the slots' own
++    tests refuse, as _not_dates says.
++    """
+     if isinstance(value, Cells):
+-        bad = _not_dates(value.numbers)
+-        if value.seen != ONLY_NUMBERS:
+-            bad |= value.kinds != NUMBER_CODE
+-        if bad.any():
+-            raise _first_bad(value, bad, "date")
+-        return _as_days(value.numbers)
++        whole = _whole_serials(value.numbers)
++        if whole is None:
++            raise _first_bad(value, _not_dates(value.numbers), "date")
++        return _as_days(whole)
+     return np.array([[_date(value)]])
+ 
+ 
+@@ -649,10 +676,10 @@ def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
+ 
+ def _dates_of(body: _Body, j: int) -> NDArray[np.datetime64]:
+     slots = body.mixed.numeric_slots[:, j]
+-    bad = _not_dates(slots)
+-    if bad.any():
+-        raise _bad_cell(body, j, bad, "date")
+-    return _as_days(slots)
++    whole = _whole_serials(slots)
++    if whole is None:
++        raise _bad_cell(body, j, _not_dates(slots), "date")
++    return _as_days(whole)
+ 
+ 
+ def _texts_of(body: _Body, j: int) -> tuple[str, ...]:

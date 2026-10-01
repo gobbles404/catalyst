@@ -1,0 +1,124 @@
+From 54feebed3d70ebfa416d98f19ae832609f68e25e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:36:14 +0000
+Subject: [PATCH] gas-daily-consecutive-by-span: an order mask over the day
+ numbers and one span; the day-after column only names the row
+
+---
+ docs/library/market-data/gas-daily-fixings.md  |  2 +-
+ src/goosedove/market_data/gas_daily_fixings.py | 27 ++++++++++++++++----------
+ tests/performance/test_seam_allocation.py      | 10 +++++-----
+ tests/performance/test_seam_budgets.py         |  7 ++++---
+ 4 files changed, 27 insertions(+), 19 deletions(-)
+
+diff --git a/docs/library/market-data/gas-daily-fixings.md b/docs/library/market-data/gas-daily-fixings.md
+index f43962f..f0fdaac 100644
+--- a/docs/library/market-data/gas-daily-fixings.md
++++ b/docs/library/market-data/gas-daily-fixings.md
+@@ -63,7 +63,7 @@ Three rules, in this order, the first failure being the message. The first is th
+ | the price column has one row per flow day, since the seam never compares two columns and a series is rows | `price has 5 prices, expected 6, one per flow_date` |
+ | each flow day is the day after the row above, since a series that prices every calendar day has no other shape: the days increase, no day is given twice, and no day between the first and the last is missing | `flow_date row 4 is 2026-09-07, expected 2026-09-06, the day after row 3's 2026-09-05` |
+ 
+-A count of one reads `1 price`. The third rule is one comparison over the column, and the first row that breaks it is the one named: a day given twice, a day skipped and a series pasted newest first all fail at that row, with the day that was expected. Nothing is sorted, filled or extended: a series pasted newest first fails at its second row, and the desk sorts it; a day without a row is a row the desk did not paste, never a price to carry forward, and a day Platts printed no midpoint for is a gap the desk cannot fill, so the series is refused at it and what such a day means to an average is a rule for the instrument that averages, not for the fixings. Nothing else is checked: no weekday is looked at, no holiday list is taken, no month is read off a day, and the flow days are not held to the index's schedule, since a series may run past the calendar on either side, allowed and unused there, as the history decided in #105. The prices are copied and frozen, so the fixings own their data, the days are copied as days, and the index is kept by reference, the one the desk paired the series with. A failed call publishes nothing, and a column the seam rejects never reaches the function.
++A count of one reads `1 price`. The third rule is one comparison over the column's day numbers, that they increase, and one over its span, that the last day is one fewer than the rows after the first, which together hold exactly when each day is the day after the one above; only when they fail is the day after each day made, and the first row that breaks it is the one named: a day given twice, a day skipped and a series pasted newest first all fail at that row, with the day that was expected. Nothing is sorted, filled or extended: a series pasted newest first fails at its second row, and the desk sorts it; a day without a row is a row the desk did not paste, never a price to carry forward, and a day Platts printed no midpoint for is a gap the desk cannot fill, so the series is refused at it and what such a day means to an average is a rule for the instrument that averages, not for the fixings. Nothing else is checked: no weekday is looked at, no holiday list is taken, no month is read off a day, and the flow days are not held to the index's schedule, since a series may run past the calendar on either side, allowed and unused there, as the history decided in #105. The prices are copied and frozen, so the fixings own their data, the days are copied as days, and the index is kept by reference, the one the desk paired the series with. A failed call publishes nothing, and a column the seam rejects never reaches the function.
+ 
+ ## Tests
+ 
+diff --git a/src/goosedove/market_data/gas_daily_fixings.py b/src/goosedove/market_data/gas_daily_fixings.py
+index ec14955..34465a4 100644
+--- a/src/goosedove/market_data/gas_daily_fixings.py
++++ b/src/goosedove/market_data/gas_daily_fixings.py
+@@ -36,13 +36,13 @@ def gas_daily_fixings(
+     there. One price per flow day, since the seam never compares two columns and a series is
+     rows. And each flow day the day after the row above, since a series that prices every
+     calendar day has no other shape: the days increase, no day is given twice and no day between
+-    the first and the last is missing, one comparison over the column, the first row that breaks
+-    it named with the day that was expected. Nothing is sorted, filled or carried forward: a
+-    series pasted newest first fails at its second row, and a day without a row is a row the
+-    desk did not paste. No weekday is looked at, no holiday list is taken and no month is read
+-    off a day. Both columns are copied and then frozen, so the fixings own their data, and the
+-    index is kept by reference, the one the desk paired the series with. Rows count as the sheet
+-    counts them, the first row of the column being row 1.
++    the first and the last is missing, one comparison over the column's day numbers and their
++    span, the first row that breaks it named with the day that was expected. Nothing is sorted,
++    filled or carried forward: a series pasted newest first fails at its second row, and a day
++    without a row is a row the desk did not paste. No weekday is looked at, no holiday list is
++    taken and no month is read off a day. Both columns are copied and then frozen, so the
++    fixings own their data, and the index is kept by reference, the one the desk paired the
++    series with. Rows count as the sheet counts them, the first row of the column being row 1.
+     """
+     if index.kind is not Kind.GAS_DAILY:
+         raise ValueError(f"index is {described(index.kind, 'index')}, expected a Gas Daily index")
+@@ -50,9 +50,16 @@ def gas_daily_fixings(
+         have = f"{price.size} {'price' if price.size == 1 else 'prices'}"
+         raise ValueError(f"price has {have}, expected {flow_date.size}, one per flow_date")
+     days = np.array(flow_date, dtype="datetime64[D]")
+-    following = days[:-1] + np.timedelta64(1, "D")
+-    broken = days[1:] != following
+-    if broken.any():
++    # The days are consecutive exactly when their day numbers increase and the last is one fewer
++    # than the rows after the first: one mask over the day numbers, a view of the column, and
++    # one subtraction of two Python integers. NaT's day number is the least an int64 holds, so a
++    # NaT breaks the order or the span, as it breaks the day after. The day after each day is
++    # made only when the series breaks, to name the first row that does.
++    serial = days.view(np.int64)
++    unordered = serial[1:] <= serial[:-1]
++    if unordered.any() or (days.size and int(serial[-1]) - int(serial[0]) != days.size - 1):
++        following = days[:-1] + np.timedelta64(1, "D")
++        broken = days[1:] != following
+         k = int(broken.argmax())  # days[k + 1] is the first day that is not the day after days[k]
+         raise ValueError(
+             f"flow_date row {k + 2} is {days[k + 1]}, expected {following[k]}, "
+diff --git a/tests/performance/test_seam_allocation.py b/tests/performance/test_seam_allocation.py
+index c34506a..f717993 100644
+--- a/tests/performance/test_seam_allocation.py
++++ b/tests/performance/test_seam_allocation.py
+@@ -564,17 +564,17 @@ def flow_day_columns(count: int) -> tuple[Cells, Cells]:
+ 
+ 
+ # Gas Daily fixings keep a copy of each column, 16 bytes per flow day, and on the way pay the
+-# date column's masks and its arrays on the way to days, then the day after each day and the
+-# mask of the days that are not it: measured 13,108 bytes at a year of flow days on 2026-09-24,
+-# 36 bytes per day, and 121,513 at ten years, 33 bytes per day, which 40 per day covers with
+-# twice the slack for a creator's small objects.
++# date column's masks and its arrays on the way to days, then the mask of the days whose number
++# is not above the one before: measured 10,044 bytes at a year of flow days on 2026-10-01, 13,100
++# when the day after each day was made, 27 bytes per day, and 92,169 at ten years, 25 bytes per
++# day, which 30 per day covers with twice the slack for a creator's small objects.
+ def test_gas_daily_fixings_keep_a_copy_of_each_column() -> None:
+     count = 365
+     flow_days, prices = flow_day_columns(count)
+     index = an_index(ENTRY["_CreateGasDailySchedule"](*gas_daily_month_columns(12)))
+     assert (
+         least_peak(lambda: ENTRY["_CreateGasDailyFixings"](flow_days, prices, index))
+-        <= 40 * count + 2 * SLACK
++        <= 30 * count + 2 * SLACK
+     )
+ 
+ 
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index b2446e5..a6f1f15 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -1693,10 +1693,10 @@ def flow_day_columns(count: int) -> tuple[Cells, Cells]:
+ 
+ # A year of flow days: the date column through its look and its conversion to days, the number
+ # column accepted on the host's summary alone, the index by handle through its text rule and one
+-# lookup, the builder's kind check, its one look over the days for the day after each, its two
++# lookup, the builder's kind check, its one look over the days' numbers for their order, its two
+ # copies and one publication. Twenty calls across sixteen functions, the accept rule once per
+-# argument; on numpy one look for the calendar and one for the days, the column's two
+-# conversions, the two copies and their freezes.
++# argument; on numpy one look for the calendar and one for the days, the view of the days as
++# their numbers, the column's two conversions, the two copies and their freezes.
+ def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
+     call_profile: CallProfile, numpy_calls: CallProfile
+ ) -> None:
+@@ -1724,6 +1724,7 @@ def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_o
+     assert numpy_calls(lambda: PATH["_CreateGasDailyFixings"](flow_days, prices, index)) == {
+         "ndarray.any": 2,  # the column's look for the calendar, then the look over the days
+         "ndarray.astype": 2,  # the column on its way to days
++        "ndarray.view": 1,  # the days as their numbers, no copy
+         "numpy.array": 2,  # the two copies the fixings keep
+         "ndarray.setflags": 2,  # frozen
+         "ufunc.reduce": 2,

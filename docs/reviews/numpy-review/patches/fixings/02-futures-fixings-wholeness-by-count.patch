@@ -1,0 +1,136 @@
+From 18276c9f53601982590d6fca4dfcd421aefeefba Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:29:48 +0000
+Subject: [PATCH] futures-fixings-wholeness-by-count: one busday_count answers
+ the wholeness rule; the day-after column only names the row
+
+---
+ docs/library/market-data/futures-fixings.md  |  2 +-
+ src/goosedove/market_data/futures_fixings.py | 27 ++++++++++++++++-----------
+ tests/performance/test_seam_allocation.py    | 12 ++++++------
+ tests/performance/test_seam_budgets.py       | 14 +++++++-------
+ 4 files changed, 30 insertions(+), 25 deletions(-)
+
+diff --git a/docs/library/market-data/futures-fixings.md b/docs/library/market-data/futures-fixings.md
+index cefb156..cb87e90 100644
+--- a/docs/library/market-data/futures-fixings.md
++++ b/docs/library/market-data/futures-fixings.md
+@@ -39,7 +39,7 @@ Quoted from the declaration in `src/goosedove/excel/market_data.py`, which `test
+ 
+ ## The library checks
+ 
+-Five rules, in this order, the first failure being the message. The first is the index's kind: the days are checked against a holiday calendar, and only a futures index has one, so an IFERC or a Gas Daily index is refused naming its kind, as the calendar names kinds. The second comes with the columns: the settle column has one row per date, since the seam never compares two columns and a series is rows. The third is the curve's, which the owner stated as no duplicate dates and the dates ascending: each date is after the row above, and that one comparison covers both, keeping one fixing per day in the order a reader finds a day by. The fourth and fifth are the ticket's of #79, that creation detects a fixing on a day the market was closed and a business day without a fixing: each date is a business day, Monday to Friday and not a holiday, at either end of the series as in the middle; and no business day between the first date and the last is without a fixing. With every date a business day and the dates increasing, the series is whole exactly when each date is the business day after the one above, which is one `np.busday_offset` over the column and one comparison, as [time.md](../time.md) decided business days would be counted: numpy's functions over the calendar's list, a week of Monday to Friday, and no loop. Rows count as the sheet counts them, the first row of the column being row 1, and the message names the column by its argument name.
++Five rules, in this order, the first failure being the message. The first is the index's kind: the days are checked against a holiday calendar, and only a futures index has one, so an IFERC or a Gas Daily index is refused naming its kind, as the calendar names kinds. The second comes with the columns: the settle column has one row per date, since the seam never compares two columns and a series is rows. The third is the curve's, which the owner stated as no duplicate dates and the dates ascending: each date is after the row above, and that one comparison covers both, keeping one fixing per day in the order a reader finds a day by. The fourth and fifth are the ticket's of #79, that creation detects a fixing on a day the market was closed and a business day without a fixing: each date is a business day, Monday to Friday and not a holiday, at either end of the series as in the middle; and no business day between the first date and the last is without a fixing. With every date a business day and the dates increasing, the series is whole exactly when each date is the business day after the one above, which is exactly when the business days from the first date up to the last number one fewer than the rows: one `np.busday_count` of two dates, and only when that count is short one `np.busday_offset` over the column and one comparison to name the first business day without a fixing, as [time.md](../time.md) decided business days would be counted: numpy's functions over the calendar's list, a week of Monday to Friday, and no loop. Rows count as the sheet counts them, the first row of the column being row 1, and the message names the column by its argument name.
+ 
+ | Rule | Message |
+ |---|---|
+diff --git a/src/goosedove/market_data/futures_fixings.py b/src/goosedove/market_data/futures_fixings.py
+index 207624c..557c338 100644
+--- a/src/goosedove/market_data/futures_fixings.py
++++ b/src/goosedove/market_data/futures_fixings.py
+@@ -44,14 +44,15 @@ def futures_fixings(
+     weekend day or a holiday in the series is refused, at either end as in the middle. And no
+     business day between the first date and the last is without a fixing, since a gap is a row
+     the desk did not paste: with every date a business day and the dates increasing, the series
+-    is whole exactly when each date is the business day after the one above, one numpy call
+-    over the column. The first and last dates bound the check, so nothing is asked for before
+-    the first or after the last, and a holiday outside them changes nothing. The holidays are
+-    read as numpy reads them: a day listed twice counts once, and a day listed on a weekend adds
+-    nothing. Both columns are copied and then frozen, so the fixings own their data: a Python
+-    caller keeps whatever it passed, and a later change to an input never changes a fixing; the
+-    index is kept by reference, the one the desk paired the series with. Rows count as the sheet
+-    counts them, the first row of the column being row 1.
++    is whole exactly when the business days from the first date up to the last number one fewer
++    than the rows, one numpy count of two dates, and the business day after each date is found
++    only to name the first one missing. The first and last dates bound the check, so nothing is
++    asked for before the first or after the last, and a holiday outside them changes nothing.
++    The holidays are read as numpy reads them: a day listed twice counts once, and a day listed
++    on a weekend adds nothing. Both columns are copied and then frozen, so the fixings own their
++    data: a Python caller keeps whatever it passed, and a later change to an input never
++    changes a fixing; the index is kept by reference, the one the desk paired the series with.
++    Rows count as the sheet counts them, the first row of the column being row 1.
+     """
+     if index.kind is not Kind.FUTURES:
+         raise ValueError(f"index is {described(index.kind, 'index')}, expected a futures index")
+@@ -73,9 +74,13 @@ def futures_fixings(
+         weekday = WEEKDAYS[date.fromisoformat(str(days[k])).weekday()]
+         reason = weekday if weekday in ("Saturday", "Sunday") else "holiday"
+         raise ValueError(f"date row {k + 1} is {days[k]}, a {reason}, expected a business day")
+-    following = np.busday_offset(days[:-1], 1, busdaycal=calendar)
+-    skipped = following != days[1:]
+-    if skipped.any():
++    # Every date a business day and the dates increasing, the rows but the last are that many
++    # business days from the first date up to the last, so the series is whole exactly when
++    # those business days number one fewer than the rows: one np.busday_count of two dates. The
++    # business day after each date is made only when one is missing, to name the first.
++    if days.size > 1 and np.busday_count(days[0], days[-1], busdaycal=calendar) != days.size - 1:
++        following = np.busday_offset(days[:-1], 1, busdaycal=calendar)
++        skipped = following != days[1:]
+         k = int(skipped.argmax())  # following[k] is the first business day without a fixing
+         raise ValueError(
+             f"date row {k + 2} is {days[k + 1]}, expected {following[k]}, "
+diff --git a/tests/performance/test_seam_allocation.py b/tests/performance/test_seam_allocation.py
+index ffc578d..c34506a 100644
+--- a/tests/performance/test_seam_allocation.py
++++ b/tests/performance/test_seam_allocation.py
+@@ -363,11 +363,11 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
+ 
+ 
+ # Futures fixings keep a copy of each column, 16 bytes per row, and on the way pay the date
+-# column's masks and its arrays on the way to days, and the builder's three looks, the order,
+-# the days closed and the gaps, the last over the business day after each date, a full-size
+-# temporary: measured 11,202 bytes at 260 rows on 2026-09-24, about 43 bytes per row, 280 below
+-# the table path's 11,482, the header row and its binding; 93,102 at 2,600 and 912,102 at
+-# 26,000, 35 bytes per row, so the ceiling of 45 per row stands.
++# column's masks and its arrays on the way to days, and the builder's two looks, the order and
++# the days closed, and its count of the business days between the first date and the last, two
++# dates and no temporary: measured 8,511 bytes at 260 rows on 2026-10-01, about 29 bytes per
++# row on top of the slack, 11,210 when the gaps were a look over the business day after each
++# date; 69,367 at 2,600 and 677,767 at 26,000, 26 bytes per row, so a ceiling of 35 per row.
+ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
+     rows = 260
+     codes, futures, _, _ = schedule_columns(2)
+@@ -378,7 +378,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
+     days, settles = fixings_columns(rows, 100)
+     assert (
+         least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
+-        <= 45 * rows + SLACK
++        <= 35 * rows + SLACK
+     )
+ 
+ 
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 904dd21..b2446e5 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -1119,11 +1119,11 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
+ # A year of fixings at the column path, with the index by handle: the date column through its
+ # look and its conversion to days, the settle column accepted on the host's summary alone, the
+ # handle's text rule and its one lookup, then the builder's kind check, the holiday calendar
+-# read off the index, its count, its three looks, the order of the dates, the days the market
+-# is closed and the business days without a fixing, its two copies, and one publication.
+-# Twenty-one calls across seventeen functions, the accept rule once per argument. The three
+-# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
+-# fixture reads, so only their looks are in its count.
++# read off the index, its count, its two looks, the order of the dates and the days the market
++# is closed, its count of the business days from the first date to the last, its two copies,
++# and one publication. Twenty-one calls across seventeen functions, the accept rule once per
++# argument. The three business-day calls, the calendar, is_busday and busday_count, raise no
++# event the numpy fixture reads, so only their looks are in its count.
+ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
+     call_profile: CallProfile, numpy_calls: CallProfile
+ ) -> None:
+@@ -1154,11 +1154,11 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
+         "_publish": 1,
+     }
+     assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
+-        "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
++        "ndarray.any": 3,  # the date column's look for the calendar, then the builder's two
+         "ndarray.astype": 2,  # the date column on its way to days
+         "numpy.array": 2,  # the two copies the fixings keep
+         "ndarray.setflags": 2,  # frozen
+-        "ufunc.reduce": 4,
++        "ufunc.reduce": 3,
+     }
+ 
+ 

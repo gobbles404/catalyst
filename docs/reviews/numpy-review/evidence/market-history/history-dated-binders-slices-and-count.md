@@ -1,0 +1,20 @@
+as-is tree: <repo>/src/goosedove/__init__.py
+proposed tree: worktrees/wf_0d4f8983-1f8-3/src/goosedove/__init__.py
+rounds: 5, batches: 7, batch target: 20.0 ms; 'moved' means the proposed spread lies wholly outside the as-is spread
+
+| scenario | as-is us median (spread) | proposed us median (spread) | change | moved | peak bytes as-is -> proposed | numpy ledger diff | package ledger diff |
+|---|---:|---:|---:|---|---:|---|---|
+| create.MarketHistory.futures.360 | 28.02 (28.02..45.17) | 15.68 (15.68..31.52) | -44% |  | 3,504 -> 1,746 (-50%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| create.MarketHistory.futures.3630 | 32.70 (32.70..50.93) | 18.37 (18.37..30.83) | -44% | down | 16,584 -> 1,749 (-89%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| create.MarketHistory.futures.36000 | 35.20 (35.20..62.60) | 19.23 (19.23..31.46) | -45% | down | 146,064 -> 1,749 (-99%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| create.MarketHistory.gasdaily.12m | 30.27 (30.27..54.83) | 18.22 (18.22..35.34) | -40% |  | 7,388 -> 4,773 (-35%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| create.MarketHistory.gasdaily.120m | 35.94 (35.94..55.33) | 19.17 (19.17..35.20) | -47% | down | 19,964 -> 4,773 (-76%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.futures.series26000x360 | 194.63 (194.63..301.64) | 18.72 (18.72..34.56) | -90% | down | 442,720 -> 1,749 (-100%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.futures.allfixed3630 | 63.87 (63.87..106.87) | 24.40 (24.40..51.92) | -62% | down | 66,482 -> 40,917 (-38%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.futures.days36000x30 | 37.96 (37.96..65.92) | 15.97 (15.97..27.10) | -58% | down | 146,064 -> 1,749 (-99%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.gasdaily.allfixed120m | 70.48 (70.48..120.86) | 27.49 (27.49..43.43) | -61% | down | 95,736 -> 59,141 (-38%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.gasdaily.series26000x12m | 193.81 (193.81..411.53) | 17.99 (17.99..28.21) | -91% | down | 442,720 -> 4,773 (-99%) | ndarray.any: 2->0; ndarray.astype: 1->0; ndarray.copy: 0->1; ndarray.searchsorted: 0->2; ndarray.view: 0->1; numpy.zeros: 1->0; ufunc.reduce: 2->0 | _inside: 0->1 |
+| history.reject.futures.short3630 | 57.26 (57.26..94.37) | 40.33 (40.33..67.48) | -30% |  | 60,104 -> 35,088 (-42%) | ndarray.any: 2->1; ndarray.astype: 1->0; ndarray.searchsorted: 0->2; ndarray.view: 0->1; ufunc.reduce: 2->1 | _inside: 0->1 |
+| history.reject.futures.late360 | 9.55 (9.55..17.46) | 8.62 (8.62..13.90) | -10% |  | 2,112 -> 1,914 (-9%) | ndarray.any: 1->0; ndarray.argmax: 1->0; ndarray.searchsorted: 0->1; ufunc.reduce: 1->0 | same |
+| history.reject.gasdaily.short120m | 61.49 (61.49..108.55) | 48.14 (48.14..81.64) | -22% |  | 80,948 -> 44,512 (-45%) | ndarray.any: 2->1; ndarray.astype: 1->0; ndarray.searchsorted: 0->2; ndarray.view: 0->1; ufunc.reduce: 2->1 | _inside: 0->1 |
+| read.MarketHistory.futures.360 | 229.45 (229.45..461.81) | 230.48 (230.48..394.70) | +0% |  | 53,627 -> 53,627 (+0%) | same | same |

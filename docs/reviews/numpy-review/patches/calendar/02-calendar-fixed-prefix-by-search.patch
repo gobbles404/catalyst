@@ -1,0 +1,137 @@
+From 1031f7cca2bbe9f66794a019f81287576a788659 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:31:43 +0000
+Subject: [PATCH] calendar-fixed-prefix-by-search: is_fixed by one search and a
+ fill, first_unfixed from the search
+
+---
+ docs/library/calendar/calendar.md      |  2 +-
+ src/goosedove/calendar/calendar.py     | 27 ++++++++++++++++-----------
+ tests/performance/test_seam_budgets.py |  6 ++++++
+ 3 files changed, 23 insertions(+), 12 deletions(-)
+
+diff --git a/docs/library/calendar/calendar.md b/docs/library/calendar/calendar.md
+index 0efddcb..ef057c3 100644
+--- a/docs/library/calendar/calendar.md
++++ b/docs/library/calendar/calendar.md
+@@ -106,7 +106,7 @@ An IFERC index's two rules, one month being a calendar:
+ | each code once, spelling and case as typed | `contract_code row 2 is 'V26', already given at row 1` |
+ | each month's index published after the month above's, in the order given | `publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-11-02` |
+ 
+-A count of one reads `1 contract`. The messages name the schedule's columns, since the row to fix is in the schedule's cells, and `index` where the rule is about the index's contracts as a whole. The codes are labels: `M26` and `m26` are two codes, no code is read for its month, nothing is sorted, and no contract is inferred between two that are given; the Gas Daily days come from the schedule's typed first and last days and the IFERC rows from its publication days, so no calendar here reads a month off a code. Then the four columns are made, once. For a futures index as in #82: the days one `np.arange` from the day after the first expiry to the last, the contract on each day one `np.repeat` of the rows after the first, each as many times as its expiry follows the one above, never the first row, the priced flag `np.is_busday` over the days with the index's holiday calendar's list, and the fixed flag one comparison against the valuation date's day. For a Gas Daily index: the days one `np.arange` from the first month's first day to the last month's last, the contract on each day one `np.repeat` of the months' rows, each as many times as it has days, the priced flag true throughout, and the fixed flag one comparison, on or before the valuation date's day. For an IFERC index: the dates the publication days as given, the contract each month's own row, the priced flag true throughout, and the fixed flag one comparison, before the valuation date's day. The valuation date and the index are kept by reference, not copied, and the columns are frozen. Reading the handle shows the columns as they were made and reads each row's code from the schedule the index keeps; nothing is rebuilt. A failed call publishes nothing.
++A count of one reads `1 contract`. The messages name the schedule's columns, since the row to fix is in the schedule's cells, and `index` where the rule is about the index's contracts as a whole. The codes are labels: `M26` and `m26` are two codes, no code is read for its month, nothing is sorted, and no contract is inferred between two that are given; the Gas Daily days come from the schedule's typed first and last days and the IFERC rows from its publication days, so no calendar here reads a month off a code. Then the four columns are made, once. For a futures index as in #82: the days one `np.arange` from the day after the first expiry to the last, the contract on each day one `np.repeat` of the rows after the first, each as many times as its expiry follows the one above, never the first row, the priced flag `np.is_busday` over the days with the index's holiday calendar's list, and the fixed flag true up to the first day not before the valuation date's day, found by one search of the days, which are in order. For a Gas Daily index: the days one `np.arange` from the first month's first day to the last month's last, the contract on each day one `np.repeat` of the months' rows, each as many times as it has days, the priced flag true throughout, and the fixed flag true through the valuation date's day, one search. For an IFERC index: the dates the publication days as given, the contract each month's own row, the priced flag true throughout, and the fixed flag true up to the first publication day not before the valuation date's day, one search, the days being checked increasing. The valuation date and the index are kept by reference, not copied, and the columns are frozen. Reading the handle shows the columns as they were made and reads each row's code from the schedule the index keeps; nothing is rebuilt. A failed call publishes nothing.
+ 
+ ## Tests
+ 
+diff --git a/src/goosedove/calendar/calendar.py b/src/goosedove/calendar/calendar.py
+index 30266c3..e5dd1c9 100644
+--- a/src/goosedove/calendar/calendar.py
++++ b/src/goosedove/calendar/calendar.py
+@@ -94,7 +94,7 @@ def _futures_calendar(
+     the next inclusive are the next contract's and the days are in order; whether the market
+     is open, np.is_busday over the days with the index's holiday calendar's list, Monday to
+     Friday, a day listed twice or on a weekend or outside the calendar changing nothing; and
+-    whether the day is before the valuation date's day, one comparison, the day itself not
++    whether the day is before the valuation date's day, one search of the days, the day itself not
+     fixed whatever fraction of it has elapsed, and a valuation date before the calendar fixing
+     no day, after it every day.
+     """
+@@ -125,8 +125,8 @@ def _futures_calendar(
+         np.arange(1, expiries.size, dtype=np.intp), (expiries[1:] - expiries[:-1]).view(np.int64)
+     )
+     is_priced = np.is_busday(dates, holidays=holidays.holiday)
+-    is_fixed = dates < valuation_date.as_of
+-    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
++    first_unfixed = int(dates.searchsorted(valuation_date.as_of, side="left"))
++    return _frozen(valuation_date, index, dates, contract, is_priced, first_unfixed)
+ 
+ 
+ def _gas_daily_calendar(
+@@ -143,7 +143,7 @@ def _gas_daily_calendar(
+     day from the first day to the last, one np.arange; the month on each day, one np.repeat of
+     the months' rows, each as many times as it has days, since the months are laid end to end;
+     priced throughout, since Gas Daily prints every flow day; and fixed when the flow day is on
+-    or before the valuation date's day, since its print preceded the day, one comparison.
++    or before the valuation date's day, since its print preceded the day, one search of the days.
+     """
+     codes = schedule.codes
+     first = schedule.first_date
+@@ -175,8 +175,8 @@ def _gas_daily_calendar(
+     # count in all, by the gap rule. The lengths are freed before the flags.
+     contract = np.repeat(np.arange(last.size, dtype=np.intp), (last - first).view(np.int64) + 1)
+     is_priced = np.ones(dates.size, dtype=bool)
+-    is_fixed = dates <= valuation_date.as_of
+-    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
++    first_unfixed = int(dates.searchsorted(valuation_date.as_of, side="right"))
++    return _frozen(valuation_date, index, dates, contract, is_priced, first_unfixed)
+ 
+ 
+ def _iferc_calendar(
+@@ -189,7 +189,7 @@ def _iferc_calendar(
+     the order given; nothing is sorted. The columns: the publication days as given, copied so
+     the calendar owns them; the contract each month's own row; priced throughout, since an
+     index is a price for its whole month; and fixed when the publication day is before the
+-    valuation date's day, since the index prints during that day, one comparison.
++    valuation date's day, since the index prints during that day, one search of the days.
+     """
+     codes = schedule.codes
+     published = schedule.publication_date
+@@ -205,8 +205,8 @@ def _iferc_calendar(
+     dates = np.array(published, dtype="datetime64[D]")
+     contract = np.arange(dates.size, dtype=np.intp)
+     is_priced = np.ones(dates.size, dtype=bool)
+-    is_fixed = dates < valuation_date.as_of
+-    return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
++    first_unfixed = int(dates.searchsorted(valuation_date.as_of, side="left"))
++    return _frozen(valuation_date, index, dates, contract, is_priced, first_unfixed)
+ 
+ 
+ def _at_least_one(codes: tuple[str, ...]) -> None:
+@@ -233,9 +233,14 @@ def _frozen(
+     dates: NDArray[np.datetime64],
+     contract: NDArray[np.intp],
+     is_priced: NDArray[np.bool_],
+-    is_fixed: NDArray[np.bool_],
++    first_unfixed: int,
+ ) -> Calendar:
++    """The calendar of those columns, the fixed flag made from the row of the first unfixed
++    period: the periods are in date order, the days an arange or publication days checked
++    increasing, and the fixed side is the earlier one, so the flag is true before that row and
++    false from it, one fill, where a comparison over every period would find the same."""
++    is_fixed = np.zeros(dates.size, dtype=bool)
++    is_fixed[:first_unfixed] = True
+     for column in (dates, contract, is_priced, is_fixed):
+         column.setflags(write=False)
+-    first_unfixed = int(np.count_nonzero(is_fixed))  # the fixed periods come first
+     return Calendar(valuation_date, index, dates, contract, is_priced, is_fixed, first_unfixed)
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 6c62c76..e72bc82 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -1204,6 +1204,8 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
+         "numpy.arange": 2,  # every day, and the rows after the first, once each
+         "ndarray.view": 1,  # the gaps between expiries as day counts
+         "ndarray.repeat": 1,  # the prompt row of every day, once
++        "ndarray.searchsorted": 1,  # the first unfixed day, one search of the days
++        "numpy.zeros": 1,  # the fixed flag, filled up to it
+         "ndarray.setflags": 4,  # the four columns frozen
+         "ufunc.reduce": 1,
+     }
+@@ -1295,6 +1297,8 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
+         "numpy.arange": 2,  # every day, and the months' rows
+         "ndarray.view": 1,  # the months' lengths as day counts
+         "ndarray.repeat": 1,  # the month of every day, once
++        "ndarray.searchsorted": 1,  # the first unfixed day
++        "numpy.zeros": 1,  # the fixed flag, filled up to it
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
+         "ufunc.reduce": 2,
+@@ -1329,6 +1333,8 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
+         "ndarray.any": 1,
+         "numpy.array": 1,
+         "numpy.arange": 1,
++        "ndarray.searchsorted": 1,  # the first unfixed month
++        "numpy.zeros": 1,  # the fixed flag, filled up to it
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
+         "ufunc.reduce": 1,

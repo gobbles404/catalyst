@@ -1,0 +1,126 @@
+From 034dbeac06dc68947faeedec15ff90ea999b8b77 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:42:45 +0000
+Subject: [PATCH] instrument-ufunc-ledger-traced-inputs: a ledger of every
+ ufunc over a range's storage, operators included, and the bytes they touch
+
+---
+ docs/seam/measuring.md                 |  2 +-
+ tests/performance/conftest.py          | 50 +++++++++++++++++++++++++++++++++-
+ tests/performance/test_seam_budgets.py | 20 ++++++++++++++
+ 3 files changed, 70 insertions(+), 2 deletions(-)
+
+diff --git a/docs/seam/measuring.md b/docs/seam/measuring.md
+index 73d5909..7902a66 100644
+--- a/docs/seam/measuring.md
++++ b/docs/seam/measuring.md
+@@ -27,7 +27,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
+ 
+ ## Counts, as tests
+ 
+-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. Where the business-day calls matter, the fixings and the calendar, a third ledger, `numpy_callables`, reads the `CALL` event of `sys.monitoring`: every ufunc called by name, every function numpy dispatches and every numpy type built, such as `busdaycalendar`, which cProfile mostly cannot see; an operator is in no ledger, and an ndarray method is in cProfile's alone. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
++**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. Where the business-day calls matter, the fixings and the calendar, a third ledger, `numpy_callables`, reads the `CALL` event of `sys.monitoring`: every ufunc called by name, every function numpy dispatches and every numpy type built, such as `busdaycalendar`, which cProfile mostly cannot see; an operator is in neither, and an ndarray method is in cProfile's alone. The operators are in `ufunc_ledger`, which hands a call its ranges viewed through an ndarray subclass that reports every ufunc over their storage and the bytes of its operands and result: the passes over the data on the way in, counted in bytes, and nothing past a copy. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+ 
+ **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
+ 
+diff --git a/tests/performance/conftest.py b/tests/performance/conftest.py
+index e61582a..a735795 100644
+--- a/tests/performance/conftest.py
++++ b/tests/performance/conftest.py
+@@ -5,12 +5,13 @@ import re
+ import sys
+ from collections.abc import Callable
+ from pathlib import Path
++from typing import Any
+ 
+ import numpy as np
+ import pytest
+ 
+ import goosedove
+-from goosedove.excel.bridge import DateColumn, NumberColumn, TextColumn
++from goosedove.excel.bridge import Cells, DateColumn, NumberColumn, TextColumn
+ from goosedove.excel.probes import probe
+ 
+ PACKAGE_DIR = str(Path(goosedove.__file__).parent)
+@@ -143,3 +144,50 @@ def _numpy_callables(fn: Callable[[], object]) -> dict[str, int]:
+ @pytest.fixture
+ def numpy_callables() -> Callable[[Callable[[], object]], dict[str, int]]:
+     return _numpy_callables
++
++
++UfuncLedger = tuple[dict[str, int], int]
++
++
++def _ufunc_ledger(call: Callable[..., object], *args: object) -> UfuncLedger:
++    """Every ufunc the call ran over the storage of its ranges, operators included, and the
++    bytes their operands and results held in all: the passes over the data, counted in bytes.
++
++    Each range in args is handed over with its kinds and numbers viewed through an ndarray
++    subclass made for this one count, which reports each ufunc it takes part in and keeps its
++    results reporting, so a mask's reduction counts too. A copy taken with np.array or
++    np.asarray is a plain array again, so a record's own columns are never counted, and a
++    result the seam returns as an array is refused as a subclass: count the way in, not the
++    way out.
++    """
++    ufuncs: dict[str, int] = {}
++    moved = [0]
++
++    class Traced(np.ndarray[Any, Any]):
++        def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any:
++            plain = tuple(i.view(np.ndarray) if isinstance(i, np.ndarray) else i for i in inputs)
++            out = kwargs.get("out")
++            if out is not None:
++                kwargs["out"] = tuple(o.view(np.ndarray) for o in out)
++            result = getattr(ufunc, method)(*plain, **kwargs)
++            touched = sum(i.nbytes for i in plain if isinstance(i, np.ndarray))
++            if isinstance(result, np.ndarray):
++                touched += result.nbytes
++                result = result.view(Traced)
++            key = ufunc.__name__ if method == "__call__" else f"{ufunc.__name__}.{method}"
++            ufuncs[key] = ufuncs.get(key, 0) + 1
++            moved[0] += touched
++            return result
++
++    def traced(arg: object) -> object:
++        if isinstance(arg, Cells):
++            return Cells(arg.kinds.view(Traced), arg.numbers.view(Traced), arg.texts, arg.seen)
++        return arg
++
++    call(*(traced(arg) for arg in args))
++    return ufuncs, moved[0]
++
++
++@pytest.fixture
++def ufunc_ledger() -> Callable[..., UfuncLedger]:
++    return _ufunc_ledger
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 6802c91..6ea5219 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -91,6 +91,26 @@ def test_accepted_date_column_call_itemized(call_profile: CallProfile) -> None:
+     }
+ 
+ 
++# The date rule's passes over a column of dates: the whole-number test, the two bounds and the
++# kinds compare, their masks joined, one look, and the shift to days. Seventy-four bytes read
++# or written per cell, over the nine the column holds.
++def test_a_date_column_in_is_eight_ufuncs_over_eight_times_its_bytes(
++    ufunc_ledger: Callable[..., tuple[dict[str, int], int]],
++) -> None:
++    column = Cells.from_rows([[float(61 + i)] for i in range(N)])
++    ufuncs, touched = ufunc_ledger(PATH["FirstOfDates"], column)
++    assert ufuncs == {
++        "floor": 1,
++        "not_equal": 1,
++        "less": 1,
++        "greater": 1,
++        "bitwise_or": 2,
++        "logical_or.reduce": 1,
++        "add": 1,
++    }
++    assert touched == 74 * N
++
++
+ def test_accepted_text_column_call_itemized(
+     call_profile: CallProfile, numpy_calls: CallProfile
+ ) -> None:

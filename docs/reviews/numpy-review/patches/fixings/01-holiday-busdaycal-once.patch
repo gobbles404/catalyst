@@ -1,0 +1,148 @@
+From ed3a87e116f8ac8ce9cad4d704b901eeb5bfa040 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:17:06 +0000
+Subject: [PATCH] holiday-busdaycal-once: build np.busdaycalendar once on the
+ HolidayCalendar record
+
+---
+ docs/library/index-definitions/holiday-calendar.md  |  2 +-
+ src/goosedove/calendar/calendar.py                  | 11 ++++++-----
+ src/goosedove/index_definitions/holiday_calendar.py | 12 +++++++++---
+ src/goosedove/market_data/futures_fixings.py        | 14 +++++++-------
+ tests/performance/test_seam_allocation.py           | 11 ++++++-----
+ 5 files changed, 29 insertions(+), 21 deletions(-)
+
+diff --git a/docs/library/index-definitions/holiday-calendar.md b/docs/library/index-definitions/holiday-calendar.md
+index b7c1585..7c8ce75 100644
+--- a/docs/library/index-definitions/holiday-calendar.md
++++ b/docs/library/index-definitions/holiday-calendar.md
+@@ -39,7 +39,7 @@ Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which
+ 
+ ## The library checks
+ 
+-None. The seam never compares two arguments and the calendar has one, so there is no rule of alignment as the schedule has, and a calendar is the days the desk listed. The dates are kept as given, in the order given: a day listed twice is listed twice, a day out of order stays where it was, and a Saturday listed is kept. What a calendar must look like for a reader to use it, whether days repeat, whether they increase, whether a weekend day belongs, is that reader's rule; its two readers, the futures fixings and the calendar, read the list as numpy does, a day listed twice counting once and a weekend day listed adding nothing, so neither needs one. A one-row calendar is a calendar. A failed call publishes nothing, and a column the seam rejects never reaches the function.
++None. The seam never compares two arguments and the calendar has one, so there is no rule of alignment as the schedule has, and a calendar is the days the desk listed. The dates are kept as given, in the order given: a day listed twice is listed twice, a day out of order stays where it was, and a Saturday listed is kept. What a calendar must look like for a reader to use it, whether days repeat, whether they increase, whether a weekend day belongs, is that reader's rule; its two readers, the futures fixings and the calendar, read the list as numpy does, a day listed twice counting once and a weekend day listed adding nothing, so neither needs one. That reading is made once, here: beside the list as given the record keeps `busdaycal`, numpy's business-day calendar of the same days, which numpy builds by sorting them, keeping each once and dropping the weekend days, and which both readers hand to numpy's business-day functions rather than building it again on every call. A one-row calendar is a calendar. A failed call publishes nothing, and a column the seam rejects never reaches the function.
+ 
+ ## Tests
+ 
+diff --git a/src/goosedove/calendar/calendar.py b/src/goosedove/calendar/calendar.py
+index 851c669..15e4ade 100644
+--- a/src/goosedove/calendar/calendar.py
++++ b/src/goosedove/calendar/calendar.py
+@@ -91,10 +91,11 @@ def _futures_calendar(
+     The columns: every calendar day from the day after the first expiry to the last expiry,
+     one np.arange; the row prompt on each day, one np.searchsorted over the expiries, each day
+     finding the first expiry on or after it; whether the market is open, np.is_busday over the
+-    days with the index's holiday calendar's list, Monday to Friday, a day listed twice or on a
+-    weekend or outside the calendar changing nothing; and whether the day is before the
+-    valuation date's day, one comparison, the day itself not fixed whatever fraction of it has
+-    elapsed, and a valuation date before the calendar fixing no day, after it every day.
++    days with the business-day calendar the index's holiday calendar made once from its list,
++    Monday to Friday, a day listed twice or on a weekend or outside the calendar changing
++    nothing; and whether the day is before the valuation date's day, one comparison, the day
++    itself not fixed whatever fraction of it has elapsed, and a valuation date before the
++    calendar fixing no day, after it every day.
+     """
+     holidays = with_holiday_calendar(index.holiday_calendar)  # a futures index always has one
+     codes = schedule.codes
+@@ -118,7 +119,7 @@ def _futures_calendar(
+     day = np.timedelta64(1, "D")
+     dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
+     contract = np.searchsorted(expiries, dates, side="left")
+-    is_priced = np.is_busday(dates, holidays=holidays.holiday)
++    is_priced = np.is_busday(dates, busdaycal=holidays.busdaycal)
+     is_fixed = dates < valuation_date.as_of
+     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+ 
+diff --git a/src/goosedove/index_definitions/holiday_calendar.py b/src/goosedove/index_definitions/holiday_calendar.py
+index 617fddb..bc16a3c 100644
+--- a/src/goosedove/index_definitions/holiday_calendar.py
++++ b/src/goosedove/index_definitions/holiday_calendar.py
+@@ -10,9 +10,13 @@ from numpy.typing import NDArray
+ @dataclass(frozen=True, slots=True)
+ class HolidayCalendar:
+     """The holidays, read-only: one calendar day per row, as the desk listed them, in the order
+-    given. A day listed twice is listed twice, and a weekend day listed is kept."""
++    given. A day listed twice is listed twice, and a weekend day listed is kept. Beside them,
++    numpy's business-day calendar of the same list, which numpy builds by sorting it, keeping
++    each day once and dropping the weekend days, made once here for every reader that asks
++    numpy which days are business days, rather than once per reader's call."""
+ 
+     holiday: NDArray[np.datetime64]
++    busdaycal: np.busdaycalendar
+ 
+ 
+ def holiday_calendar(holiday: NDArray[np.datetime64]) -> HolidayCalendar:
+@@ -21,8 +25,10 @@ def holiday_calendar(holiday: NDArray[np.datetime64]) -> HolidayCalendar:
+     reader's rule, written when the reader is.
+ 
+     The column is copied and then frozen, so the calendar owns its data: a Python caller keeps
+-    whatever it passed, and a later change to an input never changes a calendar.
++    whatever it passed, and a later change to an input never changes a calendar. numpy's
++    business-day calendar is made from the frozen copy and holds its own copy, sorted, and
++    numpy offers no way to change it.
+     """
+     days = np.array(holiday, dtype="datetime64[D]")
+     days.setflags(write=False)
+-    return HolidayCalendar(days)
++    return HolidayCalendar(days, np.busdaycalendar(holidays=days))
+diff --git a/src/goosedove/market_data/futures_fixings.py b/src/goosedove/market_data/futures_fixings.py
+index 207624c..093f3c3 100644
+--- a/src/goosedove/market_data/futures_fixings.py
++++ b/src/goosedove/market_data/futures_fixings.py
+@@ -47,15 +47,16 @@ def futures_fixings(
+     is whole exactly when each date is the business day after the one above, one numpy call
+     over the column. The first and last dates bound the check, so nothing is asked for before
+     the first or after the last, and a holiday outside them changes nothing. The holidays are
+-    read as numpy reads them: a day listed twice counts once, and a day listed on a weekend adds
+-    nothing. Both columns are copied and then frozen, so the fixings own their data: a Python
+-    caller keeps whatever it passed, and a later change to an input never changes a fixing; the
+-    index is kept by reference, the one the desk paired the series with. Rows count as the sheet
+-    counts them, the first row of the column being row 1.
++    read as numpy reads them, through the business-day calendar the holiday calendar made once:
++    a day listed twice counts once, and a day listed on a weekend adds nothing. Both columns are
++    copied and then frozen, so the fixings own their data: a Python caller keeps whatever it
++    passed, and a later change to an input never changes a fixing; the index is kept by
++    reference, the one the desk paired the series with. Rows count as the sheet counts them,
++    the first row of the column being row 1.
+     """
+     if index.kind is not Kind.FUTURES:
+         raise ValueError(f"index is {described(index.kind, 'index')}, expected a futures index")
+-    holidays = with_holiday_calendar(index.holiday_calendar).holiday  # a futures index has one
++    calendar = with_holiday_calendar(index.holiday_calendar).busdaycal  # a futures index has one
+     if settles.size != dates.size:
+         have = f"{settles.size} {'settle' if settles.size == 1 else 'settles'}"
+         raise ValueError(f"settle has {have}, expected {dates.size}, one per date")
+@@ -66,7 +67,6 @@ def futures_fixings(
+         raise ValueError(
+             f"date row {k + 2} is {days[k + 1]}, expected a date after row {k + 1}'s {days[k]}"
+         )
+-    calendar = np.busdaycalendar(holidays=holidays)
+     closed = ~np.is_busday(days, busdaycal=calendar)
+     if closed.any():
+         k = int(closed.argmax())  # days[k] is the first weekend day or holiday
+diff --git a/tests/performance/test_seam_allocation.py b/tests/performance/test_seam_allocation.py
+index ffc578d..a0952f0 100644
+--- a/tests/performance/test_seam_allocation.py
++++ b/tests/performance/test_seam_allocation.py
+@@ -221,14 +221,15 @@ def holiday_column(days: int) -> Cells:
+     return Cells.from_rows([[46023.0 + 7 * i] for i in range(days)])
+ 
+ 
+-# A calendar keeps a copy of its column, 8 bytes per holiday, and on the way pays the column's
+-# conversion to days and its look, as a schedule without options does: measured 2,908 bytes at
+-# 100 holidays on 2026-09-16, about 17 bytes per holiday on top of a creator's small objects,
+-# which twice the slack covers; 18,208 at 1,000 holidays and 171,208 at 10,000.
++# A calendar keeps a copy of its column, 8 bytes per holiday, and numpy's business-day calendar
++# of it, its own sorted copy, 8 more, and on the way pays the column's conversion to days and
++# its look, as a schedule without options does: measured 3,072 bytes at 100 holidays on
++# 2026-10-01, 2,908 before the business-day calendar was kept; 24,672 at 1,000 holidays and
++# 240,672 at 10,000, about 24 bytes per holiday, which 25 per holiday and twice the slack cover.
+ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
+     days = 100
+     holidays = holiday_column(days)
+-    assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
++    assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 25 * days + 2 * SLACK
+ 
+ 
+ def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:

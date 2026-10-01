@@ -1,0 +1,126 @@
+From 7001e1e23ea6708abbea9b5411a5ed316cda2c98 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:09:57 +0000
+Subject: [PATCH] utilities-priced-column-doubled-rectangle: (design fork, for
+ measurement) a spare column in MixedArray.table so the five-wide rectangle is
+ built once
+
+---
+ src/goosedove/excel/bridge.py    | 12 ++++++++--
+ src/goosedove/excel/utilities.py | 52 +++++++++++++++++++++-------------------
+ 2 files changed, 38 insertions(+), 26 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 27a0646..aa65b68 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -119,7 +119,10 @@ class MixedArray:
+ 
+     @classmethod
+     def table(
+-        cls, headings: Sequence[Sequence[str]], *columns: NDArray[Any] | tuple[str, ...]
++        cls,
++        headings: Sequence[Sequence[str]],
++        *columns: NDArray[Any] | tuple[str, ...],
++        spare: int = 0,
+     ) -> "MixedArray":
+         """A rectangle for the way out: rows of text over columns of one kind each.
+ 
+@@ -128,8 +131,12 @@ class MixedArray:
+         array of booleans, all of one length. The kinds and the slots are filled a column at a
+         time and the texts gathered in sheet order, so nothing runs per cell. A day outside the
+         calendar fails as a date result fails, naming the cell.
++
++        spare reserves that many trailing columns, headed like the others, their body cells of
++        text kind over NaN slots and with no text gathered: the caller writes them by kind and
++        composes the texts, so the record is not a result until it has.
+         """
+-        width = len(columns)
++        width = len(columns) + spare
+         rows = len(columns[0]) if columns else 0
+         top = len(headings)
+         for r, row in enumerate(headings):
+@@ -140,6 +147,7 @@ class MixedArray:
+         kinds = np.empty((top + rows, width), dtype=np.uint8)
+         slots = np.full((top + rows, width), np.nan)
+         kinds[:top] = TEXT_CODE
++        kinds[top:, len(columns) :] = TEXT_CODE
+         text_columns: list[tuple[str, ...]] = []
+         for j, column in enumerate(columns):
+             if len(column) != rows:
+diff --git a/src/goosedove/excel/utilities.py b/src/goosedove/excel/utilities.py
+index eac7cad..02dcfd6 100644
+--- a/src/goosedove/excel/utilities.py
++++ b/src/goosedove/excel/utilities.py
+@@ -15,7 +15,6 @@ from numpy.typing import NDArray
+ from goosedove.calendar.calendar import Calendar
+ from goosedove.excel.bridge import (
+     NUMBER_CODE,
+-    TEXT_CODE,
+     Handle,
+     MixedArray,
+     excel_function,
+@@ -133,35 +132,40 @@ def _priced_column(
+     for every day or one per day, shows on the rest. The words are display, not values, and a
+     column holding numbers on some rows and words on others is not one the table builder takes,
+     so the column is written by kind: its kinds, its slots, and its words into the texts. The
+-    calendar's own table stands as it is, nothing rebuilt, made here as the calendar's reader
+-    makes it.
+-
+-    The texts in sheet order: each heading row's four then this column's, and each day's code
+-    then, on a day without a price, its word. Each day's code is gathered again from the
+-    schedule's codes through the prompt rows, an array of references, rather than read off the
+-    table's tuple of texts, which numpy would walk text by text to find its shape. The priced
+-    rows are written through the column's body, a view under the two heading rows, so no row
+-    is shifted into a new array.
++    builder lays the calendar's four columns out as the calendar's reader does and reserves the
++    fifth as a spare column of text kind, so the rectangle is built once, five wide, and no
++    four-wide one is copied into it.
++
++    The texts in sheet order: the two heading rows, then each day's code and, on a day without
++    a price, its word. Each day's code is gathered from the schedule's codes through the
++    prompt rows, an array of references; the builder's own body texts, the codes alone, are
++    not used. The priced rows are written through the column's body, a view under the two
++    heading rows, so no row is shifted into a new array.
+     """
+-    base = calendar_table(calendar)
+-    rows, width = base.shape
+-    kinds = np.empty((rows, width + 1), dtype=np.uint8)
+-    kinds[:, :width] = base.kinds
+-    kinds[:, width] = TEXT_CODE
+-    slots = np.empty((rows, width + 1))
+-    slots[:, :width] = base.numeric_slots
+-    slots[:, width] = np.nan
+-    pairs = np.empty((rows - 2, 2), dtype=object)
+-    pairs[:, 0] = np.array(calendar.index.schedule.codes, dtype=object)[calendar.contract]
++    codes = np.array(calendar.index.schedule.codes, dtype=object)[calendar.contract]
++    table = MixedArray.table(
++        [
++            ("date", "contract", "is_priced", "is_fixed", header),
++            ("datetime64[D]", "str", "bool", "bool", "float64"),
++        ],
++        calendar.dates,
++        tuple(codes),
++        calendar.is_priced,
++        calendar.is_fixed,
++        spare=1,
++    )
++    kinds, slots = table.kinds, table.numeric_slots
++    rows = calendar.dates.size
++    pairs = np.empty((rows, 2), dtype=object)
++    pairs[:, 0] = codes
+     pairs[:, 1] = words
+-    worded = np.ones((rows - 2, 2), dtype=bool)
+-    body_kinds, body_slots = kinds[2:, width], slots[2:, width]
++    worded = np.ones((rows, 2), dtype=bool)
++    body_kinds, body_slots = kinds[2:, 4], slots[2:, 4]
+     for on, prices in priced:  # the pairs, not the prices: one or two of them
+         body_kinds[on] = NUMBER_CODE
+         body_slots[on] = prices
+         worded[on, 1] = False
+-    headings = (*base.texts[:width], header, *base.texts[width : 2 * width], "float64")
+-    return MixedArray(kinds, slots, (*headings, *pairs[worded]))
++    return MixedArray(kinds, slots, (*table.texts[:10], *pairs[worded]))
+ 
+ 
+ @shown.register

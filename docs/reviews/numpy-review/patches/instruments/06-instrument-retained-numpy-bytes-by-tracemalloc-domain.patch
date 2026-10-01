@@ -1,0 +1,131 @@
+From 5fbcf684ec44e7629711b4467f0934afb4d530eb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:47:47 +0000
+Subject: [PATCH] instrument-retained-numpy-bytes-by-tracemalloc-domain: the
+ allocation tests pin what a creator keeps, to the byte
+
+---
+ docs/seam/measuring.md                    |  2 +-
+ tests/performance/test_seam_allocation.py | 68 +++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+), 1 deletion(-)
+
+diff --git a/docs/seam/measuring.md b/docs/seam/measuring.md
+index b39eb86..5e531c5 100644
+--- a/docs/seam/measuring.md
++++ b/docs/seam/measuring.md
+@@ -27,7 +27,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
+ 
+ ## Counts, as tests
+ 
+-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. Where the business-day calls matter, the fixings and the calendar, a third ledger, `numpy_callables`, reads the `CALL` event of `sys.monitoring`: every ufunc called by name, every function numpy dispatches and every numpy type built, such as `busdaycalendar`, which cProfile mostly cannot see; an operator is in neither, and an ndarray method is in cProfile's alone. The operators are in `ufunc_ledger`, which hands a call its ranges viewed through an ndarray subclass that reports every ufunc over their storage and the bytes of its operands and result: the passes over the data on the way in, counted in bytes, and nothing past a copy. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
++**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. Where the business-day calls matter, the fixings and the calendar, a third ledger, `numpy_callables`, reads the `CALL` event of `sys.monitoring`: every ufunc called by name, every function numpy dispatches and every numpy type built, such as `busdaycalendar`, which cProfile mostly cannot see; an operator is in neither, and an ndarray method is in cProfile's alone. The operators are in `ufunc_ledger`, which hands a call its ranges viewed through an ndarray subclass that reports every ufunc over their storage and the bytes of its operands and result: the passes over the data on the way in, counted in bytes, and nothing past a copy. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's, and for the creators what the publication keeps after the call, to the byte, read from the domain numpy traces its buffers under, and that the release frees it.
+ 
+ **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
+ 
+diff --git a/tests/performance/test_seam_allocation.py b/tests/performance/test_seam_allocation.py
+index ffc578d..a9135e4 100644
+--- a/tests/performance/test_seam_allocation.py
++++ b/tests/performance/test_seam_allocation.py
+@@ -9,6 +9,7 @@ temporary fails here and a change that removes one lowers the ceiling in its own
+ import ctypes
+ import tracemalloc
+ from collections.abc import Callable
++from typing import cast
+ 
+ import numpy as np
+ import pytest
+@@ -35,6 +36,40 @@ def peak_bytes(fn: Callable[[], object]) -> int:
+         tracemalloc.stop()
+ 
+ 
++# numpy registers every data buffer it allocates with tracemalloc under its own domain, so the
++# domain alone is the arrays' bytes, with no Python object among them.
++NUMPY_DOMAIN = 389_047
++
++
++def numpy_bytes() -> int:
++    """The bytes of numpy data buffers alive now that were allocated since tracemalloc started."""
++    snapshot = tracemalloc.take_snapshot()
++    numpy = snapshot.filter_traces([tracemalloc.DomainFilter(True, NUMPY_DOMAIN)])
++    return sum(trace.size for trace in numpy.traces)
++
++
++def retained_numpy_bytes(create: Callable[[], object]) -> tuple[int, int]:
++    """The bytes of numpy data a creator's publication holds after the call, and after its
++    release: the record's own columns, then nothing."""
++    tracemalloc.start()
++    try:
++        text = cast(str, create())
++        held = numpy_bytes()
++        bridge.release(text)
++        return held, numpy_bytes()
++    finally:
++        tracemalloc.stop()
++
++
++def test_numpy_buffers_are_traced_in_their_own_domain() -> None:
++    tracemalloc.start()
++    try:
++        held = np.empty(4096)
++        assert numpy_bytes() == held.nbytes
++    finally:
++        tracemalloc.stop()
++
++
+ def test_a_scalar_call_allocates_only_small_objects() -> None:
+     assert peak_bytes(lambda: ENTRY["Add"](1.0, 2.0)) <= SLACK
+     assert peak_bytes(lambda: ENTRY["Zero"]()) <= SLACK
+@@ -162,6 +197,15 @@ def test_reading_a_curve_back_peaks_at_its_table_and_the_roads_masks() -> None:
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 18 * cells + SLACK
+ 
+ 
++# What a curve keeps, to the byte: its two arrays of 3,631 days, 8 bytes each, however many
++# anchors it was given, and nothing once released.
++def test_a_discount_curve_keeps_exactly_its_two_columns_and_release_frees_them() -> None:
++    days = 3_631
++    for body in (curve_body(days), anchor_body(12, days - 1)):
++        held = retained_numpy_bytes(lambda b=body: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, b))
++        assert held == (2 * 8 * days, 0)
++
++
+ def anchor_body(anchors: int, days: int) -> Cells:
+     """Anchors spread evenly over that many days from 11 September 2026, as the sheet sends them."""
+     step = days // (anchors - 1)
+@@ -382,6 +426,24 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
+     )
+ 
+ 
++# Fixings keep their two columns, 16 bytes per row, and nothing else; a holiday calendar its
++# one, 8 bytes per holiday.
++def test_futures_fixings_and_a_holiday_calendar_keep_exactly_their_columns() -> None:
++    rows = 260
++    codes, futures, _, _ = schedule_columns(2)
++    index = an_index(
++        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
++        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
++    )
++    days, settles = fixings_columns(rows, 100)
++    assert retained_numpy_bytes(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index)) == (
++        16 * rows,
++        0,
++    )
++    holidays = holiday_column(100)
++    assert retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) == (8 * 100, 0)
++
++
+ def calendar_sources(contracts: int) -> tuple[object, object]:
+     """The two handles a calendar takes: the valuation date, and the index of a schedule of that
+     many monthly contracts a month apart with a calendar of a hundred holidays a week apart."""
+@@ -406,6 +468,12 @@ def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
+     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+ 
+ 
++# A calendar keeps its four columns, 18 bytes per day, and nothing else.
++def test_a_calendar_keeps_exactly_its_four_columns() -> None:
++    valuation, index = calendar_sources(13)
++    assert retained_numpy_bytes(lambda: ENTRY["_CreateCalendar"](valuation, index)) == (18 * 360, 0)
++
++
+ def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
+     """Codes and the first and last day of that many calendar months from January 2026, laid
+     end to end, as the sheet sends them."""

@@ -1,0 +1,162 @@
+From 859b4d5706dd0b9990ac2ebedfbc879cb7558e49 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:25:54 +0000
+Subject: [PATCH] specs-inf-lot-and-nan-fee-correctness: An infinite lot size
+ is no whole number and a NaN fee is not 0 or more
+
+---
+ .../index_definitions/contract_specifications.py   | 45 ++++++++---------
+ tests/performance/test_seam_budgets.py             |  2 +-
+ tests/unit/test_contract_specifications.py         | 56 ++++++++++++++++++++++
+ 3 files changed, 80 insertions(+), 23 deletions(-)
+
+diff --git a/src/goosedove/index_definitions/contract_specifications.py b/src/goosedove/index_definitions/contract_specifications.py
+index af9a39c..149e1a2 100644
+--- a/src/goosedove/index_definitions/contract_specifications.py
++++ b/src/goosedove/index_definitions/contract_specifications.py
+@@ -40,23 +40,23 @@ def contract_specifications(
+     """The one way to make a ContractSpecifications: six rules of meaning, checked once, in this
+     order, the first failure being the message, and within a rule the first offending row named.
+ 
+-    Each word is named once, since a name twice would be two specifications for one word. Each
+-    lot size is whole, since a lot is a whole number of its unit, and 1 or more, since a lot of
+-    nothing, or of a negative quantity, is no lot; a whole lot size below one fails the second of
+-    those, so -3 reads `expected 1 or more`. Each lot unit is a unit of a category a quantity can
+-    measure, volume, mass or energy, in the tables passed in, matched exactly as a code and never
+-    trimmed or re-cased; whether it is a unit of the index's own category is the index's rule,
+-    since nothing here holds the conventions, so a barrel row and a gallon row stand side by side
+-    here and MMBTU beside them, and the index refuses the one that is not its measure. Each
+-    brokerage rate,
+-    then each clearing rate, is 0 or more, since a fee is a charge and zero is no charge; a rebate
+-    is not a fee, and a negative rate is refused as the mistyped charge it most often is. The
+-    fees are costs per lot in the index's settlement currency, which the consumer reads off the
+-    index; nothing here holds the conventions, so nothing here checks it. The seam hands the lot
+-    sizes over as the numbers the cells hold, and a whole double goes back out as it came, so no
+-    line at 2^53 is drawn here. The three columns of numbers are copied and then frozen, so the
+-    specifications own their data, each rule one look over its column; the names and the lot
+-    units are the seam's tuples, kept as they are, the units read against the tables by key.
++    Each word is named once, since a name twice would be two specifications for one word. Each lot
++    size is whole, since a lot is a whole number of its unit, and 1 or more, since a lot of nothing,
++    or of a negative quantity, is no lot; a whole lot size below one fails the second of those, so
++    -3 reads `expected 1 or more`, and neither NaN nor infinity is a whole number. Each lot unit is
++    a unit of a category a quantity can measure, volume, mass or energy, in the tables passed in,
++    matched exactly as a code and never trimmed or re-cased; whether it is a unit of the index's own
++    category is the index's rule, since nothing here holds the conventions, so a barrel row and a
++    gallon row stand side by side here and MMBTU beside them, and the index refuses the one that is
++    not its measure. Each brokerage rate, then each clearing rate, is 0 or more, NaN not being,
++    since a fee is a charge and zero is no charge; a rebate is not a fee, and a negative rate is
++    refused as the mistyped charge it most often is. The fees are costs per lot in the index's
++    settlement currency, which the consumer reads off the index; nothing here holds the conventions,
++    so nothing here checks it. The seam hands the lot sizes over as the numbers the cells hold, and
++    a whole double goes back out as it came, so no line at 2^53 is drawn here. The three columns of
++    numbers are copied and then frozen, so the specifications own their data, each rule one look
++    over its column; the names and the lot units are the seam's tuples, kept as they are, the units
++    read against the tables by key.
+     Rows count as the sheet counts them, the first row of the body being row 1.
+     """
+     if len(set(names)) != len(names):
+@@ -66,7 +66,8 @@ def contract_specifications(
+                 raise ValueError(f"name row {row} is {name!r}, already given at row {seen[name]}")
+             seen[name] = row
+     lots = np.array(lot_sizes, dtype=np.float64)
+-    fraction = lots != np.floor(lots)
++    fraction = lots != np.floor(lots)  # NaN is no whole number: nan != nan
++    fraction |= lots == np.inf  # nor is infinity, though inf == floor(inf); -inf is below one
+     if fraction.any():
+         i = int(fraction.argmax())
+         raise ValueError(f"lot_size row {i + 1} is {float(lots[i])!r}, expected a whole number")
+@@ -87,10 +88,10 @@ def contract_specifications(
+         ("brokerage_rate_per_lot", brokerage),
+         ("clearing_rate_per_lot", clearing),
+     ):
+-        # fmin, not min: fmin passes over a NaN where min returns it, so a NaN fee, which is not
+-        # below zero, cannot hide a negative fee in another row.
+-        if fees.size and np.fmin.reduce(fees) < 0.0:
+-            i = int((fees < 0.0).argmax())
++        # The least fee, NaN if any fee is NaN, and NaN is not 0 or more; the mask only to name
++        # the first row that is not.
++        if fees.size and not fees.min() >= 0.0:
++            i = int((~(fees >= 0.0)).argmax())
+             raise ValueError(f"{argument} row {i + 1} is {float(fees[i])!r}, expected 0 or more")
+     for column in (lots, brokerage, clearing):
+         column.setflags(write=False)
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index ba70a49..0d280bb 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -960,7 +960,7 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
+         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
+     ) == {
+         "ndarray.any": 6,  # one look per column, five of them, then the builder's fraction look
+-        "ndarray.min": 1,  # the least lot size; each fee column's least is a bare fmin.reduce
++        "ndarray.min": 3,  # the least lot size, then the least of each fee column
+         "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
+         "ndarray.cumsum": 1,  # the text cells above each row
+         "ndarray.sum": 3,  # text cells per row, and to the left of each of the two text columns
+diff --git a/tests/unit/test_contract_specifications.py b/tests/unit/test_contract_specifications.py
+index 0827e26..10448db 100644
+--- a/tests/unit/test_contract_specifications.py
++++ b/tests/unit/test_contract_specifications.py
+@@ -262,6 +262,62 @@ def test_a_negative_fee_is_rejected_naming_the_column_and_the_row(
+     assert str(failure.value) == message
+ 
+ 
++# A cell cannot hold infinity or NaN; a Python caller can. Infinity is no whole number of a unit,
++# though it equals its own floor, and NaN is not 0 or more, though it is not below zero either;
++# -inf stays below one, and the first such row is named wherever it is.
++@pytest.mark.parametrize(
++    ("lots", "brokerage", "clearing", "message"),
++    [
++        (
++            wholes(10000, np.inf, 1),
++            BROKERAGE,
++            CLEARING,
++            "lot_size row 2 is inf, expected a whole number",
++        ),
++        (
++            wholes(10000, -np.inf, 1),
++            BROKERAGE,
++            CLEARING,
++            "lot_size row 2 is -inf, expected 1 or more",
++        ),
++        (
++            wholes(np.inf, 2.5, 1),
++            BROKERAGE,
++            CLEARING,
++            "lot_size row 1 is inf, expected a whole number",
++        ),
++        (
++            LOTS,
++            numbers(3.0, np.nan, -1.0),
++            CLEARING,
++            "brokerage_rate_per_lot row 2 is nan, expected 0 or more",
++        ),
++        (
++            LOTS,
++            BROKERAGE,
++            numbers(-1.0, np.nan, 0.0),
++            "clearing_rate_per_lot row 1 is -1.0, expected 0 or more",
++        ),
++    ],
++    ids=[
++        "an infinite lot size",
++        "a negative infinite lot size",
++        "infinity before a fraction",
++        "a NaN fee before a negative one",
++        "a negative fee before a NaN one",
++    ],
++)
++def test_infinity_is_no_lot_size_and_nan_no_fee(
++    lots: NDArray[np.float64],
++    brokerage: NDArray[np.float64],
++    clearing: NDArray[np.float64],
++    message: str,
++) -> None:
++    with pytest.raises(ValueError) as failure:
++        specifications(NAMES, lots, LOT_UNITS, brokerage, clearing)
++    assert str(failure.value) == message
++
++
+ # The rules run in order: names, lot sizes, lot units, fees; with several wrong, the earlier is
+ # named.
+ def test_the_rules_run_in_order_and_the_earlier_failure_is_named() -> None:

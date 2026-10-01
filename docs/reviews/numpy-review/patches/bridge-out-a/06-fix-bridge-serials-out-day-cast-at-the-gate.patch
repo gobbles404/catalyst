@@ -1,0 +1,61 @@
+From 228f94ce03d49b29c63be907e8e906c56c9bfacb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:35:57 +0000
+Subject: [PATCH] fix(bridge-serials-out): read the days' int64 view over
+ native single days
+
+The gate on the unit's name also admits datetime64[2D], [7D] and big-endian
+days, whose int64 storage is not a count of days: cast to datetime64[D]
+with copy=False first, which returns native day arrays themselves.
+
+---
+ src/goosedove/excel/bridge.py | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 71b4ef7..88529b2 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -848,7 +848,10 @@ def _boolean_out(value: object) -> bool:
+ 
+ # Numpy stores a day as an int64, the days since 1970-01-01, and NaT as the int64 minimum, below
+ # every day. Excel's epoch and calendar in those units let a column of days be read through its
+-# int64 view, numpy's own storage and not a copy.
++# int64 view, numpy's own storage and not a copy. The view is taken over DAY, native single days:
++# the unit's name alone also admits [2D], [7D] and a foreign byte order, whose storage counts
++# something else, and those are cast to DAY first; days already in DAY are not copied.
++DAY: Final = np.dtype("datetime64[D]")
+ EPOCH_DAYS: Final = int(EXCEL_EPOCH.astype(np.int64))
+ NAT_DAYS: Final = int(np.datetime64("NaT", "D").astype(np.int64))
+ FIRST_DAY: Final = FIRST_SERIAL + EPOCH_DAYS
+@@ -873,9 +876,9 @@ def _not_days(counted: NDArray[np.int64]) -> tuple[int, str] | None:
+ 
+ def _serials(days: NDArray[Any]) -> tuple[NDArray[np.float64], int | None, str]:
+     """Serials for an array of days, or the flat index and reason of the first that is not one.
+-    The serials are one cast of the int64 view shifted in place by the epoch, exact, since every
+-    day in the calendar is a whole number far below 2^53."""
+-    counted = days.view(np.int64)
++    The serials are one cast of the int64 view over DAY shifted in place by the epoch, exact,
++    since every day in the calendar is a whole number far below 2^53."""
++    counted = days.astype(DAY, copy=False).view(np.int64)
+     bad = _not_days(counted)
+     if bad is not None:
+         return np.empty(0), bad[0], bad[1]
+@@ -917,11 +920,11 @@ def _table_column(column: NDArray[Any], row: int, col: int, target: NDArray[np.f
+     """A table column's kind code, its slots written into target, its column of the slots;
+     checked before the copy into the slots would hide what the rule could no longer see, as the
+     array results check before their conversion; a bad cell is named as INDEX counts it, `row`
+-    being the first body row. Days are cast from their int64 view straight into the column and
+-    shifted there by the epoch, so no serials are made on the way."""
++    being the first body row. Days are cast from their int64 view over DAY straight into the
++    column and shifted there by the epoch, so no serials are made on the way."""
+     kind = column.dtype.kind
+     if kind == "M" and _unit(column) == "D":
+-        counted = column.view(np.int64)
++        counted = column.astype(DAY, copy=False).view(np.int64)
+         bad = _not_days(counted)
+         if bad is not None:
+             raise _BadResult(f"result cell ({row + bad[0]}, {col}) {bad[1]}")
+-- 
+2.43.0
+

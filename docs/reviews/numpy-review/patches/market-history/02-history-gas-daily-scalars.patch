@@ -1,0 +1,41 @@
+From d136dc36c66bcab3ae44ca74107c0c014bc207c0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:01:39 +0000
+Subject: [PATCH] history-gas-daily-scalars: bind Gas Daily prints with the run
+ placed by one scalar
+
+---
+ src/goosedove/market/market_history.py | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index 8df10fa..3765645 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -108,9 +108,23 @@ def gas_daily_history(fixings: GasDailyFixings, calendar: Calendar) -> MarketHis
+             f"fixings flow_date {flow_dates[k]} is after valuation date {as_of}, "
+             "expected flow days on or before the valuation date"
+         )
+-    first, last, rows = _inside(calendar, flow_dates)
+-    _every_fixed_day(calendar, rows)
+-    return _frozen(calendar, rows, fixings.prices[first:last].copy())
++    dates = calendar.dates
++    # The flow days are consecutive, so the prints inside the calendar are one run placed by one
++    # scalar, every day of it fixed by the rule above; the fixed days are covered exactly when
++    # the run starts at the calendar's first day and numbers them, and the first day without a
++    # print is then row 0, or the row after the run.
++    first_row = int((flow_dates[0] - dates[0]).astype(np.int64)) if flow_dates.size else 0
++    skipped = max(0, -first_row)
++    count = max(min(flow_dates.size, dates.size - first_row) - skipped, 0)
++    starts_at_first = count > 0 and first_row + skipped == 0
++    if count != calendar.first_unfixed or (count and not starts_at_first):
++        k = count if starts_at_first else 0
++        raise ValueError(
++            f"fixings has no fixing for {dates[k]}, "
++            "expected a fixing for every fixed day in calendar"
++        )
++    rows = np.arange(count, dtype=np.intp)
++    return _frozen(calendar, rows, fixings.prices[skipped : skipped + count].copy())
+ 
+ 
+ @_bind.register

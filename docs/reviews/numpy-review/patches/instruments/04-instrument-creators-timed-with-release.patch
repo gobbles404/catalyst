@@ -1,0 +1,275 @@
+From 701e8bc833b0205ca3d6aa8a508eea3683ac4976 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:44:27 +0000
+Subject: [PATCH] instrument-creators-timed-with-release: the Python runner and
+ the profiler time the creators, releasing inside the clock
+
+---
+ docs/seam/measuring.md                |   2 +-
+ tools/performance/measure_python.py   | 176 +++++++++++++++++++++++++++++++++-
+ tools/performance/profile_workload.py |  19 ++--
+ 3 files changed, 187 insertions(+), 10 deletions(-)
+
+diff --git a/docs/seam/measuring.md b/docs/seam/measuring.md
+index 7902a66..b39eb86 100644
+--- a/docs/seam/measuring.md
++++ b/docs/seam/measuring.md
+@@ -54,7 +54,7 @@ Each runner warms once, checks the answer, calibrates the number of calls until
+ 
+ | Command | Clock | Includes | Leaves out |
+ |---|---|---|---|
+-| `uv run python tools/performance/measure_python.py` | each function's prepared path, held once, on `Cells` built before the clock | validation, the probe, result conversion; `cells_from_buffers` from buffers as its own scenario | the host, Excel, building the inputs |
++| `uv run python tools/performance/measure_python.py` | each function's prepared path, held once, on `Cells` built before the clock | validation, the probe, result conversion; `cells_from_buffers` from buffers as its own scenario; a creator's publication and its release, so the store does not grow | the host, Excel, building the inputs |
+ | `dotnet run --project tools/performance/Goosedove.Host.Measure -c Release` | the registered delegate | marshaling, the trip into Python, validation, the probe, result conversion, the way back to a .NET value; plus two stage rows, `way in` (`Marshal.ToPython` alone) and `way out` (`Marshal.FromPython` alone), with the GIL held outside the clock | Excel and Excel-DNA |
+ | `.\tools\performance\measure_excel.ps1` | `Range.Calculate` or `Application.Calculate` over COM in a hidden Excel | everything a user feels: Excel, Excel-DNA, the host, Python, and the COM round trips | startup, building the sheets, checking answers |
+ | `uv run python tools/performance/summarize.py` | none | reads whatever CSVs exist under `profiles/` and writes `profiles/summary.md`, one table, a column per layer | |
+diff --git a/tools/performance/measure_python.py b/tools/performance/measure_python.py
+index 018f6ee..41d4c4d 100644
+--- a/tools/performance/measure_python.py
++++ b/tools/performance/measure_python.py
+@@ -3,7 +3,8 @@
+ Run with `uv run python tools/performance/measure_python.py`. The clock includes each function's
+ prepared path, entry(name), held once as the host holds it, on Cells already built: type
+ validation, the probe, and result conversion. cells_from_buffers from the host's buffers is its
+-own scenario, so what owning a range costs is timed apart. The clock
++own scenario, so what owning a range costs is timed apart. A creator's row releases what each
++call published inside the clock, so the store holds no more after a row than before. The clock
+ excludes the host, Excel, and building the inputs. Each row of python-timing.csv is one batch:
+ a calibrated number of calls whose mean is the figure, never a percentile of single calls.
+ Results are checked before and after the clock, never inside it. A second, untimed pass
+@@ -142,11 +143,178 @@ def curve_body(rows: int) -> Cells:
+     return Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(rows)])
+ 
+ 
++def anchor_body(anchors: int, days: int) -> Cells:
++    """A curve's table of that many anchors spread over that many days."""
++    step = days // (anchors - 1)
++    return Cells.from_rows([[46276.0 + i * step, 1.0 - i * step * 1e-5] for i in range(anchors)])
++
++
++def serials(n: int, start: float, step: float) -> Cells:
++    """A column of n numbers from start, step apart: dates as serials, or prices."""
++    return Cells.from_rows([[start + step * i] for i in range(n)])
++
++
++def codes(n: int) -> Cells:
++    return Cells.from_rows([[f"c{i}"] for i in range(n)])
++
++
++def an_index(contracts: int, days_apart: int, holidays: int) -> object:
++    """A futures index of that many contracts that many days apart, under a calendar of that many
++    Thursdays a week apart from New Year's Day 2026: the handle fixings and a calendar take."""
++    schedule = ENTRY["_CreateFuturesSchedule"](
++        codes(contracts), serials(contracts, 46161.0, days_apart), MISSING
++    )
++    specifications = ENTRY["_CreateContractSpecifications"](
++        Cells.from_rows(
++            [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
++        ),
++        Cells.from_rows([["contract 0", 1000.0, "MMBTU", 3.0, 2.0]]),
++    )
++    return ENTRY["_CreateIndex"](
++        "sample",
++        schedule,
++        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
++        specifications,
++        ENTRY["_CreateHolidayCalendar"](serials(holidays, 46023.0, 7)),
++    )
++
++
++def business_days(rows: int, holidays: int) -> Cells:
++    """That many business days from Friday 1 May 2026 under an_index's holidays, as serials."""
++    epoch = np.datetime64("1899-12-30")
++    closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
++    days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
++    return Cells.from_rows([[float(day)] for day in (days - epoch).astype(np.int64)])
++
++
++def created(name: str, *args: object) -> Callable[[], object]:
++    """A creator's prepared path and the release of what it published, both on the clock: the
++    store holds no more after the call than before, and the release is one dictionary pop."""
++    run, release = ENTRY[name], bridge.release
++
++    def call() -> object:
++        text = run(*args)
++        if not isinstance(text, str) or not release(text):
++            raise AssertionError(f"{name} published nothing: {text!r}")
++        return text
++
++    return call
++
++
++def handle(kind: str) -> Callable[[object], None]:
++    """A handle of that kind; its number differs on every call, so only the kind is checked."""
++
++    def check(result: object) -> None:
++        if not isinstance(result, str) or f":{kind}:" not in result:
++            raise AssertionError(f"got {result!r}, expected a {kind} handle")
++
++    return check
++
++
++def creators() -> list[Scenario]:
++    """A row per creator at the sizes a sheet sends, inputs and the handles taken built here."""
++    curve = curve_body(3_631)
++    anchors = anchor_body(12, 3_630)
++    cases = [
++        Scenario(
++            "_CreateValuationDate",
++            "two numbers in",
++            2,
++            1,
++            created("_CreateValuationDate", 46276.0, 0.5),
++            handle("valuation_date"),
++        ),
++        Scenario(
++            "_CreateDiscountCurve",
++            "a daily table",
++            2 * 3_631,
++            1,
++            created("_CreateDiscountCurve", CURVE_HEADERS, curve),
++            handle("discount_curve"),
++        ),
++        Scenario(
++            "_CreateDiscountCurve",
++            "a dozen anchors",
++            24,
++            1,
++            created("_CreateDiscountCurve", CURVE_HEADERS, anchors),
++            handle("discount_curve"),
++        ),
++    ]
++    for n in (120, 1_200):
++        cases.append(
++            Scenario(
++                "_CreateFuturesSchedule",
++                "three columns",
++                3 * n,
++                1,
++                created(
++                    "_CreateFuturesSchedule",
++                    codes(n),
++                    serials(n, 46161.0, 30),
++                    serials(n, 46156.0, 30),
++                ),
++                handle("futures_schedule"),
++            )
++        )
++    for n in (100, 1_000, 10_000):
++        cases.append(
++            Scenario(
++                "_CreateHolidayCalendar",
++                "one column",
++                n,
++                1,
++                created("_CreateHolidayCalendar", serials(n, 46023.0, 7)),
++                handle("holiday_calendar"),
++            )
++        )
++    for n in (120, 10_000):
++        cases.append(
++            Scenario(
++                "_CreatePriceVector",
++                "one column",
++                n,
++                1,
++                created("_CreatePriceVector", "sample", serials(n, 74.0, 0.25)),
++                handle("price_vector"),
++            )
++        )
++    index = an_index(2, 30, 100)
++    for rows in (260, 2_600):
++        cases.append(
++            Scenario(
++                "_CreateFuturesFixings",
++                "two columns and an index",
++                2 * rows,
++                1,
++                created(
++                    "_CreateFuturesFixings",
++                    business_days(rows, 100),
++                    serials(rows, 100.0, 0.0),
++                    index,
++                ),
++                handle("futures_fixings"),
++            )
++        )
++    valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
++    for contracts, label in ((13, "a year of days"), (121, "ten years of days")):
++        cases.append(
++            Scenario(
++                "_CreateCalendar",
++                label,
++                2,
++                1,
++                created("_CreateCalendar", valuation, an_index(contracts, 30, 100)),
++                handle("calendar"),
++            )
++        )
++    return cases
++
++
+ def scenarios() -> list[Scenario]:
+     """Every timed case, with its inputs built here, before any clock starts."""
+     # A valuation date and a ten-year curve, created once here: the reader's handles. The
+-    # creators themselves have no row, because each call would retain an object for the life of
+-    # the run.
++    # creators' own rows release what each call publishes, below.
+     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
+     curve = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+     cases = [
+@@ -418,6 +586,7 @@ def scenarios() -> list[Scenario]:
+             ),
+         )
+     )
++    cases.extend(creators())
+     return cases
+ 
+ 
+@@ -492,6 +661,7 @@ def environment() -> dict[str, object]:
+         "timed_scope": (
+             "Each function's prepared path, entry(name), held once, on Cells built before the "
+             "clock: validation, the probe, result conversion. cells_from_buffers is timed apart. "
++            "A creator's row publishes and releases inside the clock. "
+             "Excludes the host, Excel, and building inputs. Each row is one batch; per_call_us is "
+             "that batch's mean."
+         ),
+diff --git a/tools/performance/profile_workload.py b/tools/performance/profile_workload.py
+index 096964d..f3f401f 100644
+--- a/tools/performance/profile_workload.py
++++ b/tools/performance/profile_workload.py
+@@ -3,6 +3,7 @@
+ from collections.abc import Callable
+ from pathlib import Path
+ from time import perf_counter
++from typing import cast
+ 
+ from pyinstrument import Profiler
+ 
+@@ -45,14 +46,20 @@ def workloads() -> dict[str, Callable[[], object]]:
+     mixed = Cells.from_rows([[["nn", 1.0, True][i % 3]] for i in range(n)])
+     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
+     trades = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(n // 4)])
+-    # The reader's handle: a ten-year curve created once here, since a creator under the
+-    # profiler would retain a curve per call.
+-    curve = ENTRY["_CreateDiscountCurve"](
+-        Cells.from_rows([["date", "discount_factor"]]),
+-        Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(3_631)]),
+-    )
++    # The reader's handle: a ten-year curve created once here. The creator's own workload
++    # releases each curve it publishes, so the store does not grow under the profiler.
++    curve_headers = Cells.from_rows([["date", "discount_factor"]])
++    curve_body = Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(3_631)])
++    curve = ENTRY["_CreateDiscountCurve"](curve_headers, curve_body)
++    holidays = Cells.from_rows([[46023.0 + 7 * i] for i in range(1_000)])
+     return {
+         "util_ReadHandle": lambda: ENTRY["util_ReadHandle"](curve),
++        "_CreateDiscountCurve": lambda: bridge.release(
++            cast(str, ENTRY["_CreateDiscountCurve"](curve_headers, curve_body))
++        ),
++        "_CreateHolidayCalendar": lambda: bridge.release(
++            cast(str, ENTRY["_CreateHolidayCalendar"](holidays))
++        ),
+         "Zero": lambda: ENTRY["Zero"](),
+         "Add": lambda: ENTRY["Add"](1.0, 2.0),
+         "Times": lambda: ENTRY["Times"](5.0, MISSING),

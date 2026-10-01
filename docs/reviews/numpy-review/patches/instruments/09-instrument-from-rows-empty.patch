@@ -1,0 +1,23 @@
+From d4cf5663d01209ae09f139742923a6cbdd446407 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:51:49 +0000
+Subject: [PATCH] instrument-from-rows-empty: from_rows writes every number
+ once, no NaN fill first
+
+---
+ src/goosedove/excel/bridge.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 27a0646..1092732 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -260,7 +260,7 @@ class Cells:
+         if not rows or not rows[0]:
+             raise ValueError("a range has at least one cell; Excel never sends fewer")
+         kinds = np.empty((len(rows), len(rows[0])), dtype=np.uint8)
+-        numbers = np.full(kinds.shape, np.nan)
++        numbers = np.empty(kinds.shape)  # every cell written below, NaN where it holds no number
+         texts: list[str] = []
+         seen = 0
+         for r, row in enumerate(rows):

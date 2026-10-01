@@ -1,0 +1,46 @@
+From f5c0c0564e2c0ce3e5e8becdb6c71a90dd4080b3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:44:37 +0000
+Subject: [PATCH] bridge-mixed-empty-text-index-already-known: a rejected mixed
+ range names its empty text by the index _mixed found
+
+---
+ src/goosedove/excel/bridge.py | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index ac50d9b..64cc439 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -349,11 +349,19 @@ def _cell(
+             assert_never(kind)
+ 
+ 
+-def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected:
+-    """The rejection for the first flagged cell, named as INDEX counts."""
++def _first_bad(
++    cells: Cells, bad: NDArray[np.bool_], expected: str, text_index: int = -1
++) -> _Rejected:
++    """The rejection for the first flagged cell, named as INDEX counts. text_index is the
++    flagged text cell's place among the texts when the caller already knows it, so the text
++    cells before it are not counted again."""
+     i = int(bad.argmax())
+     r, c = divmod(i, cells.kinds.shape[1])
+-    return _Rejected((r + 1, c + 1), _cell(cells.kinds, cells.numbers, cells.texts, i), expected)
++    if text_index >= 0 and cells.kinds.item(i) == TEXT_CODE:
++        value: object = cells.texts[text_index]
++    else:
++        value = _cell(cells.kinds, cells.numbers, cells.texts, i)
++    return _Rejected((r + 1, c + 1), value, expected)
+ 
+ 
+ # --- one cell ---------------------------------------------------------------
+@@ -513,7 +521,7 @@ def _mixed(value: object) -> MixedArray:
+         empty = value.texts.index("") if "" in value.texts else -1
+         if value.seen & NOT_MIXED or empty >= 0:
+             raise _first_bad(
+-                value, _bad_mixed(value.kinds, empty), "number, nonempty text or boolean"
++                value, _bad_mixed(value.kinds, empty), "number, nonempty text or boolean", empty
+             )
+         return MixedArray(value.kinds, value.numbers, value.texts)
+     return _mixed_scalar(value)

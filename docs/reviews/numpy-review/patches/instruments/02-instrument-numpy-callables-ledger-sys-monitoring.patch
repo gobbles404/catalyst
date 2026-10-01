@@ -1,0 +1,144 @@
+From d0ae041b323b1f452fb3b2a0713093ca81b024da Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:40:16 +0000
+Subject: [PATCH] instrument-numpy-callables-ledger-sys-monitoring: a third
+ ledger counts the numpy callables the interpreter calls
+
+---
+ docs/seam/measuring.md                 |  2 +-
+ tests/performance/conftest.py          | 49 ++++++++++++++++++++++++++++++++++
+ tests/performance/test_seam_budgets.py | 19 ++++++++++---
+ 3 files changed, 66 insertions(+), 4 deletions(-)
+
+diff --git a/docs/seam/measuring.md b/docs/seam/measuring.md
+index 02b9155..73d5909 100644
+--- a/docs/seam/measuring.md
++++ b/docs/seam/measuring.md
+@@ -27,7 +27,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
+ 
+ ## Counts, as tests
+ 
+-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
++**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. Where the business-day calls matter, the fixings and the calendar, a third ledger, `numpy_callables`, reads the `CALL` event of `sys.monitoring`: every ufunc called by name, every function numpy dispatches and every numpy type built, such as `busdaycalendar`, which cProfile mostly cannot see; an operator is in no ledger, and an ndarray method is in cProfile's alone. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+ 
+ **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
+ 
+diff --git a/tests/performance/conftest.py b/tests/performance/conftest.py
+index a729fa0..e61582a 100644
+--- a/tests/performance/conftest.py
++++ b/tests/performance/conftest.py
+@@ -2,9 +2,11 @@
+ 
+ import cProfile
+ import re
++import sys
+ from collections.abc import Callable
+ from pathlib import Path
+ 
++import numpy as np
+ import pytest
+ 
+ import goosedove
+@@ -94,3 +96,50 @@ def _numpy_calls(fn: Callable[[], object]) -> dict[str, int]:
+ @pytest.fixture
+ def numpy_calls() -> Callable[[Callable[[], object]], dict[str, int]]:
+     return _numpy_calls
++
++
++# Tool 4 is free: 0 is the debugger's, 1 coverage's, 2 cProfile's, 3 Hypothesis's, 5 the
++# optimizer's.
++_LEDGER_TOOL = 4
++
++
++def _numpy_callables(fn: Callable[[], object]) -> dict[str, int]:
++    """Which numpy callables the interpreter itself called, and how many times each.
++
++    Read from sys.monitoring's CALL event, which fires for every call a line of Python makes
++    and for none a C function makes: a ufunc called by name, such as isfinite or floor; a
++    function numpy dispatches, such as interp, is_busday or count_nonzero; and a numpy type
++    built, such as busdaycalendar or timedelta64. cProfile raises no event for most of these.
++    An operator and an ndarray method are not calls of a numpy callable, so neither is here.
++    """
++    monitoring = sys.monitoring
++    calls: dict[str, int] = {}
++
++    def on_call(code: object, offset: int, called: object, arg0: object) -> None:
++        kind = type(called)
++        if kind is np.ufunc:
++            group = "ufunc"
++        elif kind is type and called.__module__ == "numpy":
++            group = "type"
++        elif kind.__module__.startswith("numpy"):
++            group = "numpy"
++        else:
++            return
++        name = f"{group}:{getattr(called, '__name__', '?')}"
++        calls[name] = calls.get(name, 0) + 1
++
++    monitoring.use_tool_id(_LEDGER_TOOL, "numpy callables")
++    try:
++        monitoring.register_callback(_LEDGER_TOOL, monitoring.events.CALL, on_call)
++        monitoring.set_events(_LEDGER_TOOL, monitoring.events.CALL)
++        fn()
++    finally:
++        monitoring.set_events(_LEDGER_TOOL, 0)
++        monitoring.register_callback(_LEDGER_TOOL, monitoring.events.CALL, None)
++        monitoring.free_tool_id(_LEDGER_TOOL)
++    return calls
++
++
++@pytest.fixture
++def numpy_callables() -> Callable[[Callable[[], object]], dict[str, int]]:
++    return _numpy_callables
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index f5c8a5d..6802c91 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -1128,9 +1128,10 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
+ # is closed and the business days without a fixing, its two copies, and one publication.
+ # Twenty-one calls across seventeen functions, the accept rule once per argument. The three
+ # business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
+-# fixture reads, so only their looks are in its count.
++# fixture reads, so only their looks are in its count; the callables ledger counts them, and
++# the calendar is built from the index's holidays on every call.
+ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
+-    call_profile: CallProfile, numpy_calls: CallProfile
++    call_profile: CallProfile, numpy_calls: CallProfile, numpy_callables: CallProfile
+ ) -> None:
+     codes, futures, _, _ = schedule_columns(2)
+     index = an_index(
+@@ -1165,6 +1166,12 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
+         "ndarray.setflags": 2,  # frozen
+         "ufunc.reduce": 4,
+     }
++    assert numpy_callables(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
++        "ufunc:floor": 1,  # the date rule's whole-number test
++        "type:busdaycalendar": 1,  # the index's holidays, made a calendar on every call
++        "numpy:is_busday": 1,  # the days the market is closed
++        "numpy:busday_offset": 1,  # the business day after each
++    }
+ 
+ 
+ # --- the calendar: a schedule of any kind in, four columns made once, one publication out --
+@@ -1186,7 +1193,7 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
+ # accept rule once per argument; is_busday and the comparison against the valuation date raise
+ # no event the numpy fixture reads.
+ def test_a_calendar_is_two_handles_in_and_four_columns_out(
+-    call_profile: CallProfile, numpy_calls: CallProfile
++    call_profile: CallProfile, numpy_calls: CallProfile, numpy_callables: CallProfile
+ ) -> None:
+     valuation, index = calendar_sources(13)
+     PATH["_CreateCalendar"](valuation, index)
+@@ -1212,6 +1219,12 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
+         "numpy.count_nonzero": 1,  # the fixed periods, which come first
+         "ufunc.reduce": 1,
+     }
++    assert numpy_callables(lambda: PATH["_CreateCalendar"](valuation, index)) == {
++        "type:timedelta64": 2,  # the span's limit and the one day the days step by
++        "numpy:searchsorted": 1,  # the prompt row of every day
++        "numpy:is_busday": 1,  # the market open, the holidays read on every call
++        "numpy:count_nonzero": 1,
++    }
+ 
+ 
+ # Reading a calendar back rebuilds nothing: no arange, no searchsorted, no look at a holiday

@@ -1,0 +1,28 @@
+From 671e9f107b143e27f33e4e05c5b6fd5421748a7b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:42:08 +0000
+Subject: [PATCH] fix(specs-bounds-as-reductions): reduce each fee column over
+ every element, axis=None
+
+---
+ src/goosedove/index_definitions/contract_specifications.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/goosedove/index_definitions/contract_specifications.py b/src/goosedove/index_definitions/contract_specifications.py
+index af9a39c..2231fe1 100644
+--- a/src/goosedove/index_definitions/contract_specifications.py
++++ b/src/goosedove/index_definitions/contract_specifications.py
+@@ -88,8 +88,8 @@ def contract_specifications(
+         ("clearing_rate_per_lot", clearing),
+     ):
+         # fmin, not min: fmin passes over a NaN where min returns it, so a NaN fee, which is not
+-        # below zero, cannot hide a negative fee in another row.
+-        if fees.size and np.fmin.reduce(fees) < 0.0:
++        # below zero, cannot hide a negative fee in another row; over every element, as min is.
++        if fees.size and np.fmin.reduce(fees, axis=None) < 0.0:
+             i = int((fees < 0.0).argmax())
+             raise ValueError(f"{argument} row {i + 1} is {float(fees[i])!r}, expected 0 or more")
+     for column in (lots, brokerage, clearing):
+-- 
+2.43.0
+

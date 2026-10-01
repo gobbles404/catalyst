@@ -1,0 +1,32 @@
+From 0e739ebbbe633167a5e4c8a55fd9d5fa49490f26 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:39:49 +0000
+Subject: [PATCH] fix(history-dated-binders-slices-and-count): the inside rows
+ are an owned copy, not a view of the subtraction
+
+---
+ src/goosedove/market/market_history.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/goosedove/market/market_history.py b/src/goosedove/market/market_history.py
+index 58c4e62..dbe3979 100644
+--- a/src/goosedove/market/market_history.py
++++ b/src/goosedove/market/market_history.py
+@@ -154,12 +154,12 @@ def _inside(
+     rows: the fixings' dates increase, their creator's rule, and the calendar's days run one
+     after another from its first, so the fixings inside are one run found by two searches, and
+     each one's row is its day count from the calendar's first day, one subtraction over that run
+-    alone, viewed as whole numbers."""
++    alone, copied as whole numbers so the record owns its rows."""
+     start: np.datetime64 = calendar.dates[0]
+     end: np.datetime64 = calendar.dates[-1]
+     first = int(fixing_dates.searchsorted(start))
+     last = int(fixing_dates.searchsorted(end, side="right"))
+-    return first, last, (fixing_dates[first:last] - start).view(np.intp)
++    return first, last, (fixing_dates[first:last] - start).astype(np.intp)
+ 
+ 
+ def _every_fixed_day(calendar: Calendar, rows: NDArray[np.intp]) -> None:
+-- 
+2.43.0
+

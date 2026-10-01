@@ -1,0 +1,26 @@
+From 607c8d7487b007141a00c26bec6bf3241905b0fb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:31:30 +0000
+Subject: [PATCH] interp-day-grid-from-int64: The day grid as an int64 arange
+ viewed as days
+
+---
+ src/goosedove/globals/interpolation.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/goosedove/globals/interpolation.py b/src/goosedove/globals/interpolation.py
+index c8c5b65..6297972 100644
+--- a/src/goosedove/globals/interpolation.py
++++ b/src/goosedove/globals/interpolation.py
+@@ -31,7 +31,10 @@ def interpolate_discount_factors(
+     anchor it runs from, since it adds a non-positive step to it, so the hold is the one bound
+     left to keep, and for any ordinary curve it changes nothing.
+     """
+-    days = np.arange(dates[0], dates[-1] + ONE_DAY, dtype="datetime64[D]")
++    # The day grid counted as whole days since 1970 and read as days, with no date arithmetic.
++    serial = dates.view(np.int64)
++    grid: NDArray[np.int64] = np.arange(serial[0], serial[-1] + 1)
++    days = grid.view("datetime64[D]")
+     offsets = (dates - dates[0]) / ONE_DAY
+     values = np.interp(np.arange(days.size, dtype=np.float64), offsets, factors)
+     # The anchor each day runs to: the first anchor for its own day, then each later anchor for

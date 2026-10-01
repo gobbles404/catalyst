@@ -1,0 +1,42 @@
+From f4433c0740b9070e0ace884bd7cb2c21a3a4b531 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:15:54 +0000
+Subject: [PATCH] curve-finite-look-as-all: The finite look as
+ isfinite().all(), with the inverted mask built only on the failure path
+
+---
+ src/goosedove/globals/discount_curve.py | 6 +++---
+ tests/performance/test_seam_budgets.py  | 3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/globals/discount_curve.py b/src/goosedove/globals/discount_curve.py
+index d3aad09..510cf2f 100644
+--- a/src/goosedove/globals/discount_curve.py
++++ b/src/goosedove/globals/discount_curve.py
+@@ -46,9 +46,9 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64])
+     row 1.
+     """
+     days = np.asarray(dates, dtype="datetime64[D]")  # read, never written: no copy of the anchors
+-    bad = ~np.isfinite(factors)
+-    if bad.any():  # before any arithmetic: numpy warns on inf - inf, and a warning fails here
+-        i = int(bad.argmax())
++    finite = np.isfinite(factors)  # before any arithmetic: numpy warns on inf - inf, and a
++    if not finite.all():  # warning fails here; the inverse is made only on the way out
++        i = int((~finite).argmax())
+         raise ValueError(
+             f"discount_factor row {i + 1} is {float(factors[i])!r}, expected a finite number"
+         )
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 904dd21..ebf66ba 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -587,7 +587,8 @@ CURVE_LEDGER = {
+     "_publish": 1,
+ }
+ CURVE_NUMPY = {
+-    "ndarray.any": 5,  # one look per column, then finite, rising and unordered, one look each
++    "ndarray.any": 4,  # one look per column, then rising and unordered, one look each
++    "ndarray.all": 1,  # every factor finite: the success path makes no inverted mask
+     "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
+     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
+     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets

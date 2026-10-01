@@ -1,0 +1,52 @@
+From 686f2177dfbf0a920f7a040b15c9b140403a3cc9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 12:35:55 +0000
+Subject: [PATCH] fix(gas-daily-consecutive-by-span): a NaT first row breaks
+ the series, told by its day number
+
+---
+ .../market_data/gas_daily_fixings.py          | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/src/goosedove/market_data/gas_daily_fixings.py b/src/goosedove/market_data/gas_daily_fixings.py
+index 34465a4..4d113a5 100644
+--- a/src/goosedove/market_data/gas_daily_fixings.py
++++ b/src/goosedove/market_data/gas_daily_fixings.py
+@@ -10,6 +10,9 @@ from numpy.typing import NDArray
+ from goosedove.index_definitions.index import Index
+ from goosedove.index_definitions.kind import Kind, described
+ 
++# NaT's day number, the least an int64 holds.
++NAT_DAY = int(np.iinfo(np.int64).min)
++
+ 
+ @dataclass(frozen=True, slots=True)
+ class GasDailyFixings:
+@@ -50,14 +53,18 @@ def gas_daily_fixings(
+         have = f"{price.size} {'price' if price.size == 1 else 'prices'}"
+         raise ValueError(f"price has {have}, expected {flow_date.size}, one per flow_date")
+     days = np.array(flow_date, dtype="datetime64[D]")
+-    # The days are consecutive exactly when their day numbers increase and the last is one fewer
+-    # than the rows after the first: one mask over the day numbers, a view of the column, and
+-    # one subtraction of two Python integers. NaT's day number is the least an int64 holds, so a
+-    # NaT breaks the order or the span, as it breaks the day after. The day after each day is
+-    # made only when the series breaks, to name the first row that does.
++    # The days are consecutive exactly when their day numbers increase, the first is a day and
++    # the last is one fewer than the rows after the first: one mask over the day numbers, a view
++    # of the column, and three Python integers. NaT's day number is the least an int64 holds, so
++    # a NaT after the first row breaks the order, and a NaT first is told by its number, since
++    # the least days after it could still increase by one. The day after each day is made only
++    # when the series breaks, to name the first row that does; a single row has none after it.
+     serial = days.view(np.int64)
+     unordered = serial[1:] <= serial[:-1]
+-    if unordered.any() or (days.size and int(serial[-1]) - int(serial[0]) != days.size - 1):
++    if unordered.any() or (
++        days.size > 1
++        and (int(serial[0]) == NAT_DAY or int(serial[-1]) - int(serial[0]) != days.size - 1)
++    ):
+         following = days[:-1] + np.timedelta64(1, "D")
+         broken = days[1:] != following
+         k = int(broken.argmax())  # days[k + 1] is the first day that is not the day after days[k]
+-- 
+2.43.0
+

@@ -1,0 +1,25 @@
+From a7ff09de05f642b922d7793d7296ac98dcd5cfda Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:27:25 +0000
+Subject: [PATCH] interp-offsets-one-temporary: The anchors' offsets from one
+ float conversion of the int64 view and an in-place shift
+
+---
+ src/goosedove/globals/interpolation.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/goosedove/globals/interpolation.py b/src/goosedove/globals/interpolation.py
+index c8c5b65..066995f 100644
+--- a/src/goosedove/globals/interpolation.py
++++ b/src/goosedove/globals/interpolation.py
+@@ -32,7 +32,9 @@ def interpolate_discount_factors(
+     left to keep, and for any ordinary curve it changes nothing.
+     """
+     days = np.arange(dates[0], dates[-1] + ONE_DAY, dtype="datetime64[D]")
+-    offsets = (dates - dates[0]) / ONE_DAY
++    # Each anchor's days since the first, as floats: whole days are exact in float64.
++    offsets = dates.view(np.int64).astype(np.float64)
++    offsets -= offsets[0]
+     values = np.interp(np.arange(days.size, dtype=np.float64), offsets, factors)
+     # The anchor each day runs to: the first anchor for its own day, then each later anchor for
+     # every day since the one before it.

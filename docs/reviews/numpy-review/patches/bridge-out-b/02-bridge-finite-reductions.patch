@@ -1,0 +1,28 @@
+From 8a410930fe1c2466ebdf656d304cc915fdf98edc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:54:06 +0000
+Subject: [PATCH] bridge-finite-reductions: The finite check by two reductions,
+ with the mask built only to name the cell
+
+---
+ src/goosedove/excel/bridge.py | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index fef69ff..b1800eb 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -929,9 +929,10 @@ def _finite(array: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[
+             r, c = divmod(int(big.argmax()), array.shape[1])
+             raise _BadResult(f"result cell ({r + 1}, {c + 1}) is beyond what a cell holds exactly")
+     out = np.ascontiguousarray(array, dtype=np.float64)
+-    finite = np.isfinite(out)
+-    if not finite.all():
+-        r, c = divmod(int((~finite).argmax()), out.shape[1])
++    # NaN propagates through min and max and an infinity is its own extreme, so the two
++    # reductions settle finiteness with no mask; the mask is built only to name the cell.
++    if not (math.isfinite(out.min()) and math.isfinite(out.max())):
++        r, c = divmod(int((~np.isfinite(out)).argmax()), out.shape[1])
+         raise _BadResult(f"result cell ({r + 1}, {c + 1}) is not a finite number")
+     return out
+ 

@@ -1,0 +1,136 @@
+From 48125c6cea05833e8bd0265bb7448bddf684e151 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:37:02 +0000
+Subject: [PATCH] instrument-ledger-regex-drops-dotted-builtins: the numpy
+ ledger reads functions named by a dotted module path
+
+---
+ docs/seam/measuring.md                 |  2 +-
+ tests/performance/conftest.py          |  7 +++++--
+ tests/performance/test_seam_budgets.py | 11 +++++++++++
+ 3 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/docs/seam/measuring.md b/docs/seam/measuring.md
+index fbe5768..02b9155 100644
+--- a/docs/seam/measuring.md
++++ b/docs/seam/measuring.md
+@@ -27,7 +27,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
+ 
+ ## Counts, as tests
+ 
+-**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
++**Python, `tests/performance/test_seam_budgets.py`.** Two ledgers per probe, both exact and both deterministic. `call_profile` lists the seam's own functions that ran and how many times: `Registered.run`, the prepared path, then `_validate`, `_numbers`, the probe, the result rule. `numpy_calls` lists the numpy C calls cProfile saw: `ndarray.copy`, `ndarray.sum`, `ndarray.all`, `ufunc.reduce`, `numpy.frombuffer`, `numpy.ascontiguousarray`, and a function numpy reaches through a Python wrapper by its last name, `numpy.count_nonzero`, `numpy.interp`. A range whose summary from the host says all numbers, or all text, takes no look at its kinds, so nothing numpy did appears on an accepted range in; a rejected range finds its first bad cell with `argmax`, and `ndarray.any` appears only where a value must be checked, the date paths. That second ledger is measured, not derived; a ufunc applied by an operator, such as the kinds compare, raises no cProfile event and is not in it. `tests/performance/test_seam_allocation.py` pins the peak of the Python heap during one warm call with `tracemalloc`, which sees numpy's data buffers and not the host's.
+ 
+ **Host, `tests/performance/HostWorkBudgets.cs`.** The host reports what it did to a `WorkCounter` the observer supplies; a worksheet call passes none, so the worksheet path builds nothing. Every increment sits at a boundary, never inside the cell loop.
+ 
+diff --git a/tests/performance/conftest.py b/tests/performance/conftest.py
+index beee002..a729fa0 100644
+--- a/tests/performance/conftest.py
++++ b/tests/performance/conftest.py
+@@ -55,9 +55,12 @@ def call_profile() -> Callable[[Callable[[], object]], dict[str, int]]:
+ 
+ 
+ # cProfile names a C call like "<method 'any' of 'numpy.ndarray' objects>" or
+-# "<built-in method numpy.frombuffer>"; these read the type and the name out of that.
++# "<built-in method numpy.frombuffer>"; these read the type and the name out of that. A
++# function a Python wrapper reaches is named by its full module path, such as
++# "<built-in method numpy._core._multiarray_umath.count_nonzero>", so the function pattern
++# takes any dotted path below numpy and keeps the last name.
+ _NUMPY_METHOD = re.compile(r"<method '(\w+)' of 'numpy\.(\w+)' objects>")
+-_NUMPY_FUNCTION = re.compile(r"<built-in method numpy\.(\w+)>")
++_NUMPY_FUNCTION = re.compile(r"<built-in method numpy(?:\.\w+)*\.(\w+)>")
+ 
+ 
+ def _numpy_calls(fn: Callable[[], object]) -> dict[str, int]:
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 904dd21..f5c8a5d 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -271,6 +271,7 @@ def test_a_mixed_array_out_takes_three_looks_whatever_it_holds(
+     assert numpy_calls(lambda: PATH["EchoMixed"](cells)) == {
+         "ndarray.any": 3,
+         "numpy.ascontiguousarray": 2,  # the kinds and the numbers, already contiguous: no copy
++        "numpy.count_nonzero": 1,  # the text cells, counted against the texts
+         "ufunc.reduce": 3,
+     }
+ 
+@@ -420,6 +421,7 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
+         "ndarray.any": 3,
+         "ndarray.argmax": 1,  # the first bad cell of the column
+         "ndarray.ravel": 1,  # and its text, by counting the text codes before it
++        "numpy.count_nonzero": 1,
+         "ndarray.astype": 2,
+         "numpy.array": 1,
+         "ndarray.cumsum": 1,
+@@ -592,6 +594,7 @@ CURVE_NUMPY = {
+     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
+     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
+     "ndarray.repeat": 1,  # the anchor each day runs to, which the line is held above
++    "numpy.interp": 1,  # every day's factor, in one call
+     "ndarray.setflags": 2,  # frozen
+     "ufunc.reduce": 5,
+ }
+@@ -643,6 +646,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
+         "numpy.datetime_data": 1,  # the unit of the date column
+         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+         "numpy.ascontiguousarray": 2,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 5,
+     }
+ 
+@@ -1095,6 +1099,7 @@ def test_reading_an_index_back_costs_one_row(
+         "numpy.asarray": 1,
+         "ndarray.any": 5,  # the two counts' exactness looks, then the mixed road's three
+         "numpy.ascontiguousarray": 2,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 5,
+     }
+ 
+@@ -1204,6 +1209,7 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
+         "numpy.arange": 1,  # every day, once
+         "ndarray.searchsorted": 1,  # the prompt row of every day, once
+         "ndarray.setflags": 4,  # the four columns frozen
++        "numpy.count_nonzero": 1,  # the fixed periods, which come first
+         "ufunc.reduce": 1,
+     }
+ 
+@@ -1241,6 +1247,7 @@ def test_reading_a_calendar_back_rebuilds_nothing(
+         "numpy.datetime_data": 1,  # the unit of the date column
+         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+         "numpy.ascontiguousarray": 2,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 5,
+     }
+     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+@@ -1294,6 +1301,7 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
+         "ndarray.searchsorted": 1,
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 2,
+     }
+ 
+@@ -1328,6 +1336,7 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
+         "numpy.arange": 1,
+         "numpy.empty": 1,  # the priced flag, true throughout
+         "ndarray.setflags": 4,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 1,
+     }
+ 
+@@ -1525,6 +1534,7 @@ def test_reading_a_market_history_back_rebuilds_nothing(
+         "numpy.datetime_data": 1,  # the unit of the date column
+         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+         "numpy.ascontiguousarray": 2,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 5,
+     }
+     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+@@ -1674,6 +1684,7 @@ def test_reading_a_market_back_rebuilds_nothing(
+         "numpy.datetime_data": 1,  # the unit of the date column
+         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+         "numpy.ascontiguousarray": 2,
++        "numpy.count_nonzero": 1,
+         "ufunc.reduce": 5,
+     }
+     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls

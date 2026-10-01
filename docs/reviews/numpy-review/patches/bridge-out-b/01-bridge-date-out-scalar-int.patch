@@ -1,0 +1,52 @@
+From acedcbf2908ee42948628987285f5782218cc2d8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:51:19 +0000
+Subject: [PATCH] bridge-date-out-scalar-int: A scalar date out: integer
+ arithmetic on the day's int64 view instead of a one-cell array through five
+ numpy calls
+
+---
+ src/goosedove/excel/bridge.py | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 27a0646..fef69ff 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -766,6 +766,7 @@ class _BadResult(Exception):
+ 
+ MAX_TEXT: Final = 32767  # the longest text a cell holds; Excel cuts longer text without a word
+ CALENDAR: Final = "1900-03-01 to 9999-12-31"
++NAT: Final = int(np.iinfo(np.int64).min)  # NaT as numpy stores it, in a day's int64 view
+ 
+ 
+ def _returned(value: object, expected: str) -> _BadResult:
+@@ -856,16 +857,23 @@ def _serials(days: NDArray[Any]) -> tuple[NDArray[np.float64], int | None, str]:
+ 
+ 
+ def _date_out(value: object) -> float:
+-    """A date goes out as its whole serial, the meaning exception mirrored."""
++    """A date goes out as its whole serial, the meaning exception mirrored.
++
++    One day needs no array: the day less the epoch is one numpy scalar, whose int64 view is the
++    serial. NaT less anything stays NaT, the int64 minimum, which no difference of two days can
++    be; a day too far for the subtraction raises numpy's overflow, as it does in a column.
++    """
+     if not isinstance(value, np.datetime64):
+         raise _returned(value, "date")
+     day = cast(Any, value)
+     if _unit(day) != "D":
+         raise _returned(day, "date")
+-    serials, bad, reason = _serials(np.array([day]))
+-    if bad is not None:
+-        raise _BadResult(f"result {reason}")
+-    return float(serials[0])
++    serial = int((day - EXCEL_EPOCH).view(np.int64))
++    if serial == NAT:
++        raise _BadResult("result is not a date")
++    if not FIRST_SERIAL <= serial <= LAST_SERIAL:
++        raise _BadResult(f"result is a date outside {CALENDAR}")
++    return float(serial)
+ 
+ 
+ def _dimensions(value: object, ndim: int, expected: str) -> NDArray[Any]:

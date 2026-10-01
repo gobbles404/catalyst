@@ -1,0 +1,35 @@
+From 5260e3f927c0bc43674bb08e6b45cdcb63580670 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:28:01 +0000
+Subject: [PATCH] bridge-table-text-gather: The table's texts: each text column
+ slice-assigned into one list at its stride, no object array, no transpose, no
+ ravel
+
+---
+ src/goosedove/excel/bridge.py | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index 3bfc0fc..3ea2659 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -156,11 +156,14 @@ class MixedArray:
+                 raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
+             kinds[top:, j] = _table_column(column, top + 1, j + 1, slots[top:, j])
+         # Sheet order: the heading rows, then each body row's texts left to right, which is the
+-        # transpose of the text columns laid side by side.
+-        texts = tuple(itertools.chain.from_iterable(headings))
+-        if text_columns:
+-            texts += tuple(np.array(text_columns, dtype=object).T.ravel())
+-        return cls(kinds, slots, texts)
++        # transpose of the text columns laid side by side: of every k texts of the body, the j-th
++        # is from text column j, so each column is copied whole into its slice of one list.
++        texts = list(itertools.chain.from_iterable(headings))
++        start, k = len(texts), len(text_columns)
++        texts.extend(itertools.repeat("", k * rows))
++        for j, column in enumerate(text_columns):
++            texts[start + j :: k] = column
++        return cls(kinds, slots, tuple(texts))
+ 
+ 
+ @dataclass_transform(frozen_default=True, eq_default=False)

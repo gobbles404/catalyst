@@ -1,0 +1,42 @@
+From 3c464d481df55f84ada6a90efa9d925ff5708d8c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:33:04 +0000
+Subject: [PATCH] futures-fixings-closed-by-all: ask all() of the is_busday
+ mask and argmin on failure, no negated copy
+
+---
+ src/goosedove/market_data/futures_fixings.py | 6 +++---
+ tests/performance/test_seam_budgets.py       | 3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/market_data/futures_fixings.py b/src/goosedove/market_data/futures_fixings.py
+index 557c338..8cdcf01 100644
+--- a/src/goosedove/market_data/futures_fixings.py
++++ b/src/goosedove/market_data/futures_fixings.py
+@@ -68,9 +68,9 @@ def futures_fixings(
+             f"date row {k + 2} is {days[k + 1]}, expected a date after row {k + 1}'s {days[k]}"
+         )
+     calendar = np.busdaycalendar(holidays=holidays)
+-    closed = ~np.is_busday(days, busdaycal=calendar)
+-    if closed.any():
+-        k = int(closed.argmax())  # days[k] is the first weekend day or holiday
++    open_day = np.is_busday(days, busdaycal=calendar)
++    if not open_day.all():
++        k = int(open_day.argmin())  # days[k] is the first weekend day or holiday
+         weekday = WEEKDAYS[date.fromisoformat(str(days[k])).weekday()]
+         reason = weekday if weekday in ("Saturday", "Sunday") else "holiday"
+         raise ValueError(f"date row {k + 1} is {days[k]}, a {reason}, expected a business day")
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index b2446e5..bc517e1 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -1154,7 +1154,8 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
+         "_publish": 1,
+     }
+     assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
+-        "ndarray.any": 3,  # the date column's look for the calendar, then the builder's two
++        "ndarray.all": 1,  # the builder's look at the days the market is open
++        "ndarray.any": 2,  # the date column's look for the calendar, then the builder's order
+         "ndarray.astype": 2,  # the date column on its way to days
+         "numpy.array": 2,  # the two copies the fixings keep
+         "ndarray.setflags": 2,  # frozen

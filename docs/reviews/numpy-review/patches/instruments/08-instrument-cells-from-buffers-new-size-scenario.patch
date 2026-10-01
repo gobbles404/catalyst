@@ -1,0 +1,37 @@
+From 3d353e94b2f529c982575692911b8e4007026d7a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:51:06 +0000
+Subject: [PATCH] instrument-cells-from-buffers-new-size-scenario: a runner row
+ for a range size never seen
+
+---
+ tools/performance/measure_python.py | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/tools/performance/measure_python.py b/tools/performance/measure_python.py
+index db45e93..355bd02 100644
+--- a/tools/performance/measure_python.py
++++ b/tools/performance/measure_python.py
+@@ -512,6 +512,22 @@ def scenarios() -> list[Scenario]:
+                 lambda result: None,
+             )
+         )
++        # The same buffers read at a size the process has never seen, as a sheet of many range
++        # sizes does on its first recalculation: ctypes makes, and keeps, an array type per size.
++        kinds_big, numbers_big = host_buffers(n + 1_000_000)
++        sizes = iter(range(n + 1, n + 1_000_000))  # never repeats in the calibration or batches
++        cases.append(
++            Scenario(
++                "cells_from_buffers",
++                "owning a range, a size never seen",
++                n,
++                0,
++                lambda own=bridge.cells_from_buffers, k=kinds_big, m=numbers_big, s=sizes: own(
++                    k, m, next(s), 1, "", 1
++                ),
++                lambda result: None,
++            )
++        )
+     n = 10_000
+     good: list[list[object]] = [[float(i)] for i in range(n)]
+     text_first = [list(row) for row in good]

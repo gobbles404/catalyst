@@ -1,0 +1,35 @@
+From 4bf72978874bc53ea7796daf129a8fe823fdc443 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:42:55 +0000
+Subject: [PATCH] bridge-cell-item-instead-of-flat: naming the bad cell reads
+ it with ndarray.item
+
+---
+ src/goosedove/excel/bridge.py | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index bb8d236..ac50d9b 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -331,15 +331,16 @@ def cells_from_buffers(
+ def _cell(
+     kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
+ ) -> object:
+-    """The value at flat index i of a range's storage, as it arrived."""
+-    kind = Kind(int(kinds.flat[i]))
++    """The value at flat index i of a range's storage, as it arrived. item(i) reads one cell by
++    its flat index straight into a Python int or float, with no numpy scalar in between."""
++    kind = Kind(kinds.item(i))
+     match kind:
+         case Kind.NUMBER:
+-            return float(numbers.flat[i])
++            return float(numbers.item(i))
+         case Kind.TEXT:
+             return texts[int(np.count_nonzero(kinds.ravel()[:i] == TEXT_CODE))]
+         case Kind.BOOLEAN:
+-            return bool(numbers.flat[i])
++            return bool(numbers.item(i))
+         case Kind.BLANK:
+             return None
+         case Kind.MISSING:

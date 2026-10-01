@@ -1,0 +1,58 @@
+From f6cd8b7931fe4b10d12d1dbe2fc71bc52738513e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:23:34 +0000
+Subject: [PATCH] specs-bounds-as-reductions: The 'below one' and 'negative
+ fee' rules as reductions on the success path, the mask only to name the row
+
+---
+ .../index_definitions/contract_specifications.py          | 15 +++++++++------
+ tests/performance/test_seam_budgets.py                    |  3 ++-
+ 2 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/src/goosedove/index_definitions/contract_specifications.py b/src/goosedove/index_definitions/contract_specifications.py
+index 1d1f4f9..af9a39c 100644
+--- a/src/goosedove/index_definitions/contract_specifications.py
++++ b/src/goosedove/index_definitions/contract_specifications.py
+@@ -70,9 +70,11 @@ def contract_specifications(
+     if fraction.any():
+         i = int(fraction.argmax())
+         raise ValueError(f"lot_size row {i + 1} is {float(lots[i])!r}, expected a whole number")
+-    below_one = lots < 1.0
+-    if below_one.any():
+-        i = int(below_one.argmax())
++    # The least lot size, a reduction that makes no mask; the mask only to name the row. No NaN
++    # reaches here, the whole-number rule above having refused it; the size guards an empty
++    # column, which has no least value and passes, as it does every rule.
++    if lots.size and lots.min() < 1.0:
++        i = int((lots < 1.0).argmax())
+         raise ValueError(f"lot_size row {i + 1} is {float(lots[i])!r}, expected 1 or more")
+     measures = measures_of(units)
+     quantity_units = {unit for measure in measures for unit in units.categories[measure].sizes}
+@@ -85,9 +87,10 @@ def contract_specifications(
+         ("brokerage_rate_per_lot", brokerage),
+         ("clearing_rate_per_lot", clearing),
+     ):
+-        negative = fees < 0.0
+-        if negative.any():
+-            i = int(negative.argmax())
++        # fmin, not min: fmin passes over a NaN where min returns it, so a NaN fee, which is not
++        # below zero, cannot hide a negative fee in another row.
++        if fees.size and np.fmin.reduce(fees) < 0.0:
++            i = int((fees < 0.0).argmax())
+             raise ValueError(f"{argument} row {i + 1} is {float(fees[i])!r}, expected 0 or more")
+     for column in (lots, brokerage, clearing):
+         column.setflags(write=False)
+diff --git a/tests/performance/test_seam_budgets.py b/tests/performance/test_seam_budgets.py
+index 075a007..ba70a49 100644
+--- a/tests/performance/test_seam_budgets.py
++++ b/tests/performance/test_seam_budgets.py
+@@ -959,7 +959,8 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
+     assert numpy_calls(
+         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
+     ) == {
+-        "ndarray.any": 9,  # one look per column, five of them, then the builder's four
++        "ndarray.any": 6,  # one look per column, five of them, then the builder's fraction look
++        "ndarray.min": 1,  # the least lot size; each fee column's least is a bare fmin.reduce
+         "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
+         "ndarray.cumsum": 1,  # the text cells above each row
+         "ndarray.sum": 3,  # text cells per row, and to the left of each of the two text columns

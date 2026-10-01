@@ -1,0 +1,63 @@
+From cacc69050bfd0f9b0635fbfa5b0041127a5e6622 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 1 Oct 2026 11:56:50 +0000
+Subject: [PATCH] bridge-beyond-exact-reductions: Whole numbers beyond 2^53:
+ two reductions instead of two masks and an or, the mask only to name the cell
+
+---
+ src/goosedove/excel/bridge.py | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
+
+diff --git a/src/goosedove/excel/bridge.py b/src/goosedove/excel/bridge.py
+index b1800eb..faf31e5 100644
+--- a/src/goosedove/excel/bridge.py
++++ b/src/goosedove/excel/bridge.py
+@@ -886,10 +886,17 @@ def _dimensions(value: object, ndim: int, expected: str) -> NDArray[Any]:
+     return value
+ 
+ 
+-def _beyond_exact(array: NDArray[Any]) -> NDArray[np.bool_]:
+-    """Flags every whole number a cell would hold inexactly, beyond 2^53 either side. Two-sided,
++def _beyond_exact(array: NDArray[Any]) -> bool:
++    """Whether some whole number lies beyond 2^53 either side, where a cell would hold it
++    inexactly. The two extremes settle it with no mask, compared as Python integers, which are
++    exact for every int64 and uint64; an empty column, a table's body of no rows, holds none."""
++    return array.size > 0 and (int(array.max()) > EXACT or int(array.min()) < -EXACT)
++
++
++def _first_beyond_exact(array: NDArray[Any]) -> int:
++    """The flat index of the first such number, flagged only to name the cell. Two-sided,
+     because taking absolute values overflows on the int64 minimum."""
+-    return (array > EXACT) | (array < -EXACT)
++    return int(((array > EXACT) | (array < -EXACT)).argmax())
+ 
+ 
+ def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArray[Any]]:
+@@ -905,10 +912,9 @@ def _table_column(column: NDArray[Any], row: int, col: int) -> tuple[int, NDArra
+     if kind == "b":
+         return BOOLEAN_CODE, column
+     if kind in "iu":
+-        big = _beyond_exact(column)
+-        if big.any():
++        if _beyond_exact(column):
+             raise _BadResult(
+-                f"result cell ({row + int(big.argmax())}, {col}) "
++                f"result cell ({row + _first_beyond_exact(column)}, {col}) "
+                 "is beyond what a cell holds exactly"
+             )
+         return NUMBER_CODE, column
+@@ -923,11 +929,9 @@ def _finite(array: NDArray[Any], value: NDArray[Any], expected: str) -> NDArray[
+         raise _BadResult(f"returned {describe(value)}, expected {expected} with at least one cell")
+     if array.dtype.kind not in "fiu":
+         raise _returned(value, expected)
+-    if array.dtype.kind in "iu":
+-        big = _beyond_exact(array)
+-        if big.any():
+-            r, c = divmod(int(big.argmax()), array.shape[1])
+-            raise _BadResult(f"result cell ({r + 1}, {c + 1}) is beyond what a cell holds exactly")
++    if array.dtype.kind in "iu" and _beyond_exact(array):
++        r, c = divmod(_first_beyond_exact(array), array.shape[1])
++        raise _BadResult(f"result cell ({r + 1}, {c + 1}) is beyond what a cell holds exactly")
+     out = np.ascontiguousarray(array, dtype=np.float64)
+     # NaN propagates through min and max and an infinity is its own extreme, so the two
+     # reductions settle finiteness with no mask; the mask is built only to name the cell.
