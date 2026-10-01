@@ -154,11 +154,74 @@ def test_from_rows_sees_the_kinds_the_host_would_see() -> None:
     assert bridge.Cells.from_rows([[1.0, "x", None, True, bridge.MISSING]]).seen == 0b11111
 
 
-def test_from_rows_refuses_a_range_with_no_cells() -> None:
-    with pytest.raises(ValueError):
-        bridge.Cells.from_rows([[]])
-    with pytest.raises(ValueError):
-        bridge.Cells.from_rows([])
+# No rows, a first row of no cells, and a first row of no cells with a whole row under it: each
+# is a range of no cells by its first row, and the message is the one it always was.
+@pytest.mark.parametrize(
+    "rows",
+    [[], [[]], [[], [1.0]]],
+    ids=["no rows", "a first row of no cells", "a first row of no cells over a whole one"],
+)
+def test_from_rows_refuses_a_range_with_no_cells(rows: list[list[object]]) -> None:
+    with pytest.raises(ValueError) as failure:
+        bridge.Cells.from_rows(rows)
+    assert str(failure.value) == "a range has at least one cell; Excel never sends fewer"
+
+
+# A range is a rectangle. A row of another length than the first is refused and named, counted
+# as the sheet counts, with what it holds and what the first row holds, the first such row
+# where there are two. It is never padded or cut: the cells a short row leaves out would keep
+# whatever kind the memory last held, so the same rows could build a different range each run.
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        ([[1.0, 2.0], [3.0]], "row 2 holds 1 cells, expected 2, as row 1 does"),
+        ([[1.0], [2.0, 3.0]], "row 2 holds 2 cells, expected 1, as row 1 does"),
+        ([[1.0, 2.0], []], "row 2 holds 0 cells, expected 2, as row 1 does"),
+        (
+            [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0]],
+            "row 4 holds 1 cells, expected 2, as row 1 does",
+        ),
+        (
+            [[1.0, 2.0], [3.0], [4.0, 5.0, 6.0]],
+            "row 2 holds 1 cells, expected 2, as row 1 does",
+        ),
+    ],
+    ids=["shorter", "longer", "of no cells", "after three whole rows", "the first of two"],
+)
+def test_from_rows_refuses_a_row_of_another_length_than_the_first(
+    rows: list[list[object]], message: str
+) -> None:
+    with pytest.raises(ValueError) as failure:
+        bridge.Cells.from_rows(rows)
+    assert str(failure.value) == message
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [[[1.0]], [[1.0, 2.0, 3.0]], [[1.0], [2.0], [3.0]]],
+    ids=["one cell", "one row", "one column"],
+)
+def test_from_rows_takes_one_cell_one_row_and_one_column(rows: list[list[float]]) -> None:
+    cells = bridge.Cells.from_rows(rows)
+    assert cells.numbers.tolist() == rows
+    assert cells.seen == bridge.ONLY_NUMBERS
+
+
+# A rectangle is kept as it was given: each cell's kind, the numbers with NaN wherever a cell
+# holds none, the texts in sheet order, and one bit per kind that occurred. A blank cell and a
+# missing argument are written out, None and MISSING, never left out of their row.
+def test_from_rows_keeps_a_rectangle_as_given_with_its_blank_and_missing_cells() -> None:
+    cells = bridge.Cells.from_rows([[1.0, "x", None], [True, bridge.MISSING, "y"]])
+    kind = bridge.Kind
+    assert cells.kinds.tolist() == [
+        [kind.NUMBER, kind.TEXT, kind.BLANK],
+        [kind.BOOLEAN, kind.MISSING, kind.TEXT],
+    ]
+    np.testing.assert_array_equal(
+        cells.numbers, np.array([[1.0, np.nan, np.nan], [1.0, np.nan, np.nan]])
+    )
+    assert cells.texts == ("x", "y")
+    assert cells.seen == 0b11111
 
 
 # A bad cell is still named by its kind code when the summary says the range is not all numbers.

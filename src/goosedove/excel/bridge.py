@@ -256,14 +256,25 @@ class Cells:
 
     @classmethod
     def from_rows(cls, rows: Sequence[Sequence[object]]) -> "Cells":
-        """What the host would send for these cells, from Python values. Tests build ranges here."""
+        """What the host would send for these cells, from Python values. Tests build ranges here.
+
+        A range is a rectangle, so every row holds as many cells as the first. A row of another
+        length is refused, never padded or cut: the cells a short row leaves out would keep
+        whatever kind the memory last held, a different range from one run to the next. A blank
+        cell is written as None.
+        """
         if not rows or not rows[0]:
             raise ValueError("a range has at least one cell; Excel never sends fewer")
-        kinds = np.empty((len(rows), len(rows[0])), dtype=np.uint8)
+        width = len(rows[0])
+        kinds = np.empty((len(rows), width), dtype=np.uint8)
         numbers = np.full(kinds.shape, np.nan)
         texts: list[str] = []
         seen = 0
         for r, row in enumerate(rows):
+            if len(row) != width:
+                raise ValueError(
+                    f"row {r + 1} holds {len(row)} cells, expected {width}, as row 1 does"
+                )
             for c, cell in enumerate(row):
                 kind, number = _classify(cell)
                 kinds[r, c] = kind
