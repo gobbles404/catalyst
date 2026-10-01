@@ -55,17 +55,23 @@ def call_profile() -> Callable[[Callable[[], object]], dict[str, int]]:
 
 
 # cProfile names a C call like "<method 'any' of 'numpy.ndarray' objects>" or
-# "<built-in method numpy.frombuffer>"; these read the type and the name out of that.
+# "<built-in method numpy.frombuffer>"; these read the type and the name out of that. A C
+# function behind a Python wrapper is named under the module that holds it,
+# "<built-in method numpy._core._multiarray_umath.count_nonzero>", and is read by its leaf, the
+# name the caller wrote: numpy.count_nonzero, wherever numpy keeps it.
 _NUMPY_METHOD = re.compile(r"<method '(\w+)' of 'numpy\.(\w+)' objects>")
-_NUMPY_FUNCTION = re.compile(r"<built-in method numpy\.(\w+)>")
+_NUMPY_FUNCTION = re.compile(r"<built-in method numpy(?:\.\w+)*\.(\w+)>")
 
 
 def _numpy_calls(fn: Callable[[], object]) -> dict[str, int]:
     """Which numpy C calls ran, and how many times each: the copies and reductions.
 
-    Measured, not derived: these are the C functions cProfile saw. A ufunc applied by an
-    operator, such as kinds != NUMBER or isfinite, raises no cProfile event and is not here;
-    ufunc.reduce is the reduction behind any, all, and sum, so it appears beside them.
+    Measured, not derived: these are the C functions cProfile saw, a floor on what numpy did
+    and never the whole of it. A ufunc, applied by an operator such as kinds != NUMBER or
+    called by name such as isfinite, raises no cProfile event and is not here, and neither is
+    a function numpy dispatches in C straight to its C implementation, such as concatenate or
+    is_busday; ufunc.reduce is the reduction behind any, all, and sum, so it appears beside
+    them. tests/performance/test_numpy_ledger.py pins what is seen and what is not.
     """
     profiler = cProfile.Profile()
     profiler.enable()

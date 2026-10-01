@@ -249,10 +249,11 @@ def test_a_sum_is_one_reduction_and_no_look(numpy_calls: CallProfile) -> None:
     }
 
 
-# The mixed road out runs the same functions and takes the same three looks whatever the
-# rectangle holds: one for a cell holding no value, one for a number that is not finite, one
-# for a boolean slot that is not 0 or 1. The texts are joined and encoded once, off the ledger,
-# and split per text only when the total runs past what a cell holds.
+# The mixed road out runs the same functions, counts its text cells once and takes the same
+# three looks whatever the rectangle holds: one for a cell holding no value, one for a number
+# that is not finite, one for a boolean slot that is not 0 or 1. The texts are joined and
+# encoded once, off the ledger, and split per text only when the total runs past what a cell
+# holds.
 @pytest.mark.parametrize("rectangle", ["numbers", "mixed"])
 def test_a_mixed_array_out_takes_three_looks_whatever_it_holds(
     rectangle: str, call_profile: CallProfile, numpy_calls: CallProfile
@@ -271,6 +272,7 @@ def test_a_mixed_array_out_takes_three_looks_whatever_it_holds(
     assert numpy_calls(lambda: PATH["EchoMixed"](cells)) == {
         "ndarray.any": 3,
         "numpy.ascontiguousarray": 2,  # the kinds and the numbers, already contiguous: no copy
+        "numpy.count_nonzero": 1,  # the text cells counted, to check against the texts held
         "ufunc.reduce": 3,
     }
 
@@ -420,6 +422,7 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "ndarray.any": 3,
         "ndarray.argmax": 1,  # the first bad cell of the column
         "ndarray.ravel": 1,  # and its text, by counting the text codes before it
+        "numpy.count_nonzero": 1,  # that count
         "ndarray.astype": 2,
         "numpy.array": 1,
         "ndarray.cumsum": 1,
@@ -591,6 +594,7 @@ CURVE_NUMPY = {
     "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
+    "numpy.interp": 1,  # the interpolation itself, every day between the anchors at once
     "ndarray.repeat": 1,  # the anchor each day runs to, which the line is held above
     "ndarray.setflags": 2,  # frozen
     "ufunc.reduce": 5,
@@ -643,6 +647,7 @@ def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
         "numpy.datetime_data": 1,  # the unit of the date column
         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
         "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
         "ufunc.reduce": 5,
     }
 
@@ -1095,6 +1100,7 @@ def test_reading_an_index_back_costs_one_row(
         "numpy.asarray": 1,
         "ndarray.any": 5,  # the two counts' exactness looks, then the mixed road's three
         "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
         "ufunc.reduce": 5,
     }
 
@@ -1204,6 +1210,7 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
         "numpy.arange": 1,  # every day, once
         "ndarray.searchsorted": 1,  # the prompt row of every day, once
         "ndarray.setflags": 4,  # the four columns frozen
+        "numpy.count_nonzero": 1,  # the fixed periods counted, the row of the first unfixed one
         "ufunc.reduce": 1,
     }
 
@@ -1241,6 +1248,7 @@ def test_reading_a_calendar_back_rebuilds_nothing(
         "numpy.datetime_data": 1,  # the unit of the date column
         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
         "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
         "ufunc.reduce": 5,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
@@ -1294,6 +1302,7 @@ def test_a_gas_daily_calendar_is_an_index_and_a_valuation_date_in_and_four_colum
         "ndarray.searchsorted": 1,
         "numpy.empty": 1,  # the priced flag, true throughout
         "ndarray.setflags": 4,
+        "numpy.count_nonzero": 1,  # the fixed periods counted
         "ufunc.reduce": 2,
     }
 
@@ -1328,6 +1337,7 @@ def test_an_iferc_calendar_is_an_index_and_a_valuation_date_in_and_four_columns_
         "numpy.arange": 1,
         "numpy.empty": 1,  # the priced flag, true throughout
         "ndarray.setflags": 4,
+        "numpy.count_nonzero": 1,  # the fixed periods counted
         "ufunc.reduce": 1,
     }
 
@@ -1525,6 +1535,7 @@ def test_reading_a_market_history_back_rebuilds_nothing(
         "numpy.datetime_data": 1,  # the unit of the date column
         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
         "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
         "ufunc.reduce": 5,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
@@ -1674,6 +1685,7 @@ def test_reading_a_market_back_rebuilds_nothing(
         "numpy.datetime_data": 1,  # the unit of the date column
         "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
         "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
         "ufunc.reduce": 5,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
