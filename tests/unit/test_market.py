@@ -75,12 +75,15 @@ def a_history(
     fraction: float = 0.5,
 ) -> MarketHistory:
     """The history of that calendar, with a fixing on every business day from ten days before
-    the calendar's first day to the day before the valuation date."""
+    the calendar's first day to the day before the valuation date, 70 on the oldest and one more
+    each day, handed to the builder as the sheet gives a series: the newest day in the first
+    row, each settle beside its own day."""
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, holidays))
     first = made.dates[0] - np.timedelta64(10, "D")
     days = np.arange(first, day(as_of), dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=holidays.holiday)]
-    fixings = futures_fixings(days, 70.0 + np.arange(days.size, dtype=np.float64), made.index)
+    settles = 70.0 + np.arange(days.size, dtype=np.float64)
+    fixings = futures_fixings(days[::-1], settles[::-1], made.index)
     return market_history(made, fixings)
 
 
@@ -106,11 +109,13 @@ def a_gas_daily_history(
 ) -> MarketHistory:
     """The Gas Daily history of that calendar, with a print on every flow day from ten days
     before the calendar's first day, or from the valuation day when that is earlier, through
-    the valuation day."""
+    the valuation day, 2.80 on the oldest and a cent more each day, handed to the builder newest
+    first, each print beside its own flow day."""
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     start = min(made.dates[0] - np.timedelta64(10, "D"), day(as_of))
     days = np.arange(start, day(as_of) + np.timedelta64(1, "D"), dtype="datetime64[D]")
-    prints = gas_daily_fixings(days, 2.8 + np.arange(days.size, dtype=np.float64) / 100, made.index)
+    prices = 2.8 + np.arange(days.size, dtype=np.float64) / 100
+    prints = gas_daily_fixings(days[::-1], prices[::-1], made.index)
     return market_history(made, prints)
 
 
@@ -118,10 +123,12 @@ def an_iferc_history(
     as_of: str, schedule: IfercSchedule = IFERC_SCHEDULE, fraction: float = 0.5
 ) -> MarketHistory:
     """The IFERC history of that calendar, with an index for every month published before the
-    valuation day."""
+    valuation day, 1.80 for the oldest and ten cents more each month, handed to the builder as
+    the desk keeps its months, the newest in the first row, each index beside its own code."""
     made = calendar(valuation_date(day(as_of), fraction), an_index(schedule, None))
     codes = tuple(schedule.codes[int(row)] for row in np.flatnonzero(made.is_fixed))
-    indices = iferc_fixings(codes, 1.8 + np.arange(len(codes), dtype=np.float64) / 10, made.index)
+    prices = 1.8 + np.arange(len(codes), dtype=np.float64) / 10
+    indices = iferc_fixings(codes[::-1], prices[::-1], made.index)
     return market_history(made, indices)
 
 
@@ -483,6 +490,30 @@ def test_the_iferc_sample_quotes_the_unpublished_month() -> None:
     )
 
 
+# The desk keeps its months as it keeps its days, the newest in the first row, and an IFERC
+# series is taken in either direction, each index found by its code: the same months either way
+# up make the same history, and a market over each prices every period alike, the fixed months
+# from the history and the unpublished one from the vector.
+def test_iferc_months_given_newest_first_make_the_same_history_and_market_prices() -> None:
+    made = calendar(valuation_date(day("2026-11-15"), 0.5), an_index(IFERC_SCHEDULE, None))
+    newest_first = market_history(
+        made, iferc_fixings(("X26", "V26"), np.array([2.10, 1.85]), made.index)
+    )
+    oldest_first = market_history(
+        made, iferc_fixings(("V26", "X26"), np.array([1.85, 2.10]), made.index)
+    )
+    assert newest_first.fixed_rows.tolist() == oldest_first.fixed_rows.tolist() == [0, 1]
+    assert newest_first.fixing_prices.tolist() == [1.85, 2.10]
+    assert oldest_first.fixing_prices.tolist() == [1.85, 2.10]
+    quotes = a_vector(2.20)
+    december = np.array([2], dtype=np.intp)
+    for history in (newest_first, oldest_first):
+        view = market(history, quotes)
+        assert view.first_contract == 2 and view.last_contract == 2
+        assert view.market_history.fixing_prices.tolist() == [1.85, 2.10]
+        assert view.live_prices(december).tolist() == [2.20]
+
+
 @pytest.mark.parametrize(
     ("as_of", "first_contract", "quotes"),
     [
@@ -539,7 +570,8 @@ def any_history(data: st.DataObject) -> MarketHistory:
     )
     days = np.arange(made.dates[0] - np.timedelta64(10, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=listed)]
-    fixings = futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), made.index)
+    settles = 60.0 + np.arange(days.size, dtype=np.float64)
+    fixings = futures_fixings(days[::-1], settles[::-1], made.index)  # newest first, as given
     return market_history(made, fixings)
 
 
@@ -586,7 +618,8 @@ def any_gas_daily_history(data: st.DataObject) -> MarketHistory:
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(lengths.sum()) - 2)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     days = np.arange(min(firsts[0], as_of) - one_day, as_of + one_day, dtype="datetime64[D]")
-    prints = gas_daily_fixings(days, 1.0 + np.arange(days.size, dtype=np.float64), made.index)
+    prices = 1.0 + np.arange(days.size, dtype=np.float64)
+    prints = gas_daily_fixings(days[::-1], prices[::-1], made.index)  # newest first, as given
     return market_history(made, prints)
 
 
@@ -606,10 +639,10 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
     as_of = published[0] + np.timedelta64(data.draw(st.integers(-10, int(gaps[1:].sum()))), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
-    fixed = np.flatnonzero(made.is_fixed)
+    fixed = np.flatnonzero(made.is_fixed)[::-1]  # the newest month first, as the desk keeps them
     indices = iferc_fixings(
         tuple(codes[int(i)] for i in fixed),
-        100.0 + np.arange(fixed.size, dtype=np.float64),
+        100.0 + fixed.astype(np.float64),
         made.index,
     )
     return market_history(made, indices)

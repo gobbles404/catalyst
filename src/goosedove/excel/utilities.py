@@ -202,20 +202,27 @@ def market_table(obj: Market) -> MixedArray:
 
 @shown.register
 def futures_fixings_table(obj: FuturesFixings) -> MixedArray:
+    # Newest first, as the creator takes them: the columns are kept oldest first, and each is
+    # read here from its last row back, a view and no copy, date beside its own settle, so the
+    # spill pasted back into the creator makes the same fixings.
     return MixedArray.table(
-        [("date", "settle"), ("datetime64[D]", "float64")], obj.dates, obj.settles
+        [("date", "settle"), ("datetime64[D]", "float64")], obj.dates[::-1], obj.settles[::-1]
     )
 
 
 @shown.register
 def gas_daily_fixings_table(obj: GasDailyFixings) -> MixedArray:
+    # Newest first, as the creator takes them, each kept column read from its last row back.
     return MixedArray.table(
-        [("flow_date", "price"), ("datetime64[D]", "float64")], obj.dates, obj.prices
+        [("flow_date", "price"), ("datetime64[D]", "float64")],
+        obj.dates[::-1],
+        obj.prices[::-1],
     )
 
 
 @shown.register
 def iferc_fixings_table(obj: IfercFixings) -> MixedArray:
+    # In the order the desk gave the codes, whichever it was: nothing here is dated.
     return MixedArray.table([("contract_code", "price"), ("str", "float64")], obj.codes, obj.prices)
 
 

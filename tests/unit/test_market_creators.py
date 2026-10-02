@@ -18,13 +18,14 @@ from goosedove.excel.bridge import BOOLEAN_CODE, MISSING, NUMBER_CODE, TEXT_CODE
 PID = os.getpid()  # leads every handle this Python publishes
 
 # The page's sample as the sheet sends it: serials for 18 to 22 May, 25 and 26 May, 22 June and
-# 21 July 2026, and 1 January.
+# 21 July 2026, and 1 January; the fixings' rows run newest first, as the desk keeps them, the
+# 22nd in the first row and the 20th in the last, each settle beside its own day.
 MAY_18, MAY_19, MAY_20, MAY_21, MAY_22 = 46160.0, 46161.0, 46162.0, 46163.0, 46164.0
 MAY_25, MAY_26, JUN_22, JUL_21, JAN_1 = 46167.0, 46168.0, 46195.0, 46224.0, 46023.0
 HANDLE = re.compile(r"[0-9]+:market_history:.+:([0-9]+)")
 HEADERS = ["date", "contract", "is_priced", "is_fixed", "fixing_price"]
 TYPES = ["datetime64[D]", "str", "bool", "bool", "float64"]
-SAMPLE = [[MAY_20, 70.85], [MAY_21, 71.10], [MAY_22, 71.25]]
+SAMPLE = [[MAY_22, 71.25], [MAY_21, 71.10], [MAY_20, 70.85]]
 
 
 def column(*cells: object) -> Cells:
@@ -100,6 +101,7 @@ def a_calendar(valuation: str | None = None, index: str | None = None) -> str:
 
 
 def the_fixings(body: list[list[float]] = SAMPLE, index: str | None = None) -> str:
+    """Futures fixings from rows of a day and its settle, as the sheet sends them, newest first."""
     days = Cells.from_rows([[day] for day, _ in body])
     settles = Cells.from_rows([[settle] for _, settle in body])
     args = [days, settles, index or the_index()]
@@ -167,7 +169,7 @@ def test_the_fixing_price_reaches_the_sheet_as_a_number_where_fixed_and_text_els
 
 
 def test_a_settle_of_zero_is_a_number_and_a_day_without_one_is_a_word() -> None:
-    fixings = the_fixings([[MAY_20, 0.0], [MAY_21, -37.63], [MAY_22, 71.25]])
+    fixings = the_fixings([[MAY_22, 71.25], [MAY_21, -37.63], [MAY_20, 0.0]])
     spill = read(a_history(fixings=fixings))
     kinds, _, _ = spill
     shown = rows(spill)
@@ -180,7 +182,7 @@ def test_a_settle_of_zero_is_a_number_and_a_day_without_one_is_a_word() -> None:
 # Valued on 20 May, the calendar's first day, no day is past: the fixings, on the Monday and
 # Tuesday before, are before the valuation date and unused, and every row shows a word.
 def test_a_calendar_with_no_past_business_day_is_a_history_without_a_price() -> None:
-    fixings = the_fixings([[MAY_18, 70.0], [MAY_19, 70.5]])
+    fixings = the_fixings([[MAY_19, 70.5], [MAY_18, 70.0]])
     made = a_history(calendar=a_calendar(valuation=a_valuation(MAY_20)), fixings=fixings)
     shown = rows(read(made))
     assert len(shown) == 65
@@ -195,17 +197,17 @@ THE_CALENDAR, THE_FIXINGS = object(), object()
     ("args", "text"),
     [
         (
-            [THE_CALENDAR, ([*SAMPLE, [MAY_26, 71.5]], MAY_25)],
+            [THE_CALENDAR, ([[MAY_26, 71.5], *SAMPLE], MAY_25)],
             "#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or "
             "after valuation date 2026-05-26, expected dates before the valuation date",
         ),
         (
-            [THE_CALENDAR, ([*SAMPLE, [MAY_25, 71.4]], JAN_1)],
+            [THE_CALENDAR, ([[MAY_25, 71.4], *SAMPLE], JAN_1)],
             "#ERROR _CreateMarketHistory: ValueError: fixings is over another index, "
             "'WTI NYMEX', expected the calendar's, 'WTI NYMEX'",
         ),
         (
-            [THE_CALENDAR, (SAMPLE[:2], MAY_25)],
+            [THE_CALENDAR, (SAMPLE[1:], MAY_25)],
             "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for "
             "2026-05-22, expected a fixing for every fixed day in calendar",
         ),
@@ -309,7 +311,7 @@ def test_a_handle_of_another_kind_in_either_slot_is_refused_by_name() -> None:
 
 def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
     calendar, fixings = a_calendar(), the_fixings()
-    short = the_fixings(SAMPLE[:2])
+    short = the_fixings(SAMPLE[1:])
     before = number(a_history(calendar, fixings))
     assert bridge.call("_CreateMarketHistory", [calendar, short]) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-22, "
@@ -321,7 +323,7 @@ def test_a_failed_construction_publishes_no_object_and_no_handle() -> None:
 def test_two_histories_from_one_calendar_each_read_their_own_prices() -> None:
     calendar = a_calendar()
     first = a_history(calendar, the_fixings())
-    second = a_history(calendar, the_fixings([[MAY_20, 1.0], [MAY_21, 2.0], [MAY_22, 3.0]]))
+    second = a_history(calendar, the_fixings([[MAY_22, 3.0], [MAY_21, 2.0], [MAY_20, 1.0]]))
     assert [row[4] for row in rows(read(first))[2:5]] == [70.85, 71.10, 71.25]
     assert [row[4] for row in rows(read(second))[2:5]] == [1.0, 2.0, 3.0]
     assert [row[:4] for row in rows(read(first))] == [row[:4] for row in rows(read(second))]
@@ -380,7 +382,7 @@ def market_number(text: str) -> int:
 def whole_fixings(first: float, last: float, *listed: float) -> str:
     """A fixing on every business day from the first serial to the last, the listed serials the
     holidays, checked against a calendar of those days; the last day's settle 71.60 and the
-    rest below it."""
+    rest below it, the rows sent newest first, as the sheet sends them."""
     epoch = np.datetime64("1899-12-30")
     serials = np.arange(int(first), int(last) + 1)
     days = epoch + serials.astype("timedelta64[D]")
@@ -388,7 +390,7 @@ def whole_fixings(first: float, last: float, *listed: float) -> str:
     kept = serials[np.is_busday(days, holidays=closed)].tolist()
     body = [[float(s), 70.0 + i * 0.05] for i, s in enumerate(kept)]
     body[-1][1] = 71.60
-    return the_fixings(body, index_closed_on(*listed))
+    return the_fixings(body[::-1], index_closed_on(*listed))
 
 
 # The sample: the history of the tests above, valued on 26 May with the 25th a holiday, and two
@@ -449,7 +451,7 @@ def test_valuation_on_the_first_or_last_day_or_a_weekend_starts_at_the_prompt_co
     assert shown[63][4] == 71.60
     first = a_history(
         calendar=a_calendar(valuation=a_valuation(MAY_20)),
-        fixings=the_fixings([[MAY_18, 70.0], [MAY_19, 70.5]]),
+        fixings=the_fixings([[MAY_19, 70.5], [MAY_18, 70.0]]),
     )
     shown = rows(read(a_market(first)))
     assert shown[2] == [MAY_20, "n26", 1.0, 0.0, 72.10]
@@ -526,7 +528,7 @@ def test_a_last_covered_contract_with_closed_days_alone_keeps_its_rows_in_the_re
     )
     history = a_history(
         calendar=a_calendar(valuation=a_valuation(MAY_20), index=index),
-        fixings=the_fixings([[MAY_18, 70.0], [MAY_19, 70.5]], index),
+        fixings=the_fixings([[MAY_19, 70.5], [MAY_18, 70.0]], index),
     )
     shown = rows(read(a_market(history, a_vector(1.0, 2.0))))
     assert shown[2:] == [
@@ -736,10 +738,11 @@ def a_gas_daily_calendar(as_of: float = SEP_25) -> str:
 
 
 def prints_through(first: float, last: float) -> str:
-    """A print on every flow day from the first serial to the last, 2.80 rising by a cent."""
+    """A print on every flow day from the first serial to the last, 2.80 rising by a cent, the
+    rows sent newest first, as the sheet sends them."""
     serials = [first + i for i in range(int(last - first) + 1)]
     prices = [2.80 + i / 100 for i in range(len(serials))]
-    args = [column(*serials), column(*prices), the_gas_daily_index()]
+    args = [column(*serials[::-1]), column(*prices[::-1]), the_gas_daily_index()]
     text = bridge.call("_CreateGasDailyFixings", args)
     assert isinstance(text, str) and text.startswith(f"{PID}:gas_daily_fixings:"), text
     return text

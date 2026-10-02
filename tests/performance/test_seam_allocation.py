@@ -354,26 +354,30 @@ def test_owning_a_range_peaks_at_the_two_copies() -> None:
 
 
 def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
-    """That many futures fixings as the sheet sends them, a column of serials and a column of
-    settles, one per business day from Friday 1 May 2026 under a calendar of that many Thursdays
-    a week apart, the calendar holiday_column makes."""
+    """That many futures fixings as the sheet sends them, the newest day in the first row: a
+    column of serials and a column of settles, one per business day from Friday 1 May 2026 under
+    a calendar of that many Thursdays a week apart, the calendar holiday_column makes."""
     epoch = np.datetime64("1899-12-30")
     closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
     days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
     serials = (days - epoch).astype(np.int64)
+    newest_first = range(rows - 1, -1, -1)
     return (
-        Cells.from_rows([[float(serials[i])] for i in range(rows)]),
-        Cells.from_rows([[100.0 + i % 7] for i in range(rows)]),
+        Cells.from_rows([[float(serials[i])] for i in newest_first]),
+        Cells.from_rows([[100.0 + i % 7] for i in newest_first]),
     )
 
 
 # Futures fixings keep a copy of each column, 16 bytes per row, and on the way pay the date
 # column's masks and its arrays on the way to days, and the builder's two looks, the order and
-# the days closed, and its count of the business days between the first date and the last, two
-# dates and no temporary: measured 8,624 bytes at 260 rows on 2026-10-01, about 29 bytes per
-# row on top of the slack, 11,210 when the gaps were a look over the business day after each
-# date; 69,464 at 2,600 and 677,864 at 26,000, 26 bytes per row, where they were 93,110 and
-# 912,110, 35 per row. A ceiling of 35 per row holds the new form and refuses the old.
+# the days closed, and its count of the business days between the last row's date and the
+# first's, two dates and no temporary: measured 8,624 bytes at 260 rows on 2026-10-01, about 29
+# bytes per row on top of the slack, 11,210 when the gaps were a look over the business day
+# after each date; 69,464 at 2,600 and 677,864 at 26,000, 26 bytes per row, where they were
+# 93,110 and 912,110, 35 per row. Taking the rows newest first and copying each column from its
+# last row back added 40 bytes at any count, the two views the copies read through: 8,664 at
+# 260 rows and 69,504 at 2,600 on 2026-10-02. A ceiling of 35 per row holds the new form and
+# refuses the old.
 def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
     codes, futures, _, _ = schedule_columns(2)
@@ -496,9 +500,10 @@ def gas_daily_history_sources() -> tuple[object, object]:
     index = an_index(schedule)
     made = ENTRY["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
+    newest_first = range(days - 1, -1, -1)  # the sheet's order, the 11th in the first row
     fixings = ENTRY["_CreateGasDailyFixings"](
-        Cells.from_rows([[46023.0 + i] for i in range(days)]),
-        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+        Cells.from_rows([[46023.0 + i] for i in newest_first]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in newest_first]),
         index,
     )
     return made, fixings
@@ -567,19 +572,23 @@ def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
 
 
 def flow_day_columns(count: int) -> tuple[Cells, Cells]:
-    """That many consecutive flow days from 1 September 2026 as the sheet sends them, a serial
-    per row, and a price beside each."""
+    """That many consecutive flow days from 1 September 2026 as the sheet sends them, the newest
+    in the first row, a serial per row, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
     return (
-        Cells.from_rows([[46266.0 + i] for i in range(count)]),
-        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(count)]),
+        Cells.from_rows([[46266.0 + i] for i in newest_first]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in newest_first]),
     )
 
 
 # Gas Daily fixings keep a copy of each column, 16 bytes per flow day, and on the way pay the
-# date column's masks and its arrays on the way to days, then the day after each day and the
+# date column's masks and its arrays on the way to days, then the day before each day and the
 # mask of the days that are not it: measured 13,108 bytes at a year of flow days on 2026-09-24,
 # 36 bytes per day, and 121,513 at ten years, 33 bytes per day, which 40 per day covers with
-# twice the slack for a creator's small objects.
+# twice the slack for a creator's small objects. Taking the rows newest first and copying each
+# column from its last row back added 40 bytes at any count, the two views the copies read
+# through: 13,156 at a year and 121,561 at ten years on 2026-10-02, against 13,116 and 121,521
+# for the old form measured the same day.
 def test_gas_daily_fixings_keep_a_copy_of_each_column() -> None:
     count = 365
     flow_days, prices = flow_day_columns(count)

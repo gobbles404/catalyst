@@ -129,8 +129,8 @@ try {
     Put "F1" "WTI NYMEX"
     Put "F2" "25-May-2026"
     Put "F3" "26-May-2026"
-    Put "F4" "20-May-2026"; Put "G4" "70.85"
-    Put "F5" "21-May-2026"; Put "G5" "71.1"
+    Put "F4" "21-May-2026"; Put "G4" "71.1"  # the fixings, newest first, as the creator takes them
+    Put "F5" "20-May-2026"; Put "G5" "70.85"
     Put "H1" "name"; Put "I1" "lot_size"; Put "J1" "brokerage_rate_per_lot"; Put "K1" "clearing_rate_per_lot"; Put "L1" "lot_unit"
     Put "H2" "NYMEX"; Put "I2" "1000"; Put "J2" "0"; Put "K2" "0"; Put "L2" "BBL"
     Put "M1" "=_CreateFuturesSchedule(A1:A$contracts,B1:B$contracts)"

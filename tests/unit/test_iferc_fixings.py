@@ -39,13 +39,14 @@ def an_index(schedule: object, name: str = "Waha IFERC") -> Index:
     return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, UNITS)
 
 
-# The page's sample: Waha IFERC, the first four months of 2026, the codes as the desk typed them
-# and an illustrative index beside each, over the index of those four months, ICE's last trading
-# days and Platts' publication days, January's index having printed on the 5th.
-CODES = ("F26", "G26", "H26", "J26")
-PRICES = prices(1.85, 2.10, 1.95, 1.60)
+# The page's sample: Waha IFERC, the first four months of 2026, the codes as the desk keeps
+# them, the newest month in the first row, and an illustrative index beside each, over the index
+# of those four months, ICE's last trading days and Platts' publication days, January's index
+# having printed on the 5th. The schedule runs the other way, as schedules do, the oldest first.
+CODES = ("J26", "H26", "G26", "F26")
+PRICES = prices(1.60, 1.95, 2.10, 1.85)
 SCHEDULE = iferc_schedule(
-    CODES,
+    ("F26", "G26", "H26", "J26"),
     dates("2025-12-31", "2026-01-30", "2026-02-27", "2026-03-31"),
     dates("2026-01-05", "2026-02-02", "2026-03-02", "2026-04-01"),
 )
@@ -83,15 +84,19 @@ def test_the_sample_keeps_every_code_and_every_price_aligned_as_typed_and_the_in
 
 def test_the_fixings_of_one_month_are_a_series() -> None:
     fixings = iferc_fixings(CODES[:1], PRICES[:1], INDEX)
-    assert fixings.codes == ("F26",)
-    assert np.array_equal(fixings.prices, prices(1.85))
+    assert fixings.codes == ("J26",)
+    assert np.array_equal(fixings.prices, prices(1.60))
 
 
-def test_twelve_months_are_kept_in_their_order() -> None:
-    codes = tuple(f"{letter}27" for letter in "FGHJKMNQUVXZ")
+# Twelve months given newest first, December down to January, over a schedule that runs January
+# to December: kept as given, row for row, nothing turned over.
+def test_twelve_months_are_kept_in_the_order_given() -> None:
+    schedule_order = tuple(f"{letter}27" for letter in "FGHJKMNQUVXZ")
+    codes = schedule_order[::-1]
     given_prices = prices(*(2.0 + 0.1 * i for i in range(12)))
-    fixings = iferc_fixings(codes, given_prices, months_of(*codes))
+    fixings = iferc_fixings(codes, given_prices, months_of(*schedule_order))
     assert fixings.codes == codes
+    assert fixings.codes[0] == "Z27" and fixings.codes[-1] == "F27"
     assert np.array_equal(fixings.prices, given_prices)
 
 
@@ -100,15 +105,28 @@ def test_a_price_below_zero_and_a_zero_are_kept_as_given() -> None:
     assert np.array_equal(fixings.prices, prices(-1.25, 0.0, 1.95))
 
 
-# Months out of the schedule's order and a month left out: whether a month's index has printed
-# by a given day and whether every published month has its index are the history's rules. The
-# fixings keep them as given.
+# Months in neither direction and a month left out: whether a month's index has printed by a
+# given day and whether every published month has its index are the history's rules. The fixings
+# keep them as given.
 def test_nothing_else_is_checked() -> None:
     codes = ("J26", "F26", "H26")
     given_prices = prices(1.60, 1.85, 1.95)
     fixings = iferc_fixings(codes, given_prices, INDEX)
     assert fixings.codes == codes
     assert np.array_equal(fixings.prices, given_prices)
+
+
+# The months given oldest first, the schedule's own order, are taken as they always were: the
+# codes carry no date for a direction to be read from, each price is found by its code, and the
+# same months either way up pair every code with the same price.
+def test_the_months_are_taken_in_either_direction_each_price_beside_its_code() -> None:
+    newest_first = iferc_fixings(CODES, PRICES, INDEX)
+    oldest_first = iferc_fixings(CODES[::-1], PRICES[::-1], INDEX)
+    assert oldest_first.codes == ("F26", "G26", "H26", "J26")
+    assert oldest_first.prices.tolist() == [1.85, 2.10, 1.95, 1.60]
+    assert dict(zip(newest_first.codes, newest_first.prices.tolist(), strict=True)) == dict(
+        zip(oldest_first.codes, oldest_first.prices.tolist(), strict=True)
+    )
 
 
 # --- what is rejected ---------------------------------------------------------
@@ -246,7 +264,7 @@ def test_the_fixings_own_their_prices_and_keep_the_codes_and_the_index_that_arri
     given_prices = PRICES.copy()
     fixings = iferc_fixings(CODES, given_prices, INDEX)
     given_prices[0] = 9.99
-    assert fixings.prices[0] == 1.85
+    assert fixings.prices[0] == 1.60
     assert not fixings.prices.flags.writeable
     with pytest.raises(ValueError):
         fixings.prices[0] = 9.99

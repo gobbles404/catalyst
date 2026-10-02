@@ -61,9 +61,9 @@ What each kind shows:
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_specifications` | `name`, `lot_size`, `lot_unit`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `str`, `float64`, `float64` | one per word for a quantity |
 | `index` | `name`, `kind`, `contracts`, `specifications`, `has_holiday_calendar` | `str`, `str`, `int64`, `int64`, `bool` | one, a summary of what the index holds, the kind spelled `futures`, `IFERC` or `Gas Daily`; the parts spill through their own handles |
-| `futures_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing |
-| `iferc_fixings` | `contract_code`, `price` | `str`, `float64` | one per month published |
-| `gas_daily_fixings` | `flow_date`, `price` | `datetime64[D]`, `float64` | one per calendar day, weekends and holidays included |
+| `futures_fixings` | `date`, `settle` | `datetime64[D]`, `float64` | one per fixing, newest first since #128, the order the creator takes and the sheet gave, each settle beside its own day; the fixings keep the columns oldest first, and the spill reads them from the last row back |
+| `iferc_fixings` | `contract_code`, `price` | `str`, `float64` | one per month published, in the order typed |
+| `gas_daily_fixings` | `flow_date`, `price` | `datetime64[D]`, `float64` | one per calendar day, weekends and holidays included, newest first since #128, as the creator takes them |
 | `price_vector` | `price` | `float64` | one per price, in the column's order |
 | `market` | the calendar's four, then `price` | the calendar's four, then `float64` | one per calendar period through the last period of the last contract quoted, every row the calendar has when the quotes reach the schedule's end and no row past them when they stop before it, since #127; the fifth cell the fixing on a fixed and priced period, its contract's quote on an unfixed period, and the word `closed` where the calendar does not price the day, a futures weekend or holiday |
 | `calendar` | `date`, `contract`, `is_priced`, `is_fixed` | `datetime64[D]`, `str`, `bool`, `bool` | one per calendar day from the day after the first contract's expiry to the last's on a futures calendar, one per flow day on a Gas Daily calendar, one per contract month on an IFERC calendar |
@@ -107,9 +107,10 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | index conventions: one row of five texts under its two heading rows | example |
 | contract specifications: one row per contract, the name as text and the lot size and fees as numbers, under its two heading rows | example |
 | the index: one row, the name and the kind as text, the two counts as numbers and the holiday flag a boolean, with a holiday calendar and without | example |
-| futures fixings: two columns, dates as serials and settles exactly, one row per day under its two heading rows | example |
-| IFERC fixings: two columns, codes as text and prices exactly, a zero and a negative in their places, one row per month under its two heading rows | example |
-| Gas Daily fixings: two columns, flow days as serials and prices exactly, a Friday and the three rows its print covers, under its two heading rows | example |
+| futures fixings: two columns, dates as serials and settles exactly, one row per day in the order given, newest first, under its two heading rows | example |
+| IFERC fixings: two columns, codes as text and prices exactly, a zero and a negative in their places, one row per month in the order typed, newest first over a schedule running the other way, under its two heading rows | example |
+| Gas Daily fixings: two columns, flow days as serials and prices exactly, newest first, a Friday under the three rows its print covers, under its two heading rows | example |
+| each kind of fixings' spill, its two columns fed back to its creator, gives fixings with the same kept columns and the same spill, every price beside its own date or code, in `tests/unit/test_market_data.py` | example and property, through the seam |
 | a price vector: one column of prices under its two heading rows, a zero and a negative price in their places | example |
 | a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; a Gas Daily and an IFERC market of one month, the print or the index where fixed and the quote elsewhere; and for any history of any of the three kinds with any count of quotes from one to the contracts that remain, the calendar's rows through the last contract quoted and every period's fixing, quote or `closed` | example and property |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |

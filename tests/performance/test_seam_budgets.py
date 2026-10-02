@@ -1098,29 +1098,31 @@ def test_reading_an_index_back_costs_one_row(
 
 
 def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
-    """That many futures fixings as the sheet sends them, a column of serials and a column of
-    settles, one per business day from Friday 1 May 2026 under a calendar of that many Thursdays
-    a week apart, the calendar holiday_column makes."""
+    """That many futures fixings as the sheet sends them, the newest day in the first row: a
+    column of serials and a column of settles, one per business day from Friday 1 May 2026 under
+    a calendar of that many Thursdays a week apart, the calendar holiday_column makes."""
     epoch = np.datetime64("1899-12-30")
     closed = epoch + (46023 + 7 * np.arange(holidays)).astype("timedelta64[D]")
     days = np.busday_offset(np.datetime64("2026-05-01"), np.arange(rows), holidays=closed)
     serials = (days - epoch).astype(np.int64)
+    newest_first = range(rows - 1, -1, -1)
     return (
-        Cells.from_rows([[float(serials[i])] for i in range(rows)]),
-        Cells.from_rows([[100.0 + i % 7] for i in range(rows)]),
+        Cells.from_rows([[float(serials[i])] for i in newest_first]),
+        Cells.from_rows([[100.0 + i % 7] for i in newest_first]),
     )
 
 
-# A year of fixings at the column path, with the index by handle: the date column through its
-# look and its conversion to days, the settle column accepted on the host's summary alone, the
-# handle's text rule and its one lookup, then the builder's kind check, the holiday calendar
-# read off the index, its count, its two looks, the order of the dates and the days the market
-# is closed, its count of the business days from the first date to the last and the one look at
-# that count, its two copies, and one publication. Twenty-one calls across seventeen functions,
-# the accept rule once per argument. The three business-day calls, the calendar, is_busday and
-# busday_count, raise no event the numpy fixture reads, so only their looks are in its count:
-# the ledger reads as it did when the gaps were a look over the business day after each date,
-# and the ceiling in test_seam_allocation.py is what records the work saved.
+# A year of fixings at the column path, given newest first, with the index by handle: the date
+# column through its look and its conversion to days, the settle column accepted on the host's
+# summary alone, the handle's text rule and its one lookup, then the builder's kind check, the
+# holiday calendar read off the index, its count, its two looks, the order of the dates and the
+# days the market is closed, its count of the business days from the last row's date to the
+# first's and the one look at that count, its two copies, each read from the last row back, and
+# one publication. Twenty-one calls across seventeen functions, the accept rule once per
+# argument. The three business-day calls, the calendar, is_busday and busday_count, raise no
+# event the numpy fixture reads, so only their looks are in its count: the ledger reads as it
+# did when the gaps were a look over the business day after each date, and as it did when the
+# rows ran oldest first, and the ceiling in test_seam_allocation.py is what records the work.
 def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1153,7 +1155,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
     assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
         "ndarray.any": 4,  # the date column's look, the builder's two, and the count's one
         "ndarray.astype": 2,  # the date column on its way to days
-        "numpy.array": 2,  # the two copies the fixings keep
+        "numpy.array": 2,  # the two copies the fixings keep, each read from the last row back
         "ndarray.setflags": 2,  # frozen
         "ufunc.reduce": 4,
     }
@@ -1394,9 +1396,10 @@ def gas_daily_history_sources() -> tuple[object, object]:
     index = an_index(schedule)
     made = PATH["_CreateCalendar"](valuation, index)
     days = 46276 - 46023 + 1  # New Year's Day 2026 is serial 46023
+    newest_first = range(days - 1, -1, -1)  # the sheet's order, the 11th in the first row
     fixings = PATH["_CreateGasDailyFixings"](
-        Cells.from_rows([[46023.0 + i] for i in range(days)]),
-        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(days)]),
+        Cells.from_rows([[46023.0 + i] for i in newest_first]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in newest_first]),
         index,
     )
     return made, fixings
@@ -1740,20 +1743,21 @@ def test_reading_a_market_back_rebuilds_nothing(
 
 
 def flow_day_columns(count: int) -> tuple[Cells, Cells]:
-    """That many consecutive flow days from 1 September 2026 as the sheet sends them, a serial
-    per row, and a price beside each."""
+    """That many consecutive flow days from 1 September 2026 as the sheet sends them, the newest
+    in the first row, a serial per row, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
     return (
-        Cells.from_rows([[46266.0 + i] for i in range(count)]),
-        Cells.from_rows([[2.8 + (i % 30) / 100] for i in range(count)]),
+        Cells.from_rows([[46266.0 + i] for i in newest_first]),
+        Cells.from_rows([[2.8 + (i % 30) / 100] for i in newest_first]),
     )
 
 
-# A year of flow days: the date column through its look and its conversion to days, the number
-# column accepted on the host's summary alone, the index by handle through its text rule and one
-# lookup, the builder's kind check, its one look over the days for the day after each, its two
-# copies and one publication. Twenty calls across sixteen functions, the accept rule once per
-# argument; on numpy one look for the calendar and one for the days, the column's two
-# conversions, the two copies and their freezes.
+# A year of flow days, given newest first: the date column through its look and its conversion
+# to days, the number column accepted on the host's summary alone, the index by handle through
+# its text rule and one lookup, the builder's kind check, its one look over the days for the day
+# before each, its two copies, each read from the last row back, and one publication. Twenty
+# calls across sixteen functions, the accept rule once per argument; on numpy one look for the
+# calendar and one for the days, the column's two conversions, the two copies and their freezes.
 def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:

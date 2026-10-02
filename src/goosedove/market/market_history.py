@@ -85,7 +85,7 @@ def futures_history(fixings: FuturesFixings, calendar: Calendar) -> MarketHistor
     fixing_dates = fixings.dates
     late = fixing_dates >= as_of
     if late.any():
-        k = int(late.argmax())  # the dates increase, so the first late date is the earliest
+        k = int(late.argmax())  # kept oldest first, so the first late date is the earliest
         raise ValueError(
             f"fixings date {fixing_dates[k]} is on or after valuation date {as_of}, "
             "expected dates before the valuation date"
@@ -108,7 +108,7 @@ def gas_daily_history(fixings: GasDailyFixings, calendar: Calendar) -> MarketHis
     flow_dates = fixings.dates
     late = flow_dates > as_of
     if late.any():
-        k = int(late.argmax())  # the flow days increase, so the first late day is the earliest
+        k = int(late.argmax())  # kept oldest first, so the first late day is the earliest
         raise ValueError(
             f"fixings flow_date {flow_dates[k]} is after valuation date {as_of}, "
             "expected flow days on or before the valuation date"

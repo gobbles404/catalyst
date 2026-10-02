@@ -6,7 +6,10 @@ import os
 import re
 from typing import cast
 
+import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from test_utilities import read, rows
 
 from goosedove.excel import bridge
@@ -35,34 +38,31 @@ def a_valuation_date() -> str:
 # --- _CreateFuturesFixings ---------------------------------------------------------
 
 
-# The page's sample as the sheet sends it: a column of four serials, 1, 4, 5 and 6 May 2026, a
-# Friday and the Monday to Wednesday after it, and a column of the settles beside them.
+# The page's sample as the sheet sends it, the newest day in the first row: a column of four
+# serials, 6, 5, 4 and 1 May 2026, a Wednesday back to the Monday and the Friday before it, and a
+# column of the settles beside them.
 MAY_1, MAY_2, MAY_4, MAY_5, MAY_6 = 46143.0, 46144.0, 46146.0, 46147.0, 46148.0
-DATES = Cells.from_rows([[MAY_1], [MAY_4], [MAY_5], [MAY_6]])
-SETTLES = Cells.from_rows([[101.94], [106.42], [102.27], [95.08]])
+DATES = Cells.from_rows([[MAY_6], [MAY_5], [MAY_4], [MAY_1]])
+SETTLES = Cells.from_rows([[95.08], [102.27], [106.42], [101.94]])
 FIXINGS = re.compile(r"[0-9]+:futures_fixings:.+:([0-9]+)")
 
 # The calendar page's sample as the sheet sends it, the ten days one market is closed in 2026,
 # one serial per row; the one in May is the 25th, a Monday. Made once into the handle every
 # fixings call takes, so a test that counts publications sees the fixings' alone.
 MAY_25 = 46167.0
-HOLIDAYS = Cells.from_rows(
-    [
-        [s]
-        for s in (
-            46023.0,
-            46041.0,
-            46069.0,
-            46115.0,
-            MAY_25,
-            46192.0,
-            46206.0,
-            46272.0,
-            46352.0,
-            46381.0,
-        )
-    ]
+HOLIDAY_SERIALS = (
+    46023.0,
+    46041.0,
+    46069.0,
+    46115.0,
+    MAY_25,
+    46192.0,
+    46206.0,
+    46272.0,
+    46352.0,
+    46381.0,
 )
+HOLIDAYS = Cells.from_rows([[s] for s in HOLIDAY_SERIALS])
 CALENDAR = re.compile(r"[0-9]+:holiday_calendar:([0-9]+)")
 THE_CALENDAR = object()  # in a case's arguments: the calendar's handle, made below
 
@@ -111,7 +111,8 @@ def the_index() -> str:
 
 
 # The market history reads futures fixings, but this hidden reader proves on its own that a
-# handle resolves to the fixings the seam kept, with their columns as they arrived.
+# handle resolves to the fixings the seam kept, with their columns as the fixings keep them: the
+# oldest day first, the other way up from the sheet, each settle beside its own day.
 @probe
 def ReadFuturesFixings(fixings: Handle[FuturesFixings]) -> str:
     days = " ".join(str(day) for day in fixings.dates)
@@ -124,6 +125,7 @@ def the_fixings(days: object, settles: object) -> str:
     return text
 
 
+# The sheet's rows run newest first, 6 May down to 1 May, and what is kept runs oldest first.
 def test_fixings_are_created_from_two_columns_and_a_calendar_and_read_back() -> None:
     assert bridge.call("ReadFuturesFixings", [the_fixings(DATES, SETTLES)]) == (
         "2026-05-01 2026-05-04 2026-05-05 2026-05-06 | 101.94 106.42 102.27 95.08"
@@ -142,11 +144,11 @@ def test_two_single_cells_make_the_fixings_of_one_day_under_a_calendar() -> None
     assert bridge.call("ReadFuturesFixings", [the_fixings(MAY_1, 101.94)]) == "2026-05-01 | 101.94"
 
 
-# Friday 22 May and Tuesday 26 May 2026: the weekend and the holiday between them are the days
+# Tuesday 26 May and Friday 22 May 2026: the holiday and the weekend between them are the days
 # without a fixing, and the calendar's handle is what says so.
 def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
-    days = Cells.from_rows([[46164.0], [46168.0]])
-    settles = Cells.from_rows([[101.94], [106.42]])
+    days = Cells.from_rows([[46168.0], [46164.0]])
+    settles = Cells.from_rows([[106.42], [101.94]])
     assert bridge.call("ReadFuturesFixings", [the_fixings(days, settles)]) == (
         "2026-05-22 2026-05-26 | 101.94 106.42"
     )
@@ -163,17 +165,24 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             "one per date",
         ),
         (
-            Cells.from_rows([[MAY_4], [MAY_1]]),
-            Cells.from_rows([[106.42], [101.94]]),
+            Cells.from_rows([[MAY_1], [MAY_4]]),
+            Cells.from_rows([[101.94], [106.42]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, "
-            "expected a date after row 1's 2026-05-04",
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-04, "
+            "expected a date before row 1's 2026-05-01",
         ),
         (
-            Cells.from_rows([[MAY_1], [MAY_2]]),
-            Cells.from_rows([[101.94], [100.0]]),
+            Cells.from_rows([[MAY_4], [MAY_4]]),
+            Cells.from_rows([[106.42], [106.42]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-04, "
+            "expected a date before row 1's 2026-05-04",
+        ),
+        (
+            Cells.from_rows([[MAY_2], [MAY_1]]),
+            Cells.from_rows([[100.0], [101.94]]),
+            THE_CALENDAR,
+            "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, "
             "expected a business day",
         ),
         (
@@ -184,44 +193,44 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
             "expected a business day",
         ),
         (
-            Cells.from_rows([[MAY_1], [MAY_5]]),
-            Cells.from_rows([[101.94], [102.27]]),
+            Cells.from_rows([[MAY_5], [MAY_1]]),
+            Cells.from_rows([[102.27], [101.94]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, "
-            "expected 2026-05-04, the business day after row 1's 2026-05-01",
+            "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, "
+            "expected 2026-05-04, the business day before row 1's 2026-05-05",
         ),
         (
-            Cells.from_rows([[MAY_1], [None], [MAY_5]]),
-            Cells.from_rows([[101.94], [106.42], [102.27]]),
+            Cells.from_rows([[MAY_5], [None], [MAY_1]]),
+            Cells.from_rows([[102.27], [106.42], [101.94]]),
             THE_CALENDAR,
             "#ERROR _CreateFuturesFixings: date cell (2, 1) is blank, expected date",
         ),
         (
-            Cells.from_rows([[MAY_1], [MAY_4 + 0.5]]),
-            Cells.from_rows([[101.94], [106.42]]),
+            Cells.from_rows([[MAY_5], [MAY_4 + 0.5]]),
+            Cells.from_rows([[102.27], [106.42]]),
             THE_CALENDAR,
             "#ERROR _CreateFuturesFixings: date cell (2, 1) is number 46146.5, expected date",
         ),
         (
-            Cells.from_rows([["1-May-2026"], [MAY_4]]),
-            Cells.from_rows([[101.94], [106.42]]),
+            Cells.from_rows([[MAY_4], ["1-May-2026"]]),
+            Cells.from_rows([[106.42], [101.94]]),
             THE_CALENDAR,
-            "#ERROR _CreateFuturesFixings: date cell (1, 1) is text '1-May-2026', expected date",
+            "#ERROR _CreateFuturesFixings: date cell (2, 1) is text '1-May-2026', expected date",
         ),
         (
             DATES,
-            Cells.from_rows([[101.94], [None], [102.27], [95.08]]),
+            Cells.from_rows([[95.08], [None], [106.42], [101.94]]),
             THE_CALENDAR,
             "#ERROR _CreateFuturesFixings: settle cell (2, 1) is blank, expected number",
         ),
         (
             DATES,
-            Cells.from_rows([[101.94], ["x"], [102.27], [95.08]]),
+            Cells.from_rows([[95.08], ["x"], [106.42], [101.94]]),
             THE_CALENDAR,
             "#ERROR _CreateFuturesFixings: settle cell (2, 1) is text 'x', expected number",
         ),
         (
-            Cells.from_rows([[MAY_1, MAY_4]]),
+            Cells.from_rows([[MAY_4, MAY_1]]),
             SETTLES,
             THE_CALENDAR,
             "#ERROR _CreateFuturesFixings: date is 1x2 array, expected column of dates",
@@ -297,7 +306,8 @@ def test_a_listed_holiday_is_a_day_without_a_fixing() -> None:
     ],
     ids=[
         "a settle column one row short",
-        "dates backwards",
+        "dates oldest first, as the series was once given",
+        "a date twice",
         "a Saturday in the series",
         "a listed holiday in the series, one cell each",
         "a business day without a fixing",
@@ -329,19 +339,24 @@ def test_fixings_that_cannot_be_made_say_why(
 
 def test_a_failed_fixings_construction_publishes_no_object_and_no_handle() -> None:
     before = number(the_fixings(DATES, SETTLES), FIXINGS)
-    gap = Cells.from_rows([[MAY_1], [MAY_5]])
+    gap = Cells.from_rows([[MAY_5], [MAY_1]])
     assert bridge.call("_CreateFuturesFixings", [gap, SETTLES, the_index()]) == (
         "#ERROR _CreateFuturesFixings: ValueError: settle has 4 settles, expected 2, one per date"
     )
-    two = Cells.from_rows([[101.94], [102.27]])
+    two = Cells.from_rows([[102.27], [101.94]])
     assert bridge.call("_CreateFuturesFixings", [gap, two, the_index()]) == (
-        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, "
-        "expected 2026-05-04, the business day after row 1's 2026-05-01"
+        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, "
+        "expected 2026-05-04, the business day before row 1's 2026-05-05"
     )
-    saturday = Cells.from_rows([[MAY_1], [MAY_2]])
+    saturday = Cells.from_rows([[MAY_2], [MAY_1]])
     assert bridge.call("_CreateFuturesFixings", [saturday, two, the_index()]) == (
-        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, "
+        "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, "
         "expected a business day"
+    )
+    oldest_first = Cells.from_rows([[MAY_1], [MAY_4], [MAY_5], [MAY_6]])
+    assert bridge.call("_CreateFuturesFixings", [oldest_first, SETTLES, the_index()]) == (
+        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-04, "
+        "expected a date before row 1's 2026-05-01"
     )
     assert number(the_fixings(DATES, SETTLES), FIXINGS) == before + 1
 
@@ -398,11 +413,14 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
 
 
 # The page's sample as the sheet sends it, Waha IFERC gas: the first four months of 2026 as
-# codes, and an illustrative index beside each.
-IFERC_CODES = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
-IFERC_PRICES = Cells.from_rows([[1.85], [2.10], [1.95], [1.60]])
+# codes, the newest month in the first row as the desk keeps them, and an illustrative index
+# beside each.
+IFERC_CODES = Cells.from_rows([["J26"], ["H26"], ["G26"], ["F26"]])
+IFERC_PRICES = Cells.from_rows([[1.60], [1.95], [2.10], [1.85]])
 IFERC_HANDLE = re.compile(r"[0-9]+:iferc_fixings:.+:([0-9]+)")
-# ICE's last trading days and Platts' publication days for those four months, as serials.
+# The schedule lists the same four months the other way, the oldest first, as a schedule does,
+# with ICE's last trading days and Platts' publication days for them, as serials.
+IFERC_MONTHS = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
 IFERC_LAST_TRADING = Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]])
 IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
 
@@ -411,7 +429,7 @@ IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]]
 def the_iferc_index() -> str:
     """The IFERC index of the four months the codes name, made once."""
     schedule = bridge.call(
-        "_CreateIfercSchedule", [IFERC_CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION]
+        "_CreateIfercSchedule", [IFERC_MONTHS, IFERC_LAST_TRADING, IFERC_PUBLICATION]
     )
     return an_index_of("Waha IFERC", schedule, MISSING)
 
@@ -431,8 +449,15 @@ def iferc(codes: object, prices: object) -> str:
 
 def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
     made = iferc(IFERC_CODES, IFERC_PRICES)
-    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
+    assert bridge.call("ReadIfercFixings", [made]) == "J26 H26 G26 F26 | 1.6 1.95 2.1 1.85"
     assert made.startswith(f"{PID}:iferc_fixings:Waha IFERC:")  # the index's name, as typed
+
+
+# The same months the other way up, the schedule's own order, are taken as they always were: a
+# code carries no date for a direction to be read from, and the fixings keep the order typed.
+def test_iferc_months_given_oldest_first_are_taken_and_kept_as_typed() -> None:
+    made = iferc(IFERC_MONTHS, Cells.from_rows([[1.85], [2.10], [1.95], [1.60]]))
+    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
 
 
 # A single cell is a column of one, so the fixings of one month need no range.
@@ -456,29 +481,29 @@ def test_two_single_cells_make_the_fixings_of_one_month() -> None:
             "one per contract_code",
         ),
         (
-            Cells.from_rows([["F26"], ["G26"], ["G26"], ["J26"]]),
+            Cells.from_rows([["J26"], ["G26"], ["G26"], ["F26"]]),
             IFERC_PRICES,
             "#ERROR _CreateIfercFixings: ValueError: contract_code row 3 is 'G26', "
             "already given at row 2",
         ),
         (
             IFERC_CODES,
-            Cells.from_rows([[1.85], [None], [1.95], [1.60]]),
+            Cells.from_rows([[1.60], [None], [2.10], [1.85]]),
             "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number",
         ),
         (
             IFERC_CODES,
-            Cells.from_rows([[1.85], ["2.10"], [1.95], [1.60]]),
-            "#ERROR _CreateIfercFixings: price cell (2, 1) is text '2.10', expected number",
+            Cells.from_rows([[1.60], ["1.95"], [2.10], [1.85]]),
+            "#ERROR _CreateIfercFixings: price cell (2, 1) is text '1.95', expected number",
         ),
         (
-            Cells.from_rows([["F26"], [46027.0], ["H26"], ["J26"]]),
+            Cells.from_rows([["J26"], [46027.0], ["G26"], ["F26"]]),
             IFERC_PRICES,
             "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46027.0, "
             "expected text",
         ),
         (
-            Cells.from_rows([["F26"], [""], ["H26"], ["J26"]]),
+            Cells.from_rows([["J26"], [""], ["G26"], ["F26"]]),
             IFERC_PRICES,
             "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is empty text, expected text",
         ),
@@ -568,7 +593,7 @@ def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None
     assert (
         bridge.call(
             "_CreateIfercFixings",
-            [IFERC_CODES, Cells.from_rows([[1.85], [None], [1.95], [1.60]]), index],
+            [IFERC_CODES, Cells.from_rows([[1.60], [None], [2.10], [1.85]]), index],
         )
         == "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
     )
@@ -634,12 +659,12 @@ def test_the_iferc_index_that_cannot_be_taken_says_why() -> None:
 # --- _CreateGasDailyFixings ------------------------------------------------------
 
 
-# The page's sample as the sheet sends it, Henry Hub Gas Daily over Labor Day week 2026: serials
-# for 4 to 9 September and an illustrative midpoint beside each, Friday's print carrying the
-# weekend and the holiday.
+# The page's sample as the sheet sends it, Henry Hub Gas Daily over Labor Day week 2026, the
+# newest flow day in the first row: serials for 9 back to 4 September and an illustrative midpoint
+# beside each, Friday's print carrying the weekend and the holiday.
 SEP_4, SEP_5, SEP_6, SEP_7, SEP_8, SEP_9 = 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0
-FLOW_DAYS = Cells.from_rows([[SEP_4], [SEP_5], [SEP_6], [SEP_7], [SEP_8], [SEP_9]])
-MIDPOINTS = Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875], [2.900]])
+FLOW_DAYS = Cells.from_rows([[SEP_9], [SEP_8], [SEP_7], [SEP_6], [SEP_5], [SEP_4]])
+MIDPOINTS = Cells.from_rows([[2.900], [2.875], [2.875], [2.875], [2.875], [2.930]])
 GAS_DAILY_HANDLE = re.compile(r"[0-9]+:gas_daily_fixings:.+:([0-9]+)")
 
 
@@ -653,8 +678,9 @@ def the_gas_daily_index() -> str:
     return an_index_of("Henry Hub Gas Daily", schedule, MISSING)
 
 
-# The library has no consumer of Gas Daily fixings yet, so this hidden reader proves that a
-# handle resolves to the fixings the seam kept, the flow days as days and the prices as numbers.
+# The market history reads Gas Daily fixings, but this hidden reader proves on its own that a
+# handle resolves to the fixings the seam kept, the flow days as days and the prices as numbers,
+# as the fixings keep them: the oldest flow day first, the other way up from the sheet.
 @probe
 def ReadGasDailyFixings(fixings: Handle[GasDailyFixings]) -> str:
     kept = " ".join(str(day) for day in fixings.dates)
@@ -667,6 +693,8 @@ def gas_daily(flow_days: object, prices: object) -> str:
     return text
 
 
+# The sheet's rows run newest first, 9 September down to the 4th, and what is kept runs oldest
+# first, each print beside its own flow day.
 def test_gas_daily_fixings_are_created_from_two_columns_and_read_back() -> None:
     made = gas_daily(FLOW_DAYS, MIDPOINTS)
     assert bridge.call("ReadGasDailyFixings", [made]) == (
@@ -686,56 +714,56 @@ def test_two_single_cells_make_the_fixings_of_one_day() -> None:
     [
         (
             FLOW_DAYS,
-            Cells.from_rows([[2.930], [2.875], [2.875], [2.875], [2.875]]),
+            Cells.from_rows([[2.900], [2.875], [2.875], [2.875], [2.875]]),
             "#ERROR _CreateGasDailyFixings: ValueError: price has 5 prices, expected 6, "
             "one per flow_date",
         ),
         (
-            Cells.from_rows([[SEP_4], [SEP_6]]),
-            Cells.from_rows([[2.930], [2.875]]),
-            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, "
-            "expected 2026-09-05, the day after row 1's 2026-09-04",
+            Cells.from_rows([[SEP_6], [SEP_4]]),
+            Cells.from_rows([[2.875], [2.930]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
+            "expected 2026-09-05, the day before row 1's 2026-09-06",
         ),
         (
             Cells.from_rows([[SEP_4], [SEP_4]]),
             Cells.from_rows([[2.930], [2.875]]),
             "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
-            "expected 2026-09-05, the day after row 1's 2026-09-04",
+            "expected 2026-09-03, the day before row 1's 2026-09-04",
         ),
         (
-            Cells.from_rows([[SEP_5], [SEP_4]]),
-            Cells.from_rows([[2.875], [2.930]]),
-            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
-            "expected 2026-09-06, the day after row 1's 2026-09-05",
+            Cells.from_rows([[SEP_4], [SEP_5]]),
+            Cells.from_rows([[2.930], [2.875]]),
+            "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-05, "
+            "expected 2026-09-03, the day before row 1's 2026-09-04",
         ),
         (
-            Cells.from_rows([[SEP_4], [None], [SEP_6]]),
-            Cells.from_rows([[2.930], [2.875], [2.875]]),
+            Cells.from_rows([[SEP_6], [None], [SEP_4]]),
+            Cells.from_rows([[2.875], [2.875], [2.930]]),
             "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is blank, expected date",
         ),
         (
-            Cells.from_rows([[SEP_4], [SEP_5 + 0.5]]),
-            Cells.from_rows([[2.930], [2.875]]),
+            Cells.from_rows([[SEP_6], [SEP_5 + 0.5]]),
+            Cells.from_rows([[2.875], [2.875]]),
             "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is number 46270.5, expected date",
         ),
         (
-            Cells.from_rows([["4-Sep-2026"], [SEP_5]]),
-            Cells.from_rows([[2.930], [2.875]]),
-            "#ERROR _CreateGasDailyFixings: flow_date cell (1, 1) is text '4-Sep-2026', "
+            Cells.from_rows([[SEP_5], ["4-Sep-2026"]]),
+            Cells.from_rows([[2.875], [2.930]]),
+            "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text '4-Sep-2026', "
             "expected date",
         ),
         (
             FLOW_DAYS,
-            Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]]),
+            Cells.from_rows([[2.900], [None], [2.875], [2.875], [2.875], [2.930]]),
             "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number",
         ),
         (
             FLOW_DAYS,
-            Cells.from_rows([[2.930], ["2.875"], [2.875], [2.875], [2.875], [2.900]]),
+            Cells.from_rows([[2.900], ["2.875"], [2.875], [2.875], [2.875], [2.930]]),
             "#ERROR _CreateGasDailyFixings: price cell (2, 1) is text '2.875', expected number",
         ),
         (
-            Cells.from_rows([[SEP_4, SEP_5]]),
+            Cells.from_rows([[SEP_5, SEP_4]]),
             MIDPOINTS,
             "#ERROR _CreateGasDailyFixings: flow_date is 1x2 array, expected column of dates",
         ),
@@ -774,7 +802,7 @@ def test_two_single_cells_make_the_fixings_of_one_day() -> None:
         "a price column one row short",
         "a day skipped",
         "a day given twice",
-        "a series pasted newest first",
+        "a series pasted oldest first, as it was once given",
         "a blank among the days",
         "a day with a time",
         "a day typed as text",
@@ -806,19 +834,24 @@ def test_a_failed_gas_daily_construction_publishes_no_object_and_no_handle() -> 
         "#ERROR _CreateGasDailyFixings: ValueError: price has 1 price, expected 6, "
         "one per flow_date"
     )
-    skipped = Cells.from_rows([[SEP_4], [SEP_6]])
+    skipped = Cells.from_rows([[SEP_6], [SEP_4]])
     assert bridge.call(
-        "_CreateGasDailyFixings", [skipped, Cells.from_rows([[2.930], [2.875]]), index]
+        "_CreateGasDailyFixings", [skipped, Cells.from_rows([[2.875], [2.930]]), index]
     ) == (
-        "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, "
-        "expected 2026-09-05, the day after row 1's 2026-09-04"
+        "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, "
+        "expected 2026-09-05, the day before row 1's 2026-09-06"
+    )
+    oldest_first = Cells.from_rows([[SEP_4], [SEP_5], [SEP_6], [SEP_7], [SEP_8], [SEP_9]])
+    assert bridge.call("_CreateGasDailyFixings", [oldest_first, MIDPOINTS, index]) == (
+        "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-05, "
+        "expected 2026-09-03, the day before row 1's 2026-09-04"
     )
     assert (
         bridge.call(
             "_CreateGasDailyFixings",
             [
                 FLOW_DAYS,
-                Cells.from_rows([[2.930], [None], [2.875], [2.875], [2.875], [2.900]]),
+                Cells.from_rows([[2.900], [None], [2.875], [2.875], [2.875], [2.930]]),
                 index,
             ],
         )
@@ -878,6 +911,147 @@ def test_the_gas_daily_index_that_cannot_be_taken_says_why() -> None:
     assert bridge.call("_CreateGasDailyFixings", [FLOW_DAYS, MIDPOINTS, the_iferc_index()]) == (
         "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, "
         "expected a Gas Daily index"
+    )
+
+
+# --- a fixings spill is the table its creator took --------------------------------
+
+
+def columns(spilled: list[list[object]]) -> tuple[Cells, Cells]:
+    """The two columns of a spill's body, the rows under its two heading rows, as a sheet would
+    hand them back to the creator: each a range of its own, the two the same height."""
+    body = spilled[2:]
+    return Cells.from_rows([[row[0]] for row in body]), Cells.from_rows([[row[1]] for row in body])
+
+
+# The creator, util_ReadHandle, and the creator again. The spill runs newest first, the direction
+# the creator takes, so its two columns handed straight back make fixings that keep the same days
+# and settles, each settle still beside its own day, and that spill the same rows. No two settles
+# are alike, so one that moved to another day would show.
+def test_a_futures_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -> None:
+    first = the_fixings(DATES, SETTLES)
+    spilled = rows(read(first))
+    assert spilled == [
+        ["date", "settle"],
+        ["datetime64[D]", "float64"],
+        [MAY_6, 95.08],
+        [MAY_5, 102.27],
+        [MAY_4, 106.42],
+        [MAY_1, 101.94],
+    ]
+    second = the_fixings(*columns(spilled))
+    assert second != first  # a new creator call publishes anew
+    assert rows(read(second)) == spilled
+    kept = bridge.call("ReadFuturesFixings", [second])
+    assert kept == bridge.call("ReadFuturesFixings", [first])
+    assert kept == "2026-05-01 2026-05-04 2026-05-05 2026-05-06 | 101.94 106.42 102.27 95.08"
+
+
+def test_a_gas_daily_fixings_spill_fed_back_to_its_creator_makes_equal_fixings() -> None:
+    prices = Cells.from_rows([[2.900], [2.885], [2.870], [2.860], [2.875], [2.930]])
+    first = gas_daily(FLOW_DAYS, prices)
+    spilled = rows(read(first))
+    assert spilled == [
+        ["flow_date", "price"],
+        ["datetime64[D]", "float64"],
+        [SEP_9, 2.900],
+        [SEP_8, 2.885],
+        [SEP_7, 2.870],
+        [SEP_6, 2.860],
+        [SEP_5, 2.875],
+        [SEP_4, 2.930],
+    ]
+    second = gas_daily(*columns(spilled))
+    assert second != first
+    assert rows(read(second)) == spilled
+    kept = bridge.call("ReadGasDailyFixings", [second])
+    assert kept == bridge.call("ReadGasDailyFixings", [first])
+    assert kept == (
+        "2026-09-04 2026-09-05 2026-09-06 2026-09-07 2026-09-08 2026-09-09 | "
+        "2.93 2.875 2.86 2.87 2.885 2.9"
+    )
+
+
+# IFERC fixings spill their codes in the order typed, whichever it was, so the round trip keeps
+# that order and each index beside its own code: the desk's order, the schedule's and neither.
+@pytest.mark.parametrize(
+    ("codes", "prices", "kept"),
+    [
+        (
+            ("J26", "H26", "G26", "F26"),
+            (1.60, 1.95, 2.10, 1.85),
+            "J26 H26 G26 F26 | 1.6 1.95 2.1 1.85",
+        ),
+        (
+            ("F26", "G26", "H26", "J26"),
+            (1.85, 2.10, 1.95, 1.60),
+            "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6",
+        ),
+        (("H26", "F26", "J26"), (1.95, 1.85, 1.60), "H26 F26 J26 | 1.95 1.85 1.6"),
+    ],
+    ids=["newest first", "oldest first", "in neither order, a month left out"],
+)
+def test_an_iferc_fixings_spill_fed_back_to_its_creator_makes_equal_fixings(
+    codes: tuple[str, ...], prices: tuple[float, ...], kept: str
+) -> None:
+    first = iferc(
+        Cells.from_rows([[code] for code in codes]), Cells.from_rows([[p] for p in prices])
+    )
+    spilled = rows(read(first))
+    assert spilled[:2] == [["contract_code", "price"], ["str", "float64"]]
+    assert spilled[2:] == [[code, price] for code, price in zip(codes, prices, strict=True)]
+    second = iferc(*columns(spilled))
+    assert second != first
+    assert rows(read(second)) == spilled
+    assert bridge.call("ReadIfercFixings", [second]) == kept
+    assert bridge.call("ReadIfercFixings", [first]) == kept
+
+
+EPOCH = np.datetime64("1899-12-30")
+# The holiday calendar's days as days, for making runs of business days under the_index.
+CLOSED = EPOCH + np.array(HOLIDAY_SERIALS, dtype=np.int64).astype("timedelta64[D]")
+
+
+# For any run of business days under the index's calendar, given newest first with no two
+# settles alike: the spill shows the rows as they were given, and its columns handed back to the
+# creator make fixings that keep the same days and settles and spill the same rows.
+@settings(deadline=None, max_examples=50)
+@given(count=st.integers(1, 40), back=st.integers(0, 250), data=st.data())
+def test_any_futures_series_survives_the_round_trip_with_every_settle_beside_its_day(
+    count: int, back: int, data: st.DataObject
+) -> None:
+    newest = np.busday_offset(np.datetime64("2026-12-31"), -back, roll="backward", holidays=CLOSED)
+    days = np.busday_offset(newest, -np.arange(count), holidays=CLOSED)
+    serials = [float(s) for s in (days - EPOCH).astype(np.int64)]
+    settles = data.draw(
+        st.lists(st.floats(-1000, 1000), min_size=count, max_size=count, unique=True)
+    )
+    first = the_fixings(
+        Cells.from_rows([[s] for s in serials]), Cells.from_rows([[p] for p in settles])
+    )
+    spilled = rows(read(first))
+    assert spilled[2:] == [[s, p] for s, p in zip(serials, settles, strict=True)]
+    second = the_fixings(*columns(spilled))
+    assert rows(read(second)) == spilled
+    assert bridge.call("ReadFuturesFixings", [second]) == bridge.call("ReadFuturesFixings", [first])
+
+
+@settings(deadline=None, max_examples=50)
+@given(count=st.integers(1, 40), last=st.integers(46000, 47000), data=st.data())
+def test_any_gas_daily_series_survives_the_round_trip_with_every_price_beside_its_day(
+    count: int, last: int, data: st.DataObject
+) -> None:
+    serials = [float(last - i) for i in range(count)]
+    prices = data.draw(st.lists(st.floats(-100, 100), min_size=count, max_size=count, unique=True))
+    first = gas_daily(
+        Cells.from_rows([[s] for s in serials]), Cells.from_rows([[p] for p in prices])
+    )
+    spilled = rows(read(first))
+    assert spilled[2:] == [[s, p] for s, p in zip(serials, prices, strict=True)]
+    second = gas_daily(*columns(spilled))
+    assert rows(read(second)) == spilled
+    assert bridge.call("ReadGasDailyFixings", [second]) == bridge.call(
+        "ReadGasDailyFixings", [first]
     )
 
 
