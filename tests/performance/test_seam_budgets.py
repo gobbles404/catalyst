@@ -347,8 +347,9 @@ def trades() -> Cells:
 
 
 # A table is the mixed call with the binding and one rule per column on top: every bridge
-# function runs once, and numpy takes one look per column, one conversion per date or boolean
-# column, and one gather for the column of text, whatever the number of rows.
+# function runs once, and numpy takes one look per column and one conversion per date or
+# boolean column, whatever the number of rows. The column of text asks numpy for nothing: it is
+# a slice of the host's tuple.
 def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     body = trades()
     PATH["SumQuantity"](HEADERS, body)
@@ -364,8 +365,6 @@ def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile
         "MixedArray.shape": 1,
         "_refine": 1,  # then bound and refined
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
-        "_text_places": 1,
         "_dates_of": 1,
         "_not_dates": 1,
         "_as_days": 1,
@@ -379,10 +378,8 @@ def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile
     assert numpy_calls(lambda: PATH["SumQuantity"](HEADERS, body)) == {
         "ndarray.any": 4,  # one look per column
         "ndarray.astype": 3,  # the date column twice on its way to days, the boolean column once
-        "numpy.array": 1,  # the texts as an array, for the gather
-        "ndarray.cumsum": 1,  # the text cells above each row
-        "ndarray.sum": 3,  # text cells per row, text cells to the left, and the probe's own sum
-        "ufunc.reduce": 7,
+        "ndarray.sum": 1,  # the probe's own sum
+        "ufunc.reduce": 5,
     }
 
 
@@ -407,8 +404,6 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "MixedArray.shape": 1,
         "_refine": 1,
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,
-        "_text_places": 1,
         "_dates_of": 1,
         "_not_dates": 1,
         "_as_days": 1,
@@ -424,10 +419,7 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "ndarray.ravel": 1,  # and its text, by counting the text codes before it
         "numpy.count_nonzero": 1,  # that count
         "ndarray.astype": 2,
-        "numpy.array": 1,
-        "ndarray.cumsum": 1,
-        "ndarray.sum": 2,
-        "ufunc.reduce": 5,
+        "ufunc.reduce": 3,
     }
 
 
@@ -580,7 +572,7 @@ CURVE_LEDGER = {
     "MixedArray.shape": 1,
     "_refine": 1,
     "_bind": 1,
-    "_dates_of": 1,  # no column of text, so no text places are made
+    "_dates_of": 1,  # the curve's table has no column of text
     "_not_dates": 1,
     "_as_days": 1,
     "_numbers_of": 1,
@@ -590,7 +582,8 @@ CURVE_LEDGER = {
     "_publish": 1,
 }
 CURVE_NUMPY = {
-    "ndarray.any": 5,  # one look per column, then finite, rising and unordered, one look each
+    "ndarray.any": 4,  # one look per column, then rising and unordered, one look each
+    "ndarray.all": 1,  # every factor finite: the success path makes no inverted mask
     "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
@@ -926,11 +919,12 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
 
 
 # A dozen words at the table path: the header row as any row of text, the body admitted as a
-# mixed range and bound, then each column through its rule, the names and the lot units gathered
-# and the three number columns as views, the builder's four looks, a fraction and a lot below one
-# among the lot sizes and a fee below zero in each fee column, the measures read once and the one
-# set of their units the lot units are looked up in, its three copies and one publication.
-# Twenty-three calls across nineteen functions; the set of units is built inline and is no call.
+# mixed range and bound, then each column through its rule, the names and the lot units sliced
+# from the host's tuple and the three number columns as views, the builder's four looks, a
+# fraction and a lot below one among the lot sizes and a fee below zero in each fee column, the
+# measures read once and the one set of their units the lot units are looked up in, its three
+# copies and one publication. Twenty-one calls across seventeen functions; the set of units is
+# built inline and is no call.
 def test_contract_specifications_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -950,8 +944,6 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
         "MixedArray.shape": 1,
         "_refine": 1,
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
-        "_text_places": 1,
         "_texts_of": 2,  # the names, then the lot units
         "_numbers_of": 3,
         "_CreateContractSpecifications": 1,
@@ -963,11 +955,9 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
     ) == {
         "ndarray.any": 9,  # one look per column, five of them, then the builder's four
-        "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
-        "ndarray.cumsum": 1,  # the text cells above each row
-        "ndarray.sum": 3,  # text cells per row, and to the left of each of the two text columns
+        "numpy.array": 3,  # the builder's three copies; the two columns of text are slices
         "ndarray.setflags": 3,  # frozen
-        "ufunc.reduce": 12,
+        "ufunc.reduce": 9,
     }
 
 
@@ -1094,8 +1084,7 @@ def test_reading_an_index_back_costs_one_row(
         "_bad_mixed": 1,
     }
     assert numpy_calls(lambda: PATH["util_ReadHandle"](made)) == {
-        "numpy.array": 4,  # the three text columns gathered, and the table's texts
-        "ndarray.ravel": 1,  # the texts in sheet order
+        "numpy.array": 3,  # the three text columns; the table's texts are placed by slices
         "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
         "numpy.asarray": 1,
         "ndarray.any": 5,  # the two counts' exactness looks, then the mixed road's three
@@ -1125,11 +1114,13 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 # A year of fixings at the column path, with the index by handle: the date column through its
 # look and its conversion to days, the settle column accepted on the host's summary alone, the
 # handle's text rule and its one lookup, then the builder's kind check, the holiday calendar
-# read off the index, its count, its three looks, the order of the dates, the days the market
-# is closed and the business days without a fixing, its two copies, and one publication.
-# Twenty-one calls across seventeen functions, the accept rule once per argument. The three
-# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
-# fixture reads, so only their looks are in its count.
+# read off the index, its count, its two looks, the order of the dates and the days the market
+# is closed, its count of the business days from the first date to the last and the one look at
+# that count, its two copies, and one publication. Twenty-one calls across seventeen functions,
+# the accept rule once per argument. The three business-day calls, the calendar, is_busday and
+# busday_count, raise no event the numpy fixture reads, so only their looks are in its count:
+# the ledger reads as it did when the gaps were a look over the business day after each date,
+# and the ceiling in test_seam_allocation.py is what records the work saved.
 def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1160,7 +1151,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
-        "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
+        "ndarray.any": 4,  # the date column's look, the builder's two, and the count's one
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
         "ndarray.setflags": 2,  # frozen
@@ -1241,8 +1232,7 @@ def test_reading_a_calendar_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the schedule's codes as an array, and the table's texts gathered
-        "ndarray.ravel": 1,  # the texts in sheet order
+        "numpy.array": 1,  # the schedule's codes as an array; the texts are placed by slices
         "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
         "numpy.asarray": 1,
         "numpy.datetime_data": 1,  # the unit of the date column
@@ -1528,8 +1518,7 @@ def test_reading_a_market_history_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the calendar's: the codes as an array, its texts gathered
-        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "numpy.array": 1,  # the calendar's: the codes as an array
         "numpy.empty": 7,  # the calendar's two; the words, kinds, slots, pairs and mask
         "numpy.asarray": 2,
         "numpy.datetime_data": 1,  # the unit of the date column
@@ -1676,8 +1665,8 @@ def test_reading_a_market_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the calendar's: the schedule's codes as an array, its texts gathered
-        "ndarray.ravel": 2,  # the calendar's texts in sheet order, and the live mask flattened
+        "numpy.array": 1,  # the calendar's: the schedule's codes as an array
+        "ndarray.ravel": 1,  # the live mask flattened
         "numpy.asanyarray": 1,  # on the way to the live rows
         "ndarray.nonzero": 1,  # the live rows
         "numpy.empty": 6,  # the calendar's two; the kinds, the slots, the pairs and their mask

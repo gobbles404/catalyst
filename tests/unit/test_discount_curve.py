@@ -150,6 +150,10 @@ def test_dates_are_never_sorted(bad_dates: NDArray[np.datetime64], message: str)
             "discount_factor row 3 is -inf, expected a finite number",
         ),
         (factors(float("nan"), 0.5), "discount_factor row 1 is nan, expected a finite number"),
+        (
+            factors(1.0, float("inf"), float("nan"), float("-inf")),
+            "discount_factor row 2 is inf, expected a finite number",
+        ),
     ],
     ids=[
         "first factor not one",
@@ -161,6 +165,7 @@ def test_dates_are_never_sorted(bad_dates: NDArray[np.datetime64], message: str)
         "inf",
         "-inf",
         "nan first",
+        "three not finite, the first named",
     ],
 )
 def test_factors_are_neither_rescaled_nor_clipped(

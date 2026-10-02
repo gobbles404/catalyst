@@ -155,6 +155,15 @@ def test_the_fixings_keep_their_index() -> None:
     assert np.array_equal(fixings.index.holiday_calendar.holiday, HOLIDAYS)
 
 
+# A series of no rows reaches the builder only from a Python caller, the seam never sending a
+# range of no cells. It has always made fixings of no rows: the count of business days asks
+# nothing of it, as the look over the day after each date asked nothing before.
+def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
+    fixings = futures_fixings(dates(), settles(), an_index(HOLIDAYS))
+    assert fixings.dates.size == 0 and fixings.settles.size == 0
+    assert not fixings.dates.flags.writeable and not fixings.settles.flags.writeable
+
+
 # --- what is rejected, naming the row -----------------------------------------
 
 
@@ -215,6 +224,12 @@ def test_the_fixings_keep_their_index() -> None:
             "the business day after row 1's 2026-05-22",
         ),
         (
+            dates("2026-05-01", "2026-05-05", "2026-05-07"),
+            HOLIDAYS,
+            "date row 2 is 2026-05-05, expected 2026-05-04, "
+            "the business day after row 1's 2026-05-01",
+        ),
+        (
             dates("2026-05-01", "2026-05-04", "2026-05-06"),
             ELSEWHERE,
             "date row 3 is 2026-05-06, expected 2026-05-05, "
@@ -258,6 +273,7 @@ def test_the_fixings_keep_their_index() -> None:
         "a weekday missing",
         "the Monday after a weekend missing",
         "the day after a holiday missing",
+        "two days missing, the first named",
         "a weekday missing with the calendar's day elsewhere",
         "a Saturday with the calendar's day elsewhere",
         "the 25th of May is a business day when the calendar does not list it",

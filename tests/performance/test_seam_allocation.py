@@ -1,4 +1,5 @@
-"""What one call through the seam allocates on the Python heap, at its peak.
+"""What one call through the seam allocates on the Python heap, at its peak, and what a
+creator's publication still holds once the call has returned.
 
 tracemalloc sees Python objects and numpy's data buffers, which numpy registers with it.
 It does not see the host's pinned buffers or anything in the CLR. Each ceiling is the
@@ -75,15 +76,17 @@ def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
     assert peak_bytes(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
 
 
-# A table pays for what it converts and gathers, and nothing per row beyond that. Measured
-# 135,266 bytes at ten thousand cells, 2,500 rows of four columns, on 2026-09-13: the date
-# column's masks and its three arrays on the way to days, the text mask and the counts that place
-# each text, the texts as an array and the gathered tuple, the boolean column, and a 1-byte mask
-# per column. About 54 bytes per row, and one mask per column beyond that.
+# A table pays for what it converts, and nothing per row beyond that. Measured 43,940 bytes at
+# ten thousand cells, 2,500 rows of four columns, on 2026-10-01: the date column's masks and its
+# three arrays on the way to days, the boolean column, and a 1-byte mask per column, about 17.6
+# bytes per row and 4.4 per cell. The column of text adds nothing per row: it is a slice of the
+# host's tuple. It was 135,186 bytes, 13.5 per cell, while the texts were placed by a mask, a
+# count and a cumulative sum and gathered from an array of them: what the ceiling of 14 per cell
+# covered, and the ceiling of 5 refuses.
 def test_a_table_in_pays_for_its_conversions_and_nothing_per_row_beyond() -> None:
     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
     body = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)])
-    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 14 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 5 * N + SLACK
 
 
 # Naming the bad cell is the rejection path's work. A blank is one mask over the kinds, measured
@@ -144,11 +147,13 @@ def least_peak(fn: Callable[[], object]) -> int:
     return min(peak_bytes(fn) for _ in range(3))
 
 
-# Measured 1,176 bytes for the valuation date on 2026-09-14, and 1,671 for reading it back as a
-# three-row table on 2026-09-15: the record and its entry, then the kinds, the slots and the
-# masks of six cells.
+# Measured 272 bytes for the valuation date on 2026-10-01, the record and its entry. It took
+# 1,144 while the scalar date was a span of days built and then added to the epoch, a kilobyte
+# of numpy's scalar arithmetic, which a ceiling of twice the slack covered and the slack alone
+# refuses. Reading it back as a three-row table is 1,671, measured on 2026-09-15 and unmoved:
+# the kinds, the slots and the masks of six cells.
 def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
-    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= SLACK
     handle = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
@@ -363,11 +368,12 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 
 
 # Futures fixings keep a copy of each column, 16 bytes per row, and on the way pay the date
-# column's masks and its arrays on the way to days, and the builder's three looks, the order,
-# the days closed and the gaps, the last over the business day after each date, a full-size
-# temporary: measured 11,202 bytes at 260 rows on 2026-09-24, about 43 bytes per row, 280 below
-# the table path's 11,482, the header row and its binding; 93,102 at 2,600 and 912,102 at
-# 26,000, 35 bytes per row, so the ceiling of 45 per row stands.
+# column's masks and its arrays on the way to days, and the builder's two looks, the order and
+# the days closed, and its count of the business days between the first date and the last, two
+# dates and no temporary: measured 8,624 bytes at 260 rows on 2026-10-01, about 29 bytes per
+# row on top of the slack, 11,210 when the gaps were a look over the business day after each
+# date; 69,464 at 2,600 and 677,864 at 26,000, 26 bytes per row, where they were 93,110 and
+# 912,110, 35 per row. A ceiling of 35 per row holds the new form and refuses the old.
 def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
     codes, futures, _, _ = schedule_columns(2)
@@ -378,7 +384,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     days, settles = fixings_columns(rows, 100)
     assert (
         least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
-        <= 45 * rows + SLACK
+        <= 35 * rows + SLACK
     )
 
 
@@ -396,14 +402,18 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
 # temporaries: measured 8,620 bytes at 360 days on 2026-09-18, about 24 bytes per day on top of
 # a creator's small objects, which twice the slack covers; 66,741 at 3,630 days and 661,841 at
 # 36,630, 18 bytes per day. Reading it back pays the reader's rectangle, four cells per day,
-# the codes gathered as text and the days to serials: measured 26,308 at 360 days, about 18
-# bytes per cell; 251,938 at 3,630 days.
+# the codes placed as text and the days to serials: measured 26,308 at 360 days, about 18
+# bytes per cell; 251,938 at 3,630 days, 17.4 per cell. The ceiling is 18 per cell at both
+# sizes: a second copy of the codes alive at the peak, 8 bytes per day, read 276,540 at 3,630
+# days and passed a ceiling of 20 at 360, so the larger size is pinned too.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
     valuation, index = calendar_sources(13)
     assert least_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 25 * days + 2 * SLACK
     made = ENTRY["_CreateCalendar"](valuation, index)
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 18 * 4 * days + 2 * SLACK
+    ten_years = ENTRY["_CreateCalendar"](*calendar_sources(122))
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](ten_years)) <= 18 * 4 * 3_630 + 2 * SLACK
 
 
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
@@ -695,3 +705,105 @@ def test_reading_a_market_back_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * 365 + 2 * SLACK
     monthly = ENTRY["_CreateMarket"](*iferc_market_sources())
     assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
+
+
+# --- what a publication keeps -------------------------------------------------
+# The peaks above bound what a call allocates on its way; these pin what is still held when it
+# has returned, and that a release lets all of it go. numpy registers every data buffer it
+# allocates with tracemalloc under a domain of its own, np.lib.tracemalloc_domain, so that
+# domain alone is the arrays' bytes: the buffers allocated since tracing started and still
+# alive. Nothing else is in the measure: not a buffer made before tracing started, a
+# dependency's columns among them, not a Python object, the record, its entry in the store,
+# its handle or a tuple of texts, and nothing the host or Excel holds.
+
+DAY_BYTES = np.dtype("datetime64[D]").itemsize
+NUMBER_BYTES = np.dtype(np.float64).itemsize
+ROW_BYTES = np.dtype(np.intp).itemsize
+FLAG_BYTES = np.dtype(np.bool_).itemsize
+
+
+def numpy_bytes() -> int:
+    """The bytes of the numpy data buffers allocated since tracing started and still alive."""
+    snapshot = tracemalloc.take_snapshot()
+    buffers = snapshot.filter_traces([tracemalloc.DomainFilter(True, np.lib.tracemalloc_domain)])
+    return sum(trace.size for trace in buffers.traces)
+
+
+def retained_numpy_bytes(create: Callable[[], object]) -> tuple[int, int]:
+    """The numpy bytes a creator's publication holds once the call has returned, and once it has
+    been released. The inputs and the handles the creator depends on are made before this is
+    called, so nothing of theirs is counted. The publication is released whatever happens in
+    between, and both the creation and the release must have succeeded."""
+    tracemalloc.start()
+    try:
+        made = create()
+        text = made if isinstance(made, str) else ""
+        try:
+            assert text and not text.startswith("#ERROR"), f"the creator returned {made!r}"
+            held = numpy_bytes()
+        finally:
+            released = bridge.release(text)
+        assert released, f"{text} named no publication to release"
+        return held, numpy_bytes()
+    finally:
+        tracemalloc.stop()
+
+
+# The measure itself: a buffer made before tracing started is never counted, a buffer made
+# since is counted to the byte, a Python object beside it adds nothing, and the count returns to
+# zero when the buffer is freed. A numpy release that moved its buffers out of the domain would
+# fail here, loudly, before any pin below read zero for the wrong reason.
+def test_the_retained_measure_counts_new_numpy_buffers_and_nothing_else() -> None:
+    before = np.empty(4_096)
+    tracemalloc.start()
+    try:
+        assert numpy_bytes() == 0
+        made = np.empty(4_096)
+        words = ["text"] * 4_096
+        assert numpy_bytes() == made.nbytes == 4_096 * NUMBER_BYTES
+        del made
+        assert numpy_bytes() == 0
+    finally:
+        tracemalloc.stop()
+    assert before.size == len(words) == 4_096
+
+
+# A discount curve keeps its two columns, a day and a factor for every day from the first anchor
+# to the last, the same from a daily table and from a dozen anchors, and nothing once released.
+@pytest.mark.parametrize("given", ["a daily table", "a dozen anchors"])
+def test_a_discount_curve_keeps_its_two_columns_and_release_frees_them(given: str) -> None:
+    days = 3_631
+    body = curve_body(days) if given == "a daily table" else anchor_body(12, days - 1)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body))
+    assert kept == (days * (DAY_BYTES + NUMBER_BYTES), 0)
+
+
+# Futures fixings keep their two columns, a date and a settle per row; the index and its
+# holiday calendar were made before and are not theirs.
+def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None:
+    rows = 260
+    codes, futures, _, _ = schedule_columns(2)
+    index = an_index(
+        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+    )
+    days, settles = fixings_columns(rows, 100)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
+    assert kept == (rows * (DAY_BYTES + NUMBER_BYTES), 0)
+
+
+# A holiday calendar keeps its one column of dates.
+def test_a_holiday_calendar_keeps_its_one_column_and_release_frees_it() -> None:
+    dates = 100
+    holidays = holiday_column(dates)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays))
+    assert kept == (dates * DAY_BYTES, 0)
+
+
+# A futures calendar keeps its four columns: the days, the row of each day's contract, and the
+# two flags, priced and fixed.
+def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> None:
+    days = 360
+    valuation, index = calendar_sources(13)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateCalendar"](valuation, index))
+    assert kept == (days * (DAY_BYTES + ROW_BYTES + 2 * FLAG_BYTES), 0)

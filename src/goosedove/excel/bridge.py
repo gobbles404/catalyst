@@ -33,7 +33,7 @@ import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields, replace
 from enum import IntEnum
-from functools import cache, partial
+from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from operator import attrgetter
 from types import NoneType, UnionType
@@ -156,11 +156,18 @@ class MixedArray:
                 raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
             kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
         # Sheet order: the heading rows, then each body row's texts left to right, which is the
-        # transpose of the text columns laid side by side.
-        texts = tuple(itertools.chain.from_iterable(headings))
-        if text_columns:
-            texts += tuple(np.array(text_columns, dtype=object).T.ravel())
-        return cls(kinds, slots, texts)
+        # transpose of the text columns laid side by side: of every k texts of the body, the j-th
+        # is from text column j. One list is made at its full length, the headings assigned to its
+        # head and each column whole into its own stride of the rest, and the list becomes the
+        # tuple. No array of the texts is built, nothing runs per cell, and no second copy of the
+        # body's texts is alive beside the list and the tuple. With no column of text the list is
+        # the headings alone, and with no rows each column fills an empty stride: one path for all.
+        start, k = top * width, len(text_columns)
+        texts = [""] * (start + k * rows)
+        texts[:start] = itertools.chain.from_iterable(headings)
+        for j, column in enumerate(text_columns):
+            texts[start + j :: k] = column
+        return cls(kinds, slots, tuple(texts))
 
 
 @dataclass_transform(frozen_default=True, eq_default=False)
@@ -369,6 +376,9 @@ def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected
 # --- one cell ---------------------------------------------------------------
 
 EXCEL_EPOCH: Final = np.datetime64("1899-12-30", "D")
+# The same epoch as a count of days from numpy's own, read off the value above so the two can
+# never disagree: a serial plus this count is the day's number in numpy's calendar.
+EPOCH_DAYS: Final = int(EXCEL_EPOCH.astype(np.int64))
 
 # A date is a whole serial inside Excel's own calendar. Serial 61 is 1 March
 # 1900, the first day on which Excel's serial numbers and the real calendar
@@ -419,7 +429,8 @@ def _date(value: object) -> np.datetime64:
     serial = _number(value)
     if not serial.is_integer() or not FIRST_SERIAL <= serial <= LAST_SERIAL:
         raise _Rejected
-    return EXCEL_EPOCH + np.timedelta64(int(serial), "D")
+    # One construction from the day's own number; no span of days is built and added.
+    return np.datetime64(int(serial) + EPOCH_DAYS, "D")
 
 
 # --- every cell of a range: no look when the host's summary settles it, one look otherwise ---
@@ -611,31 +622,13 @@ _DECLARED: Final[dict[object, tuple[str, Callable[[object], object]]]] = {
 
 
 @dataclass(frozen=True, slots=True)
-class _TextPlaces:
-    """Where the body's text cells sit among its texts, found once per table when a column of
-    text is bound: the mask of text cells, how many text cells the rows above each row hold, and
-    the texts as an array, so a column's texts are gathered by index with nothing built per row.
-    """
-
-    is_text: NDArray[np.bool_]
-    above: NDArray[np.int64]
-    texts: NDArray[np.object_]
-
-
-def _text_places(body: MixedArray) -> _TextPlaces:
-    is_text = body.kinds == TEXT_CODE
-    per_row = is_text.sum(axis=1)
-    return _TextPlaces(is_text, np.cumsum(per_row) - per_row, np.array(body.texts, dtype=object))
-
-
-@dataclass(frozen=True, slots=True)
 class _Body:
     """One body under refinement: its storage, the table argument's name for messages, and the
-    text places, made on first use, so a table with no column of text never pays for them."""
+    positions of the columns bound to text, in sheet order, which place each one's texts."""
 
     mixed: MixedArray
     argument: str
-    places: Callable[[], _TextPlaces]
+    text_columns: tuple[int, ...]
 
 
 def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> TypeValidationError:
@@ -650,7 +643,8 @@ def _bad_cell(body: _Body, j: int, bad: NDArray[np.bool_], expected: str) -> Typ
 
 # One rule per column type. Each takes one look at its column: the kinds settle number, text
 # and boolean, and the slots settle a date, as the whole-range rules do. Number columns are
-# views of the mixed storage; dates and booleans are converted once; text is gathered once.
+# views of the mixed storage; dates and booleans are converted once; text is a slice of the
+# host's tuple.
 def _numbers_of(body: _Body, j: int) -> NDArray[np.float64]:
     bad = body.mixed.kinds[:, j] != NUMBER_CODE
     if bad.any():
@@ -670,9 +664,15 @@ def _texts_of(body: _Body, j: int) -> tuple[str, ...]:
     bad = body.mixed.kinds[:, j] != TEXT_CODE
     if bad.any():
         raise _bad_cell(body, j, bad, "text")
-    places = body.places()
-    ranks = places.above + places.is_text[:, :j].sum(axis=1)  # text cells before each, in order
-    return tuple(places.texts[ranks])
+    # A record is built only when every column has passed, and then every text cell of the body
+    # lies in a column bound to text: _bind binds every column, and each other column type
+    # refuses a text cell, the number and boolean columns by its kind and the date column by its
+    # NaN slot. The texts are in sheet order, so they are the text columns' cells row by row, and
+    # this column's are every T-th from its rank among the T. A slice taken while a later column
+    # will still refuse is never seen. A column type that accepted text would break this.
+    # With one text column the slice is the host's tuple itself, handed over as a TextColumn is.
+    columns = body.text_columns
+    return body.mixed.texts[columns.index(j) :: len(columns)]
 
 
 def _booleans_of(body: _Body, j: int) -> NDArray[np.bool_]:
@@ -689,6 +689,10 @@ _COLUMNS: Final[dict[object, tuple[str, Callable[[_Body, int], object]]]] = {
     TextColumn: ("text", _texts_of),
     BooleanColumn: ("boolean", _booleans_of),
 }
+
+# The column types a table may declare, in the registry's order: public so that a test can hold
+# every one of them to the rule the slice in _texts_of rests on.
+COLUMN_TYPES: Final = tuple(_COLUMNS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -760,7 +764,8 @@ def _bind(schema: Schema, headers: tuple[str, ...], cols: int) -> tuple[Column, 
 def _refine(schema: Schema, headers: tuple[str, ...], body: MixedArray) -> Table:
     """Bind the headers, check each column against its type in sheet order, build the record."""
     bound = _bind(schema, headers, body.shape[1])
-    under = _Body(body, schema.table, cache(lambda: _text_places(body)))
+    text_columns = tuple([j for j, column in enumerate(bound) if column.refine is _texts_of])
+    under = _Body(body, schema.table, text_columns)
     return schema.record(**{column.name: column.refine(under, j) for j, column in enumerate(bound)})
 
 
