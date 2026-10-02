@@ -34,6 +34,12 @@ def DateText(day: Date) -> str:
 
 
 @probe
+def DateParts(day: Date) -> str:
+    """What a scalar date arrives as: its type, its unit and its day's number in numpy's count."""
+    return f"{type(day).__name__} {day.dtype} {int(day.astype('int64'))}"
+
+
+@probe
 def SumColumn(values: NumberColumn) -> float:
     return float(values.sum())
 
@@ -209,6 +215,63 @@ def test_nothing_is_reordered() -> None:
 
 def test_dates_are_real_dates() -> None:
     assert bridge.call("Kind", [DATES_COLUMN]) == "datetime64[D]"
+
+
+# A scalar date arrives as one numpy day, whole days its unit, at the number the serial names:
+# the two ends of the calendar the sheet can show and the day inside each, and a day of this
+# century. Each number is the day's count from 1970-01-01, stated here and not derived, so the
+# test holds whatever arithmetic builds the date.
+@pytest.mark.parametrize(
+    ("serial", "day", "number"),
+    [
+        (61.0, "1900-03-01", -25_508),
+        (62.0, "1900-03-02", -25_507),
+        (46164.0, "2026-05-22", 20_595),
+        (2958464.0, "9999-12-30", 2_932_895),
+        (2958465.0, "9999-12-31", 2_932_896),
+    ],
+    ids=["the first day", "the second", "a day of this century", "the last but one", "the last"],
+)
+def test_a_scalar_date_is_one_numpy_day_at_its_serials_own_number(
+    serial: float, day: str, number: int
+) -> None:
+    assert bridge.call("DateText", [serial]) == day
+    assert bridge.call("DateParts", [serial]) == f"datetime64 datetime64[D] {number}"
+
+
+# What is not a scalar date, each in the seam's words: a fraction of a day, a serial either side
+# of the calendar, a number that is none, and a cell that holds no number at all.
+@pytest.mark.parametrize(
+    ("value", "words"),
+    [
+        (61.5, "number 61.5"),
+        (60.0, "number 60.0"),
+        (0.0, "number 0.0"),
+        (-1.0, "number -1.0"),
+        (2958466.0, "number 2958466.0"),
+        (float("inf"), "number inf"),
+        (float("nan"), "number nan"),
+        (True, "boolean TRUE"),
+        ("1900-03-01", "text '1900-03-01'"),
+        (None, "blank"),
+        (MISSING, "missing"),
+    ],
+    ids=[
+        "a fraction",
+        "the day before the first",
+        "zero",
+        "below zero",
+        "the day after the last",
+        "infinite",
+        "not a number",
+        "a boolean",
+        "a date as text",
+        "a blank cell",
+        "a missing argument",
+    ],
+)
+def test_what_is_not_a_scalar_date_is_refused_in_the_seams_words(value: object, words: str) -> None:
+    assert bridge.call("DateParts", [value]) == f"#ERROR DateParts: day is {words}, expected date"
 
 
 def test_text_is_handed_over_as_a_tuple() -> None:

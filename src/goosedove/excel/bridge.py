@@ -374,6 +374,9 @@ def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected
 # --- one cell ---------------------------------------------------------------
 
 EXCEL_EPOCH: Final = np.datetime64("1899-12-30", "D")
+# The same epoch as a count of days from numpy's own, read off the value above so the two can
+# never disagree: a serial plus this count is the day's number in numpy's calendar.
+EPOCH_DAYS: Final = int(EXCEL_EPOCH.astype(np.int64))
 
 # A date is a whole serial inside Excel's own calendar. Serial 61 is 1 March
 # 1900, the first day on which Excel's serial numbers and the real calendar
@@ -424,7 +427,8 @@ def _date(value: object) -> np.datetime64:
     serial = _number(value)
     if not serial.is_integer() or not FIRST_SERIAL <= serial <= LAST_SERIAL:
         raise _Rejected
-    return EXCEL_EPOCH + np.timedelta64(int(serial), "D")
+    # One construction from the day's own number; no span of days is built and added.
+    return np.datetime64(int(serial) + EPOCH_DAYS, "D")
 
 
 # --- every cell of a range: no look when the host's summary settles it, one look otherwise ---

@@ -147,11 +147,13 @@ def least_peak(fn: Callable[[], object]) -> int:
     return min(peak_bytes(fn) for _ in range(3))
 
 
-# Measured 1,176 bytes for the valuation date on 2026-09-14, and 1,671 for reading it back as a
-# three-row table on 2026-09-15: the record and its entry, then the kinds, the slots and the
-# masks of six cells.
+# Measured 272 bytes for the valuation date on 2026-10-01, the record and its entry. It took
+# 1,144 while the scalar date was a span of days built and then added to the epoch, a kilobyte
+# of numpy's scalar arithmetic, which a ceiling of twice the slack covered and the slack alone
+# refuses. Reading it back as a three-row table is 1,671, measured on 2026-09-15 and unmoved:
+# the kinds, the slots and the masks of six cells.
 def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
-    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["_CreateValuationDate"](46276.0, 0.5)) <= SLACK
     handle = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
