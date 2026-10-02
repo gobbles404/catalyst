@@ -402,14 +402,18 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
 # temporaries: measured 8,620 bytes at 360 days on 2026-09-18, about 24 bytes per day on top of
 # a creator's small objects, which twice the slack covers; 66,741 at 3,630 days and 661,841 at
 # 36,630, 18 bytes per day. Reading it back pays the reader's rectangle, four cells per day,
-# the codes gathered as text and the days to serials: measured 26,308 at 360 days, about 18
-# bytes per cell; 251,938 at 3,630 days.
+# the codes placed as text and the days to serials: measured 26,308 at 360 days, about 18
+# bytes per cell; 251,938 at 3,630 days, 17.4 per cell. The ceiling is 18 per cell at both
+# sizes: a second copy of the codes alive at the peak, 8 bytes per day, read 276,540 at 3,630
+# days and passed a ceiling of 20 at 360, so the larger size is pinned too.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
     valuation, index = calendar_sources(13)
     assert least_peak(lambda: ENTRY["_CreateCalendar"](valuation, index)) <= 25 * days + 2 * SLACK
     made = ENTRY["_CreateCalendar"](valuation, index)
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 20 * 4 * days + 2 * SLACK
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 18 * 4 * days + 2 * SLACK
+    ten_years = ENTRY["_CreateCalendar"](*calendar_sources(122))
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](ten_years)) <= 18 * 4 * 3_630 + 2 * SLACK
 
 
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:

@@ -157,15 +157,17 @@ class MixedArray:
             kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
         # Sheet order: the heading rows, then each body row's texts left to right, which is the
         # transpose of the text columns laid side by side: of every k texts of the body, the j-th
-        # is from text column j, so each column is copied whole into its own stride of one list
-        # of the body's texts, and the headings and that list are joined into one tuple. No array
-        # of the texts is built and nothing runs per cell. With no column of text the body is an
-        # empty list, and with no rows each column fills an empty stride: one path for all.
-        k = len(text_columns)
-        body = [""] * (k * rows)
+        # is from text column j. One list is made at its full length, the headings assigned to its
+        # head and each column whole into its own stride of the rest, and the list becomes the
+        # tuple. No array of the texts is built, nothing runs per cell, and no second copy of the
+        # body's texts is alive beside the list and the tuple. With no column of text the list is
+        # the headings alone, and with no rows each column fills an empty stride: one path for all.
+        start, k = top * width, len(text_columns)
+        texts = [""] * (start + k * rows)
+        texts[:start] = itertools.chain.from_iterable(headings)
         for j, column in enumerate(text_columns):
-            body[j::k] = column
-        return cls(kinds, slots, (*itertools.chain.from_iterable(headings), *body))
+            texts[start + j :: k] = column
+        return cls(kinds, slots, tuple(texts))
 
 
 @dataclass_transform(frozen_default=True, eq_default=False)
