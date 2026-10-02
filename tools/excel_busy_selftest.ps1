@@ -3,8 +3,10 @@
 # refused under nested errors, refused until the deadline, and failing for another reason. It
 # drives Read-ExcelProperty with a stand-in whose property read is refused, and with a real COM
 # object whose property read fails, to show both what PowerShell's dot hides and that the read
-# made here keeps it. A run of the smoke or the lifetime checks may meet no busy Excel at all,
-# so green runs alone would not show that any of this works. check.ps1 and CI run it.
+# made here keeps it. It asks for a failure and the report again under a decimal comma, since
+# what is said must not change with the machine. A run of the smoke or the lifetime checks may
+# meet no busy Excel at all, so green runs alone would not show that any of this works.
+# check.ps1 and CI run it.
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "hidden_excel.ps1")
 $ExcelBusyPause = 10  # the pause between tries, shortened so the checks take a second, not thirty
@@ -202,6 +204,24 @@ $lines = @(Write-ExcelBusyReport 6>&1 | ForEach-Object { "$_" })
 $all = $lines -join "|"
 Check "the report counts the calls that waited and their refusals" ($lines[0] -match '^busy Excel: 8 call\(s\) had to wait, \d+ refusal\(s\) in all, the longest wait \d+\.\d\d s$') $lines[0]
 Check "and names each: what it was, how often it was refused, how it ended" ($lines.Count -eq 9 -and $all -match 'type input at A1: refused 2 time\(s\) over \d+\.\d\d s, then taken' -and $all -match 'read Text at K7: refused 2 time\(s\) over \d+\.\d\d s, then taken' -and $all -match 'read Text at Z1: refused \d+ time\(s\) over \d+\.\d\d s, never taken') "$($lines.Count) lines"
+
+# --- a machine whose decimal mark is a comma ---------------------------------------------------
+# What is said about a busy Excel must not change with the regional settings. A failure and the
+# report are asked for again under a culture that writes 0.3 as 0,3, and worded as above.
+$comma = [Globalization.CultureInfo]::InvariantCulture.Clone()
+$comma.NumberFormat.NumberDecimalSeparator = ","
+$machine = [Globalization.CultureInfo]::CurrentCulture
+[Globalization.CultureInfo]::CurrentCulture = $comma
+try {
+    $written = "{0:F1}" -f 0.3
+    $cell = StandIn 1000000
+    $failed = Failure { Read-ExcelProperty $cell "Text" "Z2" ([datetime]::UtcNow.AddMilliseconds(300)) }
+    $lines = @(Write-ExcelBusyReport 6>&1 | ForEach-Object { "$_" })
+}
+finally { [Globalization.CultureInfo]::CurrentCulture = $machine }
+Check "on a machine with a decimal comma, where PowerShell itself writes 0.3 as 0,3" ($written -eq "0,3") $written
+Check "a failure is worded as on any other, with a decimal point" ("$failed" -match '^Excel stayed busy: read Text at Z2 was refused \d+ time\(s\) over \d+\.\d s, the last time with RPC_E_CALL_REJECTED \(0x80010001\)$') "$failed"
+Check "and so is the report" ($lines.Count -eq 10 -and $lines[0] -match '^busy Excel: 9 call\(s\) had to wait, \d+ refusal\(s\) in all, the longest wait \d+\.\d\d s$' -and ($lines -join "|") -match 'read Text at Z2: refused \d+ time\(s\) over \d+\.\d\d s, never taken') $lines[0]
 
 Write-Host "excel busy self-test: $($script:checks) checks, $($script:failures) failed"
 exit $script:failures

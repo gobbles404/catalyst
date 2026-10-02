@@ -395,7 +395,6 @@ $books = {
     Check "a later price propagates" ((Text $state $reopenedSheet "D12") -eq "76") (Text $state $reopenedSheet "D12")
     $c = Settle $state $reopenedSheet { param($c) $c.Live -eq $ChainCreators }
     Check "with eleven live" ($c.Live -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
-    $reopened.Saved = $true
     Close-Book $state $reopened
     Remove-Item $path -ErrorAction SilentlyContinue
 }
@@ -488,7 +487,6 @@ $processes = {
         Check "and the market reads the quote" ((Text $other $reopenedSheet "D12") -eq "72.1") (Text $other $reopenedSheet "D12")
         $d = Settle $other $reopenedSheet { param($c) $c.Live -eq ($ChainCreators + 2) }
         Check "thirteen live in the second: its eleven, and the reopened book's own vector and market" ($d.Live -eq 13 -and $d.Misses -eq 0 -and $d.DisposalErrors -eq 0) $d.Text
-        $reopened.Saved = $true
         Close-Book $other $reopened
         Remove-Item $path -ErrorAction SilentlyContinue
     }

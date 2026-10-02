@@ -35,6 +35,13 @@ $ExcelBusyPause = 50    # milliseconds between two tries
 # call returns is never touched by any of it.
 $ExcelBusyWaits = [Collections.Generic.List[object]]::new()
 
+# What is said about a busy Excel is worded the same on every machine: a number is written with
+# a decimal point whatever the regional settings, since the words are compared by the self-test
+# and quoted in the docs. PowerShell's own -f follows the machine and writes 0,3 on some.
+function Format-ExcelBusyText([string]$ExcelFormat) {
+    return [string]::Format([Globalization.CultureInfo]::InvariantCulture, $ExcelFormat, $args)
+}
+
 # The busy result an error carries, or nothing. PowerShell wraps a COM error, sometimes twice,
 # so the whole chain of exceptions is read.
 function Get-ExcelBusyResult($ErrorRecord) {
@@ -73,7 +80,7 @@ function Invoke-ExcelCall([string]$ExcelOperation, [scriptblock]$ExcelAction, [s
             if ([datetime]::UtcNow -ge $excelLimit) {
                 $excelSeconds = $excelClock.Elapsed.TotalSeconds
                 $ExcelBusyWaits.Add([pscustomobject]@{ What = $excelWhere; Refusals = $excelTry; Seconds = $excelSeconds; Taken = $false })
-                throw ("Excel stayed busy: {0} was refused {1} time(s) over {2:F1} s, the last time with {3}" -f $excelWhere, $excelTry, $excelSeconds, $ExcelBusyResults[$excelBusy])
+                throw (Format-ExcelBusyText "Excel stayed busy: {0} was refused {1} time(s) over {2:F1} s, the last time with {3}" $excelWhere $excelTry $excelSeconds ($ExcelBusyResults[$excelBusy]))
             }
             Start-Sleep -Milliseconds $ExcelBusyPause
         }
@@ -101,10 +108,10 @@ function Write-ExcelBusyReport {
     }
     $refusals = ($ExcelBusyWaits | Measure-Object -Property Refusals -Sum).Sum
     $longest = ($ExcelBusyWaits | Measure-Object -Property Seconds -Maximum).Maximum
-    Write-Host ("busy Excel: {0} call(s) had to wait, {1} refusal(s) in all, the longest wait {2:F2} s" -f $ExcelBusyWaits.Count, $refusals, $longest)
+    Write-Host (Format-ExcelBusyText "busy Excel: {0} call(s) had to wait, {1} refusal(s) in all, the longest wait {2:F2} s" $ExcelBusyWaits.Count $refusals $longest)
     foreach ($wait in ($ExcelBusyWaits | Select-Object -First 10)) {
         $end = if ($wait.Taken) { "then taken" } else { "never taken" }
-        Write-Host ("     {0}: refused {1} time(s) over {2:F2} s, {3}" -f $wait.What, $wait.Refusals, $wait.Seconds, $end)
+        Write-Host (Format-ExcelBusyText "     {0}: refused {1} time(s) over {2:F2} s, {3}" $wait.What $wait.Refusals $wait.Seconds $end)
     }
 }
 
