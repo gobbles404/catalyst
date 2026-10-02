@@ -24,6 +24,8 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pyright
       - run: uv run pytest -n auto
+      # The Excel tools' handling of a busy Excel, proved without Excel.
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1
 
   measure:
     runs-on: windows-2022

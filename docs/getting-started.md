@@ -116,7 +116,7 @@ The second line rebuilds the add-in; `.\tools\excel_dev.ps1` does the same and o
 .\check.ps1
 ```
 
-Seven steps in order, stopping at the first failure: formatting, lint, types, the Python tests, the host's own tests, the add-in in a hidden Excel of its own, one formula per row compared with the text it must show, and last the handles' lifetime in hidden Excels, a chain of creators built, changed and closed while the handles they own are counted. It takes a few minutes. Without Excel installed, the first five pass and the sixth stops and says so.
+Eight steps in order, stopping at the first failure: formatting, lint, types, the Python tests, the host's own tests, a self-test of how the next two steps wait when Excel is busy, which needs no Excel, the add-in in a hidden Excel of its own, one formula per row compared with the text it must show, and last the handles' lifetime in hidden Excels, a chain of creators built, changed and closed while the handles they own are counted. It takes a few minutes. Without Excel installed, the first six pass and the seventh stops and says so.
 
 ## When something fails
 
@@ -133,7 +133,8 @@ Seven steps in order, stopping at the first failure: formatting, lint, types, th
 | the build says the `.xll` is in use | an Excel still has it loaded | close every Excel, including any hidden one in Task Manager, and build again |
 | Excel warns of a potential security concern when loading the `.xll` | it is a file built on this machine, unsigned | Enable |
 | `tests\test_smoke.py` fails about 64-bit | the environment's Python is 32-bit | install the 64-bit 3.13.13, delete `.venv`, run `uv sync --locked` again |
-| `excel_smoke.ps1` cannot start a hidden Excel | Excel is not installed or not activated | the five steps before it have already passed; run the smoke on a machine with Excel |
+| `excel_smoke.ps1` cannot start a hidden Excel | Excel is not installed or not activated | the six steps before it have already passed; run the smoke on a machine with Excel |
+| an Excel step stops with `Excel stayed busy:` | the hidden Excel refused one call for the whole thirty seconds the tools wait; a refusal of a moment is waited out and only reported, in the step's `busy Excel:` line | run that step again on its own; if it stops again, the message names the call and the cell to look at |
 
 ## Where to read next
 
