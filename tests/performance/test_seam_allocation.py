@@ -422,6 +422,18 @@ def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](ten_years)) <= 18 * 4 * 3_630 + 2 * SLACK
 
 
+# Reading the prompt code makes no array and publishes nothing: three reads off the calendar and
+# a text out, within the slack at a year of days and at a hundred years alike, measured 192 bytes
+# at either on 2026-10-02, and the store's live count and bytes as they were.
+@pytest.mark.parametrize("contracts", [13, 1201], ids=["a year of days", "a hundred years of days"])
+def test_reading_the_prompt_makes_no_array_and_publishes_nothing(contracts: int) -> None:
+    made = ENTRY["_CreateCalendar"](*calendar_sources(contracts))
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["util_ReadPrompt"](made)) <= SLACK
+    assert ENTRY["util_ReadPrompt"](made) == "c4"
+    assert bridge.live_handles() == live
+
+
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
     """Codes and the first and last day of that many calendar months from January 2026, laid
     end to end, as the sheet sends them."""

@@ -45,6 +45,24 @@ class Calendar:
     is_fixed: NDArray[np.bool_]
     first_unfixed: int
 
+    def prompt_code(self) -> str:
+        """The code of the contract on the first unfixed period: the contract the first price
+        of a market over this calendar is for, as the schedule spells it. Three reads and no
+        array made, whatever the calendar's length: the row counted when the calendar was
+        made, the contract on it, and that contract's code. On a futures calendar it is the
+        contract prompt on the valuation day, the expiring contract on its expiry day and the
+        next from the day after, a weekend or a holiday moving nothing; on a Gas Daily calendar
+        the month of the day after the valuation day, so the next month from the month's last
+        day; on an IFERC calendar the first month whose index has not published, the month
+        itself on its publication day. Valued before the calendar begins, it is the first
+        contract the calendar represents, which on a futures calendar is the schedule's second,
+        the first only bounding the calendar. A calendar whose every period has fixed has no
+        such contract, and says so, as the market does in its own words.
+        """
+        if self.first_unfixed == self.dates.size:
+            raise ValueError("calendar has no unfixed period, expected at least one to quote")
+        return self.index.schedule.codes[int(self.contract[self.first_unfixed])]
+
 
 def calendar(valuation_date: ValuationDate, index: Index) -> Calendar:
     """The one way to make a Calendar: the index's kind chooses which calendar is made, then that

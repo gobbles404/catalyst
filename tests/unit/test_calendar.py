@@ -765,3 +765,129 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
     assert np.array_equal(made.is_fixed, published < as_of)
     for column in (made.dates, made.contract, made.is_priced, made.is_fixed):
         assert not column.flags.writeable
+
+
+# --- the prompt code: the contract of the first unfixed period ----------------------------
+
+
+# The ticket's examples, each kind's own rule: on a futures calendar the contract prompt on the
+# valuation day, the expiring one on its expiry day and the next from the day after; on a Gas
+# Daily calendar the month of the day after the valuation day, the next month from a month's
+# last day; on an IFERC calendar the first month not yet published, the month itself on its
+# publication day. Nothing here is a new rule: it is the row the calendar counted and the
+# contract on it, read as the market reads them.
+@pytest.mark.parametrize(
+    ("schedule", "holidays", "as_of", "code"),
+    [
+        (SCHEDULE, CLOSED_MAY_25, "2026-06-22", "n26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-06-23", "q26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-05-23", "n26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-05-25", "n26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-05-01", "n26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-05-19", "n26"),
+        (SCHEDULE, CLOSED_MAY_25, "2026-07-21", "q26"),
+        (GAS_DAILY, None, "2026-09-18", "U26"),
+        (GAS_DAILY, None, "2026-09-30", "V26"),
+        (GAS_DAILY, None, "2026-10-31", "X26"),
+        (GAS_DAILY, None, "2026-11-29", "X26"),
+        (GAS_DAILY, None, "2026-08-15", "U26"),
+        (
+            an_iferc_schedule(
+                ("U26", "2026-08-28", "2026-09-01"), ("V26", "2026-09-30", "2026-10-01")
+            ),
+            None,
+            "2026-09-01",
+            "U26",
+        ),
+        (
+            an_iferc_schedule(
+                ("U26", "2026-08-28", "2026-09-01"), ("V26", "2026-09-30", "2026-10-01")
+            ),
+            None,
+            "2026-09-02",
+            "V26",
+        ),
+        (IFERC, None, "2026-11-15", "Z26"),
+        (IFERC, None, "2026-11-02", "X26"),
+        (IFERC, None, "2026-12-01", "Z26"),
+        (IFERC, None, "2026-09-15", "V26"),
+    ],
+    ids=[
+        "futures, the expiry day: the expiring contract",
+        "futures, the day after the expiry: the next contract",
+        "futures, a Saturday: the contract prompt that day, no day skipped",
+        "futures, a holiday: the same",
+        "futures, before the calendar: its first contract, never the boundary contract",
+        "futures, the boundary expiry itself, the day before the calendar: the same",
+        "futures, the last day: the last contract",
+        "Gas Daily, inside a month: that month",
+        "Gas Daily, a month's last day: the next month, the last flow day having fixed",
+        "Gas Daily, the second month's last day: the third month",
+        "Gas Daily, the day before the last flow day: the last month",
+        "Gas Daily, before the calendar: the first month",
+        "IFERC, the publication day: the month publishing, not yet fixed",
+        "IFERC, the day after publication: the next month",
+        "IFERC, two months published: the third",
+        "IFERC, the second publication day: the second month",
+        "IFERC, the last publication day: the last month",
+        "IFERC, before any publication: the first month",
+    ],
+)
+def test_the_prompt_code_is_the_contract_of_the_first_unfixed_period(
+    schedule: object, holidays: HolidayCalendar | None, as_of: str, code: str
+) -> None:
+    made = calendar(valuation_date(day(as_of), 0.5), an_index(schedule, holidays))
+    assert made.prompt_code() == code
+    assert made.prompt_code() == made.index.schedule.codes[int(made.contract[made.first_unfixed])]
+
+
+def test_the_fraction_of_the_valuation_day_changes_the_prompt_code_of_no_kind() -> None:
+    for schedule, holidays, as_of in (
+        (SCHEDULE, CLOSED_MAY_25, "2026-06-22"),
+        (GAS_DAILY, None, "2026-09-30"),
+        (IFERC, None, "2026-11-02"),
+    ):
+        codes = {
+            calendar(valuation_date(day(as_of), f), an_index(schedule, holidays)).prompt_code()
+            for f in (0.0, 0.5, 1.0)
+        }
+        assert len(codes) == 1
+
+
+# A calendar whose every period has fixed has no first price to name, and says so in its own
+# words; the market over its history says the same of the history.
+@pytest.mark.parametrize(
+    ("schedule", "holidays", "as_of"),
+    [
+        (SCHEDULE, CLOSED_MAY_25, "2026-07-22"),
+        (GAS_DAILY, None, "2026-11-30"),
+        (IFERC, None, "2026-12-02"),
+    ],
+    ids=[
+        "futures, the day after the last expiry",
+        "Gas Daily, the last flow day",
+        "IFERC, the day after the last publication",
+    ],
+)
+def test_a_calendar_whose_every_period_has_fixed_has_no_prompt_code(
+    schedule: object, holidays: HolidayCalendar | None, as_of: str
+) -> None:
+    made = calendar(valuation_date(day(as_of), 0.5), an_index(schedule, holidays))
+    assert made.first_unfixed == made.dates.size
+    with pytest.raises(ValueError) as failure:
+        made.prompt_code()
+    assert str(failure.value) == "calendar has no unfixed period, expected at least one to quote"
+
+
+# The code comes back as the schedule spells it, whatever the desk typed: a lowercase month, a
+# label with a space, a year in full.
+def test_the_prompt_code_is_the_schedules_spelling() -> None:
+    labels = a_schedule(("front", "2026-05-19"), ("Jul 2026", "2026-06-22"), ("q-26", "2026-07-21"))
+    made = calendar(valuation_date(day("2026-06-22"), 0.5), an_index(labels, CLOSED_MAY_25))
+    assert made.prompt_code() == "Jul 2026"
+    assert (
+        calendar(
+            valuation_date(day("2026-06-23"), 0.5), an_index(labels, CLOSED_MAY_25)
+        ).prompt_code()
+        == "q-26"
+    )

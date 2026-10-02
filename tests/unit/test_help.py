@@ -75,6 +75,22 @@ def test_the_handle_reader_explains_itself() -> None:
     ]
 
 
+def test_the_prompt_reader_explains_itself() -> None:
+    description, arguments, hidden = SPECS["util_ReadPrompt"]
+    assert not hidden
+    assert description == (
+        "Reads the contract code for the first price expected in the calendar's market price "
+        "vector."
+    )
+    assert arguments == [
+        (
+            "calendar",
+            "The calendar handle: the cell showing _CreateCalendar's result, such as B5, or a "
+            "name for it.",
+        ),
+    ]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden

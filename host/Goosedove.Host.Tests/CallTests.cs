@@ -128,6 +128,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
             yield return new object[] { "util_ReadHandle", new object[] { "x" }, "#ERROR util_ReadHandle: handle is text 'x' naming no live object, expected a handle" };
             yield return new object[] { "util_ReadHandle", new object[] { 46276.0 }, "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle" };
+            // The prompt reader: one calendar handle. Left out, a number and text naming no live object fail in the seam's words; the live calendars are in the calendar fact below.
+            yield return new object[] { "util_ReadPrompt", new object[] { ExcelMissing.Value }, "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle" };
+            yield return new object[] { "util_ReadPrompt", new object[] { 46276.0 }, "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle" };
+            yield return new object[] { "util_ReadPrompt", new object[] { "x" }, "#ERROR util_ReadPrompt: calendar is text 'x' naming no live object, expected calendar handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -442,7 +446,11 @@ namespace Goosedove.Host.Tests
         // types, then a row per day, the date as a serial, the prompt contract as text and the two
         // flags as booleans. The library's rules answer through the same objects: an index of one
         // contract, a code given twice, expiries backwards and a span no sheet could show; a
-        // calendar and a bare schedule where the index should be fail in the seam's.
+        // calendar and a bare schedule where the index should be fail in the seam's. util_ReadPrompt
+        // reads the contract of each calendar's first unfixed period as text, n26 on 25 May, U26 on
+        // a Gas Daily calendar valued 25 September and Z26 on an IFERC one valued 15 November; a
+        // calendar valued after its last day has none, the library's words, and a schedule where the
+        // calendar should be fails in the seam's.
         [Fact]
         public void a_calendar_is_created_from_two_handles_and_read_back_through_its_handle()
         {
@@ -489,6 +497,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46328.0, months[3, 0]);
             Assert.Equal(true, months[3, 3]);
             Assert.Equal(false, months[4, 3]);
+            Assert.Equal("n26", Seam.Call("util_ReadPrompt", handle));
+            var gasCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46290.0, 0.5), Index(gasDaily, ExcelMissing.Value));
+            Assert.Equal("U26", Seam.Call("util_ReadPrompt", gasCalendar));
+            var ifercCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), Index(iferc, ExcelMissing.Value));
+            Assert.Equal("Z26", Seam.Call("util_ReadPrompt", ifercCalendar));
+            var ended = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46225.0, 0.5), index);
+            Assert.Equal("#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, expected at least one to quote", Seam.Call("util_ReadPrompt", ended));
+            Assert.Equal("#ERROR util_ReadPrompt: calendar is futures schedule handle '" + schedule + "', expected calendar handle", Seam.Call("util_ReadPrompt", schedule));
         }
 
         // The market history: the calendar of the fact above valued a day later, on 26 May 2026

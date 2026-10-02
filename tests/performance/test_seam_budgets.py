@@ -1246,6 +1246,31 @@ def test_reading_a_calendar_back_rebuilds_nothing(
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
 
 
+# Reading the prompt code is the handle's text rule and one lookup, the function, the
+# calendar's three reads, the row it counted when it was made, the contract on it and that
+# contract's code, and the way out for text, the scalar rule and the text check. Nine calls
+# across nine functions, no numpy call, no array made, no publication, for a calendar of a year
+# of days and for one of a hundred years alike.
+@pytest.mark.parametrize("contracts", [13, 1201], ids=["a year of days", "a hundred years of days"])
+def test_reading_the_prompt_is_three_reads_and_no_array(
+    call_profile: CallProfile, numpy_calls: CallProfile, contracts: int
+) -> None:
+    made = PATH["_CreateCalendar"](*calendar_sources(contracts))
+    assert PATH["util_ReadPrompt"](made) == "c4"  # prompt on 11 September, 30 days a contract
+    assert call_profile(lambda: PATH["util_ReadPrompt"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadPrompt": 1,
+        "Calendar.prompt_code": 1,
+        "_text_out": 1,  # the way out for text
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ReadPrompt"](made)) == {}
+
+
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
     """Codes and the first and last day of that many calendar months from January 2026, laid
     end to end, as the sheet sends them."""

@@ -287,6 +287,25 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AR7),5,4)" = "FALSE"
     "=_CreateCalendar(AA2,C2)" = "#ERROR _CreateCalendar: index is blank, expected index handle"
     "=_CreateCalendar(AA2,ED8)" = "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, expected 2026-10-01, the day after row 1's last_date 2026-09-30"
+    # The prompt reader: the contract of a calendar's first unfixed period, as text in the
+    # schedule's own spelling. V26 on the six-contract futures calendar in AR1, valued 11-Sep-2026,
+    # the contract prompt that day; n26 on CT5, the two-contract calendar valued 26-May; q26 on
+    # CW4, valued before it begins, the first contract it represents; U26 on the Gas Daily
+    # calendar in AR6 and on DW6, valued inside September; V26 on the IFERC calendar in AR7,
+    # before any month published, and Z26 on DW2, valued 15-Nov; the IFERC calendar in EA6, every
+    # month published, has none, the library's words; the calendar left out, blank or a number,
+    # the seam's.
+    "=util_ReadPrompt(AR1)" = "V26"
+    "=util_ReadPrompt(CT5)" = "n26"
+    "=util_ReadPrompt(CW4)" = "q26"
+    "=util_ReadPrompt(AR6)" = "U26"
+    "=util_ReadPrompt(DW6)" = "U26"
+    "=util_ReadPrompt(AR7)" = "V26"
+    "=util_ReadPrompt(DW2)" = "Z26"
+    "=util_ReadPrompt(EA6)" = "#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, expected at least one to quote"
+    "=util_ReadPrompt()" = "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle"
+    "=util_ReadPrompt(C2)" = "#ERROR util_ReadPrompt: calendar is blank, expected calendar handle"
+    "=util_ReadPrompt(Y2)" = "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the

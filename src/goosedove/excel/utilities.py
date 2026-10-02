@@ -299,3 +299,17 @@ def util_ReadHandle(
     """Reads the object behind a handle and spills it as a table: its headers, a row of types,
     then one row per element."""
     return shown(handle)
+
+
+@excel_function
+def util_ReadPrompt(
+    calendar: Annotated[
+        Handle[Calendar],
+        "The calendar handle: the cell showing _CreateCalendar's result, such as B5, or a name "
+        "for it.",
+    ],
+) -> str:
+    """Reads the contract code for the first price expected in the calendar's market price
+    vector."""
+    # The calendar's own reading of its first unfixed period: text in the cell, no object kept.
+    return calendar.prompt_code()

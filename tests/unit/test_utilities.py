@@ -1,6 +1,7 @@
 """util_ReadHandle through the seam: each kind spilled as its creator's table, a spill fed back to a
 creator, and the seam's words for a handle that does not resolve."""
 
+import functools
 import os
 from typing import cast
 
@@ -565,6 +566,134 @@ def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
     assert joined == "date\0discount_factor\0datetime64[D]\0float64"
     assert slots[2:, 0].tolist() == [SEP_11 + i for i in range(count)]
     assert slots[2:, 1].tolist() == [1.0 - i * 1e-5 for i in range(count)]
+
+
+# --- the prompt code: one calendar handle in, one code out ---------------------
+
+
+@functools.cache
+def the_futures_index() -> str:
+    """A three-contract index, m26, n26 and q26 expiring 19 May, 22 June and 21 July 2026, with
+    the 25th of May a holiday, made once so that its calendars and fixings share it."""
+    schedule = bridge.call(
+        "_CreateFuturesSchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"], ["q26"]]),
+            Cells.from_rows([[46161.0], [46195.0], [46224.0]]),
+            MISSING,
+        ],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    return an_index(schedule, holidays)
+
+
+def a_futures_calendar(serial: float) -> str:
+    """That index's calendar, valued on the serial at midday."""
+    valuation = bridge.call("_CreateValuationDate", [serial, 0.5])
+    return cast(str, bridge.call("_CreateCalendar", [valuation, the_futures_index()]))
+
+
+# The prompt code, through the seam, on each kind: the contract prompt on the valuation day on
+# a futures calendar, the expiring contract on its expiry day and the next from the day after,
+# the first contract before the calendar begins; the month of the day after the valuation day
+# on a Gas Daily calendar; the first month not yet published on an IFERC one, the month itself on
+# its publication day. Text in the cell, the schedule's own spelling.
+def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
+    for serial, code in ((46168.0, "n26"), (46195.0, "n26"), (46196.0, "q26"), (46150.0, "n26")):
+        assert bridge.call("util_ReadPrompt", [a_futures_calendar(serial)]) == code
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    gas = an_index(month, MISSING)
+    september = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), gas]
+    )
+    assert bridge.call("util_ReadPrompt", [september]) == "U26"
+    months = bridge.call(
+        "_CreateIfercSchedule",
+        [
+            Cells.from_rows([["V26"], ["X26"]]),
+            Cells.from_rows([[46295.0], [46325.0]]),
+            Cells.from_rows([[46296.0], [46328.0]]),
+        ],
+    )
+    henry = an_index(months, MISSING)
+    for serial, code in ((46296.0, "V26"), (46297.0, "X26"), (46328.0, "X26")):
+        iferc = bridge.call(
+            "_CreateCalendar", [bridge.call("_CreateValuationDate", [serial, 0.5]), henry]
+        )
+        assert bridge.call("util_ReadPrompt", [iferc]) == code
+
+
+# A calendar whose every period has fixed: the library's words, through the seam, for each kind.
+def test_a_calendar_with_no_unfixed_period_has_no_prompt_code_through_the_seam() -> None:
+    message = (
+        "#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, "
+        "expected at least one to quote"
+    )
+    assert bridge.call("util_ReadPrompt", [a_futures_calendar(46225.0)]) == message
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    ended = bridge.call(
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46295.0, 0.5]), an_index(month, MISSING)],
+    )
+    assert bridge.call("util_ReadPrompt", [ended]) == message
+    published = bridge.call(
+        "_CreateIfercSchedule",
+        [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
+    )
+    after = bridge.call(
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46297.0, 0.5]), an_index(published, MISSING)],
+    )
+    assert bridge.call("util_ReadPrompt", [after]) == message
+
+
+# The one argument is a calendar's handle, and the seam says so for anything else: left out,
+# blank, a number, text naming no live object, and a handle of another kind, the index's and the
+# market history's included.
+def test_the_prompt_code_takes_a_calendar_handle_and_nothing_else() -> None:
+    made = a_futures_calendar(46168.0)
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (46168.0, "is number 46168.0"),
+        ("calendar:9999999", "is text 'calendar:9999999' naming no live object"),
+    ):
+        assert bridge.call("util_ReadPrompt", [wrong]) == (
+            f"#ERROR util_ReadPrompt: calendar {what}, expected calendar handle"
+        )
+    index = the_futures_index()
+    fixings = bridge.call(
+        "_CreateFuturesFixings",
+        [
+            Cells.from_rows([[46164.0], [46163.0], [46162.0]]),
+            Cells.from_rows([[71.25], [71.1], [70.85]]),
+            index,
+        ],
+    )
+    history = bridge.call("_CreateMarketHistory", [made, fixings])
+    for other, kind in (
+        (history, "market history"),
+        (index, "index"),
+        (fixings, "futures fixings"),
+    ):
+        assert bridge.call("util_ReadPrompt", [other]) == (
+            f"#ERROR util_ReadPrompt: calendar is {kind} handle {other!r}, expected calendar handle"
+        )
+
+
+# Reading the prompt publishes nothing: the store holds what it held, and the cell gets text.
+def test_reading_the_prompt_publishes_no_object() -> None:
+    made = a_futures_calendar(46168.0)
+    before = bridge.live_handles()
+    assert bridge.call("util_ReadPrompt", [made]) == "n26"
+    assert bridge.call("util_ReadPrompt", [made]) == "n26"
+    assert bridge.live_handles() == before
 
 
 # --- what does not resolve fails in the seam's words, and spills nothing -------
