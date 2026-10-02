@@ -1083,8 +1083,7 @@ def test_reading_an_index_back_costs_one_row(
         "_bad_mixed": 1,
     }
     assert numpy_calls(lambda: PATH["util_ReadHandle"](made)) == {
-        "numpy.array": 4,  # the three text columns gathered, and the table's texts
-        "ndarray.ravel": 1,  # the texts in sheet order
+        "numpy.array": 3,  # the three text columns; the table's texts are placed by slices
         "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
         "numpy.asarray": 1,
         "ndarray.any": 5,  # the two counts' exactness looks, then the mixed road's three
@@ -1230,8 +1229,7 @@ def test_reading_a_calendar_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the schedule's codes as an array, and the table's texts gathered
-        "ndarray.ravel": 1,  # the texts in sheet order
+        "numpy.array": 1,  # the schedule's codes as an array; the texts are placed by slices
         "numpy.empty": 2,  # the kinds, and the slots underneath numpy's full
         "numpy.asarray": 1,
         "numpy.datetime_data": 1,  # the unit of the date column
@@ -1517,8 +1515,7 @@ def test_reading_a_market_history_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the calendar's: the codes as an array, its texts gathered
-        "ndarray.ravel": 1,  # the calendar's texts in sheet order
+        "numpy.array": 1,  # the calendar's: the codes as an array
         "numpy.empty": 7,  # the calendar's two; the words, kinds, slots, pairs and mask
         "numpy.asarray": 2,
         "numpy.datetime_data": 1,  # the unit of the date column
@@ -1665,8 +1662,8 @@ def test_reading_a_market_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
-        "numpy.array": 2,  # the calendar's: the schedule's codes as an array, its texts gathered
-        "ndarray.ravel": 2,  # the calendar's texts in sheet order, and the live mask flattened
+        "numpy.array": 1,  # the calendar's: the schedule's codes as an array
+        "ndarray.ravel": 1,  # the live mask flattened
         "numpy.asanyarray": 1,  # on the way to the live rows
         "ndarray.nonzero": 1,  # the live rows
         "numpy.empty": 6,  # the calendar's two; the kinds, the slots, the pairs and their mask

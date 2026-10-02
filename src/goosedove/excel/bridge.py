@@ -156,11 +156,16 @@ class MixedArray:
                 raise TypeError(f"column {j + 1} is {describe(column)}, which a table cannot hold")
             kinds[top:, j], slots[top:, j] = _table_column(column, top + 1, j + 1)
         # Sheet order: the heading rows, then each body row's texts left to right, which is the
-        # transpose of the text columns laid side by side.
-        texts = tuple(itertools.chain.from_iterable(headings))
-        if text_columns:
-            texts += tuple(np.array(text_columns, dtype=object).T.ravel())
-        return cls(kinds, slots, texts)
+        # transpose of the text columns laid side by side: of every k texts of the body, the j-th
+        # is from text column j, so each column is copied whole into its own stride of one list
+        # of the body's texts, and the headings and that list are joined into one tuple. No array
+        # of the texts is built and nothing runs per cell. With no column of text the body is an
+        # empty list, and with no rows each column fills an empty stride: one path for all.
+        k = len(text_columns)
+        body = [""] * (k * rows)
+        for j, column in enumerate(text_columns):
+            body[j::k] = column
+        return cls(kinds, slots, (*itertools.chain.from_iterable(headings), *body))
 
 
 @dataclass_transform(frozen_default=True, eq_default=False)
