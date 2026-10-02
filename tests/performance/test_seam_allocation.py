@@ -434,6 +434,16 @@ def test_reading_the_prompt_makes_no_array_and_publishes_nothing(contracts: int)
     assert bridge.live_handles() == live
 
 
+# The two text helpers read three characters and write three or six: within the slack, measured
+# 192 to 235 bytes on 2026-10-02, a code in capitals or in lowercase, and nothing published.
+@pytest.mark.parametrize("name", ["util_NextFut", "util_FutToCme"])
+@pytest.mark.parametrize("contract", ["F26", "z98"])
+def test_a_text_helper_makes_nothing_and_publishes_nothing(name: str, contract: str) -> None:
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY[name](contract)) <= SLACK
+    assert bridge.live_handles() == live
+
+
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
     """Codes and the first and last day of that many calendar months from January 2026, laid
     end to end, as the sheet sends them."""

@@ -91,6 +91,27 @@ def test_the_prompt_reader_explains_itself() -> None:
     ]
 
 
+def test_the_two_text_helpers_explain_themselves() -> None:
+    line = (
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2."
+    )
+    description, arguments, hidden = SPECS["util_NextFut"]
+    assert not hidden
+    assert description == (
+        "Gives the next contract in the monthly sequence, G26 after F26 and F27 after Z26, "
+        "spelled as the code given."
+    )
+    assert arguments == [("contract", line)]
+    description, arguments, hidden = SPECS["util_FutToCme"]
+    assert not hidden
+    assert description == (
+        "Gives the contract month as CME's data feeds spell it, the year then the month, 202601 "
+        "for F26."
+    )
+    assert arguments == [("contract", line)]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden

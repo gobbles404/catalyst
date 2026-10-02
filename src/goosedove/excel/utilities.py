@@ -22,6 +22,7 @@ from goosedove.excel.bridge import (
 )
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
+from goosedove.index_definitions.contract_codes import cme_code, next_contract
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
@@ -313,3 +314,29 @@ def util_ReadPrompt(
     vector."""
     # The calendar's own reading of its first unfixed period: text in the cell, no object kept.
     return calendar.prompt_code()
+
+
+@excel_function
+def util_NextFut(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> str:
+    """Gives the next contract in the monthly sequence, G26 after F26 and F27 after Z26, spelled
+    as the code given."""
+    return next_contract(contract)
+
+
+@excel_function
+def util_FutToCme(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> str:
+    """Gives the contract month as CME's data feeds spell it, the year then the month, 202601 for
+    F26."""
+    return cme_code(contract)

@@ -306,6 +306,21 @@ $formulas = [ordered]@{
     "=util_ReadPrompt()" = "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle"
     "=util_ReadPrompt(C2)" = "#ERROR util_ReadPrompt: calendar is blank, expected calendar handle"
     "=util_ReadPrompt(Y2)" = "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle"
+    # The two text helpers: the next contract in the monthly sequence, spelled as the code given,
+    # F26 to G26, Z26 to F27 and the schedule's m26 in AE2 to n26; the month as CME's feeds spell
+    # it, 202601 for F26 and 202610 for the V26 in AE6; a strip, a winter and December 2099, the
+    # library's words; a number, a blank and empty text, the seam's.
+    '=util_NextFut("F26")' = "G26"
+    '=util_NextFut("Z26")' = "F27"
+    "=util_NextFut(AE2)" = "n26"
+    '=util_FutToCme("F26")' = "202601"
+    "=util_FutToCme(AE6)" = "202610"
+    '=util_NextFut("Cal27")' = "#ERROR util_NextFut: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26"
+    '=util_FutToCme("W29")' = "#ERROR util_FutToCme: ValueError: contract is 'W29', expected a month letter and a two-digit year, such as F26"
+    '=util_NextFut("Z99")' = "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before December 2099, the last a two-digit year can name"
+    "=util_NextFut(A1)" = "#ERROR util_NextFut: contract is number 1.0, expected text"
+    "=util_FutToCme(C2)" = "#ERROR util_FutToCme: contract is blank, expected text"
+    "=util_FutToCme(I2)" = "#ERROR util_FutToCme: contract is empty text, expected text"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the

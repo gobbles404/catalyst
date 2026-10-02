@@ -197,6 +197,30 @@ def test_text_in_and_out_itemized(call_profile: CallProfile) -> None:
     }
 
 
+# The two text helpers are text in and text out around one reading of the code: the text rule,
+# the function, the library's function and its one parse, then the way out for text. Nine calls
+# across nine functions, no numpy call.
+@pytest.mark.parametrize(
+    ("name", "library"), [("util_NextFut", "next_contract"), ("util_FutToCme", "cme_code")]
+)
+def test_a_text_helper_is_text_in_one_parse_and_text_out(
+    call_profile: CallProfile, numpy_calls: CallProfile, name: str, library: str
+) -> None:
+    PATH[name]("F26")
+    assert call_profile(lambda: PATH[name]("F26")) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        name: 1,
+        library: 1,
+        "month_and_year": 1,
+        "_text_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH[name]("F26")) == {}
+
+
 def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
     PATH["EchoBoolean"](True)
     assert call_profile(lambda: PATH["EchoBoolean"](True)) == {

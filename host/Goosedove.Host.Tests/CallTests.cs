@@ -132,6 +132,20 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ReadPrompt", new object[] { ExcelMissing.Value }, "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle" };
             yield return new object[] { "util_ReadPrompt", new object[] { 46276.0 }, "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle" };
             yield return new object[] { "util_ReadPrompt", new object[] { "x" }, "#ERROR util_ReadPrompt: calendar is text 'x' naming no live object, expected calendar handle" };
+            // The two text helpers: a contract code in, text out. The next month in the exchanges' sequence, spelled as the code given, and the month as CME's feeds spell it; a strip, a four-digit year and December 2099 fail in the library's words, a number, a blank and empty text in the seam's.
+            yield return new object[] { "util_NextFut", new object[] { "F26" }, "G26" };
+            yield return new object[] { "util_NextFut", new object[] { "Z26" }, "F27" };
+            yield return new object[] { "util_NextFut", new object[] { "m26" }, "n26" };
+            yield return new object[] { "util_NextFut", new object[] { "Cal27" }, "#ERROR util_NextFut: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_NextFut", new object[] { "Z99" }, "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before December 2099, the last a two-digit year can name" };
+            yield return new object[] { "util_NextFut", new object[] { 26.0 }, "#ERROR util_NextFut: contract is number 26.0, expected text" };
+            yield return new object[] { "util_NextFut", new object[] { ExcelEmpty.Value }, "#ERROR util_NextFut: contract is blank, expected text" };
+            yield return new object[] { "util_FutToCme", new object[] { "F26" }, "202601" };
+            yield return new object[] { "util_FutToCme", new object[] { "Z26" }, "202612" };
+            yield return new object[] { "util_FutToCme", new object[] { "u26" }, "202609" };
+            yield return new object[] { "util_FutToCme", new object[] { "F2026" }, "#ERROR util_FutToCme: ValueError: contract is 'F2026', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_FutToCme", new object[] { "" }, "#ERROR util_FutToCme: contract is empty text, expected text" };
+            yield return new object[] { "util_FutToCme", new object[] { ExcelMissing.Value }, "#ERROR util_FutToCme: contract is missing, expected text" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };

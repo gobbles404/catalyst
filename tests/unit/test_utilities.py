@@ -696,6 +696,51 @@ def test_reading_the_prompt_publishes_no_object() -> None:
     assert bridge.live_handles() == before
 
 
+# --- two text helpers: the next contract, and the month as CME spells it --------------
+
+
+# Text in and text out through the seam: the next contract in the monthly sequence, spelled as
+# the code given, and the month as CME's feeds spell it, year then month, text and no number.
+def test_the_next_contract_and_the_cme_month_read_a_code_as_the_desk_types_it() -> None:
+    assert bridge.call("util_NextFut", ["F26"]) == "G26"
+    assert bridge.call("util_NextFut", ["Z26"]) == "F27"
+    assert bridge.call("util_NextFut", ["m26"]) == "n26"
+    assert bridge.call("util_FutToCme", ["F26"]) == "202601"
+    assert bridge.call("util_FutToCme", ["Z26"]) == "202612"
+    assert bridge.call("util_FutToCme", ["u26"]) == "202609"
+    assert isinstance(bridge.call("util_FutToCme", ["F26"]), str)
+
+
+# A strip, a season, a four-digit year and December 2099: the library's words through the seam.
+def test_a_code_that_is_no_single_contract_is_refused_through_the_seam() -> None:
+    for name in ("util_NextFut", "util_FutToCme"):
+        for contract in ("Cal27", "W29", "F2026", "F-26"):
+            assert bridge.call(name, [contract]) == (
+                f"#ERROR {name}: ValueError: contract is {contract!r}, "
+                "expected a month letter and a two-digit year, such as F26"
+            )
+    assert bridge.call("util_NextFut", ["Z99"]) == (
+        "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before "
+        "December 2099, the last a two-digit year can name"
+    )
+    assert bridge.call("util_FutToCme", ["Z99"]) == "209912"
+
+
+# The one argument is text, and the seam says so for anything else: left out, blank, empty text,
+# a number, a boolean and a range.
+def test_the_text_helpers_take_one_text_and_nothing_else() -> None:
+    for name in ("util_NextFut", "util_FutToCme"):
+        for wrong, what in (
+            (MISSING, "is missing"),
+            (None, "is blank"),
+            ("", "is empty text"),
+            (26.0, "is number 26.0"),
+            (True, "is boolean TRUE"),
+            (Cells.from_rows([["F26"], ["G26"]]), "is 2x1 array"),
+        ):
+            assert bridge.call(name, [wrong]) == f"#ERROR {name}: contract {what}, expected text"
+
+
 # --- what does not resolve fails in the seam's words, and spills nothing -------
 
 

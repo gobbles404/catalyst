@@ -1,0 +1,54 @@
+"""Contract codes as the desk types them, a month letter and a two-digit year, F26 for January
+2026: the code of the month after, and the month as CME's data feeds spell it, 202601. Text in
+and text out, no object and no handle. docs/library/utilities/next-fut.md and
+docs/library/utilities/fut-to-cme.md are the pages."""
+
+# The exchanges' month letters, January to December, and the same in lowercase, the two
+# spellings a code's letter is read in; the ten digits a year is written with.
+MONTH_LETTERS = "FGHJKMNQUVXZ"
+LOWER_LETTERS = MONTH_LETTERS.lower()
+DIGITS = "0123456789"
+
+
+def month_and_year(contract: str) -> tuple[int, int]:
+    """The month, 1 to 12, and the year, 2000 to 2099, a code names: the letter's place among
+    the twelve and the two digits after 2000, since the desk's codes are of this century. One
+    month letter, in either case, F26 and f26 naming one month, and two digits, nothing before,
+    between or after: the one form taken, three looks at three characters and no pattern. A
+    strip, a season or a year, Cal27, W29, Q1 27, is no single contract, a four-digit year,
+    F2026, is another spelling than the desk's codes use, and I is no month letter; each is
+    refused naming what arrived and the form wanted."""
+    if len(contract) == 3 and contract[1] in DIGITS and contract[2] in DIGITS:
+        letter = contract[0]
+        place = (
+            MONTH_LETTERS.find(letter) if letter in MONTH_LETTERS else LOWER_LETTERS.find(letter)
+        )
+        if place >= 0:
+            return place + 1, 2000 + int(contract[1:])
+    raise ValueError(
+        f"contract is {contract!r}, expected a month letter and a two-digit year, such as F26"
+    )
+
+
+def next_contract(contract: str) -> str:
+    """The code of the month after the one given, the next in the exchanges' sequence: G26 after
+    F26, F27 after Z26, the letter in the case the code was typed, a lowercase code giving a
+    lowercase code. Z99 has no next that two digits can name, and is refused rather than wrapped
+    to F00, which would read as January 2000."""
+    month, year = month_and_year(contract)
+    if month == 12 and year == 2099:
+        raise ValueError(
+            f"contract is {contract!r}, expected a month before December 2099, "
+            "the last a two-digit year can name"
+        )
+    letter = MONTH_LETTERS[month % 12]  # the month after, January after December
+    year = year + 1 if month == 12 else year
+    return (letter if contract[0].isupper() else letter.lower()) + f"{year % 100:02d}"
+
+
+def cme_code(contract: str) -> str:
+    """The month as CME's data feeds spell it, the year then the month, two digits each for the
+    month, 202601 for F26 and 202612 for Z26: text, since it names a month and is not a number
+    to add to."""
+    month, year = month_and_year(contract)
+    return f"{year}{month:02d}"
