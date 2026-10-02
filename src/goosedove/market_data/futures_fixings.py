@@ -44,14 +44,15 @@ def futures_fixings(
     weekend day or a holiday in the series is refused, at either end as in the middle. And no
     business day between the first date and the last is without a fixing, since a gap is a row
     the desk did not paste: with every date a business day and the dates increasing, the series
-    is whole exactly when each date is the business day after the one above, one numpy call
-    over the column. The first and last dates bound the check, so nothing is asked for before
-    the first or after the last, and a holiday outside them changes nothing. The holidays are
-    read as numpy reads them: a day listed twice counts once, and a day listed on a weekend adds
-    nothing. Both columns are copied and then frozen, so the fixings own their data: a Python
-    caller keeps whatever it passed, and a later change to an input never changes a fixing; the
-    index is kept by reference, the one the desk paired the series with. Rows count as the sheet
-    counts them, the first row of the column being row 1.
+    is whole exactly when the business days from the first date up to the last number one fewer
+    than the rows, one numpy count of two dates, and the business day after each date is found
+    only to name the first one missing. The first and last dates bound the check, so nothing is
+    asked for before the first or after the last, and a holiday outside them changes nothing.
+    The holidays are read as numpy reads them: a day listed twice counts once, and a day listed
+    on a weekend adds nothing. Both columns are copied and then frozen, so the fixings own their
+    data: a Python caller keeps whatever it passed, and a later change to an input never
+    changes a fixing; the index is kept by reference, the one the desk paired the series with.
+    Rows count as the sheet counts them, the first row of the column being row 1.
     """
     if index.kind is not Kind.FUTURES:
         raise ValueError(f"index is {described(index.kind, 'index')}, expected a futures index")
@@ -73,9 +74,17 @@ def futures_fixings(
         weekday = WEEKDAYS[date.fromisoformat(str(days[k])).weekday()]
         reason = weekday if weekday in ("Saturday", "Sunday") else "holiday"
         raise ValueError(f"date row {k + 1} is {days[k]}, a {reason}, expected a business day")
-    following = np.busday_offset(days[:-1], 1, busdaycal=calendar)
-    skipped = following != days[1:]
-    if skipped.any():
+    # Every date a business day and the dates increasing, the rows but the last are that many
+    # business days from the first date up to the last, so the series is whole exactly when
+    # those business days number one fewer than the rows: one np.busday_count of the two end
+    # dates. The ends are taken as slices, the first row and the last, so a series of one row
+    # asks the same question, no days counted against none expected, and a series of no rows
+    # asks it of nothing: one path, with no case for either. The business day after each date is
+    # made only when one is missing, to name the first.
+    short = np.busday_count(days[:1], days[-1:], busdaycal=calendar) != days.size - 1
+    if short.any():
+        following = np.busday_offset(days[:-1], 1, busdaycal=calendar)
+        skipped = following != days[1:]
         k = int(skipped.argmax())  # following[k] is the first business day without a fixing
         raise ValueError(
             f"date row {k + 2} is {days[k + 1]}, expected {following[k]}, "

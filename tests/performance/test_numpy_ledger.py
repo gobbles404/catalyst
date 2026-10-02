@@ -71,8 +71,16 @@ def test_a_call_outside_numpy_is_no_entry(numpy_calls: NumpyCalls) -> None:
         lambda: np.concatenate((VALUES, VALUES)),
         lambda: np.is_busday(DAYS),
         lambda: np.busday_offset(DAYS, 1, roll="forward"),
+        lambda: np.busday_count(DAYS[:1], DAYS[-1:]),
     ],
-    ids=["a ufunc by operator", "a ufunc by name", "concatenate", "is_busday", "busday_offset"],
+    ids=[
+        "a ufunc by operator",
+        "a ufunc by name",
+        "concatenate",
+        "is_busday",
+        "busday_offset",
+        "busday_count",
+    ],
 )
 def test_a_ufunc_and_a_function_dispatched_in_c_raise_no_event(
     unseen: Callable[[], object], numpy_calls: NumpyCalls

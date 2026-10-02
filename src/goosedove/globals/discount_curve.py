@@ -46,9 +46,12 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) 
     row 1.
     """
     days = np.asarray(dates, dtype="datetime64[D]")  # read, never written: no copy of the anchors
-    bad = ~np.isfinite(factors)
-    if bad.any():  # before any arithmetic: numpy warns on inf - inf, and a warning fails here
-        i = int(bad.argmax())
+    # Before any arithmetic: numpy warns on inf - inf, and a warning fails here. The mask is the
+    # finite one, asked whether every factor is; its inverse is made only to name the first that
+    # is not.
+    finite = np.isfinite(factors)
+    if not finite.all():
+        i = int((~finite).argmax())
         raise ValueError(
             f"discount_factor row {i + 1} is {float(factors[i])!r}, expected a finite number"
         )

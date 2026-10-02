@@ -476,6 +476,48 @@ def test_a_table_is_built_from_headings_and_columns_of_one_kind_each() -> None:
     assert joined == "code\0expiry\0size\0cleared\0str\0datetime64[D]\0float64\0bool\0m26\0n26"
 
 
+# The table's texts, whatever sits beside them: any number of columns of text, none included,
+# among a number, a date and a boolean column in any order, under any number of heading rows and
+# over any number of body rows, none included. The texts are the heading rows left to right,
+# then each body row's texts left to right, and every column's kinds and slots are its own.
+@given(
+    data=st.data(),
+    rows=st.integers(0, 5),
+    heading_rows=st.integers(0, 2),
+    text_columns=st.integers(0, 4),
+)
+def test_a_tables_texts_are_its_headings_then_each_rows_texts_whatever_the_columns(
+    data: st.DataObject, rows: int, heading_rows: int, text_columns: int
+) -> None:
+    word = st.text(alphabet="abc", min_size=1, max_size=3)
+    columns: list[tuple[str, ...] | NDArray[Any]] = [
+        tuple(data.draw(st.lists(word, min_size=rows, max_size=rows))) for _ in range(text_columns)
+    ]
+    columns.append(np.arange(rows, dtype=np.float64) + 0.5)
+    columns.append(np.array(["2026-05-19"] * rows, dtype="datetime64[D]"))
+    columns.append(np.arange(rows) % 2 == 0)
+    placed = [columns[i] for i in data.draw(st.permutations(range(len(columns))))]
+    headings = [tuple(f"h{r}.{c}" for c in range(len(placed))) for r in range(heading_rows)]
+    table = MixedArray.table(headings, *placed)
+    body_texts = [column[r] for r in range(rows) for column in placed if isinstance(column, tuple)]
+    assert table.texts == tuple([h for row in headings for h in row] + body_texts)
+    assert (table.kinds[:heading_rows] == bridge.Kind.TEXT).all()
+    for j, column in enumerate(placed):
+        kinds = table.kinds[heading_rows:, j].tolist()
+        slots = table.numeric_slots[heading_rows:, j].tolist()
+        if isinstance(column, tuple):
+            assert kinds == [bridge.Kind.TEXT] * rows
+        elif column.dtype == np.bool_:
+            assert kinds == [bridge.Kind.BOOLEAN] * rows
+            assert slots == [1.0 if r % 2 == 0 else 0.0 for r in range(rows)]
+        elif column.dtype == np.float64:
+            assert kinds == [bridge.Kind.NUMBER] * rows
+            assert slots == [r + 0.5 for r in range(rows)]
+        else:
+            assert kinds == [bridge.Kind.NUMBER] * rows
+            assert slots == [46161.0] * rows  # 19-May-2026 as the sheet's serial
+
+
 def test_a_table_of_headings_alone_and_one_of_a_single_number() -> None:
     kinds, _, joined = mixed_out(MixedArray.table([("only",)], ()))
     assert kinds == [[1]] and joined == "only"
