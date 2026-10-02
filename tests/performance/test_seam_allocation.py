@@ -1,4 +1,5 @@
-"""What one call through the seam allocates on the Python heap, at its peak.
+"""What one call through the seam allocates on the Python heap, at its peak, and what a
+creator's publication still holds once the call has returned.
 
 tracemalloc sees Python objects and numpy's data buffers, which numpy registers with it.
 It does not see the host's pinned buffers or anything in the CLR. Each ceiling is the
@@ -695,3 +696,105 @@ def test_reading_a_market_back_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * 365 + 2 * SLACK
     monthly = ENTRY["_CreateMarket"](*iferc_market_sources())
     assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
+
+
+# --- what a publication keeps -------------------------------------------------
+# The peaks above bound what a call allocates on its way; these pin what is still held when it
+# has returned, and that a release lets all of it go. numpy registers every data buffer it
+# allocates with tracemalloc under a domain of its own, np.lib.tracemalloc_domain, so that
+# domain alone is the arrays' bytes: the buffers allocated since tracing started and still
+# alive. Nothing else is in the measure: not a buffer made before tracing started, a
+# dependency's columns among them, not a Python object, the record, its entry in the store,
+# its handle or a tuple of texts, and nothing the host or Excel holds.
+
+DAY_BYTES = np.dtype("datetime64[D]").itemsize
+NUMBER_BYTES = np.dtype(np.float64).itemsize
+ROW_BYTES = np.dtype(np.intp).itemsize
+FLAG_BYTES = np.dtype(np.bool_).itemsize
+
+
+def numpy_bytes() -> int:
+    """The bytes of the numpy data buffers allocated since tracing started and still alive."""
+    snapshot = tracemalloc.take_snapshot()
+    buffers = snapshot.filter_traces([tracemalloc.DomainFilter(True, np.lib.tracemalloc_domain)])
+    return sum(trace.size for trace in buffers.traces)
+
+
+def retained_numpy_bytes(create: Callable[[], object]) -> tuple[int, int]:
+    """The numpy bytes a creator's publication holds once the call has returned, and once it has
+    been released. The inputs and the handles the creator depends on are made before this is
+    called, so nothing of theirs is counted. The publication is released whatever happens in
+    between, and both the creation and the release must have succeeded."""
+    tracemalloc.start()
+    try:
+        made = create()
+        text = made if isinstance(made, str) else ""
+        try:
+            assert text and not text.startswith("#ERROR"), f"the creator returned {made!r}"
+            held = numpy_bytes()
+        finally:
+            released = bridge.release(text)
+        assert released, f"{text} named no publication to release"
+        return held, numpy_bytes()
+    finally:
+        tracemalloc.stop()
+
+
+# The measure itself: a buffer made before tracing started is never counted, a buffer made
+# since is counted to the byte, a Python object beside it adds nothing, and the count returns to
+# zero when the buffer is freed. A numpy release that moved its buffers out of the domain would
+# fail here, loudly, before any pin below read zero for the wrong reason.
+def test_the_retained_measure_counts_new_numpy_buffers_and_nothing_else() -> None:
+    before = np.empty(4_096)
+    tracemalloc.start()
+    try:
+        assert numpy_bytes() == 0
+        made = np.empty(4_096)
+        words = ["text"] * 4_096
+        assert numpy_bytes() == made.nbytes == 4_096 * NUMBER_BYTES
+        del made
+        assert numpy_bytes() == 0
+    finally:
+        tracemalloc.stop()
+    assert before.size == len(words) == 4_096
+
+
+# A discount curve keeps its two columns, a day and a factor for every day from the first anchor
+# to the last, the same from a daily table and from a dozen anchors, and nothing once released.
+@pytest.mark.parametrize("given", ["a daily table", "a dozen anchors"])
+def test_a_discount_curve_keeps_its_two_columns_and_release_frees_them(given: str) -> None:
+    days = 3_631
+    body = curve_body(days) if given == "a daily table" else anchor_body(12, days - 1)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body))
+    assert kept == (days * (DAY_BYTES + NUMBER_BYTES), 0)
+
+
+# Futures fixings keep their two columns, a date and a settle per row; the index and its
+# holiday calendar were made before and are not theirs.
+def test_futures_fixings_keep_their_two_columns_and_release_frees_them() -> None:
+    rows = 260
+    codes, futures, _, _ = schedule_columns(2)
+    index = an_index(
+        ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(100)),
+    )
+    days, settles = fixings_columns(rows, 100)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
+    assert kept == (rows * (DAY_BYTES + NUMBER_BYTES), 0)
+
+
+# A holiday calendar keeps its one column of dates.
+def test_a_holiday_calendar_keeps_its_one_column_and_release_frees_it() -> None:
+    dates = 100
+    holidays = holiday_column(dates)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateHolidayCalendar"](holidays))
+    assert kept == (dates * DAY_BYTES, 0)
+
+
+# A futures calendar keeps its four columns: the days, the row of each day's contract, and the
+# two flags, priced and fixed.
+def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> None:
+    days = 360
+    valuation, index = calendar_sources(13)
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateCalendar"](valuation, index))
+    assert kept == (days * (DAY_BYTES + ROW_BYTES + 2 * FLAG_BYTES), 0)
