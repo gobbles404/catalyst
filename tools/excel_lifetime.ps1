@@ -16,7 +16,11 @@
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
-# read inside a bounded wait, and a wait that runs out prints what it last saw.
+# read inside a bounded wait, and a wait that runs out prints what it last saw. Excel also
+# refuses a call while it is busy, so every call is made through Invoke-ExcelCall of
+# hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
+# inside a bounded wait that time is the wait's own deadline, never more. A property is read
+# through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
 param([string[]]$Groups = @("core", "edits", "books", "processes", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
@@ -40,8 +44,15 @@ function Open-Session {
     $session = Start-HiddenExcel
     $owned = [Collections.Generic.List[object]]::new()
     $state = [pscustomobject]@{ Session = $session; Excel = $session.Excel; Owned = $owned; Loaded = $false; Books = [Collections.Generic.List[object]]::new(); Stopped = $false }
-    if (-not $session.Excel.RegisterXLL($xll)) { throw "Excel refused to load $xll" }
-    $state.Loaded = $true
+    try {
+        if (-not (Invoke-ExcelCall "register the add-in" { $session.Excel.RegisterXLL($xll) })) { throw "Excel refused to load $xll" }
+        $state.Loaded = $true
+    }
+    catch {
+        # A hidden Excel that could not load the add-in is still this tool's to end.
+        Close-Session $state -FailureInFlight
+        throw
+    }
     return $state
 }
 function Own($State, $Object) { $State.Owned.Add($Object); Write-Output -NoEnumerate $Object }
@@ -53,30 +64,68 @@ function Close-Session($State, [switch]$FailureInFlight) {
     $State.Books.Clear()
     Stop-HiddenExcel $State.Session $State.Owned $book -AddInLoaded:$State.Loaded -FailureInFlight:$FailureInFlight
 }
+# Each of these makes its calls into Excel one at a time through Invoke-ExcelCall or, for a
+# property read, Read-ExcelProperty, so a call Excel refuses as busy is made again and nothing
+# around it is repeated; a reference is registered once, after Excel has handed it over.
 function New-Book($State) {
-    $books = Own $State (Own $State $State.Excel.Workbooks)
-    $book = Own $State $books.Add()
+    $books = Own $State (Read-ExcelProperty $State.Excel "Workbooks")
+    $book = Own $State (Invoke-ExcelCall "new workbook" { , $books.Add() })
     $State.Books.Add($book)
     return $book
 }
+function Open-Book($State, [string]$Path) {
+    $books = Own $State (Read-ExcelProperty $State.Excel "Workbooks")
+    return Own $State (Invoke-ExcelCall "open a workbook" { , $books.Open($Path) })
+}
 function Close-Book($State, $Book) {
-    Close-HiddenExcelWorkbook $State.Excel $Book
+    Close-HiddenExcelWorkbook $State.Excel $Book ([datetime]::UtcNow.AddSeconds($ExcelBusySeconds))
     [void]$State.Books.Remove($Book)
 }
-function Sheet($State, $Book) { return Own $State (Own $State $Book.Worksheets).Item(1) }
-function Cell($State, $Sheet, [string]$Address) { return Own $State $Sheet.Range($Address) }
-function Put($State, $Sheet, [string]$Address, [string]$Formula) { (Cell $State $Sheet $Address).Formula = $Formula }
-function Text($State, $Sheet, [string]$Address) { return [string](Cell $State $Sheet $Address).Text }
+function Sheet($State, $Book) {
+    $sheets = Own $State (Read-ExcelProperty $Book "Worksheets")
+    return Own $State (Invoke-ExcelCall "first worksheet" { , $sheets.Item(1) })
+}
+function Cell($State, $Sheet, [string]$Address, $Deadline = $null) {
+    return Own $State (Invoke-ExcelCall "range" { , $Sheet.Range($Address) } $Address $Deadline)
+}
+function Put($State, $Sheet, [string]$Address, [string]$Formula) {
+    $cell = Cell $State $Sheet $Address
+    Invoke-ExcelCall "type formula" { $cell.Formula = $Formula } $Address
+}
+function Text($State, $Sheet, [string]$Address) {
+    $cell = Cell $State $Sheet $Address
+    return [string](Read-ExcelProperty $cell "Text" $Address)
+}
+function Read-Formula($State, $Sheet, [string]$Address) {
+    $cell = Cell $State $Sheet $Address
+    return [string](Read-ExcelProperty $cell "Formula" $Address)
+}
+function Clear-Cell($State, $Sheet, [string]$Address) {
+    $cell = Cell $State $Sheet $Address
+    Invoke-ExcelCall "clear" { $cell.ClearContents() } $Address | Out-Null
+}
+function Cut-Cell($State, $Sheet, [string]$From, [string]$To) {
+    $source = Cell $State $Sheet $From
+    $target = Cell $State $Sheet $To
+    Invoke-ExcelCall "cut" { $source.Cut($target) } "$From to $To" | Out-Null
+}
+function Insert-Row($State, $Sheet, [string]$Address) {
+    $rows = Cell $State $Sheet $Address
+    Invoke-ExcelCall "insert" { $rows.Insert() } $Address | Out-Null
+}
 # The hidden Excel's process ID, read from its window when the session started: it leads every
 # handle that Excel publishes.
 function Id($State) { return [string]$State.Session.Process.Id }
 
 # --- the store's counts, read through GoosedoveHandles in a scratch cell ----------------------
 
-function Counts($State, $Sheet, [string]$Address = "Z1") {
-    $cell = Cell $State $Sheet $Address
-    $cell.Formula = "=GoosedoveHandles()"
-    $text = [string]$cell.Value2
+# Three calls, each made again on its own if Excel refuses it: a refused read is read again,
+# and the formula is not typed a second time for it. A deadline given by a bounded wait is the
+# most any of them may take. A text that is not the counts fails as it always did.
+function Counts($State, $Sheet, [string]$Address = "Z1", $Deadline = $null) {
+    $cell = Cell $State $Sheet $Address $Deadline
+    Invoke-ExcelCall "type the counts formula" { $cell.Formula = "=GoosedoveHandles()" } $Address $Deadline
+    $text = [string](Read-ExcelProperty $cell "Value2" $Address $Deadline)
     if ($text -notmatch "^live (-?\d+); price bytes (-?\d+); published (\d+); reused (\d+); released (\d+); release misses (\d+); disposal errors (\d+); skipped at close (\d+)") {
         throw "GoosedoveHandles showed: $text"
     }
@@ -86,15 +135,17 @@ function Counts($State, $Sheet, [string]$Address = "Z1") {
     }
 }
 # Waits, giving Excel time to deliver its callbacks, until the counts satisfy the condition or the
-# patience runs out; either way the last counts come back.
+# patience runs out; either way the last counts come back. The wait's deadline is also the most a
+# busy Excel may hold up any read inside it, so a call made again and again never stretches the
+# wait: a read still refused when the patience has run out fails, saying so.
 function Settle($State, $Sheet, [scriptblock]$Until, [string]$Address = "Z1") {
-    $deadline = (Get-Date).AddSeconds($Patience)
+    $deadline = [datetime]::UtcNow.AddSeconds($Patience)
     do {
-        $counts = Counts $State $Sheet $Address
+        $counts = Counts $State $Sheet $Address $deadline
         if (& $Until $counts) { return $counts }
         Start-Sleep -Milliseconds 250
-    } while ((Get-Date) -lt $deadline)
-    return (Counts $State $Sheet $Address)
+    } while ([datetime]::UtcNow -lt $deadline)
+    return (Counts $State $Sheet $Address $deadline)
 }
 
 # --- the sample chain: an index, its calendar and history, a vector and a market ----------------
@@ -157,7 +208,7 @@ $core = {
     Check "every handle begins with this Excel's process ID" ($led -eq $ChainCreators) "$id leads $(Text $state $sheet 'D5')"
 
     # Unchanged recalculation: every creator runs again, none publishes, the texts stay.
-    $state.Excel.CalculateFull()
+    Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     $c = Counts $state $sheet
     Check "a full calculation with nothing changed publishes nothing" ($c.Published -eq 11 -and $c.Live -eq 11) $c.Text
     Check "and reuses every creator's live call" ($c.Reused -ge 11) $c.Text
@@ -178,7 +229,7 @@ $core = {
     Check "an identical creator in another cell shows the same handle" ((Text $state $sheet "F10") -eq $changed) (Text $state $sheet "F10")
     $c = Counts $state $sheet
     Check "and publishes nothing" ($c.Published -eq 13 -and $c.Live -eq 11) $c.Text
-    (Cell $state $sheet "F10").ClearContents()
+    Clear-Cell $state $sheet "F10"
     Start-Sleep -Seconds 3
     $c = Counts $state $sheet
     Check "deleting the duplicate releases nothing while the first cell lives" ($c.Live -eq 11 -and $c.Released -eq 2) $c.Text
@@ -189,7 +240,7 @@ $core = {
     Check "a creator with other inputs is its own publication" ($other -ne $changed -and $other.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $other
     $c = Counts $state $sheet
     Check "and published" ($c.Published -eq 14 -and $c.Live -eq 12) $c.Text
-    (Cell $state $sheet "F10").ClearContents()
+    Clear-Cell $state $sheet "F10"
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "deleting its last owner releases it" ($c.Live -eq 11 -and $c.Released -eq 3) $c.Text
 
@@ -232,7 +283,7 @@ $edits = {
     # chain's prices, copy the market's creator; after Excel's callbacks the current values hold
     # and nothing has leaked.
     $before = Text $state $sheet "D10"
-    (Cell $state $sheet "D10").Cut((Cell $state $sheet "F10")) | Out-Null
+    Cut-Cell $state $sheet "D10" "F10"
     Start-Sleep -Seconds 3
     $moved = Text $state $sheet "F10"
     Check "a creator cut to another cell under automatic calculation keeps a live handle" ($moved.StartsWith("$(Id $state):price_vector:WTI NYMEX:")) $moved
@@ -240,26 +291,26 @@ $edits = {
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "with eleven live after the callbacks" ($c.Live -eq 11) $c.Text
     Note "the moved creator's text $(if ($moved -eq $before) { 'stayed' } else { 'changed' })"
-    (Own $state $sheet.Range("10:10")).Insert() | Out-Null
+    Insert-Row $state $sheet "10:10"
     Start-Sleep -Seconds 3
     Check "a row inserted above shifts the chain and the reader still reads" ((Text $state $sheet "D13") -eq "72.1") (Text $state $sheet "D13")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "with eleven live" ($c.Live -eq 11) $c.Text
     # The same call typed in another cell: the formula's text, since a copy would shift its references.
-    Put $state $sheet "G12" (Cell $state $sheet "D12").Formula
+    Put $state $sheet "G12" (Read-Formula $state $sheet "D12")
     Check "the market's call typed in another cell shares the market" ((Text $state $sheet "G12") -eq (Text $state $sheet "D12")) (Text $state $sheet "G12")
     $c = Counts $state $sheet
     Check "and publishes nothing" ($c.Live -eq 11) $c.Text
-    (Cell $state $sheet "G12").ClearContents()
+    Clear-Cell $state $sheet "G12"
 
     # Manual calculation without a move: nothing propagates until asked, nothing is lost.
-    $state.Excel.Calculation = -4135  # xlCalculationManual
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }  # xlCalculationManual
     Put $state $sheet "A11" "74"
     Check "in manual mode a changed price does not propagate" ((Text $state $sheet "D13") -eq "72.1") (Text $state $sheet "D13")
     Start-Sleep -Seconds 3
     $c = Counts $state $sheet
     Check "and the owned objects stay live while waiting" ($c.Live -eq 11) $c.Text
-    $state.Excel.Calculate()
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
     Check "a requested calculation propagates it" ((Text $state $sheet "D13") -eq "74") (Text $state $sheet "D13")
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "and the old vector and market go" ($c.Live -eq 11) $c.Text
@@ -268,7 +319,7 @@ $edits = {
     # subscription and others on the sheet while the cells still show the old text; a full
     # calculation rebuilds the chain. A build that keeps the subscriptions is recorded, not failed.
     $shown = Text $state $sheet "F11"
-    (Cell $state $sheet "F11").Cut((Cell $state $sheet "H11")) | Out-Null
+    Cut-Cell $state $sheet "F11" "H11"
     Start-Sleep -Seconds 5
     $c = Counts $state $sheet
     if ($c.Live -lt $ChainCreators) {
@@ -279,13 +330,13 @@ $edits = {
     else {
         Note "this Excel kept the subscriptions through the cut: live stayed at $($c.Live)"
     }
-    $state.Excel.CalculateFull()
+    Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "a full calculation rebuilds the chain" ($c.Live -eq 11 -and (Text $state $sheet "D13") -eq "74") "$($c.Text); reader $(Text $state $sheet "D13")"
     Put $state $sheet "A11" "75"
-    $state.Excel.Calculate()
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
     Check "and a later update propagates" ((Text $state $sheet "D13") -eq "75") (Text $state $sheet "D13")
-    $state.Excel.Calculation = -4105  # xlCalculationAutomatic
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }  # xlCalculationAutomatic
     $c = Settle $state $sheet { param($c) $c.Live -eq $ChainCreators }
     Check "with eleven live at the end" ($c.Live -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
@@ -330,14 +381,14 @@ $books = {
     $savedSheet = Sheet $state $saved
     Build-Chain $state $savedSheet
     $c = Settle $state $savedSheet { param($c) $c.Live -eq $ChainCreators }
-    $saved.SaveAs($path, 51)  # xlOpenXMLWorkbook
+    Invoke-ExcelCall "save the workbook" { $saved.SaveAs($path, 51) }  # xlOpenXMLWorkbook
     Close-Book $state $saved
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
     Check "the saved book's publications went with it" ($c.Live -eq 0) $c.Text
-    $reopened = Own $state (Own $state $state.Excel.Workbooks).Open($path)
+    $reopened = Open-Book $state $path
     $state.Books.Add($reopened)
     $reopenedSheet = Sheet $state $reopened
-    $state.Excel.CalculateFull()
+    Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
     Check "reopened and fully calculated, the vector has a live handle" ((Text $state $reopenedSheet "D10").StartsWith("$(Id $state):price_vector:WTI NYMEX:")) (Text $state $reopenedSheet "D10")
     Check "and the market reads the quote" ((Text $state $reopenedSheet "D12") -eq "72.1") (Text $state $reopenedSheet "D12")
     Put $state $reopenedSheet "A10" "76"
@@ -409,7 +460,7 @@ $processes = {
         # handle recreated under the second's process ID, none of the saved texts surviving; the
         # nine creators equal to the second's own chain share, the vector and the market are new.
         # The scratch valuation date goes first, so that the saved chain is all the first Excel holds.
-        (Cell $state $watch "A1").ClearContents()
+        Clear-Cell $state $watch "A1"
         $c = Settle $state $watch { param($c) $c.Live -eq 0 }
         Check "clearing the scratch creator empties the first Excel's store again" ($c.Live -eq 0) $c.Text
         $path = Join-Path ([IO.Path]::GetTempPath()) ("goosedove-processes-" + [guid]::NewGuid().ToString("N") + ".xlsx")
@@ -419,12 +470,12 @@ $processes = {
         $c = Settle $state $savedSheet { param($c) $c.Live -eq $ChainCreators }
         Check "the chain to be saved is live in the first Excel, and nothing else" ($c.Live -eq $ChainCreators) $c.Text
         $savedTexts = @(1..$ChainCreators | ForEach-Object { Text $state $savedSheet "D$_" })
-        $saved.SaveAs($path, 51)  # xlOpenXMLWorkbook
+        Invoke-ExcelCall "save the workbook" { $saved.SaveAs($path, 51) }  # xlOpenXMLWorkbook
         Close-Book $state $saved
-        $reopened = Own $other (Own $other $other.Excel.Workbooks).Open($path)
+        $reopened = Open-Book $other $path
         $other.Books.Add($reopened)
         $reopenedSheet = Sheet $other $reopened
-        $other.Excel.CalculateFull()
+        Invoke-ExcelCall "full calculation" { $other.Excel.CalculateFull() }
         $under = 0
         $survived = 0
         foreach ($row in 1..$ChainCreators) {
@@ -470,5 +521,6 @@ foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]
 }
+Write-ExcelBusyReport
 Write-Host "excel lifetime: $($script:checks) checks, $($script:failures) failed"
 exit $script:failures

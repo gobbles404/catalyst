@@ -777,21 +777,27 @@ $scriptError = $null
 $book = $null
 $failures = 0
 try {
-    if (-not $excel.RegisterXLL($xll)) { throw "Excel refused to load $xll" }
+    # Every call into Excel is made through Invoke-ExcelCall: Excel refuses a call while it is
+    # busy, and the refused call is made again until it is taken or its time runs out. Each call
+    # is one operation, so a reference is taken once and registered once it has been handed over.
+    # A property is read through Read-ExcelProperty: read with a dot, a refused read would come
+    # back as nothing and no error, and a formula's text would look empty.
+    if (-not (Invoke-ExcelCall "register the add-in" { $excel.RegisterXLL($xll) })) { throw "Excel refused to load $xll" }
     $loaded = $true
-    $books = Own $excel.Workbooks
-    $book = Own $books.Add()
-    $sheets = Own $book.Worksheets
-    $sheet = Own $sheets.Item(1)
+    $books = Own (Read-ExcelProperty $excel "Workbooks")
+    $book = Own (Invoke-ExcelCall "new workbook" { , $books.Add() })
+    $sheets = Own (Read-ExcelProperty $book "Worksheets")
+    $sheet = Own (Invoke-ExcelCall "first worksheet" { , $sheets.Item(1) })
     # Formula takes text for everything and lets Excel parse it, as typing into the cell would.
     foreach ($address in $cells.Keys) {
-        (Own $sheet.Range($address)).Formula = $cells[$address]
+        $target = Own (Invoke-ExcelCall "range" { , $sheet.Range($address) } $address)
+        Invoke-ExcelCall "type input" { $target.Formula = $cells[$address] } $address
     }
     $row = 1
     foreach ($formula in $formulas.Keys) {
-        $cell = Own $sheet.Range("K$row")
-        $cell.Formula = $formula
-        $shown = $cell.Text
+        $cell = Own (Invoke-ExcelCall "range" { , $sheet.Range("K$row") } "K$row")
+        Invoke-ExcelCall "type formula" { $cell.Formula = $formula } "K$row"
+        $shown = Read-ExcelProperty $cell "Text" "K$row"
         $expected = $formulas[$formula].Replace("{pid}", [string]$session.Process.Id)
         $ok = ($shown -eq $expected)
         if (-not $ok) { $failures++ }
@@ -802,6 +808,7 @@ try {
 }
 catch { $scriptError = $_; throw }
 finally {
+    Write-ExcelBusyReport
     Stop-HiddenExcel $session $owned $book -AddInLoaded:$loaded -FailureInFlight:($null -ne $scriptError)
 }
 Write-Host "excel smoke: $($formulas.Count) formulas, $failures failed"
