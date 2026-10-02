@@ -366,11 +366,12 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 
 
 # Futures fixings keep a copy of each column, 16 bytes per row, and on the way pay the date
-# column's masks and its arrays on the way to days, and the builder's three looks, the order,
-# the days closed and the gaps, the last over the business day after each date, a full-size
-# temporary: measured 11,202 bytes at 260 rows on 2026-09-24, about 43 bytes per row, 280 below
-# the table path's 11,482, the header row and its binding; 93,102 at 2,600 and 912,102 at
-# 26,000, 35 bytes per row, so the ceiling of 45 per row stands.
+# column's masks and its arrays on the way to days, and the builder's two looks, the order and
+# the days closed, and its count of the business days between the first date and the last, two
+# dates and no temporary: measured 8,624 bytes at 260 rows on 2026-10-01, about 29 bytes per
+# row on top of the slack, 11,210 when the gaps were a look over the business day after each
+# date; 69,464 at 2,600 and 677,864 at 26,000, 26 bytes per row, where they were 93,110 and
+# 912,110, 35 per row. A ceiling of 35 per row holds the new form and refuses the old.
 def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     rows = 260
     codes, futures, _, _ = schedule_columns(2)
@@ -381,7 +382,7 @@ def test_futures_fixings_keep_a_copy_of_each_column() -> None:
     days, settles = fixings_columns(rows, 100)
     assert (
         least_peak(lambda: ENTRY["_CreateFuturesFixings"](days, settles, index))
-        <= 45 * rows + SLACK
+        <= 35 * rows + SLACK
     )
 
 

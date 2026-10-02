@@ -1113,11 +1113,13 @@ def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
 # A year of fixings at the column path, with the index by handle: the date column through its
 # look and its conversion to days, the settle column accepted on the host's summary alone, the
 # handle's text rule and its one lookup, then the builder's kind check, the holiday calendar
-# read off the index, its count, its three looks, the order of the dates, the days the market
-# is closed and the business days without a fixing, its two copies, and one publication.
-# Twenty-one calls across seventeen functions, the accept rule once per argument. The three
-# business-day calls, the calendar, is_busday and busday_offset, raise no event the numpy
-# fixture reads, so only their looks are in its count.
+# read off the index, its count, its two looks, the order of the dates and the days the market
+# is closed, its count of the business days from the first date to the last and the one look at
+# that count, its two copies, and one publication. Twenty-one calls across seventeen functions,
+# the accept rule once per argument. The three business-day calls, the calendar, is_busday and
+# busday_count, raise no event the numpy fixture reads, so only their looks are in its count:
+# the ledger reads as it did when the gaps were a look over the business day after each date,
+# and the ceiling in test_seam_allocation.py is what records the work saved.
 def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -1148,7 +1150,7 @@ def test_futures_fixings_are_two_columns_and_an_index_in_and_one_publication_out
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateFuturesFixings"](days, settles, index)) == {
-        "ndarray.any": 4,  # the date column's look for the calendar, then the builder's three
+        "ndarray.any": 4,  # the date column's look, the builder's two, and the count's one
         "ndarray.astype": 2,  # the date column on its way to days
         "numpy.array": 2,  # the two copies the fixings keep
         "ndarray.setflags": 2,  # frozen
