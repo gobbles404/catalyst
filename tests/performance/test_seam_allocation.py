@@ -281,7 +281,7 @@ def test_a_gas_daily_schedule_keeps_a_copy_of_each_date_column() -> None:
 # Five texts kept as they arrived, the record and its entry: measured 281 bytes on 2026-09-16,
 # and 1,162 for reading them back as a three-row table of fifteen text cells.
 def test_a_creator_of_index_conventions_and_its_reader_stay_small() -> None:
-    codes = ("USD", "BBL", "USD", "volume", "BBL")
+    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
     assert least_peak(lambda: ENTRY["_CreateIndexConventions"](*codes)) <= 2 * SLACK
     handle = ENTRY["_CreateIndexConventions"](*codes)
     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
@@ -305,7 +305,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
     return ENTRY["_CreateIndex"](
         "sample",
         schedule,
-        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
         holidays,
     )
@@ -329,7 +329,7 @@ def test_contract_specifications_keep_a_copy_of_each_numeric_column() -> None:
 def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
     codes, futures, _, _ = schedule_columns(13)
     schedule = ENTRY["_CreateFuturesSchedule"](codes, futures, MISSING)
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU")
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         SPECIFICATION_HEADERS, specification_body(12)
     )

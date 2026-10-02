@@ -27,7 +27,7 @@ def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
     quantities = np.full(N, 2.0)
 
     def convert() -> object:
-        return UNITS.convert(quantities, "volume", "BBL", "GAL")
+        return UNITS.convert(quantities, "VOLUME", "BBL", "GAL")
 
     assert call_profile(convert) == {
         "UnitConversions.convert": 1,
@@ -41,4 +41,4 @@ def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
 # for the factor. Measured 80,200 bytes at ten thousand quantities on 2026-09-17.
 def test_a_conversion_allocates_its_result_and_nothing_else() -> None:
     quantities = np.full(N, 2.0)
-    assert peak_bytes(lambda: UNITS.convert(quantities, "volume", "BBL", "GAL")) <= 8 * N + SLACK
+    assert peak_bytes(lambda: UNITS.convert(quantities, "VOLUME", "BBL", "GAL")) <= 8 * N + SLACK

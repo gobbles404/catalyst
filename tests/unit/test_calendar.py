@@ -45,7 +45,7 @@ CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 # A calendar of one day, New Year's Day, outside every calendar built here.
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
-CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
 )

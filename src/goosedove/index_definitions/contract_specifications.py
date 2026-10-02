@@ -44,7 +44,7 @@ def contract_specifications(
     lot size is whole, since a lot is a whole number of its unit, and 1 or more, since a lot of
     nothing, or of a negative quantity, is no lot; a whole lot size below one fails the second of
     those, so -3 reads `expected 1 or more`. Each lot unit is a unit of a category a quantity can
-    measure, volume, mass or energy, in the tables passed in, matched exactly as a code and never
+    measure, VOLUME, MASS or ENERGY, in the tables passed in, matched exactly as a code and never
     trimmed or re-cased; whether it is a unit of the index's own category is the index's rule,
     since nothing here holds the conventions, so a barrel row and a gallon row stand side by side
     here and MMBTU beside them, and the index refuses the one that is not its measure. Each

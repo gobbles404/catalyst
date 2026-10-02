@@ -1,8 +1,8 @@
 # UnitConversions
 
-Built in #71.
+Built in #71; the category codes in capitals since #NN.
 
-The library's fixed unit definitions and the conversion between them: four categories, `volume`, `mass`, `energy` and `usd`, each a reference unit and the size of every unit of it in that reference unit. Why these choices, and what they cost, are on this page. It has no worksheet surface and needs nothing from the seam. The code is `src/goosedove/globals/unit_conversions.py`: the records, the two builders that check the definitions once, the shipped definitions at its foot, and the collection they make, `UNITS`.
+The library's fixed unit definitions and the conversion between them: four categories, `VOLUME`, `MASS`, `ENERGY` and `USD`, each a reference unit and the size of every unit of it in that reference unit. Why these choices, and what they cost, are on this page. It has no worksheet surface and needs nothing from the seam. The code is `src/goosedove/globals/unit_conversions.py`: the records, the two builders that check the definitions once, the shipped definitions at its foot, and the collection they make, `UNITS`.
 
 ## Not a worksheet function
 
@@ -23,7 +23,7 @@ an argument belongs to that argument; `UnitConversions` has no Excel help entry 
 ```python
 UNITS: Final = unit_conversions(
     category(
-        "volume", "GAL", UnitDefinition("GAL", "GAL", 1.0), UnitDefinition("BBL", "GAL", 42.0), ...
+        "VOLUME", "GAL", UnitDefinition("GAL", "GAL", 1.0), UnitDefinition("BBL", "GAL", 42.0), ...
     ),
     ...,
 )
@@ -59,12 +59,12 @@ repeating these checks.
 
 | Rule | Message |
 |---|---|
-| unit codes unique within a category | `energy defines BTU twice` |
-| every row's reference unit is its category's | `mass row LB references GAL, expected KG` |
-| every size finite and strictly positive | `volume row L has size 0, expected greater than 0` |
-| the reference unit has a row of its own | `volume reference GAL has no row, expected one with size 1` |
-| the reference unit's own row has size exactly `1` | `volume reference GAL has size 42, expected 1` |
-| a category defined once in the collection, which keys them by name | `volume is defined twice` |
+| unit codes unique within a category | `ENERGY defines BTU twice` |
+| every row's reference unit is its category's | `MASS row LB references GAL, expected KG` |
+| every size finite and strictly positive | `VOLUME row L has size 0, expected greater than 0` |
+| the reference unit has a row of its own | `VOLUME reference GAL has no row, expected one with size 1` |
+| the reference unit's own row has size exactly `1` | `VOLUME reference GAL has size 42, expected 1` |
+| a category defined once in the collection, which keys them by name | `VOLUME is defined twice` |
 
 The rows are checked in order, each against the three rules on a row, then the reference row, so the first row that fails is the one named. The last rule is the collection's own, from its layout: a second category of the same name would silently replace the first.
 
@@ -72,11 +72,11 @@ The rows are checked in order, each against the three rules on a row, then the r
 
 | Rule | Message |
 |---|---|
-| the category exists, matched exactly and case-sensitively | `unknown category 'Volume'; categories are volume, mass, energy, usd` |
-| both units exist in that category, the first that does not being named | `unknown unit 'GALLON' in volume; units are GAL, BBL, L, M3` |
-| both units are in the same category | `cannot convert MWH to BBL; energy and volume are different categories` |
+| the category exists, matched exactly and case-sensitively | `unknown category 'Volume'; categories are VOLUME, MASS, ENERGY, USD` |
+| both units exist in that category, the first that does not being named | `unknown unit 'GALLON' in VOLUME; units are GAL, BBL, L, M3` |
+| both units are in the same category | `cannot convert MWH to BBL; ENERGY and VOLUME are different categories` |
 
-A unit the category asked for does not have fails as unknown in it, unless the two units belong to two different categories, when the conversion is refused as one across categories, naming both: `MWH` to `KWH` asked for in `volume` is an unknown unit in volume, and `MWH` to `BBL` asked for in any category is energy to volume.
+A unit the category asked for does not have fails as unknown in it, unless the two units belong to two different categories, when the conversion is refused as one across categories, naming both: `MWH` to `KWH` asked for in `VOLUME` is an unknown unit in VOLUME, and `MWH` to `BBL` asked for in any category is energy to volume.
 
 Codes are never trimmed or re-cased on the way in: a code is an identifier, not prose.
 Category matching is case-sensitive and is a separate rule from worksheet header matching
@@ -98,7 +98,7 @@ One row means:
 
 A row is a `UnitDefinition`, and the code holds the tables below row for row, the decimal on the page being the literal in the code.
 
-### volume
+### VOLUME
 
 | unit | reference_unit | size_in_reference_unit |
 |---|---|---:|
@@ -112,7 +112,7 @@ metre. EIA defines the barrel as [42 U.S. gallons](https://www.eia.gov/tools/glo
 [NIST Handbook 130](https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=936069) gives
 3.785411784 litres per U.S. gallon.
 
-### mass
+### MASS
 
 | unit | reference_unit | size_in_reference_unit |
 |---|---|---:|
@@ -130,7 +130,7 @@ Kilogram, international avoirdupois pound, metric tonne, short ton (2000 lb), lo
 [NIST ton definitions](https://www.nist.gov/document/appendb-07-hb44-finalpdf). Then, since #71: `G` the gram, for precious-metal contracts and quotations expressed in grams; `OZT` the troy ounce, exactly 31.1034768 grams, for gold, silver, platinum and palladium, and explicitly not the avoirdupois ounce, which has no code here; `CWT_US` the U.S. hundredweight, 100 pounds, used in rice and dairy, its name saying which, since the imperial hundredweight is 112 pounds and has no code here. The full
 names must accompany the codes in library documentation.
 
-### energy
+### ENERGY
 
 | unit | reference_unit | size_in_reference_unit |
 |---|---|---:|
@@ -145,7 +145,7 @@ names must accompany the codes in library documentation.
 of them. `THERM` is exactly 100,000 Btu_IT. `GJ` is 1e9 joules, `MWH` is 3.6e9 joules, and `KWH`, since #71, is 3.6e6 joules, one thousandth of a megawatt hour, completing the common electricity scales.
 These exact meanings must stay written down beside the codes.
 
-### usd
+### USD
 
 | unit | reference_unit | size_in_reference_unit |
 |---|---|---:|
@@ -169,7 +169,7 @@ Grouping the four categories in one collection does not permit conversion betwee
 
 | Case | Kind | Where |
 |---|---|---|
-| the collection holds `volume`, `mass`, `energy`, `usd`, each with its own reference unit, and the units of each as listed above | example | `tests/unit/test_unit_conversions.py` |
+| the collection holds `VOLUME`, `MASS`, `ENERGY`, `USD`, each with its own reference unit, and the units of each as listed above | example | `tests/unit/test_unit_conversions.py` |
 | 2 BBL → 84 GAL; 84 GAL → 2 BBL; GAL → GAL unchanged | example | `tests/unit/test_unit_conversions.py` |
 | 1 GAL → 3.785411784 L; 1 M3 → 1000 L | example | `tests/unit/test_unit_conversions.py` |
 | 1 MT → 1000 KG; 1 ST → 2000 LB; 1 LT → 2240 LB; 1 OZT → 31.1034768 G; 1 CWT_US → 100 LB | example | `tests/unit/test_unit_conversions.py` |
@@ -196,4 +196,4 @@ last place, the tests allowing 1e-15 relative. Display rounding must never chang
 An Excel constructor, a handle, a companion worksheet function, FX. Cross-category
 conversion, which needs a density or heat content the tables do not carry; prices such as
 USD/BBL or cents/gal, which are pairs of units and have no type here; and the `contract`
-category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units: that builder's since #110, reading this collection by key, `usd` the currency category and the other three the measures a quantity type may name. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.
+category, all excluded above. The check that `_CreateIndexConventions`' five codes are among these categories and units: that builder's since #110, reading this collection by key, `USD` the currency category and the other three the measures a quantity type may name. A work counter: library code takes none yet, parked with the measurement session as [README.md](../README.md) says, and a conversion's work is pinned directly instead.

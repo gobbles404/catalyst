@@ -135,7 +135,7 @@ try {
     Put "H2" "NYMEX"; Put "I2" "1000"; Put "J2" "0"; Put "K2" "0"; Put "L2" "BBL"
     Put "M1" "=_CreateFuturesSchedule(A1:A$contracts,B1:B$contracts)"
     Put "M2" "=_CreateHolidayCalendar(F2)"
-    Put "M3" '=_CreateIndexConventions("USD","BBL","USD","volume","BBL")'
+    Put "M3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
     Put "M4" "=_CreateContractSpecifications(H1:L1,H2:L2)"
     Put "M5" "=_CreateIndex(F1,M1,M3,M4,M2)"
     Put "M6" "=_CreateValuationDate(F3,0.5)"

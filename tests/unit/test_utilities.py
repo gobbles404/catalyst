@@ -155,7 +155,7 @@ def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() 
 def an_index(schedule: object, holidays: object = MISSING) -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
     conventions and specifications, since nothing here reads either."""
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [
@@ -501,7 +501,7 @@ def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
 
 
 def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
-    handle = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    handle = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
     assert rows(read(handle)) == [
         [
             "quote_currency_unit",
@@ -511,7 +511,7 @@ def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() 
             "quantity_unit",
         ],
         ["str", "str", "str", "str", "str"],
-        ["USD", "BBL", "USD", "volume", "BBL"],
+        ["USD", "BBL", "USD", "VOLUME", "BBL"],
     ]
 
 
@@ -620,7 +620,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "energy", "MMBTU"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "ENERGY", "MMBTU"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [

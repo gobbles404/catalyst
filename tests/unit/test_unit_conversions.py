@@ -40,18 +40,18 @@ def close(actual: float, target: float) -> bool:
 
 def test_the_four_categories_each_with_their_own_reference_unit() -> None:
     assert [(c.name, c.reference_unit) for c in UNITS.categories.values()] == [
-        ("volume", "GAL"),
-        ("mass", "KG"),
-        ("energy", "MMBTU"),
-        ("usd", "USD"),
+        ("VOLUME", "GAL"),
+        ("MASS", "KG"),
+        ("ENERGY", "MMBTU"),
+        ("USD", "USD"),
     ]
     assert all(c.sizes[c.reference_unit] == 1.0 for c in UNITS.categories.values())
     assert all(UNITS.category(name) is c for name, c in UNITS.categories.items())
 
 
 def test_the_units_of_each_category_as_the_page_lists_them() -> None:
-    assert list(UNITS.category("volume").sizes) == ["GAL", "BBL", "L", "M3"]
-    assert list(UNITS.category("mass").sizes) == [
+    assert list(UNITS.category("VOLUME").sizes) == ["GAL", "BBL", "L", "M3"]
+    assert list(UNITS.category("MASS").sizes) == [
         "KG",
         "LB",
         "MT",
@@ -61,38 +61,38 @@ def test_the_units_of_each_category_as_the_page_lists_them() -> None:
         "OZT",
         "CWT_US",
     ]
-    assert list(UNITS.category("energy").sizes) == ["MMBTU", "BTU", "THERM", "GJ", "MWH", "KWH"]
-    assert list(UNITS.category("usd").sizes) == ["USD", "CENT"]
+    assert list(UNITS.category("ENERGY").sizes) == ["MMBTU", "BTU", "THERM", "GJ", "MWH", "KWH"]
+    assert list(UNITS.category("USD").sizes) == ["USD", "CENT"]
 
 
 # --- the page's conversions -------------------------------------------------
 
 
 def test_barrels_and_gallons_both_ways_and_a_unit_to_itself() -> None:
-    assert converted(2.0, "volume", "BBL", "GAL") == 84.0
-    assert converted(84.0, "volume", "GAL", "BBL") == 2.0
-    assert converted(3.5, "volume", "GAL", "GAL") == 3.5
-    assert UNITS.factor("volume", "BBL", "GAL") == 42.0
-    assert UNITS.factor("volume", "GAL", "GAL") == 1.0
+    assert converted(2.0, "VOLUME", "BBL", "GAL") == 84.0
+    assert converted(84.0, "VOLUME", "GAL", "BBL") == 2.0
+    assert converted(3.5, "VOLUME", "GAL", "GAL") == 3.5
+    assert UNITS.factor("VOLUME", "BBL", "GAL") == 42.0
+    assert UNITS.factor("VOLUME", "GAL", "GAL") == 1.0
 
 
 @pytest.mark.parametrize(
     ("quantity", "which", "from_unit", "to_unit", "target"),
     [
-        (1.0, "volume", "GAL", "L", 3.785411784),
-        (1.0, "volume", "M3", "L", 1000.0),
-        (1.0, "mass", "MT", "KG", 1000.0),
-        (1.0, "mass", "ST", "LB", 2000.0),
-        (1.0, "mass", "LT", "LB", 2240.0),
-        (1.0, "mass", "OZT", "G", 31.1034768),
-        (1.0, "mass", "CWT_US", "LB", 100.0),
-        (1.0, "energy", "MWH", "GJ", 3.6),
-        (1.0, "energy", "MMBTU", "BTU", 1_000_000.0),
-        (1.0, "energy", "MMBTU", "THERM", 10.0),
-        (1.0, "energy", "MWH", "KWH", 1000.0),
-        (1.0, "usd", "USD", "CENT", 100.0),
-        (100.0, "usd", "CENT", "USD", 1.0),
-        (250.0, "usd", "CENT", "USD", 2.5),
+        (1.0, "VOLUME", "GAL", "L", 3.785411784),
+        (1.0, "VOLUME", "M3", "L", 1000.0),
+        (1.0, "MASS", "MT", "KG", 1000.0),
+        (1.0, "MASS", "ST", "LB", 2000.0),
+        (1.0, "MASS", "LT", "LB", 2240.0),
+        (1.0, "MASS", "OZT", "G", 31.1034768),
+        (1.0, "MASS", "CWT_US", "LB", 100.0),
+        (1.0, "ENERGY", "MWH", "GJ", 3.6),
+        (1.0, "ENERGY", "MMBTU", "BTU", 1_000_000.0),
+        (1.0, "ENERGY", "MMBTU", "THERM", 10.0),
+        (1.0, "ENERGY", "MWH", "KWH", 1000.0),
+        (1.0, "USD", "USD", "CENT", 100.0),
+        (100.0, "USD", "CENT", "USD", 1.0),
+        (250.0, "USD", "CENT", "USD", 2.5),
     ],
 )
 def test_the_pages_relations_hold_within_tolerance(
@@ -103,14 +103,14 @@ def test_the_pages_relations_hold_within_tolerance(
 
 def test_zero_stays_zero_and_a_negative_quantity_keeps_its_sign() -> None:
     quantities = np.array([0.0, -2.0, -0.5])
-    result = UNITS.convert(quantities, "volume", "BBL", "GAL")
+    result = UNITS.convert(quantities, "VOLUME", "BBL", "GAL")
     assert result.tolist() == [0.0, -84.0, -21.0]
     assert result.dtype == np.float64
 
 
 def test_a_column_converts_in_one_go_and_the_column_is_left_as_it_was() -> None:
     quantities = np.array([1.0, 2.0, 3.0])
-    result = UNITS.convert(quantities, "usd", "USD", "CENT")
+    result = UNITS.convert(quantities, "USD", "USD", "CENT")
     assert result.tolist() == [100.0, 200.0, 300.0]
     assert quantities.tolist() == [1.0, 2.0, 3.0]
     assert result is not quantities
@@ -162,9 +162,9 @@ def rows(*triples: tuple[str, str, float]) -> tuple[UnitDefinition, ...]:
 
 
 def test_a_unit_defined_twice_in_a_category_fails() -> None:
-    with pytest.raises(ValueError, match=r"^energy defines BTU twice$"):
+    with pytest.raises(ValueError, match=r"^ENERGY defines BTU twice$"):
         category(
-            "energy",
+            "ENERGY",
             "MMBTU",
             *rows(("MMBTU", "MMBTU", 1.0), ("BTU", "MMBTU", 1e-06), ("BTU", "MMBTU", 1e-06)),
         )
@@ -172,19 +172,19 @@ def test_a_unit_defined_twice_in_a_category_fails() -> None:
 
 def test_a_category_without_its_reference_units_row_fails() -> None:
     with pytest.raises(
-        ValueError, match=r"^volume reference GAL has no row, expected one with size 1$"
+        ValueError, match=r"^VOLUME reference GAL has no row, expected one with size 1$"
     ):
-        category("volume", "GAL", *rows(("BBL", "GAL", 42.0)))
+        category("VOLUME", "GAL", *rows(("BBL", "GAL", 42.0)))
 
 
 def test_a_row_referencing_another_unit_than_the_categorys_fails() -> None:
-    with pytest.raises(ValueError, match=r"^mass row LB references GAL, expected KG$"):
-        category("mass", "KG", *rows(("KG", "KG", 1.0), ("LB", "GAL", 0.45359237)))
+    with pytest.raises(ValueError, match=r"^MASS row LB references GAL, expected KG$"):
+        category("MASS", "KG", *rows(("KG", "KG", 1.0), ("LB", "GAL", 0.45359237)))
 
 
 def test_a_reference_row_whose_size_is_not_one_fails() -> None:
-    with pytest.raises(ValueError, match=r"^volume reference GAL has size 42, expected 1$"):
-        category("volume", "GAL", *rows(("GAL", "GAL", 42.0), ("BBL", "GAL", 1.0)))
+    with pytest.raises(ValueError, match=r"^VOLUME reference GAL has size 42, expected 1$"):
+        category("VOLUME", "GAL", *rows(("GAL", "GAL", 42.0), ("BBL", "GAL", 1.0)))
 
 
 @pytest.mark.parametrize(
@@ -193,24 +193,24 @@ def test_a_reference_row_whose_size_is_not_one_fails() -> None:
 )
 def test_a_size_that_is_not_finite_and_greater_than_zero_fails(size: float, shown: str) -> None:
     with pytest.raises(
-        ValueError, match=rf"^volume row L has size {shown}, expected greater than 0$"
+        ValueError, match=rf"^VOLUME row L has size {shown}, expected greater than 0$"
     ):
-        category("volume", "GAL", *rows(("GAL", "GAL", 1.0), ("L", "GAL", size)))
+        category("VOLUME", "GAL", *rows(("GAL", "GAL", 1.0), ("L", "GAL", size)))
 
 
 def test_a_category_defined_twice_in_a_collection_fails() -> None:
-    volume = category("volume", "GAL", *rows(("GAL", "GAL", 1.0)))
-    with pytest.raises(ValueError, match=r"^volume is defined twice$"):
+    volume = category("VOLUME", "GAL", *rows(("GAL", "GAL", 1.0)))
+    with pytest.raises(ValueError, match=r"^VOLUME is defined twice$"):
         unit_conversions(volume, volume)
 
 
 # --- the rules on a request ---------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["Volume", "VOLUME", "volume ", " volume", "weight", ""])
+@pytest.mark.parametrize("name", ["Volume", "volume", "VOLUME ", " VOLUME", "weight", ""])
 def test_a_category_is_matched_exactly_or_is_unknown(name: str) -> None:
     with pytest.raises(
-        ValueError, match=rf"^unknown category {name!r}; categories are volume, mass, energy, usd$"
+        ValueError, match=rf"^unknown category {name!r}; categories are VOLUME, MASS, ENERGY, USD$"
     ):
         UNITS.category(name)
     with pytest.raises(ValueError, match=rf"^unknown category {name!r};"):
@@ -219,48 +219,48 @@ def test_a_category_is_matched_exactly_or_is_unknown(name: str) -> None:
 
 @pytest.mark.parametrize("unit", ["GALLON", "gal", "Bbl", "BBL ", ""])
 def test_a_unit_is_matched_exactly_within_its_category_or_is_unknown(unit: str) -> None:
-    message = rf"^unknown unit {unit!r} in volume; units are GAL, BBL, L, M3$"
+    message = rf"^unknown unit {unit!r} in VOLUME; units are GAL, BBL, L, M3$"
     with pytest.raises(ValueError, match=message):
-        UNITS.category("volume").size_of(unit)
+        UNITS.category("VOLUME").size_of(unit)
     with pytest.raises(ValueError, match=message):
-        UNITS.factor("volume", unit, "BBL")
+        UNITS.factor("VOLUME", unit, "BBL")
     with pytest.raises(ValueError, match=message):
-        UNITS.factor("volume", "BBL", unit)
+        UNITS.factor("VOLUME", "BBL", unit)
 
 
 def test_the_first_unknown_unit_is_named() -> None:
-    with pytest.raises(ValueError, match=r"^unknown unit 'GALLON' in volume;"):
-        UNITS.factor("volume", "GALLON", "BARREL")
-    with pytest.raises(ValueError, match=r"^unknown unit 'GALLON' in volume;"):
-        UNITS.factor("volume", "GALLON", "MWH")
+    with pytest.raises(ValueError, match=r"^unknown unit 'GALLON' in VOLUME;"):
+        UNITS.factor("VOLUME", "GALLON", "BARREL")
+    with pytest.raises(ValueError, match=r"^unknown unit 'GALLON' in VOLUME;"):
+        UNITS.factor("VOLUME", "GALLON", "MWH")
 
 
 @pytest.mark.parametrize(
     ("which", "from_unit", "to_unit", "message"),
     [
         (
-            "energy",
+            "ENERGY",
             "MWH",
             "BBL",
-            "cannot convert MWH to BBL; energy and volume are different categories",
+            "cannot convert MWH to BBL; ENERGY and VOLUME are different categories",
         ),
         (
-            "volume",
+            "VOLUME",
             "MWH",
             "BBL",
-            "cannot convert MWH to BBL; energy and volume are different categories",
+            "cannot convert MWH to BBL; ENERGY and VOLUME are different categories",
         ),
         (
-            "volume",
+            "VOLUME",
             "BBL",
             "MWH",
-            "cannot convert BBL to MWH; volume and energy are different categories",
+            "cannot convert BBL to MWH; VOLUME and ENERGY are different categories",
         ),
         (
-            "mass",
+            "MASS",
             "USD",
             "GAL",
-            "cannot convert USD to GAL; usd and volume are different categories",
+            "cannot convert USD to GAL; USD and VOLUME are different categories",
         ),
     ],
 )
@@ -277,9 +277,9 @@ def test_units_of_different_categories_are_refused(
 # units the category asked for does not have.
 def test_two_units_of_one_other_category_are_unknown_in_the_one_asked_for() -> None:
     with pytest.raises(
-        ValueError, match=r"^unknown unit 'MWH' in volume; units are GAL, BBL, L, M3$"
+        ValueError, match=r"^unknown unit 'MWH' in VOLUME; units are GAL, BBL, L, M3$"
     ):
-        UNITS.factor("volume", "MWH", "KWH")
+        UNITS.factor("VOLUME", "MWH", "KWH")
 
 
 # --- nothing changes ------------------------------------------------------------
@@ -287,10 +287,10 @@ def test_two_units_of_one_other_category_are_unknown_in_the_one_asked_for() -> N
 
 def test_a_conversion_leaves_the_collection_and_every_definition_unchanged() -> None:
     before = {name: dict(c.sizes) for name, c in UNITS.categories.items()}
-    UNITS.convert(np.array([1.0, 2.0]), "mass", "LB", "KG")
-    UNITS.convert(np.array([1.0, 2.0]), "energy", "KWH", "MMBTU")
+    UNITS.convert(np.array([1.0, 2.0]), "MASS", "LB", "KG")
+    UNITS.convert(np.array([1.0, 2.0]), "ENERGY", "KWH", "MMBTU")
     assert {name: dict(c.sizes) for name, c in UNITS.categories.items()} == before
-    assert before["volume"] == {
+    assert before["VOLUME"] == {
         "GAL": 1.0,
         "BBL": 42.0,
         "L": 0.26417205235814845,
@@ -299,7 +299,7 @@ def test_a_conversion_leaves_the_collection_and_every_definition_unchanged() -> 
 
 
 def test_the_collection_and_its_categories_are_read_only() -> None:
-    volume = UNITS.category("volume")
+    volume = UNITS.category("VOLUME")
     with pytest.raises(TypeError):
         cast(MutableMapping[str, float], volume.sizes)["GAL"] = 2.0
     with pytest.raises(TypeError):

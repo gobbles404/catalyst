@@ -177,8 +177,8 @@ def test_the_conventions_creator_explains_itself() -> None:
         "other formulas take as the conventions."
     )
     units = (
-        "GAL, BBL, L or M3 for volume; KG, LB, MT, ST, LT, G, OZT or CWT_US for mass; MMBTU, BTU, "
-        "THERM, GJ, MWH or KWH for energy."
+        "GAL, BBL, L or M3 for VOLUME; KG, LB, MT, ST, LT, G, OZT or CWT_US for MASS; MMBTU, BTU, "
+        "THERM, GJ, MWH or KWH for ENERGY."
     )
     assert arguments == [
         (
@@ -191,7 +191,7 @@ def test_the_conventions_creator_explains_itself() -> None:
             + units,
         ),
         ("currency_unit", "The currency unit the index settles in: USD or CENT."),
-        ("quantity_type", "What a quantity of the index measures: volume, mass or energy."),
+        ("quantity_type", "What a quantity of the index measures: VOLUME, MASS or ENERGY."),
         (
             "quantity_unit",
             "The unit a quantity of the index is stated in, a unit of the quantity type: " + units,

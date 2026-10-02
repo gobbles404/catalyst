@@ -116,7 +116,7 @@ $formulas = [ordered]@{
     # and a number where a code is expected, and a code left out, the seam's.
     '=MID(AP1,FIND(":",AP1)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP1),1,4)" = "quantity_type"
-    "=INDEX(util_ReadHandle(AP1),3,4)" = "volume"
+    "=INDEX(util_ReadHandle(AP1),3,4)" = "VOLUME"
     "=COLUMNS(util_ReadHandle(AP1))"   = "5"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
@@ -124,8 +124,8 @@ $formulas = [ordered]@{
     '=MID(AP2,FIND(":",AP2)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP2),3,1)" = "CENT"
     "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
-    "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy"
-    "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+    "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY"
+    "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The contract specifications: a creator over a header row and a table of two words for a
     # quantity of WTI, a thousand-barrel lot and the bare gallon, read back through util_ReadHandle
     # with the lot units as text; a lot size with a fraction, a lot size of zero, a negative fee, a
@@ -147,8 +147,8 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(EI1:EM1,EI7:EM8)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'lots', already given at row 1"
     "=_CreateContractSpecifications(EI1:EM1,EI9:EM9)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI10:EM10)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
-    "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a volume, mass or energy unit"
-    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+    "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit"
+    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -540,7 +540,7 @@ $cells = [ordered]@{
     # The index conventions: five codes as the desk types them and one creator cell; a category in
     # another case and an energy unit, for the conventions to refuse; and the gasoline index's
     # quoted units, cents a gallon, with a second creator cell settling in dollars a barrel.
-    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
+    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "VOLUME"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
     "AO8" = "Volume"; "AO9" = "MMBTU"
     "AO10" = "CENT"; "AO11" = "GAL"

@@ -41,7 +41,7 @@ LOT_UNITS = ("MMBTU", "MMBTU", "MMBTU")
 BROKERAGE = numbers(3.0, 0.75, 0.0)
 CLEARING = numbers(2.0, 0.5, 0.0)
 QUANTITY_UNITS = tuple(
-    unit for name, category in UNITS.categories.items() if name != "usd" for unit in category.sizes
+    unit for name, category in UNITS.categories.items() if name != "USD" for unit in category.sizes
 )
 
 
@@ -176,23 +176,23 @@ def test_a_negative_fraction_is_a_fraction_and_a_negative_whole_is_below_one() -
     [
         (
             ("MMBTU", "USD", "MMBTU"),
-            "lot_unit row 2 is 'USD', expected a volume, mass or energy unit",
+            "lot_unit row 2 is 'USD', expected a VOLUME, MASS or ENERGY unit",
         ),
         (
             ("mmbtu", "MMBTU", "MMBTU"),
-            "lot_unit row 1 is 'mmbtu', expected a volume, mass or energy unit",
+            "lot_unit row 1 is 'mmbtu', expected a VOLUME, MASS or ENERGY unit",
         ),
         (
             ("MMBTU", "MMBTU", "MMBTU "),
-            "lot_unit row 3 is 'MMBTU ', expected a volume, mass or energy unit",
+            "lot_unit row 3 is 'MMBTU ', expected a VOLUME, MASS or ENERGY unit",
         ),
         (
             ("MMBTU", "MMBTU", "therms"),
-            "lot_unit row 3 is 'therms', expected a volume, mass or energy unit",
+            "lot_unit row 3 is 'therms', expected a VOLUME, MASS or ENERGY unit",
         ),
         (
             ("CENT", "usd", "MMBTU"),
-            "lot_unit row 1 is 'CENT', expected a volume, mass or energy unit",
+            "lot_unit row 1 is 'CENT', expected a VOLUME, MASS or ENERGY unit",
         ),
     ],
     ids=[
@@ -275,7 +275,7 @@ def test_the_rules_run_in_order_and_the_earlier_failure_is_named() -> None:
     with pytest.raises(ValueError, match=r"^lot_size row 1 is 0.0, expected 1 or more$"):
         specifications(NAMES, wholes(0, 2500, 1), ("usd",) * 3, bad_fees, bad_fees)
     with pytest.raises(
-        ValueError, match=r"^lot_unit row 1 is 'usd', expected a volume, mass or energy unit$"
+        ValueError, match=r"^lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit$"
     ):
         specifications(NAMES, LOTS, ("usd",) * 3, bad_fees, bad_fees)
     with pytest.raises(
@@ -342,7 +342,7 @@ def test_one_row_below_the_line_is_named_wherever_it_is(count: int, data: st.Dat
         units[row] = data.draw(
             st.text(min_size=1, max_size=8).filter(lambda text: text not in QUANTITY_UNITS)
         )
-        bad, wanted = repr(units[row]), "a volume, mass or energy unit"
+        bad, wanted = repr(units[row]), "a VOLUME, MASS or ENERGY unit"
     elif which == "brokerage_rate_per_lot":
         brokerage[row] = data.draw(
             st.floats(max_value=-1e-9, allow_nan=False, allow_infinity=False)

@@ -10,14 +10,14 @@ from goosedove.globals.unit_conversions import UnitConversions
 # The tables' one currency category: its units are the currency units an index is quoted and
 # settled in, and it is not a category a quantity measures. Another currency is another category
 # there, when one arrives.
-CURRENCY = "usd"
+CURRENCY = "USD"
 
 
 @dataclass(frozen=True, slots=True)
 class IndexConventions:
     """Five codes, as the desk typed them and as the unit tables spell them: the currency unit and
     the quantity unit a price is quoted in, USD per BBL say; the currency unit the index settles
-    in; and what a quantity measures, volume say, with the unit it is stated in, BBL, the two
+    in; and what a quantity measures, VOLUME say, with the unit it is stated in, BBL, the two
     quantity units both of that category."""
 
     quote_currency_unit: str
@@ -40,7 +40,8 @@ def index_conventions(
 
     The two currency units first, which depend on nothing else: each is a unit of the tables'
     currency category, USD or CENT. Then the quantity type, a category a quantity can measure,
-    volume, mass or energy, and not the currency category, which scales money. Then the two
+    VOLUME, MASS or ENERGY, in capitals like every other code, and not the currency category,
+    which scales money. Then the two
     quantity units, judged by it: each a unit of that category, so that a price quoted per gallon
     and a quantity stated in barrels are two units of one measure, and the two may differ, as may
     the two currency units, so long as each pair is of one category. Each code is matched
@@ -81,13 +82,13 @@ def listed(codes: Iterable[str]) -> str:
 
 
 def measures_of(units: UnitConversions) -> list[str]:
-    """The categories a quantity can measure, volume, mass and energy: every category but the
+    """The categories a quantity can measure, VOLUME, MASS and ENERGY: every category but the
     currency's, in the tables' order."""
     return [name for name in units.categories if name != CURRENCY]
 
 
 def a_unit_of(quantity_type: str, measure: Iterable[str]) -> str:
-    """What a message wants of a unit of one category: `a volume unit, GAL, BBL, L or M3`, or
-    `an energy unit, MMBTU, BTU, THERM, GJ, MWH or KWH`."""
-    article = "an" if quantity_type[0] in "aeiou" else "a"
+    """What a message wants of a unit of one category: `a VOLUME unit, GAL, BBL, L or M3`, or
+    `an ENERGY unit, MMBTU, BTU, THERM, GJ, MWH or KWH`."""
+    article = "an" if quantity_type[0] in "AEIOU" else "a"
     return f"{article} {quantity_type} unit, {listed(measure)}"

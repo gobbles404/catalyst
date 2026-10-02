@@ -77,7 +77,7 @@ def the_calendar() -> str:
 def an_index_of(name: str, schedule: object, holidays: object) -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
     conventions and specifications, since nothing here reads either."""
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [
@@ -382,7 +382,7 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
         "_CreateGasDailySchedule",
         [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
     )
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "energy", "MMBTU"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "ENERGY", "MMBTU"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [
