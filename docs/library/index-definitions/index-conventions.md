@@ -1,6 +1,6 @@
 # _CreateIndexConventions
 
-Built in #68; the codes checked since #110; the quantity type in capitals since #NN.
+Built in #68; the codes checked since #110; the quantity type in capitals since #129.
 
 The index conventions of one index: the currency unit and the quantity unit its price is quoted in, the currency unit it settles in, and what its quantity measures with the unit it is stated in, five codes kept as typed and reached by handle, and from #110 checked against the library's unit tables. Since #107 the [index](index.md) holds the conventions. The codes were kept unchecked from #68, the check noted at the builder for the first consumer's arrival; the [follow-ups](../follow-ups.md) pinned it on 26 September 2026, this build does it once, in the creator, so that pricing reads codes that mean something, and that page marks the item resolved. The code is `src/goosedove/index_definitions/index_conventions.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function, which hands the builder the library's unit collection, `UNITS`, as [unit-conversions.md](../globals/unit-conversions.md) says a reader receives it.
 
@@ -52,7 +52,7 @@ Quoted from the declaration in `src/goosedove/excel/index_definitions.py`, which
 
 ## The library checks
 
-Five rules, in this order, the first failure being the message: the two currency units, which depend on nothing else, then the quantity type, then the two quantity units, which are judged by it. Each code is matched exactly, spelling and case as typed, never trimmed or re-cased, since a code is an identifier and not prose: `VOLUME` is a category and `Volume` is not, nor is `volume`, the spelling before #NN, as [unit-conversions.md](../globals/unit-conversions.md) decided. The quantity type is in capitals since #NN, as every other code the desk types here is, the owner having found one word in small letters odd beside four codes in capitals. A message names the argument, what arrived and the codes that would have done, the tables' units in the tables' order.
+Five rules, in this order, the first failure being the message: the two currency units, which depend on nothing else, then the quantity type, then the two quantity units, which are judged by it. Each code is matched exactly, spelling and case as typed, never trimmed or re-cased, since a code is an identifier and not prose: `VOLUME` is a category and `Volume` is not, nor is `volume`, the spelling before #129, as [unit-conversions.md](../globals/unit-conversions.md) decided. The quantity type is in capitals since #129, as every other code the desk types here is, the owner having found one word in small letters odd beside four codes in capitals. A message names the argument, what arrived and the codes that would have done, the tables' units in the tables' order.
 
 | Rule | Message |
 |---|---|

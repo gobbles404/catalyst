@@ -1,6 +1,6 @@
 # UnitConversions
 
-Built in #71; the category codes in capitals since #NN.
+Built in #71; the category codes in capitals since #129.
 
 The library's fixed unit definitions and the conversion between them: four categories, `VOLUME`, `MASS`, `ENERGY` and `USD`, each a reference unit and the size of every unit of it in that reference unit. Why these choices, and what they cost, are on this page. It has no worksheet surface and needs nothing from the seam. The code is `src/goosedove/globals/unit_conversions.py`: the records, the two builders that check the definitions once, the shipped definitions at its foot, and the collection they make, `UNITS`.
 

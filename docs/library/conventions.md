@@ -13,7 +13,7 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 | Worksheet headers | lowercase snake_case, as declared in the function's schema; bound by name in any order, case ignored ([inputs.md](../seam/inputs.md) decision 29) | `date`, `discount_factor` |
 | Utility functions | `util_` then PascalCase, for a function that inspects rather than creates, when the owner states it; a product decision | `util_ReadHandle`, since #73; `util_ReadDiscountFactor` was one until #66 |
 | Handles | `Handle[Kind]` around the library's own class, as a creator's result and as a consumer's parameter; the cell shows `pid:kind:count`, or `pid:kind:index-name:count` where the object carries an index's name, the process ID of the Excel first | `Handle[DiscountCurve]`, `30512:discount_curve:2`; `Handle[Market]`, `30512:market:WTI:36` |
-| Category codes | exact codes in capitals, like the unit codes they hold, matched case-sensitively; since #NN, lowercase until then | `VOLUME`, `MASS`, `ENERGY`, `USD` |
+| Category codes | exact codes in capitals, like the unit codes they hold, matched case-sensitively; since #129, lowercase until then | `VOLUME`, `MASS`, `ENERGY`, `USD` |
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. Every function the library lists is `_Name` or `util_Name` since #73; the seam's `Ping` and its hidden probes keep their names, being the seam's instruments and not the desk's.
