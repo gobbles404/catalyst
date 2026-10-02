@@ -92,4 +92,4 @@ A single `Range.Calculate` costs about 0.4 ms over COM before any formula runs, 
 
 ## Where reports land
 
-`profiles/`, ignored by git: `python-timing.csv`, `python-allocation.csv`, `python-environment.json`, `host-measure/batches.csv`, `host-measure/work.csv`, `host-measure/environment.json`, `excel-timing.csv`, `excel-timing-environment.json`, the same two with `-rows<N>` in the name for a control run, `summary.md`, and one HTML profile per probe.
+`profiles/`, ignored by git: `python-timing.csv`, `python-allocation.csv`, `python-environment.json`, `host-measure/batches.csv`, `host-measure/work.csv`, `host-measure/environment.json`, `excel-timing.csv`, `excel-timing-environment.json`, the same two with `-rows<N>` in the name for a control run, `summary.md`, and one HTML profile per probe. Every results file is comma-separated, and a field that holds a comma is quoted, so a scenario named `round trip, numbers` is one field in each layer's file and the three layers' rows join by it.

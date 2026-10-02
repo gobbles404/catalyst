@@ -82,7 +82,7 @@ namespace Goosedove.Host.Measure
                 writer.WriteLine("layer,probe,scenario,calls,cells_in,cells_out,batch,iterations,elapsed_ms,per_call_us,managed_bytes_per_call,gc0,gc1,gc2");
                 foreach (var row in batches)
                 {
-                    writer.WriteLine(string.Join(",", row));
+                    writer.WriteLine(Csv(row));
                 }
             }
             using (var writer = new StreamWriter(Path.Combine(directory, "work.csv")))
@@ -90,9 +90,25 @@ namespace Goosedove.Host.Measure
                 writer.WriteLine("probe,scenario,cells_in,cells_out,counter,count");
                 foreach (var row in work)
                 {
-                    writer.WriteLine(string.Join(",", row));
+                    writer.WriteLine(Csv(row));
                 }
             }
+        }
+
+        // One row as the comma-separated line its readers expect. A field that holds a comma, a
+        // quote or a line break goes in quotes, with a quote of its own doubled, as Python's csv
+        // module and Export-Csv write the other two layers' files: a scenario named
+        // "round trip, numbers" is one field in all three, and the readers join rows by it.
+        private static readonly char[] NeedsQuotes = { ',', '"', '\r', '\n' };
+
+        private static string Csv(string[] row)
+        {
+            return string.Join(",", row.Select(Field));
+        }
+
+        private static string Field(string value)
+        {
+            return value.IndexOfAny(NeedsQuotes) < 0 ? value : "\"" + value.Replace("\"", "\"\"") + "\"";
         }
 
         private static string Text(long value)
