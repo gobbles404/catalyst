@@ -76,15 +76,17 @@ def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
     assert peak_bytes(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
 
 
-# A table pays for what it converts and gathers, and nothing per row beyond that. Measured
-# 135,266 bytes at ten thousand cells, 2,500 rows of four columns, on 2026-09-13: the date
-# column's masks and its three arrays on the way to days, the text mask and the counts that place
-# each text, the texts as an array and the gathered tuple, the boolean column, and a 1-byte mask
-# per column. About 54 bytes per row, and one mask per column beyond that.
+# A table pays for what it converts, and nothing per row beyond that. Measured 43,940 bytes at
+# ten thousand cells, 2,500 rows of four columns, on 2026-10-01: the date column's masks and its
+# three arrays on the way to days, the boolean column, and a 1-byte mask per column, about 17.6
+# bytes per row and 4.4 per cell. The column of text adds nothing per row: it is a slice of the
+# host's tuple. It was 135,186 bytes, 13.5 per cell, while the texts were placed by a mask, a
+# count and a cumulative sum and gathered from an array of them: what the ceiling of 14 per cell
+# covered, and the ceiling of 5 refuses.
 def test_a_table_in_pays_for_its_conversions_and_nothing_per_row_beyond() -> None:
     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
     body = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)])
-    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 14 * N + SLACK
+    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 5 * N + SLACK
 
 
 # Naming the bad cell is the rejection path's work. A blank is one mask over the kinds, measured

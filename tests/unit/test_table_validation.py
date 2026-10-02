@@ -86,6 +86,19 @@ def JoinLabels(header_row: TextRow, labels: Labels) -> str:
     return " ".join(labels.left) + " | " + " ".join(labels.right)
 
 
+class Notes(Table):
+    first: TextColumn
+    day: DateColumn
+    second: TextColumn
+    flag: BooleanColumn
+    third: TextColumn
+
+
+@probe
+def JoinNotes(header_row: TextRow, notes: Notes) -> str:
+    return " | ".join(" ".join(column) for column in (notes.first, notes.second, notes.third))
+
+
 # The toy table of the alignment note: a date, a text, a number and a flag per trade.
 HEADERS = cells([["date", "product", "quantity", "cleared"]])
 TRADES = cells(
@@ -345,6 +358,74 @@ def test_a_column_of_text_keeps_its_own_texts_whatever_sits_beside_it(
     body = cells([[columns[name][r] for name in order] for r in range(rows)])
     assert bridge.call("JoinLabels", [cells([order]), body]) == (
         " ".join(lefts) + " | " + " ".join(rights)
+    )
+
+
+# With three columns of text among a date and a flag, in any order of headers, each column of
+# text still keeps its own cells in row order: a column's texts are every third text of the
+# body, from its place among the three.
+@given(rows=st.integers(1, 6), data=st.data())
+def test_three_columns_of_text_among_other_types_each_keep_their_own_in_any_order(
+    rows: int, data: st.DataObject
+) -> None:
+    word = st.text(alphabet="abc", min_size=1, max_size=3)
+    names = ("first", "second", "third")
+    texts = {name: data.draw(st.lists(word, min_size=rows, max_size=rows)) for name in names}
+    order = data.draw(st.permutations(["first", "day", "second", "flag", "third"]))
+    columns: dict[str, list[object]] = {name: list(texts[name]) for name in names}
+    columns["day"] = [46276.0 + r for r in range(rows)]
+    columns["flag"] = [r % 2 == 0 for r in range(rows)]
+    body = cells([[columns[name][r] for name in order] for r in range(rows)])
+    assert bridge.call("JoinNotes", [cells([order]), body]) == " | ".join(
+        " ".join(texts[name]) for name in names
+    )
+
+
+# A text cell in the number column and a number in a column of text are each refused at their
+# own cell, wherever the three columns sit, and of two bad cells the one in the earlier column
+# is named: the columns are still checked in sheet order, and no record is ever built on texts
+# counted off a body that fails.
+@given(rows=st.integers(1, 6), data=st.data())
+def test_a_bad_cell_beside_columns_of_text_is_named_at_its_own_place(
+    rows: int, data: st.DataObject
+) -> None:
+    order = data.draw(st.permutations(["left", "middle", "right"]))
+    columns: dict[str, list[object]] = {
+        "left": ["a"] * rows,
+        "middle": [1.0] * rows,
+        "right": ["b"] * rows,
+    }
+    stray = data.draw(st.integers(0, rows - 1))
+    columns["middle"][stray] = "x"
+    bad = [(order.index("middle"), stray, "text 'x', expected number")]
+    holed = data.draw(st.sampled_from(["left", "right", "neither"]))
+    if holed != "neither":
+        hole = data.draw(st.integers(0, rows - 1))
+        columns[holed][hole] = 5.0
+        bad.append((order.index(holed), hole, "number 5.0, expected text"))
+    c, r, words = min(bad)  # the earlier column, and within it the earlier row
+    body = cells([[columns[name][i] for name in order] for i in range(rows)])
+    assert bridge.call("JoinLabels", [cells([order]), body]) == (
+        f"#ERROR JoinLabels: labels cell ({r + 1}, {c + 1}) is {words}"
+    )
+
+
+# The slice that hands a column of text its texts rests on one fact across the column types:
+# every type but the text one refuses a text cell, so that once every column has passed, the
+# body's texts are the text columns' cells and nothing else. The registry's types are named here
+# in full, so a type added to it fails this test until it is given a case of its own, and its
+# author meets the rule: a column type that took a text cell would break the slice.
+@pytest.mark.parametrize(
+    ("column", "words"),
+    [(1, "date"), (3, "number"), (4, "boolean")],
+    ids=["DateColumn", "NumberColumn", "BooleanColumn"],
+)
+def test_every_column_type_but_text_refuses_a_text_cell(column: int, words: str) -> None:
+    assert set(bridge.COLUMN_TYPES) == {DateColumn, TextColumn, NumberColumn, BooleanColumn}
+    row: list[object] = [46276.0, "CL", 10.0, True]
+    row[column - 1] = "x"
+    assert bridge.call("TotalQuantity", [HEADERS, cells([row])]) == (
+        f"{ERROR}trades cell (1, {column}) is text 'x', expected {words}"
     )
 
 

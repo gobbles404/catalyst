@@ -347,8 +347,9 @@ def trades() -> Cells:
 
 
 # A table is the mixed call with the binding and one rule per column on top: every bridge
-# function runs once, and numpy takes one look per column, one conversion per date or boolean
-# column, and one gather for the column of text, whatever the number of rows.
+# function runs once, and numpy takes one look per column and one conversion per date or
+# boolean column, whatever the number of rows. The column of text asks numpy for nothing: it is
+# a slice of the host's tuple.
 def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile) -> None:
     body = trades()
     PATH["SumQuantity"](HEADERS, body)
@@ -364,8 +365,6 @@ def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile
         "MixedArray.shape": 1,
         "_refine": 1,  # then bound and refined
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
-        "_text_places": 1,
         "_dates_of": 1,
         "_not_dates": 1,
         "_as_days": 1,
@@ -379,10 +378,8 @@ def test_a_table_in_itemized(call_profile: CallProfile, numpy_calls: CallProfile
     assert numpy_calls(lambda: PATH["SumQuantity"](HEADERS, body)) == {
         "ndarray.any": 4,  # one look per column
         "ndarray.astype": 3,  # the date column twice on its way to days, the boolean column once
-        "numpy.array": 1,  # the texts as an array, for the gather
-        "ndarray.cumsum": 1,  # the text cells above each row
-        "ndarray.sum": 3,  # text cells per row, text cells to the left, and the probe's own sum
-        "ufunc.reduce": 7,
+        "ndarray.sum": 1,  # the probe's own sum
+        "ufunc.reduce": 5,
     }
 
 
@@ -407,8 +404,6 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "MixedArray.shape": 1,
         "_refine": 1,
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,
-        "_text_places": 1,
         "_dates_of": 1,
         "_not_dates": 1,
         "_as_days": 1,
@@ -424,10 +419,7 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "ndarray.ravel": 1,  # and its text, by counting the text codes before it
         "numpy.count_nonzero": 1,  # that count
         "ndarray.astype": 2,
-        "numpy.array": 1,
-        "ndarray.cumsum": 1,
-        "ndarray.sum": 2,
-        "ufunc.reduce": 5,
+        "ufunc.reduce": 3,
     }
 
 
@@ -580,7 +572,7 @@ CURVE_LEDGER = {
     "MixedArray.shape": 1,
     "_refine": 1,
     "_bind": 1,
-    "_dates_of": 1,  # no column of text, so no text places are made
+    "_dates_of": 1,  # the curve's table has no column of text
     "_not_dates": 1,
     "_as_days": 1,
     "_numbers_of": 1,
@@ -926,11 +918,12 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
 
 
 # A dozen words at the table path: the header row as any row of text, the body admitted as a
-# mixed range and bound, then each column through its rule, the names and the lot units gathered
-# and the three number columns as views, the builder's four looks, a fraction and a lot below one
-# among the lot sizes and a fee below zero in each fee column, the measures read once and the one
-# set of their units the lot units are looked up in, its three copies and one publication.
-# Twenty-three calls across nineteen functions; the set of units is built inline and is no call.
+# mixed range and bound, then each column through its rule, the names and the lot units sliced
+# from the host's tuple and the three number columns as views, the builder's four looks, a
+# fraction and a lot below one among the lot sizes and a fee below zero in each fee column, the
+# measures read once and the one set of their units the lot units are looked up in, its three
+# copies and one publication. Twenty-one calls across seventeen functions; the set of units is
+# built inline and is no call.
 def test_contract_specifications_are_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -950,8 +943,6 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
         "MixedArray.shape": 1,
         "_refine": 1,
         "_bind": 1,
-        "_refine.<locals>.<lambda>": 1,  # the text places, made once on first use
-        "_text_places": 1,
         "_texts_of": 2,  # the names, then the lot units
         "_numbers_of": 3,
         "_CreateContractSpecifications": 1,
@@ -963,11 +954,9 @@ def test_contract_specifications_are_a_table_in_and_one_publication_out(
         lambda: PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, body)
     ) == {
         "ndarray.any": 9,  # one look per column, five of them, then the builder's four
-        "numpy.array": 4,  # the names as an array for the gather, and the builder's three copies
-        "ndarray.cumsum": 1,  # the text cells above each row
-        "ndarray.sum": 3,  # text cells per row, and to the left of each of the two text columns
+        "numpy.array": 3,  # the builder's three copies; the two columns of text are slices
         "ndarray.setflags": 3,  # frozen
-        "ufunc.reduce": 12,
+        "ufunc.reduce": 9,
     }
 
 
