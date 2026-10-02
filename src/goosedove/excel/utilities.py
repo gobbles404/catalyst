@@ -105,20 +105,25 @@ def gas_daily_schedule_table(obj: GasDailySchedule) -> MixedArray:
 
 
 @shown.register
-def calendar_table(obj: Calendar) -> MixedArray:
+def calendar_table(obj: Calendar, rows: int | None = None) -> MixedArray:
     # The dates and the flags were made when the calendar was; the prompt contract's code is
     # read from the schedule of the index the calendar keeps, one take over the rows, and
-    # nothing is rebuilt.
-    codes = np.array(obj.index.schedule.codes, dtype=object)[obj.contract]
+    # nothing is rebuilt. A market asks for the first rows alone, those its quotes cover: each
+    # column is cut there before anything is made of it, a view of the calendar's own column,
+    # and the codes are taken no further than the last contract those rows reach, so the table
+    # costs its own rows and no others, however long the schedule and the calendar run on.
+    # Given no count, each cut is the whole column and the codes are the whole schedule's.
+    prompt = obj.contract[:rows]
+    codes = np.array(obj.index.schedule.codes[: int(prompt[-1]) + 1], dtype=object)[prompt]
     return MixedArray.table(
         [
             ("date", "contract", "is_priced", "is_fixed"),
             ("datetime64[D]", "str", "bool", "bool"),
         ],
-        obj.dates,
+        obj.dates[:rows],
         tuple(codes),
-        obj.is_priced,
-        obj.is_fixed,
+        obj.is_priced[:rows],
+        obj.is_fixed[:rows],
     )
 
 
@@ -173,20 +178,25 @@ def market_history_table(obj: MarketHistory) -> MixedArray:
 
 @shown.register
 def market_table(obj: Market) -> MixedArray:
-    # The calendar's four columns, then price: the fixing on each fixed and priced period, the
-    # quote of its contract on each unfixed period, and closed on every other. The quotes are
-    # gathered for those live rows alone, since a fixed period's contract may precede the first
-    # contract quoted and would index before the vector.
+    # The calendar's four columns, then price, over the rows the market's prices cover: every
+    # row through the last period of the last contract quoted, open or closed, the history
+    # before it included. That row is found by one search down the calendar's contract column,
+    # which never decreases, and the columns are cut there before the table is made, so a
+    # vector that stops before the schedule costs its own rows; a vector that reaches the
+    # schedule's end takes the same path and every row. The fixing on each fixed and priced
+    # period, the quote of its contract on each unfixed period, and closed on every other. The
+    # quotes are asked for the live rows alone, since a fixed period's contract may precede the
+    # first contract quoted, and through the market's own reader, which holds the coverage rule.
     history = obj.market_history
     calendar = history.calendar
-    live = np.flatnonzero(calendar.is_priced & ~calendar.is_fixed)
-    quotes = obj.price_vector.prices[calendar.contract[live] - obj.first_contract]
+    rows = int(calendar.contract.searchsorted(obj.last_contract, side="right"))
+    live = np.flatnonzero(calendar.is_priced[:rows] & ~calendar.is_fixed[:rows])
     return _priced_column(
-        calendar_table(calendar),
+        calendar_table(calendar, rows),
         "price",
         "closed",
         (history.fixed_rows, history.fixing_prices),
-        (live, quotes),
+        (live, obj.live_prices(calendar.contract[live])),
     )
 
 

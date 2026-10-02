@@ -347,8 +347,8 @@ $formulas = [ordered]@{
     # The market: a creator over the history in CT7 and a vector of one quote, n26 being prompt
     # on the valuation day and the last contract of that schedule, read back through
     # util_ReadHandle, a fixing on a past business day, closed on a weekend, the quote on the
-    # valuation day and after; the four-price vector, one for every contract but the one
-    # required, and the vector in CW8 named for another index, Brent, the library's words; the
+    # valuation day and after; the four-price vector, three past the one contract the schedule
+    # has left, and the vector in CW8 named for another index, Brent, the library's words; the
     # vector left out, the seam's.
     '=MID(CW1,FIND(":",CW1)+1,7)' = "market:"
     "=INDEX(util_ReadHandle(CW1),1,5)" = "price"
@@ -360,7 +360,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(CW1),36,5)" = "74.25"
     "=ROWS(util_ReadHandle(CW1))"      = "36"
     "=COLUMNS(util_ReadHandle(CW1))"   = "5"
-    "=_CreateMarket(CT7,CV1)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected 1, one per contract from 'n26' through 'n26'"
+    "=_CreateMarket(CT7,CV1)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 1, one per contract from 'n26' through 'n26'"
     "=_CreateMarket(CT7,CW8)" = "#ERROR _CreateMarket: ValueError: price_vector names index 'Brent', expected market_history's index 'Henry Hub NYMEX'"
     "=_CreateMarket(CT7)" = "#ERROR _CreateMarket: price_vector is missing, expected price vector handle"
     # The market over the other two histories, and a futures history valued before its calendar:
@@ -369,8 +369,11 @@ $formulas = [ordered]@{
     # in EA4, October's index and December's quote; the market in CW6 over the history in CW5,
     # valued on 26-May before its calendar begins on 23-Jun, its one quote on the calendar's
     # first day; the IFERC vector given with the Gas Daily history, named for the other index,
-    # one quote where three are required and a history with no unfixed period, the library's
-    # words.
+    # and a history with no unfixed period, the library's words. Then a vector that stops before
+    # the schedule does: the Gas Daily market in EA10, over the history in DU2 with one quote of
+    # the three months, read back through September's last day, the valuation day's print kept,
+    # the quote on every later day and no row of October; and a vector of four quotes, one past
+    # the schedule's last month, the library's words.
     '=MID(EA2,FIND(":",EA2)+1,7)' = "market:"
     "=ROWS(util_ReadHandle(EA2))"      = "93"
     "=INDEX(util_ReadHandle(EA2),13,5)" = "3"
@@ -384,8 +387,14 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(CW6))"      = "31"
     "=INDEX(util_ReadHandle(CW6),3,5)" = "74.25"
     "=_CreateMarket(DU2,EA3)" = "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', expected market_history's index 'Henry Hub Gas Daily'"
-    "=_CreateMarket(DU2,EA9)" = "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'"
     "=_CreateMarket(EA8,EA3)" = "#ERROR _CreateMarket: ValueError: market_history has no unfixed period, expected at least one to quote"
+    '=MID(EA10,FIND(":",EA10)+1,7)' = "market:"
+    "=ROWS(util_ReadHandle(EA10))"      = "32"
+    "=INDEX(util_ReadHandle(EA10),13,5)" = "3"
+    "=INDEX(util_ReadHandle(EA10),14,5)" = "2.2"
+    "=INDEX(util_ReadHandle(EA10),32,2)" = "U26"
+    "=INDEX(util_ReadHandle(EA10),32,5)" = "2.2"
+    "=_CreateMarket(DU2,EA11)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, one per contract from 'U26' through 'X26'"
     # The IFERC schedule: a creator over three contract months, their codes, the day each month's
     # future stops trading and the day its index is published, in DA to DC, and over the first row
     # alone, read back through util_ReadHandle; a last trading column one row long and a
@@ -706,15 +715,19 @@ $cells = [ordered]@{
     # September, October and November, named for the Gas Daily index, and the Gas Daily market
     # of the history in DU2, valued on 11-Sep-2026; a vector of one quote, December's, named for
     # the IFERC index, and the IFERC market of the history in DW4, valued on 15-Nov-2026; the
-    # same quote named for the Gas Daily index, for its market to refuse by count; and the IFERC
-    # calendar over DE1 valued on 15-Dec-2026 with all three indices, a history with no unfixed
-    # period, for the market to refuse.
+    # same quote named for the Gas Daily index, one quote of the three months, and its market
+    # in EA10, a vector that stops before the schedule does; four quotes named for the Gas Daily
+    # index, one past its schedule, for the market to refuse by count; and the IFERC calendar
+    # over DE1 valued on 15-Dec-2026 with all three indices, a history with no unfixed period,
+    # for the market to refuse.
     "DZ2" = "2.95"; "DZ3" = "3.1"; "DZ4" = "3.4"
     "EA1" = "=_CreatePriceVector(EC4,DZ2:DZ4)"
     "EA2" = "=_CreateMarket(DU2,EA1)"
     "DZ6" = "2.2"
     "EA3" = "=_CreatePriceVector(EC3,DZ6)"
     "EA9" = "=_CreatePriceVector(EC4,DZ6)"
+    "EA10" = "=_CreateMarket(DU2,EA9)"
+    "EA11" = "=_CreatePriceVector(EC4,CU2:CU5)"
     "EA4" = "=_CreateMarket(DW4,EA3)"
     "DZ8" = "15-Dec-2026"
     "EA5" = "=_CreateValuationDate(DZ8,0.5)"

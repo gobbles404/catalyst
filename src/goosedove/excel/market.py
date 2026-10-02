@@ -1,7 +1,8 @@
 """The worksheet functions of the market: the history of one index, its calendar bound to the
 price fixed on each of its periods that has fixed, created once from two objects the sheet
-already holds, and the market, the history with the quotes of its periods to come, created as
-often as the quotes move, each reached by handle. docs/library/market/ holds a page per function.
+already holds, and the market, the history with the quotes of its periods to come as far as the
+desk has them, created as often as the quotes move, each reached by handle.
+docs/library/market/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -51,8 +52,8 @@ def _CreateMarket(
     price_vector: Annotated[
         Handle[PriceVector],
         "The price-vector handle from _CreatePriceVector, such as B12, named for this "
-        "index, with one quote per contract in schedule order, from the first period not "
-        "yet fixed through the last contract.",
+        "index, with one quote per contract in schedule order, starting at the first period "
+        "not yet fixed and stopping at or before the last contract.",
     ],
 ) -> Handle[Market]:
     """Creates the market of one index from its history and the quotes of the periods still to

@@ -405,7 +405,9 @@ def calendar_sources(contracts: int) -> tuple[object, object]:
 # the codes placed as text and the days to serials: measured 26,308 at 360 days, about 18
 # bytes per cell; 251,938 at 3,630 days, 17.4 per cell. The ceiling is 18 per cell at both
 # sizes: a second copy of the codes alive at the peak, 8 bytes per day, read 276,540 at 3,630
-# days and passed a ceiling of 20 at 360, so the larger size is pinned too.
+# days and passed a ceiling of 20 at 360, so the larger size is pinned too. Measured again on
+# 2026-10-02, when the reader began to cut its columns at a row a market may give it: 26,708
+# and 252,338, 400 bytes more at either size, the cuts' own small objects and none per day.
 def test_a_calendar_keeps_four_columns_and_its_reader_pays_per_cell() -> None:
     days = 360
     valuation, index = calendar_sources(13)
@@ -663,18 +665,19 @@ def gas_daily_market_sources() -> tuple[object, object]:
     )
 
 
-def iferc_market_sources() -> tuple[object, object]:
-    """The two handles an IFERC market takes: the calendar of the ten years of months
-    iferc_columns lays out, valued on 11 September 2026 with four months published and an index
-    for each, and a vector of 116 quotes, one per month still to publish."""
+def iferc_market_sources(months: int = 120) -> tuple[object, object]:
+    """The two handles an IFERC market takes: the calendar of that many months as iferc_columns
+    lays them out, ten years unless more are asked for, valued on 11 September 2026 with four
+    months published and an index for each, and a vector of one quote per month still to
+    publish, 116 over the ten years."""
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(120))
+    schedule = ENTRY["_CreateIfercSchedule"](*iferc_columns(months))
     index = an_index(schedule)
     made = ENTRY["_CreateCalendar"](valuation, index)
     fixings = ENTRY["_CreateIfercFixings"](*iferc_fixing_columns(4), index)
     history = ENTRY["_CreateMarketHistory"](made, fixings)
     return history, ENTRY["_CreatePriceVector"](
-        "sample", Cells.from_rows([[2.0 + i] for i in range(116)])
+        "sample", Cells.from_rows([[2.0 + i] for i in range(months - 4)])
     )
 
 
@@ -696,7 +699,9 @@ def test_a_market_over_the_other_two_calendars_keeps_the_same_record(
 # history's helper, with the live rows, their prompts and their quotes on top: measured 50,931
 # bytes at 360 days on 2026-09-19, about 28 bytes per cell, and 501,307 at 3,600. A Gas Daily
 # market reads back the same way, 48,612 bytes at 365 days on 2026-09-25, 27 per cell, and an
-# IFERC market 20,163 at 120 months, 34 bytes per cell at that small count.
+# IFERC market 20,163 at 120 months, 34 bytes per cell at that small count. Measured again on
+# 2026-10-02, when the reader began to stop at the last row the quotes cover: 50,789, 501,165,
+# 48,468 and 20,107, each 80 bytes above the build before it, 48 for IFERC, none of it per row.
 def test_reading_a_market_back_pays_per_cell() -> None:
     days, months = 360, 120
     made = ENTRY["_CreateMarket"](*market_sources(13, 30))
@@ -705,6 +710,47 @@ def test_reading_a_market_back_pays_per_cell() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](daily)) <= 30 * 5 * 365 + 2 * SLACK
     monthly = ENTRY["_CreateMarket"](*iferc_market_sources())
     assert least_peak(lambda: ENTRY["util_ReadHandle"](monthly)) <= 35 * 5 * months + 2 * SLACK
+
+
+def a_short_vector(quotes: int) -> object:
+    """A vector of that many quotes, fewer than the schedule it meets has left."""
+    return ENTRY["_CreatePriceVector"](
+        "sample", Cells.from_rows([[70.0 + i] for i in range(quotes)])
+    )
+
+
+# A market whose quotes stop before the schedule does keeps the same small record, and reading
+# it back pays for the rows the quotes cover and no others, however long the calendar and the
+# schedule run on: the columns are cut at the last row covered before anything is made of them,
+# and the codes are taken no further than the last contract covered. The calendars here are a
+# hundred years long, so that a temporary the length of the calendar, a byte a day, or of the
+# schedule, eight bytes a month, would stand above the ceiling. Measured on 2026-10-02: one
+# quote over a hundred years of days, 120 rows covered of 36,000, reads back in 17,907
+# bytes, the same to the byte as over one year of days; a Gas Daily market with the balance of
+# September alone, 273 rows of 365, in 36,094; an IFERC market with one quote over a
+# hundred years of months, 5 rows of 1,200, in 4,922, most of it the reader's fixed
+# cost; and one with 56 quotes of 116, 60 rows of 120, in 12,247, 41 bytes per
+# cell at that small count, where the whole takes 20,107.
+def test_a_market_stopping_early_is_read_back_for_the_rows_it_covers() -> None:
+    covered = 120  # the days from 20 May 2026 through the first quoted contract's expiry
+    quote = a_short_vector(1)
+    year, _ = market_sources(13, 30)
+    century, _ = market_sources(1201, 30)
+    assert least_peak(lambda: ENTRY["_CreateMarket"](century, quote)) <= 2 * SLACK
+    over_a_year = ENTRY["_CreateMarket"](year, quote)
+    over_a_century = ENTRY["_CreateMarket"](century, quote)
+    ceiling = 30 * 5 * covered + 2 * SLACK
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](over_a_year)) <= ceiling
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](over_a_century)) <= ceiling
+    gas_daily, _ = gas_daily_market_sources()
+    balance = ENTRY["_CreateMarket"](gas_daily, quote)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](balance)) <= 30 * 5 * 273 + 2 * SLACK
+    months, _ = iferc_market_sources(1200)
+    one_month = ENTRY["_CreateMarket"](months, quote)
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](one_month)) <= 6 * SLACK
+    iferc, _ = iferc_market_sources()
+    half = ENTRY["_CreateMarket"](iferc, a_short_vector(56))
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](half)) <= 40 * 5 * 60 + 2 * SLACK
 
 
 # --- what a publication keeps -------------------------------------------------
