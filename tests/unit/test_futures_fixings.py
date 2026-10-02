@@ -1,5 +1,6 @@
-"""The futures fixings: the five rules of meaning, the index kept, and the columns retained
-and aligned."""
+"""The futures fixings: a series given newest first and kept oldest first, the five rules of
+meaning on the rows as the sheet gave them, the index kept, and the columns retained and
+aligned."""
 
 import numpy as np
 import pytest
@@ -28,9 +29,10 @@ def settles(*values: float) -> NDArray[np.float64]:
     return np.array(values, dtype=np.float64)
 
 
-# The page's sample: four days of May 2026, a weekend between the first two, and their settles.
-DATES = dates("2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06")
-SETTLES = settles(101.94, 106.42, 102.27, 95.08)
+# The page's sample as the desk keeps it, the newest day in the first row: four days of May
+# 2026, a weekend between the last two rows, and their settles, each beside its day.
+DATES = dates("2026-05-06", "2026-05-05", "2026-05-04", "2026-05-01")
+SETTLES = settles(95.08, 102.27, 106.42, 101.94)
 
 # The holiday calendar page's sample, the ten days one market is closed in 2026; the one in
 # May is the 25th, a Monday.
@@ -68,45 +70,58 @@ def an_index(holidays: NDArray[np.datetime64]) -> Index:
 # --- what is kept -------------------------------------------------------------
 
 
-def test_the_sample_keeps_every_date_and_settle_aligned() -> None:
+# The series is given newest first and kept oldest first, each settle still beside its own day:
+# the first row given is the last one kept.
+def test_the_sample_is_kept_oldest_first_with_every_settle_beside_its_date() -> None:
     fixings = futures_fixings(DATES, SETTLES, an_index(HOLIDAYS))
-    assert np.array_equal(fixings.dates, DATES)
+    assert (
+        fixings.dates.tolist()
+        == dates("2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06").tolist()
+    )
     assert fixings.settles.tolist() == [101.94, 106.42, 102.27, 95.08]
+    assert dict(zip(fixings.dates.tolist(), fixings.settles.tolist(), strict=True)) == dict(
+        zip(DATES.tolist(), SETTLES.tolist(), strict=True)
+    )
     assert fixings.dates.dtype == np.dtype("datetime64[D]")
     assert fixings.settles.dtype == np.dtype("float64")
 
 
+# One row is a series, with nothing above or below it to be ordered against.
 def test_one_fixing_is_a_series() -> None:
     fixings = futures_fixings(DATES[:1], SETTLES[:1], an_index(HOLIDAYS))
     assert np.array_equal(fixings.dates, DATES[:1])
-    assert fixings.settles.tolist() == [101.94]
+    assert fixings.settles.tolist() == [95.08]
+    oldest = futures_fixings(DATES[-1:], SETTLES[-1:], an_index(HOLIDAYS))
+    assert oldest.dates.tolist() == dates("2026-05-01").tolist()
+    assert oldest.settles.tolist() == [101.94]
 
 
-# Friday 22 May to Tuesday 26 May 2026: the weekend and the holiday on the Monday are the days
-# without a fixing, and the series is whole without them.
+# Tuesday 26 May back to Friday 22 May 2026: the holiday on the Monday and the weekend are the
+# days without a fixing, and the series is whole without them.
 def test_a_weekend_and_a_listed_holiday_are_the_days_without_a_fixing() -> None:
-    given = dates("2026-05-22", "2026-05-26")
-    fixings = futures_fixings(given, SETTLES[:2], an_index(HOLIDAYS))
-    assert np.array_equal(fixings.dates, given)
+    newest_first = dates("2026-05-26", "2026-05-22")
+    fixings = futures_fixings(newest_first, SETTLES[:2], an_index(HOLIDAYS))
+    assert np.array_equal(fixings.dates, newest_first[::-1])
 
 
-# Tuesday 5 May to Thursday 7 May: the Monday before and the Friday after are business days,
-# and neither is asked for, since the first and last dates bound the check.
-def test_nothing_is_asked_for_before_the_first_date_or_after_the_last() -> None:
-    given = dates("2026-05-05", "2026-05-06", "2026-05-07")
-    fixings = futures_fixings(given, SETTLES[:3], an_index(HOLIDAYS))
-    assert np.array_equal(fixings.dates, given)
+# Thursday 7 May back to Tuesday 5 May: the Friday after and the Monday before are business
+# days, and neither is asked for, since the two end dates bound the check.
+def test_nothing_is_asked_for_after_the_first_rows_date_or_before_the_last_rows() -> None:
+    newest_first = dates("2026-05-07", "2026-05-06", "2026-05-05")
+    fixings = futures_fixings(newest_first, SETTLES[:3], an_index(HOLIDAYS))
+    assert np.array_equal(fixings.dates, newest_first[::-1])
 
 
-# A settle at or below zero is kept as given. WTI's May 2020 contract settled at minus 37.63
-# on Monday 20 April 2020.
+# A settle at or below zero is kept as given, beside its own day. WTI's May 2020 contract
+# settled at minus 37.63 on Monday 20 April 2020.
 def test_a_settle_at_or_below_zero_is_kept() -> None:
     fixings = futures_fixings(
-        dates("2020-04-20", "2020-04-21", "2020-04-22"),
-        settles(-37.63, 0.0, 39.27),
+        dates("2020-04-22", "2020-04-21", "2020-04-20"),
+        settles(39.27, 0.0, -37.63),
         an_index(HOLIDAYS),
     )
     assert fixings.settles.tolist() == [-37.63, 0.0, 39.27]
+    assert fixings.dates[0] == np.datetime64("2020-04-20")
 
 
 # A day listed twice counts once, and a day listed on a weekend adds nothing: the calendar is
@@ -114,8 +129,8 @@ def test_a_settle_at_or_below_zero_is_kept() -> None:
 def test_a_holiday_listed_twice_or_on_a_weekend_changes_nothing() -> None:
     calendar = dates("2026-05-25", "2026-05-25", "2026-05-02", "2026-05-03")
     fixings = futures_fixings(DATES, SETTLES, an_index(calendar))
-    assert np.array_equal(fixings.dates, DATES)
-    fixings = futures_fixings(dates("2026-05-22", "2026-05-26"), SETTLES[:2], an_index(calendar))
+    assert np.array_equal(fixings.dates, DATES[::-1])
+    fixings = futures_fixings(dates("2026-05-26", "2026-05-22"), SETTLES[:2], an_index(calendar))
     assert fixings.dates.tolist() == [np.datetime64("2026-05-22"), np.datetime64("2026-05-26")]
 
 
@@ -157,46 +172,51 @@ def test_the_fixings_keep_their_index() -> None:
 
 # A series of no rows reaches the builder only from a Python caller, the seam never sending a
 # range of no cells. It has always made fixings of no rows: the count of business days asks
-# nothing of it, as the look over the day after each date asked nothing before.
+# nothing of it, as the look over the day before each date asks nothing.
 def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
     fixings = futures_fixings(dates(), settles(), an_index(HOLIDAYS))
     assert fixings.dates.size == 0 and fixings.settles.size == 0
     assert not fixings.dates.flags.writeable and not fixings.settles.flags.writeable
 
 
-# --- what is rejected, naming the row -----------------------------------------
+# --- what is rejected, naming the sheet's own row -------------------------------
 
 
 @pytest.mark.parametrize(
     ("given", "calendar", "message"),
     [
         (
-            dates("2026-05-04", "2026-05-01", "2026-05-05", "2026-05-06"),
+            dates("2026-05-05", "2026-05-06", "2026-05-04", "2026-05-01"),
             HOLIDAYS,
-            "date row 2 is 2026-05-01, expected a date after row 1's 2026-05-04",
+            "date row 2 is 2026-05-06, expected a date before row 1's 2026-05-05",
         ),
         (
-            dates("2026-05-01", "2026-05-04", "2026-05-04", "2026-05-06"),
+            dates("2026-05-06", "2026-05-04", "2026-05-04", "2026-05-01"),
             HOLIDAYS,
-            "date row 3 is 2026-05-04, expected a date after row 2's 2026-05-04",
+            "date row 3 is 2026-05-04, expected a date before row 2's 2026-05-04",
         ),
         (
-            dates("2026-05-06", "2026-05-05", "2026-05-04", "2026-05-01"),
+            dates("2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06"),
             HOLIDAYS,
-            "date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06",
+            "date row 2 is 2026-05-04, expected a date before row 1's 2026-05-01",
         ),
         (
-            dates("2026-05-02", "2026-05-04"),
+            dates("2026-05-06", "2026-05-05", "2026-05-01", "2026-05-04"),
             HOLIDAYS,
-            "date row 1 is 2026-05-02, a Saturday, expected a business day",
+            "date row 4 is 2026-05-04, expected a date before row 3's 2026-05-01",
         ),
         (
-            dates("2026-05-08", "2026-05-10"),
+            dates("2026-05-09", "2026-05-08"),
             HOLIDAYS,
-            "date row 2 is 2026-05-10, a Sunday, expected a business day",
+            "date row 1 is 2026-05-09, a Saturday, expected a business day",
         ),
         (
-            dates("2026-05-22", "2026-05-25", "2026-05-26"),
+            dates("2026-05-04", "2026-05-03"),
+            HOLIDAYS,
+            "date row 2 is 2026-05-03, a Sunday, expected a business day",
+        ),
+        (
+            dates("2026-05-26", "2026-05-25", "2026-05-22"),
             HOLIDAYS,
             "date row 2 is 2026-05-25, a holiday, expected a business day",
         ),
@@ -206,66 +226,77 @@ def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
             "date row 1 is 2026-05-25, a holiday, expected a business day",
         ),
         (
-            dates("2026-05-01", "2026-05-04", "2026-05-06"),
+            dates("2026-05-06", "2026-05-04", "2026-05-01"),
             HOLIDAYS,
-            "date row 3 is 2026-05-06, expected 2026-05-05, "
-            "the business day after row 2's 2026-05-04",
+            "date row 2 is 2026-05-04, expected 2026-05-05, "
+            "the business day before row 1's 2026-05-06",
         ),
         (
-            dates("2026-05-01", "2026-05-05"),
+            dates("2026-05-05", "2026-05-01"),
             HOLIDAYS,
-            "date row 2 is 2026-05-05, expected 2026-05-04, "
-            "the business day after row 1's 2026-05-01",
+            "date row 2 is 2026-05-01, expected 2026-05-04, "
+            "the business day before row 1's 2026-05-05",
         ),
         (
-            dates("2026-05-22", "2026-05-27"),
+            dates("2026-05-27", "2026-05-22"),
             HOLIDAYS,
-            "date row 2 is 2026-05-27, expected 2026-05-26, "
-            "the business day after row 1's 2026-05-22",
+            "date row 2 is 2026-05-22, expected 2026-05-26, "
+            "the business day before row 1's 2026-05-27",
         ),
         (
-            dates("2026-05-01", "2026-05-05", "2026-05-07"),
+            dates("2026-05-07", "2026-05-05", "2026-05-01"),
             HOLIDAYS,
-            "date row 2 is 2026-05-05, expected 2026-05-04, "
-            "the business day after row 1's 2026-05-01",
+            "date row 2 is 2026-05-05, expected 2026-05-06, "
+            "the business day before row 1's 2026-05-07",
         ),
         (
-            dates("2026-05-01", "2026-05-04", "2026-05-06"),
+            dates("2026-05-06", "2026-05-04", "2026-05-01"),
             ELSEWHERE,
-            "date row 3 is 2026-05-06, expected 2026-05-05, "
-            "the business day after row 2's 2026-05-04",
-        ),
-        (
-            dates("2026-05-01", "2026-05-02"),
-            ELSEWHERE,
-            "date row 2 is 2026-05-02, a Saturday, expected a business day",
-        ),
-        (
-            dates("2026-05-22", "2026-05-26"),
-            ELSEWHERE,
-            "date row 2 is 2026-05-26, expected 2026-05-25, "
-            "the business day after row 1's 2026-05-22",
-        ),
-        (
-            dates("2026-05-01", "2026-05-02"),
-            dates("2026-05-02"),
-            "date row 2 is 2026-05-02, a Saturday, expected a business day",
+            "date row 2 is 2026-05-04, expected 2026-05-05, "
+            "the business day before row 1's 2026-05-06",
         ),
         (
             dates("2026-05-02", "2026-05-01"),
-            HOLIDAYS,
-            "date row 2 is 2026-05-01, expected a date after row 1's 2026-05-02",
+            ELSEWHERE,
+            "date row 1 is 2026-05-02, a Saturday, expected a business day",
         ),
         (
-            dates("2026-05-01", "2026-05-02", "2026-05-06"),
+            dates("2026-05-26", "2026-05-22"),
+            ELSEWHERE,
+            "date row 2 is 2026-05-22, expected 2026-05-25, "
+            "the business day before row 1's 2026-05-26",
+        ),
+        (
+            dates("2026-05-02", "2026-05-01"),
+            dates("2026-05-02"),
+            "date row 1 is 2026-05-02, a Saturday, expected a business day",
+        ),
+        (
+            dates("2026-05-01", "2026-05-02"),
+            HOLIDAYS,
+            "date row 2 is 2026-05-02, expected a date before row 1's 2026-05-01",
+        ),
+        (
+            dates("2026-05-25", "2026-05-22", "2026-05-26"),
+            HOLIDAYS,
+            "date row 3 is 2026-05-26, expected a date before row 2's 2026-05-22",
+        ),
+        (
+            dates("2026-05-06", "2026-05-02", "2026-05-01"),
             HOLIDAYS,
             "date row 2 is 2026-05-02, a Saturday, expected a business day",
         ),
+        (
+            dates("2026-05-07", "2026-05-05", "2026-05-02"),
+            HOLIDAYS,
+            "date row 3 is 2026-05-02, a Saturday, expected a business day",
+        ),
     ],
     ids=[
-        "two dates swapped",
+        "two dates swapped at the top",
         "a date twice",
-        "newest first",
+        "oldest first, as the series was once given",
+        "two dates swapped at the bottom",
         "a Saturday first",
         "a Sunday last",
         "a holiday between",
@@ -273,13 +304,15 @@ def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
         "a weekday missing",
         "the Monday after a weekend missing",
         "the day after a holiday missing",
-        "two days missing, the first named",
+        "two days missing, the first from the top named",
         "a weekday missing with the calendar's day elsewhere",
         "a Saturday with the calendar's day elsewhere",
         "the 25th of May is a business day when the calendar does not list it",
         "a Saturday listed as a holiday is a Saturday",
-        "the order is checked before the calendar",
+        "the order is checked before the calendar, on one row",
+        "an order failure lower down is reported before a holiday in the first row",
         "the calendar is checked before the gaps",
+        "a Saturday lower down is reported before a gap nearer the top",
     ],
 )
 def test_a_series_that_cannot_be_made_says_why(
@@ -301,7 +334,7 @@ def test_a_series_that_cannot_be_made_says_why(
         (DATES, SETTLES[:1], "settle has 1 settle, expected 4, one per date"),
         (DATES[:1], SETTLES, "settle has 4 settles, expected 1, one per date"),
         (
-            dates("2026-05-04", "2026-05-01"),
+            dates("2026-05-01", "2026-05-04"),
             SETTLES[:1],
             "settle has 1 settle, expected 2, one per date",
         ),
@@ -325,8 +358,9 @@ def test_a_settle_column_that_does_not_match_the_dates_says_why(
 # --- the general rule ---------------------------------------------------------
 
 
-# Any run of business days under any calendar: from a start rolled forward to a business day,
-# the count of business days after it, none skipped, is a series that is kept whole.
+# Any run of business days under any calendar, given newest first: from a start rolled forward
+# to a business day, the count of business days after it, none skipped, read from the last back
+# to the first, is a series that is kept whole, oldest first, each settle beside its own day.
 @settings(deadline=None)
 @given(count=st.integers(1, 300), data=st.data())
 def test_any_run_of_business_days_and_their_settles_are_kept_aligned(
@@ -336,16 +370,36 @@ def test_any_run_of_business_days_and_their_settles_are_kept_aligned(
     listed = data.draw(st.lists(st.integers(-30, 500), max_size=40))
     holidays = start + np.array(listed, dtype="timedelta64[D]")
     calendar = np.busdaycalendar(holidays=holidays)
-    given_dates = np.busday_offset(start, np.arange(count), roll="forward", busdaycal=calendar)
-    given_settles = np.array(
+    run = np.busday_offset(start, np.arange(count), roll="forward", busdaycal=calendar)
+    run_settles = np.array(
         data.draw(st.lists(st.floats(-1e6, 1e6), min_size=count, max_size=count)), dtype=np.float64
     )
-    fixings = futures_fixings(given_dates, given_settles, an_index(holidays))
-    assert np.array_equal(fixings.dates, given_dates)
-    assert np.array_equal(fixings.settles, given_settles)
+    fixings = futures_fixings(run[::-1], run_settles[::-1], an_index(holidays))
+    assert np.array_equal(fixings.dates, run)
+    assert np.array_equal(fixings.settles, run_settles)
 
 
-# Any such run with one day left out fails at the row after the gap, naming the missing day.
+# Any such run given oldest first, of two rows or more, is refused at its second row: one
+# direction is taken, and the other is never sorted into it.
+@settings(deadline=None)
+@given(count=st.integers(2, 300), data=st.data())
+def test_any_run_given_oldest_first_is_refused_at_its_second_row(
+    count: int, data: st.DataObject
+) -> None:
+    start = np.datetime64("2000-01-01") + np.timedelta64(data.draw(st.integers(0, 36_000)), "D")
+    listed = data.draw(st.lists(st.integers(-30, 500), max_size=40))
+    holidays = start + np.array(listed, dtype="timedelta64[D]")
+    calendar = np.busdaycalendar(holidays=holidays)
+    run = np.busday_offset(start, np.arange(count), roll="forward", busdaycal=calendar)
+    with pytest.raises(ValueError) as failure:
+        futures_fixings(run, np.zeros(count), an_index(holidays))
+    assert str(failure.value) == (
+        f"date row 2 is {run[1]}, expected a date before row 1's {run[0]}"
+    )
+
+
+# Any such run with one day left out fails at the row below the gap, as the sheet counts its
+# rows from the newest down, naming the missing day.
 @settings(deadline=None)
 @given(count=st.integers(3, 300), data=st.data())
 def test_a_run_of_business_days_with_one_left_out_names_the_missing_day(
@@ -357,25 +411,33 @@ def test_a_run_of_business_days_with_one_left_out_names_the_missing_day(
     calendar = np.busdaycalendar(holidays=holidays)
     run = np.busday_offset(start, np.arange(count), roll="forward", busdaycal=calendar)
     left_out = data.draw(st.integers(1, count - 2))
-    given = np.delete(run, left_out)
+    newest_first = np.delete(run, left_out)[::-1]
     with pytest.raises(ValueError) as failure:
-        futures_fixings(given, np.zeros(count - 1), an_index(holidays))
+        futures_fixings(newest_first, np.zeros(count - 1), an_index(holidays))
     assert str(failure.value) == (
-        f"date row {left_out + 1} is {run[left_out + 1]}, expected {run[left_out]}, "
-        f"the business day after row {left_out}'s {run[left_out - 1]}"
+        f"date row {count - left_out} is {run[left_out - 1]}, expected {run[left_out]}, "
+        f"the business day before row {count - left_out - 1}'s {run[left_out + 1]}"
     )
 
 
 # --- ownership ----------------------------------------------------------------
 
 
-def test_the_fixings_own_their_columns() -> None:
+# The builder leaves what it was given as it was, in its order and writable, and keeps columns
+# of its own: a later change to an input changes no fixing, and what is kept refuses writes.
+def test_the_fixings_own_their_columns_and_leave_the_inputs_as_given() -> None:
     given_dates, given_settles = DATES.copy(), SETTLES.copy()
     fixings = futures_fixings(given_dates, given_settles, an_index(HOLIDAYS))
-    given_dates[0] = np.datetime64("2030-01-01")
-    given_settles[0] = 0.0
+    assert np.array_equal(given_dates, DATES) and np.array_equal(given_settles, SETTLES)
+    assert given_dates.flags.writeable and given_settles.flags.writeable
+    assert not np.shares_memory(fixings.dates, given_dates)
+    assert not np.shares_memory(fixings.settles, given_settles)
+    given_dates[-1] = np.datetime64("2030-01-01")
+    given_settles[-1] = 0.0
     assert fixings.dates[0] == np.datetime64("2026-05-01")
     assert fixings.settles[0] == 101.94
+    assert fixings.dates.flags.owndata and fixings.dates.flags.c_contiguous
+    assert fixings.settles.flags.owndata and fixings.settles.flags.c_contiguous
     assert not fixings.dates.flags.writeable
     assert not fixings.settles.flags.writeable
     with pytest.raises(ValueError):

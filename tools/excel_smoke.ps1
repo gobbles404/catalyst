@@ -193,41 +193,53 @@ $formulas = [ordered]@{
     "=_CreateIndex(EC2,AM1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
     "=_CreateIndex(EC2,AI1,AP1)" = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
     "=_CreateIndex(C2,AI1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: name is blank, expected text"
-    # The futures fixings: a creator over a column of four days and a column of their settles and
-    # the futures index in EB1, and over the first row alone, read back through util_ReadHandle;
-    # a settle column one row short, the days newest first, a business day without a fixing, a
-    # Saturday, a listed holiday and a Gas Daily index, the library's words; the header where a
-    # day should be, the index left out and a number in its place, the seam's.
+    # The futures fixings: a creator over a column of four days, newest first, and a column of
+    # their settles and the futures index in EB1, and over the first row alone, read back through
+    # util_ReadHandle in the order given, each settle beside its own day; the creator again over
+    # the two columns of that spill, in BK3, whose own spill reads the same cell for cell; a settle
+    # column one row short, the days oldest first, a business day without a fixing, a Saturday, a
+    # listed holiday and a Gas Daily index, the library's words; the header where a day should be,
+    # the index left out and a number in its place, the seam's.
     '=MID(BK1,FIND(":",BK1)+1,16)' = "futures_fixings:"
     '=MID(BK2,FIND(":",BK2)+1,16)' = "futures_fixings:"
     "=INDEX(util_ReadHandle(BK1),1,2)" = "settle"
     "=INDEX(util_ReadHandle(BK1),2,1)" = "datetime64[D]"
-    "=INDEX(util_ReadHandle(BK1),3,1)" = "46143"
-    "=INDEX(util_ReadHandle(BK1),6,2)" = "95.08"
+    "=INDEX(util_ReadHandle(BK1),3,1)" = "46148"
+    "=INDEX(util_ReadHandle(BK1),3,2)" = "95.08"
+    "=INDEX(util_ReadHandle(BK1),6,1)" = "46143"
+    "=INDEX(util_ReadHandle(BK1),6,2)" = "101.94"
     "=ROWS(util_ReadHandle(BK1))"      = "6"
     "=ROWS(util_ReadHandle(BK2))"      = "3"
+    '=MID(BK3,FIND(":",BK3)+1,16)' = "futures_fixings:"
+    "=AND(util_ReadHandle(BK3)=util_ReadHandle(BK1))" = "TRUE"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ4,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: settle has 3 settles, expected 4, one per date"
-    "=_CreateFuturesFixings(BL2:BL3,BM2:BM3,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06"
-    "=_CreateFuturesFixings(BL4:BL5,BM4:BM5,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01"
+    "=_CreateFuturesFixings(BL2:BL3,BM2:BM3,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-06, expected a date before row 1's 2026-05-05"
+    "=_CreateFuturesFixings(BL4:BL5,BM4:BM5,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, expected 2026-05-04, the business day before row 1's 2026-05-05"
     "=_CreateFuturesFixings(BL6,BM6,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day"
     "=_CreateFuturesFixings(BL7,BM7,EB1)" = "#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day"
     "=_CreateFuturesFixings(BI1:BI2,BJ1:BJ2,EB1)" = "#ERROR _CreateFuturesFixings: date cell (1, 1) is text 'date', expected date"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5)" = "#ERROR _CreateFuturesFixings: index is missing, expected index handle"
-    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,BJ2)" = "#ERROR _CreateFuturesFixings: index is number 101.94, expected index handle"
+    "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,BJ2)" = "#ERROR _CreateFuturesFixings: index is number 95.08, expected index handle"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,EB3)" = "#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, expected a futures index"
-    # The IFERC fixings: a creator over a column of contract codes, a column of indices and the
-    # index in EE2, whose schedule holds those four months, read back through util_ReadHandle; a
-    # price column one row short, a code given twice, a code the index does not hold and a
-    # futures index where the IFERC index should be, the library's words; a blank among the
-    # prices, a number among the codes, the prices left out, the index left out and a row where
-    # a column is expected, the seam's.
+    # The IFERC fixings: a creator over a column of contract codes, the newest month first, a
+    # column of indices and the index in EE2, whose schedule holds those four months the other way
+    # up, read back through util_ReadHandle in the order typed; the creator again over the two
+    # columns of that spill, in BQ2, whose own spill reads the same cell for cell; a price column
+    # one row short, a code given twice, a code the index does not hold and a futures index where
+    # the IFERC index should be, the library's words; a blank among the prices, a number among the
+    # codes, the prices left out, the index left out and a row where a column is expected, the
+    # seam's.
     '=MID(BQ1,FIND(":",BQ1)+1,14)' = "iferc_fixings:"
     "=INDEX(util_ReadHandle(BQ1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(BQ1),2,2)" = "float64"
-    "=INDEX(util_ReadHandle(BQ1),3,1)" = "F26"
-    "=INDEX(util_ReadHandle(BQ1),6,2)" = "1.6"
+    "=INDEX(util_ReadHandle(BQ1),3,1)" = "J26"
+    "=INDEX(util_ReadHandle(BQ1),3,2)" = "1.6"
+    "=INDEX(util_ReadHandle(BQ1),6,1)" = "F26"
+    "=INDEX(util_ReadHandle(BQ1),6,2)" = "1.85"
     "=ROWS(util_ReadHandle(BQ1))"      = "6"
     "=COLUMNS(util_ReadHandle(BQ1))"   = "2"
+    '=MID(BQ2,FIND(":",BQ2)+1,14)' = "iferc_fixings:"
+    "=AND(util_ReadHandle(BQ2)=util_ReadHandle(BQ1))" = "TRUE"
     "=_CreateIfercFixings(BO2:BO5,BP2:BP4,EE2)" = "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, one per contract_code"
     "=_CreateIfercFixings(BR2:BR3,BP2:BP3,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1"
     "=_CreateIfercFixings(BO2:BO3,BT2:BT3,EE2)" = "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
@@ -438,25 +450,30 @@ $formulas = [ordered]@{
     "=_CreateGasDailySchedule(DG6:DG7,DH2:DH3,DI2:DI3)" = "#ERROR _CreateGasDailySchedule: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateGasDailySchedule(DG2:DG4,DH2:DH4)" = "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates"
     "=_CreateGasDailySchedule(DG2:DG4,DH2:DI2,DI2:DI4)" = "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates"
-    # The Gas Daily fixings: a creator over six flow days, Labor Day week 2026, and the midpoint
-    # printed for each, in DM and DN, with the Gas Daily index in EB3, and over the first row
-    # alone, read back through util_ReadHandle; a price column one row short, a day skipped, a
-    # series pasted newest first and an IFERC index where the Gas Daily index should be, the
-    # library's words; a blank among the prices, text among the days, the prices left out and the
-    # index left out, the seam's.
+    # The Gas Daily fixings: a creator over six flow days, Labor Day week 2026, newest first, and
+    # the midpoint printed for each, in DM and DN, with the Gas Daily index in EB3, and over the
+    # first row alone, read back through util_ReadHandle in the order given; the creator again
+    # over the two columns of that spill, in DR3, whose own spill reads the same cell for cell; a
+    # price column one row short, a day skipped, a series pasted oldest first and an IFERC index
+    # where the Gas Daily index should be, the library's words; a blank among the prices, text
+    # among the days, the prices left out and the index left out, the seam's.
     '=MID(DR1,FIND(":",DR1)+1,18)' = "gas_daily_fixings:"
     '=MID(DR2,FIND(":",DR2)+1,18)' = "gas_daily_fixings:"
     "=INDEX(util_ReadHandle(DR1),1,1)" = "flow_date"
     "=INDEX(util_ReadHandle(DR1),2,2)" = "float64"
-    "=INDEX(util_ReadHandle(DR1),3,1)" = "46269"
-    "=INDEX(util_ReadHandle(DR1),6,1)" = "46272"
+    "=INDEX(util_ReadHandle(DR1),3,1)" = "46274"
+    "=INDEX(util_ReadHandle(DR1),3,2)" = "2.9"
+    "=INDEX(util_ReadHandle(DR1),6,1)" = "46271"
     "=INDEX(util_ReadHandle(DR1),6,2)" = "2.875"
-    "=INDEX(util_ReadHandle(DR1),8,2)" = "2.9"
+    "=INDEX(util_ReadHandle(DR1),8,1)" = "46269"
+    "=INDEX(util_ReadHandle(DR1),8,2)" = "2.93"
     "=ROWS(util_ReadHandle(DR1))"      = "8"
     "=ROWS(util_ReadHandle(DR2))"      = "3"
+    '=MID(DR3,FIND(":",DR3)+1,18)' = "gas_daily_fixings:"
+    "=AND(util_ReadHandle(DR3)=util_ReadHandle(DR1))" = "TRUE"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN6,EB3)" = "#ERROR _CreateGasDailyFixings: ValueError: price has 5 prices, expected 6, one per flow_date"
-    "=_CreateGasDailyFixings(DP2:DP3,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, expected 2026-09-05, the day after row 1's 2026-09-04"
-    "=_CreateGasDailyFixings(DQ2:DQ3,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, expected 2026-09-06, the day after row 1's 2026-09-05"
+    "=_CreateGasDailyFixings(DP2:DP3,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, expected 2026-09-05, the day before row 1's 2026-09-06"
+    "=_CreateGasDailyFixings(DQ2:DQ3,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-05, expected 2026-09-03, the day before row 1's 2026-09-04"
     "=_CreateGasDailyFixings(DM2:DM3,DO2:DO3,EB3)" = "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number"
     "=_CreateGasDailyFixings(DP5:DP6,DN2:DN3,EB3)" = "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date"
     "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
@@ -559,34 +576,41 @@ $cells = [ordered]@{
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"
     # Futures fixings: a header row the function never sees, then four days and a settle beside
-    # each, 1, 4, 5 and 6 May 2026, every business day of that stretch; a second pair of columns
-    # with the days newest first, one missing the Monday, one of a Saturday and one of a holiday
-    # AM1 lists; and two creator cells, over the four days and over the first alone, which take
-    # the calendar in AM1.
+    # each, 6, 5, 4 and 1 May 2026, the newest first as the desk keeps them, every business day
+    # of that stretch; a second pair of columns with the days oldest first, one missing the
+    # Monday, one of a Saturday and one of a holiday AM1 lists; two creator cells, over the four
+    # days and over the first alone, which take the calendar in AM1; and the creator once more
+    # over the two columns of BK1's spill, each read through INDEX with every body row at once,
+    # as a sheet feeds a spill back.
     "BI1" = "date"; "BJ1" = "settle"
-    "BI2" = "1-May-2026"; "BJ2" = "101.94"
-    "BI3" = "4-May-2026"; "BJ3" = "106.42"
-    "BI4" = "5-May-2026"; "BJ4" = "102.27"
-    "BI5" = "6-May-2026"; "BJ5" = "95.08"
-    "BL2" = "6-May-2026"; "BM2" = "95.08"
-    "BL3" = "5-May-2026"; "BM3" = "102.27"
-    "BL4" = "1-May-2026"; "BM4" = "101.94"
-    "BL5" = "5-May-2026"; "BM5" = "102.27"
+    "BI2" = "6-May-2026"; "BJ2" = "95.08"
+    "BI3" = "5-May-2026"; "BJ3" = "102.27"
+    "BI4" = "4-May-2026"; "BJ4" = "106.42"
+    "BI5" = "1-May-2026"; "BJ5" = "101.94"
+    "BL2" = "5-May-2026"; "BM2" = "102.27"
+    "BL3" = "6-May-2026"; "BM3" = "95.08"
+    "BL4" = "5-May-2026"; "BM4" = "102.27"
+    "BL5" = "1-May-2026"; "BM5" = "101.94"
     "BL6" = "2-May-2026"; "BM6" = "100"
     "BL7" = "19-Jan-2026"; "BM7" = "100"
     "BK1" = "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,EB1)"
     "BK2" = "=_CreateFuturesFixings(BI2,BJ2,EB1)"
-    # IFERC fixings: four contract months of Waha, January to April 2026, and an illustrative
-    # index beside each; a pair of codes with one given twice; a code over a number; the first
-    # price over a blank; and one creator cell over the four months and their index in EE2.
-    "BO2" = "F26"; "BP2" = "1.85"
-    "BO3" = "G26"; "BP3" = "2.1"
-    "BO4" = "H26"; "BP4" = "1.95"
-    "BO5" = "J26"; "BP5" = "1.6"
+    "BK3" = "=_CreateFuturesFixings(INDEX(util_ReadHandle(BK1),{3;4;5;6},1),INDEX(util_ReadHandle(BK1),{3;4;5;6},2),EB1)"
+    # IFERC fixings: four contract months of Waha, April back to January 2026, the newest first
+    # as the desk keeps them, and an illustrative index beside each; the same four months the
+    # other way up, January first, for their schedule; a pair of codes with one given twice; a
+    # code over a number; the first price over a blank; one creator cell over the four months and
+    # their index in EE2; and the creator once more over the two columns of BQ1's spill.
+    "BO2" = "J26"; "BP2" = "1.6"
+    "BO3" = "H26"; "BP3" = "1.95"
+    "BO4" = "G26"; "BP4" = "2.1"
+    "BO5" = "F26"; "BP5" = "1.85"
+    "BV2" = "F26"; "BV3" = "G26"; "BV4" = "H26"; "BV5" = "J26"
     "BR2" = "F26"; "BR3" = "F26"
     "BS2" = "F26"; "BS3" = "46023"
     "BT2" = "1.85"
     "BQ1" = "=_CreateIfercFixings(BO2:BO5,BP2:BP5,EE2)"
+    "BQ2" = "=_CreateIfercFixings(INDEX(util_ReadHandle(BQ1),{3;4;5;6},1),INDEX(util_ReadHandle(BQ1),{3;4;5;6},2),EE2)"
     # The calendar: one creator cell over the valuation date and the futures index in EB1, which
     # holds the six-contract schedule and the holiday calendar the sheet already holds; then a
     # schedule of one contract, one whose code is given twice, one whose expiries run backwards
@@ -604,23 +628,24 @@ $cells = [ordered]@{
     "AR7" = "=_CreateCalendar(AA2,EB2)"
     # The market history: a valuation date, 26-May-2026 at midday, a schedule of the first two
     # contracts, a calendar over them with the holiday calendar in AM1, which closes no day of
-    # May, and the fixings on its four past business days, 20 to 22 May and the 25th, under the
-    # fixings' headers at BI1:BJ1; then the same fixings with a row on the 26th, the first three
-    # alone, and a calendar over another index of the same name, ED2, for the history to refuse.
+    # May, and the fixings on its four past business days, the 25th then 22 down to 20 May, newest
+    # first, with the 26th in the row above them; then the same fixings with that row, the three
+    # oldest alone, and a calendar over another index of the same name, ED2, for the history to
+    # refuse.
     "CT2" = "26-May-2026"
-    "CQ2" = "20-May-2026"; "CR2" = "70.85"
-    "CQ3" = "21-May-2026"; "CR3" = "71.1"
-    "CQ4" = "22-May-2026"; "CR4" = "71.25"
-    "CQ5" = "25-May-2026"; "CR5" = "71.4"
-    "CQ6" = "26-May-2026"; "CR6" = "71.5"
+    "CQ1" = "26-May-2026"; "CR1" = "71.5"
+    "CQ2" = "25-May-2026"; "CR2" = "71.4"
+    "CQ3" = "22-May-2026"; "CR3" = "71.25"
+    "CQ4" = "21-May-2026"; "CR4" = "71.1"
+    "CQ5" = "20-May-2026"; "CR5" = "70.85"
     "CT3" = "=_CreateValuationDate(CT2,0.5)"
     "CT4" = "=_CreateFuturesSchedule(AE2:AE3,AF2:AF3)"
     "CT5" = "=_CreateCalendar(CT3,ED1)"
     "CT6" = "=_CreateFuturesFixings(CQ2:CQ5,CR2:CR5,ED1)"
     "CT7" = "=_CreateMarketHistory(CT5,CT6)"
-    "CT8" = "=_CreateFuturesFixings(CQ2:CQ6,CR2:CR6,ED1)"
-    "CT9" = "=_CreateFuturesFixings(CQ2:CQ4,CR2:CR4,ED1)"
-    "CT10" = "=_CreateHolidayCalendar(CQ5)"
+    "CT8" = "=_CreateFuturesFixings(CQ1:CQ5,CR1:CR5,ED1)"
+    "CT9" = "=_CreateFuturesFixings(CQ3:CQ5,CR3:CR5,ED1)"
+    "CT10" = "=_CreateHolidayCalendar(CQ2)"
     "CT11" = "=_CreateCalendar(CT3,ED2)"
     # The price vector: a header over four prices, a zero and a negative among them and the
     # first repeated, a cell of numeric text under them, and one creator cell over the prices,
@@ -666,39 +691,41 @@ $cells = [ordered]@{
     # A second pair of first days for the calendar to refuse, the second month starting a day late.
     "DL2" = "1-Sep-2026"; "DL3" = "2-Oct-2026"
     "DK3" = "=_CreateGasDailySchedule(DG2:DG3,DL2:DL3,DI2:DI3)"
-    # The Gas Daily fixings: six flow days of Henry Hub over Labor Day week 2026 and the midpoint
-    # printed for each, Friday 4 September's print carrying Saturday to Tuesday; the first two
-    # prices with the second blank; a pair of days with one skipped; a pair newest first; a day
-    # over text; and two creator cells, over the six days and over the first alone, each with the
-    # Gas Daily index in EB3.
-    "DM2" = "4-Sep-2026"; "DN2" = "2.93"; "DO2" = "2.93"
-    "DM3" = "5-Sep-2026"; "DN3" = "2.875"
-    "DM4" = "6-Sep-2026"; "DN4" = "2.875"
-    "DM5" = "7-Sep-2026"; "DN5" = "2.875"
-    "DM6" = "8-Sep-2026"; "DN6" = "2.875"
-    "DM7" = "9-Sep-2026"; "DN7" = "2.9"
-    "DP2" = "4-Sep-2026"; "DP3" = "6-Sep-2026"
-    "DQ2" = "5-Sep-2026"; "DQ3" = "4-Sep-2026"
-    "DP5" = "4-Sep-2026"; "DP6" = "x"
+    # The Gas Daily fixings: six flow days of Henry Hub over Labor Day week 2026, the newest
+    # first as the desk keeps them, and the midpoint printed for each, Friday 4 September's print
+    # carrying Saturday to Tuesday; the first two prices with the second blank; a pair of days
+    # with one skipped; a pair oldest first; a day over text; two creator cells, over the six days
+    # and over the first alone, each with the Gas Daily index in EB3; and the creator once more
+    # over the two columns of DR1's spill.
+    "DM2" = "9-Sep-2026"; "DN2" = "2.9"; "DO2" = "2.9"
+    "DM3" = "8-Sep-2026"; "DN3" = "2.875"
+    "DM4" = "7-Sep-2026"; "DN4" = "2.875"
+    "DM5" = "6-Sep-2026"; "DN5" = "2.875"
+    "DM6" = "5-Sep-2026"; "DN6" = "2.875"
+    "DM7" = "4-Sep-2026"; "DN7" = "2.93"
+    "DP2" = "6-Sep-2026"; "DP3" = "4-Sep-2026"
+    "DQ2" = "4-Sep-2026"; "DQ3" = "5-Sep-2026"
+    "DP5" = "5-Sep-2026"; "DP6" = "x"
     "DR1" = "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB3)"
     "DR2" = "=_CreateGasDailyFixings(DM2,DN2,EB3)"
-    # The market history over the other two calendars: eleven flow days of Henry Hub, 1 to 11
-    # September 2026, and the midpoint printed for each, so that the Gas Daily calendar in AR6,
+    "DR3" = "=_CreateGasDailyFixings(INDEX(util_ReadHandle(DR1),{3;4;5;6;7;8},1),INDEX(util_ReadHandle(DR1),{3;4;5;6;7;8},2),EB3)"
+    # The market history over the other two calendars: eleven flow days of Henry Hub, 11 back to
+    # 1 September 2026, and the midpoint printed for each, so that the Gas Daily calendar in AR6,
     # valued on the 11th, has a print on every fixed day; a valuation date of 15-Nov-2026, the
     # IFERC calendar over DE1 valued on it, October and November published and December not, and
     # the two months' indices, November's first; and a Gas Daily calendar valued on the 10th, for
     # the print of the 11th to be refused.
-    "DS2" = "1-Sep-2026"; "DT2" = "2.91"
-    "DS3" = "2-Sep-2026"; "DT3" = "2.92"
-    "DS4" = "3-Sep-2026"; "DT4" = "2.93"
-    "DS5" = "4-Sep-2026"; "DT5" = "2.93"
-    "DS6" = "5-Sep-2026"; "DT6" = "2.875"
+    "DS2" = "11-Sep-2026"; "DT2" = "3"
+    "DS3" = "10-Sep-2026"; "DT3" = "2.95"
+    "DS4" = "9-Sep-2026"; "DT4" = "2.9"
+    "DS5" = "8-Sep-2026"; "DT5" = "2.875"
+    "DS6" = "7-Sep-2026"; "DT6" = "2.875"
     "DS7" = "6-Sep-2026"; "DT7" = "2.875"
-    "DS8" = "7-Sep-2026"; "DT8" = "2.875"
-    "DS9" = "8-Sep-2026"; "DT9" = "2.875"
-    "DS10" = "9-Sep-2026"; "DT10" = "2.9"
-    "DS11" = "10-Sep-2026"; "DT11" = "2.95"
-    "DS12" = "11-Sep-2026"; "DT12" = "3"
+    "DS8" = "5-Sep-2026"; "DT8" = "2.875"
+    "DS9" = "4-Sep-2026"; "DT9" = "2.93"
+    "DS10" = "3-Sep-2026"; "DT10" = "2.93"
+    "DS11" = "2-Sep-2026"; "DT11" = "2.92"
+    "DS12" = "1-Sep-2026"; "DT12" = "2.91"
     "DU1" = "=_CreateGasDailyFixings(DS2:DS12,DT2:DT12,EB3)"
     "DU2" = "=_CreateMarketHistory(AR6,DU1)"
     "DV2" = "15-Nov-2026"
@@ -756,14 +783,15 @@ $cells = [ordered]@{
     "ED6" = "=_CreateIndex(EC2,AR4,AP1,BY1,AM1)"
     "ED7" = "=_CreateIndex(EC2,AR5,AP1,BY1,AM1)"
     "ED8" = "=_CreateIndex(EC4,DK3,AP1,BY1)"
-    # The IFERC index the fixings in BQ1 take: a schedule of their four months, ICE's last trading
-    # days and Platts' publication days beside the codes in BO, and an index over it.
+    # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
+    # a schedule runs, the codes in BV, ICE's last trading days and Platts' publication days
+    # beside them, and an index over it.
     "EC5" = "Waha IFERC"
     "EF2" = "31-Dec-2025"; "EG2" = "5-Jan-2026"
     "EF3" = "30-Jan-2026"; "EG3" = "2-Feb-2026"
     "EF4" = "27-Feb-2026"; "EG4" = "2-Mar-2026"
     "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
-    "EE1" = "=_CreateIfercSchedule(BO2:BO5,EF2:EF5,EG2:EG5)"
+    "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
     "EE2" = "=_CreateIndex(EC5,EE1,AP1,BY1)"
 }
 

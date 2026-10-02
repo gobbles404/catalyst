@@ -185,11 +185,12 @@ def a_two_contract_schedule() -> object:
     )
 
 
-# Serials for 1 and 4 May 2026, a Friday and the Monday after it, checked against a calendar of
-# one day, 1 January.
+# Serials for 4 and 1 May 2026, a Monday and the Friday before it, the newer day in the first
+# row as the creator takes them, checked against a calendar of one day, 1 January: the spill
+# shows the rows as they were given, newest first, each settle beside its own day.
 def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_exactly() -> None:
-    days = Cells.from_rows([[46143.0], [46146.0]])
-    settles = Cells.from_rows([[101.94], [106.42]])
+    days = Cells.from_rows([[46146.0], [46143.0]])
+    settles = Cells.from_rows([[106.42], [101.94]])
     calendar = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0]])])
     handle = bridge.call(
         "_CreateFuturesFixings", [days, settles, an_index(a_two_contract_schedule(), calendar)]
@@ -197,8 +198,8 @@ def test_futures_fixings_spill_their_columns_with_dates_as_serials_and_settles_e
     assert rows(read(handle)) == [
         ["date", "settle"],
         ["datetime64[D]", "float64"],
-        [46143.0, 101.94],
         [46146.0, 106.42],
+        [46143.0, 101.94],
     ]
 
 
@@ -272,10 +273,10 @@ def test_a_market_history_spills_the_calendar_and_a_fixing_price_by_kind() -> No
     assert kinds[2].tolist() == [NUMBER_CODE, TEXT_CODE, BOOLEAN_CODE, BOOLEAN_CODE, TEXT_CODE]
 
 
-# A Gas Daily calendar of one month, September 2026, valued on the 2nd with a print on the 1st
-# and the 2nd, and an IFERC calendar of two months valued on 15 October with October's index: the
-# same five columns, a number on each fixed period and the word unfixed on the rest, no period
-# being closed.
+# A Gas Daily calendar of one month, September 2026, valued on the 2nd with a print on the 2nd
+# and the 1st, given newest first, and an IFERC calendar of two months valued on 15 October with
+# October's index: the same five columns in the calendar's order, the oldest period first, a
+# number on each fixed period and the word unfixed on the rest, no period being closed.
 def test_the_other_two_histories_spill_the_same_five_columns() -> None:
     month = bridge.call(
         "_CreateGasDailySchedule",
@@ -287,7 +288,7 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
     )
     prints = bridge.call(
         "_CreateGasDailyFixings",
-        [Cells.from_rows([[46266.0], [46267.0]]), Cells.from_rows([[2.91], [2.92]]), gas],
+        [Cells.from_rows([[46267.0], [46266.0]]), Cells.from_rows([[2.92], [2.91]]), gas],
     )
     kinds, slots, joined = read(bridge.call("_CreateMarketHistory", [gas_daily, prints]))
     shown = rows((kinds, slots, joined))
@@ -327,11 +328,12 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
     assert kinds[2:, 4].tolist() == [NUMBER_CODE, TEXT_CODE]
 
 
-# Serials for 4 to 7 September 2026, a Friday through Labor Day Monday, the three rows after
-# the Friday carrying its one print.
+# Serials for 7 back to 4 September 2026, Labor Day Monday back to the Friday, the newest flow
+# day in the first row as the creator takes them, the three rows above the Friday carrying one
+# print: the spill shows the rows as they were given.
 def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> None:
-    flow_days = Cells.from_rows([[46269.0], [46270.0], [46271.0], [46272.0]])
-    prices = Cells.from_rows([[2.930], [2.875], [2.875], [2.875]])
+    flow_days = Cells.from_rows([[46272.0], [46271.0], [46270.0], [46269.0]])
+    prices = Cells.from_rows([[2.875], [2.875], [2.875], [2.930]])
     month = bridge.call(
         "_CreateGasDailySchedule",
         [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
@@ -341,24 +343,25 @@ def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> No
     assert rows((kinds, slots, joined)) == [
         ["flow_date", "price"],
         ["datetime64[D]", "float64"],
-        [46269.0, 2.930],
-        [46270.0, 2.875],
-        [46271.0, 2.875],
         [46272.0, 2.875],
+        [46271.0, 2.875],
+        [46270.0, 2.875],
+        [46269.0, 2.930],
     ]
     assert kinds.shape == (6, 2)
     assert kinds[2:].tolist() == [[NUMBER_CODE, NUMBER_CODE]] * 4
 
 
-# Two months of Waha IFERC, the codes as typed and an index beside each, a zero and a negative
-# among four kept in their places.
+# Four months of Waha IFERC, the codes as typed, the newest month in the first row as the desk
+# keeps them, and an index beside each, a zero and a negative among four kept in their places:
+# the spill shows the codes in the order typed, over a schedule that lists them the other way.
 def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
-    codes = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
-    prices = Cells.from_rows([[1.85], [0.0], [-0.5], [1.60]])
+    codes = Cells.from_rows([["J26"], ["H26"], ["G26"], ["F26"]])
+    prices = Cells.from_rows([[1.60], [-0.5], [0.0], [1.85]])
     months = bridge.call(
         "_CreateIfercSchedule",
         [
-            codes,
+            Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]]),
             Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]]),
             Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]]),
         ],
@@ -368,19 +371,20 @@ def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
     assert rows((kinds, slots, joined)) == [
         ["contract_code", "price"],
         ["str", "float64"],
-        ["F26", 1.85],
-        ["G26", 0.0],
-        ["H26", -0.5],
         ["J26", 1.60],
+        ["H26", -0.5],
+        ["G26", 0.0],
+        ["F26", 1.85],
     ]
     assert kinds.shape == (6, 2)
     assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 4
 
 
-# A Gas Daily market over one month, September 2026, valued on the 2nd with two prints and the
-# balance-of-month quote: the prints on the 1st and 2nd, the quote on every later day, every
-# cell a number. An IFERC market over two months valued on 15 October with October's index and
-# November's quote: the index on the published row and the quote on the other.
+# A Gas Daily market over one month, September 2026, valued on the 2nd with two prints, given
+# newest first, and the balance-of-month quote: the market's rows run in the calendar's order,
+# the prints on the 1st and 2nd, the quote on every later day, every cell a number. An IFERC
+# market over two months valued on 15 October with October's index and November's quote: the
+# index on the published row and the quote on the other.
 def test_the_other_two_markets_spill_the_same_five_columns() -> None:
     month = bridge.call(
         "_CreateGasDailySchedule",
@@ -392,7 +396,7 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
     )
     prints = bridge.call(
         "_CreateGasDailyFixings",
-        [Cells.from_rows([[46266.0], [46267.0]]), Cells.from_rows([[2.91], [2.92]]), gas],
+        [Cells.from_rows([[46267.0], [46266.0]]), Cells.from_rows([[2.92], [2.91]]), gas],
     )
     history = bridge.call("_CreateMarketHistory", [gas_daily, prints])
     balance = bridge.call("_CreatePriceVector", ["sample", 2.95])

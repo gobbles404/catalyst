@@ -38,8 +38,8 @@ __all__ = [
 def _CreateFuturesFixings(
     date: Annotated[
         DateColumn,
-        "The column of days the index fixed, such as A2:A5 holding 1-May-2026 to 6-May-2026, "
-        "one for every business day from the first to the last.",
+        "The column of days the index fixed, newest first, such as A2:A5 holding 6-May-2026 "
+        "down to 1-May-2026, one for every business day between them.",
     ],
     settle: Annotated[
         NumberColumn,
@@ -61,7 +61,8 @@ def _CreateFuturesFixings(
 def _CreateIfercFixings(
     contract_code: Annotated[
         TextColumn,
-        "The column of contract codes, such as A2:A5 holding F26 to J26, one per month published.",
+        "The column of contract codes, such as A2:A5 holding J26 down to F26, one per month "
+        "published.",
     ],
     price: Annotated[
         NumberColumn,
@@ -69,7 +70,7 @@ def _CreateIfercFixings(
     ],
     index: Annotated[
         Handle[Index],
-        "The index handle: the cell showing _CreateIndex's result, such as E3, or a name for "
+        "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
         "it; an IFERC index, whose months the codes are checked against.",
     ],
 ) -> Handle[IfercFixings]:
@@ -83,8 +84,8 @@ def _CreateIfercFixings(
 def _CreateGasDailyFixings(
     flow_date: Annotated[
         DateColumn,
-        "The column of flow days, such as A2:A7 holding 4-Sep-2026 to 9-Sep-2026, one for every "
-        "calendar day from the first to the last.",
+        "The column of flow days, newest first, such as A2:A7 holding 9-Sep-2026 down to "
+        "4-Sep-2026, one for every calendar day between them.",
     ],
     price: Annotated[
         NumberColumn,
@@ -97,7 +98,7 @@ def _CreateGasDailyFixings(
     ],
 ) -> Handle[GasDailyFixings]:
     """Creates the Gas Daily fixings of one index from the days gas flowed and the midpoint
-    printed for each, one for every calendar day from the first to the last, and shows its
+    printed for each, one for every calendar day between the newest and the oldest, and shows its
     handle, the text other formulas take as the fixings."""
     return gas_daily_fixings(flow_date, price, index)
 

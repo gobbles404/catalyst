@@ -1,6 +1,7 @@
 """Futures fixings: the settlement price of one index on each day it fixed, date beside settle, as
-the desk keeps them, one for every business day of its market from the first to the last, and
-the index they are the fixings of. docs/library/market-data/futures-fixings.md is the page."""
+the desk keeps them, the newest at the top, one for every business day of its market from the
+last row's day to the first row's, and the index they are the fixings of.
+docs/library/market-data/futures-fixings.md is the page."""
 
 from dataclasses import dataclass
 from datetime import date
@@ -20,7 +21,8 @@ class FuturesFixings:
     """The index whose fixings these are, kept by reference, and dates and settles aligned by
     position, both read-only: dates[i] and settles[i] describe one fixing. The dates are the
     business days of the index's market from the first to the last, every one and no other,
-    increasing; a settle is any number a cell holds, zero and below included."""
+    increasing: the sheet gives the series newest first, and it is kept oldest first, the order
+    the history reads it in. A settle is any number a cell holds, zero and below included."""
 
     index: Index
     dates: NDArray[np.datetime64]
@@ -33,26 +35,36 @@ def futures_fixings(
     index: Index,
 ) -> FuturesFixings:
     """The one way to make a FuturesFixings: its five rules of meaning, checked once, vectorized,
-    in this order, the first failure being the message.
+    in this order, the first failure being the message, then the two columns kept the other
+    way up.
 
-    The index is a futures index, since the days are checked against a holiday calendar and only
-    a futures index has one. One settle per date, since the seam never compares two columns and
-    a series is rows. Each date is after the row above, which keeps one fixing per day in the
-    order a reader searches; nothing is sorted, so a series pasted newest first fails at its
-    second row, and the desk sorts it. Each date is a business day, Monday to Friday and not a
-    holiday of the index's calendar, since an index fixes only when its market is open: a
-    weekend day or a holiday in the series is refused, at either end as in the middle. And no
-    business day between the first date and the last is without a fixing, since a gap is a row
-    the desk did not paste: with every date a business day and the dates increasing, the series
-    is whole exactly when the business days from the first date up to the last number one fewer
-    than the rows, one numpy count of two dates, and the business day after each date is found
-    only to name the first one missing. The first and last dates bound the check, so nothing is
-    asked for before the first or after the last, and a holiday outside them changes nothing.
-    The holidays are read as numpy reads them: a day listed twice counts once, and a day listed
-    on a weekend adds nothing. Both columns are copied and then frozen, so the fixings own their
-    data: a Python caller keeps whatever it passed, and a later change to an input never
-    changes a fixing; the index is kept by reference, the one the desk paired the series with.
-    Rows count as the sheet counts them, the first row of the column being row 1.
+    The series is given as the desk keeps it, the newest fixing in the first row, so that a new
+    day is a row added at the top. The index is a futures index, since the days are checked
+    against a holiday calendar and only a futures index has one. One settle per date, since the
+    seam never compares two columns and a series is rows. Each date is before the row above,
+    which keeps one fixing per day and the newest first; nothing is sorted, so a series pasted
+    oldest first fails at its second row, as a date given twice does, and one direction is the
+    only one taken. Each date is a business day, Monday to Friday and not a holiday of the
+    index's calendar, since an index fixes only when its market is open: a weekend day or a
+    holiday in the series is refused, at either end as in the middle. And no business day
+    between the last row's date and the first row's is without a fixing, since a gap is a row
+    the desk did not paste: with every date a business day and the dates decreasing, the series
+    is whole exactly when the business days from the last row's date up to the first row's
+    number one fewer than the rows, one numpy count of two dates, and the business day before
+    each date is found only to name the first one missing. The two end dates bound the check,
+    so nothing is asked for after the first row's date or before the last row's, and a holiday
+    outside them changes nothing. The holidays are read as numpy reads them: a day listed twice
+    counts once, and a day listed on a weekend adds nothing.
+
+    The rules run on the rows as the sheet gave them, a column of days, datetime64[D], as the
+    seam hands it over and as a Python caller passes it, so each message names the sheet's own
+    row, the first row of the column being row 1, and within a rule the first row from the top
+    that breaks it; a rule earlier in the order is reported before a later one, whichever row
+    each is on. Then both columns are copied from the last row to the first and frozen: one
+    copy each, as before, and what is kept runs oldest first, date beside its own settle, the
+    order the market history reads. The fixings own their data, so a Python caller keeps
+    whatever it passed and a later change to an input never changes a fixing; the index is kept
+    by reference, the one the desk paired the series with.
     """
     if index.kind is not Kind.FUTURES:
         raise ValueError(f"index is {described(index.kind, 'index')}, expected a futures index")
@@ -60,37 +72,39 @@ def futures_fixings(
     if settles.size != dates.size:
         have = f"{settles.size} {'settle' if settles.size == 1 else 'settles'}"
         raise ValueError(f"settle has {have}, expected {dates.size}, one per date")
-    days = np.array(dates, dtype="datetime64[D]")
-    unordered = days[1:] <= days[:-1]
+    # The rules run on the column as the sheet gave it, the newest first, nothing copied yet.
+    unordered = dates[1:] >= dates[:-1]
     if unordered.any():
-        k = int(unordered.argmax())  # days[k + 1] is the first date not after the one before it
+        k = int(unordered.argmax())  # dates[k + 1] is the first date not before the row above
         raise ValueError(
-            f"date row {k + 2} is {days[k + 1]}, expected a date after row {k + 1}'s {days[k]}"
+            f"date row {k + 2} is {dates[k + 1]}, expected a date before row {k + 1}'s {dates[k]}"
         )
     calendar = np.busdaycalendar(holidays=holidays)
-    closed = ~np.is_busday(days, busdaycal=calendar)
+    closed = ~np.is_busday(dates, busdaycal=calendar)
     if closed.any():
-        k = int(closed.argmax())  # days[k] is the first weekend day or holiday
-        weekday = WEEKDAYS[date.fromisoformat(str(days[k])).weekday()]
+        k = int(closed.argmax())  # dates[k] is the first weekend day or holiday from the top
+        weekday = WEEKDAYS[date.fromisoformat(str(dates[k])).weekday()]
         reason = weekday if weekday in ("Saturday", "Sunday") else "holiday"
-        raise ValueError(f"date row {k + 1} is {days[k]}, a {reason}, expected a business day")
-    # Every date a business day and the dates increasing, the rows but the last are that many
-    # business days from the first date up to the last, so the series is whole exactly when
-    # those business days number one fewer than the rows: one np.busday_count of the two end
-    # dates. The ends are taken as slices, the first row and the last, so a series of one row
-    # asks the same question, no days counted against none expected, and a series of no rows
-    # asks it of nothing: one path, with no case for either. The business day after each date is
-    # made only when one is missing, to name the first.
-    short = np.busday_count(days[:1], days[-1:], busdaycal=calendar) != days.size - 1
+        raise ValueError(f"date row {k + 1} is {dates[k]}, a {reason}, expected a business day")
+    # Every date a business day and the dates decreasing, the rows but the first are that many
+    # business days from the last row's date up to the first row's, so the series is whole
+    # exactly when those business days number one fewer than the rows: one np.busday_count of
+    # the two end dates. The ends are taken as slices, the last row and the first, so a series
+    # of one row asks the same question, no days counted against none expected, and a series of
+    # no rows asks it of nothing: one path, with no case for either. The business day before
+    # each date is made only when one is missing, to name the first.
+    short = np.busday_count(dates[-1:], dates[:1], busdaycal=calendar) != dates.size - 1
     if short.any():
-        following = np.busday_offset(days[:-1], 1, busdaycal=calendar)
-        skipped = following != days[1:]
-        k = int(skipped.argmax())  # following[k] is the first business day without a fixing
+        preceding = np.busday_offset(dates[:-1], -1, busdaycal=calendar)
+        skipped = preceding != dates[1:]
+        k = int(skipped.argmax())  # preceding[k] is the first business day without a fixing
         raise ValueError(
-            f"date row {k + 2} is {days[k + 1]}, expected {following[k]}, "
-            f"the business day after row {k + 1}'s {days[k]}"
+            f"date row {k + 2} is {dates[k + 1]}, expected {preceding[k]}, "
+            f"the business day before row {k + 1}'s {dates[k]}"
         )
-    prices = np.array(settles, dtype=np.float64)
+    # The one copy of each column, read from the last row back: oldest first, and contiguous.
+    days = np.array(dates[::-1], dtype="datetime64[D]")
+    prices = np.array(settles[::-1], dtype=np.float64)
     days.setflags(write=False)
     prices.setflags(write=False)
     return FuturesFixings(index, days, prices)

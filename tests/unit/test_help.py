@@ -233,8 +233,8 @@ def test_the_futures_fixings_creator_explains_itself() -> None:
     assert arguments == [
         (
             "date",
-            "The column of days the index fixed, such as A2:A5 holding 1-May-2026 to 6-May-2026, "
-            "one for every business day from the first to the last.",
+            "The column of days the index fixed, newest first, such as A2:A5 holding 6-May-2026 "
+            "down to 1-May-2026, one for every business day between them.",
         ),
         ("settle", "The column of settles beside the days, such as B2:B5, one per day."),
         (
@@ -256,7 +256,7 @@ def test_the_iferc_fixings_creator_explains_itself() -> None:
     assert arguments == [
         (
             "contract_code",
-            "The column of contract codes, such as A2:A5 holding F26 to J26, one per month "
+            "The column of contract codes, such as A2:A5 holding J26 down to F26, one per month "
             "published.",
         ),
         (
@@ -265,7 +265,7 @@ def test_the_iferc_fixings_creator_explains_itself() -> None:
         ),
         (
             "index",
-            "The index handle: the cell showing _CreateIndex's result, such as E3, or a name for "
+            "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
             "it; an IFERC index, whose months the codes are checked against.",
         ),
     ]
@@ -276,14 +276,14 @@ def test_the_gas_daily_fixings_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Creates the Gas Daily fixings of one index from the days gas flowed and the midpoint "
-        "printed for each, one for every calendar day from the first to the last, and shows its "
-        "handle, the text other formulas take as the fixings."
+        "printed for each, one for every calendar day between the newest and the oldest, and shows "
+        "its handle, the text other formulas take as the fixings."
     )
     assert arguments == [
         (
             "flow_date",
-            "The column of flow days, such as A2:A7 holding 4-Sep-2026 to 9-Sep-2026, one for "
-            "every calendar day from the first to the last.",
+            "The column of flow days, newest first, such as A2:A7 holding 9-Sep-2026 down to "
+            "4-Sep-2026, one for every calendar day between them.",
         ),
         (
             "price",

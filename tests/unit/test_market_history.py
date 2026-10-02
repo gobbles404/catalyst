@@ -68,8 +68,12 @@ CALENDAR = calendar(MAY_26, INDEX)
 
 
 def fixings_on(*days: str, prices: tuple[float, ...] = (), over: Index = INDEX) -> FuturesFixings:
+    """Fixings on those days, named here oldest first, the order a history reads them in, each
+    with the settle at its own place, 70 on the first named and one more each day unless given.
+    They are handed to the builder as the sheet gives a series: the newest day in the first
+    row, the two columns turned over together."""
     settles = np.array(prices or tuple(70.0 + i for i in range(len(days))), dtype=np.float64)
-    return futures_fixings(dates(*days), settles, over)
+    return futures_fixings(dates(*days)[::-1], settles[::-1], over)
 
 
 FIXINGS = fixings_on("2026-05-20", "2026-05-21", "2026-05-22", prices=(70.85, 71.10, 71.25))
@@ -93,10 +97,11 @@ def business_days(first: str, last: str, holidays: HolidayCalendar) -> NDArray[n
 
 def whole_fixings(first: str, last: str, over: Index = INDEX) -> FuturesFixings:
     """A fixing on every business day of the index's market from the first day to the last,
-    priced by position."""
+    60 on the first and one more each day, handed to the builder newest first."""
     assert over.holiday_calendar is not None
     days = business_days(first, last, over.holiday_calendar)
-    return futures_fixings(days, 60.0 + np.arange(days.size, dtype=np.float64), over)
+    settles = 60.0 + np.arange(days.size, dtype=np.float64)
+    return futures_fixings(days[::-1], settles[::-1], over)
 
 
 # --- the sample ---------------------------------------------------------------
@@ -353,7 +358,7 @@ def test_every_past_business_day_takes_its_own_fixing_and_no_other_day_takes_one
     days = np.arange(as_of - np.timedelta64(span, "D"), as_of, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=made.index.holiday_calendar.holiday)]
     settles = data.draw(st.floats(-100, 100)) + np.arange(days.size, dtype=np.float64)
-    fixings = futures_fixings(days, settles, made.index)
+    fixings = futures_fixings(days[::-1], settles[::-1], made.index)  # newest first, as given
     history = market_history(made, fixings)
     required = np.flatnonzero(made.is_fixed & made.is_priced)
     assert history.calendar is made
@@ -377,7 +382,7 @@ def test_no_fixing_over_the_calendars_index_falls_on_a_day_it_closes(
     ten = np.timedelta64(10, "D")
     days = np.arange(made.dates[0] - ten, made.dates[-1] + ten, dtype="datetime64[D]")
     days = days[np.is_busday(days, holidays=made.index.holiday_calendar.holiday)]
-    fixings = futures_fixings(days, np.zeros(days.size), made.index)
+    fixings = futures_fixings(days[::-1], np.zeros(days.size), made.index)
     inside = (fixings.dates >= made.dates[0]) & (fixings.dates <= made.dates[-1])
     rows = (fixings.dates[inside] - made.dates[0]).astype(np.intp)
     assert made.is_priced[rows].all()
@@ -446,9 +451,11 @@ def a_gas_daily_calendar(as_of: str = "2026-09-25", fraction: float = 0.5) -> Ca
 
 
 def prints_on(first: str, last: str, over: Index = GAS_DAILY_INDEX) -> GasDailyFixings:
-    """A print on every flow day from the first to the last, 2.80 rising by a cent a day."""
+    """A print on every flow day from the first to the last, 2.80 on the first rising by a
+    cent a day, handed to the builder newest first, each print beside its own flow day."""
     days = np.arange(day(first), day(last) + np.timedelta64(1, "D"), dtype="datetime64[D]")
-    return gas_daily_fixings(days, 2.80 + np.arange(days.size, dtype=np.float64) / 100, over)
+    prices = 2.80 + np.arange(days.size, dtype=np.float64) / 100
+    return gas_daily_fixings(days[::-1], prices[::-1], over)
 
 
 GAS_DAILY = a_gas_daily_calendar()
@@ -578,15 +585,19 @@ def indices_for(*pairs: tuple[str, float], over: Index = IFERC_INDEX) -> IfercFi
 IFERC = an_iferc_calendar()
 
 
+# The page's sample, the months as the desk keeps them, the newest in the first row: the
+# history's rows and prices run in the calendar's order, October then November.
 def test_the_iferc_sample_prices_the_published_months_and_no_other() -> None:
-    made = market_history(IFERC, indices_for(("V26", 1.85), ("X26", 2.10)))
+    made = market_history(IFERC, indices_for(("X26", 2.10), ("V26", 1.85)))
     assert made.calendar is IFERC
     assert made.fixed_rows.tolist() == [0, 1]
     assert made.fixing_prices.tolist() == [1.85, 2.10]
 
 
+# The same months the other way up, the oldest first, make the same history: an index finds its
+# row by its code, so neither direction is the only one taken.
 def test_iferc_indices_come_back_in_the_calendars_order_whatever_order_they_came_in() -> None:
-    made = market_history(IFERC, indices_for(("X26", 2.10), ("V26", 1.85)))
+    made = market_history(IFERC, indices_for(("V26", 1.85), ("X26", 2.10)))
     assert made.fixed_rows.tolist() == [0, 1]
     assert made.fixing_prices.tolist() == [1.85, 2.10]
 
@@ -651,6 +662,60 @@ def test_an_iferc_history_that_cannot_be_made_says_why(
     with pytest.raises(ValueError) as failure:
         market_history(IFERC, indices_for(*pairs))
     assert str(failure.value) == message
+
+
+# --- the direction the fixings were given in ----------------------------------------------
+
+
+# The series as the sheet gives it, the newest day in the first row and no two settles alike:
+# the history prices each past business day with the settle given beside that day.
+def test_fixings_given_newest_first_price_each_day_with_its_own_settle() -> None:
+    fixings = futures_fixings(
+        dates("2026-05-22", "2026-05-21", "2026-05-20"), np.array([71.25, 71.10, 70.85]), INDEX
+    )
+    made = market_history(CALENDAR, fixings)
+    assert priced(made) == {"2026-05-20": 70.85, "2026-05-21": 71.10, "2026-05-22": 71.25}
+    assert made.fixed_rows.tolist() == [0, 1, 2]
+    assert made.fixing_prices.tolist() == [70.85, 71.10, 71.25]
+
+
+def test_prints_given_newest_first_price_each_flow_day_with_its_own_print() -> None:
+    prints = gas_daily_fixings(
+        dates("2026-09-03", "2026-09-02", "2026-09-01"),
+        np.array([2.93, 2.87, 2.81]),
+        GAS_DAILY_INDEX,
+    )
+    made = market_history(a_gas_daily_calendar("2026-09-03"), prints)
+    assert priced(made) == {"2026-09-01": 2.81, "2026-09-02": 2.87, "2026-09-03": 2.93}
+    assert made.fixed_rows.tolist() == [0, 1, 2]
+
+
+# Two fixings on or after the valuation date, given newest first: the 27th is the sheet's first
+# row and the 26th its second, and the message names the 26th, the earliest, and no row. The
+# history reads what the fixings keep, oldest first, and not the sheet.
+def test_a_late_fixing_is_named_by_the_earliest_date_whichever_row_it_was_given_on() -> None:
+    late = futures_fixings(
+        dates("2026-05-27", "2026-05-26", "2026-05-22", "2026-05-21", "2026-05-20"),
+        np.array([5.0, 4.0, 3.0, 2.0, 1.0]),
+        INDEX,
+    )
+    with pytest.raises(ValueError) as failure:
+        market_history(CALENDAR, late)
+    assert str(failure.value) == (
+        "fixings date 2026-05-26 is on or after valuation date 2026-05-26, "
+        "expected dates before the valuation date"
+    )
+    late_prints = gas_daily_fixings(
+        dates("2026-09-28", "2026-09-27", "2026-09-26", "2026-09-25"),
+        np.array([4.0, 3.0, 2.0, 1.0]),
+        GAS_DAILY_INDEX,
+    )
+    with pytest.raises(ValueError) as failure:
+        market_history(GAS_DAILY, late_prints)
+    assert str(failure.value) == (
+        "fixings flow_date 2026-09-26 is after valuation date 2026-09-25, "
+        "expected flow days on or before the valuation date"
+    )
 
 
 # --- the fixings are over the calendar's index -------------------------------------------
@@ -762,7 +827,8 @@ def test_every_fixed_flow_day_takes_its_own_print_and_no_other_day_takes_one(
     days = np.arange(
         firsts[0] - np.timedelta64(before, "D"), as_of + one_day, dtype="datetime64[D]"
     )
-    prints = gas_daily_fixings(days, 1.0 + np.arange(days.size, dtype=np.float64), made.index)
+    prices = 1.0 + np.arange(days.size, dtype=np.float64)
+    prints = gas_daily_fixings(days[::-1], prices[::-1], made.index)  # newest first, as given
     history = market_history(made, prints)
     required = np.flatnonzero(made.is_fixed)
     assert history.fixed_rows.tolist() == required.tolist()

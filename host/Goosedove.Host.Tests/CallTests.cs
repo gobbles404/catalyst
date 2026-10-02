@@ -168,11 +168,11 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", 46161.0, ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is number 46161.0, expected a handle" };
             yield return new object[] { "_CreateIndex", new object[] { "Henry Hub NYMEX", "x", ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIndex: schedule is text 'x' naming no live object, expected a handle" };
             // The futures fixings: a column of days, a column of settles and the index by handle. The index left out, a number in its place and text naming no live object fail in the seam's words, as do a blank among the settles and a row where a column is expected; the library's rules, which need a live index, are in the fact below.
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, 106.42), ExcelMissing.Value }, "#ERROR _CreateFuturesFixings: index is missing, expected index handle" };
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, 106.42), 101.94 }, "#ERROR _CreateFuturesFixings: index is number 101.94, expected index handle" };
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, 106.42), "x" }, "#ERROR _CreateFuturesFixings: index is text 'x' naming no live object, expected index handle" };
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Column(101.94, ExcelEmpty.Value), "x" }, "#ERROR _CreateFuturesFixings: settle cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46143.0, 46146.0), Row(101.94, 106.42), "x" }, "#ERROR _CreateFuturesFixings: settle is 1x2 array, expected column of numbers" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), ExcelMissing.Value }, "#ERROR _CreateFuturesFixings: index is missing, expected index handle" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), 101.94 }, "#ERROR _CreateFuturesFixings: index is number 101.94, expected index handle" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, 101.94), "x" }, "#ERROR _CreateFuturesFixings: index is text 'x' naming no live object, expected index handle" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Column(106.42, ExcelEmpty.Value), "x" }, "#ERROR _CreateFuturesFixings: settle cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreateFuturesFixings", new object[] { Column(46146.0, 46143.0), Row(106.42, 101.94), "x" }, "#ERROR _CreateFuturesFixings: settle is 1x2 array, expected column of numbers" };
             // The IFERC fixings: a column of contract codes, a column of indices and the index by handle. A blank among the prices, a number among the codes, the prices left out, the index left out or a number in its place, and a row where a column is expected fail in the seam's words; the library's rules, which need a live index, are in the fact below.
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Column(1.85, 2.10), ExcelMissing.Value }, "#ERROR _CreateIfercFixings: index is missing, expected index handle" };
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Column(1.85, 2.10), 1.85 }, "#ERROR _CreateIfercFixings: index is number 1.85, expected index handle" };
@@ -181,12 +181,12 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateIfercFixings: price is missing, expected column of numbers" };
             yield return new object[] { "_CreateIfercFixings", new object[] { Column("F26", "G26"), Row(1.85, 2.10), ExcelMissing.Value }, "#ERROR _CreateIfercFixings: price is 1x2 array, expected column of numbers" };
             // The Gas Daily fixings: a column of flow days, a column of midpoints and the index by handle. A blank among the prices, text among the days, the prices left out, the index left out or a number in its place, and a row where a column is expected fail in the seam's words; the library's rules, which need a live index, are in the fact below.
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Column(2.93, 2.875), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: index is missing, expected index handle" };
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Column(2.93, 2.875), 2.93 }, "#ERROR _CreateGasDailyFixings: index is number 2.93, expected index handle" };
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Column(2.93, ExcelEmpty.Value), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number" };
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, "x"), Column(2.93, 2.875), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date" };
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers" };
-            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46269.0, 46270.0), Row(2.93, 2.875), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is 1x2 array, expected column of numbers" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), Column(2.875, 2.93), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: index is missing, expected index handle" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), Column(2.875, 2.93), 2.93 }, "#ERROR _CreateGasDailyFixings: index is number 2.93, expected index handle" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), Column(2.875, ExcelEmpty.Value), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price cell (2, 1) is blank, expected number" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, "x"), Column(2.875, 2.93), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: flow_date cell (2, 1) is text 'x', expected date" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers" };
+            yield return new object[] { "_CreateGasDailyFixings", new object[] { Column(46270.0, 46269.0), Row(2.875, 2.93), ExcelMissing.Value }, "#ERROR _CreateGasDailyFixings: price is 1x2 array, expected column of numbers" };
             // The calendar: two handles, the valuation date and the index. A number, a missing argument and text naming no live object where the valuation date should be fail in the seam's words; the library's rules and the wrong kinds, which need live handles, are in the fact below.
             yield return new object[] { "_CreateCalendar", new object[] { 46167.0, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is number 46167.0, expected valuation date handle" };
             yield return new object[] { "_CreateCalendar", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _CreateCalendar: valuation_date is missing, expected valuation date handle" };
@@ -397,34 +397,40 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateIndex: index_conventions is holiday calendar handle '" + holidays + "', expected index conventions handle", Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, holidays, specifications, holidays));
         }
 
-        // Futures fixings: a column of days, a column of settles and the index, holding the market's
-        // holiday calendar, make one, two single cells make the fixings of one day, and
-        // util_ReadHandle spills it back, the two headers, two types, then a row per day, the date
-        // as a serial and the settle as a number. With the index live, the library's rules answer:
-        // a settle column one row short, the days newest first, a business day without a fixing, a
-        // Saturday, a listed holiday and an index of another kind; a handle of another kind where
-        // the index should be fails in the seam's.
+        // Futures fixings: a column of days, newest first, a column of settles and the index, holding
+        // the market's holiday calendar, make one, two single cells make the fixings of one day, and
+        // util_ReadHandle spills it back, the two headers, two types, then a row per day in the
+        // order given, the date as a serial and the settle as a number; the spill's two columns
+        // handed back to the creator make fixings that spill the same. With the index live, the
+        // library's rules answer: a settle column one row short, the days oldest first, a business
+        // day without a fixing, a Saturday, a listed holiday and an index of another kind; a handle
+        // of another kind where the index should be fails in the seam's.
         [Fact]
         public void futures_fixings_are_created_from_two_columns_and_an_index_and_read_back_through_their_handle()
         {
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, 46041.0, 46069.0));
             var index = Index(Seam.Call("_CreateFuturesSchedule", Column("m26", "n26"), Column(46161.0, 46195.0), ExcelMissing.Value), holidays);
-            var handle = (string)Seam.Call("_CreateFuturesFixings", Column(46143.0, 46146.0), Column(101.94, 106.42), index);
+            var handle = (string)Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Column(106.42, 101.94), index);
             Assert.StartsWith(Pid + ":futures_fixings:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(4, spill.GetLength(0));
             Assert.Equal(2, spill.GetLength(1));
             Assert.Equal("settle", spill[0, 1]);
             Assert.Equal("datetime64[D]", spill[1, 0]);
-            Assert.Equal(46143.0, spill[2, 0]);
-            Assert.Equal(106.42, spill[3, 1]);
+            Assert.Equal(46146.0, spill[2, 0]);
+            Assert.Equal(106.42, spill[2, 1]);
+            Assert.Equal(46143.0, spill[3, 0]);
+            Assert.Equal(101.94, spill[3, 1]);
+            var again = (string)Seam.Call("_CreateFuturesFixings", Column(spill[2, 0], spill[3, 0]), Column(spill[2, 1], spill[3, 1]), index);
+            Assert.NotEqual(handle, again);
+            Assert.Equal(spill, (object[,])Seam.Call("util_ReadHandle", again));
             var oneDay = (string)Seam.Call("_CreateFuturesFixings", 46143.0, 101.94, index);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
-            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: settle has 1 settle, expected 2, one per date", Seam.Call("_CreateFuturesFixings", Column(46143.0, 46146.0), Column(101.94), index));
-            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected a date after row 1's 2026-05-06", Seam.Call("_CreateFuturesFixings", Column(46148.0, 46147.0), Column(95.08, 102.27), index));
-            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-05, expected 2026-05-04, the business day after row 1's 2026-05-01", Seam.Call("_CreateFuturesFixings", Column(46143.0, 46147.0), Column(101.94, 102.27), index));
-            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-02, a Saturday, expected a business day", Seam.Call("_CreateFuturesFixings", Column(46143.0, 46144.0), Column(101.94, 100.0), index));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: settle has 1 settle, expected 2, one per date", Seam.Call("_CreateFuturesFixings", Column(46146.0, 46143.0), Column(106.42), index));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-06, expected a date before row 1's 2026-05-05", Seam.Call("_CreateFuturesFixings", Column(46147.0, 46148.0), Column(102.27, 95.08), index));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2026-05-01, expected 2026-05-04, the business day before row 1's 2026-05-05", Seam.Call("_CreateFuturesFixings", Column(46147.0, 46143.0), Column(102.27, 101.94), index));
+            Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-05-02, a Saturday, expected a business day", Seam.Call("_CreateFuturesFixings", Column(46144.0, 46143.0), Column(100.0, 101.94), index));
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: date row 1 is 2026-01-19, a holiday, expected a business day", Seam.Call("_CreateFuturesFixings", 46041.0, 100.0, index));
             var gasDaily = Index(Seam.Call("_CreateGasDailySchedule", Column("U26"), Column(46266.0), Column(46295.0)), ExcelMissing.Value);
             Assert.Equal("#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, expected a futures index", Seam.Call("_CreateFuturesFixings", 46143.0, 101.94, gasDaily));
@@ -501,7 +507,7 @@ namespace Goosedove.Host.Tests
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", valuation, index);
-            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0), Column(70.85, 71.10, 71.25), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var handle = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             Assert.StartsWith(Pid + ":market_history:sample:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
@@ -519,20 +525,20 @@ namespace Goosedove.Host.Tests
             Assert.Equal(false, spill[8, 3]);
             Assert.Equal("unfixed", spill[8, 4]);
             Assert.Equal("unfixed", spill[64, 4]);
-            var late = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0, 46168.0), Column(70.85, 71.10, 71.25, 71.5), index);
+            var late = (string)Seam.Call("_CreateFuturesFixings", Column(46168.0, 46164.0, 46163.0, 46162.0), Column(71.5, 71.25, 71.10, 70.85), index);
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings date 2026-05-26 is on or after valuation date 2026-05-26, expected dates before the valuation date", Seam.Call("_CreateMarketHistory", calendar, late));
-            var twoDays = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0), Column(70.85, 71.10), index);
+            var twoDays = (string)Seam.Call("_CreateFuturesFixings", Column(46163.0, 46162.0), Column(71.10, 70.85), index);
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-05-22, expected a fixing for every fixed day in calendar", Seam.Call("_CreateMarketHistory", calendar, twoDays));
             var elsewhere = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
-            var onTheHoliday = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0, 46167.0), Column(70.85, 71.10, 71.25, 71.4), Index(schedule, elsewhere));
+            var onTheHoliday = (string)Seam.Call("_CreateFuturesFixings", Column(46167.0, 46164.0, 46163.0, 46162.0), Column(71.4, 71.25, 71.10, 70.85), Index(schedule, elsewhere));
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is over another index, 'sample', expected the calendar's, 'sample'", Seam.Call("_CreateMarketHistory", calendar, onTheHoliday));
             Assert.Equal("#ERROR _CreateMarketHistory: calendar is futures fixings handle '" + fixings + "', expected calendar handle", Seam.Call("_CreateMarketHistory", fixings, fixings));
             Assert.Equal("#ERROR _CreateMarketHistory: ValueError: fixings is a calendar, expected futures, IFERC or Gas Daily fixings", Seam.Call("_CreateMarketHistory", calendar, calendar));
         }
 
         // The market history over the other two calendars: a Gas Daily calendar of September to
-        // November 2026 valued on 11 September and a print on every flow day from the 1st to the
-        // 11th make one, every flow day through the valuation day priced and the next unfixed; an
+        // November 2026 valued on 11 September and a print on every flow day from the 11th back to
+        // the 1st make one, every flow day through the valuation day priced and the next unfixed; an
         // IFERC calendar of October to December valued on 15 November and the indices of the two
         // published months, November's first, make one, the two priced in the calendar's order and
         // December unfixed. The library's rules answer through the same objects: a print for the
@@ -544,7 +550,7 @@ namespace Goosedove.Host.Tests
             var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
             var gasIndex = Index(gasDaily, ExcelMissing.Value, "Henry Hub Gas Daily");
             var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasIndex);
-            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0), gasIndex);
+            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46276.0, 46275.0, 46274.0, 46273.0, 46272.0, 46271.0, 46270.0, 46269.0, 46268.0, 46267.0, 46266.0), Column(3.0, 2.95, 2.9, 2.875, 2.875, 2.875, 2.875, 2.93, 2.93, 2.92, 2.91), gasIndex);
             var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
             Assert.StartsWith(Pid + ":market_history:Henry Hub Gas Daily:", daily);
             var days = (object[,])Seam.Call("util_ReadHandle", daily);
@@ -621,7 +627,7 @@ namespace Goosedove.Host.Tests
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
             var index = Index(schedule, holidays);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
-            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46162.0, 46163.0, 46164.0), Column(70.85, 71.10, 71.25), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var quotes = (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80));
             var handle = (string)Seam.Call("_CreateMarket", history, quotes);
@@ -680,7 +686,7 @@ namespace Goosedove.Host.Tests
             var gasDaily = (string)Seam.Call("_CreateGasDailySchedule", Column("U26", "V26", "X26"), Column(46266.0, 46296.0, 46327.0), Column(46295.0, 46326.0, 46356.0));
             var gasIndex = Index(gasDaily, ExcelMissing.Value, "Henry Hub Gas Daily");
             var september = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5), gasIndex);
-            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46266.0, 46267.0, 46268.0, 46269.0, 46270.0, 46271.0, 46272.0, 46273.0, 46274.0, 46275.0, 46276.0), Column(2.91, 2.92, 2.93, 2.93, 2.875, 2.875, 2.875, 2.875, 2.9, 2.95, 3.0), gasIndex);
+            var prints = (string)Seam.Call("_CreateGasDailyFixings", Column(46276.0, 46275.0, 46274.0, 46273.0, 46272.0, 46271.0, 46270.0, 46269.0, 46268.0, 46267.0, 46266.0), Column(3.0, 2.95, 2.9, 2.875, 2.875, 2.875, 2.875, 2.93, 2.93, 2.92, 2.91), gasIndex);
             var daily = (string)Seam.Call("_CreateMarketHistory", september, prints);
             var threeQuotes = (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", Column(2.95, 3.10, 3.40));
             var dailyMarket = (string)Seam.Call("_CreateMarket", daily, threeQuotes);
@@ -728,8 +734,10 @@ namespace Goosedove.Host.Tests
         // IFERC fixings: a column of contract codes, a column of indices and the index of those
         // months make one, two single cells make the fixings of one month, and util_ReadHandle
         // spills it back, the two headers, the text type over the number type, then a row per
-        // month, the code as text and the index as a number. With the index live, the library's
-        // rules answer: a price column one row short, a code given twice, a code the index does not
+        // month in the order typed, here the newest first over a schedule that runs the other way,
+        // the code as text and the index as a number; the spill's two columns handed back to the
+        // creator make fixings that spill the same. With the index live, the library's rules
+        // answer: a price column one row short, a code given twice, a code the index does not
         // hold, and a futures index where the IFERC index should be; a handle of another kind where
         // the index should be fails in the seam's.
         [Fact]
@@ -737,7 +745,7 @@ namespace Goosedove.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("F26", "G26", "H26", "J26"), Column(46022.0, 46052.0, 46080.0, 46112.0), Column(46027.0, 46055.0, 46083.0, 46113.0));
             var index = Index(schedule, ExcelMissing.Value, "Waha IFERC");
-            var handle = (string)Seam.Call("_CreateIfercFixings", Column("F26", "G26", "H26", "J26"), Column(1.85, 2.10, 1.95, 1.60), index);
+            var handle = (string)Seam.Call("_CreateIfercFixings", Column("J26", "H26", "G26", "F26"), Column(1.60, 1.95, 2.10, 1.85), index);
             Assert.StartsWith(Pid + ":iferc_fixings:Waha IFERC:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
@@ -746,10 +754,13 @@ namespace Goosedove.Host.Tests
             Assert.Equal("price", spill[0, 1]);
             Assert.Equal("str", spill[1, 0]);
             Assert.Equal("float64", spill[1, 1]);
-            Assert.Equal("F26", spill[2, 0]);
-            Assert.Equal(1.85, spill[2, 1]);
-            Assert.Equal("J26", spill[5, 0]);
-            Assert.Equal(1.60, spill[5, 1]);
+            Assert.Equal("J26", spill[2, 0]);
+            Assert.Equal(1.60, spill[2, 1]);
+            Assert.Equal("F26", spill[5, 0]);
+            Assert.Equal(1.85, spill[5, 1]);
+            var again = (string)Seam.Call("_CreateIfercFixings", Column(spill[2, 0], spill[3, 0], spill[4, 0], spill[5, 0]), Column(spill[2, 1], spill[3, 1], spill[4, 1], spill[5, 1]), index);
+            Assert.NotEqual(handle, again);
+            Assert.Equal(spill, (object[,])Seam.Call("util_ReadHandle", again));
             var oneMonth = (string)Seam.Call("_CreateIfercFixings", "F26", 1.85, index);
             Assert.NotEqual(handle, oneMonth);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneMonth)).GetLength(0));
@@ -761,18 +772,20 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateIfercFixings: index is iferc schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreateIfercFixings", "F26", 1.85, schedule));
         }
 
-        // Gas Daily fixings: a column of flow days, a column of midpoints and the index of their
-        // month make one, two single cells make the fixings of one day, and util_ReadHandle spills
-        // it back, the two headers, the day type over the number type, then a row per flow day, the
-        // weekend rows among them. With the index live, the library's rules answer: a price column
-        // one row short, a day skipped, and an IFERC index where the Gas Daily index should be; a
-        // handle of another kind where the index should be fails in the seam's.
+        // Gas Daily fixings: a column of flow days, newest first, a column of midpoints and the index
+        // of their month make one, two single cells make the fixings of one day, and util_ReadHandle
+        // spills it back, the two headers, the day type over the number type, then a row per flow
+        // day in the order given, the weekend rows among them; the spill's two columns handed back
+        // to the creator make fixings that spill the same. With the index live, the library's rules
+        // answer: a price column one row short, a day skipped, the days oldest first, and an IFERC
+        // index where the Gas Daily index should be; a handle of another kind where the index
+        // should be fails in the seam's.
         [Fact]
         public void gas_daily_fixings_are_created_from_two_columns_and_an_index_and_read_back_through_their_handle()
         {
             var schedule = (string)Seam.Call("_CreateGasDailySchedule", "U26", 46266.0, 46295.0);
             var index = Index(schedule, ExcelMissing.Value, "Henry Hub Gas Daily");
-            var handle = (string)Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0, 46271.0, 46272.0), Column(2.93, 2.875, 2.875, 2.875), index);
+            var handle = (string)Seam.Call("_CreateGasDailyFixings", Column(46272.0, 46271.0, 46270.0, 46269.0), Column(2.875, 2.875, 2.875, 2.93), index);
             Assert.StartsWith(Pid + ":gas_daily_fixings:Henry Hub Gas Daily:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(6, spill.GetLength(0));
@@ -781,15 +794,19 @@ namespace Goosedove.Host.Tests
             Assert.Equal("price", spill[0, 1]);
             Assert.Equal("datetime64[D]", spill[1, 0]);
             Assert.Equal("float64", spill[1, 1]);
-            Assert.Equal(46269.0, spill[2, 0]);
-            Assert.Equal(2.93, spill[2, 1]);
-            Assert.Equal(46272.0, spill[5, 0]);
-            Assert.Equal(2.875, spill[5, 1]);
+            Assert.Equal(46272.0, spill[2, 0]);
+            Assert.Equal(2.875, spill[2, 1]);
+            Assert.Equal(46269.0, spill[5, 0]);
+            Assert.Equal(2.93, spill[5, 1]);
+            var again = (string)Seam.Call("_CreateGasDailyFixings", Column(spill[2, 0], spill[3, 0], spill[4, 0], spill[5, 0]), Column(spill[2, 1], spill[3, 1], spill[4, 1], spill[5, 1]), index);
+            Assert.NotEqual(handle, again);
+            Assert.Equal(spill, (object[,])Seam.Call("util_ReadHandle", again));
             var oneDay = (string)Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, index);
             Assert.NotEqual(handle, oneDay);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
-            Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: price has 2 prices, expected 3, one per flow_date", Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0, 46271.0), Column(2.93, 2.875), index));
-            Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-06, expected 2026-09-05, the day after row 1's 2026-09-04", Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46271.0), Column(2.93, 2.875), index));
+            Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: price has 2 prices, expected 3, one per flow_date", Seam.Call("_CreateGasDailyFixings", Column(46271.0, 46270.0, 46269.0), Column(2.875, 2.93), index));
+            Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, expected 2026-09-05, the day before row 1's 2026-09-06", Seam.Call("_CreateGasDailyFixings", Column(46271.0, 46269.0), Column(2.875, 2.93), index));
+            Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-05, expected 2026-09-03, the day before row 1's 2026-09-04", Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0), Column(2.93, 2.875), index));
             var iferc = Index(Seam.Call("_CreateIfercSchedule", "F26", 46022.0, 46027.0), ExcelMissing.Value, "Waha IFERC");
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, iferc));
             Assert.Equal("#ERROR _CreateGasDailyFixings: index is gas daily schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, schedule));
