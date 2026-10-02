@@ -582,7 +582,8 @@ CURVE_LEDGER = {
     "_publish": 1,
 }
 CURVE_NUMPY = {
-    "ndarray.any": 5,  # one look per column, then finite, rising and unordered, one look each
+    "ndarray.any": 4,  # one look per column, then rising and unordered, one look each
+    "ndarray.all": 1,  # every factor finite: the success path makes no inverted mask
     "ndarray.astype": 3,  # the date column on its way to days, and the gaps between anchors
     "numpy.asarray": 2,  # the anchors' days read as they are, and the interpolation's own
     "numpy.arange": 2,  # the days from the first anchor to the last, and their offsets
