@@ -9,7 +9,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from numpy.typing import NDArray
-from test_market import a_vector, any_history
+from test_market import a_vector, any_gas_daily_history, any_history, any_iferc_history
 
 from goosedove.calendar.calendar import Calendar
 from goosedove.excel import bridge
@@ -681,30 +681,44 @@ def test_every_kind_a_creator_publishes_has_a_table() -> None:
 # --- the market's daily view, for any calendar -------------------------------------
 
 
-# For any history of two to eight contracts, any holidays and any valuation day from before its
-# calendar to its last day, with the quotes it requires: every row of the calendar's own spill
-# stands, and the fifth cell is the day's fixing where the day is past and open, its prompt
-# contract's quote where it is open and not past, and the word closed where the market is shut;
-# no cell is unfixed, and no past day reads a quote.
+# For any history of any of the three kinds, a futures one of two to eight contracts with any
+# holidays or a Gas Daily or an IFERC one of one to eight months, valued on any day from before
+# its calendar to its last period, with any number of quotes from the first unfixed period's
+# contract's alone to one per remaining contract: the rows are the calendar's own spill through
+# the last period of the last contract quoted, every one and no other, and the fifth cell is
+# the period's fixing where it is fixed and priced, its contract's quote where it is priced and
+# not fixed, and the word closed where the market is shut; no cell is unfixed, and no fixed
+# period reads a quote.
 @settings(deadline=None)
 @given(data=st.data())
 def test_every_day_of_a_market_shows_its_fixing_its_prompts_quote_or_closed(
     data: st.DataObject,
 ) -> None:
-    history = any_history(data)
+    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
+        data
+    )
     calendar = history.calendar
     first = int(calendar.contract[int(np.count_nonzero(calendar.is_fixed))])
-    quotes = a_vector(*(100.0 + i for i in range(len(calendar.index.schedule.codes) - first)))
+    count = data.draw(st.integers(1, len(calendar.index.schedule.codes) - first))
+    quotes = a_vector(*(100.0 + i for i in range(count)))
     made = market(history, quotes)
     table = shown(made)
     body = rows((table.kinds, table.numeric_slots, "\0".join(table.texts)))[2:]
+    covered = int(np.count_nonzero(calendar.contract <= first + count - 1))
+    assert len(body) == covered > int(np.count_nonzero(calendar.is_fixed))
     days = shown(calendar)
     assert [row[:4] for row in body] == rows(
         (days.kinds, days.numeric_slots, "\0".join(days.texts))
-    )[2:]
+    )[2 : 2 + covered]
     fixed = dict(zip(history.fixed_rows.tolist(), history.fixing_prices.tolist(), strict=True))
     for row, (shown_row, open_, past, prompt) in enumerate(
-        zip(body, calendar.is_priced, calendar.is_fixed, calendar.contract, strict=True)
+        zip(
+            body,
+            calendar.is_priced[:covered],
+            calendar.is_fixed[:covered],
+            calendar.contract[:covered],
+            strict=True,
+        )
     ):
         if not open_:
             assert shown_row[4] == "closed"

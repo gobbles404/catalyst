@@ -1,6 +1,7 @@
 """The market: three rules on the history and the price vector, one number found, and
-nothing built; the daily price it implies is read through util_ReadHandle, tested with the
-utilities."""
+nothing built; a vector that may stop before the schedule does, and the live prices read by
+contract inside what it covers and refused outside it. The daily price the market implies is
+read through util_ReadHandle, tested with the utilities."""
 
 import dataclasses
 
@@ -183,7 +184,7 @@ def test_a_contract_prompt_on_closed_days_alone_still_takes_a_quote() -> None:
     with pytest.raises(ValueError) as failure:
         market(history, a_vector())
     assert str(failure.value) == (
-        "price_vector has 0 prices, expected 1, one per contract from 'q26' through 'q26'"
+        "price_vector has 0 prices, expected at least 1, one per contract from 'q26' through 'q26'"
     )
 
 
@@ -210,10 +211,11 @@ def test_codes_are_labels_and_the_mapping_follows_the_schedules_order() -> None:
     made = market(history, a_vector(1.0, 2.0))
     assert made.first_contract == 2
     assert schedule.codes[made.first_contract :] == ("x y", "Q")
+    assert schedule.codes[market(history, a_vector(1.0)).last_contract] == "x y"
     with pytest.raises(ValueError) as failure:
-        market(history, a_vector(1.0))
+        market(history, a_vector(1.0, 2.0, 3.0))
     assert str(failure.value) == (
-        "price_vector has 1 price, expected 2, one per contract from 'x y' through 'Q'"
+        "price_vector has 3 prices, expected at most 2, one per contract from 'x y' through 'Q'"
     )
 
 
@@ -251,32 +253,43 @@ def test_many_past_contracts_and_one_quote() -> None:
         ),
         (
             "2026-05-26",
-            (72.10,),
-            "price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'",
+            (72.10, 72.80, 73.0),
+            "price_vector has 3 prices, expected at most 2, "
+            "one per contract from 'n26' through 'q26'",
         ),
         (
             "2026-05-26",
-            (72.10, 72.80, 73.0),
-            "price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'",
+            (72.10, 72.80, 73.0, 73.5, 74.0),
+            "price_vector has 5 prices, expected at most 2, "
+            "one per contract from 'n26' through 'q26'",
         ),
         (
             "2026-06-23",
             (72.10, 72.80),
-            "price_vector has 2 prices, expected 1, one per contract from 'q26' through 'q26'",
+            "price_vector has 2 prices, expected at most 1, "
+            "one per contract from 'q26' through 'q26'",
+        ),
+        (
+            "2026-05-26",
+            (),
+            "price_vector has 0 prices, expected at least 1, "
+            "one per contract from 'n26' through 'q26'",
         ),
         (
             "2025-01-01",
             (),
-            "price_vector has 0 prices, expected 2, one per contract from 'n26' through 'q26'",
+            "price_vector has 0 prices, expected at least 1, "
+            "one per contract from 'n26' through 'q26'",
         ),
     ],
     ids=[
         "valued the day after the calendar, with the one quote the last day would take",
         "valued after the calendar, with no quote at all",
-        "one quote too few",
-        "one quote too many",
+        "one quote past the schedule's last contract",
+        "three past it",
         "two quotes where the last contract alone remains",
-        "valued long before, with no quote at all: two required",
+        "no quote at all: a history alone is not a market",
+        "valued long before, with no quote at all",
     ],
 )
 def test_a_market_that_cannot_be_made_says_why(
@@ -288,14 +301,16 @@ def test_a_market_that_cannot_be_made_says_why(
 
 
 # The name is the first rule: a vector named for another index is refused before the unfixed
-# period and the count are looked at, on each kind of calendar, with the right count and with
-# a wrong one; the name is compared as text, so another case, a space at either end or no name
-# at all is another name, and the message quotes the name given and the name wanted.
+# period and the count are looked at, on each kind of calendar, with a count that fits and with
+# one that does not; the name is compared as text, so another case, a space at either end or no
+# name at all is another name, and the message quotes the name given and the name wanted.
 @pytest.mark.parametrize(
     ("history", "quotes"),
     [
         (HISTORY, (72.10, 72.80)),
         (HISTORY, (72.10,)),
+        (HISTORY, (72.10, 72.80, 73.0)),
+        (HISTORY, ()),
         (a_history("2026-07-22"), (72.80,)),
         (a_gas_daily_history("2026-09-10"), (2.95, 3.10, 3.40)),
         (a_gas_daily_history("2026-11-30"), (3.40,)),
@@ -304,7 +319,9 @@ def test_a_market_that_cannot_be_made_says_why(
     ],
     ids=[
         "the futures sample with its two quotes",
-        "the futures sample with one quote too few",
+        "the futures sample with the first quote alone",
+        "the futures sample with one quote too many",
+        "the futures sample with no quote at all",
         "the futures sample valued after its calendar",
         "the Gas Daily sample with its three quotes",
         "the Gas Daily sample on its last flow day",
@@ -370,8 +387,8 @@ def test_a_history_with_no_unfixed_period_has_no_market() -> None:
 
 # Valued on Friday 15 May 2026, before m26 expires, on 19 May, its expiry day, or long before:
 # the calendar's days still run from 20 May, nothing is fixed, and the first unfixed day's
-# contract is n26, so two quotes make a market from the calendar's first day on; the days before
-# the 20th are not rows.
+# contract is n26, so one quote or two make a market from the calendar's first day on, the
+# first quote n26's either way; the days before the 20th are not rows.
 def test_a_futures_calendar_valued_before_its_first_day_is_a_market_from_that_day_on() -> None:
     for as_of in ("2026-05-15", "2026-05-19", "2025-01-01"):
         history = a_history(as_of)
@@ -380,10 +397,13 @@ def test_a_futures_calendar_valued_before_its_first_day_is_a_market_from_that_da
         made = market(history, QUOTES)
         assert made.first_contract == 1
         assert SCHEDULE.codes[made.first_contract] == "n26"
+        alone = market(history, a_vector(72.10))
+        assert alone.first_contract == alone.last_contract == 1
         with pytest.raises(ValueError) as failure:
-            market(history, a_vector(72.80))
+            market(history, a_vector(72.10, 72.80, 73.0))
         assert str(failure.value) == (
-            "price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'"
+            "price_vector has 3 prices, expected at most 2, "
+            "one per contract from 'n26' through 'q26'"
         )
 
 
@@ -391,20 +411,19 @@ def test_a_futures_calendar_valued_before_its_first_day_is_a_market_from_that_da
 
 
 # The page's sample: valued on 25 September 2026 with the prints through the 25th, the first
-# unfixed day is the 26th, so the first quote is the balance of September and three are required.
+# unfixed day is the 26th, so the first quote is the balance of September, and up to three are
+# taken, one per month through November.
 def test_the_gas_daily_sample_quotes_the_balance_of_the_month_first() -> None:
     history = a_gas_daily_history("2026-09-25")
     assert history.fixed_rows.size == 25
     made = market(history, a_vector(2.95, 3.10, 3.40))
     assert made.first_contract == 0
     assert made.market_history is history
-    for quotes in ((2.95, 3.10), (2.95, 3.10, 3.40, 3.50)):
-        with pytest.raises(ValueError) as failure:
-            market(history, a_vector(*quotes))
-        assert str(failure.value) == (
-            f"price_vector has {len(quotes)} prices, expected 3, "
-            "one per contract from 'U26' through 'X26'"
-        )
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(2.95, 3.10, 3.40, 3.50))
+    assert str(failure.value) == (
+        "price_vector has 4 prices, expected at most 3, one per contract from 'U26' through 'X26'"
+    )
 
 
 @pytest.mark.parametrize(
@@ -460,7 +479,7 @@ def test_the_iferc_sample_quotes_the_unpublished_month() -> None:
     with pytest.raises(ValueError) as failure:
         market(history, a_vector(2.10, 2.20))
     assert str(failure.value) == (
-        "price_vector has 2 prices, expected 1, one per contract from 'Z26' through 'Z26'"
+        "price_vector has 2 prices, expected at most 1, one per contract from 'Z26' through 'Z26'"
     )
 
 
@@ -617,7 +636,306 @@ def test_every_unfixed_period_of_the_other_two_kinds_has_its_contracts_quote(
     with pytest.raises(ValueError):
         market(history, a_vector(*(100.0 + i for i in range(quotes.prices.size + 1))))
     with pytest.raises(ValueError):
-        market(history, a_vector(*(100.0 + i for i in range(quotes.prices.size - 1))))
+        market(history, a_vector())
+
+
+# --- a vector that stops before the schedule does -----------------------------
+
+# Six futures contracts, the first bounding the calendar, so that the quotes can stop short of
+# the last: valued on 26 May 2026 the first contract quoted is n26 and four remain.
+LONG_SCHEDULE = a_schedule(
+    ("k26", "2026-04-21"),
+    ("m26", "2026-05-19"),
+    ("n26", "2026-06-22"),
+    ("q26", "2026-07-21"),
+    ("u26", "2026-08-20"),
+    ("v26", "2026-09-22"),
+)
+
+
+def rows_of(*contracts: int) -> NDArray[np.intp]:
+    """Those rows of a schedule as a reader asks for them."""
+    return np.array(contracts, dtype=np.intp)
+
+
+# On each kind: one price, the first required contract's alone, is a market; so is every length
+# up to one per remaining contract; the first contract is the calendar's whatever the length,
+# and the coverage ends that many contracts on. One price more than the schedule has is refused.
+@pytest.mark.parametrize(
+    ("history", "first", "remaining"),
+    [
+        (a_history("2026-05-26", schedule=LONG_SCHEDULE), 2, 4),
+        (a_gas_daily_history("2026-09-25"), 0, 3),
+        (an_iferc_history("2026-09-15"), 0, 3),
+    ],
+    ids=["futures", "Gas Daily", "IFERC"],
+)
+def test_a_vector_may_stop_at_any_contract_from_the_first_required_through_the_last(
+    history: MarketHistory, first: int, remaining: int
+) -> None:
+    codes = history.calendar.index.schedule.codes
+    assert len(codes) - first == remaining
+    for count in range(1, remaining + 1):
+        vector = a_vector(*(50.0 + i for i in range(count)))
+        made = market(history, vector)
+        assert made.market_history is history and made.price_vector is vector
+        assert made.first_contract == first
+        assert made.last_contract == first + count - 1
+        asked = rows_of(*range(first, first + count))
+        assert made.live_prices(asked).tolist() == vector.prices.tolist()
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(*(50.0 + i for i in range(remaining + 1))))
+    assert str(failure.value) == (
+        f"price_vector has {remaining + 1} prices, expected at most {remaining}, "
+        f"one per contract from {codes[first]!r} through {codes[-1]!r}"
+    )
+
+
+MONTH_CODES = "FGHJKMNQUVXZ"
+
+
+def a_monthly_iferc_history(first_year: int, last_year: int, as_of: str) -> MarketHistory:
+    """An IFERC history of every month from January of the first year through December of the
+    last, coded F23 to Z30 as the desk codes months, each published on its first day."""
+    months: NDArray[np.datetime64] = np.arange(
+        f"{first_year}-01", f"{last_year + 1}-01", dtype="datetime64[M]"
+    ).astype("datetime64[D]")
+    codes = tuple(
+        f"{MONTH_CODES[i % 12]}{(first_year + i // 12) % 100}" for i in range(months.size)
+    )
+    schedule = iferc_schedule(codes, months - np.timedelta64(1, "D"), months)
+    return an_iferc_history(as_of, schedule)
+
+
+# The ticket's example: a schedule from F23 through Z30, the calendar's first required contract
+# Z26, and prices for Z26 through Z28, twenty-five of them. The market is made, its coverage
+# ends at Z28, and F29 is refused by name. The whole remaining schedule is forty-nine contracts,
+# taken too, and a fiftieth price is past the schedule.
+def test_a_schedule_through_z30_takes_prices_through_z28() -> None:
+    history = a_monthly_iferc_history(2023, 2030, "2026-11-15")
+    codes = history.calendar.index.schedule.codes
+    assert (codes[0], codes[-1], len(codes)) == ("F23", "Z30", 96)
+    made = market(history, a_vector(*(2.0 + i / 100 for i in range(25))))
+    assert codes[made.first_contract] == "Z26" and codes[made.last_contract] == "Z28"
+    assert made.live_prices(rows_of(codes.index("Z28"))).tolist() == [2.0 + 24 / 100]
+    with pytest.raises(ValueError) as failure:
+        made.live_prices(rows_of(codes.index("F29")))
+    assert str(failure.value) == (
+        "requested contract 'F29' is beyond live-price coverage ending at 'Z28'"
+    )
+    whole = market(history, a_vector(*(2.0 + i / 100 for i in range(49))))
+    assert codes[whole.last_contract] == "Z30"
+    with pytest.raises(ValueError) as failure:
+        market(history, a_vector(*(2.0 + i / 100 for i in range(50))))
+    assert str(failure.value) == (
+        "price_vector has 50 prices, expected at most 49, one per contract from 'Z26' through 'Z30'"
+    )
+    ending_z28 = a_monthly_iferc_history(2023, 2028, "2026-11-15")
+    with pytest.raises(ValueError) as failure:
+        market(ending_z28, a_vector(*(2.0 + i / 100 for i in range(26))))
+    assert str(failure.value) == (
+        "price_vector has 26 prices, expected at most 25, one per contract from 'Z26' through 'Z28'"
+    )
+
+
+# --- live prices, by contract ---------------------------------------------------
+
+
+# The reader hands back the quote of each contract asked for, in the order asked, a contract
+# asked twice answered twice, and nothing asked answered with nothing; what it hands back is its
+# own array, and the vector is left as it was.
+def test_live_prices_are_the_quotes_of_the_contracts_asked_for() -> None:
+    history = a_history("2026-05-26", schedule=LONG_SCHEDULE)
+    vector = a_vector(72.10, 72.80)  # n26 and q26, of the four contracts that remain
+    made = market(history, vector)
+    assert made.live_prices(rows_of(2, 3, 2)).tolist() == [72.10, 72.80, 72.10]
+    assert made.live_prices(rows_of(3)).tolist() == [72.80]
+    assert made.live_prices(rows_of()).size == 0
+    read = made.live_prices(rows_of(2, 3))
+    assert read.dtype == np.float64 and not np.shares_memory(read, vector.prices)
+    assert vector.prices.tolist() == [72.10, 72.80] and not vector.prices.flags.writeable
+    calendar = history.calendar
+    live = calendar.is_priced & ~calendar.is_fixed & (calendar.contract <= made.last_contract)
+    assert set(made.live_prices(calendar.contract[live]).tolist()) == {72.10, 72.80}
+
+
+# A contract outside the coverage is refused by name, on either side: past the last contract
+# quoted, where NumPy would stop in its own words, and before the first, where NumPy would
+# count back from the end of the vector and hand over another contract's quote with no failure
+# at all. The first contract asked for that is outside is the one named, and nothing is read.
+@pytest.mark.parametrize(
+    ("asked", "message"),
+    [
+        ((4,), "requested contract 'u26' is beyond live-price coverage ending at 'q26'"),
+        ((5,), "requested contract 'v26' is beyond live-price coverage ending at 'q26'"),
+        ((1,), "requested contract 'm26' is before live-price coverage starting at 'n26'"),
+        ((0,), "requested contract 'k26' is before live-price coverage starting at 'n26'"),
+        ((2, 4, 1), "requested contract 'u26' is beyond live-price coverage ending at 'q26'"),
+        ((1, 4), "requested contract 'm26' is before live-price coverage starting at 'n26'"),
+        ((3, 2, 5, 4), "requested contract 'v26' is beyond live-price coverage ending at 'q26'"),
+    ],
+    ids=[
+        "the contract after the last quoted",
+        "the schedule's last contract",
+        "the contract before the first quoted, which NumPy would read as the last price",
+        "the schedule's first contract",
+        "one beyond among contracts inside, then one before: the first outside is named",
+        "one before, then one beyond: the first outside is named",
+        "two beyond, the later contract asked first",
+    ],
+)
+def test_a_contract_outside_the_live_price_coverage_is_refused_by_name(
+    asked: tuple[int, ...], message: str
+) -> None:
+    made = market(a_history("2026-05-26", schedule=LONG_SCHEDULE), a_vector(72.10, 72.80))
+    assert (made.first_contract, made.last_contract) == (2, 3)
+    with pytest.raises(ValueError) as failure:
+        made.live_prices(rows_of(*asked))
+    assert str(failure.value) == message
+
+
+# The same rule on the other two kinds, and on a vector that reaches the schedule's end, where
+# nothing is beyond the coverage and a contract whose periods have all fixed is still before it.
+def test_the_coverage_rule_is_the_same_on_every_kind_and_for_a_whole_vector() -> None:
+    daily = market(a_gas_daily_history("2026-09-30"), a_vector(3.10))  # October alone
+    assert daily.live_prices(rows_of(1)).tolist() == [3.10]
+    with pytest.raises(ValueError) as failure:
+        daily.live_prices(rows_of(2))
+    assert str(failure.value) == (
+        "requested contract 'X26' is beyond live-price coverage ending at 'V26'"
+    )
+    with pytest.raises(ValueError) as failure:
+        daily.live_prices(rows_of(0))
+    assert str(failure.value) == (
+        "requested contract 'U26' is before live-price coverage starting at 'V26'"
+    )
+    monthly = market(an_iferc_history("2026-10-02"), a_vector(2.10))  # November alone
+    assert monthly.live_prices(rows_of(1)).tolist() == [2.10]
+    with pytest.raises(ValueError) as failure:
+        monthly.live_prices(rows_of(2))
+    assert str(failure.value) == (
+        "requested contract 'Z26' is beyond live-price coverage ending at 'X26'"
+    )
+    with pytest.raises(ValueError) as failure:
+        monthly.live_prices(rows_of(0))
+    assert str(failure.value) == (
+        "requested contract 'V26' is before live-price coverage starting at 'X26'"
+    )
+    whole = market(HISTORY, QUOTES)
+    assert whole.last_contract == len(SCHEDULE.codes) - 1
+    assert whole.live_prices(rows_of(1, 2)).tolist() == [72.10, 72.80]
+    with pytest.raises(ValueError) as failure:
+        whole.live_prices(rows_of(0))
+    assert str(failure.value) == (
+        "requested contract 'm26' is before live-price coverage starting at 'n26'"
+    )
+
+
+# The last contract covered may have no open day left: b expires on the Friday and c on the
+# Sunday, so c is prompt on a weekend alone; or c's two days are both holidays. Valued on the
+# Wednesday with two quotes, b's and c's, c keeps its place in the vector, the coverage ends
+# with it, its quote is there to be read, and d after it is refused.
+@pytest.mark.parametrize(
+    ("contracts", "closed"),
+    [
+        (
+            (("a", "2026-05-19"), ("b", "2026-05-22"), ("c", "2026-05-24"), ("d", "2026-06-22")),
+            ELSEWHERE,
+        ),
+        (
+            (("a", "2026-05-19"), ("b", "2026-05-26"), ("c", "2026-05-28"), ("d", "2026-06-22")),
+            holiday_calendar(dates("2026-05-27", "2026-05-28")),
+        ),
+    ],
+    ids=["a weekend alone", "two holidays alone"],
+)
+def test_a_last_covered_contract_with_no_open_day_keeps_its_place(
+    contracts: tuple[tuple[str, str], ...], closed: HolidayCalendar
+) -> None:
+    history = a_history("2026-05-20", schedule=a_schedule(*contracts), holidays=closed)
+    calendar = history.calendar
+    days_of_c = calendar.contract == 2
+    assert int(days_of_c.sum()) == 2 and not calendar.is_priced[days_of_c].any()
+    made = market(history, a_vector(1.0, 2.0))
+    assert (made.first_contract, made.last_contract) == (1, 2)
+    assert made.live_prices(rows_of(2)).tolist() == [2.0]
+    with pytest.raises(ValueError) as failure:
+        made.live_prices(rows_of(3))
+    assert str(failure.value) == (
+        "requested contract 'd' is beyond live-price coverage ending at 'c'"
+    )
+    assert market(history, a_vector(1.0)).last_contract == 1
+
+
+# --- a roll ---------------------------------------------------------------------
+
+
+# Valued on n26's expiry day the first contract quoted is n26; the day after, it is q26. A
+# vector the sheet moved on with the calendar keeps its first price on the first contract, and
+# its coverage ends one contract later than before.
+def test_after_a_roll_a_vector_moved_on_starts_at_the_new_first_contract() -> None:
+    codes = LONG_SCHEDULE.codes
+    held = market(a_history("2026-06-22", schedule=LONG_SCHEDULE), a_vector(70.0, 71.0))
+    assert [codes[held.first_contract], codes[held.last_contract]] == ["n26", "q26"]
+    moved = market(a_history("2026-06-23", schedule=LONG_SCHEDULE), a_vector(71.0, 72.0))
+    assert [codes[moved.first_contract], codes[moved.last_contract]] == ["q26", "u26"]
+    assert moved.live_prices(rows_of(3, 4)).tolist() == [71.0, 72.0]
+    with pytest.raises(ValueError) as failure:
+        moved.live_prices(rows_of(2))
+    assert str(failure.value) == (
+        "requested contract 'n26' is before live-price coverage starting at 'q26'"
+    )
+
+
+# The limitation the page records: the vector carries prices and no contract, so one left as it
+# was when the first contract rolled is taken, and each price is read one contract later than
+# the desk meant it. A vector that reached the schedule's end is one price too many after the
+# roll, which is the one case the count still catches.
+def test_a_vector_left_unchanged_through_a_roll_is_read_one_contract_later() -> None:
+    before = a_history("2026-06-22", schedule=LONG_SCHEDULE)
+    after = a_history("2026-06-23", schedule=LONG_SCHEDULE)
+    unchanged = a_vector(70.0, 71.0)
+    assert market(before, unchanged).live_prices(rows_of(2, 3)).tolist() == [70.0, 71.0]
+    stale = market(after, unchanged)
+    assert stale.live_prices(rows_of(3, 4)).tolist() == [70.0, 71.0]
+    whole = a_vector(70.0, 71.0, 72.0, 73.0)
+    assert market(before, whole).last_contract == 5
+    with pytest.raises(ValueError) as failure:
+        market(after, whole)
+    assert str(failure.value) == (
+        "price_vector has 4 prices, expected at most 3, one per contract from 'q26' through 'v26'"
+    )
+
+
+# For any history of any kind and any number of quotes from one to one per remaining contract:
+# the market is made, its first contract is the calendar's whatever the count, its coverage
+# ends that many contracts on, every unfixed period of a covered contract reads its contract's
+# quote, and the first unfixed period past the coverage, where there is one, is refused.
+@settings(deadline=None)
+@given(data=st.data())
+def test_any_count_of_quotes_from_one_to_the_remaining_contracts_is_a_market(
+    data: st.DataObject,
+) -> None:
+    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
+        data
+    )
+    made = history.calendar
+    first = int(made.contract[made.first_unfixed])
+    remaining = len(made.index.schedule.codes) - first
+    count = data.draw(st.integers(1, remaining))
+    quotes = a_vector(*(100.0 + i for i in range(count)))
+    view = market(history, quotes)
+    assert view.first_contract == first and view.last_contract == first + count - 1
+    unfixed = made.contract[made.first_unfixed :]
+    inside = unfixed[unfixed <= view.last_contract]
+    assert np.array_equal(view.live_prices(inside), quotes.prices[inside - first])
+    beyond = unfixed[unfixed > view.last_contract]
+    assert beyond.size or count == remaining  # only a whole vector leaves nothing beyond it
+    if beyond.size:
+        with pytest.raises(ValueError, match="is beyond live-price coverage ending at"):
+            view.live_prices(beyond[:1])
+    with pytest.raises(ValueError, match="expected at most"):
+        market(history, a_vector(*(100.0 + i for i in range(remaining + 1))))
 
 
 # --- ownership ----------------------------------------------------------------

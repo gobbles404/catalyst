@@ -330,8 +330,8 @@ def test_the_market_creator_explains_itself() -> None:
         (
             "price_vector",
             "The price-vector handle from _CreatePriceVector, such as B12, named for this "
-            "index, with one quote per contract in schedule order, from the first period not "
-            "yet fixed through the last contract.",
+            "index, with one quote per contract in schedule order, starting at the first period "
+            "not yet fixed and stopping at or before the last contract.",
         ),
     ]
 

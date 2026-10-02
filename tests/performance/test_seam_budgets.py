@@ -1610,6 +1610,17 @@ def test_a_market_is_two_handles_in_and_one_number_out_whatever_the_sizes(
     assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
 
 
+def stopping_early(
+    sources: Callable[[], tuple[object, object]], quotes: int
+) -> tuple[object, object]:
+    """The history those sources make, with a vector of that many quotes, fewer than its
+    schedule has left: the first required contract's and the ones after it, no further."""
+    history, _ = sources()
+    return history, PATH["_CreatePriceVector"](
+        "sample", Cells.from_rows([[70.0 + i] for i in range(quotes)])
+    )
+
+
 # The same ledger over a Gas Daily history, a year of flow days with four quotes, and over an
 # IFERC one, ten years of months with 116: the kind of the calendar is read by nothing here.
 @pytest.mark.parametrize(
@@ -1628,15 +1639,56 @@ def test_a_market_over_the_other_two_calendars_costs_the_same(
     assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
 
 
-# Reading a market back is reading its calendar back, then the fifth column through the helper
-# the history's reader shares: the live rows found in one flatnonzero, their prompt rows gathered
-# and the quotes read through them, the fixings and the quotes written into their rows and the
-# word closed shared by every other; no arange, no searchsorted, nothing of the calendar made
-# again.
+# A vector that stops before the schedule does costs what a whole one costs to take: the same
+# eleven calls and no numpy call, the count compared with the contracts that remain and nothing
+# looked along, over ten years of days with the first quote of 117, a year of flow days with the
+# balance of the month alone, and ten years of months with twelve quotes of 116.
 @pytest.mark.parametrize(
     "sources",
-    [lambda: market_sources(13, 30), gas_daily_market_sources, iferc_market_sources],
-    ids=["a futures market", "a Gas Daily market", "an IFERC market"],
+    [
+        lambda: stopping_early(lambda: market_sources(121, 30), 1),
+        lambda: stopping_early(gas_daily_market_sources, 1),
+        lambda: stopping_early(iferc_market_sources, 12),
+    ],
+    ids=["ten years of days, one quote of 117", "a Gas Daily market", "an IFERC market"],
+)
+def test_a_market_whose_quotes_stop_early_costs_the_same(
+    sources: Callable[[], tuple[object, object]],
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+) -> None:
+    history, quotes = sources()
+    PATH["_CreateMarket"](history, quotes)
+    assert call_profile(lambda: PATH["_CreateMarket"](history, quotes)) == MARKET_LEDGER
+    assert numpy_calls(lambda: PATH["_CreateMarket"](history, quotes)) == {}
+
+
+# Reading a market back is reading its calendar back as far as its quotes cover, then the fifth
+# column through the helper the history's reader shares: the last row covered found by one
+# search down the calendar's contract column, the columns cut there, the live rows found in one
+# flatnonzero, their prompt rows gathered and the quotes read through the market's own reader,
+# which looks once for a contract outside the coverage, the fixings and the quotes written into
+# their rows and the word closed shared by every other; no arange, and nothing of the calendar
+# made again. One path: a vector that reaches the schedule's end and one that stops before it
+# make the same calls, on each kind.
+@pytest.mark.parametrize(
+    "sources",
+    [
+        lambda: market_sources(13, 30),
+        gas_daily_market_sources,
+        iferc_market_sources,
+        lambda: stopping_early(lambda: market_sources(121, 30), 1),
+        lambda: stopping_early(gas_daily_market_sources, 1),
+        lambda: stopping_early(iferc_market_sources, 12),
+    ],
+    ids=[
+        "a futures market",
+        "a Gas Daily market",
+        "an IFERC market",
+        "a futures market stopping early",
+        "a Gas Daily market stopping early",
+        "an IFERC market stopping early",
+    ],
 )
 def test_reading_a_market_back_rebuilds_nothing(
     sources: Callable[[], tuple[object, object]],
@@ -1653,8 +1705,10 @@ def test_reading_a_market_back_rebuilds_nothing(
         "_resolve": 1,
         "util_ReadHandle": 1,
         "market_table": 1,
+        "Market.last_contract": 1,  # where the coverage ends, read off the vector's length
+        "Market.live_prices": 1,  # the quotes of the live rows' contracts, the coverage checked
         "_priced_column": 1,
-        "calendar_table": 1,  # the calendar's own table, as the calendar shows
+        "calendar_table": 1,  # the calendar's own table, cut at the last row covered
         "MixedArray.table": 1,
         "_table_column": 3,
         "_unit": 1,
@@ -1665,6 +1719,7 @@ def test_reading_a_market_back_rebuilds_nothing(
     }
     calls = numpy_calls(lambda: PATH["util_ReadHandle"](made))
     assert calls == {
+        "ndarray.searchsorted": 1,  # the last row the quotes cover, in the contract column
         "numpy.array": 1,  # the calendar's: the schedule's codes as an array
         "ndarray.ravel": 1,  # the live mask flattened
         "numpy.asanyarray": 1,  # on the way to the live rows
@@ -1672,12 +1727,13 @@ def test_reading_a_market_back_rebuilds_nothing(
         "numpy.empty": 6,  # the calendar's two; the kinds, the slots, the pairs and their mask
         "numpy.asarray": 2,
         "numpy.datetime_data": 1,  # the unit of the date column
-        "ndarray.any": 5,  # the serials' two checks, then the mixed road's three looks
+        "ndarray.any": 6,  # the reader's look for a contract outside the coverage; the serials'
+        # two checks, then the mixed road's three looks
         "numpy.ascontiguousarray": 2,
         "numpy.count_nonzero": 1,  # the mixed road's count of its text cells
-        "ufunc.reduce": 5,
+        "ufunc.reduce": 6,
     }
-    assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+    assert "numpy.arange" not in calls
 
 
 # --- the Gas Daily fixings: two columns in, the days checked and both copied -----------------

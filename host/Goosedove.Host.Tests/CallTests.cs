@@ -610,9 +610,10 @@ namespace Goosedove.Host.Tests
         // four columns and price, a fixing on a past business day, closed on the weekend and the
         // holiday, n26's quote from the valuation day to its expiry and q26's from the day after.
         // The library's rules answer through the same objects: a vector named for another index,
-        // refused before its count is looked at; a quote too few and one too many; a history
-        // valued before its calendar begins is a market from the calendar's first day; and a
-        // handle of another kind in either slot.
+        // refused before its count is looked at; the first quote alone, a vector that stops before
+        // the schedule does, read back through n26's last day; one quote past the schedule; a
+        // history valued before its calendar begins is a market from the calendar's first day;
+        // and a handle of another kind in either slot.
         [Fact]
         public void a_market_is_created_from_two_handles_and_read_back_through_its_handle()
         {
@@ -641,8 +642,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal(72.80, spill[36, 4]);
             Assert.Equal(72.80, spill[64, 4]);
             Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector names index 'Brent', expected market_history's index 'sample'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "Brent", 72.10)));
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", 72.10)));
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80, 73.0))));
+            var alone = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", 72.10));
+            Assert.StartsWith(Pid + ":market:sample:", alone);
+            var covered = (object[,])Seam.Call("util_ReadHandle", alone);
+            Assert.Equal(36, covered.GetLength(0));
+            Assert.Equal(70.85, covered[2, 4]);
+            Assert.Equal("n26", covered[35, 1]);
+            Assert.Equal(72.10, covered[35, 4]);
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected at most 2, one per contract from 'n26' through 'q26'", Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80, 73.0))));
             var early = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46161.0, 0.5), index);
             var earlyHistory = (string)Seam.Call("_CreateMarketHistory", early, (string)Seam.Call("_CreateFuturesFixings", 46160.0, 70.0, index));
             var earlyMarket = (string)Seam.Call("_CreateMarket", earlyHistory, quotes);
@@ -663,9 +670,10 @@ namespace Goosedove.Host.Tests
         // valued on 15 November with two months published, and one quote, December's, make one,
         // the two indices and the quote on their rows, each vector named for its index. The
         // library's rules answer through the same objects: the IFERC vector given with the Gas
-        // Daily history, named for the other index; one quote where three are required; and a
-        // history with no unfixed period, the IFERC calendar valued on 15 December with all three
-        // indices.
+        // Daily history, named for the other index; one quote of the three months, a vector that
+        // stops before the schedule does, read back through September's last day; a fourth quote,
+        // one past the schedule; and a history with no unfixed period, the IFERC calendar valued
+        // on 15 December with all three indices.
         [Fact]
         public void a_gas_daily_and_an_iferc_market_are_created_from_two_handles_each_and_read_back()
         {
@@ -703,7 +711,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46357.0, months[4, 0]);
             Assert.Equal(2.20, months[4, 4]);
             Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', expected market_history's index 'Henry Hub Gas Daily'", Seam.Call("_CreateMarket", daily, oneQuote));
-            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, one per contract from 'U26' through 'X26'", Seam.Call("_CreateMarket", daily, (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", 2.20)));
+            var balance = (string)Seam.Call("_CreateMarket", daily, (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", 2.20));
+            Assert.StartsWith(Pid + ":market:Henry Hub Gas Daily:", balance);
+            var throughSeptember = (object[,])Seam.Call("util_ReadHandle", balance);
+            Assert.Equal(32, throughSeptember.GetLength(0));
+            Assert.Equal(3.0, throughSeptember[12, 4]);
+            Assert.Equal(2.20, throughSeptember[13, 4]);
+            Assert.Equal("U26", throughSeptember[31, 1]);
+            Assert.Equal(2.20, throughSeptember[31, 4]);
+            Assert.Equal("#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, one per contract from 'U26' through 'X26'", Seam.Call("_CreateMarket", daily, (string)Seam.Call("_CreatePriceVector", "Henry Hub Gas Daily", Column(2.95, 3.10, 3.40, 3.50))));
             var december = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5), ifercIndex);
             var published = (string)Seam.Call("_CreateMarketHistory", december, (string)Seam.Call("_CreateIfercFixings", Column("V26", "X26", "Z26"), Column(1.85, 2.10, 2.20), ifercIndex));
             Assert.Equal("#ERROR _CreateMarket: ValueError: market_history has no unfixed period, expected at least one to quote", Seam.Call("_CreateMarket", published, oneQuote));

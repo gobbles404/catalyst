@@ -434,10 +434,10 @@ def test_the_expiring_contract_is_quoted_on_its_expiry_day_and_the_next_from_the
     assert by_day[JUL_21] == ["q26", 1.0, 0.0, 72.80]
 
 
-# Valued on the calendar's last day, one quote is required, and on its first day two, with the
+# Valued on the calendar's last day, one quote is taken, and on its first day two, with the
 # fixings before the calendar unused; valued on a Saturday, the prompt contract of that day is
 # the first quoted, and nothing moves to the Monday.
-def test_valuation_on_the_first_or_last_day_or_a_weekend_needs_the_prompt_contracts_quotes() -> (
+def test_valuation_on_the_first_or_last_day_or_a_weekend_starts_at_the_prompt_contracts_quote() -> (
     None
 ):
     last = a_history(
@@ -491,6 +491,59 @@ def test_two_markets_share_one_history_and_each_reads_its_own_quotes() -> None:
     assert rows(read(first))[2][4] == rows(read(second))[2][4] == 70.85
 
 
+# A vector that stops before the schedule does: the sample with n26's quote alone. The market
+# is made, and its readback is the history and every day through n26's expiry, 22 June, the last
+# day the quote covers; q26's days are not rows. A market with both quotes over the same history
+# reads the same first rows and then goes on, and the calendar itself still reads whole.
+def test_a_market_with_the_first_quote_alone_is_read_back_through_that_contracts_last_day() -> None:
+    calendar = a_calendar()
+    history = a_history(calendar=calendar)
+    made = a_market(history, a_vector(72.10))
+    kinds, _, _ = read(made)
+    shown = rows(read(made))
+    assert len(shown) == 36
+    assert shown[0] == MARKET_HEADERS and shown[1] == TYPES
+    assert shown[2] == [MAY_20, "n26", 1.0, 1.0, 70.85]
+    assert shown[7] == [MAY_25, "n26", 0.0, 1.0, "closed"]
+    assert shown[8] == [MAY_26, "n26", 1.0, 0.0, 72.10]
+    assert shown[35] == [JUN_22, "n26", 1.0, 0.0, 72.10]
+    assert {row[1] for row in shown[2:]} == {"n26"}
+    whole = rows(read(a_market(history)))
+    assert len(whole) == 65 and whole[:36] == shown
+    calendar_kinds, _, _ = read(calendar)  # the calendar the history is over, read after it
+    assert len(calendar_kinds) == 65 and (kinds[:, :4] == calendar_kinds[:36]).all()
+    assert [row[:4] for row in rows(read(calendar))] == [row[:4] for row in whole]
+
+
+# The last contract covered has no open day left: b expires on Friday 22 May and c on the
+# Sunday, so c is prompt on the weekend alone. With two quotes, b's and c's, c holds the second
+# place in the vector, the readback keeps its two days, closed, as its last rows, and d's days
+# after them are not rows. With b's quote alone the readback ends on the Friday.
+def test_a_last_covered_contract_with_closed_days_alone_keeps_its_rows_in_the_readback() -> None:
+    index = an_index(
+        a_schedule(("a", "b", "c", "d"), (MAY_19, MAY_22, MAY_22 + 2, JUN_22)),
+        a_holiday_calendar(JAN_1),
+    )
+    history = a_history(
+        calendar=a_calendar(valuation=a_valuation(MAY_20), index=index),
+        fixings=the_fixings([[MAY_18, 70.0], [MAY_19, 70.5]], index),
+    )
+    shown = rows(read(a_market(history, a_vector(1.0, 2.0))))
+    assert shown[2:] == [
+        [MAY_20, "b", 1.0, 0.0, 1.0],
+        [MAY_21, "b", 1.0, 0.0, 1.0],
+        [MAY_22, "b", 1.0, 0.0, 1.0],
+        [MAY_22 + 1, "c", 0.0, 0.0, "closed"],
+        [MAY_22 + 2, "c", 0.0, 0.0, "closed"],
+    ]
+    alone = rows(read(a_market(history, a_vector(1.0))))
+    assert alone[2:] == shown[2:5]
+    assert bridge.call("_CreateMarket", [history, a_vector(1.0, 2.0, 3.0, 4.0)]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, "
+        "one per contract from 'b' through 'd'"
+    )
+
+
 THE_HISTORY, THE_VECTOR = object(), object()
 
 
@@ -498,13 +551,8 @@ THE_HISTORY, THE_VECTOR = object(), object()
     ("args", "text"),
     [
         (
-            [THE_HISTORY, (72.10,)],
-            "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, "
-            "one per contract from 'n26' through 'q26'",
-        ),
-        (
             [THE_HISTORY, (72.10, 72.80, 73.0)],
-            "#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected 2, "
+            "#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected at most 2, "
             "one per contract from 'n26' through 'q26'",
         ),
         (
@@ -553,8 +601,7 @@ THE_HISTORY, THE_VECTOR = object(), object()
         ),
     ],
     ids=[
-        "one quote too few",
-        "one quote too many",
+        "one quote past the schedule's last contract",
         "valued the day after the calendar, the count unchecked",
         "the history left out",
         "a blank cell where the history should be",
@@ -615,10 +662,10 @@ def test_a_handle_of_another_kind_in_either_market_slot_is_refused_by_name() -> 
 
 
 def test_a_failed_market_publishes_no_object_and_no_handle() -> None:
-    history, vector, short = a_history(), a_vector(72.10, 72.80), a_vector(72.10)
+    history, vector, long = a_history(), a_vector(72.10, 72.80), a_vector(72.10, 72.80, 73.0)
     before = market_number(a_market(history, vector))
-    assert bridge.call("_CreateMarket", [history, short]) == (
-        "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 2, "
+    assert bridge.call("_CreateMarket", [history, long]) == (
+        "#ERROR _CreateMarket: ValueError: price_vector has 3 prices, expected at most 2, "
         "one per contract from 'n26' through 'q26'"
     )
     assert market_number(a_market(history, vector)) == before + 1
@@ -857,6 +904,53 @@ def test_an_iferc_market_is_created_from_two_handles_and_read_back_month_by_mont
     assert (kinds[2:, 4] == NUMBER_CODE).all()
 
 
+# The Gas Daily sample with the balance of September alone, then with October's quote too: the
+# readback ends on the last day of the last month quoted, the prints before it kept, and a month
+# past the quotes is not a row.
+def test_a_gas_daily_market_is_read_back_through_the_last_month_quoted() -> None:
+    history = cast(
+        str,
+        bridge.call(
+            "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
+        ),
+    )
+    balance = rows(read(a_market(history, a_vector(2.95, name="Henry Hub Gas Daily"))))
+    assert len(balance) == 32
+    assert balance[2] == [SEP_1, "U26", 1.0, 1.0, 2.80]
+    assert balance[27] == [SEP_25 + 1, "U26", 1.0, 0.0, 2.95]
+    assert balance[31] == [SEP_30, "U26", 1.0, 0.0, 2.95]
+    two = rows(read(a_market(history, a_vector(2.95, 3.10, name="Henry Hub Gas Daily"))))
+    assert len(two) == 63 and two[:32] == balance
+    assert two[32] == [OCT_1, "V26", 1.0, 0.0, 3.10]
+    assert two[62] == [OCT_31, "V26", 1.0, 0.0, 3.10]
+    assert {row[1] for row in two[2:]} == {"U26", "V26"}
+
+
+# The IFERC sample valued on 2 October, October's index published and two months to come, with
+# November's quote alone: one row per month through November, and December is not a row; with
+# both quotes December is the last.
+def test_an_iferc_market_is_read_back_through_the_last_month_quoted() -> None:
+    history = cast(
+        str,
+        bridge.call(
+            "_CreateMarketHistory", [an_iferc_calendar(OCT_1 + 1), indices_for(("V26", 1.85))]
+        ),
+    )
+    made = a_market(history, a_vector(2.10, name="Henry Hub IFERC"))
+    assert rows(read(made)) == [
+        MARKET_HEADERS,
+        TYPES,
+        [OCT_1, "V26", 1.0, 1.0, 1.85],
+        [NOV_2, "X26", 1.0, 0.0, 2.10],
+    ]
+    whole = a_market(history, a_vector(2.10, 2.20, name="Henry Hub IFERC"))
+    assert rows(read(whole))[2:] == [
+        [OCT_1, "V26", 1.0, 1.0, 1.85],
+        [NOV_2, "X26", 1.0, 0.0, 2.10],
+        [DEC_1, "Z26", 1.0, 0.0, 2.20],
+    ]
+
+
 def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_market() -> None:
     gas_daily = cast(
         str,
@@ -865,9 +959,10 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
         ),
     )
     assert bridge.call(
-        "_CreateMarket", [gas_daily, a_vector(2.95, name="Henry Hub Gas Daily")]
+        "_CreateMarket",
+        [gas_daily, a_vector(2.95, 3.10, 3.40, 3.50, name="Henry Hub Gas Daily")],
     ) == (
-        "#ERROR _CreateMarket: ValueError: price_vector has 1 price, expected 3, "
+        "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, "
         "one per contract from 'U26' through 'X26'"
     )
     ended = cast(
@@ -887,7 +982,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
         ),
     )
     assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20, name="Henry Hub IFERC")]) == (
-        "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected 1, "
+        "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected at most 1, "
         "one per contract from 'Z26' through 'Z26'"
     )
     published = cast(
