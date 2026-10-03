@@ -1,4 +1,6 @@
-# Exercises the owned-session failure paths without starting Excel or touching a process.
+# Proves, without Excel, that a hidden Excel session whose start fails is still ended, and that
+# a session's end goes on past each step that fails. Nothing here starts Excel or touches a
+# process. check.ps1 and CI run it.
 # A real, unopened ADO recordset stands in for Excel so releasing its COM reference is real;
 # added members fail where the Excel calls can fail. Process discovery and the retained
 # process are stand-ins. The real smoke and lifetime runs check discovery against Excel.
@@ -153,5 +155,5 @@ finally {
     }
 }
 
-Write-Host "excel lifecycle self-test: $($script:checks) checks, $($script:failures) failed"
+Write-Host "excel session self-test: $($script:checks) checks, $($script:failures) failed"
 exit $script:failures

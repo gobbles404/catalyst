@@ -60,7 +60,7 @@ Each page defines these where it first uses them; here they are once, so the pag
 | the pins | `tests/performance/test_seam_budgets.py`, `test_seam_allocation.py`, `conftest.py`, `HostWorkBudgets.cs` |
 | the runners, the summary, the before-and-after tool, the handles' retention run | `tools/performance/` |
 | the smoke test in a hidden Excel, the handles' lifetime in hidden Excels, Excel by hand, a workbook printed as its cells show, the build | `tools/excel_smoke.ps1`, `tools/excel_lifetime.ps1`, `tools/excel_dev.ps1`, `tools/excel_show.ps1`, `tools/host_build.ps1` |
-| starting and ending a hidden Excel, waiting for a busy one, and the proof of that wait without Excel | `tools/hidden_excel.ps1`, `tools/excel_busy_selftest.ps1` |
+| starting and ending a hidden Excel, waiting for a busy one, and the proofs without Excel of that wait and of a failed start still ended | `tools/hidden_excel.ps1`, `tools/excel_busy_selftest.ps1`, `tools/excel_session_selftest.ps1` |
 | the workbooks we keep, one per topic, for talking about a function on a real sheet | `workbooks/handles.xlsx` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |

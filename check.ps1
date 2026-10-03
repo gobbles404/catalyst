@@ -6,7 +6,7 @@ $steps = @(
   "uv run pytest -n auto",
   "dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1",
-  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifecycle_selftest.ps1",
+  "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_session_selftest.ps1",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1",
   "powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core,processes"
 )
