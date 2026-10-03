@@ -115,25 +115,37 @@ function Write-ExcelBusyReport {
     }
 }
 
-function Start-HiddenExcel {
-    $process = $null
-    $excel = New-Object -ComObject Excel.Application
+# Return ownership only once the window's process has been verified and its handle retained.
+# A failed lookup never supplies a process that cleanup could accidentally terminate.
+function Get-HiddenExcelProcess($Excel) {
+    $excelProcessId = [uint32]0
+    [void][Goosedove.Tools.ExcelWindow]::GetWindowThreadProcessId([IntPtr](Read-ExcelProperty $Excel "Hwnd"), [ref]$excelProcessId)
+    if (-not $excelProcessId) { throw "could not identify the hidden Excel process" }
+    $process = [Diagnostics.Process]::GetProcessById($excelProcessId)
     try {
-        Invoke-ExcelCall "hide Excel" { $excel.Visible = $false }
-        Invoke-ExcelCall "silence alerts" { $excel.DisplayAlerts = $false }
-        $excelProcessId = [uint32]0
-        [void][Goosedove.Tools.ExcelWindow]::GetWindowThreadProcessId([IntPtr](Read-ExcelProperty $excel "Hwnd"), [ref]$excelProcessId)
-        if (-not $excelProcessId) { throw "could not identify the hidden Excel process" }
-        $process = [Diagnostics.Process]::GetProcessById($excelProcessId)
         # Retain the process handle, not just its reusable numeric ID.
         [void]$process.Handle
         if ($process.ProcessName -ne "EXCEL") { throw "the hidden Excel window belongs to $($process.ProcessName)" }
-        return [pscustomobject]@{ Excel = $excel; Process = $process }
+        return $process
     }
     catch {
-        try { $excel.Quit() } catch { Write-Warning "Excel startup cleanup: $_" -WarningAction Continue }
-        [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel)
-        if ($process) { $process.Dispose() }
+        $process.Dispose()
+        throw
+    }
+}
+
+function Start-HiddenExcel {
+    $session = [pscustomobject]@{ Excel = (New-Object -ComObject Excel.Application); Process = $null }
+    try {
+        $session.Process = Get-HiddenExcelProcess $session.Excel
+        Invoke-ExcelCall "hide Excel" { $session.Excel.Visible = $false }
+        Invoke-ExcelCall "silence alerts" { $session.Excel.DisplayAlerts = $false }
+        return $session
+    }
+    catch {
+        # A startup failure has no caller-owned session yet. End it here through the same
+        # terminal path as a completed session, even when Quit is refused.
+        Stop-HiddenExcel $session ([Collections.Generic.List[object]]::new()) $null -FailureInFlight
         throw
     }
 }
@@ -173,15 +185,20 @@ function Stop-HiddenExcel($Session, $Objects, $Book, [switch]$AddInLoaded, [swit
     $Objects.Clear()
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()
-    try {
-        if (-not $Session.Process.WaitForExit(5000)) {
-            $problems.Add("hidden Excel process $($Session.Process.Id) did not exit within five seconds; terminating this session's process")
-            $Session.Process.Kill()
-            if (-not $Session.Process.WaitForExit(5000)) { $problems.Add("the owned Excel process still has not exited") }
+    if ($Session.Process) {
+        try {
+            if (-not $Session.Process.WaitForExit(5000)) {
+                $problems.Add("hidden Excel process $($Session.Process.Id) did not exit within five seconds; terminating this session's process")
+                $Session.Process.Kill()
+                if (-not $Session.Process.WaitForExit(5000)) { $problems.Add("the owned Excel process still has not exited") }
+            }
         }
+        catch { $problems.Add("waiting for the owned Excel process: $_") }
+        finally { $Session.Process.Dispose() }
     }
-    catch { $problems.Add("waiting for the owned Excel process: $_") }
-    finally { $Session.Process.Dispose() }
+    else {
+        $problems.Add("could not verify Excel exit because its process was not identified")
+    }
     if ($problems.Count) {
         $message = "hidden Excel cleanup failed: " + ($problems -join "; ")
         if ($FailureInFlight) { Write-Warning $message -WarningAction Continue }

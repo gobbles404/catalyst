@@ -26,6 +26,8 @@ jobs:
       - run: uv run pytest -n auto
       # The Excel tools' handling of a busy Excel, proved without Excel.
       - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1
+      # Startup and shutdown failures, also proved without Excel.
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifecycle_selftest.ps1
 
   measure:
     runs-on: windows-2022
