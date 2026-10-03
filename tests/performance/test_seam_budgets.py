@@ -197,6 +197,123 @@ def test_text_in_and_out_itemized(call_profile: CallProfile) -> None:
     }
 
 
+# The two text helpers are text in and text out around one reading of the code: the text rule,
+# the function, the library's function and its one parse, then the way out for text. Nine calls
+# across nine functions, no numpy call.
+@pytest.mark.parametrize(
+    ("name", "library"), [("util_NextFut", "next_contract"), ("util_FutToCme", "cme_code")]
+)
+def test_a_text_helper_is_text_in_one_parse_and_text_out(
+    call_profile: CallProfile, numpy_calls: CallProfile, name: str, library: str
+) -> None:
+    PATH[name]("F26")
+    assert call_profile(lambda: PATH[name]("F26")) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        name: 1,
+        library: 1,
+        "month_and_year": 1,
+        "_text_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH[name]("F26")) == {}
+
+
+# A day in and a code out: the date rule, through the number rule it builds on, the function,
+# the library's reading of the day as a count of months, two conversions and no calendar, and
+# the way out for text. Nine calls across nine functions.
+def test_the_code_of_a_day_is_a_date_in_two_conversions_and_text_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["util_DateToFut"](46161.0)
+    assert call_profile(lambda: PATH["util_DateToFut"](46161.0)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_date": 1,
+        "_number": 1,
+        "util_DateToFut": 1,
+        "code_of_month": 1,
+        "_text_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_DateToFut"](46161.0)) == {
+        "generic.astype": 2,  # the day to a count of months, and that count to a number
+    }
+
+
+# A code in and a day out, the first worksheet function to send one date back: the text rule,
+# the function, the library's one parse and one date made, then the seam's way out for a date,
+# which puts the day in a one-day array and checks it as it checks a column, its unit and its
+# two looks. Ten calls across ten functions, and the way out's numpy, nothing of the library's.
+def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["util_FutToDate"]("F26")
+    assert call_profile(lambda: PATH["util_FutToDate"]("F26")) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "util_FutToDate": 1,
+        "first_day_of": 1,
+        "month_and_year": 1,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_FutToDate"]("F26")) == {
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
+# A period's first or last day: the text rule, the function, the library's reading of the whole
+# expression, one label read or two, the day from the month in one conversion, and the seam's way
+# out for a date. Eleven calls across eleven functions for one label, twelve for a range, the
+# label's reading twice; one numpy conversion of the library's and the way out's six, whether
+# the period is one month or the whole century.
+@pytest.mark.parametrize(
+    ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]
+)
+@pytest.mark.parametrize(
+    ("period", "labels"), [("F26", 1), ("F00-Z99", 2)], ids=["a month", "a century"]
+)
+def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    name: str,
+    library: str,
+    period: str,
+    labels: int,
+) -> None:
+    PATH[name](period)
+    assert call_profile(lambda: PATH[name](period)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        name: 1,
+        library: 1,
+        "period_months": 1,
+        "_label_months": labels,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH[name](period)) == {
+        "generic.astype": 1,  # the month to its first day
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
 def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
     PATH["EchoBoolean"](True)
     assert call_profile(lambda: PATH["EchoBoolean"](True)) == {
@@ -876,7 +993,7 @@ def test_a_gas_daily_schedule_is_three_columns_in_and_one_publication_out(
 def test_index_conventions_are_five_texts_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes = ("USD", "BBL", "USD", "volume", "BBL")
+    codes = ("USD", "BBL", "USD", "VOLUME", "BBL")
     PATH["_CreateIndexConventions"](*codes)
     assert call_profile(lambda: PATH["_CreateIndexConventions"](*codes)) == {
         "Registered.run": 1,
@@ -912,7 +1029,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
     return PATH["_CreateIndex"](
         "sample",
         schedule,
-        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
         holidays,
     )
@@ -999,7 +1116,7 @@ def index_parts() -> tuple[object, object, object, object]:
     codes, futures, _, _ = schedule_columns(13)
     return (
         PATH["_CreateFuturesSchedule"](codes, futures, MISSING),
-        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(12)),
         PATH["_CreateHolidayCalendar"](holiday_column(100)),
     )
@@ -1244,6 +1361,31 @@ def test_reading_a_calendar_back_rebuilds_nothing(
         "ufunc.reduce": 5,
     }
     assert "numpy.arange" not in calls and "ndarray.searchsorted" not in calls
+
+
+# Reading the prompt code is the handle's text rule and one lookup, the function, the
+# calendar's three reads, the row it counted when it was made, the contract on it and that
+# contract's code, and the way out for text, the scalar rule and the text check. Nine calls
+# across nine functions, no numpy call, no array made, no publication, for a calendar of a year
+# of days and for one of a hundred years alike.
+@pytest.mark.parametrize("contracts", [13, 1201], ids=["a year of days", "a hundred years of days"])
+def test_reading_the_prompt_is_three_reads_and_no_array(
+    call_profile: CallProfile, numpy_calls: CallProfile, contracts: int
+) -> None:
+    made = PATH["_CreateCalendar"](*calendar_sources(contracts))
+    assert PATH["util_ReadPrompt"](made) == "c4"  # prompt on 11 September, 30 days a contract
+    assert call_profile(lambda: PATH["util_ReadPrompt"](made)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_resolve": 1,
+        "util_ReadPrompt": 1,
+        "Calendar.prompt_code": 1,
+        "_text_out": 1,  # the way out for text
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ReadPrompt"](made)) == {}
 
 
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:

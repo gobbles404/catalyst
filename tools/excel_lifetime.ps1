@@ -169,7 +169,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "A10" "$First"; Put $State $Sheet "A11" "$Second"
     Put $State $Sheet "D1" "=_CreateFuturesSchedule(A2:A4,B2:B4)"
     Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
-    Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","volume","BBL")'
+    Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
     Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I2)"
     Put $State $Sheet "D5" "=_CreateIndex(A1,D1,D3,D4,D2)"
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"

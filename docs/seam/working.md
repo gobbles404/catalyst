@@ -193,7 +193,7 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 
 ## 7. Running the checks
 
-`.\check.ps1` runs eight steps in this order and stops at the first failure:
+`.\check.ps1` runs nine steps in this order and stops at the first failure:
 
 1. `uv run ruff format .`
 2. `uv run ruff check --fix .`
@@ -201,14 +201,15 @@ A baseline is one session's numbers at a named revision; a session is one sittin
 4. `uv run pytest -n auto`
 5. `dotnet test host\Goosedove.Host.Tests -c Release --nologo -v q`
 6. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1`
-7. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1`
-8. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core,processes`
+7. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_session_selftest.ps1`
+8. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_smoke.ps1`
+9. `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_lifetime.ps1 -Groups core,processes`
 
-The sixth step needs no Excel: it proves what the last two do when Excel refuses a call as busy, which a run of them may never meet; [host.md](host.md#when-a-hidden-excel-is-busy) is the page. Both end with one line saying which calls had to wait, `busy Excel: no call had to wait` on a calm run.
+The sixth and seventh steps need no Excel. The sixth proves what the last two do when Excel refuses a call as busy, which a run of them may never meet; [host.md](host.md#when-a-hidden-excel-is-busy) is the page, and the last two end with one line saying which calls had to wait, `busy Excel: no call had to wait` on a calm run. The seventh proves that a hidden Excel whose start fails is still ended, its process waited for and stopped if it stays, with the failure that began it kept; [host.md](host.md#when-a-hidden-excel-quits) is the page.
 
 The last two steps need Excel installed. The lifetime script's core group builds a chain of creators in a hidden Excel and checks that a creator's cell shows its handle at once, that an unchanged recalculation publishes nothing, that a changed price releases the old vector and market once Excel disconnects them, that equal creators share, that a failure owns nothing and that closing the workbook empties the store; its `processes` group runs two hidden Excels at once and checks that every handle carries its own Excel's process ID, that a handle from one Excel names nothing in the other, and that a workbook saved by one is recreated under the other's ID; run it with no group named before merging a change to ownership or registration, for its `edits`, `books` and `quit` groups too. The smoke it builds the add-in, opens a hidden Excel of its own, types the input cells, places one formula per row and compares each cell's displayed text with the text expected. It then closes the workbook, asks the add-in to prepare for quitting, and verifies that its Excel process exits, releasing the add-in file for the next build. A process that remains is stopped and the check fails. The process is identified from that Excel's window handle, never by selecting all Excel processes. Without Excel it stops and says so, and the check fails. It never touches an Excel you have open. The workbook reader and Excel timing runner use the same cleanup; [host.md](host.md#when-a-hidden-excel-quits) explains why it is needed.
 
-CI runs everything but those two steps, on a Windows runner, in three jobs. One runs format, lint, types, the Python tests and the busy-Excel self-test, with `ruff format --check .` so CI never rewrites a file. One builds the host, runs the host's tests, and builds the host runner so that it keeps compiling. The third runs `.\measure.ps1` and uploads `profiles\`, and gates nothing.
+CI runs everything but those two steps, on a Windows runner, in three jobs. One runs format, lint, types, the Python tests and the two self-tests, the busy Excel's and the session's, with `ruff format --check .` so CI never rewrites a file. One builds the host, runs the host's tests, and builds the host runner so that it keeps compiling. The third runs `.\measure.ps1` and uploads `profiles\`, and gates nothing.
 
 Any part alone:
 
@@ -220,6 +221,7 @@ uv run pytest -n auto                             # every Python test
 uv run pytest tests\performance                   # the pins alone
 dotnet test host\Goosedove.Host.Tests -c Release  # the host's tests, no Excel needed
 .\tools\excel_busy_selftest.ps1                   # how the Excel tools wait for a busy Excel, no Excel needed
+.\tools\excel_session_selftest.ps1                # a hidden Excel whose start fails is still ended, no Excel needed
 .\tools\excel_smoke.ps1                           # the add-in in a hidden Excel
 .\tools\excel_lifetime.ps1 -Groups core,processes             # handles living and dying in a hidden Excel
 .\tools\excel_lifetime.ps1                          # every lifetime group, before merging ownership changes

@@ -116,7 +116,7 @@ $formulas = [ordered]@{
     # and a number where a code is expected, and a code left out, the seam's.
     '=MID(AP1,FIND(":",AP1)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP1),1,4)" = "quantity_type"
-    "=INDEX(util_ReadHandle(AP1),3,4)" = "volume"
+    "=INDEX(util_ReadHandle(AP1),3,4)" = "VOLUME"
     "=COLUMNS(util_ReadHandle(AP1))"   = "5"
     "=_CreateIndexConventions(AO2,AO3,AO4,AO5,C2)" = "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text"
     "=_CreateIndexConventions(AO2,AO3,A1,AO5,AO6)" = "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text"
@@ -124,8 +124,8 @@ $formulas = [ordered]@{
     '=MID(AP2,FIND(":",AP2)+1,18)' = "index_conventions:"
     "=INDEX(util_ReadHandle(AP2),3,1)" = "CENT"
     "=INDEX(util_ReadHandle(AP2),3,2)" = "GAL"
-    "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy"
-    "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+    "=_CreateIndexConventions(AO2,AO3,AO4,AO8,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY"
+    "=_CreateIndexConventions(AO2,AO9,AO4,AO5,AO6)" = "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The contract specifications: a creator over a header row and a table of two words for a
     # quantity of WTI, a thousand-barrel lot and the bare gallon, read back through util_ReadHandle
     # with the lot units as text; a lot size with a fraction, a lot size of zero, a negative fee, a
@@ -147,8 +147,8 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(EI1:EM1,EI7:EM8)" = "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'lots', already given at row 1"
     "=_CreateContractSpecifications(EI1:EM1,EI9:EM9)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI10:EM10)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
-    "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a volume, mass or energy unit"
-    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+    "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit"
+    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -287,6 +287,74 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AR7),5,4)" = "FALSE"
     "=_CreateCalendar(AA2,C2)" = "#ERROR _CreateCalendar: index is blank, expected index handle"
     "=_CreateCalendar(AA2,ED8)" = "#ERROR _CreateCalendar: ValueError: first_date row 2 is 2026-10-02, expected 2026-10-01, the day after row 1's last_date 2026-09-30"
+    # The prompt reader: the contract of a calendar's first unfixed period, as text in the
+    # schedule's own spelling. V26 on the six-contract futures calendar in AR1, valued 11-Sep-2026,
+    # the contract prompt that day; n26 on CT5, the two-contract calendar valued 26-May; q26 on
+    # CW4, valued before it begins, the first contract it represents; U26 on the Gas Daily
+    # calendar in AR6 and on DW6, valued inside September; V26 on the IFERC calendar in AR7,
+    # before any month published, and Z26 on DW2, valued 15-Nov; the IFERC calendar in EA6, every
+    # month published, has none, the library's words; the calendar left out, blank or a number,
+    # the seam's.
+    "=util_ReadPrompt(AR1)" = "V26"
+    "=util_ReadPrompt(CT5)" = "n26"
+    "=util_ReadPrompt(CW4)" = "q26"
+    "=util_ReadPrompt(AR6)" = "U26"
+    "=util_ReadPrompt(DW6)" = "U26"
+    "=util_ReadPrompt(AR7)" = "V26"
+    "=util_ReadPrompt(DW2)" = "Z26"
+    "=util_ReadPrompt(EA6)" = "#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, expected at least one to quote"
+    "=util_ReadPrompt()" = "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle"
+    "=util_ReadPrompt(C2)" = "#ERROR util_ReadPrompt: calendar is blank, expected calendar handle"
+    "=util_ReadPrompt(Y2)" = "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle"
+    # The two text helpers: the next contract in the monthly sequence, spelled as the code given,
+    # F26 to G26, Z26 to F27 and the schedule's m26 in AE2 to n26; the month as CME's feeds spell
+    # it, 202601 for F26 and 202610 for the V26 in AE6; a strip, a winter and December 2099, the
+    # library's words; a number, a blank and empty text, the seam's.
+    '=util_NextFut("F26")' = "G26"
+    '=util_NextFut("Z26")' = "F27"
+    "=util_NextFut(AE2)" = "n26"
+    '=util_FutToCme("F26")' = "202601"
+    "=util_FutToCme(AE6)" = "202610"
+    '=util_NextFut("Cal27")' = "#ERROR util_NextFut: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26"
+    '=util_FutToCme("W29")' = "#ERROR util_FutToCme: ValueError: contract is 'W29', expected a month letter and a two-digit year, such as F26"
+    '=util_NextFut("Z99")' = "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before December 2099, the last a two-digit year can name"
+    "=util_NextFut(A1)" = "#ERROR util_NextFut: contract is number 1.0, expected text"
+    "=util_FutToCme(C2)" = "#ERROR util_FutToCme: contract is blank, expected text"
+    "=util_FutToCme(I2)" = "#ERROR util_FutToCme: contract is empty text, expected text"
+    # The two date helpers: the code of the month a day falls in, K26 for m26's expiry in AF2,
+    # 19-May-2026, U26 for 11-Sep-2026 in Y2 and Z26 for the last day of 2026; the first day of a
+    # code's month as a date, 1-Jan-2026 for F26 and 1-Jul-2026 for the n26 in AE3, the cell
+    # showing the serial until it is formatted; a day of 2100 and a strip, the library's words; a
+    # time, text and a blank where the day should be, the seam's.
+    "=util_DateToFut(AF2)" = "K26"
+    "=util_DateToFut(Y2)" = "U26"
+    "=util_DateToFut(DATE(2026,12,31))" = "Z26"
+    '=util_FutToDate("F26")' = "46023"
+    "=util_FutToDate(AE3)" = "46204"
+    "=util_DateToFut(DATE(2100,1,1))" = "#ERROR util_DateToFut: ValueError: date is 2100-01-01, expected a day from 2000 to 2099, the years a two-digit code can name"
+    '=util_FutToDate("Cal27")' = "#ERROR util_FutToDate: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26"
+    "=util_DateToFut(Y2+0.5)" = "#ERROR util_DateToFut: date is number 46276.5, expected date"
+    "=util_DateToFut(E1)" = "#ERROR util_DateToFut: date is text 'x', expected date"
+    "=util_DateToFut(C2)" = "#ERROR util_DateToFut: date is blank, expected date"
+    # The two period functions: the first and the last calendar day of a contract or strip label, in
+    # any case, as serials until the cell is formatted: F26 in the schedule's own m26 at AE2, a
+    # quarter, a calendar year, a winter across the year end, a summer and a range; a malformed
+    # label and a reversed range, the library's words from either reader; a number and a blank,
+    # the seam's.
+    "=util_StartDate(AE2)" = "46174"
+    "=util_EndDate(AE2)" = "46203"
+    '=util_StartDate("1q27")' = "46388"
+    '=util_EndDate("1Q27")' = "46477"
+    '=util_EndDate("cal28")' = "47118"
+    '=util_StartDate("W29")' = "47423"
+    '=util_EndDate("W29")' = "47573"
+    '=util_StartDate("s28")' = "46844"
+    '=util_EndDate("f26-z28")' = "47118"
+    '=util_EndDate("w28-w29")' = "47573"
+    '=util_StartDate("W8-W9")' = "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
+    "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
+    "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -540,7 +608,7 @@ $cells = [ordered]@{
     # The index conventions: five codes as the desk types them and one creator cell; a category in
     # another case and an energy unit, for the conventions to refuse; and the gasoline index's
     # quoted units, cents a gallon, with a second creator cell settling in dollars a barrel.
-    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "volume"; "AO6" = "BBL"
+    "AO2" = "USD"; "AO3" = "BBL"; "AO4" = "USD"; "AO5" = "VOLUME"; "AO6" = "BBL"
     "AP1" = "=_CreateIndexConventions(AO2,AO3,AO4,AO5,AO6)"
     "AO8" = "Volume"; "AO9" = "MMBTU"
     "AO10" = "CENT"; "AO11" = "GAL"

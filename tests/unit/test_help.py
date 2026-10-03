@@ -75,6 +75,85 @@ def test_the_handle_reader_explains_itself() -> None:
     ]
 
 
+def test_the_prompt_reader_explains_itself() -> None:
+    description, arguments, hidden = SPECS["util_ReadPrompt"]
+    assert not hidden
+    assert description == (
+        "Reads the contract code for the first price expected in the calendar's market price "
+        "vector."
+    )
+    assert arguments == [
+        (
+            "calendar",
+            "The calendar handle: the cell showing _CreateCalendar's result, such as B5, or a "
+            "name for it.",
+        ),
+    ]
+
+
+def test_the_two_text_helpers_explain_themselves() -> None:
+    line = (
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2."
+    )
+    description, arguments, hidden = SPECS["util_NextFut"]
+    assert not hidden
+    assert description == (
+        "Gives the next contract in the monthly sequence, G26 after F26 and F27 after Z26, "
+        "spelled as the code given."
+    )
+    assert arguments == [("contract", line)]
+    description, arguments, hidden = SPECS["util_FutToCme"]
+    assert not hidden
+    assert description == (
+        "Gives the contract month as CME's data feeds spell it, the year then the month, 202601 "
+        "for F26."
+    )
+    assert arguments == [("contract", line)]
+
+
+def test_the_two_date_helpers_explain_themselves() -> None:
+    description, arguments, hidden = SPECS["util_DateToFut"]
+    assert not hidden
+    assert description == (
+        "Gives the contract code of the month a day falls in, F26 for any day of January 2026."
+    )
+    assert arguments == [
+        ("date", "One day, such as A2 or DATE(2026,1,15): any day of the contract's month."),
+    ]
+    description, arguments, hidden = SPECS["util_FutToDate"]
+    assert not hidden
+    assert description == "Gives the first day of a contract's month as a date, 1-Jan-2026 for F26."
+    assert arguments == [
+        (
+            "contract",
+            "One contract code, a month letter and a two-digit year such as F26, typed or in a "
+            "cell such as A2.",
+        ),
+    ]
+
+
+def test_the_two_period_functions_explain_themselves() -> None:
+    line = (
+        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
+        "a cell such as A2."
+    )
+    description, arguments, hidden = SPECS["util_StartDate"]
+    assert not hidden
+    assert description == (
+        "Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for "
+        "W29 and the first day of the left label of F26-Z28."
+    )
+    assert arguments == [("period", line)]
+    description, arguments, hidden = SPECS["util_EndDate"]
+    assert not hidden
+    assert description == (
+        "Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for "
+        "W29 and the last day of the right label of F26-Z28."
+    )
+    assert arguments == [("period", line)]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden
@@ -177,8 +256,8 @@ def test_the_conventions_creator_explains_itself() -> None:
         "other formulas take as the conventions."
     )
     units = (
-        "GAL, BBL, L or M3 for volume; KG, LB, MT, ST, LT, G, OZT or CWT_US for mass; MMBTU, BTU, "
-        "THERM, GJ, MWH or KWH for energy."
+        "GAL, BBL, L or M3 for VOLUME; KG, LB, MT, ST, LT, G, OZT or CWT_US for MASS; MMBTU, BTU, "
+        "THERM, GJ, MWH or KWH for ENERGY."
     )
     assert arguments == [
         (
@@ -191,7 +270,7 @@ def test_the_conventions_creator_explains_itself() -> None:
             + units,
         ),
         ("currency_unit", "The currency unit the index settles in: USD or CENT."),
-        ("quantity_type", "What a quantity of the index measures: volume, mass or energy."),
+        ("quantity_type", "What a quantity of the index measures: VOLUME, MASS or ENERGY."),
         (
             "quantity_unit",
             "The unit a quantity of the index is stated in, a unit of the quantity type: " + units,

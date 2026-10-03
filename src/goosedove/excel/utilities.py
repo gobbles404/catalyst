@@ -16,12 +16,19 @@ from goosedove.calendar.calendar import Calendar
 from goosedove.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
+    Date,
     Handle,
     MixedArray,
     excel_function,
 )
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
+from goosedove.index_definitions.contract_codes import (
+    cme_code,
+    code_of_month,
+    first_day_of,
+    next_contract,
+)
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
@@ -29,6 +36,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
@@ -299,3 +307,91 @@ def util_ReadHandle(
     """Reads the object behind a handle and spills it as a table: its headers, a row of types,
     then one row per element."""
     return shown(handle)
+
+
+@excel_function
+def util_ReadPrompt(
+    calendar: Annotated[
+        Handle[Calendar],
+        "The calendar handle: the cell showing _CreateCalendar's result, such as B5, or a name "
+        "for it.",
+    ],
+) -> str:
+    """Reads the contract code for the first price expected in the calendar's market price
+    vector."""
+    # The calendar's own reading of its first unfixed period: text in the cell, no object kept.
+    return calendar.prompt_code()
+
+
+@excel_function
+def util_NextFut(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> str:
+    """Gives the next contract in the monthly sequence, G26 after F26 and F27 after Z26, spelled
+    as the code given."""
+    return next_contract(contract)
+
+
+@excel_function
+def util_FutToCme(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> str:
+    """Gives the contract month as CME's data feeds spell it, the year then the month, 202601 for
+    F26."""
+    return cme_code(contract)
+
+
+@excel_function
+def util_DateToFut(
+    date: Annotated[
+        Date, "One day, such as A2 or DATE(2026,1,15): any day of the contract's month."
+    ],
+) -> str:
+    """Gives the contract code of the month a day falls in, F26 for any day of January 2026."""
+    return code_of_month(date)
+
+
+@excel_function
+def util_FutToDate(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> Date:
+    """Gives the first day of a contract's month as a date, 1-Jan-2026 for F26."""
+    return Date(first_day_of(contract))
+
+
+@excel_function
+def util_StartDate(
+    period: Annotated[
+        str,
+        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
+        "a cell such as A2.",
+    ],
+) -> Date:
+    """Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for
+    W29 and the first day of the left label of F26-Z28."""
+    return Date(start_date(period))
+
+
+@excel_function
+def util_EndDate(
+    period: Annotated[
+        str,
+        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
+        "a cell such as A2.",
+    ],
+) -> Date:
+    """Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for
+    W29 and the last day of the right label of F26-Z28."""
+    return Date(end_date(period))

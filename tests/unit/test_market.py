@@ -54,7 +54,7 @@ SCHEDULE = a_schedule(("m26", "2026-05-19"), ("n26", "2026-06-22"), ("q26", "202
 CLOSED_MAY_25 = holiday_calendar(dates("2026-05-25"))
 ELSEWHERE = holiday_calendar(dates("2026-01-01"))
 
-CONVENTIONS = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
+CONVENTIONS = index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX",), np.array([1000.0]), ("BBL",), np.array([0.0]), np.array([0.0]), UNITS
 )
@@ -387,6 +387,48 @@ def test_a_history_with_no_unfixed_period_has_no_market() -> None:
             assert str(failure.value) == (
                 "market_history has no unfixed period, expected at least one to quote"
             )
+        # The calendar says the same of itself, in its own words, when asked its prompt code.
+        with pytest.raises(ValueError) as failure:
+            history.calendar.prompt_code()
+        assert (
+            str(failure.value) == "calendar has no unfixed period, expected at least one to quote"
+        )
+
+
+# The calendar's prompt code is the code of the market's first contract: the two read the same
+# row and the same contract, so a desk showing the prompt beside its indices sees the contract
+# the first price of each market is for, on the three kinds and whatever the valuation date.
+def test_the_calendars_prompt_code_is_the_markets_first_contract() -> None:
+    for history, quotes in (
+        (HISTORY, QUOTES),
+        (a_history("2026-05-20"), QUOTES),
+        (a_history("2026-06-22"), QUOTES),
+        (a_history("2026-06-23"), a_vector(72.80)),
+        (a_gas_daily_history("2026-09-18"), a_vector(2.95, 3.10, 3.40, name="sample")),
+        (a_gas_daily_history("2026-09-30"), a_vector(3.10, 3.40, name="sample")),
+        (an_iferc_history("2026-11-15"), a_vector(2.20, name="sample")),
+        (an_iferc_history("2026-09-15"), a_vector(1.9, 2.0, 2.2, name="sample")),
+    ):
+        made = market(history, quotes)
+        codes = history.calendar.index.schedule.codes
+        assert history.calendar.prompt_code() == codes[made.first_contract]
+    assert HISTORY.calendar.prompt_code() == "n26"
+
+
+@settings(deadline=None)
+@given(data=st.data())
+def test_for_any_history_the_prompt_code_names_the_first_contract_quoted(
+    data: st.DataObject,
+) -> None:
+    history = data.draw(st.sampled_from((any_history, any_gas_daily_history, any_iferc_history)))(
+        data
+    )
+    calendar = history.calendar
+    first = int(calendar.contract[int(np.count_nonzero(calendar.is_fixed))])
+    made = market(
+        history, a_vector(*(100.0 + i for i in range(len(calendar.index.schedule.codes) - first)))
+    )
+    assert calendar.prompt_code() == calendar.index.schedule.codes[made.first_contract]
 
 
 # --- a futures calendar valued before its first day --------------------------

@@ -26,7 +26,7 @@ namespace Goosedove.Host.Tests
         // replayed here reads either.
         private static string Index(object schedule, object holidays, string name = "sample")
         {
-            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
             var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 } });
             var handle = (string)Seam.Call("_CreateIndex", name, schedule, conventions, specifications, holidays);
             Assert.StartsWith(Pid + ":index:" + name + ":", handle);
@@ -128,6 +128,55 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
             yield return new object[] { "util_ReadHandle", new object[] { "x" }, "#ERROR util_ReadHandle: handle is text 'x' naming no live object, expected a handle" };
             yield return new object[] { "util_ReadHandle", new object[] { 46276.0 }, "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle" };
+            // The prompt reader: one calendar handle. Left out, a number and text naming no live object fail in the seam's words; the live calendars are in the calendar fact below.
+            yield return new object[] { "util_ReadPrompt", new object[] { ExcelMissing.Value }, "#ERROR util_ReadPrompt: calendar is missing, expected calendar handle" };
+            yield return new object[] { "util_ReadPrompt", new object[] { 46276.0 }, "#ERROR util_ReadPrompt: calendar is number 46276.0, expected calendar handle" };
+            yield return new object[] { "util_ReadPrompt", new object[] { "x" }, "#ERROR util_ReadPrompt: calendar is text 'x' naming no live object, expected calendar handle" };
+            // The two text helpers: a contract code in, text out. The next month in the exchanges' sequence, spelled as the code given, and the month as CME's feeds spell it; a strip, a four-digit year and December 2099 fail in the library's words, a number, a blank and empty text in the seam's.
+            yield return new object[] { "util_NextFut", new object[] { "F26" }, "G26" };
+            yield return new object[] { "util_NextFut", new object[] { "Z26" }, "F27" };
+            yield return new object[] { "util_NextFut", new object[] { "m26" }, "n26" };
+            yield return new object[] { "util_NextFut", new object[] { "Cal27" }, "#ERROR util_NextFut: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_NextFut", new object[] { "Z99" }, "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before December 2099, the last a two-digit year can name" };
+            yield return new object[] { "util_NextFut", new object[] { 26.0 }, "#ERROR util_NextFut: contract is number 26.0, expected text" };
+            yield return new object[] { "util_NextFut", new object[] { ExcelEmpty.Value }, "#ERROR util_NextFut: contract is blank, expected text" };
+            yield return new object[] { "util_FutToCme", new object[] { "F26" }, "202601" };
+            yield return new object[] { "util_FutToCme", new object[] { "Z26" }, "202612" };
+            yield return new object[] { "util_FutToCme", new object[] { "u26" }, "202609" };
+            yield return new object[] { "util_FutToCme", new object[] { "F2026" }, "#ERROR util_FutToCme: ValueError: contract is 'F2026', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_FutToCme", new object[] { "" }, "#ERROR util_FutToCme: contract is empty text, expected text" };
+            yield return new object[] { "util_FutToCme", new object[] { ExcelMissing.Value }, "#ERROR util_FutToCme: contract is missing, expected text" };
+            // The two date helpers: a day in and the code of its month out, in capitals; a code in and the first day of its month out, a serial. A day outside the years two digits name and a strip fail in the library's words, a serial with a time, text and a blank in the seam's.
+            yield return new object[] { "util_DateToFut", new object[] { 46161.0 }, "K26" };
+            yield return new object[] { "util_DateToFut", new object[] { 46387.0 }, "Z26" };
+            yield return new object[] { "util_DateToFut", new object[] { 73051.0 }, "#ERROR util_DateToFut: ValueError: date is 2100-01-01, expected a day from 2000 to 2099, the years a two-digit code can name" };
+            yield return new object[] { "util_DateToFut", new object[] { 46161.5 }, "#ERROR util_DateToFut: date is number 46161.5, expected date" };
+            yield return new object[] { "util_DateToFut", new object[] { "19-May-2026" }, "#ERROR util_DateToFut: date is text '19-May-2026', expected date" };
+            yield return new object[] { "util_DateToFut", new object[] { ExcelEmpty.Value }, "#ERROR util_DateToFut: date is blank, expected date" };
+            yield return new object[] { "util_FutToDate", new object[] { "F26" }, 46023.0 };
+            yield return new object[] { "util_FutToDate", new object[] { "n26" }, 46204.0 };
+            yield return new object[] { "util_FutToDate", new object[] { "W29" }, "#ERROR util_FutToDate: ValueError: contract is 'W29', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_FutToDate", new object[] { ExcelMissing.Value }, "#ERROR util_FutToDate: contract is missing, expected text" };
+            // The two period functions: a contract or strip label in, in any case, and its first or last calendar day out as a serial; a month, a quarter, a year, a winter across the year end, a summer and a range. A malformed label and a reversed range fail in the library's words from either reader, a number and empty text in the seam's.
+            yield return new object[] { "util_StartDate", new object[] { "f26" }, 46023.0 };
+            yield return new object[] { "util_EndDate", new object[] { "f26" }, 46053.0 };
+            yield return new object[] { "util_StartDate", new object[] { "1Q27" }, 46388.0 };
+            yield return new object[] { "util_EndDate", new object[] { "1Q27" }, 46477.0 };
+            yield return new object[] { "util_StartDate", new object[] { "cal28" }, 46753.0 };
+            yield return new object[] { "util_EndDate", new object[] { "CAL28" }, 47118.0 };
+            yield return new object[] { "util_StartDate", new object[] { "W29" }, 47423.0 };
+            yield return new object[] { "util_EndDate", new object[] { "W29" }, 47573.0 };
+            yield return new object[] { "util_StartDate", new object[] { "s28" }, 46844.0 };
+            yield return new object[] { "util_EndDate", new object[] { "s28" }, 47057.0 };
+            yield return new object[] { "util_StartDate", new object[] { "F26-Z28" }, 46023.0 };
+            yield return new object[] { "util_EndDate", new object[] { "F26-Z28" }, 47118.0 };
+            yield return new object[] { "util_EndDate", new object[] { "w28-w29" }, 47573.0 };
+            yield return new object[] { "util_StartDate", new object[] { "W8-W9" }, "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_EndDate", new object[] { "W8-W9" }, "#ERROR util_EndDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_StartDate", new object[] { "Z28-F26" }, "#ERROR util_StartDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order" };
+            yield return new object[] { "util_EndDate", new object[] { "CAL28-F28" }, "#ERROR util_EndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
+            yield return new object[] { "util_StartDate", new object[] { 46023.0 }, "#ERROR util_StartDate: period is number 46023.0, expected text" };
+            yield return new object[] { "util_EndDate", new object[] { "" }, "#ERROR util_EndDate: period is empty text, expected text" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -150,14 +199,14 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), ExcelMissing.Value }, "#ERROR _CreateGasDailySchedule: last_date is missing, expected column of dates" };
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Row(46266.0, 46296.0), Column(46295.0, 46326.0) }, "#ERROR _CreateGasDailySchedule: first_date is 1x2 array, expected column of dates" };
             // The index conventions: five text scalars, a blank and a number where a code is expected, and a code left out.
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "volume", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "volume", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "Volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected volume, mass or energy" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "MMBTU", "USD", "volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3" };
-            yield return new object[] { "_CreateIndexConventions", new object[] { "usd", "BBL", "USD", "volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', expected USD or CENT" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelEmpty.Value }, "#ERROR _CreateIndexConventions: quantity_unit is blank, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", 1.0, "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: currency_unit is number 1.0, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "VOLUME", ExcelMissing.Value }, "#ERROR _CreateIndexConventions: quantity_unit is missing, expected text" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "BBL", "USD", "Volume", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quantity_type is 'Volume', expected VOLUME, MASS or ENERGY" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "USD", "MMBTU", "USD", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_quantity_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3" };
+            yield return new object[] { "_CreateIndexConventions", new object[] { "usd", "BBL", "USD", "VOLUME", "BBL" }, "#ERROR _CreateIndexConventions: ValueError: quote_currency_unit is 'usd', expected USD or CENT" };
             // The contract specifications: a header row and a table of words for a quantity; a lot size with a fraction, text where a fee is expected, a name given twice, and a unit that is no quantity unit.
-            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "usd", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a volume, mass or energy unit" };
+            yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "usd", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 2.5, "MMBTU", 3.0, 2.0 } } }, "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 2.5, expected a whole number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", "three", 2.0 } } }, "#ERROR _CreateContractSpecifications: table cell (1, 4) is text 'three', expected number" };
             yield return new object[] { "_CreateContractSpecifications", new object[] { Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "NYMEX NG", 2500.0, "MMBTU", 0.75, 0.5 } } }, "#ERROR _CreateContractSpecifications: ValueError: name row 2 is 'NYMEX NG', already given at row 1" };
@@ -323,16 +372,16 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void index_conventions_are_created_from_five_codes_and_read_back_through_their_handle()
         {
-            var handle = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "volume", "BBL");
+            var handle = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
             Assert.StartsWith(Pid + ":index_conventions:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
             Assert.Equal("quantity_type", spill[0, 3]);
             Assert.Equal("str", spill[1, 0]);
-            Assert.Equal("volume", spill[2, 3]);
+            Assert.Equal("VOLUME", spill[2, 3]);
             Assert.Equal("BBL", spill[2, 4]);
-            var gasoline = (string)Seam.Call("_CreateIndexConventions", "CENT", "GAL", "USD", "volume", "BBL");
+            var gasoline = (string)Seam.Call("_CreateIndexConventions", "CENT", "GAL", "USD", "VOLUME", "BBL");
             Assert.Equal("CENT", ((object[,])Seam.Call("util_ReadHandle", gasoline))[2, 0]);
         }
 
@@ -369,13 +418,13 @@ namespace Goosedove.Host.Tests
         {
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
-            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "energy", "MMBTU");
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 3.0, 2.0 }, { "ICE NG", 2500.0, "MMBTU", 0.75, 0.5 } });
             var handle = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", schedule, conventions, specifications, holidays);
             Assert.StartsWith(Pid + ":index:Henry Hub NYMEX:", handle);
             // The lot units are units of the conventions' quantity type: the same MMBTU lots under volume conventions are refused, naming the row and the units that would have done.
-            var volume = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "volume", "BBL");
-            Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", schedule, volume, specifications, holidays));
+            var volume = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            Assert.Equal("#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3", Seam.Call("_CreateIndex", "WTI NYMEX", schedule, volume, specifications, holidays));
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(3, spill.GetLength(0));
             Assert.Equal(5, spill.GetLength(1));
@@ -442,7 +491,11 @@ namespace Goosedove.Host.Tests
         // types, then a row per day, the date as a serial, the prompt contract as text and the two
         // flags as booleans. The library's rules answer through the same objects: an index of one
         // contract, a code given twice, expiries backwards and a span no sheet could show; a
-        // calendar and a bare schedule where the index should be fail in the seam's.
+        // calendar and a bare schedule where the index should be fail in the seam's. util_ReadPrompt
+        // reads the contract of each calendar's first unfixed period as text, n26 on 25 May, U26 on
+        // a Gas Daily calendar valued 25 September and Z26 on an IFERC one valued 15 November; a
+        // calendar valued after its last day has none, the library's words, and a schedule where the
+        // calendar should be fails in the seam's.
         [Fact]
         public void a_calendar_is_created_from_two_handles_and_read_back_through_its_handle()
         {
@@ -489,6 +542,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46328.0, months[3, 0]);
             Assert.Equal(true, months[3, 3]);
             Assert.Equal(false, months[4, 3]);
+            Assert.Equal("n26", Seam.Call("util_ReadPrompt", handle));
+            var gasCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46290.0, 0.5), Index(gasDaily, ExcelMissing.Value));
+            Assert.Equal("U26", Seam.Call("util_ReadPrompt", gasCalendar));
+            var ifercCalendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), Index(iferc, ExcelMissing.Value));
+            Assert.Equal("Z26", Seam.Call("util_ReadPrompt", ifercCalendar));
+            var ended = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46225.0, 0.5), index);
+            Assert.Equal("#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, expected at least one to quote", Seam.Call("util_ReadPrompt", ended));
+            Assert.Equal("#ERROR util_ReadPrompt: calendar is futures schedule handle '" + schedule + "', expected calendar handle", Seam.Call("util_ReadPrompt", schedule));
         }
 
         // The market history: the calendar of the fact above valued a day later, on 26 May 2026

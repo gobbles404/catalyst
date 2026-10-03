@@ -65,7 +65,7 @@ GAS_DAILY = gas_daily_schedule(
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
 HOLIDAYS = holiday_calendar(dates("2026-01-01", "2026-01-19", "2026-02-16"))
-CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS)
+CONVENTIONS = index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS)
 SPECIFICATIONS = contract_specifications(
     ("NYMEX NG", "ICE NG"),
     np.array([10000.0, 2500.0]),
@@ -187,7 +187,7 @@ def test_specifications_need_not_answer_to_the_schedules_codes_or_count() -> Non
 # is refused there naming the row, the unit and the units that would have done, after the kind
 # and the holiday rules.
 def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused() -> None:
-    volume = index_conventions("USD", "BBL", "USD", "volume", "BBL", UNITS)
+    volume = index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS)
     barrels_and_gallons = contract_specifications(
         ("lots", "gal"), np.array([1000.0, 1.0]), ("BBL", "GAL"), np.zeros(2), np.zeros(2), UNITS
     )
@@ -196,7 +196,7 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
     with pytest.raises(ValueError) as failure:
         index("WTI NYMEX", FUTURES, volume, SPECIFICATIONS, HOLIDAYS, UNITS)
     assert str(failure.value) == (
-        "specifications row 1 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+        "specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     )
     mixed = contract_specifications(
         ("lots", "gal", "gas"),
@@ -209,12 +209,12 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
     with pytest.raises(ValueError) as failure:
         index("WTI NYMEX", FUTURES, volume, mixed, HOLIDAYS, UNITS)
     assert str(failure.value) == (
-        "specifications row 3 lot_unit is 'MMBTU', expected a volume unit, GAL, BBL, L or M3"
+        "specifications row 3 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     )
     with pytest.raises(ValueError) as failure:
         index("Henry Hub NYMEX", FUTURES, CONVENTIONS, barrels_and_gallons, HOLIDAYS, UNITS)
     assert str(failure.value) == (
-        "specifications row 1 lot_unit is 'BBL', expected an energy unit, MMBTU, BTU, THERM, GJ, "
+        "specifications row 1 lot_unit is 'BBL', expected an ENERGY unit, MMBTU, BTU, THERM, GJ, "
         "MWH or KWH"
     )
     with pytest.raises(ValueError, match=r"^holiday_calendar is a holiday calendar, expected none"):

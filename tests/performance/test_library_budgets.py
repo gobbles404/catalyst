@@ -1,11 +1,11 @@
 """What the library's own code costs, called directly: the code with no worksheet surface, whose
-work no seam ledger sees. A ledger is exact and a ceiling is the peak measured plus slack, as in
-the two seam files beside this one."""
+work no seam ledger sees. A ledger is exact and a ceiling is the peak measured plus slack, pinned
+on the least of three warm calls, as in the two seam files beside this one."""
 
 from collections.abc import Callable
 
 import numpy as np
-from test_seam_allocation import SLACK, peak_bytes
+from test_seam_allocation import SLACK, least_peak
 
 from goosedove.globals.unit_conversions import UNITS
 
@@ -27,7 +27,7 @@ def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
     quantities = np.full(N, 2.0)
 
     def convert() -> object:
-        return UNITS.convert(quantities, "volume", "BBL", "GAL")
+        return UNITS.convert(quantities, "VOLUME", "BBL", "GAL")
 
     assert call_profile(convert) == {
         "UnitConversions.convert": 1,
@@ -41,4 +41,4 @@ def test_a_conversion_looks_its_factor_up_once_and_checks_no_definition(
 # for the factor. Measured 80,200 bytes at ten thousand quantities on 2026-09-17.
 def test_a_conversion_allocates_its_result_and_nothing_else() -> None:
     quantities = np.full(N, 2.0)
-    assert peak_bytes(lambda: UNITS.convert(quantities, "volume", "BBL", "GAL")) <= 8 * N + SLACK
+    assert least_peak(lambda: UNITS.convert(quantities, "VOLUME", "BBL", "GAL")) <= 8 * N + SLACK

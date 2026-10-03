@@ -1,6 +1,7 @@
 """The library's fixed unit definitions and the conversion between them: four categories,
-volume, mass, energy and usd, each a reference unit and the size of every unit of it in that
-reference unit. docs/library/globals/unit-conversions.md is the page.
+VOLUME, MASS, ENERGY and USD, each a reference unit and the size of every unit of it in that
+reference unit. A category's name is a code, in capitals like the units it holds, since the desk
+types it as the quantity type of an index. docs/library/globals/unit-conversions.md is the page.
 
 Nothing here crosses the seam: no worksheet function, no handle, no workbook table. The
 definitions are authored at the foot of this module, checked once when it is imported, and shared
@@ -62,7 +63,7 @@ class UnitConversions:
 
     def factor(self, category: str, from_unit: str, to_unit: str) -> float:
         """The multiplier that restates a quantity in from_unit as one in to_unit, both units of
-        the category: size_from / size_to, so BBL to GAL in volume is 42 and GAL to BBL is 1 / 42.
+        the category: size_from / size_to, so BBL to GAL in VOLUME is 42 and GAL to BBL is 1 / 42.
 
         A unit of another category is refused as a conversion across categories, which needs a
         density or heat content the tables do not carry; a unit of no category is unknown in
@@ -159,7 +160,7 @@ UNITS: Final = unit_conversions(
     # GAL the U.S. liquid gallon; BBL the petroleum barrel, 42 U.S. gallons; L the litre and M3
     # the cubic metre, at 3.785411784 litres per U.S. gallon.
     category(
-        "volume",
+        "VOLUME",
         "GAL",
         UnitDefinition("GAL", "GAL", 1.0),
         UnitDefinition("BBL", "GAL", 42.0),
@@ -172,7 +173,7 @@ UNITS: Final = unit_conversions(
     # avoirdupois ounce; CWT_US the U.S. hundredweight, 100 lb, for rice and dairy, and not the
     # 112 lb imperial hundredweight.
     category(
-        "mass",
+        "MASS",
         "KG",
         UnitDefinition("KG", "KG", 1.0),
         UnitDefinition("LB", "KG", 0.45359237),
@@ -187,7 +188,7 @@ UNITS: Final = unit_conversions(
     # that Btu; THERM exactly 100,000 Btu; GJ the gigajoule, 1e9 joules; MWH the megawatt hour,
     # 3.6e9 joules; KWH the kilowatt hour, 3.6e6 joules.
     category(
-        "energy",
+        "ENERGY",
         "MMBTU",
         UnitDefinition("MMBTU", "MMBTU", 1.0),
         UnitDefinition("BTU", "MMBTU", 1e-06),
@@ -199,7 +200,7 @@ UNITS: Final = unit_conversions(
     # USD the U.S. dollar and CENT its cent: a scale of dollar amounts, never a currency
     # conversion.
     category(
-        "usd",
+        "USD",
         "USD",
         UnitDefinition("USD", "USD", 1.0),
         UnitDefinition("CENT", "USD", 0.01),

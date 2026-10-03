@@ -26,6 +26,8 @@ jobs:
       - run: uv run pytest -n auto
       # The Excel tools' handling of a busy Excel, proved without Excel.
       - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_busy_selftest.ps1
+      # The Excel tools' ending of a session whose start failed, also proved without Excel.
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\excel_session_selftest.ps1
 
   measure:
     runs-on: windows-2022

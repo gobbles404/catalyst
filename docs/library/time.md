@@ -10,7 +10,7 @@ A contract month is a unit of its own, as a day is: `datetime64[M]` in the libra
 
 ## Codes
 
-One spelling: a month letter and two digits, `M26`, matched exactly, never trimmed or re-cased, as unit codes are ([conventions.md](conventions.md)). The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. `_CreateFuturesSchedule`'s sample, `m26` beside `V26`, moves to `M26` in the pull request whose builder first reads codes.
+One spelling: a month letter and two digits, `M26`, matched exactly, never trimmed or re-cased, as unit codes are ([conventions.md](conventions.md)), when a schedule's builder reads codes, which none does yet. The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. `_CreateFuturesSchedule`'s sample, `m26` beside `V26`, moves to `M26` in the pull request whose builder first reads codes. The `util_` readers of #129 read a code the desk types for its meaning before any builder does, and read its letters in either case, `f26` and `F26` one month, by the owner's decision for those readers alone: a label a person types into a formula, with no table to match against, and the sample schedules spelling their codes `m26`, `n26`. That decision is theirs and not the builder's; the builder's spelling rule above stands as recorded for the day it reads codes.
 
 | Letter | F | G | H | J | K | M | N | Q | U | V | X | Z |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -43,7 +43,7 @@ The shape that needed the room is Gas Daily: a swap settling every calendar day 
 
 ## Readers the owner wants
 
-Worksheet functions with the `util_` prefix, which [conventions.md](conventions.md) reserves for the owner to state, and the owner has: the first and last calendar day of a code's month, `util_ContractStart("M26")` showing 1-Jun-2026 and `util_ContractEnd("M26")` 30-Jun-2026. Not next; each gets its page when it is, and each is one line over the month unit above.
+Worksheet functions with the `util_` prefix, which [conventions.md](conventions.md) reserves for the owner to state, and the owner has: the first and last calendar day of a code's month, asked for here as `util_ContractStart("M26")` showing 1-Jun-2026 and `util_ContractEnd("M26")` 30-Jun-2026. Built in #129 as [util_StartDate](utilities/start-date.md) and [util_EndDate](utilities/end-date.md), over the month unit above as foreseen and wider than foreseen: a label is a month, `F26`, a quarter, `1Q27`, a calendar year, `CAL28`, a winter, `W29`, November to the March after, a summer, `S28`, April to October, or two of these joined by a hyphen, `F26-Z28`, from the left's first day to the right's last; the letters are read in either case, as the Codes section says, and the year is two digits of the fixed horizon. Beside them, from the same pull request, [util_NextFut](utilities/next-fut.md), [util_FutToCme](utilities/fut-to-cme.md), [util_DateToFut](utilities/date-to-fut.md) and [util_FutToDate](utilities/fut-to-date.md) read or write a single contract code.
 
 ## Declined
 
@@ -67,7 +67,7 @@ From the braindump, each with the rule it met and what stands instead:
 
 | Fork | Where it stands |
 |---|---|
-| code case | decided: uppercase only, `M26` |
+| code case | decided: uppercase only, `M26`, for a schedule's builder when it reads codes; the `util_` readers of #129 read either case, the owner's decision for them, recorded under Codes |
 | weekends in a period | decided: every calendar day, weekends included |
 | contracts in order and none skipped | decided as the rule; relaxed for a market listing only some months when one arrives |
 | an option's expiry on or before its future's | proposed above; the owner decides with the schedule's rules |
@@ -78,4 +78,4 @@ From the braindump, each with the rule it met and what stands instead:
 
 ## When it is time
 
-Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first. Business days entered in #79 with the futures fixings, checked through `np.is_busday` and `np.busday_offset` over the calendar's list, a fixing refused on a closed day and a business day without one; a contract's terms will bring the counting, and Gas Daily daily is the first daily-settled shape to build for. The calendar of #82 is the first step along that shape: every calendar day from the schedule's first expiry to its last, weekends and holidays in, each day with its prompt contract and whether the market is open, built once and priced later. Nothing from the declined table returns.
+Three pull requests, in this order, each with its page: the schedule's builder reads codes, the rules above and the sample's spelling; the nearby reader, first and n-th, with the roll lag only if a market states one; the two `util_` readers, any time after the first, which came first in the event, in #129, as the Readers section says. Business days entered in #79 with the futures fixings, checked through `np.is_busday` and `np.busday_offset` over the calendar's list, a fixing refused on a closed day and a business day without one; a contract's terms will bring the counting, and Gas Daily daily is the first daily-settled shape to build for. The calendar of #82 is the first step along that shape: every calendar day from the schedule's first expiry to its last, weekends and holidays in, each day with its prompt contract and whether the market is open, built once and priced later. Nothing from the declined table returns.

@@ -1,6 +1,7 @@
 """util_ReadHandle through the seam: each kind spilled as its creator's table, a spill fed back to a
 creator, and the seam's words for a handle that does not resolve."""
 
+import functools
 import os
 from typing import cast
 
@@ -155,7 +156,7 @@ def test_a_gas_daily_schedule_spills_its_three_columns_under_two_heading_rows() 
 def an_index(schedule: object, holidays: object = MISSING) -> str:
     """The index handle of that schedule handle and holiday calendar handle, with one set of
     conventions and specifications, since nothing here reads either."""
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [
@@ -501,7 +502,7 @@ def test_a_calendar_spills_its_one_column_under_two_heading_rows() -> None:
 
 
 def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() -> None:
-    handle = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "volume", "BBL"])
+    handle = bridge.call("_CreateIndexConventions", ["USD", "BBL", "USD", "VOLUME", "BBL"])
     assert rows(read(handle)) == [
         [
             "quote_currency_unit",
@@ -511,7 +512,7 @@ def test_index_conventions_spill_one_row_of_five_texts_under_two_heading_rows() 
             "quantity_unit",
         ],
         ["str", "str", "str", "str", "str"],
-        ["USD", "BBL", "USD", "volume", "BBL"],
+        ["USD", "BBL", "USD", "VOLUME", "BBL"],
     ]
 
 
@@ -567,6 +568,279 @@ def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
     assert slots[2:, 1].tolist() == [1.0 - i * 1e-5 for i in range(count)]
 
 
+# --- the prompt code: one calendar handle in, one code out ---------------------
+
+
+@functools.cache
+def the_futures_index() -> str:
+    """A three-contract index, m26, n26 and q26 expiring 19 May, 22 June and 21 July 2026, with
+    the 25th of May a holiday, made once so that its calendars and fixings share it."""
+    schedule = bridge.call(
+        "_CreateFuturesSchedule",
+        [
+            Cells.from_rows([["m26"], ["n26"], ["q26"]]),
+            Cells.from_rows([[46161.0], [46195.0], [46224.0]]),
+            MISSING,
+        ],
+    )
+    holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
+    return an_index(schedule, holidays)
+
+
+def a_futures_calendar(serial: float) -> str:
+    """That index's calendar, valued on the serial at midday."""
+    valuation = bridge.call("_CreateValuationDate", [serial, 0.5])
+    return cast(str, bridge.call("_CreateCalendar", [valuation, the_futures_index()]))
+
+
+# The prompt code, through the seam, on each kind: the contract prompt on the valuation day on
+# a futures calendar, the expiring contract on its expiry day and the next from the day after,
+# the first contract before the calendar begins; the month of the day after the valuation day
+# on a Gas Daily calendar; the first month not yet published on an IFERC one, the month itself on
+# its publication day. Text in the cell, the schedule's own spelling.
+def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
+    for serial, code in ((46168.0, "n26"), (46195.0, "n26"), (46196.0, "q26"), (46150.0, "n26")):
+        assert bridge.call("util_ReadPrompt", [a_futures_calendar(serial)]) == code
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    gas = an_index(month, MISSING)
+    september = bridge.call(
+        "_CreateCalendar", [bridge.call("_CreateValuationDate", [46267.0, 0.5]), gas]
+    )
+    assert bridge.call("util_ReadPrompt", [september]) == "U26"
+    months = bridge.call(
+        "_CreateIfercSchedule",
+        [
+            Cells.from_rows([["V26"], ["X26"]]),
+            Cells.from_rows([[46295.0], [46325.0]]),
+            Cells.from_rows([[46296.0], [46328.0]]),
+        ],
+    )
+    henry = an_index(months, MISSING)
+    for serial, code in ((46296.0, "V26"), (46297.0, "X26"), (46328.0, "X26")):
+        iferc = bridge.call(
+            "_CreateCalendar", [bridge.call("_CreateValuationDate", [serial, 0.5]), henry]
+        )
+        assert bridge.call("util_ReadPrompt", [iferc]) == code
+
+
+# A calendar whose every period has fixed: the library's words, through the seam, for each kind.
+def test_a_calendar_with_no_unfixed_period_has_no_prompt_code_through_the_seam() -> None:
+    message = (
+        "#ERROR util_ReadPrompt: ValueError: calendar has no unfixed period, "
+        "expected at least one to quote"
+    )
+    assert bridge.call("util_ReadPrompt", [a_futures_calendar(46225.0)]) == message
+    month = bridge.call(
+        "_CreateGasDailySchedule",
+        [Cells.from_rows([["U26"]]), Cells.from_rows([[46266.0]]), Cells.from_rows([[46295.0]])],
+    )
+    ended = bridge.call(
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46295.0, 0.5]), an_index(month, MISSING)],
+    )
+    assert bridge.call("util_ReadPrompt", [ended]) == message
+    published = bridge.call(
+        "_CreateIfercSchedule",
+        [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
+    )
+    after = bridge.call(
+        "_CreateCalendar",
+        [bridge.call("_CreateValuationDate", [46297.0, 0.5]), an_index(published, MISSING)],
+    )
+    assert bridge.call("util_ReadPrompt", [after]) == message
+
+
+# The one argument is a calendar's handle, and the seam says so for anything else: left out,
+# blank, a number, text naming no live object, and a handle of another kind, the index's and the
+# market history's included.
+def test_the_prompt_code_takes_a_calendar_handle_and_nothing_else() -> None:
+    made = a_futures_calendar(46168.0)
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (46168.0, "is number 46168.0"),
+        ("calendar:9999999", "is text 'calendar:9999999' naming no live object"),
+    ):
+        assert bridge.call("util_ReadPrompt", [wrong]) == (
+            f"#ERROR util_ReadPrompt: calendar {what}, expected calendar handle"
+        )
+    index = the_futures_index()
+    fixings = bridge.call(
+        "_CreateFuturesFixings",
+        [
+            Cells.from_rows([[46164.0], [46163.0], [46162.0]]),
+            Cells.from_rows([[71.25], [71.1], [70.85]]),
+            index,
+        ],
+    )
+    history = bridge.call("_CreateMarketHistory", [made, fixings])
+    for other, kind in (
+        (history, "market history"),
+        (index, "index"),
+        (fixings, "futures fixings"),
+    ):
+        assert bridge.call("util_ReadPrompt", [other]) == (
+            f"#ERROR util_ReadPrompt: calendar is {kind} handle {other!r}, expected calendar handle"
+        )
+
+
+# Reading the prompt publishes nothing: the store holds what it held, and the cell gets text.
+def test_reading_the_prompt_publishes_no_object() -> None:
+    made = a_futures_calendar(46168.0)
+    before = bridge.live_handles()
+    assert bridge.call("util_ReadPrompt", [made]) == "n26"
+    assert bridge.call("util_ReadPrompt", [made]) == "n26"
+    assert bridge.live_handles() == before
+
+
+# --- two text helpers: the next contract, and the month as CME spells it --------------
+
+
+# Text in and text out through the seam: the next contract in the monthly sequence, spelled as
+# the code given, and the month as CME's feeds spell it, year then month, text and no number.
+def test_the_next_contract_and_the_cme_month_read_a_code_as_the_desk_types_it() -> None:
+    assert bridge.call("util_NextFut", ["F26"]) == "G26"
+    assert bridge.call("util_NextFut", ["Z26"]) == "F27"
+    assert bridge.call("util_NextFut", ["m26"]) == "n26"
+    assert bridge.call("util_FutToCme", ["F26"]) == "202601"
+    assert bridge.call("util_FutToCme", ["Z26"]) == "202612"
+    assert bridge.call("util_FutToCme", ["u26"]) == "202609"
+    assert isinstance(bridge.call("util_FutToCme", ["F26"]), str)
+
+
+# A strip, a season, a four-digit year and December 2099: the library's words through the seam.
+def test_a_code_that_is_no_single_contract_is_refused_through_the_seam() -> None:
+    for name in ("util_NextFut", "util_FutToCme"):
+        for contract in ("Cal27", "W29", "F2026", "F-26"):
+            assert bridge.call(name, [contract]) == (
+                f"#ERROR {name}: ValueError: contract is {contract!r}, "
+                "expected a month letter and a two-digit year, such as F26"
+            )
+    assert bridge.call("util_NextFut", ["Z99"]) == (
+        "#ERROR util_NextFut: ValueError: contract is 'Z99', expected a month before "
+        "December 2099, the last a two-digit year can name"
+    )
+    assert bridge.call("util_FutToCme", ["Z99"]) == "209912"
+
+
+# The one argument is text, and the seam says so for anything else: left out, blank, empty text,
+# a number, a boolean and a range.
+def test_the_text_helpers_take_one_text_and_nothing_else() -> None:
+    for name in ("util_NextFut", "util_FutToCme"):
+        for wrong, what in (
+            (MISSING, "is missing"),
+            (None, "is blank"),
+            ("", "is empty text"),
+            (26.0, "is number 26.0"),
+            (True, "is boolean TRUE"),
+            (Cells.from_rows([["F26"], ["G26"]]), "is 2x1 array"),
+        ):
+            assert bridge.call(name, [wrong]) == f"#ERROR {name}: contract {what}, expected text"
+
+
+# --- two more: the month a day falls in, and the first day of a code's month -------------
+
+
+# A day in and a code out, a code in and a day out, through the seam: the day's own month in
+# capitals, and the first of the code's month as a serial, the sheet's date.
+def test_the_code_of_a_day_and_the_first_day_of_a_code_through_the_seam() -> None:
+    assert bridge.call("util_DateToFut", [46161.0]) == "K26"  # 19 May 2026, a WTI June expiry
+    assert bridge.call("util_DateToFut", [46023.0]) == "F26"
+    assert bridge.call("util_DateToFut", [46387.0]) == "Z26"
+    assert bridge.call("util_FutToDate", ["F26"]) == 46023.0  # 1 January 2026
+    assert bridge.call("util_FutToDate", ["n26"]) == 46204.0  # 1 July 2026
+    assert bridge.call("util_FutToDate", ["Z99"]) == 73020.0
+    assert isinstance(bridge.call("util_FutToDate", ["F26"]), float)
+
+
+# A day outside the years two digits name, and a code that is no single contract: the library's
+# words through the seam.
+def test_a_day_outside_the_century_and_a_strip_are_refused_through_the_seam() -> None:
+    for serial, named in ((36525.0, "1999-12-31"), (73051.0, "2100-01-01")):
+        assert bridge.call("util_DateToFut", [serial]) == (
+            f"#ERROR util_DateToFut: ValueError: date is {named}, expected a day from 2000 to "
+            "2099, the years a two-digit code can name"
+        )
+    for contract in ("Cal27", "F2026"):
+        assert bridge.call("util_FutToDate", [contract]) == (
+            f"#ERROR util_FutToDate: ValueError: contract is {contract!r}, "
+            "expected a month letter and a two-digit year, such as F26"
+        )
+
+
+# The day is one date and the code one text, and the seam says so for anything else.
+def test_the_date_helpers_take_one_date_or_one_text_and_nothing_else() -> None:
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (1.5, "is number 1.5"),
+        ("x", "is text 'x'"),
+        (True, "is boolean TRUE"),
+        (Cells.from_rows([[46023.0], [46024.0]]), "is 2x1 array"),
+    ):
+        assert bridge.call("util_DateToFut", [wrong]) == (
+            f"#ERROR util_DateToFut: date {what}, expected date"
+        )
+    for wrong, what in ((MISSING, "is missing"), (None, "is blank"), ("", "is empty text")):
+        assert bridge.call("util_FutToDate", [wrong]) == (
+            f"#ERROR util_FutToDate: contract {what}, expected text"
+        )
+
+
+# --- the first and the last day of a contract or strip --------------------------------
+
+
+def serial(text: str) -> float:
+    return float((np.datetime64(text, "D") - np.datetime64("1899-12-30", "D")).astype(np.int64))
+
+
+# A label in and a date out, each the sheet's serial: a month, a quarter, a year, a winter across
+# the year end, a summer and a range, in any case.
+def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
+    for period, first, last in (
+        ("f26", "2026-01-01", "2026-01-31"),
+        ("1Q27", "2027-01-01", "2027-03-31"),
+        ("cal28", "2028-01-01", "2028-12-31"),
+        ("W29", "2029-11-01", "2030-03-31"),
+        ("s28", "2028-04-01", "2028-10-31"),
+        ("F26-Z28", "2026-01-01", "2028-12-31"),
+        ("w28-w29", "2028-11-01", "2030-03-31"),
+        ("W99", "2099-11-01", "2100-03-31"),
+    ):
+        assert bridge.call("util_StartDate", [period]) == serial(first)
+        assert bridge.call("util_EndDate", [period]) == serial(last)
+    assert isinstance(bridge.call("util_EndDate", ["G28"]), float)
+
+
+# A label that is no form, and a range the wrong way round: the library's words through the seam,
+# the same from either reader, which both read the whole expression.
+def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_seam() -> None:
+    forms = (
+        "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    )
+    for name in ("util_StartDate", "util_EndDate"):
+        for period in ("W8-W9", "Q1 27", "F26-", "F2026"):
+            assert bridge.call(name, [period]) == (
+                f"#ERROR {name}: ValueError: period is {period!r}, expected {forms}"
+            )
+        for period in ("Z28-F26", "CAL28-F28"):
+            assert bridge.call(name, [period]) == (
+                f"#ERROR {name}: ValueError: period is {period!r}, "
+                "expected range endpoints in chronological order"
+            )
+        for wrong, what in (
+            (MISSING, "is missing"),
+            (None, "is blank"),
+            ("", "is empty text"),
+            (46023.0, "is number 46023.0"),
+            (Cells.from_rows([["F26"], ["G26"]]), "is 2x1 array"),
+        ):
+            assert bridge.call(name, [wrong]) == f"#ERROR {name}: period {what}, expected text"
+
+
 # --- what does not resolve fails in the seam's words, and spills nothing -------
 
 
@@ -620,7 +894,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         [Cells.from_rows([["m26"], ["n26"]]), Cells.from_rows([[46161.0], [46162.0]]), MISSING],
     )
     holidays = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46167.0]])])
-    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "energy", "MMBTU"])
+    conventions = bridge.call("_CreateIndexConventions", ["USD", "MMBTU", "USD", "ENERGY", "MMBTU"])
     specifications = bridge.call(
         "_CreateContractSpecifications",
         [
