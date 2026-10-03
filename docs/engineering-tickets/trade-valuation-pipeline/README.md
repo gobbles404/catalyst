@@ -92,7 +92,7 @@ complete path, rather than introduce more pipeline stages.
 | [Excel trade-input binding](excel-trade-input-binding.md) | What seam extension, reference lifetimes and fully fixed behavior does the agreed surface need? |
 | [Prepared matrix walkthrough](prepared-matrix.md) | How do many trade contributions become one batch exposure vector before evaluation? |
 | [Aggregation performance](aggregation-performance.md) | What does a synthetic 100/1,000/10,000/100,000-trade timing show, and what does it exclude? |
-| [Batch boundaries and discounting](batch-boundaries-and-discounting.md) | How do a shared template, index scope, payment groups and current rate inputs fit before final compression? |
+| [Batch boundaries and discounting](batch-boundaries-and-discounting.md) | How do the one template, the one index, payment groups and current rate inputs fit before final compression? |
 | [Fixing and payment state](fixing-and-payment-state.md) | What does an ICE Henry Hub calendar strip establish, and how does a known price differ from paid cash? |
 | [Proposed result fields by route](result-fields-by-route.md) | How do encoded payment dates move bilateral amounts into modeled cash, and which values/risks does each route return? |
 
@@ -243,9 +243,11 @@ a separate future use case. trade_id remains optional attribution in the trade f
 independent of the retained identity of every occurrence. Every call represents one or
 many trade rows. Resolution and encoding
 are private children of CreateTrades, whose handle retains both outputs. `_ReportValues` and
-`_ReportRisk` take the evaluated results handle and spill what evaluation stored; their
-layouts are pinned in the pull request that builds them, and [readers](06-readers.md) says
-what each shows.
+`_ReportRisk` take the evaluated results handle and spill its stored scalar aggregates, mark
+and cash under the route's labels, the total delta and DV01 where supported; the delta by
+contract stays in the result, retained for later use and spilled by neither. Their layouts
+are pinned in the pull request that builds them, and [readers](06-readers.md) says what each
+shows.
 
 `_PrepareTrades` applies complete supplied history to the static encoding, retaining
 the batch's `floating_leg_set` and summed live exposure vector. Its fixed-leg total can be

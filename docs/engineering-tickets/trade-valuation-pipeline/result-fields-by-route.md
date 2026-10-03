@@ -99,7 +99,8 @@ with the requisite retained dated results; a reader cannot reconstruct them from
 
 Delta uses the same field and coordinate convention on both routes, stored by contract on the
 batch's stable axis, zero where a contract has fixed, with a scalar total for a common
-one-price-unit move across the contracts. Its value basis is
+one-price-unit move across the contracts; `_ReportRisk` spills the total, and the vector is
+retained in the result for later use. Its value basis is
 `bilateral_mark` or `cleared_mark`; bilateral delta therefore includes the applicable
 payment discounting. A set-but-unpaid amount can have zero commodity delta and nonzero DV01.
 Components in the settled bucket contribute neither to these remaining-trade risks.

@@ -19,7 +19,7 @@ The two reports are committed from the start:
 
 ```python
 _ReportValues(results) -> MixedArray  # mark and cash under the route's labels
-_ReportRisk(results) -> MixedArray    # delta, total and by contract; DV01 where supported
+_ReportRisk(results) -> MixedArray    # total delta; DV01 where supported
 ```
 
 Both take the results handle and spill what evaluation stored; neither selects a measure,
@@ -27,9 +27,11 @@ since one result has one route. `util_ReadHandle` on the same handle is a debugg
 of the stored contents and replaces neither. These reports close the initial end-to-end
 trade-evaluation path. A decomposition view for retained fixed/set/live amounts is a possible
 later view, not a third required report. The values layout shows the two monetary fields
-together under their route labels; the risk layout shows the total delta and the delta by
-contract on the batch's stable axis, zero where a contract has fixed, each with its units,
-and DV01 where supported, named unsupported where not. The exact spill shapes are pinned in
+together under their route labels; the risk layout shows the scalar aggregates, the total
+delta, the batch's change for a common one-price-unit move across its contracts, with its
+units, and DV01 where supported, named unsupported where not. The delta by contract on the
+batch's stable axis is retained in the result with its axis, labels and units, for later use
+without recalculation; this report does not spill it. The exact spill shapes are pinned in
 the pull request that builds them.
 
 The selected pipeline returns a results handle from `_EvaluateTrades`; the two reports spill

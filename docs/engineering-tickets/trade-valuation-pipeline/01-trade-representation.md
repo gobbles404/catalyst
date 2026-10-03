@@ -104,10 +104,10 @@ If the template already supplies the intended clearing selection, the ticket mus
 |---|---:|---|---:|
 | u26 | -6 | ION | 105 |
 
-This remains an excerpt. The template or ticket must also establish the actual index/product,
-specification selection, units, executed date and remaining required contractual facts.
-Here the template can supply the product context, LOT and compatible clearing/settlement
-facts; the ticket supplies month, signed lots, broker and agreed price.
+This remains an excerpt. The index is the argument of the call; the template or ticket must
+also establish the specification selection, units, executed date and remaining required
+contractual facts. Here the template can supply the specification name, LOT and compatible
+clearing/settlement facts; the ticket supplies month, signed lots, broker and agreed price.
 
 If the template supplies clearing_house, the ticket must omit that column. Repeating the
 same clearing choice fails just as a different choice does. To vary a field between rows,

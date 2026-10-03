@@ -26,8 +26,9 @@ the index is the first argument of that call, so one template serves any compati
 
 One field uses the same path as many. Omit a field entirely when the template should not
 supply it; a listed field with a blank value is an input error, not an instruction to inherit
-something. Start with at least one supplied default; an instrument without defaults can be
-selected directly when the trade-construction surface is specified.
+something. A template carries at least one field. The template is required on `_CreateTrades`,
+so there is no direct instrument selection and no path without one: a batch that shares
+nothing still names one shared fact in its template.
 
 The user's example, shown conceptually:
 
@@ -143,9 +144,9 @@ economic occurrences; rejecting duplicate field sources does not deduplicate tra
 
 The CreateTrades call supplies one template, required, for its array of ticket rows.
 Template-supplied fields are shared; ticket-only fields can vary. Resolution still checks
-compatibility of the completed collection. A uniform route and one actual index are the recommended first
-commodity batch scope, with the index restriction still under discussion. This does not add
-per-field permission flags or make template identity a valuation-group key. See the
+compatibility of the completed collection. One index per batch is a fact of the call, since the
+index is its argument; a uniform route is the recommended first commodity batch scope. This
+does not add per-field permission flags or make template identity a valuation-group key. See the
 [batch-boundary sketch](../../engineering-tickets/trade-valuation-pipeline/batch-boundaries-and-discounting.md).
 
 Editing a template input produces a new immutable template through normal worksheet

@@ -110,8 +110,8 @@ EvaluationResult
         mark                     # aggregate currency amount
         cash                     # aggregate modeled settled amount
     risk
-        delta: float64[M]         # by contract, the batch's static axis, zero where fixed
-        delta_total: float64      # a common one-price-unit move across the contracts
+        delta: float64[M]         # by contract, the batch's static axis, zero where fixed; retained, not reported
+        delta_total: float64      # a common one-price-unit move across the contracts; what _ReportRisk spills
         dv01: float64[R]          # where supported
     source_batch                 # shared immutable occurrence and payment facts
 ```

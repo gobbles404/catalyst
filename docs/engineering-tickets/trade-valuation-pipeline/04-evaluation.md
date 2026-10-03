@@ -161,7 +161,9 @@ Commodity delta identifies both its value measure and its market axis: amount or
 one unit of an identified mark. Evaluation retains delta by contract on the batch's stable
 axis, the contracts in static order with zero on a contract that has fixed, with the axis's
 labels and units, and the scalar total, the batch's change for a common one-price-unit move
-across its contracts; `_ReportRisk` exposes what is stored and recalculates nothing. Lots and underlying quantity are different presentations
+across its contracts; `_ReportRisk` spills the scalar aggregates, the total and DV01 where
+supported, and recalculates nothing, while the vector stays in the result for later use. Lots
+and underlying quantity are different presentations
 requiring the stored conversion. Sensitivity to bound marks is not automatically sensitivity
 to raw vendor inputs or calibration instruments if another curve transformation lies between.
 

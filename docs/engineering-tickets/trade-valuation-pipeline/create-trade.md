@@ -18,9 +18,9 @@ index is the first argument. The agreed fields argument is the column-header row
 no separate labels argument. Aliasing is a future use case, separate from the optional
 trade_id field and retained occurrence identity.
 
-The user envisages one supplied template for the call's array of trade rows. The recommended
-first commodity scope is one actual index, route and amount currency per batch; index scope
-is still a proposal rather than a permanent restriction. Template fields and ticket columns
+One template, required, serves the call's array of trade rows. One index per batch is a fact of
+the call, since the index is its argument; one route and one amount currency per batch are the
+recommended first commodity scope. Template fields and ticket columns
 must be disjoint; any overlap fails, even for equal values. Ticket-only fields can still
 vary, so resolution validates the completed batch's compatibility. See
 [batch boundaries and discounting](batch-boundaries-and-discounting.md).
