@@ -187,4 +187,3 @@ amount differences also require a numerical-drift policy. Neither is a prerequis
 
 The [synthetic aggregation benchmark](aggregation-performance.md) measures only the amount
 kernel. It does not measure this full result contract or the Excel dependency path.
-

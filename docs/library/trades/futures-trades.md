@@ -42,8 +42,8 @@ The headers occupy B11:F11, the rows B12:F15. Both formulas call the same functi
 =_CreateFuturesTrades(C6,C7,B11:F11,B12:F15)
 ```
 
-Each shows `futures_trades:Henry Hub NYMEX:<count>`, a session handle whose trailing count is
-the publication number, **not the number of trades**. C19 holds the single-row handle; C27
+Each shows `<pid>:futures_trades:Henry Hub NYMEX:<count>`, a session handle led by the Python
+process ID. Its trailing count is the publication number, **not the number of trades**. C19 holds the single-row handle; C27
 holds the four-row handle. `=util_ReadHandle(C19)` and `=util_ReadHandle(C27)` show their
 contents at B21 and B29. The reader adds `contract_position`, the zero-based position in the
 shared schedule: Z26 is 0, F27 is 1. It is not a position in a market price vector.

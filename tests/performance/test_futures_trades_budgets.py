@@ -22,7 +22,7 @@ HEADERS = Cells.from_rows(
     [["trade_id", "trade_date", "contract_code", "signed_lots", "trade_price"]]
 )
 SPECIFICATION_HEADERS = Cells.from_rows(
-    [["name", "lot_size", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+    [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
 )
 
 
@@ -34,11 +34,17 @@ def ng_index() -> Index:
             np.array(["2026-11-25", "2026-12-29"], dtype="datetime64[D]"),
             None,
         ),
-        index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS),
+        index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
         contract_specifications(
-            ("NYMEX NG",), np.array([10_000.0]), np.array([0.0]), np.array([0.0])
+            ("NYMEX NG",),
+            np.array([10_000.0]),
+            ("MMBTU",),
+            np.array([0.0]),
+            np.array([0.0]),
+            UNITS,
         ),
         holiday_calendar(np.array(["2026-12-25"], dtype="datetime64[D]")),
+        UNITS,
     )
 
 
@@ -50,9 +56,10 @@ def ng_handle() -> object:
             Cells.from_rows([[46351.0], [46385.0]]),
             MISSING,
         ),
-        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "energy", "MMBTU"),
+        ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         ENTRY["_CreateContractSpecifications"](
-            SPECIFICATION_HEADERS, Cells.from_rows([["NYMEX NG", 10_000.0, 0.0, 0.0]])
+            SPECIFICATION_HEADERS,
+            Cells.from_rows([["NYMEX NG", 10_000.0, "MMBTU", 0.0, 0.0]]),
         ),
         ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46381.0]])),
     )

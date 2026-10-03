@@ -186,4 +186,3 @@ and aligned risk vector equal the sums of separately evaluated singleton results
 stated numerical tolerances. Duplicate occurrences count repeatedly. This comparison is an
 acceptance check, not a requirement to evaluate every singleton on the batch tick path.
 Exact public casing and reader table layouts remain decisions.
-

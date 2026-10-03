@@ -1,8 +1,8 @@
 # Ethane financial validation and golden regression harness
 
-**Status:** Proposed implementation plan; no harness implemented by this document.  
-**Scale:** A small parent ticket delivered through focused PRs.  
-**Starting evidence:** `ethane-trades.xlsx` and `ethane-trades-v2.xlsx`, inspected read-only on 29 September 2026.  
+**Status:** Proposed implementation plan; no harness implemented by this document.\
+**Scale:** A small parent ticket delivered through focused PRs.\
+**Starting evidence:** `ethane-trades.xlsx` and `ethane-trades-v2.xlsx`, inspected read-only on 29 September 2026.\
 **Related work:** [Linear trade pipeline](linear-trade-pipeline.md).
 
 ## Outcome and scope

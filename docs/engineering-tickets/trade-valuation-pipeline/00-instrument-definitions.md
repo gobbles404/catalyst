@@ -178,4 +178,3 @@ Begin with a reviewable future schema and the static definitions used by the NG 
 Catalog inspection can be built before the complete valuation path. Add other definitions
 as their fields are agreed; constructor and evaluation support remain separate milestones.
 The wider vocabulary guides boundaries without requiring all types to ship in the first PR.
-

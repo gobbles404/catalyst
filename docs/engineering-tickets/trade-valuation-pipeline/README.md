@@ -1,7 +1,7 @@
 # Trade valuation pipeline: design and engineering handoff
 
-**Status:** Working design for review, 3 October 2026. No production implementation in this packet.  
-**Purpose:** Make the responsibilities and connections understandable before choosing their implementation.  
+**Status:** Working design for review, 3 October 2026. No production implementation in this packet.\
+**Purpose:** Make the responsibilities and connections understandable before choosing their implementation.\
 **Reading order:** This overview, instrument definitions, CreateTrades and its retained state, then the worked example and individual responsibility documents.
 
 ## Intended outcome
@@ -344,4 +344,3 @@ This packet is the current entry point for the shared pipeline design. The earli
 remain useful background. The latter records the earlier private-store candidate, superseded
 for the first implementation by the explicit PrepareTrades handle. The [contract survey](../../futures-trade-field-review.md) is a field
 checklist, not a requirement to implement every product before the first working example.
-

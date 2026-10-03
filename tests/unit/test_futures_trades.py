@@ -21,9 +21,17 @@ NG = index(
     futures_schedule(
         ("Z26", "F27"), np.array(["2026-11-25", "2026-12-29"], dtype="datetime64[D]"), None
     ),
-    index_conventions("USD", "MMBTU", "USD", "energy", "MMBTU", UNITS),
-    contract_specifications(("NYMEX NG",), np.array([10000.0]), np.array([0.0]), np.array([0.0])),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("NYMEX NG",),
+        np.array([10000.0]),
+        ("MMBTU",),
+        np.array([0.0]),
+        np.array([0.0]),
+        UNITS,
+    ),
     holiday_calendar(np.array(["2026-11-26", "2026-12-25"], dtype="datetime64[D]")),
+    UNITS,
 )
 IDS = ("NG-001", "NG-002", "NG-003", "NG-004")
 DATES = np.array(["2026-09-24", "2026-09-24", "2026-09-25", "2026-09-25"], dtype="datetime64[D]")
@@ -166,7 +174,12 @@ def test_the_shared_specification_is_required_and_resolved_by_name() -> None:
     with pytest.raises(ValueError, match="contract_specification is 'ICE NG'"):
         futures_trades(NG, "ICE NG", IDS, DATES, CODES, LOTS, PRICES)
     specs = contract_specifications(
-        ("other", "NYMEX NG"), np.array([2500.0, 10000.0]), np.zeros(2), np.zeros(2)
+        ("other", "NYMEX NG"),
+        np.array([2500.0, 10000.0]),
+        ("MMBTU", "MMBTU"),
+        np.zeros(2),
+        np.zeros(2),
+        UNITS,
     )
     other = dataclasses.replace(NG, specifications=specs)
     assert (

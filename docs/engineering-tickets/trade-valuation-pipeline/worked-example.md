@@ -151,4 +151,3 @@ Add a real independently resolved contract schedule in the product adapter's acc
 tests; agreement between paths sharing one wrong schedule is insufficient. Follow the
 [golden harness plan](../ethane-golden-validation-harness.md) when the actual production path
 is available. Do not turn this document's illustrative arrays into an unreviewed economic oracle.
-

@@ -88,4 +88,3 @@ can have zero market exposure and nonzero combined amount; retain both fixed leg
 PR119's `Terms` is a candidate numerical core here. It carries positional observation numbers,
 not these economic identities. Keep, adapt or replace it according to this boundary rather
 than making its present fields the trade schema.
-

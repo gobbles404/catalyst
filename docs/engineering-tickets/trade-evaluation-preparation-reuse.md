@@ -1,8 +1,8 @@
 # Retain trade valuation preparation across market price updates
 
-**Status:** Candidate design for engineering review; no implementation delivered by this document.  
-**Scale:** A parent ticket delivered through focused PRs.  
-**Date:** 30 September 2026.  
+**Status:** Candidate design for engineering review; no implementation delivered by this document.\
+**Scale:** A parent ticket delivered through focused PRs.\
+**Date:** 30 September 2026.\
 **Related:** [Linear trade pipeline](linear-trade-pipeline.md), [financial validation and golden harness](ethane-golden-validation-harness.md), and [PR119](https://github.com/gobbles404/goosedove/pull/119), reviewed at `60ae5d2`.
 
 **3 October update:** Start with the [pipeline stage contracts](trade-valuation-pipeline/README.md).

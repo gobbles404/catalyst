@@ -166,4 +166,3 @@ definition; it does not independently identify an index or imply a strip.
 Open before shipping: the minimal NG field schema, quantity convention, definition/version
 references, how the approved instrument is selected and the seam's typed partial-record input
 for defaults. A universal template language is not required to establish the trade contract.
-

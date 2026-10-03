@@ -1,8 +1,8 @@
 # Parent ticket: encode linear trades, bind market inputs, and evaluate through one array kernel
 
-**Status:** Proposed for engineering review.  
-**Scale:** A parent ticket spanning several focused PRs, with an initial NG release.  
-**First release:** Existing NG trades -> static encoding -> existing Market binding -> price-difference P&L -> inspectable Excel results.  
+**Status:** Proposed for engineering review.\
+**Scale:** A parent ticket spanning several focused PRs, with an initial NG release.\
+**First release:** Existing NG trades -> static encoding -> existing Market binding -> price-difference P&L -> inspectable Excel results.\
 **Design direction:** Work backwards from the kernel's required arrays, prove the representation with worked scenarios, then build the producers of those arrays.
 
 **3 October update:** The [pipeline stage contracts](trade-valuation-pipeline/README.md) are
@@ -114,7 +114,7 @@ compressed calculations need numerical agreement, not universal bit-for-bit agre
 
 ### 1. Trade representation: preserve the accepted deal
 
-**Inputs:** Shared definitions/template selections and individual executed terms.  
+**Inputs:** Shared definitions/template selections and individual executed terms.\
 **Output:** An immutable trade batch, preserving order and every occurrence.
 
 For the first release, reuse `FuturesTrades`: shared Index/specification plus trade IDs,
@@ -131,7 +131,7 @@ prices remain unchanged by market updates; selected contract facts remain author
 
 ### 2. Preparation / encoding: resolve contractual requirements
 
-**Input:** Static trades and their referenced definitions.  
+**Input:** Static trades and their referenced definitions.\
 **Output:** An encoded batch with required observations, `A,c`, units and component attribution.
 
 Resolve lot multipliers, quantity/price units, signs, explicit contract identities,
@@ -156,7 +156,7 @@ Its dense table can be inspected, and it reproduces the hand-worked exposures/co
 ### 3. Market binding: supply and align the requirements
 
 **Inputs:** Encoded requirements and the supplied market's identity, structure, as-of state,
-fixings and declared projection model.  
+fixings and declared projection model.\
 **Output:** A valid mapping to market inputs, known contributions, and derived coefficients.
 
 Resolve observation identities to actual market positions. Gather each shared required
@@ -182,7 +182,7 @@ change; later dated fixtures handle partial, complete and corrected fixings.
 
 ### 4. Calculation: one numerical path
 
-**Inputs:** Validated coefficients, aligned prices and offsets.  
+**Inputs:** Validated coefficients, aligned prices and offsets.\
 **Output:** One numeric amount per component, with measured work.
 
 Evaluate the affine expression through the same array path for one or many components.
@@ -199,7 +199,7 @@ zero do not cause nonzero constants to be discarded. No scalar numerical loop pe
 
 ### 5. Results and readers: make the computation inspectable
 
-**Inputs:** Component amounts and references to their encoded trades and market snapshot.  
+**Inputs:** Component amounts and references to their encoded trades and market snapshot.\
 **Output:** An immutable result with named measure, currency, attribution and readback.
 
 Use the existing handle store for in-session lifetime. Store enough source references to

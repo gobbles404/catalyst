@@ -163,4 +163,3 @@ no stale results or indefinitely retained obsolete preparations.
 Test fully fixed trades and the zero-live-mark numerical case. The current Market constructor's
 requirement for an unfixed period needs a separate integration decision; do not hide it with
 a dummy price. Selective per-fixing updates and sparse representations can follow measurements.
-

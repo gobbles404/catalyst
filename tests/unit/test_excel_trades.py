@@ -1,5 +1,7 @@
 """The complete Excel table -> retained trade columns -> spilled table path."""
 
+import os
+
 import pytest
 from test_futures_trades import NG
 from test_utilities import read, rows
@@ -9,6 +11,7 @@ from goosedove.excel.bridge import MISSING, Cells, Handle
 from goosedove.excel.probes import probe
 from goosedove.index_definitions.index import Index
 
+PID = os.getpid()  # leads every handle this Python publishes
 HEADINGS = ["trade_id", "trade_date", "contract_code", "signed_lots", "trade_price"]
 HEADER = Cells.from_rows([HEADINGS])
 # 24 and 25 September 2026, represented exactly as Excel supplies date cells.
@@ -32,7 +35,7 @@ def create(body: Cells, header: Cells = HEADER, specification: str = "NYMEX NG")
 
 def test_one_row_and_four_rows_follow_the_same_creator_and_reader() -> None:
     many = create(Cells.from_rows(BODY))
-    assert isinstance(many, str) and many.startswith("futures_trades:Henry Hub NYMEX:")
+    assert isinstance(many, str) and many.startswith(f"{PID}:futures_trades:Henry Hub NYMEX:")
     table = rows(read(many))
     assert table == [
         [*HEADINGS, "contract_position"],

@@ -120,4 +120,3 @@ Selective numerical repricing does not necessarily reduce the size of a full Exc
 An intermediate values reader and supported amount-risk reader can validate the prototype.
 They do not complete the target result profile. Postpone arbitrary joins, pivot APIs,
 cross-result comparisons and a general reporting language.
-
