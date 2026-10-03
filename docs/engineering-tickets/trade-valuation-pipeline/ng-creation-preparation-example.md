@@ -3,7 +3,8 @@
 [Pipeline overview](README.md) · [Creation](create-trade.md) ·
 [Preparation](03-market-binding.md) · [Existing average example](worked-example.md)
 
-Design fixture, 3 October 2026. This specifies expected economics and intermediate data
+Design fixture, 3 October 2026, complete as a booking under the `future` definition since the
+review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
 the proposed `_CreateTrades` and `_PrepareTrades` are not yet implemented.
@@ -18,23 +19,23 @@ invented payment terms to the physically deliverable NG contract.
 
 The initial NG calculation is undiscounted entry-to-current economic P&L for open futures.
 It does not model margin transfers, delivery obligations, a payment date, or post-expiry cash.
-This restricted economic fixture is not a complete proposed production ticket: the final
-instrument schema's payment terms still require supported, product-appropriate facts.
+The booking is complete under the `future` definition: its payment terms are none, since the
+contract is physically settled, and the toy product below carries the payment lifecycle.
 
 ## Static facts and where they come from
 
 | Fact | Source | Fixture value |
 |---|---|---|
 | Instrument | Library definition; selected first when creating a template | `future` |
-| Index | Static `Index` reference | Fixture label `Henry Hub NYMEX`; futures schedule kind |
+| Index | The first argument of `_CreateTrades`, once for the batch | Fixture label `Henry Hub NYMEX`; futures schedule kind |
 | Quote conventions | `index.conventions` | Quote currency `USD`, quote quantity `MMBTU`, amount currency `USD`, quantity type `ENERGY`, quantity unit `MMBTU` |
 | Selected specification | Name within `index.specifications` | `NYMEX NG` |
 | Lot size | Selected specification row | 10,000 MMBTU per lot |
 | Contract identity | `index.schedule` | `Z26`, `F27` |
 | Specification fee inputs | Selected specification row | Brokerage and clearing rates both `0` per lot; no fees valued in this example |
-| Static schedule | `index.schedule` | `Z26` expires `2026-11-25`; `F27` expires `2026-12-29`; no option expiry array |
+| Static schedule | `index.schedule` | `X26` expires `2026-10-28`, the preceding contract the calendar needs as its left boundary; `Z26` expires `2026-11-25`; `F27` expires `2026-12-29`; no option expiry array |
 | Pricing calendar | `index.holiday_calendar` | Fixture holidays `2026-11-26`, `2026-12-25` |
-| Contract positions in this static fixture | Static schedule lookup | `0`, `1` |
+| Schedule rows of the traded contracts | Resolved once at creation from the codes, in either case | `1`, `2`; `X26` is row 0 |
 | Agreed price | Executed trade row | Values below |
 
 The schedule dates and pricing holidays above are illustrative fixture inputs, not
@@ -43,16 +44,40 @@ does not duplicate quote conventions or lot sizes. Creation selects the named sp
 from the explicit index, validates compatibility, and retains the static references used.
 Changing the row order of specifications must not change which named specification is used.
 
-These examples use logical inputs instead of freezing the unresolved worksheet placement of
-the index or instrument selection on the no-template path. The template parameter remains
-optional and last on `CreateTrades`; it is not silently made mandatory here.
+The index is the first argument of `_CreateTrades(index, fields, trade_rows, template)`, and
+the template, required and last, carries the instrument.
 
 ## Template facts and trade rows are disjoint
 
-For the static NG portion, the shared supplied facts are `contract_specification = NYMEX NG`,
-`quantity_unit = LOT`, and `quantity_per = month`. The index is an explicit static reference.
-The template is bound to `future` when created. Other completed production terms must come
-from the supported definition and supplied fields; this illustrative subset does not waive them.
+The template is created for `future` and supplies the shared facts in one row:
+
+| contract_specification | quantity_unit | quantity_per | schedule_method | route | settlement_method | clearing_house |
+|---|---|---|---|---|---|---|
+| NYMEX NG | LOT | month | lastday | cleared | physical | CME Clearing |
+
+With the ticket's five columns below, every field the `future` definition requires is supplied
+once: `payment_time_lag` and `payment_holiday_calendar` are required only when
+`settlement_method` is `financial`, and this physical contract supplies neither; `trade_id` and
+`broker` are optional, and the ticket carries the first. `CME Clearing` is a label retained as
+typed, and nothing is inferred from it. `lastday` is the one schedule method supported first;
+for a future valued on its own contract's mark it names the settlement on the contract's last
+trading day as the final price, and the other methods fail by name until built. The index is
+not a template field: it is the argument of the call, so this template serves another NG index
+whose specifications name `NYMEX NG` and fails, by name, against one whose do not.
+
+On a sheet, with the template's headers in A1:G1 and its row in A2:G2, the ticket's headers
+in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
+
+```excel
+=_CreateTradeTemplate("future", A1:G1, A2:G2)
+=_CreateTrades(NGIndex, A4:E4, A5:E9, Template)
+=_PrepareTrades(Trades, History)
+=_EvaluateTrades(Prepared, Market)
+=_ReportValues(Results)
+=_ReportRisk(Results)
+```
+
+None of these is implemented yet; the calls are the agreed signatures.
 
 The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and `fixed_price`:
 
@@ -100,7 +125,9 @@ market_inputs = [
 ```
 
 Arrays are owned or safely shared, immutable, and one dimensional where shown. Those local
-input positions address the retained input list, not a future shortened price vector.
+input positions address the retained input list, not a future shortened price vector; each
+input also retains its row of the index's schedule, `[1, 2]` in this fixture, resolved once
+from `Z26` and `F27` in whichever case they were typed, every code of the schedule read.
 Changing as-of, history, or prices does not rebuild these static arrays.
 
 The explanatory dense matrix has five occurrences and two contract inputs:
@@ -131,6 +158,10 @@ entry_price_offset_usd       = -330000
 ```
 
 Futures history before expiry does not fix a fraction of a bullet contract's exposure.
+After expiry, a physical contract has no modeled path here: preparing a batch that holds an
+NG component whose expiry day the calendar marks as fixed fails, naming the occurrence, the
+contract, its expiry and the valuation date. The real NG portion therefore ends before
+26 November 2026, and the toy product below carries the lifecycle.
 Each live input here is the current price of that actual contract. It is not a forecast
 of remaining daily assessments or a final monthly average reconstructed from prints.
 
@@ -155,21 +186,21 @@ Two numerical tests are important: the five-row batch equals the sum of five sin
 calls, and deleting occurrence 4 decreases value by USD 10,000 and Z26 delta by 100,000.
 The first four rows above alone therefore produce USD -3,000 at these marks.
 
-### Existing market integration needs a wider static schedule
+### The schedule the calendar needs
 
-The current futures calendar uses its first scheduled contract only as its left boundary:
-it starts on the day after that contract expires. Consequently, the two-contract static
-fixture cannot also serve as a history fixture exposing Z26. Prepend an independently
-reviewed preceding-contract row before using it in the actual calendar/market path.
-Retain a later contract if testing fully fixed traded contracts within a still-live history.
-This changes the static schedule positions, so assertions must resolve identities rather
-than assuming every NG index uses positions `[0, 1]`.
+The futures calendar uses its first scheduled contract only as its left boundary: it starts on
+the day after that contract expires. So the fixture's schedule carries the preceding contract,
+`X26` expiring 2026-10-28, and Z26 and F27 sit at rows 1 and 2; assertions resolve identities
+rather than assuming positions. The toy market below carries a later contract as well, `G27`
+expiring 2027-01-27, so that every state of its lifecycle has a valid market. Both are fixture
+facts: the Market is unchanged, no code inserts a contract or a quote, and a market whose
+whole calendar has ended is deferred.
 
 Current `PriceVector` provides positional values and an index name. The product adapter
 must establish the ordered live contract axis and its compatibility with preparation.
 Two equal-length vectors with different contract order are not interchangeable. Do not
 claim the current object can detect incorrectly labeled raw spreadsheet prices without
-additional source identity. No dummy live contract or dummy quote may hide a terminal state.
+additional source identity.
 
 ## Explicit toy lifecycle: fixings are different from payments
 
@@ -180,7 +211,9 @@ Its single final price per monthly component is independently supplied, not infe
 daily average. Clearing identity `TEST_CLEARER` and `settlement_method = financial` are fixture
 facts; no exchange metadata is implied.
 
-Its library-owned product definition anchors payments to the following test last-trading dates.
+Its schedule is the NG fixture's with `G27` after it, expiring 2027-01-27, quoted and traded by
+none of the five rows. Its library-owned product definition anchors payments to the following
+test last-trading dates.
 The template supplies `payment_time_lag = "+2bd"` and a test payment calendar with Monday-Friday
 business days excluding 26 November, 25 December 2026, and 1 January 2027. These inputs are disjoint
 from the row headers. Payment dates are computed once, strictly after the anchor:
@@ -224,14 +257,18 @@ final price is present, under the pipeline's proposed inclusive cutoff.
 | Z26 now fixed, unpaid | 2026-11-26 | Z26 = 3.22 | `[F27] / [-50000]`, price `[3.50]` | `[515200, 0]` | 10,200 | 0 | 10,200 |
 | Correct Z26 fixing, same as-of | 2026-11-26 | Z26 = 3.23 | `[F27] / [-50000]`, price `[3.50]` | `[516800, 0]` | 11,800 | 0 | 11,800 |
 | Z26 payment date | 2026-11-30 | Z26 = 3.23 | `[F27] / [-50000]`, price `[3.50]` | `[516800, 0]` | -11,000 | 22,800 | 11,800 |
-| Both fixed; F27 unpaid | 2026-12-30 | Z26 = 3.23; F27 = 3.45 | `[] / []` | `[516800, -172500]` | -8,500 | 22,800 | 14,300 |
-| Both payment dates reached | 2026-12-31 | Z26 = 3.23; F27 = 3.45 | `[] / []` | `[516800, -172500]` | 0 | 14,300 | 14,300 |
+| Both fixed; F27 unpaid | 2026-12-30 | Z26 = 3.23; F27 = 3.45 | `[G27] / [0]`, price `[3.60]`, read by no trade | `[516800, -172500]` | -8,500 | 22,800 | 14,300 |
+| Both payment dates reached | 2026-12-31 | Z26 = 3.23; F27 = 3.45 | `[G27] / [0]`, price `[3.60]`, read by no trade | `[516800, -172500]` | 0 | 14,300 | 14,300 |
 
-Check the later group amounts directly: Z26 is `160000 * 3.23 - 494000 = 22800`;
+The last two states have a market because the fixture's schedule has G27: the market quotes it
+at 3.60, the batch's live exposure to it is zero, and evaluation reads zero live prices for the
+batch. Check the later group amounts directly: Z26 is `160000 * 3.23 - 494000 = 22800`;
 F27 is `-50000 * 3.45 + 164000 = -8500`. Historical final-price corrections do not carry
-live forward-price delta. The full original-contract delta axis is `[0, -50000]` once Z26
-has fixed and `[0, 0]` when both have fixed, even though the compressed live axis shrinks.
-Retain the input mapping if readers present the original axis with zero entries.
+live forward-price delta. The result retains delta by contract on the batch's stable axis, its
+two contracts in static order, `[0, -50000]` once Z26 has fixed and `[0, 0]` when both have,
+whatever the compressed live axis, and G27 is on it nowhere, since no trade holds it.
+`_ReportRisk` spills the scalar total, -50,000 then 0 USD per USD/MMBTU, and DV01 where
+supported; the vector stays in the result for later use.
 
 For the three Z26 occurrences at final price 3.23, singleton amounts are `[13000, -3200, 13000]`,
 totaling 22,800. For F27 at 3.45, they are `[3500, -12000]`, totaling -8,500. These checks also
@@ -258,14 +295,14 @@ real boundaries before asserting exact low-level allocation or lookup counts.
 
 Engineering acceptance also includes zero live exposure with fixed amounts remaining;
 offsetting quantities with different entry prices; fixing absence; wrong source/units;
-incompatible history; and payment-cutoff equality. An entirely fixed `MarketHistory` needs
-an explicit integration solution because the current `Market` constructor requires an
-unfixed period. The numerical empty-vector case above is valid but does not claim that
-constructor gap is already solved. A still-live history containing no live exposure from
-this batch is a separate, immediately testable case.
+incompatible history; a template whose specification the index does not name; an expired
+physical component; and payment-cutoff equality. A market whose whole calendar has ended is
+deferred: the `Market` constructor requires an unfixed period and is unchanged. A still-live
+market in which this batch has no live exposure is the supported case, the last two states
+above, and reads zero live prices.
 
-The [Excel binding proposal](excel-trade-input-binding.md) sets out the partial-field
-transport and a proposed terminal market extension. Neither is implemented by this fixture.
+The [Excel binding page](excel-trade-input-binding.md) sets out the partial-field transport;
+it is not implemented by this fixture.
 
 Validate hand expectations independently before snapshotting production outputs. A small
 arithmetic script can check these numbers, but its outputs are not production-library goldens.
