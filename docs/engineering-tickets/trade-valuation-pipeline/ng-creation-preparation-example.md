@@ -264,10 +264,11 @@ The last two states have a market because the fixture's schedule has G27: the ma
 at 3.60, the batch's live exposure to it is zero, and evaluation reads zero live prices for the
 batch. Check the later group amounts directly: Z26 is `160000 * 3.23 - 494000 = 22800`;
 F27 is `-50000 * 3.45 + 164000 = -8500`. Historical final-price corrections do not carry
-live forward-price delta. The result's delta axis is the batch's two contracts in static
-order, `[0, -50000]` once Z26 has fixed and `[0, 0]` when both have, whatever the compressed
-live axis; `_ReportRisk` shows that axis and the total, and G27 is on neither, since no trade
-holds it.
+live forward-price delta. The result retains delta by contract on the batch's stable axis, its
+two contracts in static order, `[0, -50000]` once Z26 has fixed and `[0, 0]` when both have,
+whatever the compressed live axis, and G27 is on it nowhere, since no trade holds it.
+`_ReportRisk` spills the scalar total, -50,000 then 0 USD per USD/MMBTU, and DV01 where
+supported; the vector stays in the result for later use.
 
 For the three Z26 occurrences at final price 3.23, singleton amounts are `[13000, -3200, 13000]`,
 totaling 22,800. For F27 at 3.45, they are `[3500, -12000]`, totaling -8,500. These checks also
