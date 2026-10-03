@@ -157,6 +157,26 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_FutToDate", new object[] { "n26" }, 46204.0 };
             yield return new object[] { "util_FutToDate", new object[] { "W29" }, "#ERROR util_FutToDate: ValueError: contract is 'W29', expected a month letter and a two-digit year, such as F26" };
             yield return new object[] { "util_FutToDate", new object[] { ExcelMissing.Value }, "#ERROR util_FutToDate: contract is missing, expected text" };
+            // The two period readers: a contract or strip label in, in any case, and its first or last calendar day out as a serial; a month, a quarter, a year, a winter across the year end, a summer and a range. A malformed label and a reversed range fail in the library's words from either reader, a number and empty text in the seam's.
+            yield return new object[] { "util_ReadStartDate", new object[] { "f26" }, 46023.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "f26" }, 46053.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "1Q27" }, 46388.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "1Q27" }, 46477.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "cal28" }, 46753.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "CAL28" }, 47118.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "W29" }, 47423.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "W29" }, 47573.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "s28" }, 46844.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "s28" }, 47057.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "F26-Z28" }, 46023.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "F26-Z28" }, 47118.0 };
+            yield return new object[] { "util_ReadEndDate", new object[] { "w28-w29" }, 47573.0 };
+            yield return new object[] { "util_ReadStartDate", new object[] { "W8-W9" }, "#ERROR util_ReadStartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_ReadEndDate", new object[] { "W8-W9" }, "#ERROR util_ReadEndDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_ReadStartDate", new object[] { "Z28-F26" }, "#ERROR util_ReadStartDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order" };
+            yield return new object[] { "util_ReadEndDate", new object[] { "CAL28-F28" }, "#ERROR util_ReadEndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
+            yield return new object[] { "util_ReadStartDate", new object[] { 46023.0 }, "#ERROR util_ReadStartDate: period is number 46023.0, expected text" };
+            yield return new object[] { "util_ReadEndDate", new object[] { "" }, "#ERROR util_ReadEndDate: period is empty text, expected text" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };

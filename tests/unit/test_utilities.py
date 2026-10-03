@@ -790,6 +790,57 @@ def test_the_date_helpers_take_one_date_or_one_text_and_nothing_else() -> None:
         )
 
 
+# --- the first and the last day of a contract or strip --------------------------------
+
+
+def serial(text: str) -> float:
+    return float((np.datetime64(text, "D") - np.datetime64("1899-12-30", "D")).astype(np.int64))
+
+
+# A label in and a date out, each the sheet's serial: a month, a quarter, a year, a winter across
+# the year end, a summer and a range, in any case.
+def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
+    for period, first, last in (
+        ("f26", "2026-01-01", "2026-01-31"),
+        ("1Q27", "2027-01-01", "2027-03-31"),
+        ("cal28", "2028-01-01", "2028-12-31"),
+        ("W29", "2029-11-01", "2030-03-31"),
+        ("s28", "2028-04-01", "2028-10-31"),
+        ("F26-Z28", "2026-01-01", "2028-12-31"),
+        ("w28-w29", "2028-11-01", "2030-03-31"),
+        ("W99", "2099-11-01", "2100-03-31"),
+    ):
+        assert bridge.call("util_ReadStartDate", [period]) == serial(first)
+        assert bridge.call("util_ReadEndDate", [period]) == serial(last)
+    assert isinstance(bridge.call("util_ReadEndDate", ["G28"]), float)
+
+
+# A label that is no form, and a range the wrong way round: the library's words through the seam,
+# the same from either reader, which both read the whole expression.
+def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_seam() -> None:
+    forms = (
+        "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    )
+    for name in ("util_ReadStartDate", "util_ReadEndDate"):
+        for period in ("W8-W9", "Q1 27", "F26-", "F2026"):
+            assert bridge.call(name, [period]) == (
+                f"#ERROR {name}: ValueError: period is {period!r}, expected {forms}"
+            )
+        for period in ("Z28-F26", "CAL28-F28"):
+            assert bridge.call(name, [period]) == (
+                f"#ERROR {name}: ValueError: period is {period!r}, "
+                "expected range endpoints in chronological order"
+            )
+        for wrong, what in (
+            (MISSING, "is missing"),
+            (None, "is blank"),
+            ("", "is empty text"),
+            (46023.0, "is number 46023.0"),
+            (Cells.from_rows([["F26"], ["G26"]]), "is 2x1 array"),
+        ):
+            assert bridge.call(name, [wrong]) == f"#ERROR {name}: period {what}, expected text"
+
+
 # --- what does not resolve fails in the seam's words, and spills nothing -------
 
 

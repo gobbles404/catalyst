@@ -272,6 +272,48 @@ def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
     }
 
 
+# A period's first or last day: the text rule, the function, the library's reading of the whole
+# expression, one label read or two, the day from the month in one conversion, and the seam's way
+# out for a date. Eleven calls across eleven functions for one label, twelve for a range, the
+# label's reading twice; one numpy conversion of the library's and the way out's five, whether
+# the period is one month or the whole century.
+@pytest.mark.parametrize(
+    ("name", "library"), [("util_ReadStartDate", "start_date"), ("util_ReadEndDate", "end_date")]
+)
+@pytest.mark.parametrize(
+    ("period", "labels"), [("F26", 1), ("F00-Z99", 2)], ids=["a month", "a century"]
+)
+def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    name: str,
+    library: str,
+    period: str,
+    labels: int,
+) -> None:
+    PATH[name](period)
+    assert call_profile(lambda: PATH[name](period)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        name: 1,
+        library: 1,
+        "period_months": 1,
+        "_label_months": labels,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH[name](period)) == {
+        "generic.astype": 1,  # the month to its first day
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
 def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
     PATH["EchoBoolean"](True)
     assert call_profile(lambda: PATH["EchoBoolean"](True)) == {

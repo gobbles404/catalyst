@@ -133,6 +133,27 @@ def test_the_two_date_helpers_explain_themselves() -> None:
     ]
 
 
+def test_the_two_period_readers_explain_themselves() -> None:
+    line = (
+        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
+        "a cell such as A2."
+    )
+    description, arguments, hidden = SPECS["util_ReadStartDate"]
+    assert not hidden
+    assert description == (
+        "Reads the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for "
+        "W29 and the first day of the left label of F26-Z28."
+    )
+    assert arguments == [("period", line)]
+    description, arguments, hidden = SPECS["util_ReadEndDate"]
+    assert not hidden
+    assert description == (
+        "Reads the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for "
+        "W29 and the last day of the right label of F26-Z28."
+    )
+    assert arguments == [("period", line)]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden
