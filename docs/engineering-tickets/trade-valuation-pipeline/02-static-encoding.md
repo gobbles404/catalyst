@@ -21,6 +21,9 @@ they use. Dispatch selects a library-supported encoder; a template does not supp
 formulas or custom execution rules. Unit conversion must be
 an explicit dependency, whether supplied through a resolved definition or separately.
 The current index's creation-time validation does not mean it retains all conversion data.
+The unit tables and the work counter travel inside the library; neither is a worksheet
+parameter. A specification's brokerage and clearing rates are reserves: retained facts, never
+a contribution to value.
 
 An encoding retains:
 

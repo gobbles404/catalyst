@@ -17,7 +17,8 @@ whether those desk terms are synonyms is needed for this scope.
 
 The candidate methods are `asian`, `lastday`, `penultimate` and `last3day`. Use
 `penultimate` as the proposed canonical spelling rather than introducing a second `pen`
-alias. Their precise definitions remain proposals for review:
+alias. `lastday` is the one method supported first; the others fail by name until built,
+never accepted and ignored. Their precise definitions remain proposals for review:
 
 | schedule_method | Static observations selected | Proposed weights |
 |---|---|---|
@@ -77,9 +78,12 @@ change that existing boundary.
 
 Propose extending contract_code to one month or a strip using the existing library period
 grammar. The same `period_months` implementation behind util_StartDate/util_EndDate already
-accepts case-insensitive cal27 and z27-x28. Verified boundaries are January-December 2027
-and December 2027-November 2028 respectively, both twelve months. The helpers establish
-bounds, not actual trade components, schedule coverage, averaging rules or payments.
+accepts case-insensitive cal27 and z27-x28, and that is the rule for ticket values: `Z26`
+or `z26`, `CAL27` or `cal27`, while field names stay exact. Verified boundaries are
+January-December 2027 and December 2027-November 2028 respectively, both twelve months. The
+helpers establish bounds, not actual trade components, schedule coverage, averaging rules or
+payments. Creation reads every code of the index's schedule for its month, refusing a label
+that is not a code and two rows for one month, and keeps the mapping once.
 
 Creation must resolve every constituent month against the supplied static index schedule,
 then encode monthly components while retaining one original trade occurrence. Reuse the
@@ -115,7 +119,10 @@ proposed.
 
 Accepted as a reasonable starting point, with broader bilateral payment conventions left
 for later refinement. Use payment_time_lag, a string such as "+1bd", in the trade row or
-template, with payment_holiday_calendar. The supported product definition supplies the
+template, with payment_holiday_calendar; both are required when `settlement_method` is
+`financial`, and a physical contract supplies neither. No schedule field is added for the
+anchor; [fixing and payment state](fixing-and-payment-state.md) sets out how the dates are
+to be derived from the contract month, business-day rules and the two calendars. The supported product definition supplies the
 anchor and counting convention; creation generates a payment_date per monthly component.
 Keep the lag and resulting dates distinctly named. The
 [cleared contract review](fixing-and-payment-state.md#cleared-payment-convention-selected-rule-and-resolved-date)
@@ -220,7 +227,7 @@ product/profile can narrow it.
 | Legacy field(s) | Proposed treatment |
 |---|---|
 | trade_id | Optional external attribution; always retain separate occurrence identity |
-| index | Static reference named by the economics; independent of market snapshots |
+| index | The `_CreateTrades` argument, once for the batch; not a field; independent of market snapshots |
 | counterparty, broker, marketer | Booking/attribution; define each entity's role and any conditional requirement |
 | clearing_house | Actual clearing organization; distinguish it from broker, clearing firm and account; proposed requirement when route is cleared |
 | marketing_reserve | Meaning remains open: monetary amount or rate, units, sign, allocation and effect on value; do not silently add it to price or fees |
@@ -233,7 +240,7 @@ product/profile can narrow it.
 | start_date, end_date | Explicit contractually chosen period where supported; otherwise derived from the selected contract and not independently overrideable |
 | settle_freq, settle_time_lag | Use payment_time_lag for the agreed lag string, such as "+1bd", with payment_holiday_calendar and a product-defined anchor; payment frequency stays separate |
 | quantity_per | V1 month or day only; proposed day meaning is calendar day, independently of pricing-day weights |
-| schedule_method | Trade-selected library definition: asian, lastday, penultimate or last3day; exact and cfd excluded from v1 |
+| schedule_method | Trade-selected library definition: asian, lastday, penultimate or last3day; lastday supported first; exact and cfd excluded from v1 |
 | quantity, quantity_unit | Explicit signed amount and measure; reference-compatible conversion and lot rules are static work |
 | fixed_price | Chosen name for the agreed fixed price in the future schema as well; replaces the proposed trade_price name without adding an alias |
 | index_spread | A possible contractual adjustment to the floating reference; define sign, price units, weighting and payment treatment before enabling it |

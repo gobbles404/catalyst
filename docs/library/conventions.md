@@ -18,12 +18,13 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. Every function the library lists is `_Name` or `util_Name` since #73; the seam's `Ping` and its hidden probes keep their names, being the seam's instruments and not the desk's.
 
-Proposed trade-input exception, not yet implemented: `_CreateTradeTemplate` and generic
-`_CreateTrades` require exact field identifiers from the selected instrument definition,
+Trade-input exception, decided on 3 October 2026 and not yet implemented: `_CreateTradeTemplate`
+and `_CreateTrades` require exact field identifiers from the selected instrument definition,
 including case, with no trimming or aliases. Column order may vary. The
-[trade-input binding proposal](../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
-records this deliberate difference from the current general Table binder. Existing table
-functions retain their currently documented matching rules.
+[trade-input binding page](../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
+records this deliberate difference from the general Table binder, and inputs.md records both
+rules when the extension is built. Existing table functions retain their documented matching
+rules.
 
 ## Verbs
 

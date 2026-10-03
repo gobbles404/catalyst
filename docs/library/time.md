@@ -10,7 +10,7 @@ A contract month is a unit of its own, as a day is: `datetime64[M]` in the libra
 
 ## Codes
 
-One spelling: a month letter and two digits, `M26`, matched exactly, never trimmed or re-cased, as unit codes are ([conventions.md](conventions.md)), when a schedule's builder reads codes, which none does yet. The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. `_CreateFuturesSchedule`'s sample, `m26` beside `V26`, moves to `M26` in the pull request whose builder first reads codes. The `util_` readers of #129 read a code the desk types for its meaning before any builder does, and read its letters in either case, `f26` and `F26` one month, by the owner's decision for those readers alone: a label a person types into a formula, with no table to match against, and the sample schedules spelling their codes `m26`, `n26`. That decision is theirs and not the builder's; the builder's spelling rule above stands as recorded for the day it reads codes.
+One form: a month letter and two digits, `M26`, never trimmed, read for its meaning in either case wherever a code is read for one. The letters are the exchanges', F G H J K M N Q U V X Z for January to December, and the two digits are the year in 2000 to 2099, a fixed horizon, not a window sliding with the valuation date, so a code means the same month on every day. The `util_` readers of #129 read a code the desk types for its meaning in either case, `f26` and `F26` one month, by the owner's decision for them: a label a person types into a formula, with no table to match against, and the sample schedules spelling their codes `m26`, `n26`. Trade creation, the first builder to read a schedule's codes, reads them the same way, by the owner's decision of 3 October 2026 for the trade pipeline: every code of the supplied index's schedule is read for its month when a trade is created, a label that is not a code is refused by name, and so are two rows for one month, `Z26` beside `z26`; schedule creation is unchanged and keeps its codes as labels. The earlier line that a builder would require capitals, `M26` alone, is withdrawn; `_CreateFuturesSchedule`'s sample keeps `m26` beside `V26`.
 
 | Letter | F | G | H | J | K | M | N | Q | U | V | X | Z |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -67,7 +67,7 @@ From the braindump, each with the rule it met and what stands instead:
 
 | Fork | Where it stands |
 |---|---|
-| code case | decided: uppercase only, `M26`, for a schedule's builder when it reads codes; the `util_` readers of #129 read either case, the owner's decision for them, recorded under Codes |
+| code case | decided: either case wherever a code is read for its meaning, the `util_` readers of #129 and trade creation alike (3 October 2026); a schedule's codes stay labels until a trade reads them, and then every one must be a code and no month may appear twice |
 | weekends in a period | decided: every calendar day, weekends included |
 | contracts in order and none skipped | decided as the rule; relaxed for a market listing only some months when one arrives |
 | an option's expiry on or before its future's | proposed above; the owner decides with the schedule's rules |

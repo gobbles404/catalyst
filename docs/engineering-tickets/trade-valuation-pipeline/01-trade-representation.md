@@ -8,8 +8,8 @@ its second child. The wrapper returns one handle retaining both resolved terms a
 The first constructor whiteboard is [_CreateTradeTemplate](../../library/trades/trade-template.md):
 instrument, field names and one aligned values row. Excel names identify the template cells;
 the library object has no label field. Its CL/LOT
-example shows shared defaults flowing into ticket rows. It creates a partial template;
-the final worksheet argument list for CreateTrades is still to be specified.
+example shows shared defaults flowing into ticket rows. It creates a partial template, which
+`_CreateTrades(index, fields, trade_rows, template)` takes last, required.
 
 ## Responsibility
 
@@ -19,9 +19,8 @@ referenced product definitions once. Preserve the accepted economics independent
 prices, fixing arrivals and valuation dates. Approved cash records use their own defined
 payment/balance meaning rather than pretending every record is a consummated commodity deal.
 
-The entry point needs an approved instrument definition, directly or through a selected
-template, and any reference required by that instrument. The current `index, fields,
-trade_rows, [template]` sketch does not yet establish that context for every instrument.
+The entry point takes its instrument from the required template and its index as the first
+argument of `_CreateTrades(index, fields, trade_rows, template)`.
 fields is the column-header row. There is no labels argument; aliasing is deferred as a
 separate future use case. trade_id remains optional attribution within the trade fields.
 The result preserves every row occurrence, including duplicates.
@@ -78,18 +77,15 @@ CreateTrades, coordinated in that order; neither needs a separate worksheet func
 Encoding materializes schedules and numerical contributions from already selected contractual
 rules. No history or current prices are needed for either child. One row is a batch of one.
 
-The creation shape currently under discussion preserves the optional template last:
+The creation shape is settled:
 
 ```text
-_CreateTrades(index, fields, trade_rows, [template]) -> trade_batch_handle
+_CreateTrades(index, fields, trade_rows, template) -> trade_batch_handle
 ```
 
-This remains provisional, not an implemented declaration. Freeze the direct instrument
-selection for the no-template path before engineering treats this as an executable
-worksheet contract. The index's authoritative
-source must also be settled: it cannot appear both as an argument and a template/ticket field. A supplied
-template contributes defaults; without it, the direct inputs satisfy the selected instrument
-definition. Selecting a taller trade body supplies more occurrences through the same path.
+The template is required and selects the instrument; the index is the argument and appears in
+no template field or ticket column. Selecting a taller trade body supplies more occurrences
+through the same path.
 
 The original ticket excerpt, preserved as whiteboard notation:
 
@@ -108,10 +104,10 @@ If the template already supplies the intended clearing selection, the ticket mus
 |---|---:|---|---:|
 | u26 | -6 | ION | 105 |
 
-This remains an excerpt. The template or ticket must also establish the actual index/product,
-specification selection, units, executed date and remaining required contractual facts.
-Here the template can supply the product context, LOT and compatible clearing/settlement
-facts; the ticket supplies month, signed lots, broker and agreed price.
+This remains an excerpt. The index is the argument of the call; the template or ticket must
+also establish the specification selection, units, executed date and remaining required
+contractual facts. Here the template can supply the specification name, LOT and compatible
+clearing/settlement facts; the ticket supplies month, signed lots, broker and agreed price.
 
 If the template supplies clearing_house, the ticket must omit that column. Repeating the
 same clearing choice fails just as a different choice does. To vary a field between rows,
@@ -142,11 +138,8 @@ and specification objects do not yet establish every such relationship automatic
 The [shared fixture](worked-example.md) is a fictional bilateral average, not a listed future:
 
 ```python
-template = create_template(
-    instrument=approved_single_index_swap_definition,
-    product=approved_toy_average_definition,
-    defaults={},
-)
+index = approved_toy_average_index  # the first argument of the call
+template = create_template(instrument=approved_single_index_swap_definition, defaults={})
 fields = ["Trade", "TradeDate", "Contract", "Quantity", "AgreedPrice", "PaymentDate"]
 trade_rows = [
     ["T1", "2026-12-10", "Z26", 100, 70, "2027-01-05"],
@@ -173,6 +166,7 @@ definition; it does not independently identify an index or imply a strip.
 - Resolution establishes meaning and compatibility once; encoding consumes that result.
   A failure in either child publishes no new trade handle.
 
-Open before shipping: the minimal NG field schema, quantity convention, definition/version
-references, how the approved instrument is selected and the seam's typed partial-record input
-for defaults. A universal template language is not required to establish the trade contract.
+Open before shipping: definition/version references. The NG field set is the
+[Show page](../../library/instruments/show-instrument.md)'s, the instrument comes from the
+template, and the seam's typed partial input is the agreed extension. A universal template
+language is not required to establish the trade contract.

@@ -54,7 +54,7 @@ trading cutoff; its final price instead references NYMEX NG's penultimate settle
 Accepted starting fields for the template/ticket:
 
 ```text
-payment_time_lag = "+1bd" or "+2bd"
+payment_time_lag = "+1bd" or "+2bd"            # required when settlement_method = financial
 payment_holiday_calendar = existing HolidayCalendar reference
 
 CreateTrades -> payment_dates[monthly_component]
@@ -69,9 +69,17 @@ HolidayCalendar object transported by its Excel handle. No separate public ancho
 numeric lag field or payment-rule constructor is needed for this starting scope.
 Listed-product terms must still validate together; a supplied lag/calendar cannot redefine
 the traded product.
-Creation also needs each traded contract's own resolved last-trading-day schedule or a
-supported static rule producing it. schedule_method alone does not establish that payment
-anchor; the reference-schedule selection remains part of the creation contract to specify.
+No new schedule field is added for that anchor. Before extending the schedule, work through
+whether the dates derive from what exists: the contract month, business-day rules and the
+relevant calendars. Advancing the NYMEX penultimate pricing date one NYMEX business day
+recovers NYMEX expiry; ICE payment is anchored to ICE's own last trading day, so the relation
+between the two is to be established from the
+[ICE contract specification](https://www.ice.com/products/6590264) rather than assumed, and
+the dates and the calendars are not assumed to coincide. A documented adjusted-lag convention
+is acceptable where it produces the correct dates; it is not a universal rule. The payment
+date is resolved once at creation and retained in the encoding; ticket R1 of the
+[README](README.md) works this through for PHH. schedule_method alone does not establish
+the payment anchor.
 Existing ContractSpecifications keeps its lot/unit/fee responsibility. The instrument's
 schedule_method still selects pricing observations, independently of payment_time_lag.
 

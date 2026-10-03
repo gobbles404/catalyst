@@ -2,9 +2,9 @@
 
 [Pipeline overview](README.md) · [Creation](create-trade.md) · [Preparation](03-market-binding.md) · [Evaluation](04-evaluation.md)
 
-**Status:** Whiteboard refinement, 3 October 2026. The user envisages one supplied template
-for the rows passed to CreateTrades. One index per batch is the recommended first scope,
-not yet a permanent restriction or an implemented check. No pricing code changes here.
+**Status:** Whiteboard refinement, 3 October 2026. One template, required, serves the rows
+passed to `_CreateTrades(index, fields, trade_rows, template)`, and one index per batch is a
+fact of that call, since the index is its argument. No pricing code changes here.
 
 ## One template, then validate the resolved collection
 
@@ -13,8 +13,8 @@ Cleared versus bilateral is a useful initial batch boundary. The first proposed 
 
 | Property | First-scope recommendation |
 |---|---|
-| Template | One supplied template for the call's rows |
-| Index | One actual index/reference identity for this commodity batch |
+| Template | One template, required, for the call's rows |
+| Index | One, the call's argument, for the whole batch |
 | Route | Uniform cleared or bilateral route |
 | Currency | One amount/result currency; no implicit FX conversion |
 | Contracts, quantities, agreed prices | May vary by ticket |
@@ -39,8 +39,8 @@ It keeps one history and one price-vector association visible while the first pi
 built. The current Market has one MarketHistory, one PriceVector and a first-contract offset;
 it is not a general multi-index/rates container. Current labels alone do not prove identity.
 
-The numerical design does not need a permanent one-index restriction. A later explicit
-market collection can supply a concatenated axis such as:
+The numerical design does not need one index forever. A later call could take an explicit
+market collection and supply a concatenated axis such as:
 
 ```text
 [(NG reference, Z26, own-contract mark),
