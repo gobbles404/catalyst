@@ -1,8 +1,8 @@
 # Parent ticket: encode linear trades, bind market inputs, and evaluate through one array kernel
 
-**Status:** Proposed for engineering review.\
+**Status:** Earlier exploration; the [pipeline handoff](trade-valuation-pipeline/README.md) is authoritative.\
 **Scale:** A parent ticket spanning several focused PRs, with an initial NG release.\
-**First release:** Existing NG trades -> static encoding -> existing Market binding -> price-difference P&L -> inspectable Excel results.\
+**First release proposed here:** NG trade rows -> static encoding -> existing Market binding -> price-difference P&L -> inspectable Excel results.\
 **Design direction:** Work backwards from the kernel's required arrays, prove the representation with worked scenarios, then build the producers of those arrays.
 
 **3 October update:** The [pipeline stage contracts](trade-valuation-pipeline/README.md) are
@@ -11,10 +11,13 @@ results and risks, select the explicit `_CreateTrades` -> `_PrepareTrades` -> `_
 boundaries, and treat PR119 as an implementation experiment. Detailed creation arguments
 and result-reader layouts remain open.
 This earlier parent remains background for product coverage and the original delivery plan.
+Its stage ordering and implementation slices do not supersede the current handoff. Trade
+creation is not yet implemented; use the current instrument/template and CreateTrades
+contracts to build it rather than treating an earlier experiment as a production entry point.
 
 ## Problem and intended outcome
 
-We can ingest static NG trades and represent markets as arrays. We also have a standalone
+We have a specified static NG trade example and can represent markets as arrays. We also have a standalone
 dense-matrix experiment demonstrating linear calculation and compression. We need a
 production boundary between those pieces that preserves economic meaning, resolves shared
 work once, and uses the same numerical path for one or many trades.
@@ -117,9 +120,11 @@ compressed calculations need numerical agreement, not universal bit-for-bit agre
 **Inputs:** Shared definitions/template selections and individual executed terms.\
 **Output:** An immutable trade batch, preserving order and every occurrence.
 
-For the first release, reuse `FuturesTrades`: shared Index/specification plus trade IDs,
-trade dates, exact contract codes, signed lots and agreed prices. Do not create one Python
-pricing object per row or move current market state into this object.
+For the first release, use the current [CreateTrades contract](trade-valuation-pipeline/create-trade.md)
+to resolve static Index/specification facts with completed instrument fields, then encode
+the resulting terms. Do not create one Python pricing object per row or move current market
+state into this object. The [NG acceptance example](trade-valuation-pipeline/ng-creation-preparation-example.md)
+supplies the trade rows and independent expected quantities and amounts.
 
 As products are added, retain product identity, settlement treatment, actual contractual
 legs, explicit strip constituents and payment terms. Exchange, clearing house and clearing
@@ -291,7 +296,7 @@ reason about its changes independently; do not combine all five responsibilities
 | Slice / suggested child-ticket title | Deliverable and exit criterion |
 |---|---|
 | 1. Define and implement the linear amount kernel contract | Array-only kernel, component/result metadata contract, worked NG and fully known-amount tests, baseline work counters; define the full scenario test inventory and seed manual-array fixtures, completing it in slices 5-6 |
-| 2. Encode existing NG trades into static exposures | Existing `FuturesTrades` -> required point identities, normalized `A,c` and source mappings; exact worked-example agreement, immutability and shared-work budgets; no Market dependency |
+| 2. Resolve and encode NG trade rows into static exposures | Current CreateTrades design -> required point identities, normalized `A,c` and source mappings; exact worked-example agreement, immutability and shared-work budgets; no Market dependency |
 | 3. Bind encoded NG trades to the existing Market | Identity/coverage checks, market-position mapping, aligned gathers, defined binding validity and price-update path; reject stale/unsupported coverage and show no re-encoding on ticks |
 | 4. Publish and inspect the NG calculation in Excel | Existing handle/readback integration and a worked workbook showing terms, encoding, bound prices, individual results and compatible totals; actual Excel single/batch and price-update checks |
 | 5. Extend encoding/binding to dated observations and components | Explicit reviewed schedules for single-date and averaging examples, fixings, separate daily projections, rolling references and a two-month strip; preserve differing payment dates and parent attribution; extend the market input contract only as required by these examples |
@@ -335,14 +340,14 @@ tests. Previous-project benchmark claims are background, not Goosedove performan
 
 ## Current implementation constraints and decisions to close
 
-- `FuturesTrades` currently shares one Index and specification across its rows. Preserve
-  that useful initial scope; broader input batching must not become a prerequisite for NG.
-- Its contract positions address the full index schedule. `Market.price_vector` starts at
+- The initial NG example shares one Index and specification across its rows. Broader
+  input batching need not become a prerequisite for proving this example.
+- Static contract positions address the full index schedule. `Market.price_vector` starts at
   `Market.first_contract`. Binding must account for this offset and verify coverage.
 - The futures calendar's first scheduled contract is a lower boundary, never its prompt
   contract. The NG market fixture needs a preceding boundary and coverage of the as-of
-  date and both traded months; the ingestion-only workbook schedule is not automatically
-  a complete valuation fixture.
+  date and both traded months; the worked example's two-contract static schedule is not
+  automatically a complete valuation fixture.
 - Index names are display labels. Establish a validated identity/reference contract;
   requiring the same immutable Index reference is a viable narrow first implementation.
   A matching text label or vector length alone cannot prove compatibility.
@@ -381,8 +386,8 @@ tests. Previous-project benchmark claims are background, not Goosedove performan
 
 - [Dense worked example and equations](../linear-trade-matrices.md)
 - [Runnable NumPy specimen](../../tools/examples/linear_trade_matrices.py)
-- [NG trade input and Excel contract](../library/trades/futures-trades.md)
-- [Existing static trade implementation](../../src/goosedove/trades/futures_trades.py)
+- [Current trade creation contract](trade-valuation-pipeline/create-trade.md)
+- [Self-contained NG acceptance example](trade-valuation-pipeline/ng-creation-preparation-example.md)
 - [Existing Market implementation](../../src/goosedove/market/market.py)
 - [Contract field survey and prior-engineer assessment](../futures-trade-field-review.md)
 - [Independent review scope and measurement questions](../independent-review-brief.md)

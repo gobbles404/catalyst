@@ -173,7 +173,8 @@ uv run python -m tools.examples.linear_trade_matrices
 
 The runnable experiment lives in `tools/examples/linear_trade_matrices.py`. It is kept
 outside the production library so the object shapes can be changed after reviewing the
-example. The existing NG Excel ingestion remains the first production trade surface.
+example. The [pipeline handoff](engineering-tickets/trade-valuation-pipeline/README.md)
+defines the intended trade-creation surface; it is not yet implemented.
 
 The dense view is a correctness reference and an inspection surface. It does not establish
 that materializing every dense intermediate is efficient for a large portfolio. The

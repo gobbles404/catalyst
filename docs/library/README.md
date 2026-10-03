@@ -12,7 +12,6 @@ These pages are for an engineer building a function and for the owner reviewing 
 | [instruments/show-instrument.md](instruments/show-instrument.md) | Draft `_ShowInstrument`: field descriptions, requirements/conditions, types, options and rules |
 | [trades/trade-template.md](trades/trade-template.md) | Draft `_CreateTradeTemplate`: one row of shared defaults under an instrument definition; worksheet names identify template cells |
 | [CreateTrades and retained state](../engineering-tickets/trade-valuation-pipeline/create-trade.md) | Public trade creation wraps private resolution and encoding; one handle retains resolved facts, static arrays, market input references and mappings |
-| [trades/futures-trades.md](trades/futures-trades.md) | `_CreateFuturesTrades`, one or many static deal rows bound to a shared futures index and specification, with an editable NG workbook |
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [time.md](time.md) | the decisions on contract months, their codes, calendar days and business days, recorded ahead of the functions that need them |
 | [follow-ups.md](follow-ups.md) | the two consolidation follow-ups pinned on 26 September 2026, on the index conventions and the contract specifications, both resolved in #110: a record, with nothing outstanding |

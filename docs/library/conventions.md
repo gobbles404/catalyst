@@ -23,7 +23,7 @@ Proposed trade-input exception, not yet implemented: `_CreateTradeTemplate` and 
 including case, with no trimming or aliases. Column order may vary. The
 [trade-input binding proposal](../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
 records this deliberate difference from the current general Table binder. Existing table
-functions, including `_CreateFuturesTrades`, retain their currently documented matching rules.
+functions retain their currently documented matching rules.
 
 ## Verbs
 

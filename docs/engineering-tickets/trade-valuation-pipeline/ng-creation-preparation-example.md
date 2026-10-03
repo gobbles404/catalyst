@@ -5,14 +5,13 @@
 
 Design fixture, 3 October 2026. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
-The current `_CreateFuturesTrades` prototype supplies the starting ingestion fixture;
-the proposed `_CreateTrades` and `_PrepareTrades` are not implemented by this document.
+All trade inputs, static fixture facts and independent expected answers are specified below;
+the proposed `_CreateTrades` and `_PrepareTrades` are not yet implemented.
 
 ## What this example proves
 
-Start with the NYMEX NG trade rows and static index in
-[test_futures_trades.py](../../../tests/unit/test_futures_trades.py). Add a repeated occurrence
-to make accidental deduplication visible. First establish signed quantities, the entry-price
+Start with the NYMEX NG trade rows and static index facts in this document. A repeated
+occurrence makes accidental deduplication visible. First establish signed quantities, the entry-price
 contribution, and compression against each contract's own quoted price. Then use an explicitly
 fictional cash-settled product to specify history and payment transitions without assigning
 invented payment terms to the physically deliverable NG contract.
@@ -27,16 +26,19 @@ instrument schema's payment terms still require supported, product-appropriate f
 | Fact | Source | Fixture value |
 |---|---|---|
 | Instrument | Library definition; selected first when creating a template | `future` |
-| Index | Static `Index` reference | Existing test index `Henry Hub NYMEX` |
-| Quote conventions | `index.conventions` | USD per MMBTU; amount currency USD |
+| Index | Static `Index` reference | Fixture label `Henry Hub NYMEX`; futures schedule kind |
+| Quote conventions | `index.conventions` | Quote currency `USD`, quote quantity `MMBTU`, amount currency `USD`, quantity type `ENERGY`, quantity unit `MMBTU` |
 | Selected specification | Name within `index.specifications` | `NYMEX NG` |
 | Lot size | Selected specification row | 10,000 MMBTU per lot |
 | Contract identity | `index.schedule` | `Z26`, `F27` |
-| Contract positions in the ingestion fixture | Static schedule lookup | `0`, `1` |
+| Specification fee inputs | Selected specification row | Brokerage and clearing rates both `0` per lot; no fees valued in this example |
+| Static schedule | `index.schedule` | `Z26` expires `2026-11-25`; `F27` expires `2026-12-29`; no option expiry array |
+| Pricing calendar | `index.holiday_calendar` | Fixture holidays `2026-11-26`, `2026-12-25` |
+| Contract positions in this static fixture | Static schedule lookup | `0`, `1` |
 | Agreed price | Executed trade row | Values below |
 
-The current static fixture has schedule dates 25 November and 29 December 2026. These are
-repository test inputs, not independent evidence of exchange dates. The instrument definition
+The schedule dates and pricing holidays above are illustrative fixture inputs, not
+independent evidence of exchange dates. The instrument definition
 does not duplicate quote conventions or lot sizes. Creation selects the named specification
 from the explicit index, validates compatibility, and retains the static references used.
 Changing the row order of specifications must not change which named specification is used.
@@ -64,8 +66,7 @@ The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and 
 
 Occurrence is internal row identity, not an additional worksheet input. Rows 0 and 4 both
 count even though every supplied value is identical. `trade_id` is not a uniqueness key.
-The proposed names `quantity` and `fixed_price` correspond to the current prototype's
-`signed_lots` and `trade_price`; this document does not change that existing API.
+The ticket fields use the proposed instrument definition's `quantity` and `fixed_price`.
 
 Any intersection between the template's supplied field names and row headers fails, even
 when the values agree. For example, adding `quantity_unit = LOT` to these rows fails because
@@ -152,12 +153,12 @@ This fixture does not establish a rate-risk convention or a DV01 output.
 
 Two numerical tests are important: the five-row batch equals the sum of five singleton
 calls, and deleting occurrence 4 decreases value by USD 10,000 and Z26 delta by 100,000.
-The first four repository rows alone therefore produce USD -3,000 at these marks.
+The first four rows above alone therefore produce USD -3,000 at these marks.
 
 ### Existing market integration needs a wider static schedule
 
 The current futures calendar uses its first scheduled contract only as its left boundary:
-it starts on the day after that contract expires. Consequently, the two-contract ingestion
+it starts on the day after that contract expires. Consequently, the two-contract static
 fixture cannot also serve as a history fixture exposing Z26. Prepend an independently
 reviewed preceding-contract row before using it in the actual calendar/market path.
 Retain a later contract if testing fully fixed traded contracts within a still-live history.

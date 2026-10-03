@@ -547,41 +547,6 @@ $formulas = [ordered]@{
     "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)" = "#ERROR _CreateGasDailyFixings: index is missing, expected index handle"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB2)" = "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index"
-    # Static NG futures trades: four signed deals across two months and the first deal alone,
-    # using the same creator and reader. The six readback columns include the resolved schedule
-    # position. A fifth row repeats the first occurrence without being netted or deduplicated.
-    '=MID(FJ1,FIND(":",FJ1)+1,15)'      = "futures_trades:"
-    '=MID(FJ2,FIND(":",FJ2)+1,15)'      = "futures_trades:"
-    "=ROWS(util_ReadHandle(FJ1))"       = "6"
-    "=ROWS(util_ReadHandle(FJ2))"       = "3"
-    "=COLUMNS(util_ReadHandle(FJ1))"    = "6"
-    "=COLUMNS(util_ReadHandle(FJ2))"    = "6"
-    "=INDEX(util_ReadHandle(FJ1),1,1)"  = "trade_id"
-    "=INDEX(util_ReadHandle(FJ1),1,2)"  = "trade_date"
-    "=INDEX(util_ReadHandle(FJ1),1,3)"  = "contract_code"
-    "=INDEX(util_ReadHandle(FJ1),1,4)"  = "signed_lots"
-    "=INDEX(util_ReadHandle(FJ1),1,5)"  = "trade_price"
-    "=INDEX(util_ReadHandle(FJ1),1,6)"  = "contract_position"
-    "=INDEX(util_ReadHandle(FJ1),2,2)"  = "datetime64[D]"
-    "=INDEX(util_ReadHandle(FJ1),2,4)"  = "float64"
-    "=INDEX(util_ReadHandle(FJ1),2,6)"  = "intp"
-    "=INDEX(util_ReadHandle(FJ1),3,1)"  = "NG-001"
-    "=INDEX(util_ReadHandle(FJ1),3,2)"  = "46289"
-    "=INDEX(util_ReadHandle(FJ1),3,3)"  = "Z26"
-    "=INDEX(util_ReadHandle(FJ1),3,4)"  = "10"
-    "=INDEX(util_ReadHandle(FJ1),3,5)"  = "3.1"
-    "=INDEX(util_ReadHandle(FJ1),3,6)"  = "0"
-    "=INDEX(util_ReadHandle(FJ1),4,4)"  = "-4"
-    "=INDEX(util_ReadHandle(FJ1),5,3)"  = "F27"
-    "=INDEX(util_ReadHandle(FJ1),5,6)"  = "1"
-    "=INDEX(util_ReadHandle(FJ1),6,4)"  = "-12"
-    "=INDEX(util_ReadHandle(FJ1),6,5)"  = "3.35"
-    "=SUMPRODUCT(--(util_ReadHandle(FJ2)=TAKE(util_ReadHandle(FJ1),3)))" = "18"
-    "=ROWS(util_ReadHandle(FJ3))"       = "7"
-    "=INDEX(util_ReadHandle(FJ3),7,1)"  = "NG-001"
-    "=INDEX(util_ReadHandle(FJ3),7,4)"  = "10"
-    "=_CreateFuturesTrades(FC3,FL2,FE1:FI1,FE7:FI7)" = "#ERROR _CreateFuturesTrades: ValueError: contract_code row 1 is 'G27', expected a code in the index's schedule"
-    "=_CreateFuturesTrades(FC3,FL2,FE1:FI1,FE8:FI8)" = "#ERROR _CreateFuturesTrades: ValueError: signed_lots row 1 is 2.5, expected a whole number"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -896,27 +861,6 @@ $cells = [ordered]@{
     "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
     "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
     "EE2" = "=_CreateIndex(EC5,EE1,AP1,BY1)"
-    # NG trades use their own energy conventions, 10,000-MMBTU specification and two-contract
-    # schedule; no market or valuation date is involved in ingestion.
-    "FL1" = "name"; "FM1" = "lot_size"; "FN1" = "lot_unit"; "FO1" = "brokerage_rate_per_lot"; "FP1" = "clearing_rate_per_lot"
-    "FL2" = "NYMEX NG"; "FM2" = "10000"; "FN2" = "MMBTU"; "FO2" = "3"; "FP2" = "2"
-    "FC4" = "=_CreateContractSpecifications(FL1:FP1,FL2:FP2)"
-    "FA2" = "Z26"; "FB2" = "25-Nov-2026"
-    "FA3" = "F27"; "FB3" = "29-Dec-2026"
-    "FC1" = "=_CreateFuturesSchedule(FA2:FA3,FB2:FB3)"
-    "FC2" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
-    "FC3" = "=_CreateIndex(EC2,FC1,FC2,FC4,AM1)"
-    "FE1" = "trade_id"; "FF1" = "trade_date"; "FG1" = "contract_code"; "FH1" = "signed_lots"; "FI1" = "trade_price"
-    "FE2" = "NG-001"; "FF2" = "24-Sep-2026"; "FG2" = "Z26"; "FH2" = "10"; "FI2" = "3.1"
-    "FE3" = "NG-002"; "FF3" = "24-Sep-2026"; "FG3" = "Z26"; "FH3" = "-4"; "FI3" = "3.15"
-    "FE4" = "NG-003"; "FF4" = "25-Sep-2026"; "FG4" = "F27"; "FH4" = "7"; "FI4" = "3.4"
-    "FE5" = "NG-004"; "FF5" = "25-Sep-2026"; "FG5" = "F27"; "FH5" = "-12"; "FI5" = "3.35"
-    "FE6" = "NG-001"; "FF6" = "24-Sep-2026"; "FG6" = "Z26"; "FH6" = "10"; "FI6" = "3.1"
-    "FE7" = "NG-005"; "FF7" = "25-Sep-2026"; "FG7" = "G27"; "FH7" = "2"; "FI7" = "3.5"
-    "FE8" = "NG-006"; "FF8" = "25-Sep-2026"; "FG8" = "F27"; "FH8" = "2.5"; "FI8" = "3.5"
-    "FJ1" = "=_CreateFuturesTrades(FC3,FL2,FE1:FI1,FE2:FI5)"
-    "FJ2" = "=_CreateFuturesTrades(FC3,FL2,FE1:FI1,FE2:FI2)"
-    "FJ3" = "=_CreateFuturesTrades(FC3,FL2,FE1:FI1,FE2:FI6)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

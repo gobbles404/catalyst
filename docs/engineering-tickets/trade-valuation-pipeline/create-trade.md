@@ -86,8 +86,8 @@ month or a monthly strip such as CAL27 or Z27-X28. Reuse the existing period_mon
 to resolve its bounds, then resolve every constituent against the static schedule. Encoding
 keeps a monthly component mapping back to the original occurrence, applies quantity_per
 and schedule_method to each month, and retains its resolved payment date. The period helpers
-do not supply payment rules or authorize one annual average. These are design changes;
-the existing _CreateFuturesTrades prototype remains a single-code trade_price API.
+do not supply payment rules or authorize one annual average. These are design requirements;
+the general trade creator is not yet implemented.
 
 Payment terms come from the trade row or template: payment_time_lag, a string such as
 "+1bd", and payment_holiday_calendar. Resolution parses the lag once and establishes the

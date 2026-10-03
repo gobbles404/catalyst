@@ -84,8 +84,8 @@ bounds, not actual trade components, schedule coverage, averaging rules or payme
 Creation must resolve every constituent month against the supplied static index schedule,
 then encode monthly components while retaining one original trade occurrence. Reuse the
 period parser rather than asking the workbook to call date helpers first. Missing or
-ambiguous schedule months fail. The existing _CreateFuturesTrades prototype still binds
-literal individual schedule codes; this proposed extension is not implemented there.
+ambiguous schedule months fail. These are requirements for the proposed general creator;
+trade creation is not yet implemented.
 
 | Ticket term | Proposed strip interpretation |
 |---|---|
@@ -108,9 +108,8 @@ There is no additional specification object to pass, and no implicit choice of t
 row. Index is static reference data; using it does not make creation depend on Market,
 history, current prices or valuation as-of. Unit conversions remain explicit static inputs.
 
-Use fixed_price for the agreed fixed price in the proposed future definition. This replaces
-the proposed trade_price spelling; no alias is proposed. The existing prototype and its
-as-built documentation retain trade_price until a later explicit implementation cutover.
+Use fixed_price for the agreed fixed price in the proposed future definition. No alias is
+proposed.
 
 ## Current refinement: payment_time_lag
 

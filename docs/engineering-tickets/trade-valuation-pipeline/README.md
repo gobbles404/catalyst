@@ -114,7 +114,7 @@ The next refinement admits monthly strips through the existing period grammar: C
 Z27-X28 resolve to monthly components, each with its schedule method, quantity allocation
 and payment date. Explicit date-window inputs remain deferred. Specification data comes
 from Index, with the selected row named by the template/ticket. The proposed future field
-is fixed_price. These proposals do not change the current single-contract prototype API.
+is fixed_price. Trade creation is not yet implemented.
 
 The [cleared payment review](fixing-and-payment-state.md#cleared-payment-convention-selected-rule-and-resolved-date)
 records the accepted starting point: payment_time_lag, a string such as "+1bd", and
@@ -285,10 +285,9 @@ existing seam conventions. Private helpers need clear typed array contracts, not
 class hierarchies or a worksheet function for each substep.
 
 The constructor design includes the no-template path. Establish its direct instrument
-selection before claiming the complete creation contract. Pick one quantity spelling/convention
-and one contract field for the first schema; do not leave engineering to guess between
-`quantity` plus `quantity_unit` and the existing prototype's `signed_lots`, or accept
-`future_month` and `contract_code` as silent aliases.
+selection before claiming the complete creation contract. The proposed schema uses
+`quantity` plus `quantity_unit` and `contract_code`; validate their meanings for the first
+product without introducing silent field aliases.
 
 The [NG creation/preparation example](ng-creation-preparation-example.md) now specifies the
 small collection: opposite signs, two contracts and a duplicate occurrence, with static and
