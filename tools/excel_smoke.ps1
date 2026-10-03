@@ -547,6 +547,41 @@ $formulas = [ordered]@{
     "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)" = "#ERROR _CreateGasDailyFixings: index is missing, expected index handle"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB2)" = "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index"
+    # Static NG futures trades: four signed deals across two months and the first deal alone,
+    # using the same creator and reader. The six readback columns include the resolved schedule
+    # position. A fifth row repeats the first occurrence without being netted or deduplicated.
+    "=LEFT(EQ1,15)"                    = "futures_trades:"
+    "=LEFT(EQ2,15)"                    = "futures_trades:"
+    "=ROWS(util_ReadHandle(EQ1))"       = "6"
+    "=ROWS(util_ReadHandle(EQ2))"       = "3"
+    "=COLUMNS(util_ReadHandle(EQ1))"    = "6"
+    "=COLUMNS(util_ReadHandle(EQ2))"    = "6"
+    "=INDEX(util_ReadHandle(EQ1),1,1)"  = "trade_id"
+    "=INDEX(util_ReadHandle(EQ1),1,2)"  = "trade_date"
+    "=INDEX(util_ReadHandle(EQ1),1,3)"  = "contract_code"
+    "=INDEX(util_ReadHandle(EQ1),1,4)"  = "signed_lots"
+    "=INDEX(util_ReadHandle(EQ1),1,5)"  = "trade_price"
+    "=INDEX(util_ReadHandle(EQ1),1,6)"  = "contract_position"
+    "=INDEX(util_ReadHandle(EQ1),2,2)"  = "datetime64[D]"
+    "=INDEX(util_ReadHandle(EQ1),2,4)"  = "float64"
+    "=INDEX(util_ReadHandle(EQ1),2,6)"  = "intp"
+    "=INDEX(util_ReadHandle(EQ1),3,1)"  = "NG-001"
+    "=INDEX(util_ReadHandle(EQ1),3,2)"  = "46289"
+    "=INDEX(util_ReadHandle(EQ1),3,3)"  = "Z26"
+    "=INDEX(util_ReadHandle(EQ1),3,4)"  = "10"
+    "=INDEX(util_ReadHandle(EQ1),3,5)"  = "3.1"
+    "=INDEX(util_ReadHandle(EQ1),3,6)"  = "0"
+    "=INDEX(util_ReadHandle(EQ1),4,4)"  = "-4"
+    "=INDEX(util_ReadHandle(EQ1),5,3)"  = "F27"
+    "=INDEX(util_ReadHandle(EQ1),5,6)"  = "1"
+    "=INDEX(util_ReadHandle(EQ1),6,4)"  = "-12"
+    "=INDEX(util_ReadHandle(EQ1),6,5)"  = "3.35"
+    "=SUMPRODUCT(--(util_ReadHandle(EQ2)=TAKE(util_ReadHandle(EQ1),3)))" = "18"
+    "=ROWS(util_ReadHandle(EQ3))"       = "7"
+    "=INDEX(util_ReadHandle(EQ3),7,1)"  = "NG-001"
+    "=INDEX(util_ReadHandle(EQ3),7,4)"  = "10"
+    "=_CreateFuturesTrades(EJ3,BU2,EL1:EP1,EL7:EP7)" = "#ERROR _CreateFuturesTrades: ValueError: contract_code row 1 is 'G27', expected a code in the index's schedule"
+    "=_CreateFuturesTrades(EJ3,BU2,EL1:EP1,EL8:EP8)" = "#ERROR _CreateFuturesTrades: ValueError: signed_lots row 1 is 2.5, expected a whole number"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -861,6 +896,24 @@ $cells = [ordered]@{
     "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
     "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
     "EE2" = "=_CreateIndex(EC5,EE1,AP1,BY1)"
+    # NG trades use their own energy conventions and two-contract schedule. Lot size and the
+    # named specification come from BY1; no market or valuation date is involved in ingestion.
+    "EH2" = "Z26"; "EI2" = "25-Nov-2026"
+    "EH3" = "F27"; "EI3" = "29-Dec-2026"
+    "EJ1" = "=_CreateFuturesSchedule(EH2:EH3,EI2:EI3)"
+    "EJ2" = '=_CreateIndexConventions("USD","MMBTU","USD","energy","MMBTU")'
+    "EJ3" = "=_CreateIndex(EC2,EJ1,EJ2,BY1,AM1)"
+    "EL1" = "trade_id"; "EM1" = "trade_date"; "EN1" = "contract_code"; "EO1" = "signed_lots"; "EP1" = "trade_price"
+    "EL2" = "NG-001"; "EM2" = "24-Sep-2026"; "EN2" = "Z26"; "EO2" = "10"; "EP2" = "3.1"
+    "EL3" = "NG-002"; "EM3" = "24-Sep-2026"; "EN3" = "Z26"; "EO3" = "-4"; "EP3" = "3.15"
+    "EL4" = "NG-003"; "EM4" = "25-Sep-2026"; "EN4" = "F27"; "EO4" = "7"; "EP4" = "3.4"
+    "EL5" = "NG-004"; "EM5" = "25-Sep-2026"; "EN5" = "F27"; "EO5" = "-12"; "EP5" = "3.35"
+    "EL6" = "NG-001"; "EM6" = "24-Sep-2026"; "EN6" = "Z26"; "EO6" = "10"; "EP6" = "3.1"
+    "EL7" = "NG-005"; "EM7" = "25-Sep-2026"; "EN7" = "G27"; "EO7" = "2"; "EP7" = "3.5"
+    "EL8" = "NG-006"; "EM8" = "25-Sep-2026"; "EN8" = "F27"; "EO8" = "2.5"; "EP8" = "3.5"
+    "EQ1" = "=_CreateFuturesTrades(EJ3,BU2,EL1:EP1,EL2:EP5)"
+    "EQ2" = "=_CreateFuturesTrades(EJ3,BU2,EL1:EP1,EL2:EP2)"
+    "EQ3" = "=_CreateFuturesTrades(EJ3,BU2,EL1:EP1,EL2:EP6)"
 }
 
 # --- build the host and tell it where Python is -----------------------------
