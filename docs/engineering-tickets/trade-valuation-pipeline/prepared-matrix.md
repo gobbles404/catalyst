@@ -82,8 +82,9 @@ market_axis     = [D3 projection, D4 projection, D5 projection]
 The source trade batch retains the original terms and payment identities. The expanded
 table is a mathematical reference; constructing or storing a dense per-trade matrix is
 not required to obtain the aggregate. Opposite coefficients on D5 cancel for this batch
-under this preparation. Keeping or omitting its explicit zero column is a storage choice;
-its zero aggregate sensitivity and original source observations must remain unambiguous.
+under this preparation. Preparation may keep or drop the zero column; the result's delta
+keeps the batch's axis stable, every contract in static order with zero where it has fixed
+or cancels, so its original source observations stay unambiguous.
 
 ## Evaluate the aggregate directly
 

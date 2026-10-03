@@ -97,7 +97,9 @@ with the requisite retained dated results; a reader cannot reconstruct them from
 
 ## Shared risks and context
 
-Delta uses the same field and coordinate convention on both routes. Its value basis is
+Delta uses the same field and coordinate convention on both routes, stored by contract on the
+batch's stable axis, zero where a contract has fixed, with a scalar total for a common
+one-price-unit move across the contracts. Its value basis is
 `bilateral_mark` or `cleared_mark`; bilateral delta therefore includes the applicable
 payment discounting. A set-but-unpaid amount can have zero commodity delta and nonzero DV01.
 Components in the settled bucket contribute neither to these remaining-trade risks.
@@ -118,7 +120,8 @@ the four measures without requiring a valuation object per trade.
   as-of. Keep compatible payment groups before compressing remaining live exposures.
 - EvaluateTrades discounts only remaining bilateral payments, includes settled signed amounts
   without discounting, and completes both route-specific values and common risks together.
-- Readers expose the completed snapshot. They never infer settlement or reprice it.
+- `_ReportValues` and `_ReportRisk` expose the completed snapshot. They never infer settlement
+  or reprice it. Fees are reserves and appear in no field.
 
 An as-of change already rebuilds preparation; it updates the date mask without a new
 external settlement store. A future actual-payment feature would add an explicit dependency,

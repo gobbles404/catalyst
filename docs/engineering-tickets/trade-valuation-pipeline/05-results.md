@@ -12,8 +12,9 @@ The target has **mark and cash for the batch's route, plus delta and dv01**. The
 outward labels are `bilateral_mark`/`bilateral_cash` and `cleared_mark`/`cleared_cash`.
 Evaluation completes all four applicable fields before publishing the result handle,
 or fails visibly. It does not populate the other route's fields with meaningless zeros.
-Readers do not finish valuation or risk calculations later. Final public casing and reader
-names remain open. See [result fields by route](result-fields-by-route.md).
+Readers do not finish valuation or risk calculations later. The two reports are
+`_ReportValues(results)` and `_ReportRisk(results)`. See
+[result fields by route](result-fields-by-route.md).
 
 Values and risks are two result families in the same evaluation context. They can share
 immutable arrays safely; they do not need separate trade traversal or independent market gathering.
@@ -82,7 +83,7 @@ measure and supplied inputs establish it.
 | Requested collection | Reference to the supplied batch, including its original occurrences and display labels |
 | Measures | The route's two completed value fields plus `delta` and `dv01`, with their meanings and units; intermediate amount results remain explicitly identified |
 | Conventions | Route, currency, as-of, remaining-value basis, date cutoff and cumulative modeled-settlement scope |
-| Optional diagnostics | Aggregate `fixed_leg`, `floating_leg_set`, `floating_leg_live` when meaningful; these are not extra required fields in the four-output target |
+| Optional diagnostics | Aggregate `fixed_leg`, `floating_leg_set`, `floating_leg_live` when meaningful; these are not extra required fields in the four-output target. Fees are reserves and appear in no measure |
 | Risk | Aggregate sensitivity vector, measure differentiated, ordered market/curve coordinates, units and bump convention where applicable |
 | Provenance | The resolved trade/definition inputs and valuation/market context used; sufficient immutable references or metadata to prevent mixed snapshots |
 | Completeness | The declared result scope and every measure it requires; no partial publication of the four-field target |
@@ -109,8 +110,9 @@ EvaluationResult
         mark                     # aggregate currency amount
         cash                     # aggregate modeled settled amount
     risk
-        delta: float64[M]
-        dv01: float64[R]
+        delta: float64[M]         # by contract, the batch's static axis, zero where fixed
+        delta_total: float64      # a common one-price-unit move across the contracts
+        dv01: float64[R]          # where supported
     source_batch                 # shared immutable occurrence and payment facts
 ```
 
@@ -167,8 +169,8 @@ implementation of the route's four-field result.
 
 ## Lifetime and acceptance
 
-A later tick creates a new result; it cannot mutate a retained result read elsewhere. Value
-and risk readers of one result must refer to the same snapshot, even if a current market cell
+A later tick creates a new result; it cannot mutate a retained result read elsewhere. The two
+reports of one result must refer to the same snapshot, even if a current market cell
 has moved on. Retained source facts continue to identify every contributing occurrence.
 
 For the first implementation, favor a complete validated batch or a visible failure over
@@ -185,4 +187,4 @@ the expected baseline. Under the same compatible market context and measure, the
 and aligned risk vector equal the sums of separately evaluated singleton results within the
 stated numerical tolerances. Duplicate occurrences count repeatedly. This comparison is an
 acceptance check, not a requirement to evaluate every singleton on the batch tick path.
-Exact public casing and reader table layouts remain decisions.
+The report layouts are pinned in the pull request that builds them.

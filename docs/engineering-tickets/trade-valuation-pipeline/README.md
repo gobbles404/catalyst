@@ -1,6 +1,6 @@
 # Trade valuation pipeline: design and engineering handoff
 
-**Status:** Working design for review, 3 October 2026. No production implementation in this packet.\
+**Status:** Agreed design, 3 October 2026, carrying the decisions of the engineering review of the same day. No production implementation in this packet.\
 **Purpose:** Make the responsibilities and connections understandable before choosing their implementation.\
 **Reading order:** This overview, instrument definitions, CreateTrades and its retained state, then the worked example and individual responsibility documents.
 
@@ -61,14 +61,15 @@ flowchart LR
     P[Compatible market with current prices] --> E
     Q[Applicable current rate inputs - interface to specify] --> E
     E --> R[5. Immutable valuation and risk result]
-    R --> V[6a. Valuation reader - mark and cash]
-    R --> K[6b. Risk reader - delta and DV01]
+    R --> V[6a. _ReportValues - mark and cash]
+    R --> K[6b. _ReportRisk - delta and DV01]
 ```
 
-The valuation reader and risk reader are the first two result-reader responsibilities.
-They close the initial **trade-to-results pipeline**: both consume the same completed
-snapshot, with no further market access or valuation. A leg-decomposition reader or richer
-reporting views can follow later; they are not additional prerequisites for this first path.
+`_ReportValues(results)` and `_ReportRisk(results)` are the two result reports, committed
+from the start. They close the initial **trade-to-results pipeline**: both spill what
+evaluation stored, with no further market access or valuation, and `util_ReadHandle` on
+the same handle is a debugging spill of its stored contents that replaces neither. A
+leg-decomposition view can follow later; it is not a prerequisite for this first path.
 
 This is an end-to-end design, not an end-to-end implementation claim. Static index/product
 definitions and market creation supply upstream inputs. Detailed schemas, Excel declarations,
@@ -88,7 +89,7 @@ complete path, rather than introduce more pipeline stages.
 | [6. Readers](06-readers.md) | How does Excel inspect those results without new valuation work? |
 | [Worked example](worked-example.md) | Can we trace the same trades and independently known answers through all six? |
 | [NG creation/preparation example](ng-creation-preparation-example.md) | How do five signed occurrences compress to two exposures, with independently checked values and a separate toy payment lifecycle? |
-| [Excel trade-input binding proposal](excel-trade-input-binding.md) | What seam extensions, reference lifetimes and terminal market behavior does the proposed surface need? |
+| [Excel trade-input binding](excel-trade-input-binding.md) | What seam extension, reference lifetimes and fully fixed behavior does the agreed surface need? |
 | [Prepared matrix walkthrough](prepared-matrix.md) | How do many trade contributions become one batch exposure vector before evaluation? |
 | [Aggregation performance](aggregation-performance.md) | What does a synthetic 100/1,000/10,000/100,000-trade timing show, and what does it exclude? |
 | [Batch boundaries and discounting](batch-boundaries-and-discounting.md) | How do a shared template, index scope, payment groups and current rate inputs fit before final compression? |
@@ -114,9 +115,11 @@ declarations and later functions follow their own reviews. A library-owned schem
 require building a separate product-catalog system:
 the existing static definition objects can supply the initial reference facts.
 
-The next constructor sketch is [_CreateTradeTemplate](../../library/trades/trade-template.md),
-using a small CL/LOT defaults row. Its partial mixed values and static object references need
-a targeted seam specification before implementation; its shape is not yet a supported call.
+The template constructor is [_CreateTradeTemplate](../../library/trades/trade-template.md),
+`_CreateTradeTemplate(instrument, fields, values)`, with a small LOT defaults row. Its partial
+typed values and reference cells are the seam extension agreed in the
+[Excel binding page](excel-trade-input-binding.md); until that is built, its shape is not
+yet a supported call.
 
 The [instrument field sketch](instrument-field-sketch.md) records the current schema pass:
 the trade selects a library-defined `schedule_method` and a `quantity_per` of month or day;
@@ -134,11 +137,18 @@ is fixed_price. Trade creation is not yet implemented.
 
 The [cleared payment review](fixing-and-payment-state.md#cleared-payment-convention-selected-rule-and-resolved-date)
 records the accepted starting point: payment_time_lag, a string such as "+1bd", and
-payment_holiday_calendar, supplied in the trade row or template. The supported product
-definition establishes the actual traded contract's last-trading-day anchor and strict-after
-counting. PHH uses "+1bd" and ETE "+2bd". CreateTrades parses the lag once and stores a
-resolved payment_date per monthly component. Reuse the existing HolidayCalendar handle
-and NumPy business-day arithmetic. Pricing calendars and final fixing dates are separate.
+payment_holiday_calendar, supplied in the trade row or template and required when
+`settlement_method` is `financial`; the pre-expiry physical NG path supplies neither. The
+supported product definition establishes the actual traded contract's last-trading-day
+anchor and strict-after counting. PHH uses "+1bd" and ETE "+2bd". CreateTrades parses the
+lag once and stores a resolved payment_date per monthly component. Reuse the existing
+HolidayCalendar handle and NumPy business-day arithmetic. No schedule field is added for
+the anchor: before extending the schedule, derive the dates from the contract month,
+business-day rules and the two calendars, establishing the relation between ICE's own last
+trading day and the NYMEX penultimate pricing date rather than assuming the dates or the
+calendars coincide; a documented adjusted-lag convention is acceptable where it produces the
+correct dates, and is not a universal rule. Pricing calendars and final fixing dates are
+separate.
 Broader bilateral payment conventions remain deferred; their limited coverage is accepted
 for this first step. This design agreement does not imply implementation. Exact-date inputs
 and zero-day adjustment semantics also remain deferred.
@@ -184,6 +194,10 @@ automatically from matrix multiplication.
   static numerical contributions and market input descriptors from those resolved facts.
 - Keep `fixed_leg`, `floating_leg_set` and `floating_leg_live` distinct for fixed/float products.
 - Bind from explicit inputs. The index identifies the reference; it does not choose an ambient market.
+- Fees are reserves: a specification's brokerage and clearing rates are retained facts and
+  never enter a trade's valuation.
+- The unit tables and the work counter travel inside the library; neither is a worksheet
+  parameter, and the agreed signatures gain no argument for them.
 - Ordinary commodity-price updates should perform no contract parsing, calendar generation,
   static encoding or historical-fixing folding once a valid preparation is retained.
 - Preserve trade occurrences, observation identities, market axes, units and payment ownership.
@@ -193,12 +207,14 @@ automatically from matrix multiplication.
 “Volatile price vector” here means frequently changing values. It is not a requirement to
 register every worksheet function as an Excel-volatile function.
 
-## Agreed worksheet boundaries; creation arguments remain open
+## Agreed worksheet boundaries
 
 ```python
-_CreateTrades(...)                 -> trades_handle
-_PrepareTrades(trades, history)    -> prepared_trades_handle
-_EvaluateTrades(prepared, market)  -> results_handle
+_CreateTradeTemplate(instrument, fields, values)    -> template_handle
+_CreateTrades(index, fields, trade_rows, template)  -> trades_handle
+_PrepareTrades(trades, history)                     -> prepared_trades_handle
+_EvaluateTrades(prepared, market)                   -> results_handle
+_ReportValues(results), _ReportRisk(results)        -> tables
 ```
 
 Plural names express the agreed cardinality contract: one handle represents one or many
@@ -210,26 +226,26 @@ Evaluation prices that aggregate vector. This supersedes the earlier assumption 
 batch evaluation must also return one result per trade. Original occurrences and payment
 facts remain in the retained source batch; duplicate occurrences contribute twice.
 
-The current trade-input sketch preserves the optional template last:
-
-```text
-_CreateTrades(index, fields, trade_rows, [template])
-```
-
-Adding the instrument catalog exposes a missing distinction: an index does not choose an
-instrument type. The same reference can underlie a future or swap, while cash has no commodity
-index. The constructor therefore needs explicit instrument context, directly or through a
-selected approved template. The instrument selection without a template and the authoritative
-source of index remain to settle. The final argument list remains open; see
-[instrument definitions](00-instrument-definitions.md) for the selection flow.
+The creation call is settled. The template is required and last; it selects the instrument,
+and CreateTrades takes the instrument from it, so there is no instrument argument and no
+path without a template. The index is supplied exactly once, as the first argument, and
+applies to the whole batch: it is not a template field and not a ticket column, and the
+template retains no index, so one template serves any compatible index. CreateTrades
+resolves the completed terms against the supplied index's conventions, schedule and the
+specification the terms name; an incompatible term fails by name, with no fallback or
+substitution, and compatibility means the specification name, the units and the supported
+product and schedule-method combination together. The batch retains the index it was
+resolved against. The same index can underlie a future or a swap, and the template says
+which; a cash instrument has no index, and its call is specified when cash is built.
 
 fields is the agreed column-header argument. No labels argument is included; aliasing is
 a separate future use case. trade_id remains optional attribution in the trade fields,
 independent of the retained identity of every occurrence. Every call represents one or
 many trade rows. Resolution and encoding
-are private children of CreateTrades, whose handle retains both outputs. Result readers consume
-an evaluated result handle. Valuation and risk are the first two reader responsibilities;
-their public names and table layouts remain to be designed.
+are private children of CreateTrades, whose handle retains both outputs. `_ReportValues` and
+`_ReportRisk` take the evaluated results handle and spill what evaluation stored; their
+layouts are pinned in the pull request that builds them, and [readers](06-readers.md) says
+what each shows.
 
 `_PrepareTrades` applies complete supplied history to the static encoding, retaining
 the batch's `floating_leg_set` and summed live exposure vector. Its fixed-leg total can be
@@ -288,11 +304,11 @@ the pipeline or require every future instrument to be designed.
 | Boundary | Already established | What the concrete pass must finish |
 |---|---|---|
 | Instrument inspection | Library-owned definitions; list and field-detail spills | Approved first future field set, exact supported product/treatment and constructible combinations |
-| Template | Instrument first; optional partial shared fields; template/ticket overlap fails even for equal values; blank is not omission | Review and implement the [typed partial-input proposal](excel-trade-input-binding.md) |
-| CreateTrades | Private resolution plus encoding; one immutable batch for one or many occurrences; fields names the column headers; optional template last | Instrument/index source for template/no-template paths, ticket column names/types/units, and first batch compatibility rules |
-| PrepareTrades | Explicit history/as-of input; complete rebuild on history changes; retained set amounts and live exposure; [worked payload](ng-creation-preparation-example.md) | Review the concrete mapping and the proposed terminal market path before claiming the fully fixed lifecycle |
-| EvaluateTrades | Small orchestration; shared inputs; completed mark/cash/delta/DV01 result | First product's numerical definitions and units; explicit compatibility checks; identify the separate rates-input/DV01 decisions needed before bilateral support |
-| First two result readers | Pure valuation and risk views of the same completed snapshot | Exact names/arguments and expected spill headers, units, coordinates and shapes, including singleton/empty-risk cases |
+| Template | Instrument first; optional partial shared fields; template/ticket overlap fails even for equal values; blank is not omission; required and last on CreateTrades | Build the agreed [seam extension](excel-trade-input-binding.md), instrument-selected tables with exact headers and reference cells |
+| CreateTrades | Private resolution plus encoding; one immutable batch for one or many occurrences; fields names the column headers; the instrument from the required template, the index the first argument | Ticket column names/types/units and the first batch compatibility rules |
+| PrepareTrades | Explicit history/as-of input; complete rebuild on history changes; retained set amounts and live exposure; [worked payload](ng-creation-preparation-example.md); the history's index must be the batch's | Review the concrete mapping; a fully fixed batch inside a valid market is the supported case, and a market whose whole calendar has ended is deferred |
+| EvaluateTrades | Small orchestration; shared inputs; completed mark/cash/delta/DV01 result; the market's history must be the prepared history | First product's numerical definitions and units; identify the separate rates-input/DV01 decisions needed before bilateral support |
+| The two result reports | `_ReportValues(results)` and `_ReportRisk(results)`, spilling stored aggregates of the same completed snapshot | Expected spill headers, units, coordinates and shapes, including the singleton and a contract whose delta has gone to zero |
 
 For each callable boundary, capture the worksheet call, one toy input table, the logical
 output/array shapes, validation ownership, and which input changes require work. State
@@ -300,10 +316,9 @@ examples of rejected inputs and the offending field/row. Exact error prose can f
 existing seam conventions. Private helpers need clear typed array contracts, not frozen
 class hierarchies or a worksheet function for each substep.
 
-The constructor design includes the no-template path. Establish its direct instrument
-selection before claiming the complete creation contract. The proposed schema uses
-`quantity` plus `quantity_unit` and `contract_code`; validate their meanings for the first
-product without introducing silent field aliases.
+The proposed schema uses `quantity` plus `quantity_unit` and `contract_code`; validate their
+meanings for the first product without introducing silent field aliases. Contract codes and
+strips are read in either case, `Z26` or `z26`, `CAL27` or `cal27`; field names are exact.
 
 The [NG creation/preparation example](ng-creation-preparation-example.md) now specifies the
 small collection: opposite signs, two contracts and a duplicate occurrence, with static and
@@ -334,15 +349,15 @@ the selected representation; zero unwanted work at these boundaries is part of t
 
 Three current-code gaps must be visible in the relevant implementation slices:
 
-- [Template transport](../../library/trades/trade-template.md) does not yet support the
-  proposed schema-selected partial record with typed references. The
-  [Excel binding proposal](excel-trade-input-binding.md) specifies the proposed extension,
-  error ownership and dependency/lifetime acceptance cases.
+- [Template transport](../../library/trades/trade-template.md) does not yet exist in the seam:
+  the [Excel binding page](excel-trade-input-binding.md) specifies the agreed extension,
+  instrument-selected tables with exact headers and reference cells, its error order and its
+  dependency/lifetime acceptance cases; inputs.md records it when it is built.
 - The current PriceVector's display name and positional values cannot verify a silently
-  permuted input, and Market rejects an entirely fixed calendar. The Excel binding proposal
-  makes the current positional alignment limit explicit and recommends an optional-vector
-  terminal market extension. That recommendation still needs approval and implementation;
-  it is not an agreed change to the market API.
+  permuted input, and Market rejects an entirely fixed calendar. The positional alignment
+  limit is accepted and made explicit. The Market is not changed: a fully fixed batch inside
+  a valid market is supported and reads zero live prices, and a market whose whole calendar
+  has ended is deferred, with no dummy quote or inserted contract standing in for it.
 - Current Market carries no rate context. DiscountCurve provides dated factors but no
   agreed rate bump. Specify the rate interface, bump/sign and axes before bilateral DV01;
   this is not a prerequisite for the narrow undiscounted cleared specimen.
@@ -353,28 +368,28 @@ Have engineering map existing main/PR119 components to reuse, adapt or replace a
 of its slice; neither wholesale reuse nor wholesale replacement is preselected.
 Review a small runnable path and its independent expected answers before broadening scope.
 
-### Delivery slices
+### Delivery: the tickets
 
-1. **Contract review:** start with the approved instrument schema, then walk the shared example
-   through the six per-record stages, including the two payment dates. Decide the first result
-   measure and mark-risk units. Record remaining choices.
-2. **Small executable specimen:** manually supply the resolved inputs; prove amounts, risk,
-   batch total equals the sum of separate singleton evaluations, fixings and missing-input
-   behavior. PR119 may supply the arithmetic. This is still a prototype.
-3. **First complete product path:** NG trade rows through construction, encoding, binding,
-   evaluation, results and one reader. Name the entry-price P&L measure explicitly if that is
-   the chosen starting output. Prove actual worksheet dependencies before claiming tick reuse.
-4. **Averaging path:** add a narrowly specified product using independently reviewed ethane
-   examples; prove fixing transitions and corrections through real schedules and adapters.
-5. **Payment valuation and rate risk:** introduce NPV per payment and a defined DV01 measure
-   after the amount path is understood. The illustrative PV column in this packet is not a
-   promise that rates support ships in the first product release.
+The contract review is done; its decisions are in these pages. Each ticket is one pull
+request from main, reviewed on its own, and the pages are the ticket: a pull request builds
+what its pages say and changes the pages where it learns something.
 
-Use one thin vertical example early, then broaden each stage as new cases demand. A feature
-branch can hold this exploration and its runnable specimen; branch topology does not decide
-architecture. Before creating one, choose whether its base is main or an inspected PR119
-revision, use an isolated checkout, and keep incremental reviews focused. This packet creates
-no branch and changes no production code.
+| | Ticket | What it proves | After |
+|---|---|---|---|
+| D1 | the packet carries the review's decisions | these pages agree with the decisions and with one another | |
+| D2 | the NG example as a complete booking | the NG template complete under its own definition; a three-contract schedule and G27 in the toy market, so every state has a valid market | D1 |
+| I1 | the NG kernel | private modules for static encoding from resolved terms, preparation against a real history and evaluation against a real market; every hand answer of the NG example and the toy lifecycle pinned; batch equals summed singletons; duplicates count; a fixed batch inside a live market; an expired physical component refused; a tick folds nothing | D2 |
+| I2 | `_ListInstruments` and `_ShowInstrument` with the `future` definition | the field set in code and on a sheet; the cell-wise table builder | D1 |
+| I3 | the seam extension: instrument-selected tables and reference cells | the transport, proved with probes and recorded in inputs.md | I2 |
+| I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3 |
+| I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4 |
+| R1 | PHH payment dates derived from the schedule and the calendars | the relation between ICE's last trading day and the NYMEX penultimate pricing date, worked dates, whether an adjusted lag gives them | I1 |
+| I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5, R1 |
+
+Averaging, with independently reviewed ethane examples, and payment valuation with a defined
+DV01 follow. Use one thin vertical example early, then broaden each stage as new cases demand.
+PR119 is closed and is evidence only; every ticket starts from main. This packet creates no
+branch and changes no production code.
 
 The [golden harness plan](../ethane-golden-validation-harness.md) supplies the separate
 financial-reference and snapshot workflow. Snapshots of a standalone specimen do not become
@@ -385,14 +400,14 @@ tick, fixing update, date roll, trade amendment, rate-input change when supporte
 
 | Decision | Needed by |
 |---|---|
-| Approved first prototype fields, static reference facts and supported product combinations; disjoint template/ticket field policy is established | Instrument-definition slice |
-| How instrument context enters the constructor, including cash without an index | Public input API |
+| The `future` field set is the [Show page](../../library/instruments/show-instrument.md)'s, `lastday` the one schedule method supported first; static reference facts and the disjoint template/ticket policy are established | Instrument-definition slice, I2 |
+| Settled: the required template carries the instrument and the index is the first argument; a cash instrument's call is specified when cash is built | |
 | First product's exact mark/cash semantics, risk units and required booking fields; mark/cash naming and rejection of duplicate field sources are established | Trade/encoding slice |
 | Observation identity, publication cutoff, missing-fixing policy and forward projection | Binding slice |
-| Where static unit definitions and market-axis identities live | Encoding/binding slice |
+| Settled: the library's unit tables, passed inside the library and never a worksheet parameter; the risk axis is the batch's contracts in static order | |
 | Ownership/release of the selected explicit prepared handle across updates/workbooks | Excel integration slice |
-| Fully fixed market route; current kernel supports zero marks but current Market requires an unfixed period | Fully fixed Excel integration |
-| Modeled payment cutoff/cumulative scope, common risk conventions, reader declarations/layouts, completeness and reader ownership | Result/reader slice |
+| Deferred: a market whose whole calendar has ended; a fully fixed batch inside a valid market is supported | |
+| Settled names `_ReportValues(results)` and `_ReportRisk(results)`; their layouts, pinned when built; the cutoff and cumulative scope as proposed; common risk conventions open | Result/report slice, I5 |
 | Discounting treatment, payment currency, curve association and DV01 definition | Rates slice |
 
 Dense versus sparse arrays, shared exposure-pattern evaluation, selective repricing, incremental

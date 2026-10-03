@@ -1,4 +1,4 @@
-# 6. Pure result readers
+# 6. Result reports: _ReportValues and _ReportRisk
 
 [Pipeline overview](README.md) · [Previous: results](05-results.md)
 
@@ -10,32 +10,36 @@ calculation that evaluation omitted.
 
 The intended result supplies the route's **mark and cash plus delta and dv01**, all
 completed by evaluation before its handle is published. The accepted labels are
-`bilateral_mark` and `bilateral_cash`, or `cleared_mark` and `cleared_cash`; exact public
-casing and reader names remain drafts. Value and risk readers expose existing fields without
+`bilateral_mark` and `bilateral_cash`, or `cleared_mark` and `cleared_cash`. The two reports
+expose existing fields without
 deferred valuation or risk calculations, and without zero placeholders for the other route. See
 [result fields by route](result-fields-by-route.md).
 
-The first two reader responsibilities are agreed: a valuation reader for mark/cash and a
-risk reader for delta/DV01. Possible public shapes, not final names or signatures, are:
+The two reports are committed from the start:
 
 ```python
-ReadValues(result, measure) -> Table
-ReadRisk(result, risk_measure) -> Table
+_ReportValues(results) -> MixedArray  # mark and cash under the route's labels
+_ReportRisk(results) -> MixedArray    # delta, total and by contract; DV01 where supported
 ```
 
-These readers close the initial end-to-end trade-evaluation path. A decomposition reader
-for retained fixed/set/live amounts is a possible later view, not a third required first
-reader. The valuation layout may show both monetary fields together; the risk layout must
-retain each measure's own axes and units. Exact selectors and spill layouts remain open.
+Both take the results handle and spill what evaluation stored; neither selects a measure,
+since one result has one route. `util_ReadHandle` on the same handle is a debugging spill
+of the stored contents and replaces neither. These reports close the initial end-to-end
+trade-evaluation path. A decomposition view for retained fixed/set/live amounts is a possible
+later view, not a third required report. The values layout shows the two monetary fields
+together under their route labels; the risk layout shows the total delta and the delta by
+contract on the batch's stable axis, zero where a contract has fixed, each with its units,
+and DV01 where supported, named unsupported where not. The exact spill shapes are pinned in
+the pull request that builds them.
 
-The selected pipeline returns a results handle from `_EvaluateTrades`; these readers spill
-views from that handle. Separate value and risk readers do not calculate them independently.
+The selected pipeline returns a results handle from `_EvaluateTrades`; the two reports spill
+views from that handle and calculate nothing independently.
 They select the `valuation` or `risk` section of the same immutable `EvaluationResult`, using
 its shared context. The internal valuation section stores one `mark` and one `cash`; the
 route determines their outward labels without duplicating amounts. A risk spill follows
 the stored market/rate axes, not the number of trades in the supplied batch.
 The initial result represents the supplied batch as a whole, whether it contains one trade
-or many. The example names above do not introduce implemented functions or a grouping API.
+or many. The two functions are not yet implemented, and no grouping API is introduced.
 
 ## Allowed work and dependencies
 
@@ -117,6 +121,6 @@ a reader cannot reinterpret an older result under a new convention.
 
 Count table construction, copies and worksheet publication separately from valuation work.
 Selective numerical repricing does not necessarily reduce the size of a full Excel spill.
-An intermediate values reader and supported amount-risk reader can validate the prototype.
+An intermediate values report and a supported amount-risk report can validate the prototype.
 They do not complete the target result profile. Postpone arbitrary joins, pivot APIs,
 cross-result comparisons and a general reporting language.

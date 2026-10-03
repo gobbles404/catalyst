@@ -113,18 +113,18 @@ For example, a future schema could expose:
 | Field | Domain | Source/constraint |
 |---|---|---|
 | Instrument kind | Selected approved definition | Not a user-written payoff instruction |
-| Product | Compatible authoritative product reference | Selection or permitted template default |
+| Index | The `_CreateTrades` argument, once for the whole batch; not a template field or ticket column | Explicit; the template retains none, so one template serves any compatible index |
 | Trade ID | Optional nonempty label | Attribution only; duplicate labels do not merge occurrences |
 | Trade date | Date | Ticket or explicitly permitted default |
-| Contract | One month or monthly strip under the existing period grammar | Template default or ticket; every constituent must resolve in the static schedule |
-| Schedule method | asian, lastday, penultimate, last3day | Trade selection of a library rule, combined with static reference dates/calendars |
+| Contract | One month or monthly strip under the existing period grammar, in either case, `Z26` or `z26`, `CAL27` or `cal27` | Template default or ticket; every constituent month must resolve to one row of the index's schedule |
+| Schedule method | asian, lastday, penultimate, last3day | Trade selection of a library rule, combined with static reference dates/calendars; `lastday` alone is supported first, the others fail by name until built |
 | Signed lots | Whole nonzero quantity for the initially supported listed product | Ticket; product owns the quantity convention |
 | Quantity per | month, day | Trade quantity basis, independently of price-observation weights |
 | Fixed price | fixed_price: finite number in reference price units | Same price per constituent of a flat-priced strip; no universal positivity assumption |
 | Route | cleared, bilateral | Actual trade arrangement, compatible with its product/agreement |
 | Settlement method | physical, financial | Descriptive trade fact retained; physical-delivery handling is outside v1 |
-| Payment time lag | payment_time_lag: text such as +1bd or +2bd | Trade row or template; positive whole business days consistent with supported trade terms; product defines the actual traded contract's Last Trading Day anchor and strict-after counting |
-| Payment holiday calendar | payment_holiday_calendar: existing HolidayCalendar reference | Trade row or template; separate from pricing calendar; creation resolves payment_date per monthly component |
+| Payment time lag | payment_time_lag: text such as +1bd or +2bd | Trade row or template, required when settlement_method is financial; positive whole business days consistent with supported trade terms; product defines the actual traded contract's Last Trading Day anchor and strict-after counting |
+| Payment holiday calendar | payment_holiday_calendar: existing HolidayCalendar reference | Trade row or template, required when settlement_method is financial; separate from pricing calendar; creation resolves payment_date per monthly component |
 
 The catalog must describe and enforce supported combinations. A trade's schedule method
 selects a reviewed observation rule; it does not redefine a listed product's identity or
@@ -179,12 +179,12 @@ the same rules regardless of whether a value came from a template or ticket.
 A later template/reference inspector can show
 selected defaults and remaining ticket inputs once that stage is specified.
 
-Only expose defaults once their fields are supported. A no-template path still
-needs an explicit approved instrument definition and all required terms. The current sketch
-`_CreateTrades(index, fields, trade_rows, [template])` is therefore an incomplete universal signature:
-the same index can underlie different instruments, and cash may have no index. Decide how the
-definition is supplied, directly or through a selected template, before freezing the API.
-Selection of a template must not silently become permission to invent economic rules.
+Only expose defaults once their fields are supported. The definition is supplied through the
+template, which is required: `_CreateTrades(index, fields, trade_rows, template)` takes the
+instrument from the template and the index as its first argument, once for the whole batch.
+The same index can underlie different instruments, and the template says which. A cash
+instrument has no index and gets its own call when cash is built. Selection of a template is
+not permission to invent economic rules.
 
 ## Dependencies and acceptance
 

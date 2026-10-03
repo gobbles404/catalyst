@@ -24,7 +24,7 @@ _PrepareTrades(trades, history) -> prepared_trades_handle
 | Argument | Meaning |
 |---|---|
 | trades | One handle returned by CreateTrades, retaining resolved terms and static encoding for one or many trade occurrences |
-| history | One compatible MarketHistory handle, carrying the index, calendar, valuation context and applied historical fixings |
+| history | One compatible MarketHistory handle, carrying the index, calendar, valuation context and applied historical fixings; its calendar's index must be the batch's index, the same object, else refused by name |
 
 Both arguments are required. The result is one immutable prepared-batch handle. For example,
 `=_PrepareTrades(TradesHandle, HistoryHandle)` exposes the two dependencies directly to
@@ -49,7 +49,11 @@ encoding again. Keep its history-dependent state separate from that immutable tr
 The initial amount output retains its input identities, the batch's `floating_leg_set`,
 summed live exposure vector and its market axis. It can pre-add the aggregate fixed leg and set contribution
 for arithmetic while preserving their separate meanings. Missing required fixings fail;
-they are not forecasts, zeros or omitted averaging days. Scheduled dates and publication
+they are not forecasts, zeros or omitted averaging days. A physical futures component whose
+expiry has passed fails preparation for the whole batch: the calendar marks its expiry day as
+fixed, so from the day after expiry on, and the message names the occurrence, the contract,
+its expiry and the valuation date. Nothing is omitted, zeroed, kept in mark or moved to cash;
+the post-expiry workflow is a later feature. Scheduled dates and publication
 availability are different facts; define the supported cutoff explicitly.
 
 The current MarketHistory carries the as-of context through its calendar. In this initial signature, history
@@ -171,13 +175,11 @@ date roll must rebuild the whole prepared batch under the initial conservative p
 markets/histories must not overwrite each other's state. Releases and failures must leave
 no stale results or indefinitely retained obsolete preparations.
 
-Test fully fixed trades and the zero-live-mark numerical case. A fully fixed trade batch
-within a still-live history can have no live exposure. An entirely fixed history is a
-different integration case: the current Market constructor requires an unfixed period.
-The [Excel binding proposal](excel-trade-input-binding.md) recommends a terminal market
-extension for review; it is not yet an agreed or implemented API. Bound the first delivery
-explicitly until that path is supported; do not hide the gap with a dummy price. Selective per-fixing
-updates and sparse representations can follow measurements.
+Test fully fixed trades and the zero-live-mark case: a fully fixed batch within a still-live
+market is supported, reads zero live prices and has zero live exposure. A market whose whole
+calendar has ended is deferred; the Market is unchanged, and no dummy quote or inserted
+contract stands in for it. Selective per-fixing updates and sparse representations can
+follow measurements.
 
 The [NG creation/preparation fixture](ng-creation-preparation-example.md) now gives concrete
 input descriptors and ordered live coefficients, with a separate toy lifecycle for the
