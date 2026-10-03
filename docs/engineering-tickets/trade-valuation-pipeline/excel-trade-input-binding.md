@@ -1,34 +1,31 @@
-# Excel trade inputs and terminal market state
+# Excel trade inputs and fully fixed trades
 
 [Pipeline overview](README.md) · [CreateTrades](create-trade.md) ·
 [Preparation](03-market-binding.md) · [Seam inputs](../../seam/inputs.md)
 
-Engineering proposal, 3 October 2026. This specifies the integration work needed by the
-agreed pipeline; it does not describe implemented generic trade functions. No new public
-argument or function below is agreed merely because a possible signature is shown.
+Agreed integration contract, 3 October 2026, carrying the review's decisions 9 to 14. This
+specifies the integration work needed by the agreed pipeline; it does not describe implemented
+generic trade functions.
 
 ## Agreed surface and remaining choices
 
 ```text
-_CreateTradeTemplate(instrument, fields, values) -> template_handle
-_CreateTrades(..., fields, trade_rows, [template]) -> trades_handle
-_PrepareTrades(trades, history) -> prepared_trades_handle
-_EvaluateTrades(prepared, market) -> results_handle
+_CreateTradeTemplate(instrument, fields, values)   -> template_handle
+_CreateTrades(index, fields, trade_rows, template) -> trades_handle
+_PrepareTrades(trades, history)                    -> prepared_trades_handle
+_EvaluateTrades(prepared, market)                  -> results_handle
+_ReportValues(results), _ReportRisk(results)       -> tables
 ```
 
 The template binds the instrument, identified by the first argument, and supplies a typed
 partial set of its fields. `fields` is the column-header row, not labels for trade rows.
 `values` contains one template row; `trade_rows` contains one or many occurrences. The
-template argument of creation is optional and last. Aliases remain deferred.
+template argument of creation is required and last; the index is the first argument.
+Aliases remain deferred.
 
-Before freezing `CreateTrades`, two product decisions remain explicit:
-
-1. How the no-template call identifies its instrument.
-2. Whether `index` is exclusively an explicit argument or a template/ticket field. There
-   must be one authoritative route, not two places silently overriding each other.
-
-Neither question is answered by the seam. The proposed adapter below works after these
-decisions supply an unambiguous instrument and index context.
+Both product decisions are made: there is no call without a template, so the instrument
+always comes from the template; and `index` is exclusively the explicit argument, never a
+template field or ticket column, so no two places can disagree.
 
 Template fields and ticket fields are disjoint. If a ticket includes any field already
 supplied by its template, creation fails even when the two values are equal. Duplicate
@@ -60,20 +57,23 @@ chosen at registration, requires every declared column, and supports number, dat
 and boolean columns. It has no instrument-selected partial-column schema or typed handle
 column. Generic `CreateTrades` and its partial-input binding are not yet implemented.
 
-The general binder's case-insensitive matching differs from the proposed exact trade-field
-contract above. The new partial-table path must preserve exact identifiers rather than
-inheriting casefold behavior. This document does not change existing table functions; the
-implementation review must record this deliberate difference in matching rules.
+The general binder's case-insensitive matching differs from the exact trade-field contract
+above, and that is decided: the new path matches exactly, decision 29 stays for the
+registered tables, and inputs.md records the two rules in the decision that records this
+extension. This document does not change existing table functions.
 
-## Bounded seam extension
+## Bounded seam extension, agreed
 
-Recommend one extension for library-defined, typed partial tables. Keep the raw mixed-cell
+One extension for library-defined, typed partial tables, agreed in the review of 3 October
+2026 as its decisions 9 to 12. Keep the raw mixed-cell
 transport private to the seam. Do not pass a `MixedArray` to the trade library and ask it to
 interpret Excel cell kinds, serial dates, handle strings or positions.
 
 The proposed prepared boundary performs these steps once per changed creator input:
 
-1. Establish the instrument context from the typed instrument selector or resolved template.
+1. Establish the instrument context from the `instrument` text of `_CreateTradeTemplate` or
+   the resolved template of `_CreateTrades`, which the seam resolves before it binds the
+   ticket's columns.
    Instrument identifier meaning belongs to the library-owned definition registry. It
    provides an immutable field/type descriptor; the seam adapter compiles the corresponding
    column validators once per definition, not once per trade or tick. This is an explicit
@@ -90,6 +90,17 @@ The proposed prepared boundary performs these steps once per changed creator inp
 4. Hand the library the typed partial input. The library rejects template/ticket overlap,
    combines disjoint fields, checks completed requirements and valid combinations, resolves
    conventions, then encodes. It does not check Excel cell types again.
+
+The order of failures is: each argument alone, in signature order where possible; the
+template resolved before the instrument-dependent schema is bound; the header row's width
+against the body; unknown or repeated headers in input order; the cells column by column,
+left to right; then the library's meaning, overlap between template and ticket, a required
+field missing, an unsupported choice, incompatibility with the index. One failure is reported
+at a time and no handle is published on any. An omitted optional field is absence; a supplied
+blank reference cell is a failure naming the cell. The `type` row of `_ShowInstrument` uses
+the seam's words: `holiday calendar handle` for that reference, `code` for a choice from a
+defined list, `text`, `date` and `number`; a contract code follows a grammar, stated in its
+rule, not a list.
 
 Use the same library-owned field definitions for reader metadata, the seam's type
 descriptors and construction's semantic validation. The library must not import the Excel
@@ -126,9 +137,10 @@ And the ticket columns could be:
 | 1-Oct-2026 | Z26 | 2 | 3.50 |
 | 1-Oct-2026 | F27 | -1 | 3.70 |
 
-This shows a partial input boundary, not a complete future specification. Other required
-fields must be supplied from their single agreed source. Adding `quantity_unit` to the
-ticket is an overlap error, including when every row says `LOT`.
+This shows a partial input boundary for a financial product, not a complete future
+specification; the physical NG template supplies no payment fields. Other required fields
+must be supplied from their single agreed source. Adding `quantity_unit` to the ticket is an
+overlap error, including when every row says `LOT`.
 
 The calendar cell contains a formula reference to the creator or an Excel name referring
 to that cell. The new reference-column validator resolves its handle once and passes the
@@ -190,51 +202,27 @@ the codes and prices used. If detecting incorrectly ordered supplied prices beco
 requirement, a future input contract must carry source identities; that is an additional
 design change, not a check the present positional vector can perform.
 
-## Entirely fixed history: recommended minimal terminal path
+## Entirely ended calendar: deferred
 
-Two cases must be kept separate:
+Two cases are kept separate:
 
-| Case | Current market support | Proposed trade-evaluation behavior |
+| Case | Current market support | Decided trade-evaluation behavior |
 |---|---|---|
-| All observations for this trade batch are fixed, while the broader history still has unfixed periods | A normal market can be constructed with its valid live vector | Prepare zero commodity live inputs; evaluate only retained amounts and payment states, making no live-price reads |
-| Every period of the supplied history is fixed | History can exist, but `market()` rejects it and requires at least one quoted period | Requires an explicit terminal market path before the complete lifecycle can be delivered |
+| All observations for this trade batch are fixed, while the broader market still has unfixed periods | A normal market is constructed with its valid live vector | Supported: prepare zero commodity live inputs; evaluate the retained amounts and payment states, reading zero live prices |
+| Every period of the supplied history is fixed | History can exist, but `market()` rejects it and requires at least one quoted period | Deferred; the Market is unchanged for this first implementation |
 
-The zero-live numerical dot product is not the integration blocker. Excel has no ordinary
-zero-row range to supply to the current price-vector creator, and the market builder
-explicitly rejects both an entirely fixed history and an empty vector. A fake zero quote,
-extra fabricated schedule month or earlier as-of is not a valid terminal representation.
-
-**Recommendation for engineering review, not an agreed API change:** allow the existing
-market creator to omit its price-vector argument only when its history has no unfixed
-periods:
-
-```text
-proposed extension only:
-_CreateMarket(history, [price_vector]) -> market_handle
-
-unchanged trade evaluation boundary:
-_EvaluateTrades(prepared, market) -> results_handle
-```
-
-The terminal market would retain the real history and an explicitly absent live-price
-source. Its live axis has length zero. No first live contract exists; represent that
-absence explicitly rather than pretending the last contract is still quoted. A supplied
-price vector for this terminal state should fail. Missing a vector while the history has
-unfixed periods should continue to fail, even if one selected trade batch happens to have
-zero exposure.
-
-Audit `Market.live_prices`, its coverage properties and market readers together with this
-change. An empty live-input request returns an empty array; a nonempty request against a
-terminal market fails. Readers can still return historical rows. No reader may blindly
-dereference an absent price vector or ask for a first unfixed contract. This extends one
-market object rather than adding a second public valuation function or a dummy quote.
+The zero-live numerical dot product is not the blocker. Excel has no ordinary zero-row range
+to supply to the price-vector creator, and the market builder rejects both an entirely fixed
+history and an empty vector. A fake zero quote, a fabricated schedule month or an earlier
+as-of is not a valid representation, and no code inserts a contract or a price to reach one:
+where a fixture needs a later contract so that every state has a valid market, the fixture
+supplies it, as the [NG example](ng-creation-preparation-example.md) does with G27.
 
 Preparation still owns the fixing fold and payment-state classification under the history's
 as-of. A completely fixed unpaid amount can remain in mark until its modeled payment date;
 fixed is not paid. Commodity delta is zero when there are no remaining commodity inputs.
 Future bilateral rate exposure is a separate measure and must not be declared zero merely
-because commodity fixings are complete. Discounting remains outside this terminal amount
-proposal.
+because commodity fixings are complete. Discounting remains outside this amount path.
 
 ## Acceptance cases
 
@@ -258,13 +246,12 @@ prototype. Independent worked amounts establish expected economics.
 | Only current prices change | Zero decode/resolve/encode/fixing-fold work; only applicable evaluation work |
 | History changes but a stale prepared handle is supplied | Visible incompatibility error, no implicit preparation |
 | Entire trade batch fixed within a live broader market | Correct retained amounts; zero live-price reads |
-| Entire history fixed under the proposed terminal extension | Real history accepted without a vector; zero live-input axis; correct mark/cash classification |
-| Vector omitted for a live history, or nonempty request against terminal market | Visible failure |
+| Entire calendar ended | Deferred: refused as today, and no dummy quote or inserted contract stands in |
+| Vector omitted for a live history | Visible failure, as today |
 | Fixing correction with zero live inputs | New prepared amount equals the independently recomputed amount |
 | Repeated price ticks, failed inputs and recovery, then last workbook closed | No stale results or abandoned ownership; retained memory returns to the live graph's baseline |
 
-Instrument-selected partial tables and typed reference columns should be a separately
-reviewable seam change. Generic construction and preparation consume that contract. The
-terminal market extension is another bounded change with its own market-reader and
-lifetime checks. This scope does not require per-row creator handles, a general rule
+Instrument-selected partial tables and typed reference columns are a separately reviewable
+seam change, ticket I3 of the [README](README.md). Generic construction and preparation
+consume that contract. This scope does not require per-row creator handles, a general rule
 language, incremental fixing updates or a new cache.

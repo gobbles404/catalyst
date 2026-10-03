@@ -82,7 +82,10 @@ identity, expected live layout and price units must agree. Use retained identiti
 already validated mappings; do not re-resolve each trade or walk its observation schedule.
 An incompatible market fails here and needs the appropriate preparation outside evaluation.
 
-Then obtain current prices in the prepared matrix's column order, using the retained mapping.
+The market's history must be the prepared history, the same object; a market over another
+history, even one of the same index and name, is refused by name, and evaluation never
+prepares again. Then obtain current prices in the prepared matrix's column order, using the
+retained mapping.
 A correctly sized vector or the same display index name is not proof of correct alignment.
 If the required inputs are already in precisely that order, the numerical path may consume
 them directly. The first version evaluates the complete prepared batch.
@@ -155,7 +158,12 @@ an inability to compute a required field fails publication rather than returning
 successful-looking result. An interim amount-only specimen is identified as such.
 
 Commodity delta identifies both its value measure and its market axis: amount or NPV per
-one unit of an identified mark. Lots and underlying quantity are different presentations
+one unit of an identified mark. Evaluation retains delta by contract on the batch's stable
+axis, the contracts in static order with zero on a contract that has fixed, with the axis's
+labels and units, and the scalar total, the batch's change for a common one-price-unit move
+across its contracts; `_ReportRisk` spills the scalar aggregates, the total and DV01 where
+supported, and recalculates nothing, while the vector stays in the result for later use. Lots
+and underlying quantity are different presentations
 requiring the stored conversion. Sensitivity to bound marks is not automatically sensitivity
 to raw vendor inputs or calibration instruments if another curve transformation lies between.
 

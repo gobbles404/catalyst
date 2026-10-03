@@ -35,17 +35,19 @@ The `required` row contains Excel booleans after its text label; all other cells
 nonempty text. There are no spacer rows, blank placeholders, object handles or additional
 implementation-type row. This is the default layout; no transpose argument is introduced.
 
-Candidate contract-based future schema, for discussion. A template supplies defaults for
-recognized trade fields; the selected traded product/agreement constrains the resolved values:
+The `future` schema agreed for the first implementation. A template supplies defaults for
+recognized trade fields; the selected traded product/agreement constrains the resolved values.
+The index is not among the fields: `_CreateTrades(index, fields, trade_rows, template)` takes
+it as its first argument, once for the whole batch.
 
-| field | trade_id | trade_date | index | contract_specification | contract_code | schedule_method | route | settlement_method | clearing_house | broker | quantity | quantity_unit | quantity_per | fixed_price | payment_time_lag | payment_holiday_calendar |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| description | External label identifying the deal | Date the deal was executed | The economic reference named by the deal | Name selecting the lot and quantity specification from the index | One monthly contract or a strip of monthly contracts | How observations determine the floating price | The actual trade's clearing arrangement | Descriptive final-settlement form of the actual trade | The clearing organization for this trade | The broker recorded for the deal | Signed size of the position | How the supplied quantity is measured | Whether quantity applies per month or per day | The fixed price agreed when the deal was executed | Business-day offset from the payment anchor defined by the supported product | Calendar supplying holidays for payment-day counting |
-| required | FALSE | TRUE | TRUE | TRUE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | TRUE | TRUE | TRUE | TRUE | TRUE |
-| required_when | none | none | none | none | none | none | none | none | route = cleared | none | none | none | none | none | none | none |
-| type | text | date | index reference | text | text | code | code | code | reference | text | number | code | code | number | text | holiday calendar reference |
-| options | no fixed list | no fixed list | compatible static reference | selected index's specifications | existing contract-period grammar, subject to index schedule coverage | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | compatible clearing organization | no fixed list in this sketch | by supported profile | by supported profile | month, day | no fixed list | +1bd, +2bd and other positive whole-business-day offsets consistent with supported trade terms | compatible static payment calendar |
-| rule | Duplicate labels retain separate occurrences | Explicit executed date; never inferred from as-of or today's date | No market snapshot dependency | Data is obtained through index; template can supply the selection; no separate specification handle | Proposed strip expansion: CAL27 is F27 through Z27; Z27-X28 is December 2027 through November 2028, inclusive | Library-defined rule selected by the trade; template may default it; exact and cfd excluded from v1 | Must be supported for the selected traded product/agreement | Retained product/trade fact; physical-delivery handling is outside v1; does not choose pricing observations or payment dates | Distinct from clearing firm/account; constrained by the actual route | Attribution; no fees or clearing role inferred from the label | First NG profile: whole nonzero lots; no universal lot-integrality rule for bilateral extensions | First NG profile: LOT; later units require supported conversions | Proposed: each contract month or each calendar day in the quantity period; independent of observation weights | Finite number in the defined quote units; applies to every monthly constituent of a flat-priced strip | Trade row or template supplies it; PHH uses +1bd and ETE uses +2bd; initially count eligible days strictly after the actual traded contract's last trading day | Reuse HolidayCalendar; Monday-Friday excluding listed holidays; independent of pricing calendar |
+| field | trade_id | trade_date | contract_specification | contract_code | schedule_method | route | settlement_method | clearing_house | broker | quantity | quantity_unit | quantity_per | fixed_price | payment_time_lag | payment_holiday_calendar |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| description | External label identifying the deal | Date the deal was executed | Name selecting the lot and quantity specification from the index | One monthly contract or a strip of monthly contracts | How observations determine the floating price | The actual trade's clearing arrangement | Descriptive final-settlement form of the actual trade | The clearing organization for this trade | The broker recorded for the deal | Signed size of the position | How the supplied quantity is measured | Whether quantity applies per month or per day | The fixed price agreed when the deal was executed | Business-day offset from the payment anchor defined by the supported product | Calendar supplying holidays for payment-day counting |
+| required | FALSE | TRUE | TRUE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE |
+| required_when | none | none | none | none | none | none | none | route = cleared | none | none | none | none | none | settlement_method = financial | settlement_method = financial |
+| type | text | date | text | text | code | code | code | text | text | number | code | code | number | text | holiday calendar handle |
+| options | no fixed list | no fixed list | selected index's specifications | existing contract-period grammar, subject to index schedule coverage | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list; a label, nothing inferred from it | no fixed list in this sketch | by supported profile | by supported profile | month, day | no fixed list | +1bd, +2bd and other positive whole-business-day offsets consistent with supported trade terms | compatible static payment calendar |
+| rule | Duplicate labels retain separate occurrences | Explicit executed date; never inferred from as-of or today's date | Data is obtained through the index argument of _CreateTrades; template can supply the selection; no separate specification handle | Typed in either case, Z26 or z26, CAL27 or cal27, and resolved by month against the index's schedule, every schedule code read; proposed strip expansion: CAL27 is F27 through Z27; Z27-X28 is December 2027 through November 2028, inclusive | Library-defined rule selected by the trade; template may default it; exact and cfd excluded from v1; lastday is supported first, the others fail by name until built | Must be supported for the selected traded product/agreement | Retained product/trade fact; physical-delivery handling is outside v1; does not choose pricing observations or payment dates | Distinct from clearing firm/account; constrained by the actual route | Attribution; no fees or clearing role inferred from the label | First NG profile: whole nonzero lots; no universal lot-integrality rule for bilateral extensions | First NG profile: LOT; later units require supported conversions | Proposed: each contract month or each calendar day in the quantity period; independent of observation weights | Finite number in the defined quote units; applies to every monthly constituent of a flat-priced strip | Trade row or template supplies it; PHH uses +1bd and ETE uses +2bd; initially count eligible days strictly after the actual traded contract's last trading day | Reuse HolidayCalendar; Monday-Friday excluding listed holidays; independent of pricing calendar |
 
 `future` here is a proposed desk family organized around a specified reference contract. A
 bilateral lookalike can share this schema while retaining its own contractual treatment.
@@ -63,8 +65,9 @@ existing HolidayCalendar handle as payment_holiday_calendar. CreateTrades parses
 once, then resolves and stores each monthly component's payment_date from these static
 dependencies. There is no additional public payment-rule field, constructor or handle.
 Positive whole business days are the initial scope; zero-day adjustment semantics and
-broader bilateral payment terms remain deferred. This accepted starting design is not yet
-implemented.
+broader bilateral payment terms remain deferred. Both payment fields are required when
+`settlement_method` is `financial`; the physical NG path supplies neither. This accepted
+starting design is not yet implemented.
 
 This is a schema proposal; trade creation is not yet implemented.
 `quantity` plus `quantity_unit` preserves the vocabulary in the user's example. For the first
@@ -115,8 +118,9 @@ or pen alias is proposed. The month/day meanings and method weights remain revie
 choices; no schedule implementation is included here.
 
 The field list is the logical instrument schema, not a declaration that all these fields must
-be repeated in every ticket row. The future `CreateTrades` contract will establish which
-facts arrive as shared arguments, template defaults and row columns.
+be repeated in every ticket row. `_CreateTrades(index, fields, trade_rows, template)` takes
+the index as its argument; every other fact arrives as a template default or a ticket column,
+each from one source.
 
 ## Excel help
 
@@ -155,9 +159,10 @@ partial spill and creates no object. Optionality of trade fields is unrelated to
 - `required_when`: an additional condition making a field mandatory; `none` when absent.
   Conditions apply to the resolved values, including defaults. A supplied zero is
   present. Displayed conditions describe library-owned rules, not user-authored expressions.
-- `type`: the semantic type of the eventual resolved input, not the storage dtype of the
-  metadata cell. For example, `index reference` describes a trade input; this reader neither
-  looks up nor publishes such a reference.
+- `type`: the semantic type of the eventual resolved input, in the seam's words, not the
+  storage dtype of the metadata cell: `text`, `number`, `date`, `code` for a choice from a
+  defined list, and `holiday calendar handle` for that reference, which this reader neither
+  looks up nor publishes. A contract code follows a grammar, stated in its rule, not a list.
 - `options`: the fixed allowed choices or the source of contextual choices. `no fixed list`
   and similar display phrases are explanatory text, not valid ticket values. A generic
   instrument reader cannot enumerate a selected index's contract codes without that index.
@@ -191,7 +196,7 @@ this generic schema reader for now.
 | Earlier field | Proposal for review |
 |---|---|
 | trade_id | Keep optional attribution; occurrence identity always preserves every row |
-| index | Keep the required static economic reference; no market snapshot dependency |
+| index | The `_CreateTrades` argument, not a field; no market snapshot dependency |
 | future_month | Use contract_code with explicitly supported syntax |
 | quantity, quantity_unit, fixed_price | Use fixed_price for the agreed price; quantity basis is explicit and applies per monthly component |
 | broker | Retain optional attribution as in the user's ticket; no pricing effect inferred |
@@ -199,7 +204,7 @@ this generic schema reader for now.
 | clearing_house | Distinguish the clearing house from a clearing firm/account; agree whether selected specifications supply or constrain it |
 | marketing_reserve | Defer until defined: currency/units, per-unit versus total, sign, and whether it changes value or is reporting-only |
 | trade_date, contract_specification | Add the missing executed date and unambiguous specification selection |
-| schedule_method, quantity_per | Retain these field names; library-defined methods and month/day quantity basis; exact and cfd outside v1 |
+| schedule_method, quantity_per | Retain these field names; library-defined methods, lastday supported first, and month/day quantity basis; exact and cfd outside v1 |
 | settlement_method | Retain physical/financial identification; physical-delivery handling is outside v1 and does not set payment dates |
 
 Omitted candidates are not silently supported or discarded at ingestion. The eventual
