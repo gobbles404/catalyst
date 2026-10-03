@@ -1,10 +1,15 @@
 """What one call through the seam allocates on the Python heap, at its peak, and what a
 creator's publication still holds once the call has returned.
 
-tracemalloc sees Python objects and numpy's data buffers, which numpy registers with it.
-It does not see the host's pinned buffers or anything in the CLR. Each ceiling is the
-peak measured on 2026-09-11 plus slack, so a change that allocates a new full-size
-temporary fails here and a change that removes one lowers the ceiling in its own PR.
+tracemalloc sees Python objects and numpy's data buffers, which numpy registers with it, on
+every thread of this process and not only in the call measured; it does not see the host's
+pinned buffers or anything in the CLR. Each ceiling is the peak measured plus slack, and
+since #NN every pin is the least of three warm measurements, each with its own untraced
+warmup and its own trace, so that an allocation the call did not make, another thread's or a
+resize of the store's dictionary, which lands on one call in many, never lands on the pin.
+The least is what a warm call does every time, not a cold call and not a worst case: a change
+that allocates a new full-size temporary on every call stands in all three samples and fails
+here, and a change that removes one lowers the ceiling in its own PR.
 """
 
 import ctypes
@@ -36,10 +41,72 @@ def peak_bytes(fn: Callable[[], object]) -> int:
         tracemalloc.stop()
 
 
+def least_peak(fn: Callable[[], object]) -> int:
+    """The least of three peaks of one call, each with its own untraced warmup and its own trace.
+
+    One sample can be raised by what the call did not do: a resize of the store's dictionary,
+    which lands on one call in many, or an allocation on another thread of the process, an xdist
+    worker's receiver among them. What the call does every time stands in all three samples and
+    so in the least; so does a disturbance that lands on all three. A call that fails is not
+    retried: its error comes out of the first sample, with tracing stopped.
+    """
+    return min(peak_bytes(fn) for _ in range(3))
+
+
+# The measure itself: three samples, each a warmup untraced and then one traced call, six calls
+# in all, and the pin is the least of the three. A 4-kilobyte temporary made on the traced call
+# of one sample, whichever one, leaves the least where the other two put it, under the slack;
+# with one sample, or the greatest or the mean of three, it would stand over it.
+@pytest.mark.parametrize("noisy_sample", [0, 1, 2], ids=["first", "second", "third"])
+def test_a_spike_in_one_sample_does_not_set_the_least(noisy_sample: int) -> None:
+    traced: list[bool] = []
+
+    def work() -> object:
+        traced.append(tracemalloc.is_tracing())
+        noisy = len(traced) == 2 * noisy_sample + 2  # the traced call of the noisy sample
+        return bytearray(4 * SLACK) if noisy else None
+
+    assert least_peak(work) < SLACK
+    assert traced == [False, True] * 3
+
+
+# A full-size temporary made on every call, 8 bytes per cell, stands in every sample and so in
+# the least, freed before the call returns or not: the scalar call's pin above, which the slack
+# holds, would fail with it.
+def test_a_full_size_temporary_on_every_call_stands_in_the_least() -> None:
+    def call_with_scratch() -> object:
+        scratch = np.empty(N)
+        result = ENTRY["Add"](1.0, 2.0)
+        del scratch
+        return result
+
+    peak = least_peak(call_with_scratch)
+    assert peak >= 8 * N
+    assert peak > SLACK
+    assert not tracemalloc.is_tracing()
+
+
+# A call that fails, in the warmup or under the trace, fails the measurement at once: the error
+# as it was raised, no second sample taken, and tracing stopped behind it.
+@pytest.mark.parametrize("failing_call", [1, 2], ids=["the warmup", "the traced call"])
+def test_a_failing_call_is_not_retried_and_tracing_stops(failing_call: int) -> None:
+    traced: list[bool] = []
+
+    def work() -> None:
+        traced.append(tracemalloc.is_tracing())
+        if len(traced) == failing_call:
+            raise ValueError("measured failure")
+
+    with pytest.raises(ValueError, match=r"^measured failure$"):
+        least_peak(work)
+    assert traced == [False, True][:failing_call]
+    assert not tracemalloc.is_tracing()
+
+
 def test_a_scalar_call_allocates_only_small_objects() -> None:
-    assert peak_bytes(lambda: ENTRY["Add"](1.0, 2.0)) <= SLACK
-    assert peak_bytes(lambda: ENTRY["Zero"]()) <= SLACK
-    assert peak_bytes(lambda: ENTRY["Fail"]()) <= SLACK
+    assert least_peak(lambda: ENTRY["Add"](1.0, 2.0)) <= SLACK
+    assert least_peak(lambda: ENTRY["Zero"]()) <= SLACK
+    assert least_peak(lambda: ENTRY["Fail"]()) <= SLACK
 
 
 # A range of numbers is accepted on the host's summary alone: no look at the kinds, so no
@@ -47,7 +114,7 @@ def test_a_scalar_call_allocates_only_small_objects() -> None:
 # when every range paid a look and its 8-byte-per-cell scratch.
 def test_a_range_of_numbers_in_makes_no_temporary() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= SLACK
+    assert least_peak(lambda: ENTRY["SumArray"](column)) <= SLACK
 
 
 # A column of text is accepted on the summary too, and the host's tuple of text cells is
@@ -55,7 +122,7 @@ def test_a_range_of_numbers_in_makes_no_temporary() -> None:
 # 160,635 when the tuple went into an object array and came back out as a second tuple.
 def test_a_column_of_text_in_makes_no_temporary() -> None:
     names = Cells.from_rows([[f"name{i}"] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["FirstOfNames"](names)) <= SLACK
+    assert least_peak(lambda: ENTRY["FirstOfNames"](names)) <= SLACK
 
 
 # A rejected range still takes the look that names the bad cell: one 1-byte mask over the
@@ -67,13 +134,13 @@ def test_a_column_of_text_in_makes_no_temporary() -> None:
 # 2026-09-12: the record, its shape, and the small objects any call makes.
 def test_a_mixed_range_in_makes_no_temporary() -> None:
     cells = Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])
-    assert peak_bytes(lambda: ENTRY["CountMixed"](cells)) <= SLACK
+    assert least_peak(lambda: ENTRY["CountMixed"](cells)) <= SLACK
 
 
 # A scalar becomes a one-cell range, which is the only mixed input that allocates storage of
 # its own: two one-element arrays. Measured 473 bytes on 2026-09-12.
 def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
-    assert peak_bytes(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
+    assert least_peak(lambda: ENTRY["CountMixed"](5.0)) <= SLACK
 
 
 # A table pays for what it converts, and nothing per row beyond that. Measured 43,940 bytes at
@@ -86,7 +153,7 @@ def test_a_scalar_promoted_to_a_mixed_range_stays_small() -> None:
 def test_a_table_in_pays_for_its_conversions_and_nothing_per_row_beyond() -> None:
     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
     body = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(N // 4)])
-    assert peak_bytes(lambda: ENTRY["SumQuantity"](headers, body)) <= 5 * N + SLACK
+    assert least_peak(lambda: ENTRY["SumQuantity"](headers, body)) <= 5 * N + SLACK
 
 
 # Naming the bad cell is the rejection path's work. A blank is one mask over the kinds, measured
@@ -96,28 +163,28 @@ def test_a_rejected_mixed_range_pays_to_locate_the_cell_it_names() -> None:
     rows: list[list[object]] = [[float(i)] for i in range(N)]
     rows[N // 2][0] = None
     blank = Cells.from_rows(rows)
-    assert peak_bytes(lambda: ENTRY["CountMixed"](blank)) <= 2 * N + SLACK
+    assert least_peak(lambda: ENTRY["CountMixed"](blank)) <= 2 * N + SLACK
     texts: list[list[object]] = [[f"n{i}"] for i in range(N)]
     texts[N // 2][0] = ""
     empty = Cells.from_rows(texts)
-    assert peak_bytes(lambda: ENTRY["CountMixed"](empty)) <= 11 * N + SLACK
+    assert least_peak(lambda: ENTRY["CountMixed"](empty)) <= 11 * N + SLACK
 
 
 def test_a_rejected_range_pays_one_look_and_its_two_masks() -> None:
     rows: list[list[object]] = [[float(i)] for i in range(N)]
     rows[-1][0] = "x"
     column = Cells.from_rows(rows)
-    assert peak_bytes(lambda: ENTRY["SumArray"](column)) <= 2 * N + SLACK
+    assert least_peak(lambda: ENTRY["SumArray"](column)) <= 2 * N + SLACK
 
 
 # The way out still looks once, for finite numbers: one byte per cell. Measured 10,385.
 def test_a_column_out_adds_only_its_finite_mask() -> None:
     column = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["EchoColumn"](column)) <= N + SLACK
+    assert least_peak(lambda: ENTRY["EchoColumn"](column)) <= N + SLACK
 
 
 def test_an_array_out_peaks_at_the_array_and_its_finite_mask() -> None:
-    assert peak_bytes(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
+    assert least_peak(lambda: ENTRY["Grid"](N // 2, 2)) <= 9 * N + SLACK
 
 
 # The mixed road out pays its three looks, a 1-byte mask each and the compares behind them, and
@@ -125,26 +192,20 @@ def test_an_array_out_peaks_at_the_array_and_its_finite_mask() -> None:
 # thousand numbers and 72,213 over the mixed column, a text in every fourth cell, on 2026-09-15.
 def test_a_mixed_array_out_peaks_at_its_masks_and_its_joined_text() -> None:
     numbers = Cells.from_rows([[float(i)] for i in range(N)])
-    assert peak_bytes(lambda: ENTRY["EchoMixed"](numbers)) <= 6 * N + SLACK
+    assert least_peak(lambda: ENTRY["EchoMixed"](numbers)) <= 6 * N + SLACK
     mixed = Cells.from_rows([[f"n{i}", 46164.0 + i, float(i), i % 2 == 0] for i in range(N // 4)])
-    assert peak_bytes(lambda: ENTRY["EchoMixed"](mixed)) <= 8 * N + SLACK
+    assert least_peak(lambda: ENTRY["EchoMixed"](mixed)) <= 8 * N + SLACK
 
 
 # --- handles ------------------------------------------------------------------
 # A creator keeps what it makes: the record, its entry in the store and its text; a reader
-# keeps nothing, and its numpy scalars are the small objects. Each is the least of three warm
-# calls, so that a resize of the store's dictionary, which lands on one call in many, never
-# lands on the pin.
+# keeps nothing, and its numpy scalars are the small objects.
 
 CURVE_HEADERS = Cells.from_rows([["date", "discount_factor"]])
 
 
 def curve_body(rows: int) -> Cells:
     return Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(rows)])
-
-
-def least_peak(fn: Callable[[], object]) -> int:
-    return min(peak_bytes(fn) for _ in range(3))
 
 
 # Measured 272 bytes for the valuation date on 2026-10-01, the record and its entry. It took
@@ -350,7 +411,7 @@ def test_owning_a_range_peaks_at_the_two_copies() -> None:
     kinds = (ctypes.c_uint8 * N)(*([0] * N))
     numbers = (ctypes.c_double * N)(*[float(i) for i in range(N)])
     pointers = ctypes.addressof(kinds), ctypes.addressof(numbers)
-    assert peak_bytes(lambda: bridge.cells_from_buffers(*pointers, N, 1, "", 1)) <= 9 * N + SLACK
+    assert least_peak(lambda: bridge.cells_from_buffers(*pointers, N, 1, "", 1)) <= 9 * N + SLACK
 
 
 def fixings_columns(rows: int, holidays: int) -> tuple[Cells, Cells]:
