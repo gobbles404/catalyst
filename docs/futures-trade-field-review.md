@@ -1,24 +1,26 @@
-# Futures trade representation: contract survey and proposed fields
+# Futures trade representation: contract research
 
-Review draft · 27 September 2026 · Goosedove
+Research collected 27 September 2026; design reconciliation 3 October 2026 · Goosedove
 
-This report consolidates Henry Hub, Waha, crude oil, refined products, ethane, carbon allowances and COMEX copper. Exchange facts are linked to primary sources. Field names and enumerations below are design proposals, not an implemented API. Sample trades and firm/account names are fictional.
+This report preserves research on Henry Hub, Waha, crude oil, refined products, ethane, carbon allowances and COMEX copper. Exchange facts are linked to primary sources; they have not been reverified during this documentation reconciliation. Sample trades and firm/account names are fictional.
 
-## 1. Recommended shape
+**The [trade-valuation pipeline](engineering-tickets/trade-valuation-pipeline/README.md) is the current engineering contract.** Its [instrument field sketch](engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md), [ShowInstrument specification](library/instruments/show-instrument.md) and [CreateTrades specification](engineering-tickets/trade-valuation-pipeline/create-trade.md) supersede this report's earlier schema and build sequence. This survey is supporting research, not a second backlog or permission to add arbitrary trade fields. Physical delivery processing and margining are outside v1.
 
-Use one broad **futures trade template**, optionally narrowed by product, contract period, book and clearing account. Individual details complete the executed deal. Together they resolve once into a complete trade with references to shared definitions.
+## 1. Research in the agreed pipeline
+
+The library owns the instrument definition. A template selects that instrument and supplies shared permitted fields; ticket rows complete the executed deal. `CreateTrades` resolves those terms against static Index definitions and encodes them. `PrepareTrades` applies history and retains aggregate compatible live exposures; `EvaluateTrades` consumes the current market and produces aggregate results for pure readers.
 
 The field universe is larger than the trade-entry form:
 
 | Component | What it contains |
 |---|---|
-| Trade template | Reusable defaults or selections, such as an index, specification, book or account |
+| Trade template | Shared fields from the selected library instrument definition |
 | Individual trade details | Executed facts: trade identifier, trade date, quantity, agreed price, and selections left open by the template |
 | Shared definitions | Product identity, conventions, lot size, settlement terms, fixing methodology, delivery eligibility and date rules |
-| Resolved contract schedule | Applicable observation, trading, notice, delivery and payment dates |
-| Valuation inputs and lifecycle records | Current prices, published fixings, cash already settled, allocations and actual delivery events |
+| Resolved contract schedule | Applicable observation, trading and payment dates; notice/delivery research below is outside v1 |
+| Valuation inputs | Current prices, published fixings and as-of state, supplied separately from static trade terms |
 
-**A template default and an exchange-defined fact have different authority.** Details can replace a default month or book. Selecting a listed product determines its lot size and final settlement form. A conflicting override must fail or select a different product/specification; it cannot quietly turn a physical future into a financial one.
+**Template and ticket fields are disjoint.** Repeating a template field in the ticket fails even when its value is identical. Headers must exactly match the selected instrument definition; unknown fields, aliases, case/whitespace variants and duplicate headers fail. The completed terms must also satisfy the selected product's static facts. Neither a ticket nor a template can quietly turn a physical listed future into a financial one.
 
 Terminology is deliberate: a **quote** is an offered price/terms; a **trade** is a consummated deal; **agreed trade price** is its execution price; **market price** is a valuation input; a **fixing** is an established observation. A contract period identifies the listed maturity; it is separate from trade date.
 
@@ -38,20 +40,11 @@ The user-facing field can also accept a defined strip alias such as `Cal27`. Its
 
 ICE defines a calendar strip as buying all monthly contracts for the selected year. Its strip convention is distinct from an average-priced monthly future. [ICE common strategies and strips, sections 3.6 and 4.1](https://www.ice.com/publicdocs/IFEU_Common_Strategies_and_Strips.pdf).
 
-Use the resolved choice **`SINGLE_CONTRACT` / `STRIP`** rather than infer structure from the code's spelling. This is separate from the fixing method: one contract can average daily prices, and a strip can contain averaging contracts. A product may also define a single longer-period averaging instrument; a year label alone is not authority to expand it into twelve contracts. WTI Financial's rules describe longer-period averaging contracts, but the applicable listing/contract definition must establish the actual binding. [CME Chapter 510](https://www.cmegroup.com/rulebook/NYMEX/5/510.pdf).
+Contract selection and fixing method are separate: one contract can average daily prices, and a strip can contain averaging contracts. A product may also define a single longer-period averaging instrument; a year label alone is not authority to expand it into twelve contracts. WTI Financial's rules describe longer-period averaging contracts, but the applicable listing/contract definition must establish the actual binding. [CME Chapter 510](https://www.cmegroup.com/rulebook/NYMEX/5/510.pdf).
 
 “Bullet” can remain a desk term, but it should not silently mean both “one listed maturity” and “one observation or payment.” Those are separate facts.
 
-For a strip, preserve one deal/package identity and resolve its constituents once. Define quantity explicitly: for an equal monthly strip with one lot of each month per strip unit, **+10 strip units means +10 lots in each month, or 120 monthly lots total**. The component-lot ratios belong in the shared strip definition. Keep the agreed package price and the actual component execution prices or an explicit allocation rule; an average package price does not prove that every month executed at that price.
-
-| Conditional strip information | Domain / sample | Purpose |
-|---|---|---|
-| `strip_definition_ref` | Reference: NG calendar-year strip definition | Defines accepted alias, constituent selection and lot ratios |
-| `signed_strip_units` | Signed whole count: `+10` | Multiplies component lots per strip unit; single contracts continue to use `signed_lots` |
-| `component_contracts`, `component_lot_ratios` | Resolved arrays: twelve monthly codes, twelve ratios of `1` | Preserve each listed contract, market point and schedule |
-| `agreed_package_price`, `component_execution_prices` | Price plus reported/explicitly allocated component prices | Preserve executed terms and support monthly cash/P&L attribution |
-
-This extends the user's compact trade entry, not the meaning of an individual listed future. The prepared path receives per-contract arrays for both one-contract trades and strips.
+The current [creation contract](engineering-tickets/trade-valuation-pipeline/create-trade.md) defines the initial strip form: `contract_code` resolves monthly constituents, `quantity_per` establishes the quantity basis, and one `fixed_price` applies to each constituent. For example, `CAL27` with `quantity = +10`, `quantity_unit = LOT` and `quantity_per = month` contributes +10 lots in each month. This is an explicitly booked flat-price strip, not an inference that a package-average execution price applies to every month. Package allocation and arbitrary component ratios from the earlier survey are not additional v1 input fields.
 
 ## 2. Contract survey
 
@@ -90,9 +83,11 @@ WTI Financial requires a first-nearby selection rule across dates; the selected 
 
 ## 3. Exchange, clearing house and clearing firm
 
-“ICE versus CME” is useful shorthand for exchange groups, but insufficient for identifying how a trade is listed, executed and cleared.
+"ICE versus CME" is useful shorthand for exchange groups, but insufficient for identifying how a trade is listed, executed and cleared.
 
-| Field | Meaning | Sample values | Usually supplied by |
+The labels below distinguish venue and account concepts; they are not additional accepted ticket headers. The current instrument definition alone establishes allowed fields.
+
+| Research term | Meaning | Sample values | Possible source |
 |---|---|---|---|
 | `exchange_group` | Corporate grouping; useful for display | CME Group; ICE | Shared exchange reference |
 | `listing_exchange` | Exchange listing the contract | NYMEX; COMEX; ICE Futures U.S.; ICE Endex | Product specification |
@@ -114,102 +109,28 @@ These are references to configured entities, not exhaustive hardcoded enums. An 
 
 The ICE Futures U.S. products selected here clear through ICE Clear Europe; an IFUS listing does not by itself imply ICE Clear U.S. [CME clearing membership](https://www.cmegroup.com/clearing/membership.html), [ICE Clear Europe scope](https://www.ice.com/clear-europe/regulation), [ICE energy/environmental fee schedule](https://www.ice.com/publicdocs/futures_us/IFUS_Energy_Fees.pdf).
 
-## 4. Proposed field universe
+## 4. What the research contributes to the field definition
 
-**Domain notation:** `Choice` means a deliberately limited set for this scope. `Reference` means a supplied definition or configured record: extensible, but validated, rather than arbitrary prose. `Value` means a typed number, date or identifier. A sample is not an exhaustive list unless explicitly called a choice.
+The earlier wide field proposal is superseded. Use the [instrument field sketch](engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md) and [ShowInstrument spill](library/instruments/show-instrument.md) for exact names, requiredness, types and choices. In particular, `trade_id` is optional attribution; executed size uses `quantity`, `quantity_unit` and `quantity_per`; the agreed price field is `fixed_price`. Retained occurrence identity does not depend on a user-supplied trade identifier. The former `signed_lots` and `agreed_trade_price` names are not accepted aliases.
 
-The names describe information requirements. They do not prescribe one wide object or a new class for every group. References can expose facts without copying them into every trade. In the existing project, an index's display name is not a unique lookup key.
+This research identifies facts the design must obtain from an appropriate source. It does not establish a trade column for every fact:
 
-### A. Trade terms and booking information
+| Research distinction | Current design boundary |
+|---|---|
+| Quote currency/unit, amount currency and quantity category | Static Index conventions; creation validates compatible quantity and price terms |
+| Lot size/unit and per-lot fee rates | Named row in `index.specifications`, selected by `contract_specification` |
+| Listed contract and observation dates | Static schedule and supported `schedule_method`, resolved once during creation |
+| Published observations versus current prices | History enters PrepareTrades; live prices enter EvaluateTrades |
+| Observation, expiry and payment dates | Distinct facts; supported payment terms resolve explicit payment dates during creation |
+| Delivery eligibility, allowances/vintage, actual weight, warehouse and registry events | Contract research for later scope; physical delivery processing is outside v1 |
+| Execution venue, firm/account and operational allocations | Research context, not arbitrary metadata permitted by the current definition |
+| Daily variation cash and collateral treatment | Separate economic concepts; margining is outside v1 |
 
-| Proposed field | Domain / sample | Requirement and source |
-|---|---|---|
-| `trade_id` | Value: `T-000123` | Required booking identity; can be generated. Equal economics do not mean the same trade |
-| `trade_date` | Value: `2026-09-25` | Required executed deal date; preserve the exchange business date where applicable |
-| `execution_timestamp` | Value: `2026-09-25T14:30:00-04:00` | Optional precision; does not replace trade date |
-| `index_ref` | Reference: any supplied compatible futures index | Required selection, from template or details |
-| `contract_spec_ref` | Reference: chosen contract specification for that index | Required selection; may be determined by a product template |
-| `contract_code` | Defined code: `Z26`; defined strip alias: `Cal27` | Required binding selection, from template or details; resolve within the selected product/specification |
-| `resolved_contract_binding` | Derived choice: `SINGLE_CONTRACT`, `STRIP` | Determined by the supplied contract/strip definition, not separately overridden |
-| `contract_period` | Resolved period: December 2026 or calendar 2027 | Describes the selected binding; period dates alone are not its identity |
-| `signed_lots` | Value: `+10`, `-4` | Required for a single contract; nonzero signed whole lots. Positive buy, negative sell. Strips use defined units and component ratios as above |
-| `agreed_trade_price` | Value: `4.25`, in selected product units | Required for a single contract; preserve package/component prices for strips. Product rules govern validity; no universal positive-price requirement |
-| `legal_entity_ref` | Reference: fictional `TradingCo` | Required for operational positions; template/account may supply it |
-| `book_ref` | Reference: fictional `Metals` | Booking allocation; template/details |
-| `clearing_route_ref` | Reference: allowed product/house route | Usually determined by the product; validate any selectable route |
-| `clearing_firm_ref`, `clearing_account_ref` | References: `Firm A`, `Metals-01` | Required for a booked cleared position; an analytical example can omit them explicitly |
-| `execution_venue_ref`, `execution_method_ref` | References: venue and supported method | Optional for pricing; useful execution provenance |
-| `executing_broker_ref` | Reference | Conditional on broker involvement |
-| `external_execution_id`, `external_clearing_id` | Namespaced identifiers | Optional reconciliation references; keep their namespaces |
-| `fee_schedule_ref` | Reference to product/account fee terms | Optional pricing cost input; actual charges belong in fee events |
-| `template_ref`, `template_revision` | Reference/value | Optional provenance; resolved terms must remain reproducible if defaults later change |
+The present `ContractSpecifications` object supplies lot/unit/fee arrays, not the entire exchange rulebook. Static product facts needed for a supported schedule or payment anchor must be provided explicitly; a clearing-house string or specification display name is insufficient. The [creation specification](engineering-tickets/trade-valuation-pipeline/create-trade.md) records the Index source and the remaining input-placement decision.
 
-An entry form may expose `side = BUY / SELL` plus a positive lot count. Resolve that once to signed lots; avoid independently editable side and signed quantity in the economic representation. A contract month, book or index need not be re-entered if the template supplies it.
+### Dates and calendars: retained exchange evidence
 
-### B. Shared product specifications and conventions
-
-| Proposed field | Domain / sample | Meaning |
-|---|---|---|
-| `instrument_type` | Choice for this template: `FUTURE` | Identifies the trade family; bilateral lookalikes will need their own contractual treatment |
-| `product_ref`, `product_name` | Reference plus display text | Official product identity; display names are not sufficient keys |
-| `external_product_codes` | Namespaced code collection | Example: Globex `CSX`, ClearPort `CS` |
-| `definition_revision`, `effective_applicability` | Version reference/date or contract range | Proposed provenance for rules applicable to a contract; exchange amendments may apply by maturity |
-| `listing_exchange_ref` | Reference | See venue table |
-| `allowed_clearing_routes` | References | Permitted house/product combinations |
-| `final_settlement_type` | **Choice: `PHYSICAL`, `FINANCIAL`** | Final obligation if carried into settlement; financial means cash here |
-| `futures_cash_rule_ref` | Reference | Variation cash and final cash treatment, independently of physical/financial final settlement |
-| `lot_size`, `lot_quantity_unit` | Positive value plus unit reference | Examples: 10,000 MMBtu; 25,000 LB |
-| `quantity_measure` | Reference; examples `energy`, `volume`, `mass`, proposed allowance count | Restricts meaningful conversions |
-| `position_quantity_unit` | Unit reference | Unit used for position/exposure reporting; may differ from price denominator |
-| `price_currency`, `price_currency_unit` | Currency/unit references: USD and USD or US cents; EUR and EUR | Currency identity and fixed scale are separate |
-| `price_denominator_unit` | Unit reference: MMBtu, BBL, GAL, LB, allowance, emissions tonne | Quantity to which one unit of price applies |
-| `cash_currency` | Currency reference | Native settlement currency, distinct from chosen reporting currency |
-| `price_increment_rule_ref` | Reference, possibly constant | HG ordinary tick 0.0005 USD/LB; ICE gas increments can depend on execution method |
-| `settlement_precision_rule_ref` | Reference | Official settlement rounding/precision may differ from trading tick |
-| `listing_schedule_ref` | Reference | Permitted contract periods and their identifiers |
-
-Currency and unit choices are extensible reference values, not a permanent enum containing only today's examples. USD/cents conversion is fixed scaling. EUR/USD conversion requires market FX input. Price currency and cash currency coincide in the surveyed products; a future product with different currencies would require explicit contractual conversion terms. Choosing a reporting currency does not change those terms. The mapping from allowance count to an emissions-price denominator is asset-specific and does not establish fungibility across programs.
-
-### C. Shared fixing and averaging definitions
-
-| Proposed field | Domain / sample | Applicability |
-|---|---|---|
-| `daily_settlement_rule_ref` | Reference to own exchange settlement procedure | All futures; separate from a final fixing formula |
-| `final_price_rule_ref` | Reference to structured final-price definition | All products; can select an exchange price, assessment or formula |
-| `reference_price_refs` | One or more benchmark references | PHH: NG settlement; WAH: named Waha and NG inputs; ETE: specified OPIS assessment |
-| `publisher_ref`, `assessment_field` | Reference/defined field | OPIS and its daily `Average` field, for example |
-| `source_price_units` | Unit references | Normalize source inputs to product units once |
-| `reference_contract_selection_ref` | Rule reference | Specified maturity; first nearby with an explicit roll convention |
-| `observation_period_rule_ref` | Rule reference | Full contract month, defined multi-month period, selected settlement date |
-| `observation_calendar_ref` | Calendar reference | Publisher observations can follow a different calendar from exchange trading |
-| `observation_aggregation` | Initial choices: `SINGLE_OBSERVATION`, `ARITHMETIC_MEAN`, `WEIGHTED_MEAN` | Within a reference series; conditional, not a universal classification of the whole payoff |
-| `observation_weight_rule_ref` | Rule reference | Equal eligible-date weights or explicitly specified weights; total quantity stays independent |
-| `publication_and_revision_rule_ref` | Rule reference | Which publication/revision establishes the fixing, including official fallback provisions |
-
-Missing data is not silently treated as a zero or skipped observation. The implementation must distinguish a non-publication date from an expected observation that is missing. No generic fallback should be invented in the trade template.
-
-### D. Dates, calendars and physical delivery
-
-| Proposed field | Domain / sample | Location |
-|---|---|---|
-| `trading_calendar_ref`, `trading_timezone` | Calendar/timezone references | Shared product definition |
-| `expiry_rule_ref` | Rule reference | Shared; resolves to last trading date/time |
-| `last_trade_datetime` | Date/time | Resolved listed contract schedule |
-| `observation_dates`, `final_fixing_datetime` | Dates/times, when known | Resolved fixing schedule; publication may follow last trade |
-| `first_notice_date`, `last_notice_date` | Conditional dates | Resolved physical contract schedule |
-| `delivery_window_start`, `delivery_window_end` | Conditional dates/times | Resolved permitted delivery window |
-| `final_cash_payment_rule_ref` | Rule/calendar reference | Financial final settlement; resolves to payment date(s) |
-| `delivery_invoice_rule_ref` | Rule reference | Physical invoice price, quantity, charges and payment convention |
-| `payment_calendar_ref` | Calendar reference | Clearing/banking calendar governing the relevant payment |
-| `deliverable_asset_ref` | Reference | Copper cathodes, eligible crude, gas, EUA or CCA |
-| `quality_eligibility_ref` | Structured rule/reference | Grade, approved brand, seasonal quality, permitted substitutes |
-| `delivery_location_eligibility_ref` | Structured rule/reference | Hub, port, eligible warehouses or other approved locations |
-| `delivery_method_ref` | Rule reference | Permitted commodity/title transfer, warehouse warrant, registry transfer |
-| `delivery_quantity_tolerance` | Conditional numeric/rule reference | HG ±2% of nominal quantity, for example |
-| `allowance_program_ref`, `registry_ref` | Conditional references | Carbon program and transfer registry |
-| `vintage_eligibility_ref` | Conditional rule reference | Specified vintage only; broader permitted vintages and exceptions |
-
-These are different events, not aliases for one `settlement_date`:
+These are different events, not aliases for one settlement date:
 
 | Example | Scheduling lesson |
 |---|---|
@@ -219,42 +140,17 @@ These are different events, not aliases for one `settlement_date`:
 | CL | Expiry is in the preceding month under the 25th-day rule; delivery is in the contract month; invoice payment has a following-month rule. [CME](https://www.cmegroup.com/rulebook/NYMEX/2/200.pdf) |
 | HG | Last trade is third-last business day of delivery month, while delivery can run from its first through last business day. Delivery can precede expiry. [COMEX](https://www.cmegroup.com/rulebook/COMEX/1a/111.pdf) |
 
-Metals notice and invoice rules also use actual delivery events: first notice is the prior month's last business day, and the invoice carries actual warrant, weight, brand and warehouse details. Store these events when known rather than require a specific warrant at trade inception. [NYMEX/COMEX Chapter 7, Rule 706](https://www.cmegroup.com/rulebook/NYMEX/1/7.pdf).
+The accepted initial payment fields are `payment_time_lag` and `payment_holiday_calendar`; their supported anchor/counting rules are described in the [fixing and payment specification](engineering-tickets/trade-valuation-pipeline/fixing-and-payment-state.md). This limited rule does not claim to express all bilateral or delivery-invoice conventions.
 
-### E. Current state and calculation inputs
+Metals notice and invoice rules also use actual delivery events: first notice is the prior month's last business day, and the invoice carries actual warrant, weight, brand and warehouse details. Those are later lifecycle facts, not required v1 ticket fields. [NYMEX/COMEX Chapter 7, Rule 706](https://www.cmegroup.com/rulebook/NYMEX/1/7.pdf).
 
-Keep these alongside the immutable trade terms, supplied as dated inputs or events:
+Missing observations cannot be silently treated as zero or skipped. Preparation needs an explicit distinction between a non-publication date and a required fixing that is absent. Publication/cutoff details remain a binding decision in the current packet; this survey does not invent a fallback.
 
-| Field/input group | Examples | Why separate |
-|---|---|---|
-| Valuation context | As-of date/time, market snapshot, reporting currency, FX inputs | The same trade can be valued repeatedly |
-| Market observations | Own current market price, published benchmark fixings | Changing values do not change executed terms |
-| Variation settlement state | Prior settlement basis, settlement dates, cash paid/received | Agreed price alone cannot identify unpaid versus already settled P&L |
-| Position/lifecycle events | Corrections, cancellations, transfers, allocations, delivery obligations | Preserve history and distinguish transaction identity from current position |
-| Delivery events | Actual weight, warrant, warehouse, registry transfer, invoice date and amount | Some facts are unknown until delivery |
-| Actual fee events | Brokerage and clearing charges, currency and charge date | Can differ from template fee estimates |
+## 5. A small trade entry still refers to richer definitions
 
-A lifecycle-status dropdown would require a separately reviewed event model. Avoid one boolean `settled` for a future that has daily cash settlement, possible open exposure and a later delivery obligation.
+A hypothetical HG trade with `contract_code = Z26`, `quantity = +10`, `quantity_unit = LOT`, `quantity_per = month` and `fixed_price = 4.25` has nominal exposure of +250,000 LB under the 25,000-LB contract specification. The user does not type copper grade, tick or eligible warehouse lists into every trade. [Copper specification](https://www.cmegroup.com/rulebook/COMEX/1a/111.pdf), [COMEX clearing membership](https://www.cmegroup.com/clearing/membership/comex.html).
 
-## 5. A small trade entry form can still cover this universe
-
-Illustrative copper template and trade, using hypothetical prices:
-
-| Field | Template supplies | Individual details supply | Resolved result |
-|---|---|---|---|
-| Trade type | FUTURE | — | FUTURE |
-| Index / specification | HG index and COMEX copper specification | — | Selected HG contract definition |
-| Contract code | Left open | Z26 | Single listed December 2026 contract |
-| Trade ID | — | T-001 | T-001 |
-| Trade date | — | 2026-09-25 | 2026-09-25 |
-| Signed lots | — | +10 | +10 |
-| Agreed price | — | 4.25 | 4.25 USD/LB |
-| Legal entity / book | TradingCo / Metals | — | TradingCo / Metals |
-| Clearing firm / account | Firm A / Metals-01 | — | Firm A / Metals-01 |
-
-Product selection supplies COMEX, CME Clearing, physical final settlement, 25,000 LB per lot and the price convention. Nominal exposure is therefore +250,000 LB. The user does not type grade, tick, first-notice rules or eligible warehouse lists into every trade. [Copper specification](https://www.cmegroup.com/rulebook/COMEX/1a/111.pdf), [COMEX clearing membership](https://www.cmegroup.com/clearing/membership/comex.html).
-
-A broader template could leave index/specification open. A narrower template could also supply the month. Shared definitions can be reused without requiring any template at all. Preserve the resolved immutable references/values so editing a reusable default does not silently rewrite old executions.
+This is an economic illustration, not a complete constructible v1 ticket or a claim that the copper product path is implemented. The current [NG worked example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) demonstrates shared template terms, disjoint ticket fields, static encoding and preparation. Immutable resolved values/references preserve executed terms when a user later constructs a different template.
 
 ## 6. Individual records and array aggregation
 
@@ -270,9 +166,9 @@ The price constant is signed nominal quantity multiplied by agreed price. It is 
 
 `150,000 × 4.40 − 632,500 = USD 27,500`
 
-This is an arithmetic illustration before fees and delivery effects, not a statement that USD 27,500 is currently unpaid or is a discounted present value. Variation cash history determines that split. If buys and sells net to zero quantity, their price constants can still leave nonzero P&L; net lots and an average entry price are not a sufficient general representation.
+This is an arithmetic illustration before fees and delivery effects, not a statement that USD 27,500 is currently unpaid or is a discounted present value. Reconciling actual paid/unpaid cash would require variation cash history, which is outside v1. The pipeline's modeled cleared mark/cash instead uses the explicit fixing and payment-date rules in the [result contract](engineering-tickets/trade-valuation-pipeline/05-results.md). If buys and sells net to zero quantity, their price constants can still leave nonzero P&L; net lots and an average entry price are not a sufficient general representation.
 
-The prepared numerical representation can hold arrays of market-point positions, signed converted quantities, entry constants and trade mappings. Simple listed futures can share market reads and arithmetic. Averaging dependencies are prepared only when required by the chosen valuation/fixing calculation. A matrix or sparse representation is justified by actual dimensions and measured work, rather than by the trade object's shape.
+The agreed preparation retains aggregate compatible live exposures and fixed/set contributions. The source batch preserves occurrences and component/payment mappings; this does not require one output per trade at every tick. Simple listed futures can share market reads and arithmetic. Averaging dependencies are prepared only when required by the chosen valuation/fixing calculation. A matrix or sparse representation is justified by actual dimensions and measured work, rather than by the trade object's shape.
 
 | Aggregation purpose | Preserve |
 |---|---|
@@ -280,6 +176,8 @@ The prepared numerical representation can hold arrays of market-point positions,
 | Combine linear exposure | Converted units, compatible market point, signed exposure and constants; retain trade mapping |
 | Combine cash/operational positions | Currency, cash dates, legal entity, clearing house/firm/account and applicable netting rules |
 | Combine delivery obligations | Deliverable eligibility, vintage, location, delivery window and actual allocations |
+
+The last two rows are research boundaries, not v1 operational netting or delivery requirements.
 
 Different accounts can share numerical work without becoming one legally netted position. Different payment dates can share price gathering without becoming one discounted payment. Distinct product prices or allowance assets remain distinct even when the commodity label or emissions measure looks similar.
 
@@ -298,7 +196,7 @@ There is a historical reason for overlapping terminology: ICE transitioned its c
 
 CME ClearPort is a clearing service covering multiple contract forms. Submission through it does not, by itself, establish that a trade is a swap. Similarly, a privately negotiated futures block remains a futures transaction. Identify the actual cleared product and rulebook. [CME ClearPort](https://www.cmegroup.com/clearport.html), [CME block trades](https://www.cmegroup.com/clearing/trading-practices/block-trades.html).
 
-If the project adds a true cleared swap, the candidate common fields are:
+If the project adds a true cleared swap, these are research dimensions to review, not new accepted field names or enumerations:
 
 | Dimension | Proposed values / source | Why retain it |
 |---|---|---|
@@ -309,7 +207,7 @@ If the project adds a true cleared swap, the candidate common fields are:
 | Contract/payment schedule | Shared rules plus resolved dates | A listed contract code or explicit periods must retain actual fixing and payment timing |
 | Clearing house, firm, account | Existing references | Retain the applicable clearing and account relationship |
 
-The first two rows describe a possible extension to the model. They do not change the current futures template's `instrument_type = FUTURE`, or imply that a swap record has already been designed.
+This table is historical terminology for a possible extension. The current template identifies its instrument through the first argument to CreateTradeTemplate; the field names and choices come from the approved instrument definition. The table neither adds an `instrument_type` ticket field nor defines a swap schema. Margining and actual bank-cash reconciliation are outside v1; route-specific modeled mark/cash remain part of the [result contract](engineering-tickets/trade-valuation-pipeline/05-results.md).
 
 Daily cash movement alone is insufficient to prove equivalence. Cleared derivatives can use cash as settlement of exposure or as collateral against it; the applicable contractual treatment determines the cash/value split. Do not infer a universal futures-versus-swaps rule from the label. [Federal Reserve explanation of cleared-derivative settlement models](https://www.federalreserve.gov/frrs/guidance/regulatory-capital-treatment-of-certain-centrally-cleared-derivative-contracts-under-regulatory-capital-rules.htm).
 
@@ -317,27 +215,21 @@ For an actual swap, check fixing dates, payment dates, quantity profiles, cash t
 
 No currently offered true cleared CL/Henry Hub swap was verified for this report. The concrete examples above are futures. The recommendation is to keep the classification explicit and defer additional swap-specific machinery until a real product or confirmation supplies terms that require it.
 
-## 8. What to establish now, and what remains a proposal
+## 8. Current authority and remaining product research
 
-The current project already has an `Index` holding schedule, conventions and specification references; price and position quantity units can differ. `FuturesSchedule.codes` already stores contract codes alongside expiry dates; explicit trade binding and strip expansion are proposed uses/extensions, not functionality established by the presence of those codes. Existing specifications contain lot sizes and brokerage/clearing fee arrays. Their names, and index display names, are not a canonical product registry. [Index implementation](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/index_definitions/index.py), [specifications](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/index_definitions/contract_specifications.py).
+The current project already has an `Index` holding schedule, conventions and specification references; price and position quantity units can differ. `FuturesSchedule.codes` already stores contract codes alongside expiry dates; explicit trade binding and strip expansion are proposed uses/extensions, not functionality established by the presence of those codes. Existing specifications contain lot sizes and brokerage/clearing fee arrays. Their names, and index display names, are not a canonical product registry. [Index implementation](../src/goosedove/index_definitions/index.py), [specifications](../src/goosedove/index_definitions/contract_specifications.py).
 
-This report proposes richer settlement, venue, delivery and fixing definitions. It does not imply they already exist. EUR requires changes to the current USD/CENT conventions, and allowances need a suitable asset/quantity representation. The current futures schedule stores expiry information, not the full generic observation/notice/delivery/payment model above. [Conventions](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/index_definitions/index_conventions.py), [futures schedule](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/index_definitions/futures_schedule.py), [unit definitions](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/globals/unit_conversions.py).
+This report proposes richer settlement, venue, delivery and fixing definitions. It does not imply they already exist. EUR requires changes to the current USD/CENT conventions, and allowances need a suitable asset/quantity representation. The current futures schedule stores expiry information, not the full generic observation/notice/delivery/payment model above. [Conventions](../src/goosedove/index_definitions/index_conventions.py), [futures schedule](../src/goosedove/index_definitions/futures_schedule.py), [unit definitions](../src/goosedove/globals/unit_conversions.py).
 
-The recommended initial decision set is:
+The [pipeline overview](engineering-tickets/trade-valuation-pipeline/README.md) supplies the current implementation sequence and open decisions. The [NG creation/preparation example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) already supplies the initial hand calculations and array sketch. Begin with that bounded path; implementing or resolving every product in this survey is not a prerequisite.
 
-1. **Keep the trade small:** identity, trade date, selected definitions, explicit contract code, signed quantity with its defined basis, agreed price, and booking/clearing references. Resolve any strip into its constituent contracts once.
-2. **Use explicit domains:** physical/financial is a two-value choice; index, currency, exchange, house and firm are validated references with extensible choices.
-3. **Resolve defaults once:** trade details complete or replace template defaults; exchange-defined facts follow the selected specification.
-4. **Keep distinct schedules and events:** last trade, observation, publication, notice, delivery and payment have their own meanings.
-5. **Separate stable terms from current state:** market ticks update inputs; fixing arrivals and lifecycle/date changes can require different preparation.
+Later product slices need their own authoritative facts, such as the WTI first-nearby roll boundary and applicable expiry/payment calendars. Preserve the distinctions researched here while adding only reviewed fields to the instrument definition. Template and ticket sources remain disjoint; static facts resolve during CreateTrades; history changes prepare afresh; compatible price ticks evaluate the retained preparation.
 
-Before numerical implementation, work through a small set of resolved records using these fields: NG, PHH, WAH, ETE, WTI Financial, EUA, specific-vintage CCA and HG. Confirm the WTI first-nearby roll boundary, select authoritative expiry calendars and define the required futures P&L/cash outputs. Then implement the simplest future through the same batch path intended for many trades.
-
-Full delivery processing, margin simulation, order execution and a universal legal trade-capture schema are outside this field review. Their relevant identity, schedule and event boundaries are retained so they need not be forced into the agreed-price trade record later.
+Physical delivery processing, margining, order execution and a universal legal trade-capture schema remain outside v1. Research on their identities and dates does not authorize those workflows or make them prerequisites for the first valuation path.
 
 ## 9. Assessment of the two Priceratops engineers' recommendations
 
-This assessment compares the first engineer's advice supplied in the conversation with the [second engineer's pasted summary](<C:/Users/jgile/.codex/attachments/e135d8da-4f8a-4f29-9ca0-62c36180dcdd/Pasted text.txt>). The linked full artifact was inaccessible. Priceratops code, historical counts and measurements were not independently audited for this assessment; they are reported experience. Both engineers examined the same earlier project, so agreement between them is not independent validation of every proposed choice.
+This historical assessment compares two engineers' advice supplied in the design conversation. The second engineer's pasted summary was a local attachment, not a repository artifact; its linked full source was inaccessible. Priceratops code, historical counts and measurements were not independently audited for this assessment; they are reported experience. Both engineers examined the same earlier project, so agreement between them is not independent validation of every proposed choice.
 
 **Assessment: substantial architectural agreement, with different emphasis. Our independent contract research supports the common direction and supplies constraints on its application.** The first engineer is more cautious about representation size and futures settlement. The second is more explicit about one linear kernel, legs as data, unit/sign normalization, direct risk and independent expected results.
 
@@ -364,7 +256,7 @@ This assessment compares the first engineer's advice supplied in the conversatio
 
 4. **Direct delta needs a named market input.** With fixed coefficients, sensitivity to the selected independent price inputs follows directly from those coefficients; discounting adds its factor where applicable. That does not automatically supply rate risk, FX risk or risk through a curve-building model. A future marked to its own ETE price has quantity-based sensitivity to that price. A reconstruction from daily observations has a different dependency mapping. Fixed observations lose forward-price sensitivity within that reconstruction; their arrival does not automatically shrink delta to an independently traded futures price.
 
-5. **Deliberate defaults remain valid.** Our template exists to supply known shared values. This is compatible with rejecting absent required economics and rejecting an explicitly blank input. An omitted override may inherit a declared template value; an arbitrary blank must not silently become zero, a side or a date. Template resolution must not rewrite old executions when defaults later change.
+5. **Templates supply shared terms once.** The template and ticket provide disjoint subsets of the approved fields. An overlap fails even for equal values; absent required economics and explicit blanks also fail. An arbitrary blank must not silently become zero, a side or a date. Creating a changed template must not mutate previously created trades.
 
 6. **Do not import the old discounting menu.** The second summary reports policies such as fees/fixed legs always discounted, swaps only when bilateral and futures never. Those are another implementation's policies, not sufficient rules for our library. We need the actual cash treatment, payment dates and requested output. Discount compatible payments by their own dates; distinguish cumulative P&L, already-settled cash and outstanding value.
 
@@ -382,7 +274,7 @@ This assessment compares the first engineer's advice supplied in the conversatio
 | Standalone basis and averaging futures | Prevents creating artificial trade legs or silently reconstructing their markets |
 | Preserved trade occurrences and signed price constants | Supports aggregation without losing attribution or zero-net-position P&L |
 
-The field survey answers what the contract means. It has **not yet established the complete prepared representation, lifecycle inputs or output definitions**. The engineers' warning about building many instruments before settling the evaluation boundary is relevant to our next step. The field universe is a review checklist, not a requirement to build every field and delivery workflow before pricing one future.
+The field survey contributes product meaning. The current pipeline packet now establishes the preparation and aggregate-result responsibility boundaries, with remaining function and rates decisions recorded there. This survey does not freeze those representations or require every product and delivery workflow before pricing one future.
 
 ### What their measurements do and do not establish
 
@@ -393,20 +285,11 @@ The field survey answers what the contract means. It has **not yet established t
 
 These are different workloads/boundaries and cannot establish a relative speedup between the proposed designs. The first account's rejected representation with roughly 30 times as many intermediate rows remains a relevant warning. For Goosedove, use work counts and representation sizes: preparation builds, calendar work, market points gathered, components evaluated and temporary allocation size. Timings can supplement those observations, not replace correctness or work-budget checks.
 
-### Recommended synthesis and next step
+### How to use the advice now
 
-Retain the first engineer's careful economic boundaries and add the second engineer's concrete safeguards: explicit data for actual legs, one normalization/sign contract, independently calculated expected results, explicit tolerances and analytic linear price sensitivity. Keep the user's progression: futures, bilateral future lookalikes, penultimate variants, then CFD/last-three-day/Asian structures as their terms are established. Cash arithmetic can be a tiny validation example without becoming a prerequisite product project.
+Keep the useful safeguards: explicit data, one normalization/sign contract, independent expected answers, tolerances and named linear price sensitivities. The current [NG worked example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) has replaced the former request to create an NG example. It covers opposite signs, duplicate occurrences and aggregate exposure over two contracts; its real NG scope is open-contract economic mark. A separate toy lifecycle example covers fixing/payment transitions without inventing a financial final payment for physical NG.
 
-The next design artifact should be a worked **NG `Z26` evaluation example**, before a broad implementation:
-
-1. Show template plus executed details and the complete resolved record, including the agreed price.
-2. Name the as-of inputs: current market price, previous settlement basis and relevant settled cash/history.
-3. Define separately the requested cumulative P&L, settled cash, outstanding mark/settlement amount and price delta, including fees only under an explicit treatment.
-4. Show the minimal prepared arrays and mappings back to each trade occurrence and market point; one trade uses the same path as many.
-5. Establish buy/sell signs, unit factors and independent expected numbers with chosen tolerances. Include equal-and-opposite quantities that leave nonzero P&L.
-6. Specify expected work for first calculation, unchanged repeat, one-price update and then a fixing/date/lifecycle change. A tick must not regenerate stable schedules; a changed fixing or settlement event must update the affected state correctly.
-
-Once that example is coherent, a defined `Cal27` strip tests constituent mapping and shared market reads. The subsequent bilateral lookalike tests payment-date valuation. Those cases should determine the useful shared representation before choosing a dense matrix, sparse matrix or a more elaborate product hierarchy.
+The [pipeline packet](engineering-tickets/trade-valuation-pipeline/README.md) controls implementation order. Preparation is explicit and retained, evaluation returns the supplied collection's aggregate results, and readers do no pricing. Complete the bounded first path and its acceptance checks before broadening products. Exact-date/CFD inputs and two-index basis swaps are deferred. The bilateral rates and payment work remains a separately specified slice; no private history cache or generic product hierarchy is a prerequisite.
 
 ## 10. Where rates enter the calculation
 
@@ -415,10 +298,10 @@ The trade is static. Current commodity prices, discount curves, fixings and sett
 ```text
 projected_amounts = constants + commodity_exposures @ commodity_prices
 payment_values    = projected_amounts * payment_date_discount_factors
-trade_values      = aggregate(payment_values, payment_to_trade)
+collection_value  = sum(payment_values)
 ```
 
-This describes ordinary future cash payments under an explicit valuation model. A floating payment's projected amount is not an already-known cash amount; uncertainty and any projection assumptions remain identifiable. The arithmetic does not authorize treating every future as one discounted terminal payment.
+This illustrates valuation of future-dated cash payments under an explicit model; it is not a settled bilateral API. A floating payment's projected amount is not an already-known cash amount; uncertainty and any projection assumptions remain identifiable. The arithmetic does not authorize treating every future as one discounted terminal payment.
 
 | Layer | Rates-related information |
 |---|---|
@@ -447,9 +330,9 @@ For an exchange future, the same USD 2,000 difference relative to original execu
 
 ### Existing support and remaining work
 
-Goosedove already has an immutable daily `DiscountCurve` of dates and factors, built from supplied anchors with linear interpolation in factors. It starts at factor 1, rejects extrapolation in its construction, and enforces positive, non-increasing factors. The latter is an already accepted limitation on negative-rate curves. It is a useful array building block, not a complete curve-selection or trade-valuation system. [Current curve implementation](C:/Users/jgile/.codex/worktrees/5b83/goosedove/src/goosedove/globals/discount_curve.py:21), [curve contract and deferred pricing work](C:/Users/jgile/.codex/worktrees/5b83/goosedove/docs/library/globals/discount-curve.md:124).
+Goosedove already has an immutable daily `DiscountCurve` of dates and factors, built from supplied anchors with linear interpolation in factors. It starts at factor 1, rejects extrapolation in its construction, and enforces positive, non-increasing factors. The latter is an already accepted limitation on negative-rate curves. It is a useful array building block, not a complete curve-selection or trade-valuation system. [Current curve implementation](../src/goosedove/globals/discount_curve.py), [curve contract and deferred pricing work](library/globals/discount-curve.md).
 
-The first consumer must establish curve selection, valuation-date alignment and payment-date coverage; no silent extension or reuse of yesterday's anchored factors. For an initial implementation, requiring curve start to equal valuation date is a proposed explicit policy, not existing consumer behavior. Building curves from rate instruments can remain outside the first instrument implementation: supplied discount factors are sufficient to establish the interface.
+The later rates slice must establish curve selection, valuation-date alignment and payment-date coverage; no silent extension or reuse of yesterday's anchored factors. For an initial implementation, requiring curve start to equal valuation date is a proposed explicit policy, not existing consumer behavior. Building curves from rate instruments can remain outside the first instrument implementation: supplied discount factors are sufficient to establish the interface.
 
 Rate risk also needs a definition. With commodity projections held fixed, direct discount risk is `sum(amount × change_in_discount_factor)`. Sensitivity to supplied DF anchors is not automatically sensitivity to market rate instruments. A DV01 requires a declared rate-bump/curve mapping. If commodity projections themselves depend on rates, total rate sensitivity also includes that dependency.
 
@@ -464,4 +347,4 @@ Rate risk also needs a definition. With commodity projections held fixed, direct
 
 Gather shared curve/date combinations once where useful. Cache positions into a curve only with its grid identity: a changed curve start changes the array offsets. These are proposed work boundaries; the choice between selective recalculation and a compact full batch should be measured.
 
-The current performance evidence and a ready-to-share independent review scope are in the [review brief](C:/Users/jgile/.codex/worktrees/5b83/goosedove/docs/independent-review-brief.md).
+Historical performance evidence and the updated independent review scope are in the [review brief](independent-review-brief.md).

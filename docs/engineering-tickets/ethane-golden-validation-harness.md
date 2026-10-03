@@ -3,19 +3,23 @@
 **Status:** Proposed implementation plan; no harness implemented by this document.\
 **Scale:** A small parent ticket delivered through focused PRs.\
 **Starting evidence:** `ethane-trades.xlsx` and `ethane-trades-v2.xlsx`, inspected read-only on 29 September 2026.\
-**Related work:** [Linear trade pipeline](linear-trade-pipeline.md).
+**Design authority:** [Trade valuation pipeline handoff](trade-valuation-pipeline/README.md).
 
 ## Outcome and scope
 
 Establish independently reviewed answers for the supplied ethane examples, then prove that
 the actual library reproduces them. Save the library's outputs as regression snapshots so
 later changes are visible and separately reviewed. One trade and a batch must use the same
-calculation path, while preserving every trade occurrence and component.
+evaluation path, while preserving every trade occurrence and its economic contribution.
+The public result is aggregate for the supplied collection. Per-trade and per-component
+breakdowns in the financial reference explain the hand answers; they do not require a
+production result row for each trade or payment.
 
-Start with the first workbook's undiscounted amounts, attribution and price sensitivities.
+Start with the first workbook's undiscounted amounts and price sensitivities, retaining its
+attribution as independent reference evidence.
 Capture the second workbook's payment/PV expectations now; activate those cases when a real
 payment-valuation path exists. Discounting is a subsequent implementation phase and does not
-expand the existing pipeline ticket's initial scope. Two-index spreads are deferred. Oil
+expand the pipeline's initial scope. Two-index spreads are deferred. Oil
 roll conventions, a general product framework, durable result storage and an Excel-driven
 CI harness are outside this ticket.
 
@@ -23,6 +27,12 @@ The supplied calendars and product descriptions are fixture assumptions pending 
 Arithmetic reconciliation does not certify an exchange contract specification. These cases
 use dated assessments and a declared monthly projection; they do not establish equivalence
 to pricing a listed future from its own directly quoted market price.
+
+Some workbook shapes use explicit date windows or a whole-quarter assessment average;
+those capabilities are outside the current future v1 schema. Preserve all seven financial
+references now, but connect each production case only when its terms have a supported
+instrument representation. This validation plan does not authorize adding those fields or
+silently translating them into a different supported trade.
 
 ## Four distinct references
 
@@ -180,22 +190,33 @@ A registry maps a stable case ID to fixed inputs and a call through actual libra
 Both pytest and snapshot generation use that same adapter. The adapter must not implement
 pricing mathematics or substitute expected values when a capability is missing.
 
-For end-to-end cases, feed static trade terms and market data through preparation, binding,
-calculation and result readers. Supplying precomputed workbook coefficients would bypass
-precisely the schedule and binding behavior we need to validate. A separately named kernel
+For end-to-end cases, feed terms through the library-owned instrument definition, optional
+template and `CreateTrades` (resolution and static encoding), then call `PrepareTrades`
+with explicit history, `EvaluateTrades` with a compatible market, and the pure result readers.
+Supplying precomputed workbook coefficients would bypass precisely the schedule and binding
+behavior we need to validate. A separately named kernel
 case may deliberately start at arrays, with that limited scope stated explicitly.
 
 Snapshot only declared observable outputs:
 
 - Measure name, currency and units; as-of date and pricing route.
-- Ordered occurrence/component identities and dates.
-- Component, trade and permitted aggregate amounts; labeled sensitivities where supported.
-- Declared reader rows and labels, including inspectable coefficient/input tables if exposed.
+- Aggregate amounts and labeled sensitivities for the supplied collection, on identified axes.
+- Declared reader rows and labels, and retained source occurrence/payment facts if exposed.
 - Numeric array shapes and dtypes where part of the output contract.
 
-Preserve row order and duplicate occurrences. Canonicalize mapping keys without sorting away
-meaningful output order. Exclude process handles, addresses, timestamps and timings. Do not
+The complete pipeline target is the route's mark/cash pair plus delta and DV01, with the
+meanings in [the result contract](trade-valuation-pipeline/05-results.md). An intermediate
+undiscounted amount case must be labeled as such; it does not prove that complete target.
+Unavailable measures cannot be replaced with zeros, and readers cannot calculate them later.
+The workbook's discount-factor sensitivity is not a substitute for DV01.
+
+Preserve duplicate source occurrences and any declared source-row order. The aggregate value
+and aligned risk must be invariant within declared tolerances to a permutation of the same
+inputs; risk/reader axes keep their defined ordering. Canonicalize mapping keys without sorting away meaningful output
+order. Exclude process handles, addresses, timestamps and timings. Do not
 snapshot every private intermediate array, which would unnecessarily freeze storage choices.
+Reference coefficient tables and daily terms remain useful independent evidence without
+requiring the production library to expose or retain the same dense/per-trade representation.
 
 Record the case-input digest, producing revision, runtime, dependency versions and lockfile
 digest as provenance alongside the output. Compare the input digest to detect input changes;
@@ -208,8 +229,8 @@ do not compare today's Git revision to the producing revision as an output asser
 - Emit deterministic JSON without decimal rounding. Start with exact serialized numeric
   comparison on the pinned reference platform. Verify repeatability in fresh processes before
   accepting this policy; any necessary exception must be narrow, explicit and separately reviewed.
-- Financial validation and full-versus-compressed checks have their own declared numerical
-  tolerances. A candidate for these small USD amount fixtures is absolute USD 1e-8 with zero
+- Financial validation, independent daily-reference comparisons and singleton/batch checks
+  have their own declared numerical tolerances. A candidate for these small USD amount fixtures is absolute USD 1e-8 with zero
   relative tolerance, subject to review. This is not a universal risk or monetary tolerance.
 - Report case ID, field/index, expected and actual values, and numeric difference. Provide
   readable structural diffs for row, shape, label and unit changes.
@@ -226,24 +247,32 @@ case-completeness checks together in delivery 3, when the first actual-library a
 
 ## Phase 3: connect the first actual-library cases
 
-The repo currently has NG trade capture and a standalone dense-matrix experiment; it does not
-yet have a production ethane averaging path. Deliver the relevant preparation/binding/kernel
-slice under the related pipeline ticket, then connect it here. Infrastructure and reviewed
-references can land first, but the ethane milestone is complete only when real library outputs
+The earlier NG trade-capture prototype was removed by the pipeline cleanup. Standalone
+numerical experiments remain as evidence; the general `CreateTrades`/`PrepareTrades`/
+`EvaluateTrades` pipeline and a production ethane averaging path are not implemented.
+Deliver the relevant slice under the current pipeline handoff, then connect it here.
+Infrastructure and reviewed references can land first, but the ethane milestone is complete
+only when real library outputs
 pass both financial validation and regression checks. Do not disguise deferred adapters with
 passing placeholders or a silently empty case registry.
 
+Declare which cases each delivery activates and which await supported product capabilities.
+The first connected delivery must have a nonempty required case set; missing active cases
+fail. A supported subset is an incremental delivery, not completion of the seven-case suite.
+Daily reference tables and independently evaluated singleton collections provide diagnostics;
+the batch tick path need not calculate or store individual trade amounts.
+
 | Case or check | Required proof |
 |---|---|
-| Seven-trade v1 baseline | Nine components, correct attribution, units, amounts and book total |
-| Each trade alone and in the book | Same API/path; per-occurrence results agree within declared tolerance |
+| Seven-trade workbook v1 baseline, when all shapes are supported | Aggregate amount/risk reconcile to the nine-component independent reference; units and source occurrence/payment facts are correct |
+| Each trade alone and the complete book | Separately evaluate singleton collections through the same API/path; their amounts and aligned risks sum to the aggregate batch within declared tolerance |
 | Whole quarter versus monthly strip | 61-day denominator versus independent monthly denominators |
 | Partial fixing state | Known contribution retained; fixed dates carry no forward-price sensitivity |
 | Equal/opposite monthly exposures at different agreed prices | T1 + T7 retain USD 378 with zero amount delta |
 | December mark +0.10 CENT/GAL | Independent predicted book amount change is USD -117.60 |
-| Full daily and compressed paths | Same economic result without losing constants or attribution |
-| Duplicate occurrence and reordered input rows | Duplicates survive; amounts add; outputs follow declared input order |
-| Fully fixed / constant-only case | Correct amount with zero remaining market columns |
+| Daily reference and compressed evaluation | Aggregate evaluation matches independent daily arithmetic without losing `fixed_leg` or `floating_leg_set` contributions; no second production path is required |
+| Duplicate occurrence and reordered input rows | Each duplicate contributes again; aggregate amounts/risks agree within declared tolerances after reordering; retained source facts follow their declared order |
+| Fully fixed / zero-live case | Correct amount and zero commodity sensitivity without fetching unused live prices; no particular private array shape is mandated |
 | Coverage and identity failures | Missing required fixing or incompatible/reordered axis cannot silently misprice |
 
 The workbook-derived baseline and bump can have actual library goldens. Broad invariants
@@ -251,6 +280,10 @@ belong in ordinary tests; avoid generating a snapshot for every property-test pe
 Synthetic cases cover gaps the workbooks cannot prove, including valid zero fixings and
 negative prices, fixing corrections, and a fixing arrival that changes binding while leaving
 static trades unchanged. Encode the relevant policy and expected result explicitly.
+Test explicit preparation reuse as well: a price-only tick evaluates the retained preparation
+without rebuilding static trades or folding history; a fixing/as-of change requires new
+preparation. Incompatible history or market layout fails at evaluation. These are observable
+dependency/work checks, not a requirement for a private cache or particular storage layout.
 
 Keep sensitivity units distinct: USD per CENT/GAL is different from quantity-equivalent GAL.
 A one-cent bump is +1.0 in the source price units, not +0.01. Where exposed, check the analytic
@@ -263,8 +296,10 @@ date through amount calculation and apply its own discount factor before aggrega
 Use the workbook's stated linear interpolation in discount factors and explicit curve anchors;
 do not introduce an unstated interest-rate convention.
 
-Required cases include the v2 baseline, payment-date attribution, component/trade/book PV,
-PV price sensitivities and USD-per-unit-DF sensitivities. T1/T7 demonstrate why amount
+Required cases include the v2 aggregate baseline, payment-date ownership, aggregate PV price
+sensitivities and USD-per-unit-DF sensitivities where that measure is supported. Check
+component/trade PV hand answers through separately evaluated compatible subcollections,
+without requiring those values in the full batch result. T1/T7 demonstrate why amount
 compression must preserve payment ownership: nominal net is USD 378 with zero amount delta,
 but their different dates produce PV USD 377.20085454545455 and a residual December PV slope
 of USD 0.5145 per CENT/GAL. The independent predicted December +0.10 CENT/GAL book PV change
@@ -273,7 +308,11 @@ recalculating the source workbooks.
 
 Add independently worked cases for a payment date outside curve coverage, a changed payment
 lag and differing assessment/payment calendars. Do not use the workbooks' fixed summary
-buckets or grid as their oracle. Rate DV01 and rates-model risk remain separate future work.
+buckets or grid as their oracle. This fixture's PV/DF checks do not complete the pipeline's
+rate DV01 requirement. Rate-bump conventions and independent DV01 expectations need their
+own reviewed cases before the full bilateral result can be published. Payment mark/cash
+transitions also need independent before/on/after-payment cases under the agreed model;
+the workbook baseline alone does not establish that lifecycle.
 
 ## Review policy: two separately reviewed PRs
 
@@ -330,7 +369,8 @@ Completion of the first connected suite requires:
 - Missing snapshots and missing/duplicate case registration fail; tests cannot quietly stop covering a case.
 - Governance tests reject mixed changes to existing code/input and baselines, including rename
   evasions, and permit the genuine new-case exception.
-- One/batch, duplicate-occurrence, constant-only and daily/compressed behavior is demonstrated.
+- Aggregate-versus-summed-singletons, duplicate-occurrence, zero-live and daily-reference
+  agreement are demonstrated without requiring per-trade tick outputs.
 - Normal CI uses versioned files and actual library calls, with no Excel or Downloads dependency.
 - Existing repository checks pass. Pricing/cache work includes `WorkCounter` budget tests;
   timings and machine-specific performance numbers stay outside the numerical goldens.

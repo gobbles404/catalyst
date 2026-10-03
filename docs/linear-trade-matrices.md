@@ -6,13 +6,18 @@ USD per barrel. Futures rows calculate a price difference from the agreed trade 
 swap rows calculate projected payment amounts. They are not interchangeable cash balances
 or a portfolio PV.
 
+The [pipeline handoff](engineering-tickets/trade-valuation-pipeline/README.md) is the current
+engineering design. This expanded specimen preserves independently inspectable rows for
+checking arithmetic. Its helper names, dense storage and per-component outputs do not
+define the production API or require per-trade work on each price tick.
+
 ## What belongs to the trade
 
 The trade remains a static record of the accepted deal. Its template supplies the shared
 product, index, units and conventions. Its details supply the trade identity, trade date,
 contract or averaging period, signed quantity, agreed price and payment terms.
 
-Preparing that record resolves an observation schedule: precisely which prices enter the
+Static resolution and encoding establish an observation schedule: precisely which prices enter the
 payoff, and with which contractual weights. Two trades may share that schedule without
 becoming one trade. No current market price or received fixing is written into the trade.
 
@@ -51,7 +56,8 @@ of every contract against every date.
 
 The first six numeric columns form **A**, the dense exposure matrix. The last column is
 **c**, the static constant vector. In this example, each constant is minus signed quantity
-times agreed price.
+times agreed price. This is algebraic notation: for a fixed/float swap the contribution is
+its signed `fixed_leg`; for a future it is an `entry_price_offset`, not a swap fixed leg.
 
 The market supplies **x**, one price per observation in exactly that column order:
 
@@ -122,6 +128,10 @@ b = c + A @ k
 amounts = W @ p + b
 ```
 
+For the fixed/float rows, `A @ k` is `floating_leg_set` and `W @ p` is
+`floating_leg_live`. The specimen folds the fixed and set contributions into `b` for
+arithmetic inspection; their separate economic meanings remain part of the pipeline.
+
 The compressed representation is:
 
 | Trade | F27 coefficient | G27 coefficient | Constant including known fixings |
@@ -146,8 +156,10 @@ keep separate points in `p`; the representation still works, but may compress le
 If a product has its own traded monthly-average price, that is its own market point;
 the representation must not automatically add historical fixings to it a second time.
 
-Keep trade rows for individual results. If an aggregate of compatible amounts is wanted,
-sum their coefficient rows and constants. The two Asian rows alone become
+The specimen keeps rows to check individual payoffs independently. Production preparation
+sums compatible coefficients and fixed/set contributions before price ticks; evaluation
+prices that retained aggregate. Request an individual value by separately evaluating a
+singleton collection through the same path. The two Asian rows alone become
 `1,000 * F27 + 2,000 * G27 - 211,000`, giving 7,000 here. Netting coefficients must not
 discard constants, even when net quantity is zero. Payment dates and settlement treatment
 remain attached to the original components for subsequent valuation.
@@ -159,7 +171,7 @@ remain attached to the original components for subsequent valuation.
 | Current price changes | Unchanged | Update | Unchanged if projection unchanged |
 | A dated observation fixes | Unchanged | Current prices may also move | Replace that projected observation with its fixing; rebuild derived compression |
 | Projection model changes | Unchanged | Depends on model | Rebuild |
-| Trade terms or contractual schedule change | Prepare again | Independent | Rebind and rebuild |
+| Trade terms or contractual schedule change | CreateTrades resolves and encodes again | Independent | PrepareTrades rebinds and rebuilds |
 
 A fixing removes that dated observation's sensitivity to future prices. It does not
 freeze the current futures mark. Its weight stays 1/4 in this example; the three
@@ -171,14 +183,23 @@ remaining observations are not renormalized to sum to one.
 uv run python -m tools.examples.linear_trade_matrices
 ```
 
-The runnable experiment lives in `tools/examples/linear_trade_matrices.py`. It is kept
-outside the production library so the object shapes can be changed after reviewing the
-example. The [pipeline handoff](engineering-tickets/trade-valuation-pipeline/README.md)
-defines the intended trade-creation surface; it is not yet implemented.
+The runnable experiment lives in `tools/examples/linear_trade_matrices.py`, outside the
+production library. Its existing helper names predate the agreed pipeline:
+
+| Specimen helper | Responsibility in the agreed pipeline |
+|---|---|
+| `prepare()` assembles supplied static schedules into A/c | Private encoding inside CreateTrades, after schedule resolution |
+| `compact()` applies history/projection and derives W/b | PrepareTrades, which also aggregates compatible collection/payment groups for production |
+| `compact_amounts()` evaluates component amounts | Arithmetic evidence for EvaluateTrades; production returns the requested aggregate result |
+
+The generic trade pipeline is not yet implemented. These helpers remain executable
+examples, not worksheet functions or production implementations of those boundaries.
 
 The dense view is a correctness reference and an inspection surface. It does not establish
 that materializing every dense intermediate is efficient for a large portfolio. The
 experiment counts preparation, matrix work and array sizes; timing and memory profiling
 on representative portfolios should guide a later choice of dense, indexed or sparse
-storage. Exact compression here means algebraically equivalent, subject to ordinary
+storage. Its component-level work budgets characterize this specimen; production acceptance
+must measure the agreed aggregate path, without requiring work proportional to the original
+trade count on every tick. Exact compression here means algebraically equivalent, subject to ordinary
 floating-point rounding, not bit-for-bit identical under every regrouping.

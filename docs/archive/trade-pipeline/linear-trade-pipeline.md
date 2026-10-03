@@ -1,21 +1,33 @@
-# Parent ticket: encode linear trades, bind market inputs, and evaluate through one array kernel
+# Archived exploration: linear trade pipeline
 
-**Status:** Earlier exploration; the [pipeline handoff](trade-valuation-pipeline/README.md) is authoritative.\
-**Scale:** A parent ticket spanning several focused PRs, with an initial NG release.\
-**First release proposed here:** NG trade rows -> static encoding -> existing Market binding -> price-difference P&L -> inspectable Excel results.\
-**Design direction:** Work backwards from the kernel's required arrays, prove the representation with worked scenarios, then build the producers of those arrays.
+**Status:** Archived and superseded on 3 October 2026. This is historical research, not an
+engineering backlog. The [trade valuation pipeline handoff](../../engineering-tickets/trade-valuation-pipeline/README.md)
+is the sole current design authority.\
+**Preserved evidence:** Product scenarios, independent arithmetic, input-identity pitfalls and
+the rationale for separating static terms, fixings and live prices.\
+**Historical proposal:** An initial NG amount calculation followed by dated observations and
+compression through the delivery sequence recorded below.
 
-**3 October update:** The [pipeline stage contracts](trade-valuation-pipeline/README.md) are
-the current entry point for reviewing the design. They work backward from named financial
-results and risks, select the explicit `_CreateTrades` -> `_PrepareTrades` -> `_EvaluateTrades`
-boundaries, and treat PR119 as an implementation experiment. Detailed creation arguments
-and result-reader layouts remain open.
-This earlier parent remains background for product coverage and the original delivery plan.
-Its stage ordering and implementation slices do not supersede the current handoff. Trade
-creation is not yet implemented; use the current instrument/template and CreateTrades
-contracts to build it rather than treating an earlier experiment as a production entry point.
+The original proposal and its acceptance language are retained below for context. Its
+imperatives, completion checklist and implementation sequence are not work to pick up.
+In particular, the current pipeline supersedes these earlier choices:
 
-## Problem and intended outcome
+| Earlier direction in this archive | Current direction |
+|---|---|
+| Separate preparation/encoding stage and a kernel-first delivery sequence | CreateTrades privately resolves and encodes; implementation follows the current handoff's small end-to-end path |
+| Generic defaults/labels and an incomplete input contract | Library-owned instrument fields, exact header matching, no undeclared fields and disjoint template/ticket field sources |
+| Component or trade results retained on every tick, with aggregates as extra views | Evaluate the supplied compatible collection; retain payment groups when their economics require it; evaluate a singleton for an individual result |
+| Product-specific Excel creators after the NG slice | One general CreateTrades boundary; no obsolete futures-specific creator or compatibility API |
+| Scenario inventory and completion checklist as committed scope | Historical coverage ideas; the current handoff defines v1, including its explicit exclusions |
+
+The agreed public path is instrument definitions and an optional template, then
+`_CreateTrades` -> `_PrepareTrades` -> `_EvaluateTrades` -> pure result readers. An explicit
+prepared handle replaces the private history-store proposal in the separately archived
+[preparation-reuse exploration](trade-evaluation-preparation-reuse.md). Numerical specimens
+remain evidence for arithmetic; their per-component arrays do not set the production result
+shape. No production implementation or golden baseline is established by this archive.
+
+## Historical problem and intended outcome
 
 We have a specified static NG trade example and can represent markets as arrays. We also have a standalone
 dense-matrix experiment demonstrating linear calculation and compression. We need a
@@ -43,7 +55,7 @@ These are ownership boundaries, not a requirement for five public Excel handles,
 classes, or exactly five PRs. Use the existing index, specification, conventions, handle
 store and reader mechanisms where they already do the required job.
 
-## Scope and terminology
+## Historical scope and terminology
 
 - A **trade** is a consummated deal. Its agreed execution price is static; changing market
   prices and published fixings are separate inputs.
@@ -69,7 +81,7 @@ storage and a general template language are outside implementation scope. Preser
 required identities and payment metadata. A future extension may value eligible payments
 after amount calculation, using each payment's own date and treatment.
 
-## Start at the numerical contract
+## Historical numerical contract
 
 Let R be the number of output components, O the number of unique required observations,
 and M the number of independent current market inputs. Proposed descriptive names below
@@ -113,17 +125,17 @@ remaining market inputs; do not introduce a dummy price to calculate a constant.
 Define explicit comparison tolerances and independently worked expected results. Full and
 compressed calculations need numerical agreement, not universal bit-for-bit agreement.
 
-## The five pieces
+## Historical five-piece proposal
 
 ### 1. Trade representation: preserve the accepted deal
 
 **Inputs:** Shared definitions/template selections and individual executed terms.\
 **Output:** An immutable trade batch, preserving order and every occurrence.
 
-For the first release, use the current [CreateTrades contract](trade-valuation-pipeline/create-trade.md)
+For the first release, use the current [CreateTrades contract](../../engineering-tickets/trade-valuation-pipeline/create-trade.md)
 to resolve static Index/specification facts with completed instrument fields, then encode
 the resulting terms. Do not create one Python pricing object per row or move current market
-state into this object. The [NG acceptance example](trade-valuation-pipeline/ng-creation-preparation-example.md)
+state into this object. The [NG acceptance example](../../engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md)
 supplies the trade rows and independent expected quantities and amounts.
 
 As products are added, retain product identity, settlement treatment, actual contractual
@@ -224,7 +236,7 @@ Keep the component dates and settlement treatments even in a permitted amount-su
 coefficient row and selected prices. Readers preserve order and duplicates. Two otherwise
 identical payments with different dates remain separately available for later valuation.
 
-## Scenario coverage required of the design and fixtures
+## Historical scenario inventory, not current release scope
 
 Every economic shape below needs an executable synthetic fixture with a declared input
 route, expected component/observation mapping and independently calculated amount. Invalid
@@ -261,7 +273,7 @@ date selection, eligible reporting days, strip quantity conventions and applicab
 must be pinned in each product fixture. The existing four-observation oil example is
 illustrative and must not be presented as a verified monthly exchange schedule.
 
-## Worked first-release acceptance case
+## Preserved worked arithmetic from the proposed first release
 
 Use the existing four NG deals. These market prices are synthetic test inputs.
 
@@ -288,7 +300,7 @@ Run each deal alone and recover its batch row. Bump Z26 by 0.01 USD/MMBtu: the f
 changes must be `[1000, -400, 0, 0]` USD. Use a market containing additional months to
 prove the result depends on resolved identities rather than incidental input positions.
 
-## Proposed implementation slices
+## Superseded implementation slices
 
 Each numbered slice should be reviewable on its own. Split further if code review cannot
 reason about its changes independently; do not combine all five responsibilities into one PR.
@@ -311,7 +323,7 @@ Do not require a universal product registry or all surveyed contracts to finish 
 Slice 5 is the most likely to need two PRs: static schedule/component encoding first,
 then fixing/projection binding. These are six delivery milestones, not a six-PR ceiling.
 
-## Update behavior and performance acceptance
+## Historical update and performance acceptance ideas
 
 | Event | Required behavior |
 |---|---|
@@ -338,7 +350,7 @@ Report cold, unchanged, price-update and fixing/structure-update measurements wi
 boundaries stated. Timings inform design; deterministic work and allocation budgets gate
 tests. Previous-project benchmark claims are background, not Goosedove performance evidence.
 
-## Current implementation constraints and decisions to close
+## Implementation observations recorded during the exploration
 
 - The initial NG example shares one Index and specification across its rows. Broader
   input batching need not become a prerequisite for proving this example.
@@ -366,31 +378,31 @@ tests. Previous-project benchmark claims are background, not Goosedove performan
   measure names, unit normalization, and numerical tolerances before each corresponding
   implementation. These are review decisions, not permission to infer absent economics.
 
-## Parent completion checklist
+## Superseded parent completion checklist
 
-- [ ] Five responsibilities have explicit inputs, outputs and owners in code.
-- [ ] Kernel contract and independent expected fixtures are reviewed.
-- [ ] NG one/N encoding, binding, calculation and Excel readback work end to end.
-- [ ] Dated observations, fixing transitions, roll references and strip components are
+- Five responsibilities have explicit inputs, outputs and owners in code.
+- Kernel contract and independent expected fixtures are reviewed.
+- NG one/N encoding, binding, calculation and Excel readback work end to end.
+- Dated observations, fixing transitions, roll references and strip components are
   exercised through the same numerical contract.
-- [ ] Every economic shape above has an executable synthetic fixture, including mixed
+- Every economic shape above has an executable synthetic fixture, including mixed
   measures, units/currencies and separate daily projections. Deferred real-product
   adapters/conventions are recorded separately and do not substitute for those fixtures.
-- [ ] Full and compressed amounts agree, with attribution and constants preserved.
-- [ ] Payment dates, currencies and result measures survive calculation and aggregation.
-- [ ] Price refreshes reuse valid encoding/binding; stale state fails or is rebuilt.
-- [ ] Readers do no pricing; existing handles provide in-session ownership.
-- [ ] Work/memory budgets and the repository's `check.ps1` pass for each implementation PR.
+- Full and compressed amounts agree, with attribution and constants preserved.
+- Payment dates, currencies and result measures survive calculation and aggregation.
+- Price refreshes reuse valid encoding/binding; stale state fails or is rebuilt.
+- Readers do no pricing; existing handles provide in-session ownership.
+- Work/memory budgets and the repository's `check.ps1` pass for each implementation PR.
 
-## Existing starting points
+## Research references and current replacement links
 
-- [Dense worked example and equations](../linear-trade-matrices.md)
-- [Runnable NumPy specimen](../../tools/examples/linear_trade_matrices.py)
-- [Current trade creation contract](trade-valuation-pipeline/create-trade.md)
-- [Self-contained NG acceptance example](trade-valuation-pipeline/ng-creation-preparation-example.md)
-- [Existing Market implementation](../../src/goosedove/market/market.py)
-- [Contract field survey and prior-engineer assessment](../futures-trade-field-review.md)
-- [Independent review scope and measurement questions](../independent-review-brief.md)
+- [Dense worked example and equations](../../linear-trade-matrices.md)
+- [Runnable NumPy specimen](../../../tools/examples/linear_trade_matrices.py)
+- [Current trade creation contract](../../engineering-tickets/trade-valuation-pipeline/create-trade.md)
+- [Self-contained NG acceptance example](../../engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md)
+- [Existing Market implementation](../../../src/goosedove/market/market.py)
+- [Contract field survey and prior-engineer assessment](../../futures-trade-field-review.md)
+- [Independent review scope and measurement questions](../../independent-review-brief.md)
 
 The standalone specimen proves a proposed algebra and contains illustrative schedules.
 It is a reference for this work, not an already completed production pipeline.

@@ -4,6 +4,10 @@ The pricing library: what each worksheet function is meant to do, one page per f
 
 These pages are for an engineer building a function and for the owner reviewing what will be built. They are not the desk's documentation: what a person sees when typing a formula is Excel's own help text, the function line and one line per argument, and each page carries that text under Excel help so there is one source for it. Nothing here ships with a release.
 
+For trade work, start with the [trade valuation pipeline handoff](../engineering-tickets/trade-valuation-pipeline/README.md).
+It establishes how instrument definitions, templates, CreateTrades, PrepareTrades, evaluation
+and readers connect. The trade function pages below specify individual parts of that design.
+
 ## The pages
 
 | Page | What it holds |
