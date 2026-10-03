@@ -4,7 +4,7 @@ creator's publication still holds once the call has returned.
 tracemalloc sees Python objects and numpy's data buffers, which numpy registers with it, on
 every thread of this process and not only in the call measured; it does not see the host's
 pinned buffers or anything in the CLR. Each ceiling is the peak measured plus slack, and
-since #NN every pin is the least of three warm measurements, each with its own untraced
+since #131 every pin is the least of three warm measurements, each with its own untraced
 warmup and its own trace, so that an allocation the call did not make, another thread's or a
 resize of the store's dictionary, which lands on one call in many, never lands on the pin.
 The least is what a warm call does every time, not a cold call and not a worst case: a change
