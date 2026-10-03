@@ -1,7 +1,10 @@
 """Contract codes as the desk types them, a month letter and a two-digit year, F26 for January
-2026: the code of the month after, and the month as CME's data feeds spell it, 202601. Text in
-and text out, no object and no handle. docs/library/utilities/next-fut.md and
-docs/library/utilities/fut-to-cme.md are the pages."""
+2026: the code of the month after, the month as CME's data feeds spell it, 202601, the code of
+the month a day falls in and the first day of a code's month. Text or one date in, text or one
+date out, no object and no handle. docs/library/utilities/next-fut.md, fut-to-cme.md,
+date-to-fut.md and fut-to-date.md are the pages."""
+
+import numpy as np
 
 # The exchanges' month letters, January to December, and the same in lowercase, the two
 # spellings a code's letter is read in; the ten digits a year is written with.
@@ -52,3 +55,25 @@ def cme_code(contract: str) -> str:
     to add to."""
     month, year = month_and_year(contract)
     return f"{year}{month:02d}"
+
+
+def code_of_month(day: np.datetime64) -> str:
+    """The code of the month a day falls in, F26 for any day of January 2026, the letter in
+    capitals, since a day carries no case to keep. The day is read as the count of months since
+    January 1970, one conversion as numpy counts them, and the year and the month fall out of
+    that count; a day before 2000 or after 2099 names no year two digits can write, and is
+    refused."""
+    years, month = divmod(int(day.astype("datetime64[M]").astype(np.int64)), 12)
+    year = 1970 + years
+    if not 2000 <= year <= 2099:
+        raise ValueError(
+            f"date is {day}, expected a day from 2000 to 2099, the years a two-digit code can name"
+        )
+    return f"{MONTH_LETTERS[month]}{year % 100:02d}"
+
+
+def first_day_of(contract: str) -> np.datetime64:
+    """The first day of the month a code names, 1 January 2026 for F26, as a date: the one day
+    a code names on its own, a contract's expiry being its schedule's to say."""
+    month, year = month_and_year(contract)
+    return np.datetime64(f"{year}-{month:02d}-01", "D")

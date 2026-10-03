@@ -444,6 +444,18 @@ def test_a_text_helper_makes_nothing_and_publishes_nothing(name: str, contract: 
     assert bridge.live_handles() == live
 
 
+# The code of a day reads two numbers off the day: within the slack, measured 870 bytes on
+# 2026-10-02. The first day of a code makes one date and then pays the seam's way out for a date,
+# a one-day array and its two looks: measured 1,217 bytes, which twice the slack covers; nothing
+# of it is the library's, and nothing is published.
+def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["util_DateToFut"](46161.0)) <= SLACK
+    assert least_peak(lambda: ENTRY["util_FutToDate"]("F26")) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["util_FutToDate"]("z98")) <= 2 * SLACK
+    assert bridge.live_handles() == live
+
+
 def gas_daily_month_columns(months: int) -> tuple[Cells, Cells, Cells]:
     """Codes and the first and last day of that many calendar months from January 2026, laid
     end to end, as the sheet sends them."""

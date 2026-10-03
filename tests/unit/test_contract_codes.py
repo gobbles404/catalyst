@@ -2,6 +2,7 @@
 CME's feeds spell it; one form taken, a month letter and two digits, and everything else refused
 naming what arrived."""
 
+import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -9,6 +10,8 @@ from hypothesis import strategies as st
 from goosedove.index_definitions.contract_codes import (
     MONTH_LETTERS,
     cme_code,
+    code_of_month,
+    first_day_of,
     month_and_year,
     next_contract,
 )
@@ -199,3 +202,107 @@ def test_twelve_next_contracts_are_a_year_and_each_is_one_month_on(
         assert following[0].islower() == lower
         walked = following
     assert walked == (letter.lower() if lower else letter) + f"{year + 1:02d}"
+
+
+# --- the month a day falls in, and the first day of a code's month ------------------------
+
+
+def day(text: str) -> np.datetime64:
+    return np.datetime64(text, "D")
+
+
+@pytest.mark.parametrize(
+    ("date", "code"),
+    [
+        ("2026-01-01", "F26"),
+        ("2026-01-15", "F26"),
+        ("2026-01-31", "F26"),
+        ("2026-02-28", "G26"),
+        ("2028-02-29", "G28"),
+        ("2026-05-19", "K26"),
+        ("2026-06-22", "M26"),
+        ("2026-07-21", "N26"),
+        ("2026-12-31", "Z26"),
+        ("2000-01-01", "F00"),
+        ("2099-12-31", "Z99"),
+        ("2030-04-10", "J30"),
+    ],
+    ids=[
+        "the first of January",
+        "the middle of January",
+        "the last of January",
+        "the last of February",
+        "a leap day",
+        "19 May, a WTI June expiry, is May's code and not June's",
+        "22 June",
+        "21 July",
+        "the last day of a year",
+        "the first day two digits name",
+        "the last day two digits name",
+        "April, J",
+    ],
+)
+def test_the_code_of_a_day_is_its_months_in_capitals(date: str, code: str) -> None:
+    assert code_of_month(day(date)) == code
+
+
+@pytest.mark.parametrize(
+    "date", ["1999-12-31", "1970-01-01", "1900-01-01", "2100-01-01", "2150-06-15"]
+)
+def test_a_day_outside_the_years_two_digits_name_is_refused(date: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        code_of_month(day(date))
+    assert str(failure.value) == (
+        f"date is {date}, expected a day from 2000 to 2099, the years a two-digit code can name"
+    )
+
+
+@pytest.mark.parametrize(
+    ("contract", "first"),
+    [
+        ("F26", "2026-01-01"),
+        ("G28", "2028-02-01"),
+        ("m26", "2026-06-01"),
+        ("n26", "2026-07-01"),
+        ("Z26", "2026-12-01"),
+        ("F00", "2000-01-01"),
+        ("Z99", "2099-12-01"),
+    ],
+    ids=[
+        "January",
+        "a leap February, the first all the same",
+        "a lowercase June",
+        "a lowercase July",
+        "December",
+        "the first month two digits name",
+        "the last month two digits name",
+    ],
+)
+def test_the_first_day_of_a_codes_month_is_a_date(contract: str, first: str) -> None:
+    made = first_day_of(contract)
+    assert made == day(first)
+    assert made.dtype == np.dtype("datetime64[D]")
+
+
+def test_a_code_that_is_no_single_contract_has_no_first_day() -> None:
+    for contract in ("Cal27", "W29", "F2026", " F26"):
+        with pytest.raises(ValueError) as failure:
+            first_day_of(contract)
+        assert str(failure.value) == (
+            f"contract is {contract!r}, expected a month letter and a two-digit year, such as F26"
+        )
+
+
+# Any day of this century: its code's first day is the first of its own month, and the code of
+# that first day is the code again, in capitals; the CME month of the code is the day's year and
+# month.
+@given(offset=st.integers(0, 36_524))
+def test_any_day_of_the_century_round_trips_through_its_code(offset: int) -> None:
+    date = day("2000-01-01") + np.timedelta64(offset, "D")
+    code = code_of_month(date)
+    first = first_day_of(code)
+    assert first.astype("datetime64[M]") == date.astype("datetime64[M]")
+    assert first == date.astype("datetime64[M]").astype("datetime64[D]")
+    assert code_of_month(first) == code
+    assert cme_code(code) == str(date.astype("datetime64[M]")).replace("-", "")
+    assert code_of_month(first_day_of(code.lower())) == code

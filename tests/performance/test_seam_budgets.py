@@ -221,6 +221,57 @@ def test_a_text_helper_is_text_in_one_parse_and_text_out(
     assert numpy_calls(lambda: PATH[name]("F26")) == {}
 
 
+# A day in and a code out: the date rule, through the number rule it builds on, the function,
+# the library's reading of the day as a count of months, two conversions and no calendar, and
+# the way out for text. Nine calls across nine functions.
+def test_the_code_of_a_day_is_a_date_in_two_conversions_and_text_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["util_DateToFut"](46161.0)
+    assert call_profile(lambda: PATH["util_DateToFut"](46161.0)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_date": 1,
+        "_number": 1,
+        "util_DateToFut": 1,
+        "code_of_month": 1,
+        "_text_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_DateToFut"](46161.0)) == {
+        "generic.astype": 2,  # the day to a count of months, and that count to a number
+    }
+
+
+# A code in and a day out, the first worksheet function to send one date back: the text rule,
+# the function, the library's one parse and one date made, then the seam's way out for a date,
+# which puts the day in a one-day array and checks it as it checks a column, its unit and its
+# two looks. Ten calls across ten functions, and the way out's numpy, nothing of the library's.
+def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["util_FutToDate"]("F26")
+    assert call_profile(lambda: PATH["util_FutToDate"]("F26")) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "util_FutToDate": 1,
+        "first_day_of": 1,
+        "month_and_year": 1,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_FutToDate"]("F26")) == {
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
 def test_a_boolean_in_and_out_itemized(call_profile: CallProfile) -> None:
     PATH["EchoBoolean"](True)
     assert call_profile(lambda: PATH["EchoBoolean"](True)) == {

@@ -146,6 +146,17 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_FutToCme", new object[] { "F2026" }, "#ERROR util_FutToCme: ValueError: contract is 'F2026', expected a month letter and a two-digit year, such as F26" };
             yield return new object[] { "util_FutToCme", new object[] { "" }, "#ERROR util_FutToCme: contract is empty text, expected text" };
             yield return new object[] { "util_FutToCme", new object[] { ExcelMissing.Value }, "#ERROR util_FutToCme: contract is missing, expected text" };
+            // The two date helpers: a day in and the code of its month out, in capitals; a code in and the first day of its month out, a serial. A day outside the years two digits name and a strip fail in the library's words, a serial with a time, text and a blank in the seam's.
+            yield return new object[] { "util_DateToFut", new object[] { 46161.0 }, "K26" };
+            yield return new object[] { "util_DateToFut", new object[] { 46387.0 }, "Z26" };
+            yield return new object[] { "util_DateToFut", new object[] { 73051.0 }, "#ERROR util_DateToFut: ValueError: date is 2100-01-01, expected a day from 2000 to 2099, the years a two-digit code can name" };
+            yield return new object[] { "util_DateToFut", new object[] { 46161.5 }, "#ERROR util_DateToFut: date is number 46161.5, expected date" };
+            yield return new object[] { "util_DateToFut", new object[] { "19-May-2026" }, "#ERROR util_DateToFut: date is text '19-May-2026', expected date" };
+            yield return new object[] { "util_DateToFut", new object[] { ExcelEmpty.Value }, "#ERROR util_DateToFut: date is blank, expected date" };
+            yield return new object[] { "util_FutToDate", new object[] { "F26" }, 46023.0 };
+            yield return new object[] { "util_FutToDate", new object[] { "n26" }, 46204.0 };
+            yield return new object[] { "util_FutToDate", new object[] { "W29" }, "#ERROR util_FutToDate: ValueError: contract is 'W29', expected a month letter and a two-digit year, such as F26" };
+            yield return new object[] { "util_FutToDate", new object[] { ExcelMissing.Value }, "#ERROR util_FutToDate: contract is missing, expected text" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };

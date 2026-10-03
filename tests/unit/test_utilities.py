@@ -741,6 +741,55 @@ def test_the_text_helpers_take_one_text_and_nothing_else() -> None:
             assert bridge.call(name, [wrong]) == f"#ERROR {name}: contract {what}, expected text"
 
 
+# --- two more: the month a day falls in, and the first day of a code's month -------------
+
+
+# A day in and a code out, a code in and a day out, through the seam: the day's own month in
+# capitals, and the first of the code's month as a serial, the sheet's date.
+def test_the_code_of_a_day_and_the_first_day_of_a_code_through_the_seam() -> None:
+    assert bridge.call("util_DateToFut", [46161.0]) == "K26"  # 19 May 2026, a WTI June expiry
+    assert bridge.call("util_DateToFut", [46023.0]) == "F26"
+    assert bridge.call("util_DateToFut", [46387.0]) == "Z26"
+    assert bridge.call("util_FutToDate", ["F26"]) == 46023.0  # 1 January 2026
+    assert bridge.call("util_FutToDate", ["n26"]) == 46204.0  # 1 July 2026
+    assert bridge.call("util_FutToDate", ["Z99"]) == 73020.0
+    assert isinstance(bridge.call("util_FutToDate", ["F26"]), float)
+
+
+# A day outside the years two digits name, and a code that is no single contract: the library's
+# words through the seam.
+def test_a_day_outside_the_century_and_a_strip_are_refused_through_the_seam() -> None:
+    for serial, named in ((36525.0, "1999-12-31"), (73051.0, "2100-01-01")):
+        assert bridge.call("util_DateToFut", [serial]) == (
+            f"#ERROR util_DateToFut: ValueError: date is {named}, expected a day from 2000 to "
+            "2099, the years a two-digit code can name"
+        )
+    for contract in ("Cal27", "F2026"):
+        assert bridge.call("util_FutToDate", [contract]) == (
+            f"#ERROR util_FutToDate: ValueError: contract is {contract!r}, "
+            "expected a month letter and a two-digit year, such as F26"
+        )
+
+
+# The day is one date and the code one text, and the seam says so for anything else.
+def test_the_date_helpers_take_one_date_or_one_text_and_nothing_else() -> None:
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (1.5, "is number 1.5"),
+        ("x", "is text 'x'"),
+        (True, "is boolean TRUE"),
+        (Cells.from_rows([[46023.0], [46024.0]]), "is 2x1 array"),
+    ):
+        assert bridge.call("util_DateToFut", [wrong]) == (
+            f"#ERROR util_DateToFut: date {what}, expected date"
+        )
+    for wrong, what in ((MISSING, "is missing"), (None, "is blank"), ("", "is empty text")):
+        assert bridge.call("util_FutToDate", [wrong]) == (
+            f"#ERROR util_FutToDate: contract {what}, expected text"
+        )
+
+
 # --- what does not resolve fails in the seam's words, and spills nothing -------
 
 

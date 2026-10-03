@@ -112,6 +112,27 @@ def test_the_two_text_helpers_explain_themselves() -> None:
     assert arguments == [("contract", line)]
 
 
+def test_the_two_date_helpers_explain_themselves() -> None:
+    description, arguments, hidden = SPECS["util_DateToFut"]
+    assert not hidden
+    assert description == (
+        "Gives the contract code of the month a day falls in, F26 for any day of January 2026."
+    )
+    assert arguments == [
+        ("date", "One day, such as A2 or DATE(2026,1,15): any day of the contract's month."),
+    ]
+    description, arguments, hidden = SPECS["util_FutToDate"]
+    assert not hidden
+    assert description == "Gives the first day of a contract's month as a date, 1-Jan-2026 for F26."
+    assert arguments == [
+        (
+            "contract",
+            "One contract code, a month letter and a two-digit year such as F26, typed or in a "
+            "cell such as A2.",
+        ),
+    ]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden

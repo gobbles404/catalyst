@@ -321,6 +321,21 @@ $formulas = [ordered]@{
     "=util_NextFut(A1)" = "#ERROR util_NextFut: contract is number 1.0, expected text"
     "=util_FutToCme(C2)" = "#ERROR util_FutToCme: contract is blank, expected text"
     "=util_FutToCme(I2)" = "#ERROR util_FutToCme: contract is empty text, expected text"
+    # The two date helpers: the code of the month a day falls in, K26 for m26's expiry in AF2,
+    # 19-May-2026, U26 for 11-Sep-2026 in Y2 and Z26 for the last day of 2026; the first day of a
+    # code's month as a date, 1-Jan-2026 for F26 and 1-Jul-2026 for the n26 in AE3, the cell
+    # showing the serial until it is formatted; a day of 2100 and a strip, the library's words; a
+    # time, text and a blank where the day should be, the seam's.
+    "=util_DateToFut(AF2)" = "K26"
+    "=util_DateToFut(Y2)" = "U26"
+    "=util_DateToFut(DATE(2026,12,31))" = "Z26"
+    '=util_FutToDate("F26")' = "46023"
+    "=util_FutToDate(AE3)" = "46204"
+    "=util_DateToFut(DATE(2100,1,1))" = "#ERROR util_DateToFut: ValueError: date is 2100-01-01, expected a day from 2000 to 2099, the years a two-digit code can name"
+    '=util_FutToDate("Cal27")' = "#ERROR util_FutToDate: ValueError: contract is 'Cal27', expected a month letter and a two-digit year, such as F26"
+    "=util_DateToFut(Y2+0.5)" = "#ERROR util_DateToFut: date is number 46276.5, expected date"
+    "=util_DateToFut(E1)" = "#ERROR util_DateToFut: date is text 'x', expected date"
+    "=util_DateToFut(C2)" = "#ERROR util_DateToFut: date is blank, expected date"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the

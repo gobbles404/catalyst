@@ -16,13 +16,19 @@ from goosedove.calendar.calendar import Calendar
 from goosedove.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
+    Date,
     Handle,
     MixedArray,
     excel_function,
 )
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.valuation_date import ValuationDate
-from goosedove.index_definitions.contract_codes import cme_code, next_contract
+from goosedove.index_definitions.contract_codes import (
+    cme_code,
+    code_of_month,
+    first_day_of,
+    next_contract,
+)
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
@@ -340,3 +346,25 @@ def util_FutToCme(
     """Gives the contract month as CME's data feeds spell it, the year then the month, 202601 for
     F26."""
     return cme_code(contract)
+
+
+@excel_function
+def util_DateToFut(
+    date: Annotated[
+        Date, "One day, such as A2 or DATE(2026,1,15): any day of the contract's month."
+    ],
+) -> str:
+    """Gives the contract code of the month a day falls in, F26 for any day of January 2026."""
+    return code_of_month(date)
+
+
+@excel_function
+def util_FutToDate(
+    contract: Annotated[
+        str,
+        "One contract code, a month letter and a two-digit year such as F26, typed or in a cell "
+        "such as A2.",
+    ],
+) -> Date:
+    """Gives the first day of a contract's month as a date, 1-Jan-2026 for F26."""
+    return Date(first_day_of(contract))
