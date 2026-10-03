@@ -2,7 +2,7 @@
 
 Whiteboard draft for review. Waiting on the seam: an instrument-selected partial record with typed field values, including static object references. Not implemented.
 
-Creates reusable defaults under a library-owned instrument definition, reducing repeated
+Creates shared trade fields under a library-owned instrument definition, reducing repeated
 ticket entry. The template is allowed to be incomplete. It has no market-state dependency.
 
 ## Worksheet contract
@@ -18,6 +18,9 @@ _CreateTradeTemplate(instrument, fields, values) -> Handle[TradeTemplate]
 | instrument | One exact instrument identifier from _ListInstruments, such as future |
 | fields | One horizontal row of recognized field names, in any order |
 | values | Exactly one aligned row of values for those fields |
+
+instrument is the first, required argument. The template retains the selected definition;
+CreateTrades uses that definition when completing the template with ticket fields.
 
 One field uses the same path as many. Omit a field entirely when the template should not
 supply it; a listed field with a blank value is an input error, not an instruction to inherit
@@ -60,9 +63,16 @@ Proposed lines for the eventual declaration:
 
 ## The library checks
 
-The selected instrument must be a recognized definition. Supplied fields must belong to
-that definition, occur once and have valid supplied values. Header matching follows the
-existing table convention; the seam owns shape, type and typed-reference resolution.
+The selected instrument must be a recognized definition. Every supplied field must exactly
+match a field identifier in that definition, occur once and have a valid supplied value.
+Matching is case-sensitive, without trimming, aliases or fuzzy matching. The identifiers
+shown in _ShowInstrument's field row are the accepted names; descriptions are not headers.
+Unknown fields fail even if their values are blank or they are intended only as notes.
+No extra columns are silently ignored or retained as arbitrary metadata. Field order may vary.
+
+This exact matching is part of the proposed trade-input binding; today's general Table
+binder ignores case. The [binding proposal](../../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
+records that difference explicitly. The seam owns shape, type and typed-reference resolution.
 Static semantic constraints belong to the library. It does not parse Excel handles or
 coerce numbers/dates from strings.
 
@@ -70,6 +80,11 @@ A template need not supply all required trade fields. Do not apply complete-trad
 or required_when checks to this partial record. Intrinsic supplied-value rules still apply;
 relationships needing ticket values are checked against the final resolved trade. Avoid
 an elaborate second validator that tries to anticipate every future ticket.
+
+The accepted payment_time_lag field is a string such as "+1bd". Like every other field,
+it is supplied by either the template or the trade row, never both. The same applies to
+payment_holiday_calendar. The supported product establishes the payment anchor;
+CreateTrades generates each component's payment_date. Broader bilateral rules are deferred.
 
 The first seam review must pin error ownership and exact messages for unknown/duplicate
 fields, width mismatch, more than one values row, unsupported types and wrong/dead reference
@@ -101,28 +116,34 @@ the future definition. Prices are illustrative agreed trade prices, not market o
 
 Ticket excerpt:
 
-| contract_code | quantity | trade_price |
+| contract_code | quantity | fixed_price |
 |---|---:|---:|
 | Z26 | 5 | 70.00 |
 | F27 | -2 | 71.25 |
 
 Resolved excerpt:
 
-| index | quantity_unit | contract_code | quantity | trade_price |
+| index | quantity_unit | contract_code | quantity | fixed_price |
 |---|---|---|---:|---:|
 | CL | LOT | Z26 | 5 | 70.00 |
 | CL | LOT | F27 | -2 | 71.25 |
 
-Explicit ticket values override template defaults. The completed record is then resolved
-and checked against its actual selected definitions, including conditional requirements.
-An explicit blank remains an error; it does not silently fall back to the template. Shared
-reference/default storage does not merge trade occurrences or introduce netting.
+Template fields and ticket columns must be disjoint. Before combining their values,
+CreateTrades rejects every overlapping field, even when its two values are identical.
+For example, a template supplying quantity_unit=LOT and a ticket containing a quantity_unit
+column fails with a field-specific error. Remove that column from the ticket or remove the
+field from the template. No override, equality exception or fallback is supported.
 
-The intended CreateTrades call supplies one template for its array of ticket rows. A shared
-template helps keep them alike, but explicit overrides still require checking compatibility
-of the resolved collection. A uniform route and one actual index are the recommended first
+Duplicate field names within either input also fail under the exact matching rule.
+The completed record must then satisfy its selected definition, including conditional
+requirements. An explicit blank remains an error. Duplicate trade rows remain distinct
+economic occurrences; rejecting duplicate field sources does not deduplicate trades.
+
+The intended CreateTrades call supplies one optional template for its array of ticket rows.
+Template-supplied fields are shared; ticket-only fields can vary. Resolution still checks
+compatibility of the completed collection. A uniform route and one actual index are the recommended first
 commodity batch scope, with the index restriction still under discussion. This does not add
-field locks or make template identity a valuation-group key. See the
+per-field permission flags or make template identity a valuation-group key. See the
 [batch-boundary sketch](../../engineering-tickets/trade-valuation-pipeline/batch-boundaries-and-discounting.md).
 
 Editing a template input produces a new immutable template through normal worksheet
@@ -130,7 +151,7 @@ dependencies; dependent trade construction can then rebuild. Market-price, fixin
 valuation-date changes alone do not recreate it. Worksheet headings and names remain an
 Excel concern and do not become additional facts inside the library object.
 
-## Seam work to specify before implementation
+## Seam work before implementation
 
 `fields` already fits `TextRow`. The combined partial record does not fit the current table path:
 
@@ -138,7 +159,8 @@ Excel concern and do not become additional facts inside the library object.
 - A listed function cannot declare a bare MixedArray input to perform its own parsing.
 - Table columns currently support numbers, dates, text and booleans, not typed handles.
 
-Specify a narrow schema-selected partial-record binding at the seam, driven by the approved
+The [Excel trade-input binding proposal](../../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
+specifies a narrow schema-selected partial-record binding at the seam, driven by the approved
 instrument definition: align fields and values, refine supplied cells once, and resolve any
 declared static-reference fields to their objects. The library should receive a typed partial
 record. Do not require all values to be text or insert a new global name registry to bypass
@@ -146,8 +168,8 @@ this requirement. Dependency/lifetime handling must cover the references retaine
 template, including when the referenced index creator changes or is released.
 
 See [inputs](../../seam/inputs.md), particularly the table and handle contracts and decision
-38, and [handles](../../seam/handles.md). This is the remaining transport specification;
-the worksheet ergonomics above are the proposed product contract.
+38, and [handles](../../seam/handles.md). The proposed transport extension still needs
+engineering review and implementation; the current seam cannot register this signature as-is.
 
 ## Tests
 
@@ -158,10 +180,12 @@ Implementation acceptance cases, not tests added by this documentation draft:
 | CL reference and LOT create the expected partial template | Example |
 | One field and several fields follow the same constructor path | Example |
 | Reordering field/value pairs preserves meaning; duplicate fields, width/row-count mismatches and wrong-type values fail | Property and example |
+| Unknown, case-changed, whitespace-padded or aliased headers fail; no extra fields survive construction | Example through the seam |
 | Missing trade-only requirements are permitted; invalid supplied values are rejected | Example |
 | An Excel name references the creator cell and its current handle without a library label field | Excel smoke |
 | Typed index reference survives through the template and into resolved trades | Example through the seam and Excel lifetime check |
-| Two ticket rows inherit defaults; explicit overrides validate against the completed record | Example in the trade-construction slice |
+| Disjoint template/ticket fields complete one or many trades; overlapping fields fail for equal and unequal values | Example in the trade-construction slice |
+| Duplicate field names fail; identical trade occurrences each contribute once | Example in the trade-construction slice |
 | No market reads, trade encoding or evaluation occur during template creation | Work budget |
 
 Inspection should expose the instrument and stored defaults using the
@@ -181,4 +205,4 @@ encoding. Its returned handle retains both outputs; template creation performs n
 The [trade-representation sketch](../../engineering-tickets/trade-valuation-pipeline/01-trade-representation.md)
 adds the user's ICE/NYMEX example: different product defaults, a separate ticket sheet and
 static resolution of the assembled facts. Clearing defaults alone do not identify delivery
-obligations, and separating templates does not introduce field locks.
+obligations; all templates follow the same disjoint-field rule.

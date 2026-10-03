@@ -18,6 +18,102 @@ ICE trading ends four business days before the contract month starts; final paym
 on the next clearing business day after that trading cutoff.
 [ICE product specification](https://www.ice.com/products/6590264).
 
+## Cleared payment convention: selected rule and resolved date
+
+**Decision:** Use payment_time_lag, a string such as "+1bd", and
+payment_holiday_calendar as static trade-row or template inputs. The supported product
+definition establishes the anchor and counting convention. CreateTrades parses the lag
+once and resolves and stores payment_date per monthly component. This is the accepted
+starting design; the payment-date API is not implemented yet. Broader bilateral conventions
+remain deferred, with their limited coverage explicitly accepted for this first step.
+
+The anchor need not be user-entered when supported product terms establish it, but it
+cannot be assumed universally from a reference index. For example, a hypothetical bilateral
+January gas swap could use the January futures fixing in late December and agree payment
+five business days after January month-end. Payment occurs after expiry but is calculated
+from month-end. FpML likewise represents a commodity payment's relative date separately
+from its day offset, including calculation-period-end and last-pricing-date choices.
+[FpML commodity relative payment dates](https://cdn.fpml.org/spec/fpml-5-12-4-rec-1/html/confirmation/schemaDocumentation/schemas/fpml-com-5-12_xsd/complexTypes/CommodityRelativePaymentDates.html).
+This example explains the boundary; broader bilateral conventions remain deferred.
+
+Rechecked against ICE product pages on 3 October 2026. Explicit date-window/exact support
+remains deferred. For cleared monthly futures, distinguish the supplied `payment_time_lag`
+from the actual `payment_date` resolved for each component.
+
+| Contract | Anchor supplied by product definition | payment_time_lag | Calendar named by the contract |
+|---|---|---|---|
+| Henry Penultimate Fixed Price Future, PHH | That ICE contract's Last Trading Day | "+1bd" | Clearing Organization business days |
+| Ethane, OPIS Mt. Belvieu Non-TET Future, ETE | That ICE contract's Last Trading Day | "+2bd" | Clearing Organization business days |
+
+Sources: [PHH](https://www.ice.com/products/6590264) and
+[ETE](https://www.ice.com/products/6590286). Both pages identify ICEU as clearing venue.
+These are different final-payment conventions despite both being cleared futures. Neither
+rule is a general zero-day cleared-futures default. The PHH payment anchor is its own
+trading cutoff; its final price instead references NYMEX NG's penultimate settlement.
+
+Accepted starting fields for the template/ticket:
+
+```text
+payment_time_lag = "+1bd" or "+2bd"
+payment_holiday_calendar = existing HolidayCalendar reference
+
+CreateTrades -> payment_dates[monthly_component]
+```
+
+For the reviewed products, the library uses the actual traded contract's last trading day
+as the anchor and counts eligible days strictly after it. The lag string expresses a
+positive whole number of business days; creation converts it once to the internal numeric
+offset. The trade row can supply the field, or a template can provide the shared default.
+The same choice applies to the payment calendar, which uses the existing immutable
+HolidayCalendar object transported by its Excel handle. No separate public anchor selector,
+numeric lag field or payment-rule constructor is needed for this starting scope.
+Listed-product terms must still validate together; a supplied lag/calendar cannot redefine
+the traded product.
+Creation also needs each traded contract's own resolved last-trading-day schedule or a
+supported static rule producing it. schedule_method alone does not establish that payment
+anchor; the reference-schedule selection remains part of the creation contract to specify.
+Existing ContractSpecifications keeps its lot/unit/fee responsibility. The instrument's
+schedule_method still selects pricing observations, independently of payment_time_lag.
+
+For positive lags, select the first or second eligible calendar day strictly after the
+anchor; do not first roll the anchor forward and then add the lag, which can overcount if
+the anchor is closed on the payment calendar. A hypothetical Friday anchor with Monday
+closed on that calendar gives Tuesday for +1bd and Wednesday for +2bd. This is an
+illustration, not a dated ICE holiday calculation. Supporting 0bd later requires an explicit
+closed-anchor adjustment rule. No further roll menu is needed to express these two ICE rules.
+
+Reuse the existing HolidayCalendar data and NumPy business-day arithmetic. The repository
+already uses these primitives in futures_fixings.py; it does not yet have a shared payment
+date function. A small private date consumer can construct a busdaycalendar with Monday-Friday
+as eligible weekdays and the supplied holidays, then apply busday_offset to an array of
+anchors. For strictly positive lags, roll="backward" followed by the offset implements the
+strict-after rule even when the anchor is closed. Do not extend that expression to zero
+without specifying its adjustment behavior. NumPy supplies arithmetic, not authoritative
+exchange holiday data. Resolve the resulting date array once during CreateTrades, including
+all monthly strip components; price ticks do not rebuild it.
+[NumPy busdaycalendar](https://numpy.org/doc/stable/reference/generated/numpy.busdaycalendar.html),
+[NumPy busday_offset](https://numpy.org/doc/stable/reference/generated/numpy.busday_offset.html).
+
+The initial supported products establish a last-trading-day anchor. A future bilateral
+example may require a month-end anchor or a different payment rule; that extension and
+direct date overrides remain deferred.
+
+Keep the payment calendar separate from the pricing calendar. ICE publishes an
+[operating calendar](https://www.ice.com/publicdocs/clear_europe/circulars/C25074.pdf) and a
+[currency holiday schedule](https://www.ice.com/publicdocs/ICEU_Currency_BankHolidays_2026.pdf)
+as distinct schedules. The reviewed product convention counts Clearing Organization
+business days; do not substitute OPIS/NYMEX holidays or silently combine all holidays.
+Currency-specific operational cash handling is outside this finalization model. A concrete
+date fixture must use the applicable contractual calendar data for its year.
+
+For CAL27, apply the selected rule independently to each constituent's trading cutoff and
+retain twelve payment dates. No pricing/fixing values are required to generate these dates.
+Preparation uses the dates with history/as-of under the existing modeled cash cutoff.
+Cleared cash remains modeled finalized economic P&L; it does not assert that the full
+entry-to-final-price P&L is transferred on that final payment date. Margining remains excluded.
+
+## Monthly constituents and fixing state
+
 For this discussion Cal26 means the January-December strip of monthly contracts, not one
 annual-average instrument. Each constituent retains its monthly price determination and
 settlement rules. ICE's general calendar-strip explanation describes a year as its monthly

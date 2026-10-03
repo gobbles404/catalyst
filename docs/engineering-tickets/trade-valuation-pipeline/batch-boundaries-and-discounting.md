@@ -21,11 +21,12 @@ Cleared versus bilateral is a useful initial batch boundary. The first proposed 
 | Supported observation schedules | May vary within the selected schema and conventions |
 | Payment dates and applicable curve associations | Preserve and group as needed; need not all be identical |
 
-The existing default policy lets explicit ticket values override the template. Therefore,
-sharing a template alone cannot prove uniform resolved index or route. Validate the completed
-batch after resolving its rows. An unsupported mixture fails visibly rather than being
-silently split or priced under one row's rules. This is a batch compatibility rule, not a
-new per-field template lock or revival of template_allowed.
+Template fields and ticket columns must be disjoint; repeating a field fails even when
+the values match. A shared template establishes common values for the fields it supplies,
+but ticket-only fields can vary. Validate the completed batch after resolving its rows.
+An unsupported mixture fails visibly rather than being silently split or priced under one
+row's rules. The uniform no-duplication rule and the batch compatibility check need no
+per-field template lock or revival of template_allowed.
 
 Template identity is not itself the economic grouping key. Two differently named templates
 can produce compatible trades; the eventual aggregation rules depend on resolved facts.

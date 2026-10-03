@@ -17,9 +17,20 @@ Three responsibilities have become bundled in our discussion and should remain d
 
 The agreed first implementation exposes these through one explicit operation:
 
-```python
+```text
 _PrepareTrades(trades, history) -> prepared_trades_handle
 ```
+
+| Argument | Meaning |
+|---|---|
+| trades | One handle returned by CreateTrades, retaining resolved terms and static encoding for one or many trade occurrences |
+| history | One compatible MarketHistory handle, carrying the index, calendar, valuation context and applied historical fixings |
+
+Both arguments are required. The result is one immutable prepared-batch handle. For example,
+`=_PrepareTrades(TradesHandle, HistoryHandle)` exposes the two dependencies directly to
+Excel. The current as-of source is history.calendar.valuation_date.as_of; no separate as_of
+argument is needed. Current prices arrive later through EvaluateTrades. This is the agreed
+worksheet boundary, not a currently implemented creator.
 
 One handle contains one or many trade occurrences. There is one batch path, including a
 batch of one. The prepared handle retains the history-dependent work for evaluation;
@@ -41,7 +52,7 @@ for arithmetic while preserving their separate meanings. Missing required fixing
 they are not forecasts, zeros or omitted averaging days. Scheduled dates and publication
 availability are different facts; define the supported cutoff explicitly.
 
-The current MarketHistory carries the as-of context. In this initial signature, history
+The current MarketHistory carries the as-of context through its calendar. In this initial signature, history
 and the trade's retained static definitions must determine the live layout and projection
 rule completely. If a supported layout or projection can vary independently, add it as an
 explicit preparation input before supporting that variation. Current price values never
@@ -73,7 +84,7 @@ The word **set** means an observation has fixed, not that its payment has been p
 
 The [Henry Hub lifecycle example](fixing-and-payment-state.md) distinguishes those states at
 the monthly component level. For the proposed initial model, assume settlement on the encoded
-payment date: preparation can derive `payment_date <= history.as_of` and retain the mask with
+payment date: preparation can derive `payment_date <= history.calendar.valuation_date.as_of` and retain the mask with
 its payment groups. Required final fixings must be known before moving a component into the
 settled bucket. Date rolls already rebuild preparation. No actual-payment store is required;
 margining and reconciliation are outside this scope. The [result-field proposal](result-fields-by-route.md)
@@ -160,6 +171,19 @@ date roll must rebuild the whole prepared batch under the initial conservative p
 markets/histories must not overwrite each other's state. Releases and failures must leave
 no stale results or indefinitely retained obsolete preparations.
 
-Test fully fixed trades and the zero-live-mark numerical case. The current Market constructor's
-requirement for an unfixed period needs a separate integration decision; do not hide it with
-a dummy price. Selective per-fixing updates and sparse representations can follow measurements.
+Test fully fixed trades and the zero-live-mark numerical case. A fully fixed trade batch
+within a still-live history can have no live exposure. An entirely fixed history is a
+different integration case: the current Market constructor requires an unfixed period.
+The [Excel binding proposal](excel-trade-input-binding.md) recommends a terminal market
+extension for review; it is not yet an agreed or implemented API. Bound the first delivery
+explicitly until that path is supported; do not hide the gap with a dummy price. Selective per-fixing
+updates and sparse representations can follow measurements.
+
+The [NG creation/preparation fixture](ng-creation-preparation-example.md) now gives concrete
+input descriptors and ordered live coefficients, with a separate toy lifecycle for the
+fixing/date cutoff and set contributions. It includes duplicate occurrences and compares
+the aggregate with compatible single-trade examples. A tick must do zero fixing-fold work; a corrected
+history or date roll prepares afresh. Current PriceVector carries a name and positional
+values, so the fixture and the input contract must establish their order. Do not promise
+detection of a silently permuted raw price column without a source of contract identities
+that makes that check possible.

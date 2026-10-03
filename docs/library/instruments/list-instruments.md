@@ -1,6 +1,6 @@
 # _ListInstruments
 
-Draft for owner and engineering review. Not implemented; the catalog contents and seam declaration have not passed the function-page review gate.
+Agreed starting reader contract. Not implemented; the seam declaration still needs engineering verification.
 
 Lists the library-defined instrument schemas that can be inspected with
 [_ShowInstrument](show-instrument.md). This is the first read-only surface for the
@@ -34,9 +34,10 @@ passed unchanged to `_ShowInstrument`. An empty catalog returns the header alone
 function creates or returns a definition handle. The seam validates the declared result:
 [outputs](../../seam/outputs.md). No additional row of implementation types is inserted.
 
-The worksheet prefix follows this repository's convention. `List` and `Show` are the user's
-proposed verbs for this surface; their adoption is a deliberate extension of the current
-Create/Read vocabulary, to be recorded in the conventions page when this design is accepted.
+The worksheet prefix follows this repository's convention. `List` and `Show` are the agreed
+verbs for catalog and definition inspection, recorded in the
+[naming conventions](../conventions.md#verbs). Both are read-only supporting functions for
+instrument definitions, before template or trade creation.
 
 ## Excel help
 

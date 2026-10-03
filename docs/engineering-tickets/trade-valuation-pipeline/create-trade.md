@@ -12,13 +12,26 @@ resulting immutable trade batch. One trade uses the same batch path as many trad
 
 The agreed worksheet name is `_CreateTrades`, matching `_PrepareTrades` and `_EvaluateTrades`.
 The plural makes the one-or-many batch contract explicit. The final creation argument list
-remains open; there is no separate singular function or compatibility alias.
+remains open; there is no separate singular function or compatibility alias. The template
+argument is optional and last. The agreed fields argument is the column-header row; there
+is no separate labels argument. Aliasing is a future use case, separate from the optional
+trade_id field and retained occurrence identity. Before freezing the signature, establish
+how an instrument is selected without a template and where the authoritative index input lives.
 
 The user envisages one supplied template for the call's array of trade rows. The recommended
 first commodity scope is one actual index, route and amount currency per batch; index scope
-is still a proposal rather than a permanent restriction. Ticket overrides remain possible,
-so resolution must validate the completed batch rather than infer compatibility from its
-template handle. See [batch boundaries and discounting](batch-boundaries-and-discounting.md).
+is still a proposal rather than a permanent restriction. Template fields and ticket columns
+must be disjoint; any overlap fails, even for equal values. Ticket-only fields can still
+vary, so resolution validates the completed batch's compatibility. See
+[batch boundaries and discounting](batch-boundaries-and-discounting.md).
+
+The selected instrument definition is the complete set of permitted trade fields. Every
+template field and ticket header must match its identifier exactly: case-sensitive, with
+no trimming, aliases, fuzzy matching or ignored extras. Column order may vary. For example,
+fixed_price is accepted; price, Fixed_Price and a whitespace-padded fixed_price fail.
+Optional fields must still be declared by the definition and satisfy their types and rules.
+An unknown field fails before resolution/encoding and no trade handle is published. Adding
+a new supported field requires a reviewed library-definition change, not a workbook column.
 
 Illustrative private orchestration, after the seam has supplied typed input:
 
@@ -36,9 +49,54 @@ instrument context and static references; a no-template path must establish thos
 Static unit definitions used by encoding must be retained/supplied explicitly through the
 resolved inputs; the encoder cannot discover them through an ambient global lookup.
 
+### Where conventions and specifications enter
+
+CreateTrades reads static reference facts through the selected Index object. The template
+or ticket supplies contract_specification, selecting one named row within that index.
+There is no separate conventions/specification handle in the proposed trade call, no
+first-specification fallback, and no global lookup using the index's display name.
+
+| Static source | What creation obtains | What the ticket/template supplies |
+|---|---|---|
+| index.conventions | Quote currency/unit, amount currency, quantity category and base quantity unit | Executed quantity/unit and fixed_price, checked against those conventions |
+| index.specifications | Named lot sizes, lot units and per-lot brokerage/clearing rates | contract_specification selects the intended named row |
+| index.schedule | Contract identities and reference dates used to resolve codes, strips and supported observation rules | contract_code and schedule_method |
+| index.holiday_calendar | Pricing holidays where applicable to the index | No duplicate pricing-calendar field in the ticket |
+| Explicit payment_holiday_calendar | Business days for the supported payment rule | This separate calendar reference and payment_time_lag, each supplied once |
+
+The current ContractSpecifications object contains lot/unit/fee data. It is not a complete
+catalog of exchange settlement rules or actual traded-product last-trading-day anchors.
+Where the supported product needs additional static facts, its approved definition must
+supply them explicitly. A clearing_house string or lot-size row cannot establish them by
+inference. A penultimate reference rule must not move an already-resolved product expiry twice.
+
+The source of these facts is settled; the Excel placement of index remains open. If index
+stays an explicit CreateTrades argument, it cannot also be supplied by a template or ticket.
+If it is a trade field supplied by either of those, there must not also be a required index
+argument. Resolve this single-source choice before freezing the creation signature.
+
+All these inputs are static. CreateTrades validates and encodes the deal using them without
+a Market, history, valuation date or live prices. PrepareTrades subsequently applies history;
+EvaluateTrades supplies the live market values.
+
+### Contract components and payment terms
+
+The proposed fixed_price field names the agreed fixed price. A contract_code can name one
+month or a monthly strip such as CAL27 or Z27-X28. Reuse the existing period_months helper
+to resolve its bounds, then resolve every constituent against the static schedule. Encoding
+keeps a monthly component mapping back to the original occurrence, applies quantity_per
+and schedule_method to each month, and retains its resolved payment date. The period helpers
+do not supply payment rules or authorize one annual average. These are design changes;
+the existing _CreateFuturesTrades prototype remains a single-code trade_price API.
+
+Payment terms come from the trade row or template: payment_time_lag, a string such as
+"+1bd", and payment_holiday_calendar. Resolution parses the lag once and establishes the
+supported product's anchor and counting convention; encoding materializes and retains
+payment dates per monthly component. Broader bilateral payment conventions remain deferred.
+
 | Child | Owns | Produces |
 |---|---|---|
-| Resolution | Merge defaults and ticket values; establish actual instrument/product/reference identity, selected contracts and conventions; validate the completed terms and compatibility | Resolved trade facts and the static definitions that give them meaning |
+| Resolution | Reject duplicate field sources, combine disjoint template/ticket fields; establish actual instrument/product/reference identity, selected contracts and conventions; validate the completed terms and compatibility | Resolved trade facts and the static definitions that give them meaning |
 | Encoding | Consume those resolved facts; expand applicable observation schedules, compute static conversions/weights and contributions, assign numerical positions and attribution | Read-only numerical arrays and identified market inputs |
 
 Resolution decides which contract and contractual rule apply. Encoding materializes that
@@ -136,6 +194,11 @@ history inside the public trade constructor was an earlier candidate; it is outs
 agreed static wrapper. The first implementation does not need a private preparation cache.
 
 ## Worked state and acceptance
+
+The [NG creation/preparation example](ng-creation-preparation-example.md) works through five
+occurrences, two contract inputs and independent aggregate answers. The
+[Excel binding proposal](excel-trade-input-binding.md) specifies the proposed typed partial
+input transport and its ownership/error boundaries.
 
 For the [two-trade average fixture](worked-example.md), the retained resolved terms include
 quantities `[100, -40]`, agreed prices `[70, 72]`, the shared two-assessment definition and

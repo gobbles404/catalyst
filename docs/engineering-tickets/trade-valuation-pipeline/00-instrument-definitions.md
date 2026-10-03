@@ -2,15 +2,26 @@
 
 [Pipeline overview](README.md) · [Next: trade representation](01-trade-representation.md)
 
-The first worksheet contracts are now drafted separately:
+The agreed starting read-only worksheet contracts are documented separately:
 [_ListInstruments](../../library/instruments/list-instruments.md) and
-[_ShowInstrument](../../library/instruments/show-instrument.md). The latter follows the
-user's preference for one field per row, with its name and description. Both are read-only;
-the pages remain proposals, not implemented functions.
+[_ShowInstrument](../../library/instruments/show-instrument.md). List takes no arguments and
+spills instrument identifiers with quick descriptions, starting with future. Show takes an
+instrument identifier as text and spills one column per instrument field. The first column
+contains the seven row labels `field`, `description`, `required`, `required_when`, `type`,
+`options` and `rule`; each field's metadata occupies the corresponding column to its right.
+This keeps field names across columns, matching trade-row entry. Both read the same library-owned definitions
+used by construction. They return tables and create no handles. Their responsibility is
+agreed; implementation and seam verification remain pending.
 
 The [field sketch](instrument-field-sketch.md) incorporates the second legacy template:
 conditional requirements, template defaults, option domains and the distinction between
 a reference contract and the actual trade's settlement terms.
+
+Current refinement: `schedule_method` is selected on the trade or defaulted by its template;
+its definitions are library-owned. V1 excludes exact/CFD and adds `quantity_per` with only
+month/day choices. The [current field proposal](instrument-field-sketch.md#current-refinement-schedule_method-and-quantity_per)
+describes candidate methods, proposed calendar-day quantity semantics and module ownership.
+Physical-delivery handling is out of scope; explicit payment dates remain part of the trade.
 
 ## Responsibility and authority
 
@@ -30,10 +41,10 @@ trade or price tick. A library change is required to support new instrument econ
 
 | Level | Owns | Example |
 |---|---|---|
-| Instrument definition | Library-owned meaning, schema, supported choices/combinations and supported measures | `future`, single-index fixed/float `swap` |
-| Product/reference definitions | Concrete product identity, index, units, schedules, lot size and settlement conventions | The selected NG product/specification and its reference index |
+| Instrument definition | Library-owned meaning, schema, supported choices/combinations and supported measures; shared method definitions | `future`, single-index fixed/float `swap`, approved schedule methods |
+| Product/reference definitions | Concrete reference identity, index, units, calendars, contract schedules and lot size | The selected NG reference and lot specification |
 | Template | Instrument/reference selections and a partial set of default trade values | A book/account and default contract under the chosen product |
-| Trade or cash record | The actual executed terms, payment obligation or explicitly defined balance | Signed lots and agreed price, or a known USD payment |
+| Trade or cash record | The actual executed terms, selected schedule method and quantity basis, payment terms or explicitly defined balance | Signed quantity and agreed price with dated payments, or a known USD payment |
 
 These are responsibilities, not a requirement to invent four frameworks. Product definitions
 can allow contractually variable fields for a supported bilateral product; they fix listed
@@ -88,8 +99,14 @@ is not a consummated trade; the intake must document which kind of economic reco
 
 Each definition has an immutable identity/revision and a support status. Its field description
 identifies meaning, type, units or unit source, required/optional/conditional status, permitted
-values, defaults and which source may provide or override the field. Include conditional and
+values and how required facts are supplied. Template and ticket fields must be disjoint;
+every overlapping field fails, including equal values. Include conditional and
 cross-field rules, not just independently valid enum values.
+
+The definition is also the complete set of permitted field identifiers. Template and ticket
+headers must match those identifiers exactly, including case and whitespace. No aliases,
+fuzzy matches, ignored extras or arbitrary metadata columns are accepted. Column order may
+vary. Optional means permitted to be absent, not permitted to escape the schema when supplied.
 
 For example, a future schema could expose:
 
@@ -99,16 +116,23 @@ For example, a future schema could expose:
 | Product | Compatible authoritative product reference | Selection or permitted template default |
 | Trade ID | Optional nonempty label | Attribution only; duplicate labels do not merge occurrences |
 | Trade date | Date | Ticket or explicitly permitted default |
-| Contract | Contract accepted by the selected product schedule | Template default or ticket |
+| Contract | One month or monthly strip under the existing period grammar | Template default or ticket; every constituent must resolve in the static schedule |
+| Schedule method | asian, lastday, penultimate, last3day | Trade selection of a library rule, combined with static reference dates/calendars |
 | Signed lots | Whole nonzero quantity for the initially supported listed product | Ticket; product owns the quantity convention |
-| Agreed price | Finite number in product price units | Ticket; any price restrictions must be product rules, not a universal positivity assumption |
+| Quantity per | month, day | Trade quantity basis, independently of price-observation weights |
+| Fixed price | fixed_price: finite number in reference price units | Same price per constituent of a flat-priced strip; no universal positivity assumption |
 | Route | cleared, bilateral | Actual trade arrangement, compatible with its product/agreement |
-| Settlement method | physical, financial | Actual trade's final obligation, determined by its product/agreement |
+| Settlement method | physical, financial | Descriptive trade fact retained; physical-delivery handling is outside v1 |
+| Payment time lag | payment_time_lag: text such as +1bd or +2bd | Trade row or template; positive whole business days consistent with supported trade terms; product defines the actual traded contract's Last Trading Day anchor and strict-after counting |
+| Payment holiday calendar | payment_holiday_calendar: existing HolidayCalendar reference | Trade row or template; separate from pricing calendar; creation resolves payment_date per monthly component |
 
-The fact that `physical` and `financial` are both recognized values does not make both valid
-for the same selected traded product. The catalog must describe and enforce combinations.
-Where a bilateral agreement only references that product's price, its own agreed settlement
-form is a different fact. Do not automatically inherit the reference's delivery obligation.
+The catalog must describe and enforce supported combinations. A trade's schedule method
+selects a reviewed observation rule; it does not redefine a listed product's identity or
+derive payment timing from whichever pricing observation happens to be last.
+CreateTrades parses payment_time_lag once and stores the resolved component dates. The
+accepted starting design has no additional public payment-rule field or aliases. Zero-day
+adjustment semantics and broader bilateral payment terms remain deferred; implementation
+of these payment inputs and date resolution is still pending.
 Unknown fields, unsupported choices, missing requirements and attempts to override locked
 facts fail with the field, selected definition and expected choice identified.
 
@@ -123,6 +147,11 @@ Existing index/specification/convention modules remain the home of reference-dat
 where they fit. Curated built-in product definitions and named templates can be packaged as
 reviewed library data. Changing definitions follows normal code/data review and acceptance
 examples; it is not accomplished by editing a schema in a workbook.
+
+The existing ContractSpecifications stays a lot/quantity/fee definition. It is not the
+container for the trade's chosen schedule method. Proposed method definitions belong in
+`instruments/schedule_methods.py`, with their private static expansion separate in
+`trades/observation_schedule.py`. The field sketch records this as a proposal, not new code.
 
 A user-created template is an immutable object containing an approved definition reference
 and defaults for recognized trade fields. Its worksheet inputs participate in ordinary dependencies. It cannot
@@ -142,7 +171,8 @@ The proposed read-only surface is:
 
 These functions return spills, not definition handles. List identifies inspectable schemas;
 Show describes one generic schema. Neither selects an index, creates a template or resolves
-ticket values. `required` and `required_when` describe when a fact must exist in the resolved
+ticket values. For N fields, Show returns seven rows and N + 1 columns, with the field-name
+row first and metadata row labels in the first column. `required` and `required_when` describe when a fact must exist in the resolved
 record; a template default or static reference may supply it. `options` gives the domain or
 its source. Templates have no separate field-permission policy: the resolved trade follows
 the same rules regardless of whether a value came from a template or ticket.
@@ -150,8 +180,8 @@ A later template/reference inspector can show
 selected defaults and remaining ticket inputs once that stage is specified.
 
 Only expose defaults once their fields are supported. A no-template path still
-needs an explicit approved instrument definition and all required terms. The earlier
-`_CreateTrades(index, labels, rows, [template])` is therefore an incomplete universal signature:
+needs an explicit approved instrument definition and all required terms. The current sketch
+`_CreateTrades(index, fields, trade_rows, [template])` is therefore an incomplete universal signature:
 the same index can underlie different instruments, and cash may have no index. Decide how the
 definition is supplied, directly or through a selected template, before freezing the API.
 Selection of a template must not silently become permission to invent economic rules.

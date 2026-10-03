@@ -20,19 +20,26 @@ prices, fixing arrivals and valuation dates. Approved cash records use their own
 payment/balance meaning rather than pretending every record is a consummated commodity deal.
 
 The entry point needs an approved instrument definition, directly or through a selected
-template, and any reference required by that instrument. The earlier `index, labels,
-trade_rows, [template]` signature does not establish that context for every instrument.
-Labels name table columns. The result preserves every row occurrence, including duplicates.
+template, and any reference required by that instrument. The current `index, fields,
+trade_rows, [template]` sketch does not yet establish that context for every instrument.
+fields is the column-header row. There is no labels argument; aliasing is deferred as a
+separate future use case. trade_id remains optional attribution within the trade fields.
+The result preserves every row occurrence, including duplicates.
 One and N rows use the same constructor and downstream batch path; mixed instrument schemas
 in a single batch are not an initial requirement.
 
 ## Inputs and output
 
 Inputs are the approved instrument definition, applicable product/reference definitions,
-typed labelled rows and optional supported defaults. Specifications define product facts; templates cannot silently override them.
-Explicit ticket values override template defaults, then the completed record is resolved
-and validated. A blank is an error, not fallback to a template default.
-Conflicts with authoritative specifications must fail or select a different product.
+typed rows with named fields and optional shared template values. Specifications define
+product facts; templates cannot silently override them. Template fields and ticket columns
+must be disjoint. Any overlap fails before combining values, even when the values match.
+Duplicate headers within either input also fail. A blank is an error, not a fallback.
+Every header must exactly match a field identifier in the selected instrument definition,
+with no case folding, trimming, aliases or arbitrary extra columns. Order may vary. The
+[CreateTrades contract](create-trade.md) defines this boundary for both templates and tickets.
+Conflicts with authoritative specifications fail; the caller must explicitly select different
+supported terms or a different product before trying again.
 
 This child's output is immutable resolved terms with occurrence identity, displayed trade
 identifiers, executed facts and retained static definitions. Encoding consumes that output
@@ -71,16 +78,18 @@ CreateTrades, coordinated in that order; neither needs a separate worksheet func
 Encoding materializes schedules and numerical contributions from already selected contractual
 rules. No history or current prices are needed for either child. One row is a batch of one.
 
-For this template-based path, a candidate worksheet shape is:
+The creation shape currently under discussion preserves the optional template last:
 
 ```text
-_CreateTrades(template, fields, trade_rows) -> handle to TradeBatch(resolved, encoded)
+_CreateTrades(index, fields, trade_rows, [template]) -> trade_batch_handle
 ```
 
-For example, `=_CreateTrades(ICE_Futs, A1:D1, A2:D2)` uses the named template cell and one
-ticket row; selecting a taller body supplies multiple occurrences through the same path.
-This is an illustrative signature, not an implemented function or a decision about the
-separate no-template input path.
+This remains provisional, not an implemented declaration. Freeze the direct instrument
+selection for the no-template path before engineering treats this as an executable
+worksheet contract. The index's authoritative
+source must also be settled: it cannot appear both as an argument and a template/ticket field. A supplied
+template contributes defaults; without it, the direct inputs satisfy the selected instrument
+definition. Selecting a taller trade body supplies more occurrences through the same path.
 
 The original ticket excerpt, preserved as whiteboard notation:
 
@@ -88,14 +97,14 @@ The original ticket excerpt, preserved as whiteboard notation:
 |---|---:|---|---|---:|
 | u26 | -6 | ICE | ION | 105 |
 
-`future_month` is the user's proposed field spelling; the current schema draft uses
-`contract_code`. Pick one before implementation; this example does not create an alias.
+`future_month` and `trade_price` are the earlier whiteboard spellings. The current schema
+draft uses `contract_code` and `fixed_price`; this historical excerpt does not create aliases.
 The code `u26` must resolve under the selected schedule's explicit spelling rules. `ION` is
 the supplied broker label, not an instruction to infer a clearing firm or apply fees.
 
-If the template already supplies the intended clearing selection, the ticket can omit it:
+If the template already supplies the intended clearing selection, the ticket must omit it:
 
-| contract_code | quantity | broker | trade_price |
+| contract_code | quantity | broker | fixed_price |
 |---|---:|---|---:|
 | u26 | -6 | ION | 105 |
 
@@ -104,11 +113,12 @@ specification selection, units, executed date and remaining required contractual
 Here the template can supply the product context, LOT and compatible clearing/settlement
 facts; the ticket supplies month, signed lots, broker and agreed price.
 
-Explicit ticket values still override defaults; no implicit locks are introduced. Repeating
-the same clearing choice is redundant but harmless. A different choice must form a valid
-completed trade with its selected product. A conflicting clearing or settlement choice
-must fail rather than silently selecting another product to make the row fit. A coherent
-supported alternative is not rejected merely because it differs from a template default.
+If the template supplies clearing_house, the ticket must omit that column. Repeating the
+same clearing choice fails just as a different choice does. To vary a field between rows,
+leave it out of the template and supply it in the tickets, subject to batch compatibility.
+The completed trade must match its selected product; never silently select a different
+product to make conflicting terms fit. This is one uniform no-duplication rule, with no
+per-field permission flag. Duplicate trade occurrences are preserved and contribute separately.
 
 ### Product, venue and clearing identity
 
@@ -137,7 +147,7 @@ template = create_template(
     product=approved_toy_average_definition,
     defaults={},
 )
-labels = ["Trade", "TradeDate", "Contract", "Quantity", "AgreedPrice", "PaymentDate"]
+fields = ["Trade", "TradeDate", "Contract", "Quantity", "AgreedPrice", "PaymentDate"]
 trade_rows = [
     ["T1", "2026-12-10", "Z26", 100, 70, "2027-01-05"],
     ["T2", "2026-12-10", "Z26", -40, 72, "2027-02-05"],
