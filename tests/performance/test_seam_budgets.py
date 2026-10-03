@@ -278,7 +278,7 @@ def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
 # label's reading twice; one numpy conversion of the library's and the way out's five, whether
 # the period is one month or the whole century.
 @pytest.mark.parametrize(
-    ("name", "library"), [("util_ReadStartDate", "start_date"), ("util_ReadEndDate", "end_date")]
+    ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]
 )
 @pytest.mark.parametrize(
     ("period", "labels"), [("F26", 1), ("F00-Z99", 2)], ids=["a month", "a century"]

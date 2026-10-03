@@ -810,9 +810,9 @@ def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
         ("w28-w29", "2028-11-01", "2030-03-31"),
         ("W99", "2099-11-01", "2100-03-31"),
     ):
-        assert bridge.call("util_ReadStartDate", [period]) == serial(first)
-        assert bridge.call("util_ReadEndDate", [period]) == serial(last)
-    assert isinstance(bridge.call("util_ReadEndDate", ["G28"]), float)
+        assert bridge.call("util_StartDate", [period]) == serial(first)
+        assert bridge.call("util_EndDate", [period]) == serial(last)
+    assert isinstance(bridge.call("util_EndDate", ["G28"]), float)
 
 
 # A label that is no form, and a range the wrong way round: the library's words through the seam,
@@ -821,7 +821,7 @@ def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_s
     forms = (
         "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
     )
-    for name in ("util_ReadStartDate", "util_ReadEndDate"):
+    for name in ("util_StartDate", "util_EndDate"):
         for period in ("W8-W9", "Q1 27", "F26-", "F2026"):
             assert bridge.call(name, [period]) == (
                 f"#ERROR {name}: ValueError: period is {period!r}, expected {forms}"

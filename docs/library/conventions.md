@@ -11,7 +11,7 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 | Data fields | snake_case | `unit`, `reference_unit`, `size_in_reference_unit` |
 | Object and seam types | PascalCase, reusing the seam's spelling where one exists | `ValuationDate`, `DiscountCurve`, `Date`, `NumberArray` |
 | Worksheet headers | lowercase snake_case, as declared in the function's schema; bound by name in any order, case ignored ([inputs.md](../seam/inputs.md) decision 29) | `date`, `discount_factor` |
-| Utility functions | `util_` then PascalCase, for a function that inspects rather than creates, or turns one text into another, when the owner states it; a product decision | `util_ReadHandle`, since #73; `util_ReadPrompt`, `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_ReadStartDate` and `util_ReadEndDate`, since #129; `util_ReadDiscountFactor` was one until #66 |
+| Utility functions | `util_` then PascalCase, when the owner states it; a product decision. `util_Read*` reads information from an existing library object through its handle; every other `util_*` function derives or transforms values and takes a name that describes its result or operation | `util_ReadHandle`, since #73; `util_ReadPrompt`, since #129; `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_StartDate` and `util_EndDate`, since #129; `util_ReadDiscountFactor` was one until #66 |
 | Handles | `Handle[Kind]` around the library's own class, as a creator's result and as a consumer's parameter; the cell shows `pid:kind:count`, or `pid:kind:index-name:count` where the object carries an index's name, the process ID of the Excel first | `Handle[DiscountCurve]`, `30512:discount_curve:2`; `Handle[Market]`, `30512:market:WTI:36` |
 | Category codes | exact codes in capitals, like the unit codes they hold, matched case-sensitively; since #129, lowercase until then | `VOLUME`, `MASS`, `ENERGY`, `USD` |
 | Unit codes | one documented spelling each, matched case-sensitively | `GAL`, `BBL`, `MWH` |
@@ -27,7 +27,7 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 | Create | makes an object from what the sheet supplies and shows its handle | `_CreateDiscountCurve` |
 | Read | shows what an object holds, and changes nothing | `util_ReadHandle` |
 
-The four helpers of #129, `util_NextFut`, `util_FutToCme`, `util_DateToFut` and `util_FutToDate`, lead with no verb: they name what they give, the next future, the CME month, the code of a day and the first day of a code, by the owner's call, making no object and reading none.
+The `util_` functions divide in two, by the owner's call in #129: `util_Read*` reads information from an existing library object through its handle, `util_ReadHandle` and `util_ReadPrompt`; every other `util_*` function derives or transforms values, making no object and reading none, and is named for its result or operation, `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_StartDate` and `util_EndDate`.
 
 ## Tables
 

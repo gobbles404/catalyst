@@ -372,26 +372,26 @@ def util_FutToDate(
 
 
 @excel_function
-def util_ReadStartDate(
+def util_StartDate(
     period: Annotated[
         str,
         "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
         "a cell such as A2.",
     ],
 ) -> Date:
-    """Reads the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for
+    """Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for
     W29 and the first day of the left label of F26-Z28."""
     return Date(start_date(period))
 
 
 @excel_function
-def util_ReadEndDate(
+def util_EndDate(
     period: Annotated[
         str,
         "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
         "a cell such as A2.",
     ],
 ) -> Date:
-    """Reads the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for
+    """Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for
     W29 and the last day of the right label of F26-Z28."""
     return Date(end_date(period))

@@ -1,25 +1,25 @@
-# util_ReadStartDate
+# util_StartDate
 
 Built in #129.
 
-Reads the first calendar day of a contract or strip from its label: 1 January 2026 for `F26`, 1 January 2027 for `1Q27`, 1 November 2029 for `W29`, and the first day of the left label of `F26-Z28`. Text in and one date out, no object and no handle; the cell holds a date the sheet formats, as every date the seam sends. These are period boundaries, the days a label covers from and to: a contract's expiry, an index's publication day and a payment day are facts the [schedules](../index-definitions/futures-schedule.md) supply, and nothing here is one. This page holds the grammar the two readers share; [util_ReadEndDate](read-end-date.md) gives the last day through the same reading. The code is `src/goosedove/index_definitions/periods.py`, the reading and the two days, and `src/goosedove/excel/utilities.py`, the worksheet functions.
+Gives the first calendar day of a contract or strip from its label: 1 January 2026 for `F26`, 1 January 2027 for `1Q27`, 1 November 2029 for `W29`, and the first day of the left label of `F26-Z28`. Text in and one date out, no object and no handle; the cell holds a date the sheet formats, as every date the seam sends. It derives a date from a label and reads no object, so it is no `util_Read*` function, as [conventions.md](../conventions.md) divides them. These are period boundaries, the days a label covers from and to: a contract's expiry, an index's publication day and a payment day are facts the [schedules](../index-definitions/futures-schedule.md) supply, and nothing here is one. This page holds the grammar the two functions share; [util_EndDate](end-date.md) gives the last day through the same reading. The code is `src/goosedove/index_definitions/periods.py`, the reading and the two days, and `src/goosedove/excel/utilities.py`, the worksheet functions.
 
 ## Worksheet contract
 
 ```python
-def util_ReadStartDate(period: str) -> Date: ...
+def util_StartDate(period: str) -> Date: ...
 ```
 
 | | A | B | C |
 |---|---|---|---|
-| 1 | f26 | `=util_ReadStartDate(A1)` shows `46023`, 1-Jan-2026 once formatted | `=util_ReadEndDate(A1)` shows `46053`, 31-Jan-2026 |
+| 1 | f26 | `=util_StartDate(A1)` shows `46023`, 1-Jan-2026 once formatted | `=util_EndDate(A1)` shows `46053`, 31-Jan-2026 |
 | 2 | 1Q27 | `46388`, 1-Jan-2027 | `46477`, 31-Mar-2027 |
 | 3 | CAL28 | `46753`, 1-Jan-2028 | `47118`, 31-Dec-2028 |
 | 4 | W29 | `47423`, 1-Nov-2029 | `47573`, 31-Mar-2030 |
 | 5 | w28-w29 | `47058`, 1-Nov-2028 | `47573`, 31-Mar-2030 |
-| 6 | Z28-F26 | `#ERROR util_ReadStartDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order` | the same from `util_ReadEndDate` |
+| 6 | Z28-F26 | `#ERROR util_StartDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order` | the same from `util_EndDate` |
 
-One argument, required: the label as text, typed in the formula, `=util_ReadStartDate("f26")`, or in a cell, which the seam checks as it checks any text scalar, as [inputs.md](../../seam/inputs.md) says, refusing a number, a blank, empty text and a range in its own words, `period is number 46023.0, expected text`; nothing here restates that. The result is a date, which goes out as its serial, as [outputs.md](../../seam/outputs.md) says, so a fresh cell shows `46023` until it is formatted once.
+One argument, required: the label as text, typed in the formula, `=util_StartDate("f26")`, or in a cell, which the seam checks as it checks any text scalar, as [inputs.md](../../seam/inputs.md) says, refusing a number, a blank, empty text and a range in its own words, `period is number 46023.0, expected text`; nothing here restates that. The result is a date, which goes out as its serial, as [outputs.md](../../seam/outputs.md) says, so a fresh cell shows `46023` until it is formatted once.
 
 ## Excel help
 
@@ -27,12 +27,12 @@ Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/
 
 | Item | Text |
 |---|---|
-| Function | Reads the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for W29 and the first day of the left label of F26-Z28. |
+| Function | Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for W29 and the first day of the left label of F26-Z28. |
 | `period` | One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in a cell such as A2. |
 
 ## The grammar
 
-A label is one of five forms, or two of them joined by one hyphen. The letters are read in either case, `f26`, `F26`, `cal28` and `Cal28` alike, by the owner's decision for these readers, recorded in [time.md](../time.md); the year is exactly two digits and means 2000 to 2099, the library's fixed horizon, never a decade inferred or today's date consulted.
+A label is one of five forms, or two of them joined by one hyphen. The letters are read in either case, `f26`, `F26`, `cal28` and `Cal28` alike, by the owner's decision for these functions, recorded in [time.md](../time.md); the year is exactly two digits and means 2000 to 2099, the library's fixed horizon, never a decade inferred or today's date consulted.
 
 | Form | Means | Such as | First day | Last day |
 |---|---|---|---|---|
@@ -50,7 +50,7 @@ A range covers every calendar day between its ends, so `W28-W29` includes the su
 
 ## The library checks
 
-Two rules, the first failure being the message, and both readers run them over the whole expression, so asking for a start cannot hide an end that is no label.
+Two rules, the first failure being the message, and both functions run them over the whole expression, so asking for a start cannot hide an end that is no label.
 
 | Rule | Message |
 |---|---|
@@ -72,8 +72,8 @@ The library's examples and properties are `tests/unit/test_periods.py`; the seam
 | every example in the grammar's table, in lowercase, capitals and mixed case: the first and the last day each | example |
 | the twelve month letters in either case, each one month long; `Q27` is August and `3Q27` the third quarter | example |
 | February 2000 and 2028, leap years, and 2027; `W99`, ending in 2100; `Z99`; the whole horizon as `f00-cAL99` | example |
-| one-digit years, a four-digit year, a space anywhere, a fifth and a zeroth quarter, an empty end, two hyphens, three labels, a month by name, `I`, a letter that is no month, `CA`, `CALS`, `WS`, a letter or a year alone: refused by both readers, naming the whole expression | example |
-| `Z28-F26`, `CAL28-F28`, two months the wrong way round, a winter then the summer that began before it, a summer then the quarter before it, a year then the quarter before it: refused by both readers | example |
+| one-digit years, a four-digit year, a space anywhere, a fifth and a zeroth quarter, an empty end, two hyphens, three labels, a month by name, `I`, a letter that is no month, `CA`, `CALS`, `WS`, a letter or a year alone: refused by both functions, naming the whole expression | example |
+| `Z28-F26`, `CAL28-F28`, two months the wrong way round, a winter then the summer that began before it, a summer then the quarter before it, a year then the quarter before it: refused by both functions | example |
 | for any month of the horizon in either case: its first day, its last the day before the next month's first, 28 to 31 days; and the range from it to any month on or after it, the left's start and the right's end | property |
 | for any year: a quarter is three months, a year twelve, a winter five from November, a summer seven from April; `1Q` to `CAL` of a year is the year, a later quarter to it refused | property |
 | the first and last days through the seam as serials, a month, a quarter, a year, a winter, a summer, a range and `W99`; a malformed label and a reversed range refused by both in the library's words; left out, blank, empty text, a number and a range of cells in the seam's | example, through the seam |
@@ -82,4 +82,4 @@ The library's examples and properties are `tests/unit/test_periods.py`; the seam
 
 ## Not here
 
-A contract's expiry, an index's publication day, a payment day and anything else a schedule supplies: the [schedules](../index-definitions/futures-schedule.md)', read through [util_ReadHandle](read-handle.md). Building a schedule from a strip, pricing a strip, weighting its months and checking a market covers it: separate work, not these readers'. Aliases, `Jan26`, `Cal 28`, `Win29`, a year of four digits, a label with a space: refused, one spelling per form. Sorting or swapping the ends of a range. The schedule creators reading their codes: unchanged, their codes still labels, as [time.md](../time.md) records.
+A contract's expiry, an index's publication day, a payment day and anything else a schedule supplies: the [schedules](../index-definitions/futures-schedule.md)', read through [util_ReadHandle](read-handle.md). Building a schedule from a strip, pricing a strip, weighting its months and checking a market covers it: separate work, not these functions'. Aliases, `Jan26`, `Cal 28`, `Win29`, a year of four digits, a label with a space: refused, one spelling per form. Sorting or swapping the ends of a range. The schedule creators reading their codes: unchanged, their codes still labels, as [time.md](../time.md) records.

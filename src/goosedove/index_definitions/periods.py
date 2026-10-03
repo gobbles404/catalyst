@@ -4,7 +4,7 @@ of two labels joined by a hyphen, F26-Z28, from the first day of the left to the
 right. Each is read for two months, numpy's month unit, its first month and the month after its
 last, from which its first and its last calendar day follow by one conversion each. Text in and
 one date out, no object and no handle; the letters are read in either case, by the owner's
-decision for these utilities. docs/library/utilities/read-start-date.md holds the grammar."""
+decision for these utilities. docs/library/utilities/start-date.md holds the grammar."""
 
 import numpy as np
 

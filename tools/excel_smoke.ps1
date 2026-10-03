@@ -336,25 +336,25 @@ $formulas = [ordered]@{
     "=util_DateToFut(Y2+0.5)" = "#ERROR util_DateToFut: date is number 46276.5, expected date"
     "=util_DateToFut(E1)" = "#ERROR util_DateToFut: date is text 'x', expected date"
     "=util_DateToFut(C2)" = "#ERROR util_DateToFut: date is blank, expected date"
-    # The two period readers: the first and the last calendar day of a contract or strip label, in
+    # The two period functions: the first and the last calendar day of a contract or strip label, in
     # any case, as serials until the cell is formatted: F26 in the schedule's own m26 at AE2, a
     # quarter, a calendar year, a winter across the year end, a summer and a range; a malformed
     # label and a reversed range, the library's words from either reader; a number and a blank,
     # the seam's.
-    "=util_ReadStartDate(AE2)" = "46174"
-    "=util_ReadEndDate(AE2)" = "46203"
-    '=util_ReadStartDate("1q27")' = "46388"
-    '=util_ReadEndDate("1Q27")' = "46477"
-    '=util_ReadEndDate("cal28")' = "47118"
-    '=util_ReadStartDate("W29")' = "47423"
-    '=util_ReadEndDate("W29")' = "47573"
-    '=util_ReadStartDate("s28")' = "46844"
-    '=util_ReadEndDate("f26-z28")' = "47118"
-    '=util_ReadEndDate("w28-w29")' = "47573"
-    '=util_ReadStartDate("W8-W9")' = "#ERROR util_ReadStartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
-    '=util_ReadEndDate("Z28-F26")' = "#ERROR util_ReadEndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
-    "=util_ReadStartDate(A1)" = "#ERROR util_ReadStartDate: period is number 1.0, expected text"
-    "=util_ReadEndDate(C2)" = "#ERROR util_ReadEndDate: period is blank, expected text"
+    "=util_StartDate(AE2)" = "46174"
+    "=util_EndDate(AE2)" = "46203"
+    '=util_StartDate("1q27")' = "46388"
+    '=util_EndDate("1Q27")' = "46477"
+    '=util_EndDate("cal28")' = "47118"
+    '=util_StartDate("W29")' = "47423"
+    '=util_EndDate("W29")' = "47573"
+    '=util_StartDate("s28")' = "46844"
+    '=util_EndDate("f26-z28")' = "47118"
+    '=util_EndDate("w28-w29")' = "47573"
+    '=util_StartDate("W8-W9")' = "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
+    "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
+    "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the

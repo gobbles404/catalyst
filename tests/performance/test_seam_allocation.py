@@ -459,7 +459,7 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
 # A period's first or last day makes two months and one day, then pays the seam's way out for a
 # date: measured 1,264 bytes on 2026-10-02 for one month and for the whole century alike, which
 # twice the slack covers; nothing grows with the period, and nothing is published.
-@pytest.mark.parametrize("name", ["util_ReadStartDate", "util_ReadEndDate"])
+@pytest.mark.parametrize("name", ["util_StartDate", "util_EndDate"])
 @pytest.mark.parametrize("period", ["F26", "F00-Z99", "w28-w29"])
 def test_a_periods_day_costs_the_same_for_a_month_and_a_century(name: str, period: str) -> None:
     live = bridge.live_handles()
