@@ -47,7 +47,7 @@ class Category:
     def size_of(self, unit: str) -> float: ...
 ```
 
-The collection is a frozen record of frozen records, plain Python and read-only: each category by name, and in each the size of each unit by code, in the order the tables below list them. Nothing is numpy until a conversion, which takes an array of quantities and returns a new one; a definition is a number looked up by key, not an array. Category names are lowercase and unit codes uppercase, as [conventions.md](../conventions.md) lists them, and since #71 the desk types `volume` in `_CreateIndexConventions` the same way.
+The collection is a frozen record of frozen records, plain Python and read-only: each category by name, and in each the size of each unit by code, in the order the tables below list them. Nothing is numpy until a conversion, which takes an array of quantities and returns a new one; a definition is a number looked up by key, not an array. Category names and unit codes are codes in capitals, as [conventions.md](../conventions.md) lists them; the category names were lowercase from #71 until #129 took them to capitals, and the desk types `VOLUME` in `_CreateIndexConventions` the same way.
 
 ## The library checks
 

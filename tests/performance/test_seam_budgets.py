@@ -275,7 +275,7 @@ def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
 # A period's first or last day: the text rule, the function, the library's reading of the whole
 # expression, one label read or two, the day from the month in one conversion, and the seam's way
 # out for a date. Eleven calls across eleven functions for one label, twelve for a range, the
-# label's reading twice; one numpy conversion of the library's and the way out's five, whether
+# label's reading twice; one numpy conversion of the library's and the way out's six, whether
 # the period is one month or the whole century.
 @pytest.mark.parametrize(
     ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]

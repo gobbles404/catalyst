@@ -49,7 +49,7 @@ Six rules, in this order, the first failure being the message: the names, then t
 | each name once, because a trade will pick its word by this name, `lots` or `mmbtu` as the desk likes, and a name twice would be two meanings for one word | `name row 2 is 'lots', already given at row 1` |
 | each lot size whole, because a lot is a whole number of its unit | `lot_size row 1 is 2.5, expected a whole number` |
 | each lot size 1 or more, because a lot of nothing, or of a negative quantity, is no lot | `lot_size row 2 is 0.0, expected 1 or more` |
-| each lot unit a quantity unit of the unit tables, a unit of volume, mass or energy and never a currency unit, matched exactly, because a lot size without its unit is a number and not a fact | `lot_unit row 2 is 'usd', expected a volume, mass or energy unit` |
+| each lot unit a quantity unit of the unit tables, a unit of volume, mass or energy and never a currency unit, matched exactly, because a lot size without its unit is a number and not a fact | `lot_unit row 2 is 'usd', expected a VOLUME, MASS or ENERGY unit` |
 | each brokerage rate 0 or more, because a fee is a charge, and zero is no charge | `brokerage_rate_per_lot row 2 is -0.75, expected 0 or more` |
 | each clearing rate 0 or more, for the same reason | `clearing_rate_per_lot row 1 is -0.5, expected 0 or more` |
 

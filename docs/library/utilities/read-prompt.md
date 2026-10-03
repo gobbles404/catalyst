@@ -15,7 +15,7 @@ def util_ReadPrompt(calendar: Handle[Calendar]) -> str: ...
 | 1 | as_of | 22-Jun-2026 |
 | 2 | `=_CreateValuationDate(B1, 0.5)` | shows `30512:valuation_date:3` |
 | 3 | `=_CreateCalendar(A2, B12)` | shows `30512:calendar:WTI NYMEX:14`, B12 the index whose schedule holds m26, n26 expiring 22-Jun-2026 and q26 |
-| 5 | `=util_ReadPrompt(B3)` | shows `n26` |
+| 5 | `=util_ReadPrompt(A3)` | shows `n26` |
 
 One argument, required: the calendar's handle, the cell showing `_CreateCalendar`'s result or a name for it, declared `Handle[Calendar]`, so the seam resolves it to the calendar and refuses anything else in its own words, a blank, a number, text naming no live object or a handle of another kind, `calendar is market history handle '30512:market_history:WTI NYMEX:19', expected calendar handle`, as [inputs.md](../../seam/inputs.md) decisions 34 to 37 say; nothing here restates that. The result is text, the code as the schedule spells it, `n26` for a schedule that spells it so and `Jul 2026` for one that does, as [outputs.md](../../seam/outputs.md) sends text: no object is kept and no handle shown, so the cell is ordinary text other formulas read. Type 23-Jun-2026 over B1 and the cell shows `q26`, the day after n26's expiry belonging to the next contract.
 
