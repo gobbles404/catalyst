@@ -52,7 +52,6 @@ What each kind shows:
 
 | Kind | Headers | Types | Rows |
 |---|---|---|---|
-| `futures_trades` | `trade_id`, `trade_date`, `contract_code`, `signed_lots`, `trade_price`, `contract_position` | `str`, `datetime64[D]`, `str`, `float64`, `float64`, `intp` | one per trade occurrence, preserving input order; the final column exposes its resolved zero-based schedule position for this ingestion experiment |
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
 | `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
 | `futures_schedule` | `contract_code`, `future_expiry`, then `option_expiry` when the index has options | `str`, then `datetime64[D]` per date column | one per contract |

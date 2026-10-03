@@ -50,7 +50,7 @@ recognized trade fields; the selected traded product/agreement constrains the re
 `future` here is a proposed desk family organized around a specified reference contract. A
 bilateral lookalike can share this schema while retaining its own contractual treatment.
 The table does not assert that every route/settlement pair is available or supported for every
-reference. The existing ingestion prototype remains limited to individual contract codes. See the
+reference. See the
 [field sketch](../../engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md)
 for the current schedule-method and quantity-basis proposals and separate payment rules.
 Physical-delivery handling is outside scope. The
@@ -66,12 +66,11 @@ Positive whole business days are the initial scope; zero-day adjustment semantic
 broader bilateral payment terms remain deferred. This accepted starting design is not yet
 implemented.
 
-This is a schema proposal, not a change to the existing local `_CreateFuturesTrades` API.
+This is a schema proposal; trade creation is not yet implemented.
 `quantity` plus `quantity_unit` preserves the vocabulary in the user's example. For the first
 NG future profile, the suggested unit is the instrument-level code `LOT`; the selected
 specification supplies the quantity per lot. `LOT` is not a physical-unit category in the
-existing unit-conversion tables. Choosing this surface instead of the local prototype's
-`signed_lots` remains a field-review decision. Do not imply arbitrary physical quantities
+existing unit-conversion tables. Do not imply arbitrary physical quantities
 are accepted until their conversion and lot-integrality rules are specified.
 
 `contract_code` now proposes one month or a monthly strip using the existing period grammar.
@@ -106,16 +105,14 @@ does not select a lot size; do not infer the first row, or use quantity_unit=LOT
 Static index references preserve market-independent creation: prices, fixings, history and
 valuation as-of remain later dependencies.
 
-`fixed_price` replaces `trade_price` in this proposed instrument schema. It is not an alias.
-The existing _CreateFuturesTrades prototype still uses trade_price; renaming that implemented
-API, its workbook and tests is separate implementation work, not performed by this draft.
+`fixed_price` is the agreed-price field in this proposed instrument schema. It has no alias.
 
 The current method proposal and proposed library homes are in the
 [field sketch](../../engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md#current-refinement-schedule_method-and-quantity_per).
 The resolved trade owns its selection; library code defines the rule and static reference
 data supplies its calendar and contract anchors. No independent pricing_convention field
 or pen alias is proposed. The month/day meanings and method weights remain reviewable design
-choices; no schedule implementation or prototype API change is included here.
+choices; no schedule implementation is included here.
 
 The field list is the logical instrument schema, not a declaration that all these fields must
 be repeated in every ticket row. The future `CreateTrades` contract will establish which

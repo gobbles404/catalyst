@@ -4,6 +4,22 @@
 **Purpose:** Make the responsibilities and connections understandable before choosing their implementation.\
 **Reading order:** This overview, instrument definitions, CreateTrades and its retained state, then the worked example and individual responsibility documents.
 
+## How to use this handoff
+
+This packet is the authoritative design for the next trade implementation. Read it alongside
+the linked instrument-reader and template function specifications. Its agreed boundaries and
+economic meanings govern the work; its explicitly open questions still need decisions in
+their implementation slices. Internal types and array layouts remain engineering choices.
+Surface any proposed change to an agreed boundary or economic meaning for design discussion.
+
+| Material | How engineering should use it |
+|---|---|
+| This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
+| [Golden harness plan](../ethane-golden-validation-harness.md) | Active plan for independent financial expectations and separately reviewed production snapshots |
+| [Contract survey](../../futures-trade-field-review.md) | Product facts and examples for checking coverage, not a second trade schema |
+| [Dense matrix specimen](../../linear-trade-matrices.md) and PR119 | Evidence for arithmetic and measured work; their helper names, component outputs and layouts do not prescribe production APIs or tick work |
+| [Archived pipeline](../../archive/trade-pipeline/linear-trade-pipeline.md) and [archived preparation proposal](../../archive/trade-pipeline/trade-evaluation-preparation-reuse.md) | Design history only; their superseded APIs and delivery plans are not additional backlogs |
+
 ## Intended outcome
 
 Start from a library-owned instrument definition. CreateTrades resolves the accepted terms
@@ -32,7 +48,7 @@ they are not forced to carry the executed fields of a commodity trade.
 
 ```mermaid
 flowchart LR
-    I[Library-owned definitions] --> A[Template defaults + ticket fields]
+    I[Library-owned definitions] --> A[Shared template fields + ticket fields]
     A --> B
     subgraph CT[CreateTrades - public wrapper]
         B[Resolve trade terms] --> C[Encode static contributions and market inputs]
@@ -114,7 +130,7 @@ The next refinement admits monthly strips through the existing period grammar: C
 Z27-X28 resolve to monthly components, each with its schedule method, quantity allocation
 and payment date. Explicit date-window inputs remain deferred. Specification data comes
 from Index, with the selected row named by the template/ticket. The proposed future field
-is fixed_price. These proposals do not change the current single-contract prototype API.
+is fixed_price. Trade creation is not yet implemented.
 
 The [cleared payment review](fixing-and-payment-state.md#cleared-payment-convention-selected-rule-and-resolved-date)
 records the accepted starting point: payment_time_lag, a string such as "+1bd", and
@@ -285,10 +301,9 @@ existing seam conventions. Private helpers need clear typed array contracts, not
 class hierarchies or a worksheet function for each substep.
 
 The constructor design includes the no-template path. Establish its direct instrument
-selection before claiming the complete creation contract. Pick one quantity spelling/convention
-and one contract field for the first schema; do not leave engineering to guess between
-`quantity` plus `quantity_unit` and the existing prototype's `signed_lots`, or accept
-`future_month` and `contract_code` as silent aliases.
+selection before claiming the complete creation contract. The proposed schema uses
+`quantity` plus `quantity_unit` and `contract_code`; validate their meanings for the first
+product without introducing silent field aliases.
 
 The [NG creation/preparation example](ng-creation-preparation-example.md) now specifies the
 small collection: opposite signs, two contracts and a duplicate occurrence, with static and
@@ -386,8 +401,10 @@ choosing them. Report unsupported measures explicitly; a zero result is not a pl
 
 ## Relationship to earlier artifacts
 
-This packet is the current entry point for the shared pipeline design. The earlier
-[pipeline parent](../linear-trade-pipeline.md) and [preparation-reuse ticket](../trade-evaluation-preparation-reuse.md)
-remain useful background. The latter records the earlier private-store candidate, superseded
-for the first implementation by the explicit PrepareTrades handle. The [contract survey](../../futures-trade-field-review.md) is a field
-checklist, not a requirement to implement every product before the first working example.
+The earlier [pipeline parent](../../archive/trade-pipeline/linear-trade-pipeline.md) and
+[preparation-reuse ticket](../../archive/trade-pipeline/trade-evaluation-preparation-reuse.md)
+are archived. In particular, the private history store, mandatory per-trade tick results and
+earlier delivery sequence do not carry forward. The explicit PrepareTrades handle and
+aggregate evaluation described here supersede them. Preserve useful financial examples
+when replacing a specimen implementation, and validate the new path against independently
+reviewed expectations.

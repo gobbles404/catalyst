@@ -1,24 +1,44 @@
-# Retain trade valuation preparation across market price updates
+# Archived exploration: private trade preparation reuse
 
-**Status:** Candidate design for engineering review; no implementation delivered by this document.\
-**Scale:** A parent ticket delivered through focused PRs.\
-**Date:** 30 September 2026.\
-**Related:** [Linear trade pipeline](linear-trade-pipeline.md), [financial validation and golden harness](ethane-golden-validation-harness.md), and [PR119](https://github.com/gobbles404/goosedove/pull/119), reviewed at `60ae5d2`.
+**Status:** Archived and superseded on 3 October 2026. This is historical research, not an
+engineering backlog; no implementation is delivered by this document.\
+**Original proposal date:** 30 September 2026.\
+**Current authority:** [Trade valuation pipeline handoff](../../engineering-tickets/trade-valuation-pipeline/README.md).\
+**Related research:** [Archived linear trade pipeline](linear-trade-pipeline.md),
+[financial validation and golden harness](../../engineering-tickets/ethane-golden-validation-harness.md),
+and [PR119](https://github.com/gobbles404/goosedove/pull/119), reviewed at `60ae5d2`.
 
-**3 October update:** Start with the [pipeline stage contracts](trade-valuation-pipeline/README.md).
-This historical ticket records the private preparation-store candidate. The agreed first
-approach now uses `_CreateTrades` for static resolution/encoding, an explicit
-`_PrepareTrades(trades, history)` handle, then `_EvaluateTrades(prepared, market)`.
-The alternatives and signatures below are background, superseded for the first implementation;
-a separate history cache is not required. The stage contracts treat PR119 as revisable experimental code.
+The hidden history store, two-call worksheet API, signatures and delivery sequence below
+were considered and superseded. They must not be implemented alongside the agreed pipeline.
+The current approach is:
 
-## Problem and intended outcome
+```text
+Instrument definition + optional template + ticket fields
+    -> CreateTrades (private resolution and static encoding)
+    -> PrepareTrades(trades, history) -> explicit prepared handle
+    -> EvaluateTrades(prepared, market) -> aggregate valuation and risk result
+    -> pure result readers
+```
+
+No separate history cache is required for this first implementation. Evaluation consumes a
+compatible preparation; it does not secretly prepare or search a cache. Current headers are
+`fields`, not `labels`; they exactly match the instrument definition. Template/ticket field
+sets are disjoint, and even equal duplicate sources fail. The collection is the evaluation
+unit; per-trade tick outputs and per-row preparation sharing are not requirements.
+
+The remainder preserves the original reasoning, illustrative arrays and independent answers.
+All statements of agreement, acceptance and delivery below belong to that superseded
+proposal. Useful arithmetic and the requirement to avoid repeated fixing work remain
+evidence; the explicit-handle ownership and acceptance contract lives in the current handoff.
+PR119 is revisable numerical evidence, not the authority for public pipeline boundaries.
+
+## Historical problem and intended outcome
 
 A market price update should evaluate an already prepared calculation. It should not encode
 the trade again, regenerate its observation schedule, gather historical fixings again, or
 recalculate the set portion of its floating leg.
 
-Expose two trade operations to Excel:
+The superseded proposal exposed two trade operations to Excel:
 
 ```excel
 TradeBook = _CreateTrades(Index, Labels, TradeRows, [Template])
@@ -43,7 +63,7 @@ or the retained preparation store. Existing local experiments are not evidence t
 end-to-end surface has shipped. This ticket refines the parent pipeline's worksheet surface,
 economic names and reuse policy; it does not require five public pipeline objects.
 
-## Agreed worksheet surface and trade ownership
+## Superseded worksheet surface and trade ownership
 
 Proposed argument order:
 
@@ -96,7 +116,7 @@ particular, settle how unit-conversion definitions reach the encoder: the curren
 validates against conversions during its creation but does not retain the conversion table.
 Do not obtain those definitions through an untracked ambient lookup.
 
-## Economic components and retained objects
+## Historical economic components and object proposal
 
 For a fixed/float trade, retain these meanings:
 
@@ -133,7 +153,7 @@ Numerical storage is owned and read-only, consistent with the existing kernel. T
 store belongs to valuation infrastructure. Do not put mutable market-dependent caches on a
 static trade or store a current market/price vector in preparation.
 
-## Excel dependencies and change detection
+## Superseded Excel graph and change-detection proposal
 
 The existing market graph provides the relevant split:
 
@@ -182,7 +202,7 @@ the edited fixing is irrelevant to this batch or the new as-of leaves its fixing
 unchanged. Selective updating is a later measured optimization. Applicability of fixings
 remains the product/calendar's rule; object-change detection does not define that rule.
 
-## Preparation lookup, ownership and lifetime
+## Superseded private-store lookup, ownership and lifetime
 
 The logical key is **encoded-object identity plus history-object identity**:
 
@@ -230,7 +250,7 @@ The lookup is straightforward; its lifetime is a required engineering decision:
 This ticket specifies those guarantees, not an already implemented ownership mechanism.
 Agree the mechanism before wiring a production `_Evaluate` surface to the store.
 
-## Proposed private pipeline
+## Superseded private-pipeline pseudocode
 
 This is pseudocode for responsibilities, not a second implementation of the kernel. Reuse
 PR119's binding and compression arithmetic. Work counters are explicit on library work and
@@ -298,7 +318,7 @@ prices. Establish and document the required order; do not claim object identity 
 arbitrary vendor columns. If a future market axis can change independently of history, its
 identity must become a preparation dependency before that behavior is supported.
 
-## Worked acceptance example
+## Preserved independent worked arithmetic
 
 Use the two trades above with two explicit, equally weighted observations. Prices are USD
 per quantity unit, so no hidden conversion applies. This is an independent arithmetic
@@ -342,7 +362,7 @@ case at the numerical boundary now and make an explicit integration decision bef
 support for wholly fixed markets through `_Evaluate`; do not introduce a dummy price. Fully
 fixed trades within a market that still has other live contracts also need a test.
 
-## Acceptance, measurement and delivery
+## Historical acceptance ideas and superseded delivery sequence
 
 Financial answers alone do not establish reuse. Add observable work and lifetime checks:
 
@@ -394,7 +414,7 @@ Discounting, payment-date valuation, futures variation-margin accounting, two-in
 nonlinear products, selective incremental fixing updates, sparse-matrix selection and durable
 result storage remain separate work. Preserve the component identities they will need.
 
-This parent is complete when the agreed public surface has a working first product, the
-identity-keyed preparation path has verified Excel ownership and measured tick reuse, and
-the averaging integration demonstrates correct set/live transitions against independent
-expectations. Until the final slice lands, report the delivered scope explicitly.
+The superseded proposal defined completion as a working first product through its then-agreed
+public surface, verified Excel ownership and measured tick reuse for the identity-keyed
+preparation store, and averaging integration checked against independent answers. These are
+recorded historical exit criteria, not the completion criteria for the current pipeline.

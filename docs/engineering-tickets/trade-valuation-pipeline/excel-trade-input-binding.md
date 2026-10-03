@@ -58,8 +58,7 @@ do not change a field value's own documented grammar, such as contract-code case
 The current `Table` does **not** implement the proposed template inputs. Its schema is
 chosen at registration, requires every declared column, and supports number, date, text
 and boolean columns. It has no instrument-selected partial-column schema or typed handle
-column. `_CreateFuturesTrades` in [trades.py](../../../src/goosedove/excel/trades.py) is an
-existing fixed-schema example, not an implementation of generic `CreateTrades`.
+column. Generic `CreateTrades` and its partial-input binding are not yet implemented.
 
 The general binder's case-insensitive matching differs from the proposed exact trade-field
 contract above. The new partial-table path must preserve exact identifiers rather than

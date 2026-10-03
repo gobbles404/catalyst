@@ -42,7 +42,11 @@ prices are currency/unit, and averaging weights are equal. Every payment is unpa
 | T2 | Last day | -40 x (D5 - 75) |
 | T3 | Penultimate | 60 x (D4 - 73) |
 | T4 | Last three days | 30 x (average(D3,D4,D5) - 72) |
-| T5 | Illustrative same-index CFD | 10 x (D5 - D4) |
+| T5 | Illustrative same-index CFD, outside v1 | 10 x (D5 - D4) |
+
+T5 is retained solely as an algebraic example, not a bookable v1 instrument or a delivery
+requirement. Exact/CFD inputs are deferred in the current instrument definition. The five-row
+hand answers below include T5 to preserve the original worked example.
 
 CFD alone does not define a schedule. T5 explicitly defines both sides of a same-index
 difference; the eventual desk CFD convention remains to be established. No second index

@@ -13,7 +13,6 @@ from goosedove.excel import (
     market,
     market_data,
     probes,
-    trades,
     utilities,
 )
 
@@ -25,6 +24,5 @@ __all__ = [
     "market",
     "market_data",
     "probes",
-    "trades",
     "utilities",
 ]
