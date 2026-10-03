@@ -18,6 +18,13 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. Every function the library lists is `_Name` or `util_Name` since #73; the seam's `Ping` and its hidden probes keep their names, being the seam's instruments and not the desk's.
 
+Proposed trade-input exception, not yet implemented: `_CreateTradeTemplate` and generic
+`_CreateTrades` require exact field identifiers from the selected instrument definition,
+including case, with no trimming or aliases. Column order may vary. The
+[trade-input binding proposal](../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
+records this deliberate difference from the current general Table binder. Existing table
+functions, including `_CreateFuturesTrades`, retain their currently documented matching rules.
+
 ## Verbs
 
 A worksheet function leads with a verb that says what it does, and the verbs stay few, so the language stays simple: each means one thing, and a new one is added only when none of these fits, as a row here in the pull request that first uses it. Before adding one, ask whether the function is really a Create or a Read under another name.
@@ -26,6 +33,14 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 |---|---|---|
 | Create | makes an object from what the sheet supplies and shows its handle | `_CreateDiscountCurve` |
 | Read | shows what an object holds, and changes nothing | `util_ReadHandle` |
+| List | spills the identifiers and descriptions in a library-owned definition catalog | `_ListInstruments` (agreed design, implementation pending) |
+| Show | spills the field definition for a named catalog entry supplied as text | `_ShowInstrument` (agreed design, implementation pending) |
+
+List and Show are the owner's agreed verbs for instrument-definition inspection. Both read
+the library catalog directly and return tables without creating handles; they precede
+template and trade construction. Their contracts are recorded in
+[ListInstruments](instruments/list-instruments.md) and
+[ShowInstrument](instruments/show-instrument.md).
 
 The `util_` functions divide in two, by the owner's call in #129: `util_Read*` reads information from an existing library object through its handle, `util_ReadHandle` and `util_ReadPrompt`; every other `util_*` function derives or transforms values, making no object and reading none, and is named for its result or operation, `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_StartDate` and `util_EndDate`.
 

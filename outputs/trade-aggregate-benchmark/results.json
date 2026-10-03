@@ -1,0 +1,468 @@
+{
+  "utc": "2026-10-03T15:31:51.434436+00:00",
+  "python": "3.13.13",
+  "numpy": "2.5.2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "processor": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "numpy_configuration": {
+    "Compilers": {
+      "c": {
+        "name": "msvc",
+        "linker": "link",
+        "version": "19.44.35228",
+        "commands": "cl"
+      },
+      "cython": {
+        "name": "cython",
+        "linker": "cython",
+        "version": "3.2.9",
+        "commands": "cython"
+      },
+      "c++": {
+        "name": "msvc",
+        "linker": "link",
+        "version": "19.44.35228",
+        "commands": "cl"
+      }
+    },
+    "Machine Information": {
+      "host": {
+        "cpu": "x86_64",
+        "family": "x86_64",
+        "endian": "little",
+        "system": "windows"
+      },
+      "build": {
+        "cpu": "x86_64",
+        "family": "x86_64",
+        "endian": "little",
+        "system": "windows"
+      }
+    },
+    "Build Dependencies": {
+      "blas": {
+        "name": "scipy-openblas",
+        "found": true,
+        "version": "0.3.34.0.0",
+        "detection method": "pkgconfig",
+        "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-b2ht6fnl/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+        "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-b2ht6fnl/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+        "openblas configuration": "OpenBLAS 0.3.34.0.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY SkylakeX MAX_THREADS=24",
+        "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+      },
+      "lapack": {
+        "name": "scipy-openblas",
+        "found": true,
+        "version": "0.3.34.0.0",
+        "detection method": "pkgconfig",
+        "include directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-b2ht6fnl/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/include",
+        "lib directory": "C:/Users/runneradmin/AppData/Local/Temp/cibw-run-b2ht6fnl/cp313-win_amd64/build/venv/Lib/site-packages/scipy_openblas64/lib",
+        "openblas configuration": "OpenBLAS 0.3.34.0.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY SkylakeX MAX_THREADS=24",
+        "pc file directory": "D:/a/numpy-release/numpy-release/.openblas"
+      }
+    },
+    "Python Information": {
+      "path": "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\build-env-m8lsj2zx\\Scripts\\python.exe",
+      "version": "3.13"
+    },
+    "SIMD Extensions": {
+      "baseline": [
+        "X86_V2"
+      ],
+      "found": [
+        "X86_V3"
+      ]
+    }
+  },
+  "thread_environment": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "BLIS_NUM_THREADS": "1"
+  },
+  "scope": "Warm NumPy amount kernel only, fixed 24 live inputs, 3 terms/trade; counters included",
+  "excludes": [
+    "trade creation",
+    "full schedule/history preparation",
+    "market binding",
+    "NPV",
+    "cash lifecycle",
+    "delta/DV01 computation",
+    "Excel/host",
+    "reader publication"
+  ],
+  "rows": [
+    {
+      "trades": 100,
+      "live_inputs": 24,
+      "terms_per_trade": 3,
+      "timings": {
+        "dense_trade_values_then_sum": {
+          "median_us": 4.57421875,
+          "min_us": 4.4593017578125,
+          "max_us": 4.77940673828125,
+          "iterations_per_batch": 8192,
+          "batch_means_us": [
+            4.59376220703125,
+            4.77940673828125,
+            4.5162109375,
+            4.521435546875,
+            4.59298095703125,
+            4.4593017578125,
+            4.57421875
+          ]
+        },
+        "sparse_trade_values_then_sum": {
+          "median_us": 7.408837890625,
+          "min_us": 7.3549560546875,
+          "max_us": 7.5764892578125,
+          "iterations_per_batch": 4096,
+          "batch_means_us": [
+            7.3549560546875,
+            7.5764892578125,
+            7.3908447265625,
+            7.4928466796875,
+            7.408837890625,
+            7.4105712890625,
+            7.389111328125
+          ]
+        },
+        "prepared_aggregate": {
+          "median_us": 1.628155517578125,
+          "min_us": 1.62275390625,
+          "max_us": 1.662969970703125,
+          "iterations_per_batch": 16384,
+          "batch_means_us": [
+            1.64964599609375,
+            1.641632080078125,
+            1.6265869140625,
+            1.62275390625,
+            1.628155517578125,
+            1.662969970703125,
+            1.623223876953125
+          ]
+        }
+      },
+      "aggregation_preparation": {
+        "median_us": 3.3510009765625,
+        "min_us": 3.33851318359375,
+        "max_us": 3.37745361328125,
+        "iterations_per_batch": 8192,
+        "batch_means_us": [
+          3.345751953125,
+          3.33851318359375,
+          3.3510009765625,
+          3.37745361328125,
+          3.34971923828125,
+          3.35155029296875,
+          3.36422119140625
+        ]
+      },
+      "work_counts_per_tick": {
+        "dense_trade_values_then_sum": {
+          "coefficient_products": 2400,
+          "component_amounts_formed": 100,
+          "result_float_elements_allocated": 200
+        },
+        "sparse_trade_values_then_sum": {
+          "coefficient_products": 300,
+          "component_amounts_formed": 100,
+          "result_float_elements_allocated": 800
+        },
+        "prepared_aggregate": {
+          "coefficient_products": 24,
+          "component_amounts_formed": 0,
+          "result_float_elements_allocated": 0
+        }
+      },
+      "aggregation_work_counts": {
+        "aggregate_coefficients_allocated": 24,
+        "exposure_terms_read": 300,
+        "fixed_set_amounts_read": 100
+      },
+      "dense_coefficients_bytes": 19200,
+      "sparse_weights_and_positions_bytes": 4800,
+      "aggregate_coefficients_bytes": 192,
+      "checked_price_scenarios": 3
+    },
+    {
+      "trades": 1000,
+      "live_inputs": 24,
+      "terms_per_trade": 3,
+      "timings": {
+        "dense_trade_values_then_sum": {
+          "median_us": 8.10458984375,
+          "min_us": 7.997119140625,
+          "max_us": 8.4198974609375,
+          "iterations_per_batch": 4096,
+          "batch_means_us": [
+            7.997119140625,
+            8.03291015625,
+            8.04013671875,
+            8.10458984375,
+            8.1776123046875,
+            8.2216064453125,
+            8.4198974609375
+          ]
+        },
+        "sparse_trade_values_then_sum": {
+          "median_us": 18.577490234375,
+          "min_us": 18.4849609375,
+          "max_us": 18.824365234375,
+          "iterations_per_batch": 2048,
+          "batch_means_us": [
+            18.824365234375,
+            18.488134765625,
+            18.58544921875,
+            18.554296875,
+            18.577490234375,
+            18.4849609375,
+            18.6126953125
+          ]
+        },
+        "prepared_aggregate": {
+          "median_us": 1.61876220703125,
+          "min_us": 1.61307373046875,
+          "max_us": 1.625537109375,
+          "iterations_per_batch": 16384,
+          "batch_means_us": [
+            1.616693115234375,
+            1.6212158203125,
+            1.623956298828125,
+            1.61876220703125,
+            1.625537109375,
+            1.61307373046875,
+            1.617486572265625
+          ]
+        }
+      },
+      "aggregation_preparation": {
+        "median_us": 6.0030029296875,
+        "min_us": 5.9738037109375,
+        "max_us": 6.057861328125,
+        "iterations_per_batch": 4096,
+        "batch_means_us": [
+          6.057861328125,
+          6.0030029296875,
+          6.0044189453125,
+          6.046728515625,
+          5.9738037109375,
+          5.995556640625,
+          5.97568359375
+        ]
+      },
+      "work_counts_per_tick": {
+        "dense_trade_values_then_sum": {
+          "coefficient_products": 24000,
+          "component_amounts_formed": 1000,
+          "result_float_elements_allocated": 2000
+        },
+        "sparse_trade_values_then_sum": {
+          "coefficient_products": 3000,
+          "component_amounts_formed": 1000,
+          "result_float_elements_allocated": 8000
+        },
+        "prepared_aggregate": {
+          "coefficient_products": 24,
+          "component_amounts_formed": 0,
+          "result_float_elements_allocated": 0
+        }
+      },
+      "aggregation_work_counts": {
+        "aggregate_coefficients_allocated": 24,
+        "exposure_terms_read": 3000,
+        "fixed_set_amounts_read": 1000
+      },
+      "dense_coefficients_bytes": 192000,
+      "sparse_weights_and_positions_bytes": 48000,
+      "aggregate_coefficients_bytes": 192,
+      "checked_price_scenarios": 3
+    },
+    {
+      "trades": 10000,
+      "live_inputs": 24,
+      "terms_per_trade": 3,
+      "timings": {
+        "dense_trade_values_then_sum": {
+          "median_us": 36.67216796875,
+          "min_us": 36.53193359375,
+          "max_us": 37.3203125,
+          "iterations_per_batch": 1024,
+          "batch_means_us": [
+            36.53583984375,
+            36.53193359375,
+            37.01220703125,
+            36.6220703125,
+            36.67216796875,
+            36.90341796875,
+            37.3203125
+          ]
+        },
+        "sparse_trade_values_then_sum": {
+          "median_us": 127.20234375,
+          "min_us": 127.08046875,
+          "max_us": 127.4390625,
+          "iterations_per_batch": 256,
+          "batch_means_us": [
+            127.4390625,
+            127.30234375,
+            127.180078125,
+            127.121484375,
+            127.20234375,
+            127.266796875,
+            127.08046875
+          ]
+        },
+        "prepared_aggregate": {
+          "median_us": 1.61951904296875,
+          "min_us": 1.614251708984375,
+          "max_us": 1.625213623046875,
+          "iterations_per_batch": 16384,
+          "batch_means_us": [
+            1.616973876953125,
+            1.61951904296875,
+            1.618701171875,
+            1.623828125,
+            1.614251708984375,
+            1.62037353515625,
+            1.625213623046875
+          ]
+        }
+      },
+      "aggregation_preparation": {
+        "median_us": 33.8919921875,
+        "min_us": 33.8203125,
+        "max_us": 34.0236328125,
+        "iterations_per_batch": 1024,
+        "batch_means_us": [
+          33.8337890625,
+          33.8203125,
+          33.8451171875,
+          33.89873046875,
+          33.9748046875,
+          34.0236328125,
+          33.8919921875
+        ]
+      },
+      "work_counts_per_tick": {
+        "dense_trade_values_then_sum": {
+          "coefficient_products": 240000,
+          "component_amounts_formed": 10000,
+          "result_float_elements_allocated": 20000
+        },
+        "sparse_trade_values_then_sum": {
+          "coefficient_products": 30000,
+          "component_amounts_formed": 10000,
+          "result_float_elements_allocated": 80000
+        },
+        "prepared_aggregate": {
+          "coefficient_products": 24,
+          "component_amounts_formed": 0,
+          "result_float_elements_allocated": 0
+        }
+      },
+      "aggregation_work_counts": {
+        "aggregate_coefficients_allocated": 24,
+        "exposure_terms_read": 30000,
+        "fixed_set_amounts_read": 10000
+      },
+      "dense_coefficients_bytes": 1920000,
+      "sparse_weights_and_positions_bytes": 480000,
+      "aggregate_coefficients_bytes": 192,
+      "checked_price_scenarios": 3
+    },
+    {
+      "trades": 100000,
+      "live_inputs": 24,
+      "terms_per_trade": 3,
+      "timings": {
+        "dense_trade_values_then_sum": {
+          "median_us": 1367.9125,
+          "min_us": 1342.05,
+          "max_us": 1779.475,
+          "iterations_per_batch": 16,
+          "batch_means_us": [
+            1373.425,
+            1351.53125,
+            1362.10625,
+            1367.9125,
+            1342.05,
+            1387.81875,
+            1779.475
+          ]
+        },
+        "sparse_trade_values_then_sum": {
+          "median_us": 2546.8625,
+          "min_us": 2488.2875,
+          "max_us": 2568.4625,
+          "iterations_per_batch": 8,
+          "batch_means_us": [
+            2558.7625,
+            2568.4625,
+            2488.2875,
+            2546.8625,
+            2549.1,
+            2534.4125,
+            2504.2375
+          ]
+        },
+        "prepared_aggregate": {
+          "median_us": 1.624273681640625,
+          "min_us": 1.610858154296875,
+          "max_us": 1.635247802734375,
+          "iterations_per_batch": 16384,
+          "batch_means_us": [
+            1.62440185546875,
+            1.624273681640625,
+            1.6220703125,
+            1.635247802734375,
+            1.625677490234375,
+            1.610858154296875,
+            1.611602783203125
+          ]
+        }
+      },
+      "aggregation_preparation": {
+        "median_us": 318.825,
+        "min_us": 315.38125,
+        "max_us": 328.609375,
+        "iterations_per_batch": 64,
+        "batch_means_us": [
+          328.609375,
+          323.375,
+          318.825,
+          319.8546875,
+          315.38125,
+          317.6875,
+          317.3765625
+        ]
+      },
+      "work_counts_per_tick": {
+        "dense_trade_values_then_sum": {
+          "coefficient_products": 2400000,
+          "component_amounts_formed": 100000,
+          "result_float_elements_allocated": 200000
+        },
+        "sparse_trade_values_then_sum": {
+          "coefficient_products": 300000,
+          "component_amounts_formed": 100000,
+          "result_float_elements_allocated": 800000
+        },
+        "prepared_aggregate": {
+          "coefficient_products": 24,
+          "component_amounts_formed": 0,
+          "result_float_elements_allocated": 0
+        }
+      },
+      "aggregation_work_counts": {
+        "aggregate_coefficients_allocated": 24,
+        "exposure_terms_read": 300000,
+        "fixed_set_amounts_read": 100000
+      },
+      "dense_coefficients_bytes": 19200000,
+      "sparse_weights_and_positions_bytes": 4800000,
+      "aggregate_coefficients_bytes": 192,
+      "checked_price_scenarios": 3
+    }
+  ]
+}

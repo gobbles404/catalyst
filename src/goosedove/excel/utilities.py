@@ -43,6 +43,7 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.futures_trades import FuturesTrades
 
 
 @singledispatch
@@ -295,6 +296,29 @@ def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
         obj.lot_units,
         obj.brokerage_rates_per_lot,
         obj.clearing_rates_per_lot,
+    )
+
+
+@shown.register
+def futures_trades_table(obj: FuturesTrades) -> MixedArray:
+    return MixedArray.table(
+        [
+            (
+                "trade_id",
+                "trade_date",
+                "contract_code",
+                "signed_lots",
+                "trade_price",
+                "contract_position",
+            ),
+            ("str", "datetime64[D]", "str", "float64", "float64", "intp"),
+        ],
+        obj.trade_ids,
+        obj.trade_dates,
+        obj.contract_codes,
+        obj.signed_lots,
+        obj.trade_prices,
+        obj.contract_positions,
     )
 
 
