@@ -3,9 +3,10 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Dated exposure](dated-exposure.md) · [Fixing and payment state](fixing-and-payment-state.md)
 
-**Status:** Agreed implementation ticket, 4 October 2026. Build after I5, on the reviewed
-pipeline through #141. This replaces R1's earlier research-only scope and adjusted-lag
-proposal. This page specifies the work; penultimate booking is not implemented yet.
+**Status:** Agreed implementation ticket, 4 October 2026, reviewed the same day. Build on the
+reviewed pipeline through #142, stacked on it. This replaces R1's earlier research-only scope
+and adjusted-lag proposal. This page specifies the work; penultimate booking is not
+implemented yet.
 
 ## Outcome
 
@@ -93,17 +94,21 @@ _ReportRisk(results)
    terms. R1 supports cleared financial pens; reject physical penultimate combinations by
    name during creation. Existing bilateral evaluation remains unsupported. Preserve the
    current one-index, one-specification and one-method batch restrictions.
-2. **Resolve dates before payments.** Refactor the current payment resolver, which directly
-   reads `schedule.future_expiry`, to consume resolved component anchors. Resolve the selected
-   method once per component array and pass the dates forward to payment resolution and
-   encoding. A pen produces one observation of weight 1 for each monthly component. Its
-   referenced NYMEX contract and month stay unchanged. Strips resolve each month separately.
-3. **Retain the explanation.** Keep the underlying schedule by reference and the derived
-   observation/payment-anchor date plus resolved payment date as immutable component facts.
-   One canonical date array may serve both observation and anchor; avoid calculating or
-   storing duplicate copies just to serve two consumers. Retain the lag and payment calendar
-   already held by `PaymentTerms`. No new worksheet field, schedule column, anchor selector
-   or constructor is required. Keep `ContractSpecifications` focused on lot, unit and fee data.
+2. **Resolve the observations first, then the payments.** Resolve the schedule method's
+   observations once during creation, and count `payment_time_lag` from each component's
+   last observation day on its payment calendar: the expiry for `lastday`, the pen date for
+   `penultimate`. The current payment resolver reads `schedule.future_expiry` directly and
+   changes to read the observations. A pen produces one observation of weight 1 for each
+   monthly component. Its referenced NYMEX contract and month stay unchanged. Strips resolve
+   each month separately. This is the payment rule for the two methods built; a later method,
+   Asian or bilateral, states its own payment convention on its own page and inherits nothing
+   from this one.
+3. **Retain the explanation without a copy.** The underlying schedule by reference, the
+   observations the encoding already retains, and the lag, payment calendar and payment date
+   `PaymentTerms` already holds are the facts; the observation day is the payment anchor, so
+   no anchor array is kept beside the observations. No new worksheet field, schedule column,
+   anchor selector or constructor is required. Keep `ContractSpecifications` focused on lot,
+   unit and fee data.
 4. **Reuse dated slots.** Feed the resolved observation into the I4a observation/encoding path.
    Keep its checks that the day is priced, lies within history coverage and maps to the
    intended underlying contract. Do not overwrite the index's expiry or let a lookup silently
@@ -116,8 +121,9 @@ _ReportRisk(results)
    remains in mark until its payment date, then moves into cash. The underlying's later final
    settlement must not replace the pen fixing. Price ticks rebuild neither dates nor fixed
    amounts; evaluation still rejects a different history instead of preparing implicitly.
-6. **Expose the facts.** Make the reference contract, observation/payment anchor and payment
-   date inspectable from the retained trade/prepared records without re-resolving dates.
+6. **Expose the facts as the spills already do.** The trades spill shows each component's
+   `payment_date`, and the prepared spill each slot's `observation_date` with its reference
+   `contract_code`; a pen's dates read back there without re-resolving, and no column is added.
    Preserve the two scalar reports and the distinct dated `live_exposure` and `contract_delta`
    meanings. Update help, current library pages, smoke examples and the kept workbook with
    the implementation. `_ShowInstrument` keeps its agreed layout and no capability row.
@@ -143,6 +149,7 @@ date source.
 | Product and month | Underlying NYMEX expiry | Pen expiry and observation | Modeled payment date |
 |---|---|---|---|
 | PHH Z26 | Wed 25 Nov 2026 | Tue 24 Nov 2026 | Wed 25 Nov 2026 |
+| PHH M27 | Wed 26 May 2027, Memorial Day closing Mon 31 May | Tue 25 May 2027 | Wed 26 May 2027 |
 | PHH N27 | Mon 28 Jun 2027 | Fri 25 Jun 2027 | Mon 28 Jun 2027 |
 | ICE WTI T F27 | Mon 21 Dec 2026 | Fri 18 Dec 2026 | Mon 21 Dec 2026, at the rule deadline |
 
@@ -151,6 +158,11 @@ Sources: [NYMEX NG rule 220102.F](https://www.cmegroup.com/content/dam/cmegroup/
 [CME 2026 holiday notice](https://www.cmegroup.com/content/dam/cmegroup/notices/market-regulation/2026/01/msn01-09-2026revisedholidayprocessinglargetrader2026.pdf),
 [PHH expiry table](https://www.ice.com/products/6590264/Henry-Penultimate-Fixed-Price-Future/expiry),
 [WTI expiry table](https://www.ice.com/products/213/WTI-Crude-Futures/expiry).
+
+M27 is the real holiday-crossing case: a US holiday closes the last business day of the month
+before the contract month, so ICE's four-business-day description and the NYMEX derivation
+could have parted, and ICE's table gives 25 May 2027, the derivation's date. Every PHH and WTI
+month checked on 4 October 2026, Z26 through N27, agrees with the derivation.
 
 Also pin two **synthetic calendar tests**, separate from the exchange examples: with a Monday
 underlying expiry and Friday closed on the pricing calendar, the pen date is Thursday; with
@@ -195,7 +207,9 @@ Acceptance requires:
 - Existing `lastday` values, cash, risk and expired-physical refusals continue to pass. Existing
   goldens remain untouched in the code-change PR; new hand cases precede new snapshots.
 
-Deliver R1 as one focused implementation PR after I5, with its tests and documentation. I6
-then builds the broader worksheet cash-lifecycle walkthrough on this path. Asian and last3day
-booking, physical penultimate delivery, bilateral rates, alternate fixing sources, differing
-payment dates within one contract group and general payment-rule machinery remain later work.
+Deliver R1 as one focused implementation PR stacked on #142, with its tests, its documentation
+and its own worksheet example: the PHH lifecycle above in the kept workbook, live on the pen
+day, fixed and unpaid, then cash on the payment day, with the price tick and the corrected
+fixing, beside the toy lifecycle I6 built under `lastday` in #142. Asian and last3day booking,
+physical penultimate delivery, bilateral rates, alternate fixing sources, differing payment
+dates within one contract group and general payment-rule machinery remain later work.

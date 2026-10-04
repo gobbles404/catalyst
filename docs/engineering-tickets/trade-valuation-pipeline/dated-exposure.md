@@ -10,9 +10,10 @@ rule and retained, and the fixing source is kept once on the shared object. Buil
 records and the daily toy among them; `src/goosedove/trades/observations.py` is the new module,
 `encoding.py`, `preparation.py` and `evaluation.py` the reshaped ones.
 
-**Placement:** I4 → **I4a** → I5 → R1 → I6. I4 is built, #139, and I4a stacked on it.
-[R1](penultimate-trades.md) now specifies public penultimate booking using this dated path,
-with payment lag applied from the derived pen expiry.
+**Placement:** I4 → **I4a** → I5 → I6 → R1. I4 is built, #139, I4a #140, I5 #141 and I6 #142,
+each stacked on the one before. [R1](penultimate-trades.md) specifies public penultimate
+booking using this dated path, the payment lag counted from the derived pen date, and stacks
+on #142.
 
 ## Outcome
 
@@ -262,10 +263,10 @@ The two reports still return the agreed aggregate scalars; stored contract and d
 remain available without recalculation. No new public creator or mandatory reporting argument
 is introduced here.
 
-[R1](penultimate-trades.md) derives the pen observation/payment anchor from the underlying
-expiry and then resolves payment separately, for PHH and ICE WTI. I6 uses the dated
-representation for its financial payment lifecycle. Observation dates must never be replaced
-by payment dates to join these pieces.
+[R1](penultimate-trades.md) derives the pen observation from the underlying expiry and counts
+payment from it, for PHH and ICE WTI. I6, #142, uses the dated representation for its
+financial payment lifecycle under `lastday`. Observation dates must never be replaced by
+payment dates to join these pieces.
 
 Penultimate booking belongs to R1. Asian/last3day booking, hourly or other time grids,
 bilateral discounting and DV01, physical delivery, an entirely ended market calendar, incremental fixing updates,
