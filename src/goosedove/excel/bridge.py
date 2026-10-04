@@ -65,6 +65,8 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.evaluation import TradeResults
+from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 
 # --- what a function may declare, beyond float, int, str, and bool ----------
@@ -1277,6 +1279,8 @@ _NAMED: Final[dict[type[object], str]] = {
     PriceVector: "index_name",
     Market: "market_history.calendar.index.name",
     Trades: "resolved.index.name",
+    PreparedTrades: "encoded.terms.index.name",
+    TradeResults: "prepared.encoded.terms.index.name",
 }
 
 

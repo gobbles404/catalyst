@@ -15,8 +15,9 @@
 #          this group beside core.
 #   trades a trade template holding a payment calendar and a batch of trades on the chain's
 #          index: the calendar's change reaching the template and the batch's payment day; the
-#          template deleted and the batch failing with it, both recovered. check.ps1 runs this
-#          group beside core.
+#          template deleted and the batch failing with it, both recovered; the batch prepared
+#          against the chain's history and evaluated against its market, a price tick making new
+#          results over the same preparation. check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -519,7 +520,7 @@ $trades = {
     Put $state $sheet "K1" "contract_specification"; Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "route"; Put $state $sheet "P1" "settlement_method"; Put $state $sheet "Q1" "clearing_house"; Put $state $sheet "R1" "payment_time_lag"; Put $state $sheet "S1" "payment_holiday_calendar"
     Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "LOT"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "cleared"; Put $state $sheet "P2" "financial"; Put $state $sheet "Q2" "ICE Clear"; Put $state $sheet "R2" "+1bd"; Put $state $sheet "S2" "=D13"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
-    Put $state $sheet "K5" "24-Sep-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
+    Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
     Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
@@ -556,6 +557,26 @@ $trades = {
     Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
     Check "fourteen live again, two more published, no misses, no disposal errors" ($c.Live -eq 14 -and $c.Published -eq 19 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # The batch prepared against the chain's history and evaluated against its market: two lots
+    # of n26 at 70 against a quote of 72.1 mark 4,200. A price tick remakes the vector, the market
+    # and the results, and the preparation is reused as it is.
+    Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
+    Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"
+    Put $state $sheet "D19" "=INDEX(_ReportValues(D18),3,1)"
+    $prepared = Text $state $sheet "D17"
+    Check "the preparation's cell shows its handle, named for the index" ($prepared.StartsWith("${id}:prepared_trades:WTI NYMEX:")) $prepared
+    $results = Text $state $sheet "D18"
+    Check "the results' cell shows its handle, named for the index" ($results.StartsWith("${id}:trade_results:WTI NYMEX:")) $results
+    Check "the values report reads the mark, 4,200" ((Text $state $sheet "D19") -eq "4200") (Text $state $sheet "D19")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) }
+    Check "sixteen live, two more published" ($c.Live -eq 16 -and $c.Published -eq 21) $c.Text
+    Put $state $sheet "A10" "73.5"
+    Check "a price tick gives the results a new handle" ((Text $state $sheet "D18") -ne $results -and (Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "and the mark follows the quote, 7,000" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
+    Check "while the preparation is reused as it is" ((Text $state $sheet "D17") -eq $prepared) (Text $state $sheet "D17")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 8 }
+    Check "the old vector, market and results are released; sixteen live, three more published" ($c.Live -eq 16 -and $c.Released -eq 8 -and $c.Published -eq 24 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 $quit = {

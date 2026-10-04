@@ -30,9 +30,9 @@ from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
-from goosedove.trades.evaluation import results
+from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import observations, observed
-from goosedove.trades.preparation import prepared
+from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -183,7 +183,7 @@ def test_the_preparation_reports_its_slots_and_one_settle_read_per_fixed_slot(
     components: int, contracts: int, fixed: int
 ) -> None:
     counter = WorkCounter()
-    prepared(a_batch(components, contracts), a_history(), counter)
+    prepared_trades(a_batch(components, contracts), a_history(), counter)
     assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": contracts}
 
 
@@ -192,9 +192,9 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
     components: int, contracts: int, live: int
 ) -> None:
     history = a_history()
-    prep = prepared(a_batch(components, contracts), history, WorkCounter())
+    prep = prepared_trades(a_batch(components, contracts), history, WorkCounter())
     counter = WorkCounter()
-    results(prep, a_market(history), counter)
+    trade_results(prep, a_market(history), counter)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live}
 
 
@@ -228,10 +228,10 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
 ) -> None:
     history = a_history()
-    prep = prepared(a_batch(components, contracts), history, WorkCounter())
+    prep = prepared_trades(a_batch(components, contracts), history, WorkCounter())
     quoted = a_market(history)
-    assert call_profile(lambda: results(prep, quoted, WorkCounter())) == {
-        "results": 1,
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -240,7 +240,7 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     # the preparation's, shared and not made again. What is seen is the market's one look at the
     # references asked for, with its reduction, the sum of the dated contributions, and the
     # contributions frozen.
-    assert numpy_calls(lambda: results(prep, quoted, WorkCounter())) == {
+    assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
         "ndarray.any": 1,
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
@@ -284,12 +284,12 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
 ) -> None:
     enc = a_batch(components, contracts)
     history = a_history()
-    assert call_profile(lambda: prepared(enc, history, WorkCounter())) == {
-        "prepared": 1,
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    numpy = numpy_calls(lambda: prepared(enc, history, WorkCounter()))
+    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
 
 
@@ -336,13 +336,13 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     enc = a_daily_batch(components, contracts, days)
     history = a_history()
     counter = WorkCounter()
-    prep = prepared(enc, history, counter)
+    prep = prepared_trades(enc, history, counter)
     slots, fixed = contracts * days, daily_fixed_slots(components, contracts, days)
     assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": slots}
     assert prep.live_slot.size == slots - fixed
     assert prep.dated_live_exposure.nbytes == 8 * slots and prep.delta.nbytes == 8 * contracts
     counter = WorkCounter()
-    result = results(prep, a_market(history), counter)
+    result = trade_results(prep, a_market(history), counter)
     live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live_references}
     assert result.dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
@@ -369,16 +369,16 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
     enc = encoded(terms, obs, UNITS, WorkCounter())
     history = a_history()
-    assert call_profile(lambda: prepared(enc, history, WorkCounter())) == {
-        "prepared": 1,
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    assert numpy_calls(lambda: prepared(enc, history, WorkCounter())) == PREPARATION_NUMPY
-    prep = prepared(enc, history, WorkCounter())
+    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
+    prep = prepared_trades(enc, history, WorkCounter())
     quoted = a_market(history)
-    assert call_profile(lambda: results(prep, quoted, WorkCounter())) == {
-        "results": 1,
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
         "Market.live_prices": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
@@ -396,10 +396,10 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     enc = a_daily_batch(components, contracts, days)
     history = a_history()
     slots = contracts * days
-    assert least_peak(lambda: prepared(enc, history, WorkCounter())) <= 90 * slots + SLACK
-    prep = prepared(enc, history, WorkCounter())
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    prep = prepared_trades(enc, history, WorkCounter())
     quoted = a_market(history)
-    assert least_peak(lambda: results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
     small = a_daily_batch(*DAILY[0])
-    small_prep = prepared(small, history, WorkCounter())
-    assert least_peak(lambda: results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+    small_prep = prepared_trades(small, history, WorkCounter())
+    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK

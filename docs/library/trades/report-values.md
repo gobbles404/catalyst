@@ -1,0 +1,43 @@
+# _ReportValues
+
+Built in #NN as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportRisk](report-risk.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
+
+The batch's values from its results, as evaluation stored them: the mark and the cash under the route's labels, the currency and the valuation day. A report selects and labels; it values nothing, reads no market and infers no settlement, so a report of an older result stands after a later tick, and two reports of one result agree. The code is `src/goosedove/excel/trades.py`.
+
+## Worksheet contract
+
+```python
+def _ReportValues(results: Handle[TradeResults]) -> MixedArray: ...
+```
+
+| | A | B | C | D |
+|---|---|---|---|---|
+| 13 | `=_ReportValues(A12)` | | | |
+| | cleared_mark | cleared_cash | currency | as_of |
+| | float64 | float64 | str | datetime64[D] |
+| | 7000 | 0 | USD | 24-Nov-2026 |
+
+One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it; a cell of another kind fails in the seam's words, `results is prepared trades handle '30512:prepared_trades:Henry Hub NYMEX:43', expected trade results handle`. The spill is three rows by four columns, a table as every reader spills one: the headers, the types and one row. The labels are the route's, `cleared_mark` and `cleared_cash` for the one route built, `bilateral_mark` and `bilateral_cash` when bilateral valuation is; the other route's fields are not shown as zeros. The mark is a currency amount, the undiscounted entry-to-current-price P&L of the payment groups not yet settled, live slots at their quotes and fixed slots at their settles; the cash the cumulative entry-to-final-price P&L of the groups settled by the valuation day, the payment day on or before it, undiscounted, every settled group of the batch through that day; neither is a bank reconciliation, and margining is outside the model. The day is the history's valuation day, a date as the sheet formats one.
+
+## Excel help
+
+| Item | Text |
+|---|---|
+| Function | Reports the batch's values from its results: the mark and the cash under the route's labels, the currency and the valuation day, as evaluation stored them. |
+| results | The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name for it. |
+
+## The library checks
+
+Nothing: the result is complete when it is published or it is not published, so a report finds every field it shows.
+
+## Tests
+
+| Where | What |
+|---|---|
+| `tests/unit/test_trade_valuation.py` | the NG example's spill cell for cell, 7,000 and 0 in USD on 24 November; the toy's -11,000 and 22,800 on 30 November; a report of the old results unmoved by a tick; one trade's -18,000; a blank and a prepared-trades handle refused |
+| `tests/performance/test_trade_valuation_budgets.py` | one handle resolved, one row laid out, no kernel call, nothing published; 1,967 bytes |
+| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups trades`, `workbooks/handles.xlsx` | the chain's mark read through the report on a sheet, from the host, through a tick, and at the foot of the handles sheet, B1304 |
+
+## Not here
+
+No delta or DV01, [_ReportRisk](report-risk.md). No value per trade, no decomposition into offsets, set and live amounts, no cash over a chosen interval, no NPV: a new view is a new function over a result that holds what it needs, and `util_ReadHandle` on the results handle is the debugging spill of the dated contents meanwhile.

@@ -201,6 +201,12 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number of lots" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
+            // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
+            yield return new object[] { "_PrepareTrades", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _PrepareTrades: trades is missing, expected trades handle" };
+            yield return new object[] { "_PrepareTrades", new object[] { "x:trades:gas:9", "y:market_history:gas:9" }, "#ERROR _PrepareTrades: trades is text 'x:trades:gas:9' naming no live object, expected trades handle" };
+            yield return new object[] { "_EvaluateTrades", new object[] { ExcelEmpty.Value, ExcelMissing.Value }, "#ERROR _EvaluateTrades: prepared is blank, expected prepared trades handle" };
+            yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
+            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value }, "#ERROR _ReportRisk: results is blank, expected trade results handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -409,6 +415,65 @@ namespace Goosedove.Host.Tests
             Assert.Equal("+2bd", strip[2, 12]);
             Assert.Equal(46356.0, strip[2, 13]);
             Assert.Equal(46387.0, strip[3, 13]);
+        }
+
+        // The valuation path from the host's side: the market fact's chain, valued on 26 May 2026 with
+        // n26 at 72.10 and q26 at 72.80, a batch of two lots of n26 at 70 and one lot sold of q26
+        // at 72, prepared, evaluated and reported: a mark of 34,000 and no cash, a total delta of
+        // 10,000 and a DV01 of zero, the readers' rows per slot; a tick making new results over the
+        // same preparation while the first results stand.
+        [Fact]
+        public void a_batch_is_prepared_evaluated_and_reported()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
+            var index = Index(schedule, holidays);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
+            var fields = Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "LOT", "month", "lastday", "cleared", "physical", "CME Clearing"));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { "V1", 46153.0, "n26", 2.0, 70.0 }, { "V2", 46153.0, "q26", -1.0, 72.0 } }, template);
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            Assert.StartsWith(Pid + ":prepared_trades:sample:", prepared);
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, market);
+            Assert.StartsWith(Pid + ":trade_results:sample:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(3, values.GetLength(0));
+            Assert.Equal(4, values.GetLength(1));
+            Assert.Equal("cleared_mark", values[0, 0]);
+            Assert.Equal("cleared_cash", values[0, 1]);
+            Assert.Equal(34000.0, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            Assert.Equal("USD", values[2, 2]);
+            Assert.Equal(46168.0, values[2, 3]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results);
+            Assert.Equal(5, risk.GetLength(1));
+            Assert.Equal("delta_total", risk[0, 0]);
+            Assert.Equal(10000.0, risk[2, 0]);
+            Assert.Equal("USD per USD/MMBTU", risk[2, 1]);
+            Assert.Equal(0.0, risk[2, 2]);
+            Assert.Equal("USD per basis point", risk[2, 3]);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(4, slots.GetLength(0));
+            Assert.Equal("live_exposure", slots[0, 4]);
+            Assert.Equal("n26", slots[2, 0]);
+            Assert.Equal(false, slots[2, 2]);
+            Assert.Equal(20000.0, slots[2, 4]);
+            Assert.Equal(-10000.0, slots[3, 4]);
+            var contributions = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal("live_contribution", contributions[0, 3]);
+            Assert.Equal(1442000.0, (double)contributions[2, 3], 6);
+            Assert.Equal(20000.0, contributions[2, 4]);
+            var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
+            var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked);
+            Assert.NotEqual(results, later);
+            Assert.Equal(36000.0, (double)((object[,])Seam.Call("_ReportValues", later))[2, 0], 6);
+            Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market));
+            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_ReportRisk", prepared));
         }
 
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.

@@ -45,6 +45,8 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.evaluation import TradeResults
+from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.template import TradeTemplate
 
@@ -383,6 +385,51 @@ def trades_table(obj: Trades) -> MixedArray:
     numbers("coefficient", "float64", encoding.coefficient)
     numbers("offset", "float64", encoding.offset)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+@shown.register
+def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
+    # One row per slot, the dated axis as the preparation left it: the contract pricing the day,
+    # the observation day, whether it has fixed, whether its payment group has settled, and its
+    # live exposure, zero where it has fixed; nothing is made again, every column the record's
+    # own or a gather of one.
+    encoding = obj.encoded
+    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
+    return MixedArray.table(
+        [
+            ("contract_code", "observation_date", "is_fixed", "is_settled", "live_exposure"),
+            ("str", "datetime64[D]", "bool", "bool", "float64"),
+        ],
+        tuple(codes),
+        encoding.slot_date,
+        obj.is_fixed,
+        obj.is_settled[encoding.slot_group],
+        obj.dated_live_exposure,
+    )
+
+
+@shown.register
+def trade_results_table(obj: TradeResults) -> MixedArray:
+    # One row per slot, the dated contents of the result: the contract pricing the day, the
+    # observation day, whether it has fixed, its live contribution, exposure times its contract's
+    # quote and zero where it has fixed, and the delta of its contract, the retained vector read
+    # by each slot's reference; the mark, the cash and the totals are the two reports' to show.
+    prepared = obj.prepared
+    encoding = prepared.encoded
+    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
+    contribution = np.zeros(encoding.slot_group.size)
+    contribution[prepared.live_slot] = obj.dated_live_contribution
+    return MixedArray.table(
+        [
+            ("contract_code", "observation_date", "is_fixed", "live_contribution", "delta"),
+            ("str", "datetime64[D]", "bool", "float64", "float64"),
+        ],
+        tuple(codes),
+        encoding.slot_date,
+        prepared.is_fixed,
+        contribution,
+        obj.delta[encoding.reference_of_slot],
+    )
 
 
 @excel_function
