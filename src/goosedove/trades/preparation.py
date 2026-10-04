@@ -31,7 +31,9 @@ class Prepared:
     three sums: offset_unsettled and set_unsettled, the entry-price offsets and set amounts of
     the inputs not yet settled, which the tick adds to the live amount for the mark; and cash,
     the whole amounts of the settled inputs, offset and set together, moved out of the mark on the
-    day they pay and never discounted."""
+    day they pay and never discounted. And the risk, which no tick changes: delta[m], the exposure
+    where the input is live and zero where it has fixed, over the whole axis, and delta_total,
+    their sum, the change for a common move of one in every contract; the result shares them."""
 
     encoded: Encoded
     history: MarketHistory
@@ -43,6 +45,8 @@ class Prepared:
     offset_unsettled: float
     set_unsettled: float
     cash: float
+    delta: NDArray[np.float64]
+    delta_total: float
 
 
 def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> Prepared:
@@ -62,7 +66,8 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
     holds for every fixed and priced day; an expiry on a day the calendar does not price, a
     weekend or a holiday of the schedule's own making, has no settle and is refused by name. It
     is settled when it has fixed and its payment day is on or before the valuation date, the
-    inclusive cutoff of the pipeline; fixed is not paid.
+    inclusive cutoff of the pipeline; fixed is not paid. Delta is settled here too, since nothing
+    a tick brings changes it: the exposure on the live inputs, zero on the fixed.
 
     Work: one input prepared per input and one fixing read per fixed input, reported to the
     counter; nothing per component, nothing per day of the calendar.
@@ -112,9 +117,10 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
     live_contracts = encoded.inputs[is_live]
     live_exposure = encoded.exposure[is_live]
     unsettled = ~is_settled
+    delta = np.where(is_live, encoded.exposure, 0.0)
     counter.hit(PREPARED_INPUTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_expiry_rows.size))
-    for array in (is_live, is_settled, set_amount, live_contracts, live_exposure):
+    for array in (is_live, is_settled, set_amount, live_contracts, live_exposure, delta):
         array.setflags(write=False)
     return Prepared(
         encoded,
@@ -127,4 +133,6 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
         float(encoded.offset_of_input[unsettled].sum()),
         float(set_amount[unsettled].sum()),
         float((encoded.offset_of_input + set_amount)[is_settled].sum()),
+        delta,
+        float(delta.sum()),
     )

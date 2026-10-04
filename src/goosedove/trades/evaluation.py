@@ -1,7 +1,8 @@
 """The prepared batch evaluated against one market: the quotes of its live inputs read off the
 market, aligned by schedule row, one multiplication and one addition for the mark; the cash as
-the preparation settled it; delta by contract on the batch's own axis, zero where a contract has
-fixed, and its total; and DV01, zero by the undiscounted cleared model. One snapshot for the
+the preparation settled it; delta by contract on the batch's own axis and its total, shared with
+the preparation that settled them, since no tick changes them; and DV01, zero by the
+undiscounted cleared model. One snapshot for the
 batch as a whole, immutable, retained with everything that explains it.
 docs/library/trades/kernel.md is the page."""
 
@@ -28,9 +29,10 @@ class Results:
     batch's axis, the schedule rows of its inputs in the schedule's order, the same whatever has
     fixed; delta[m] is the change in mark for a move of one quote unit in contract m, the
     exposure where it is live and zero where it has fixed, in delta_unit, currency per quote
-    currency per quote quantity unit; delta_total is the change for a common move of one in every
-    contract, the sum. dv01 is zero: the cleared model is undiscounted, so a rate move changes
-    nothing, a result of the model and not a placeholder. as_of is the history's valuation day."""
+    currency per quote quantity unit, the preparation's own array shared and never written;
+    delta_total is the change for a common move of one in every contract, the sum. dv01 is zero:
+    the cleared model is undiscounted, so a rate move changes nothing, a result of the model and
+    not a placeholder. as_of is the history's valuation day."""
 
     prepared: Prepared
     market: Market
@@ -62,8 +64,8 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
     as if undiscounted. Then the market answers the quotes of the live contracts, in the batch's
     order, and refuses by name a contract before or past its coverage, as it does for every
     reader; the live amount is the exposure times the quotes, one dot product; the mark adds the
-    unsettled offsets and set amounts; the cash is the preparation's. Delta is the exposure on
-    the live inputs and zero on the fixed, over the batch's whole axis.
+    unsettled offsets and set amounts; the cash is the preparation's, and so are delta and its
+    total, shared and not made again, since nothing a tick brings changes them.
 
     Work: one kernel call and one quote read per live input, reported to the counter; no fixing
     read, nothing per component, nothing of the encoding or the preparation done again.
@@ -85,8 +87,6 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
     counter.hit(LIVE_PRICES_READ, int(quotes.size))
     live = float(prepared.live_exposure @ quotes)
     counter.hit(KERNEL)
-    delta = np.where(prepared.is_live, encoded.exposure, 0.0)
-    delta.setflags(write=False)
     conventions = terms.index.conventions
     return Results(
         prepared,
@@ -97,8 +97,8 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
         prepared.offset_unsettled + prepared.set_unsettled + live,
         prepared.cash,
         encoded.inputs,
-        delta,
-        float(delta.sum()),
+        prepared.delta,
+        prepared.delta_total,
         0.0,
         f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
         f"{conventions.quote_quantity_unit}",

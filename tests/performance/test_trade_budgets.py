@@ -158,14 +158,12 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    # The delta over the whole axis is one np.where, dispatched in C and unseen, as the dot
-    # product is; what is seen is the market's one look at the contracts asked for, the freeze
-    # of the delta, and the total delta's sum with its reduction.
+    # The dot product is dispatched in C and unseen; delta and its total are the preparation's,
+    # shared and not made again. What is seen is the market's one look at the contracts asked
+    # for, with its reduction.
     assert numpy_calls(lambda: results(prep, quoted, WorkCounter())) == {
         "ndarray.any": 1,
-        "ndarray.setflags": 1,
-        "ndarray.sum": 1,
-        "ufunc.reduce": 2,
+        "ufunc.reduce": 1,
     }
 
 

@@ -5,7 +5,6 @@ evaluation against a real market, every hand answer of the pages pinned, the bat
 singletons summed, duplicates counting, a fixed batch inside a live market, an expired physical
 component refused, and nothing redone on a tick."""
 
-import dataclasses
 import re
 from typing import Any, cast
 
@@ -178,10 +177,15 @@ def evaluated(
 
 
 def test_the_terms_own_frozen_copies_of_their_columns() -> None:
-    lots = LOTS.copy()
-    terms = terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)
-    lots[0] = 99.0
+    lots, pays = LOTS.copy(), TOY_PAYS.copy()
+    terms = resolved_trades(
+        TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        QuantityPer.MONTH, LABELS, TRADE_DATES, np.arange(5, dtype=np.intp), CONTRACT, lots,
+        FIXED_PRICE, pays,
+    )  # fmt: skip
+    lots[0], pays[0] = 99.0, day("2030-01-01")  # the arrays that were passed, changed after
     assert terms.lots[0] == 10.0 and terms.schedule is TOY.schedule
+    assert terms.payment_date is not None and terms.payment_date[0] == day("2026-11-30")
     for column in (terms.trade_dates, terms.occurrence, terms.contract, terms.lots):
         assert not column.flags.writeable
     assert terms.payment_date is not None and not terms.payment_date.flags.writeable
@@ -307,9 +311,11 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
     counter = WorkCounter()
     enc = encoded(terms_of(), UNITS, counter)
     np.testing.assert_array_equal(enc.quantity, [100_000, -40_000, 70_000, -120_000, 100_000])
+    np.testing.assert_array_equal(enc.coefficient, enc.quantity)  # dollars quoted, dollars paid
     np.testing.assert_array_equal(enc.offset, [-310_000, 126_000, -238_000, 402_000, -310_000])
     np.testing.assert_array_equal(enc.inputs, [1, 2])
     np.testing.assert_array_equal(enc.input_of_component, [0, 0, 1, 1, 0])
+    np.testing.assert_array_equal(enc.quantity_of_input, [160_000, -50_000])
     np.testing.assert_array_equal(enc.exposure, [160_000, -50_000])
     np.testing.assert_array_equal(enc.offset_of_input, [-494_000, 164_000])
     assert enc.offset_of_input.sum() == -330_000
@@ -339,8 +345,72 @@ def test_a_lot_in_another_unit_than_the_quote_is_converted_once() -> None:
 def test_a_price_in_cents_settles_in_dollars() -> None:
     cents = an_index("cents", quote=("CENT", "MMBTU"))
     enc = encoded(terms_of(cents), UNITS, WorkCounter())
-    np.testing.assert_array_equal(enc.quantity, LOTS * 10_000)
-    np.testing.assert_allclose(enc.offset, -LOTS * 10_000 * FIXED_PRICE * 0.01)
+    np.testing.assert_array_equal(enc.quantity, LOTS * 10_000)  # MMBTU, the physical quantity
+    np.testing.assert_allclose(enc.coefficient, LOTS * 100)  # USD per cent per MMBTU
+    np.testing.assert_allclose(enc.offset, -LOTS * 100 * FIXED_PRICE)
+    np.testing.assert_allclose(enc.exposure, [1_600, -500])
+    np.testing.assert_array_equal(enc.quantity_of_input, [160_000, -50_000])
+
+
+# The review's case: one lot of 10,000 MMBTU bought at 300 cents, settled in dollars, through
+# live, fixed and paid. At 300 cents everything is zero; a cent is 100 dollars; at 310 the mark
+# is 1,000 dollars and so, once fixed and paid at 310, is the cash. The quotes, the final price
+# and the fixed price are all in cents, and only the coefficient turns them into dollars.
+CENTS = an_index(
+    "cents",
+    (("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29"), ("G27", "2027-01-27")),
+    ("2026-11-26", "2026-12-25", "2027-01-01"),
+    quote=("CENT", "MMBTU"),
+)
+
+
+def one_lot_in_cents(
+    as_of: str, finals: dict[str, float], *quotes: float
+) -> tuple[Results, WorkCounter]:
+    counter = WorkCounter()
+    terms = resolved_trades(
+        CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        QuantityPer.MONTH, ("C-1",), dates("2026-09-24"), rows(0), rows(1), numbers(1),
+        numbers(300.0), dates("2026-11-30"),
+    )  # fmt: skip
+    history = history_on(CENTS, as_of, finals)
+    prep = prepared(encoded(terms, UNITS, counter), history, counter)
+    return results(prep, quoted(history, *quotes), counter), counter
+
+
+@pytest.mark.parametrize(
+    ("as_of", "finals", "quotes", "mark", "cash", "delta"),
+    [
+        ("2026-11-24", {}, (300.0, 350.0, 360.0), 0, 0, 100),
+        ("2026-11-24", {}, (310.0, 350.0, 360.0), 1_000, 0, 100),
+        ("2026-11-26", {"Z26": 300.0}, (350.0, 360.0), 0, 0, 0),
+        ("2026-11-26", {"Z26": 310.0}, (350.0, 360.0), 1_000, 0, 0),
+        ("2026-11-30", {"Z26": 300.0}, (350.0, 360.0), 0, 0, 0),
+        ("2026-11-30", {"Z26": 310.0}, (350.0, 360.0), 0, 1_000, 0),
+    ],
+    ids=[
+        "live at cost",
+        "live ten cents up",
+        "fixed at cost",
+        "fixed ten up",
+        "paid at cost",
+        "paid ten up",
+    ],
+)
+def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
+    as_of: str,
+    finals: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    result, _ = one_lot_in_cents(as_of, finals, *quotes)
+    assert result.mark == pytest.approx(mark)
+    assert result.cash == pytest.approx(cash)
+    np.testing.assert_allclose(result.delta, [delta])
+    assert result.delta_total == pytest.approx(delta)
+    assert result.delta_unit == "USD per CENT/MMBTU" and result.currency == "USD"
 
 
 def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
@@ -488,14 +558,16 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
     enc = encoded(terms_of(), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
     prep = prepared(enc, history, WorkCounter())
-    before = dataclasses.replace(prep)
+    before = (prep.live_exposure.copy(), prep.delta.copy(), prep.offset_unsettled, prep.cash)
     counter = WorkCounter()
     later = results(prep, quoted(history, 3.21, 3.50), counter)
     assert later.mark == pytest.approx(8_600)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 2}
     assert later.prepared is prep and later.market.market_history is history
-    np.testing.assert_array_equal(prep.live_exposure, before.live_exposure)
-    assert (prep.offset_unsettled, prep.cash) == (before.offset_unsettled, before.cash)
+    assert later.delta is prep.delta and not later.delta.flags.writeable  # shared, never written
+    np.testing.assert_array_equal(prep.live_exposure, before[0])
+    np.testing.assert_array_equal(prep.delta, before[1])
+    assert (prep.offset_unsettled, prep.cash) == before[2:]
 
 
 def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -> None:
