@@ -7,7 +7,7 @@ Design fixture, 3 October 2026, complete as a booking under the `future` definit
 review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
-`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #141, and the toy lifecycle below runs on a sheet in #NN, ticket I6.
+`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #141, and the toy lifecycle below runs on a sheet in #142, ticket I6.
 
 ## What this example proves
 
@@ -281,7 +281,7 @@ assertion that these amounts are the actual final clearing transfers or a cash r
 
 ### On a sheet
 
-Built in #NN, ticket I6, through the functions of #139 and #141 and no new one. The kept
+Built in #142, ticket I6, through the functions of #139 and #141 and no new one. The kept
 workbook's handles sheet holds the lifecycle from row 1320: the index `TOY_GAS` over the schedule
 above with G27, energy conventions in MMBTU, one specification of 10,000 MMBTU a lot and the
 payment calendar, which is also the index's holiday calendar; the financial template, cleared
