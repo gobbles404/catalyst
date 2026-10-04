@@ -55,7 +55,7 @@ do not change a field value's own documented grammar, such as contract-code case
 The `Table` declared beside a function keeps its schema fixed at registration, every column
 required, with number, date, text and boolean columns. The instrument-selected form beside it,
 `FieldRow[S]` and `FieldRows[S]`, chooses its schema on the call and takes a subset of the
-fields and a handle column; `_CreateTradeTemplate` and `_CreateTrades` declare it since #NN.
+fields and a handle column; `_CreateTradeTemplate` and `_CreateTrades` declare it since #139.
 
 The general binder's case-insensitive matching differs from the exact trade-field contract
 above, and that is decided: the new path matches exactly, decision 29 stays for the

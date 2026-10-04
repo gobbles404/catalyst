@@ -62,7 +62,7 @@ pid:kind:count
 | market history | `30512:market_history:WTI:34` | `calendar.index.name` |
 | price vector | `30512:price_vector:WTI:35` | `index_name`, the text typed to `_CreatePriceVector` since #112 |
 | market | `30512:market:WTI:36` | `market_history.calendar.index.name` |
-| trades | `30512:trades:WTI:41` | `resolved.index.name`, the index the batch was resolved against, since #NN |
+| trades | `30512:trades:WTI:41` | `resolved.index.name`, the index the batch was resolved against, since #139 |
 | valuation date, discount curve, trade template | `30512:valuation_date:1`, `30512:discount_curve:2`, `30512:trade_template:40` | none: a template serves any compatible index and carries none |
 | the three schedules, the holiday calendar, the conventions, the contract specifications | `30512:futures_schedule:12`, `30512:holiday_calendar:13`, `30512:index_conventions:14`, `30512:contract_specifications:15` | none: an index uses them, which names them nothing, and their creators gain no argument |
 

@@ -1,6 +1,6 @@
 # _CreateTradeTemplate
 
-Built in #NN as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTrades](create-trades.md); the seam's part, `FieldRow[str]` and the `FieldValues` it hands over, in #138 as [inputs.md](../../seam/inputs.md) decision 42.
+Built in #139 as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTrades](create-trades.md); the seam's part, `FieldRow[str]` and the `FieldValues` it hands over, in #138 as [inputs.md](../../seam/inputs.md) decision 42.
 
 Shared trade fields under a library-owned instrument definition, created once and taken by every batch whose ticket supplies the rest, so a ticket of many rows types each shared fact once. The template may be incomplete, has no market-state dependency, and retains no index: the index is the first argument of `_CreateTrades`, so one template serves a CL index and an NG index alike. The code is `src/goosedove/trades/template.py`, the record, its builder and the readers of each field's value, and `src/goosedove/excel/trades.py`, the worksheet function.
 

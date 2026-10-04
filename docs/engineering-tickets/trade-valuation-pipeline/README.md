@@ -119,7 +119,7 @@ The template constructor is [_CreateTradeTemplate](../../library/trades/trade-te
 `_CreateTradeTemplate(instrument, fields, values)`, with a small LOT defaults row. Its partial
 typed values and reference cells are the seam extension agreed in the
 [Excel binding page](excel-trade-input-binding.md), built in #138; the constructor and
-[_CreateTrades](../../library/trades/create-trades.md) are built in #NN, ticket I4.
+[_CreateTrades](../../library/trades/create-trades.md) are built in #139, ticket I4.
 
 The [instrument field sketch](instrument-field-sketch.md) records the current schema pass:
 the trade selects a library-defined `schedule_method` and a `quantity_per` of month or day;
@@ -133,7 +133,7 @@ The next refinement admits monthly strips through the existing period grammar: C
 Z27-X28 resolve to monthly components, each with its schedule method, quantity allocation
 and payment date. Explicit date-window inputs remain deferred. Specification data comes
 from Index, with the selected row named by the template/ticket. The future field is
-fixed_price. Trade creation is built in #NN, as [create-trades.md](../../library/trades/create-trades.md) records.
+fixed_price. Trade creation is built in #139, as [create-trades.md](../../library/trades/create-trades.md) records.
 
 The [cleared payment review](fixing-and-payment-state.md#cleared-payment-convention-selected-rule-and-resolved-date)
 records the accepted starting point: payment_time_lag, a string such as "+1bd", and
@@ -383,7 +383,7 @@ what its pages say and changes the pages where it learns something.
 | I1 | the NG kernel | private modules for static encoding from resolved terms, preparation against a real history and evaluation against a real market; every hand answer of the NG example and the toy lifecycle pinned; batch equals summed singletons; duplicates count; a fixed batch inside a live market; an expired physical component refused; a tick folds nothing | D2; built in #136, [kernel.md](../../library/trades/kernel.md) |
 | I2 | `_ListInstruments` and `_ShowInstrument` with the `future` definition | the field set in code and on a sheet; the cell-wise table builder | D1; built in #137, [list-instruments.md](../../library/instruments/list-instruments.md) and [show-instrument.md](../../library/instruments/show-instrument.md) |
 | I3 | the seam extension: instrument-selected tables and reference cells | the transport, proved with probes and recorded in inputs.md | I2; built in #138, [inputs.md](../../seam/inputs.md) decision 42 |
-| I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3; built in #NN, [trade-template.md](../../library/trades/trade-template.md) and [create-trades.md](../../library/trades/create-trades.md) |
+| I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3; built in #139, [trade-template.md](../../library/trades/trade-template.md) and [create-trades.md](../../library/trades/create-trades.md) |
 | I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4 |
 | R1 | PHH payment dates derived from the schedule and the calendars | the relation between ICE's last trading day and the NYMEX penultimate pricing date, worked dates, whether an adjusted lag gives them | I1 |
 | I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5, R1 |

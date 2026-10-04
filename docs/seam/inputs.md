@@ -229,7 +229,7 @@ decisions 9 to 12 of the trade-valuation review; built in #138.
 definition, chosen on the call: `FieldRow[S]` for exactly one row, `FieldRows[S]` for one or
 more, each after a `TextRow` holding the headers, and `S` naming the type of the one parameter
 whose value selects the instrument, `str` for an instrument named as `_CreateTradeTemplate`
-names it, or a class whose handle holds one, as `_CreateTrades`'s template does since #NN; registration
+names it, or a class whose handle holds one, as `_CreateTrades`'s template does since #139; registration
 refuses a function with none or two such parameters, and the library says which kinds select,
 through `goosedove.instruments.fields.selected`. Any subset of the instrument's fields, in any
 order; the headers match the field names exactly, case and all, decision 29 standing for the

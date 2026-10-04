@@ -89,7 +89,7 @@ Creation must resolve every constituent month against the supplied static index 
 then encode monthly components while retaining one original trade occurrence. Reuse the
 period parser rather than asking the workbook to call date helpers first. Missing or
 ambiguous schedule months fail. These are the requirements the general creator meets, built
-in #NN as [create-trades.md](../../library/trades/create-trades.md).
+in #139 as [create-trades.md](../../library/trades/create-trades.md).
 
 | Ticket term | Proposed strip interpretation |
 |---|---|
@@ -132,7 +132,7 @@ the lag once. The actual payment calendar is an existing HolidayCalendar referen
 static creation dependency, independent of the pricing calendar. Reuse NumPy business-day
 arithmetic for the array of monthly dates. Start with positive whole business-day lags;
 zero-day adjustment semantics, direct payment-date overrides and broader bilateral
-conventions remain unspecified. Exact pricing-date windows remain deferred. Built in #NN as
+conventions remain unspecified. Exact pricing-date windows remain deferred. Built in #139 as
 the resolution's payment days, [create-trades.md](../../library/trades/create-trades.md).
 
 ## Contract-based future family

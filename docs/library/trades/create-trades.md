@@ -1,6 +1,6 @@
 # _CreateTrades
 
-Built in #NN as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTradeTemplate](trade-template.md); the design is [CreateTrades: resolution, encoding and retained state](../../engineering-tickets/trade-valuation-pipeline/create-trade.md).
+Built in #139 as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTradeTemplate](trade-template.md); the design is [CreateTrades: resolution, encoding and retained state](../../engineering-tickets/trade-valuation-pipeline/create-trade.md).
 
 A batch of trades on one index: the deals a ticket's rows describe, one trade per row, completed with the shared fields a template supplies, resolved against the index and encoded into the static arrays the [kernel](kernel.md) prices. One row is a batch of one and a repeated row is a second trade; the batch is immutable, retains no history, price or valuation date, and is what `_PrepareTrades` takes. The code is `src/goosedove/trades/resolution.py`, the resolution child and the batch, `src/goosedove/trades/template.py`, the readers of each field's value, and `src/goosedove/excel/trades.py`, the worksheet function.
 
