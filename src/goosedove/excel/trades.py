@@ -40,7 +40,7 @@ def _CreateTradeTemplate(
 def _CreateTrades(
     index: Annotated[
         Handle[Index],
-        "The index handle: the cell showing _CreateIndex's result, such as B6, or a name for it, "
+        "The index handle: the cell showing _CreateIndex's result, such as I3, or a name for it, "
         "the one index every trade of the batch is on.",
     ],
     fields: Annotated[
@@ -55,7 +55,7 @@ def _CreateTrades(
     ],
     template: Annotated[
         Handle[TradeTemplate],
-        "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as B2, "
+        "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as B3, "
         "or a name for it, which selects the instrument and supplies the shared fields.",
     ],
 ) -> Handle[Trades]:

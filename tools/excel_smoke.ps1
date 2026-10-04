@@ -394,10 +394,11 @@ $formulas = [ordered]@{
     # twice, read back one row per component with the kernel's numbers, ten lots of a thousand
     # barrels at 70 an offset of -700,000; a financial template in EW11 whose strip of q26-u26, in
     # EW13, pays two business days after each expiry on the calendar in AM1; the handles' texts;
-    # the name in another case and a value against its field's rule, the library's words, and a
-    # header row of another width, the seam's; a template field repeated in the ticket, a code the
-    # schedule lacks, a fraction of a lot and an IFERC index, the library's words, and a template
-    # handle naming nothing, the seam's.
+    # the batch's own facts, the specification, the method, the route and the settlement, on every
+    # row of the spill; the name in another case and a value against its field's rule, a fraction
+    # of a lot among them, the library's words, and a header row of another width, the seam's; a
+    # template field repeated in the ticket, a code the schedule lacks, a fraction of a lot and an
+    # IFERC index, the library's words, and a template handle naming nothing, the seam's.
     '=MID(EW3,FIND(":",EW3)+1,15)' = "trade_template:"
     '=MID(EW8,FIND(":",EW8)+1,23)' = "trades:Henry Hub NYMEX:"
     "=INDEX(util_ReadHandle(EW3),1,1)" = "instrument"
@@ -409,18 +410,26 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),4,5)" = "X26"
     "=INDEX(util_ReadHandle(EW8),5,5)" = "u26"
     "=INDEX(util_ReadHandle(EW8),5,1)" = "3"
-    "=INDEX(util_ReadHandle(EW8),3,7)" = "10000"
-    "=INDEX(util_ReadHandle(EW8),3,10)" = "-700000"
+    "=INDEX(util_ReadHandle(EW8),3,4)" = "lots"
+    "=INDEX(util_ReadHandle(EW8),3,6)" = "lastday"
+    "=INDEX(util_ReadHandle(EW8),3,7)" = "cleared"
+    "=INDEX(util_ReadHandle(EW8),3,8)" = "physical"
+    "=INDEX(util_ReadHandle(EW8),3,10)" = "10"
+    "=INDEX(util_ReadHandle(EW8),3,14)" = "10000"
+    "=INDEX(util_ReadHandle(EW8),3,16)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "10"
-    "=INDEX(util_ReadHandle(EW13),1,10)" = "payment_date"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "16"
+    "=INDEX(util_ReadHandle(EW13),1,14)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,4)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,4)"  = "u26"
-    "=INDEX(util_ReadHandle(EW13),3,10)" = "46226"
-    "=INDEX(util_ReadHandle(EW13),4,10)" = "46258"
+    "=INDEX(util_ReadHandle(EW13),3,13)" = "+2bd"
+    "=INDEX(util_ReadHandle(EW13),3,14)" = "46226"
+    "=INDEX(util_ReadHandle(EW13),4,14)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "17"
     '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
     '=_CreateTradeTemplate("future",EZ1,EY2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, the one method built"
+    '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number of lots"
     '=_CreateTradeTemplate("future",EW1:FC1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: fields has 7 headers, expected 6, one per column of values"
     "=_CreateTrades(EB1,EW1:FC1,EW2:FC2,EW3)"    = "#ERROR _CreateTrades: ValueError: contract_specification is supplied by the template and by the ticket, expected by one of them"
     "=_CreateTrades(EB1,EW4:FA4,EW14:FA14,EW3)"  = "#ERROR _CreateTrades: ValueError: contract_code row 1 is 'F27', expected months the index's schedule has a contract for; it has none for 2027-01"

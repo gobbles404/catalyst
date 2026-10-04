@@ -182,7 +182,7 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     np.testing.assert_array_equal(terms.contract, [1, 1, 2, 2, 1])  # Z26 and F27 by row
     np.testing.assert_array_equal(terms.lots, [10, -4, 7, -12, 10])
     np.testing.assert_array_equal(terms.fixed_price, [3.1, 3.15, 3.4, 3.35, 3.1])
-    assert terms.payment_date is None
+    assert terms.payment is None
     assert batch.encoded.terms is terms
     np.testing.assert_array_equal(
         batch.encoded.quantity, [100_000, -40_000, 70_000, -120_000, 100_000]
@@ -223,10 +223,12 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     np.testing.assert_array_equal(terms.contract, [1, 2, 2])
     np.testing.assert_array_equal(terms.lots, [3, 3, -1])  # the strip's lots in every month
     np.testing.assert_array_equal(terms.fixed_price, [3.2, 3.2, 3.3])
-    assert terms.payment_date is not None
+    assert terms.payment is not None
     np.testing.assert_array_equal(
-        terms.payment_date, dates("2026-11-30", "2026-12-31", "2026-12-31")
+        terms.payment.date, dates("2026-11-30", "2026-12-31", "2026-12-31")
     )  # two business days after each expiry, the page's dates, 26 November closed
+    np.testing.assert_array_equal(terms.payment.lag_days, [2, 2])  # the terms, per occurrence
+    assert terms.payment.calendar == (PAYMENT_CALENDAR, PAYMENT_CALENDAR)
     assert terms.named(1) == "trade 'S1' at row 1"
     assert counter.freeze()["resolved_components"] == 3
     assert counter.freeze()["resolved_occurrences"] == 2
@@ -312,8 +314,8 @@ def one_payment_day(expiry: str, holidays: tuple[str, ...], lag: str) -> np.date
             "payment_holiday_calendar": holiday_calendar(dates(*holidays)),
         },
     )
-    assert batch.resolved.payment_date is not None
-    return batch.resolved.payment_date[0]
+    assert batch.resolved.payment is not None
+    return batch.resolved.payment.date[0]
 
 
 def test_payment_days_are_counted_strictly_after_the_expiry() -> None:
@@ -348,8 +350,11 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
         },
         template,
     )
-    assert batch.resolved.payment_date is not None
-    np.testing.assert_array_equal(batch.resolved.payment_date, dates("2026-11-30", "2027-01-01"))
+    payment = batch.resolved.payment
+    assert payment is not None
+    np.testing.assert_array_equal(payment.date, dates("2026-11-30", "2027-01-01"))
+    np.testing.assert_array_equal(payment.lag_days, [1, 3])
+    assert payment.calendar == (closes_two_days, open_calendar)
 
 
 # --- what is refused, naming the field and the sheet's row ----------------------------------
@@ -737,56 +742,89 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
     assert table[0] == [
         "row",
         "trade_id",
-        "clearing_house",
         "trade_date",
+        "contract_specification",
         "contract_code",
-        "lots",
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "clearing_house",
         "quantity",
+        "quantity_unit",
+        "quantity_per",
         "fixed_price",
+        "quote_quantity",
         "coefficient",
         "offset",
     ]
     assert table[1] == [
         "int64",
         "str",
-        "str",
         "datetime64[D]",
         "str",
+        "str",
+        "str",
+        "str",
+        "str",
+        "str",
         "float64",
+        "str",
+        "str",
         "float64",
         "float64",
         "float64",
         "float64",
     ]
-    assert table[2] == [
+    first = [
         1.0,
         "NG-001",
-        "CME Clearing",
         46289.0,
+        "NYMEX NG",
         "Z26",
+        "lastday",
+        "cleared",
+        "physical",
+        "CME Clearing",
         10.0,
-        100_000.0,
+        "LOT",
+        "month",
         3.1,
+        100_000.0,
         100_000.0,
         -310_000.0,
     ]
+    assert table[2] == first
     assert table[3][4] == "Z26"  # the schedule's spelling, where the ticket typed z26
-    assert table[6] == [
-        5.0,
-        "NG-001",
-        "CME Clearing",
-        46289.0,
-        "Z26",
-        10.0,
-        100_000.0,
-        3.1,
-        100_000.0,
-        -310_000.0,
-    ]
+    assert table[6] == [5.0, *first[1:]]  # the repeated row, a trade of its own
     assert len(table) == 7
 
 
-def test_a_financial_batchs_spill_ends_with_its_payment_days(sheet: dict[str, Any]) -> None:
+def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[str, Any]) -> None:
+    # The route and the settlement from the ticket's columns, the template holding neither: the
+    # spill is the one place both are read back.
+    template = ENTRY["_CreateTradeTemplate"](
+        "future",
+        row("contract_specification", "quantity_unit", "quantity_per", "schedule_method"),
+        row("NYMEX NG", "LOT", "month", "lastday"),
+    )
+    handle = ENTRY["_CreateTrades"](
+        sheet["index"],
+        row("trade_date", "contract_code", "quantity", "fixed_price", "route", "settlement_method"),
+        cells(
+            [46289.0, "Z26", 1.0, 3.0, "bilateral", "physical"],
+            [46289.0, "F27", 2.0, 3.0, "bilateral", "physical"],
+        ),
+        template,
+    )
+    table = spilled(handle)
+    assert table[0][:3] == ["row", "trade_date", "contract_specification"]
+    assert "trade_id" not in table[0] and "clearing_house" not in table[0]
+    assert [line[5] for line in table[2:]] == ["bilateral", "bilateral"]
+    assert [line[6] for line in table[2:]] == ["physical", "physical"]
+    assert [line[2] for line in table[2:]] == ["NYMEX NG", "NYMEX NG"]
+
+
+def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any]) -> None:
     template = ENTRY["_CreateTradeTemplate"](
         "future",
         row(*TOY_TEMPLATE),
@@ -806,17 +844,26 @@ def test_a_financial_batchs_spill_ends_with_its_payment_days(sheet: dict[str, An
     table = spilled(handle)
     assert table[0] == [
         "row",
+        "trade_date",
+        "contract_specification",
+        "contract_code",
+        "schedule_method",
+        "route",
+        "settlement_method",
         "clearing_house",
         "broker",
-        "trade_date",
-        "contract_code",
-        "lots",
         "quantity",
+        "quantity_unit",
+        "quantity_per",
         "fixed_price",
+        "payment_time_lag",
+        "payment_date",
+        "quote_quantity",
         "coefficient",
         "offset",
-        "payment_date",
     ]
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
-    assert [line[4] for line in table[2:]] == ["Z26", "F27"]
-    assert [line[10] for line in table[2:]] == [46356.0, 46387.0]  # 30 Nov and 31 Dec 2026
+    assert [line[3] for line in table[2:]] == ["Z26", "F27"]
+    assert [line[8] for line in table[2:]] == ["ION", "ION"]
+    assert [line[13] for line in table[2:]] == ["+2bd", "+2bd"]  # the lag beside the day it gave
+    assert [line[14] for line in table[2:]] == [46356.0, 46387.0]  # 30 Nov and 31 Dec 2026

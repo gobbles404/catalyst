@@ -3,9 +3,10 @@ template's row and taken, last and required, by every batch of trades whose tick
 rest. The template retains the definition and its own values and no index, so one template
 serves every compatible index. It reads each value it holds for the rule intrinsic to its field,
 a code from its list, a lag of positive business days, a contract code or strip the period
-grammar reads, and leaves the rules that need the ticket or the index, which fields are required,
-whether the two overlap, the schedule, to the resolution of a batch. Those readers live here,
-since resolution reads the ticket's values by the same rules.
+grammar reads, a whole nonzero lot count, a finite price, and leaves the rules that need the
+ticket or the index, which fields are required, whether the two overlap, the schedule, to the
+resolution of a batch. Those readers live here, since resolution reads the ticket's values by
+the same rules, and the two numeric ones are the kernel's own.
 docs/library/trades/trade-template.md is the page."""
 
 import re
@@ -13,14 +14,22 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Final, assert_never, cast
+from typing import Final, assert_never
 
 import numpy as np
 
 from goosedove.index_definitions.periods import period_months
 from goosedove.instruments.definitions import FieldType, Instrument
 from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.terms import QuantityPer, Route, ScheduleMethod, Settlement, lot_unit
+from goosedove.trades.terms import (
+    QuantityPer,
+    Route,
+    ScheduleMethod,
+    Settlement,
+    finite_prices,
+    lot_unit,
+    whole_lots,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,10 +53,6 @@ def trade_template(values: FieldValues) -> TradeTemplate:
     if values.rows != 1:
         raise ValueError(f"values has {values.rows} rows, expected one row of field values")
     defaults = {name: _value(values, name) for name in values.names}
-    for name, value in defaults.items():
-        read = READERS.get(name)
-        if read is not None:
-            read(name, cast(str, value))
     return TradeTemplate(values.instrument, MappingProxyType(defaults))
 
 
@@ -58,18 +63,27 @@ def by_template(selector: TradeTemplate) -> Instrument:
 
 
 def _value(values: FieldValues, name: str) -> object:
-    """The one value of a field in a one-row record, as the scalar its type names."""
-    match values.field(name).type:
+    """The one value of a field in a one-row record, as the scalar its type names, read for the
+    field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
+    date and a holiday calendar mean what they are."""
+    field_type = values.field(name).type
+    match field_type:
         case FieldType.NUMBER:
-            return float(values.numbers(name)[0])
+            number = float(values.numbers(name)[0])
+            read = NUMBER_READERS.get(name)
+            return number if read is None else read(name, number)
         case FieldType.DATE:
             return values.dates(name)[0]
         case FieldType.TEXT | FieldType.CODE:
-            return values.texts(name)[0]
+            text = values.texts(name)[0]
+            read = READERS.get(name)
+            if read is not None:
+                read(name, text)
+            return text
         case FieldType.HOLIDAY_CALENDAR:
             return values.objects(name)[0]
         case _:
-            assert_never(values.field(name).type)
+            assert_never(field_type)
 
 
 # --- what each field's text means, read the same way in a template and in a ticket ------------
@@ -116,6 +130,18 @@ def business_days_of(where: str, text: str) -> int:
     return int(found.group(1))
 
 
+def lots_of(where: str, number: float) -> float:
+    """A lot count by the kernel's rule, whole and nonzero, named by its field."""
+    whole_lots(np.array([number]), lambda _: where)
+    return number
+
+
+def price_of(where: str, number: float) -> float:
+    """A price by the kernel's rule, finite, named by its field."""
+    finite_prices(np.array([number]), lambda _: where)
+    return number
+
+
 def months_of(where: str, text: str) -> tuple[int, int]:
     """The first month of a contract code or strip and the month after its last, as numpy counts
     months, through the period grammar, which reads `Z26`, `z26`, `CAL27` and `Z27-X28` alike;
@@ -128,8 +154,8 @@ def months_of(where: str, text: str) -> tuple[int, int]:
     return int(first.astype(np.int64)), int(after.astype(np.int64))
 
 
-# The readers by field name, for the fields whose text means something beyond being text; the
-# others, the labels, the dates and the numbers, are read by the kernel's rules or by nobody.
+# The readers by field name: the text fields whose text means something beyond being text, and
+# the two numbers the kernel has a rule for; the labels and the dates are read by nobody.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {
         "contract_code": months_of,
@@ -140,4 +166,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "quantity_per": quantity_per_of,
         "payment_time_lag": business_days_of,
     }
+)
+NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float]]] = MappingProxyType(
+    {"quantity": lots_of, "fixed_price": price_of}
 )

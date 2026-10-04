@@ -523,7 +523,7 @@ $trades = {
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
     Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
-    Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,10)"
+    Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,14)"
     $id = Id $state
     $template = Text $state $sheet "D14"
     Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:trade_template:")) $template

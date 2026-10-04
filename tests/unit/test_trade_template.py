@@ -123,6 +123,11 @@ def test_a_template_selects_its_instrument_for_a_ticket() -> None:
     assert selected(a_template(route="cleared")) is FUTURE
 
 
+def test_a_templates_numbers_pass_the_kernels_rules_as_a_tickets_do() -> None:
+    template = a_template(quantity=-4.0, fixed_price=3.15)
+    assert dict(template.defaults) == {"quantity": -4.0, "fixed_price": 3.15}
+
+
 def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
     # Nothing of trade_date, contract_code, quantity or fixed_price, and no payment fields with a
     # financial settlement: the ticket completes it, and resolution checks the whole.
@@ -179,6 +184,10 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
             {"quantity_unit": "LOT", "route": "cleared", "schedule_method": "pen"},
             "schedule_method is 'pen', expected lastday, the one method built",
         ),
+        ({"quantity": 0.0}, "quantity is 0.0, expected a nonzero quantity"),
+        ({"quantity": 1.5}, "quantity is 1.5, expected a whole number of lots"),
+        ({"quantity": -2.5}, "quantity is -2.5, expected a whole number of lots"),
+        ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
     ],
 )
 def test_a_value_against_its_fields_own_rule_is_refused_naming_the_field(

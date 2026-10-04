@@ -15,7 +15,7 @@ def _CreateTrades(
 ) -> Handle[Trades]: ...
 ```
 
-The NG example of the pipeline, its template in A1:G2 and `=_CreateTradeTemplate("future", A1:G1, A2:G2)` in B3 showing `30512:trade_template:40`, the index in B6:
+The NG example of the pipeline, its template in A1:G2 and `=_CreateTradeTemplate("future", A1:G1, A2:G2)` in B3 showing `30512:trade_template:40`, the index's handle in I3, outside the ticket:
 
 | | A | B | C | D | E |
 |---|---|---|---|---|---|
@@ -25,7 +25,7 @@ The NG example of the pipeline, its template in A1:G2 and `=_CreateTradeTemplate
 | 7 | NG-003 | 25-Sep-2026 | F27 | 7 | 3.400 |
 | 8 | NG-004 | 25-Sep-2026 | F27 | -12 | 3.350 |
 | 9 | NG-001 | 24-Sep-2026 | Z26 | 10 | 3.100 |
-| 10 | `=_CreateTrades(B6, A4:E4, A5:E9, B3)` | shows `30512:trades:Henry Hub NYMEX:41` | | | |
+| 10 | `=_CreateTrades(I3, A4:E4, A5:E9, B3)` | shows `30512:trades:Henry Hub NYMEX:41` | | | |
 
 Four arguments, all required, none with a default. The index is the first: the cell showing `_CreateIndex`'s result, or a name for it, the one index every trade of the batch is on; it is no template field and no ticket column, so one template serves any compatible index, and the batch retains the index it was resolved against. The ticket is two arguments, as a table is: the header row, each header a field name shown by `_ShowInstrument` spelled exactly, case and all, in any order, and the rows under it, one trade each. The template is last: the cell showing `_CreateTradeTemplate`'s result, or a name for it. It selects the instrument the headers are checked against and supplies the fields the ticket does not; there is no path without one, so a batch that shares nothing still names one shared fact in its template. The ticket crosses as `FieldRows[TradeTemplate]`, the seam's row-or-rows form of [inputs.md](../../seam/inputs.md) decision 42, bound on the call against the template's instrument: the seam resolves the two handles, checks the width, the headers and each cell by its field's type, and hands the function typed columns; nothing here restates that. The result is a handle, text standing for the batch the seam keeps, `30512:trades:Henry Hub NYMEX:41`, the index's name between the kind and the count, as [handles.md](../../seam/handles.md) says. A successful call publishes a batch and changes neither input; a recalculation with the same arguments shares the live batch, and a changed cell anywhere under it, a ticket value, the template, the index, makes a new one, the old released when Excel disconnects its last creator.
 
@@ -34,10 +34,10 @@ Four arguments, all required, none with a default. The index is the first: the c
 | Item | Text |
 |---|---|
 | Function | Creates a batch of trades on one index from a template's shared fields and a ticket's rows, each contract code resolved against the index's schedule, and shows its handle, the text other formulas take as the trades. |
-| index | The index handle: the cell showing _CreateIndex's result, such as B6, or a name for it, the one index every trade of the batch is on. |
+| index | The index handle: the cell showing _CreateIndex's result, such as I3, or a name for it, the one index every trade of the batch is on. |
 | fields | The ticket's header cells in one row, such as A4:E4, using names shown by _ShowInstrument and none the template supplies. |
 | trade_rows | The rows under the headers, such as A5:E9, one trade per row, a repeated row a second trade. |
-| template | The trade-template handle: the cell showing _CreateTradeTemplate's result, such as B2, or a name for it, which selects the instrument and supplies the shared fields. |
+| template | The trade-template handle: the cell showing _CreateTradeTemplate's result, such as B3, or a name for it, which selects the instrument and supplies the shared fields. |
 
 ## The library checks
 
@@ -76,29 +76,31 @@ Trades
     resolved   ResolvedTrades: the instrument, the index, its schedule and the specification row;
                route, settlement, schedule method, quantity unit and basis; per row its trade date
                and, where given, trade_id, clearing_house and broker; per component its row, its
-               schedule row, its lots, its fixed price and, for a financial settlement, its day
+               schedule row, its lots and its fixed price; for a financial settlement the payment
+               terms, per row the lag in business days and the calendar it is counted on, per
+               component the day they give
     encoded    Encoded: the terms by reference; per component its quantity, coefficient and
                offset; the inputs, one per contract held, and the sums by input
 ```
 
-Every array is owned and read-only; the index, the schedule, the holiday calendars and the instrument definition are held by reference, never copied. The fees on the specification are read by nothing: reserves, never a contribution to value. The handle's text names the index, `30512:trades:Henry Hub NYMEX:41`, and the batch retains it as an object.
+Every array is owned and read-only; the index, the schedule, the payment calendars and the instrument definition are held by reference, never copied. The payment terms travel with the days they gave, so a batch explains its own payment days without the template or the ticket; the template and the raw ticket themselves are not retained. The fees on the specification are read by nothing: reserves, never a contribution to value. The handle's text names the index, `30512:trades:Henry Hub NYMEX:41`, and the batch retains it as an object.
 
 ## Reading it back
 
-`util_ReadHandle` on a trades handle spills one row per component: `row`, the ticket's row the component belongs to, as the sheet counts rows; `trade_id`, `clearing_house` and `broker` where the batch has them; `trade_date`; `contract_code`, the schedule's spelling; `lots`; `quantity`, in the index's quote quantity unit; `fixed_price`; `coefficient` and `offset`, in the settlement currency; and `payment_date` for a financial settlement. The NG example spills seven rows by ten columns, the five components after the two heading rows, `100000` and `-310000` on the first; the toy's strip `Z26-F27` spills two components on row 1 with their two payment days. The batch's own facts, the route, the settlement, the method and the specification, are the template's to show, [trade-template.md](trade-template.md). On a template handle the reader spills one row, the instrument first and each default under its field name, a holiday calendar as the words of its kind. Neither spill is a round trip of a handle.
+`util_ReadHandle` on a trades handle spills one row per component, the resolved terms under the definition's own field names in the definition's order and then what the encoding made of them: `row`, the ticket's row the component belongs to, as the sheet counts rows; `trade_id` where the batch has it; `trade_date`; `contract_specification`, the name selected; `contract_code`, the schedule's spelling; `schedule_method`, `route` and `settlement_method`; `clearing_house` and `broker` where the batch has them; `quantity`, the lots, `quantity_unit` and `quantity_per`; `fixed_price`; for a financial settlement `payment_time_lag`, `+2bd`, and `payment_date`, the day it gave; then `quote_quantity`, the lots in the index's quote quantity unit, and `coefficient` and `offset` in the settlement currency. The batch's facts stand on every row, since a row should read as the whole deal and the template need not have supplied them: a route or a settlement that came from the ticket's columns is read back here and nowhere else. The NG example spills seven rows by sixteen columns, the five components after the two heading rows, `100000` and `-310000` last on the first; the toy's strip `Z26-F27` spills two components on row 1 with `+2bd` and their two payment days. On a template handle the reader spills one row, the instrument first and each default under its field name, a holiday calendar as the words of its kind. Neither spill is a round trip of a handle.
 
 ## Tests
 
 | Where | What |
 |---|---|
-| `tests/unit/test_create_trades.py`, 37 | the NG rows resolve to the terms the kernel tests supply, every number of the page, codes in either case against a schedule in either case; a strip's components on one occurrence with their payment days, a whole year against a long schedule; a template's field for every row and a ticket's varying; a batch field in the ticket taken when every row agrees; payment days strictly after the expiry, a closed expiry rolled back first, calendars and lags in the ticket applying row by row; nineteen refusals in the order above, a lot count named by its row though a strip sits before it, two lags for one contract, the index's kind and its schedule's codes; the conditions tied to the definition's own `required_when` texts; the ticket and the template of one instrument; any ticket of single months resolving row by row, a property; the creator's handle, the order of the seam's refusals before the library's, and the two spills |
-| `tests/unit/test_trade_template.py`, 21 | the template's record and the creator, [trade-template.md](trade-template.md) |
-| `tests/unit/test_trades.py` | the kernel's record with the instrument and the two attribution tuples, and its messages naming the trade |
+| `tests/unit/test_create_trades.py`, 38 | the NG rows resolve to the terms the kernel tests supply, every number of the page, codes in either case against a schedule in either case; a strip's components on one occurrence with their payment terms and days, a whole year against a long schedule; a template's field for every row and a ticket's varying; a batch field in the ticket taken when every row agrees; payment days strictly after the expiry, a closed expiry rolled back first, calendars and lags in the ticket applying row by row and retained; nineteen refusals in the order above, a lot count named by its row though a strip sits before it, two lags for one contract, the index's kind and its schedule's codes; the conditions tied to the definition's own `required_when` texts; the ticket and the template of one instrument; any ticket of single months resolving row by row, a property; the creator's handle, the order of the seam's refusals before the library's, and the three spills, one whose route and settlement came from the ticket |
+| `tests/unit/test_trade_template.py`, 26 | the template's record and the creator, [trade-template.md](trade-template.md) |
+| `tests/unit/test_trades.py` | the kernel's record with the instrument, the two attribution tuples and the payment terms, and its messages naming the trade |
 | `tests/performance/test_trade_creation_budgets.py`, 7 | the counter, `resolved_occurrences` and `resolved_components` one per row and per component, `schedule_codes_read` the schedule's 25 whatever the ticket, with the encoding's two; the resolution's ledger at five rows and at two thousand, the same functions but for four counts that follow the distinct codes, `months_of`, `period_months`, `_label_months` once each and `_Fields.where` once more for the lag, nothing per row, and the numpy ledger, two conversions per distinct code; the creator's ledger through the seam at five rows and at 2,500, the two handles resolved once each, one look per column and one publication; the template creator's, one read per value |
-| `tests/performance/test_seam_allocation.py` | a template of nine fields 2,412 bytes; a batch of 2,500 rows 268,717, about 107 a row, the ten retained columns and the components' temporaries, the ticket's columns the seam's views |
-| `tools/excel_smoke.ps1`, 29 rows | the two creators over the smoke's WTI-like index, the spills read with INDEX, a code typed in either case, a strip paying two business days after each expiry on the calendar in AM1, and nine refusals |
+| `tests/performance/test_seam_allocation.py` | a template of nine fields 2,412 bytes; a batch of 2,500 rows 324,317, about 130 a row, the twelve retained columns and the components' temporaries, the ticket's columns the seam's views |
+| `tools/excel_smoke.ps1`, 37 rows | the two creators over the smoke's WTI-like index, the spills read with INDEX, the batch's facts on a row, a code typed in either case, a strip paying two business days after each expiry on the calendar in AM1 with its lag beside, and ten refusals |
 | `tools/excel_lifetime.ps1 -Groups trades`, 14 checks | a template holding a payment calendar and a batch on the chain's index: the calendar's input changed republishes the calendar, the template and the batch and moves the payment day, the chain untouched; the template's cell cleared fails the batch as its consumer and releases both; typed back, both live again |
-| `host/Goosedove.Host.Tests/CallTests.cs`, 7 rows and a fact | the NG batch from the host's side, its spill, three refusals and the toy's strip |
+| `host/Goosedove.Host.Tests/CallTests.cs`, 8 rows and a fact | the NG batch from the host's side, its spill, three refusals and the toy's strip |
 | `workbooks/handles.xlsx` | B1273 and B1281 at the foot of the handles sheet, the template and the batch on the sample futures index, B1289 and B1292 the financial template and its strip, each read back in F, with a note in D1270 |
 
 ## Not here

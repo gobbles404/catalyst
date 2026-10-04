@@ -198,6 +198,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("LOT", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday, the one method built" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("payment_time_lag"), "+0bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number of lots" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
@@ -388,22 +389,26 @@ namespace Goosedove.Host.Tests
             Assert.StartsWith(Pid + ":trades:Henry Hub NYMEX:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(7, spill.GetLength(0));
-            Assert.Equal(10, spill.GetLength(1));
+            Assert.Equal(16, spill.GetLength(1));
             Assert.Equal("row", spill[0, 0]);
-            Assert.Equal("offset", spill[0, 9]);
+            Assert.Equal("offset", spill[0, 15]);
             Assert.Equal(1.0, spill[2, 0]);
             Assert.Equal("Z26", spill[3, 4]);
-            Assert.Equal(100000.0, spill[2, 6]);
-            Assert.Equal(-310000.0, spill[6, 9]);
+            Assert.Equal("cleared", spill[2, 6]);
+            Assert.Equal("physical", spill[2, 7]);
+            Assert.Equal(100000.0, spill[2, 13]);
+            Assert.Equal(-310000.0, spill[6, 15]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price", "route"), Row(46289.0, "Z26", 1.0, 3.0, "cleared"), template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: lots of trade 'a' at row 1 is 2.5, expected a whole number of lots", Seam.Call("_CreateTrades", ng, headers, Row("a", 46289.0, "Z26", 2.5, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: template is holiday calendar handle '" + holidays + "', expected trade template handle", Seam.Call("_CreateTrades", ng, headers, rows, holidays));
             var financial = (string)Seam.Call("_CreateTradeTemplate", "future", Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("NYMEX NG", "LOT", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
             var strip = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price"), Row(46289.0, "Z26-F27", 3.0, 3.2), financial));
             Assert.Equal(4, strip.GetLength(0));
-            Assert.Equal("payment_date", strip[0, 9]);
-            Assert.Equal(46356.0, strip[2, 9]);
-            Assert.Equal(46387.0, strip[3, 9]);
+            Assert.Equal(17, strip.GetLength(1));
+            Assert.Equal("payment_date", strip[0, 13]);
+            Assert.Equal("+2bd", strip[2, 12]);
+            Assert.Equal(46356.0, strip[2, 13]);
+            Assert.Equal(46387.0, strip[3, 13]);
         }
 
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.

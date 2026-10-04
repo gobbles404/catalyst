@@ -4,9 +4,11 @@ tests supply them in Python. One instrument and one index for the batch, one spe
 the index, one route, one settlement and one schedule method; then the occurrences, the ticket's
 rows, each with its date, its label, its clearing house and its broker where given; then the
 components, one per contract month an occurrence holds, each with its occurrence, its contract,
-its signed lots and its fixed price, and for a financial settlement the day it pays.
+its signed lots and its fixed price; and for a financial settlement the payment terms, the lag
+and the calendar each occurrence pays by and the day each component pays.
 docs/library/trades/kernel.md is the page."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import assert_never, cast
@@ -15,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
@@ -61,6 +64,20 @@ class QuantityPer(Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class PaymentTerms:
+    """How a financial settlement pays, kept with the days it gives so that a batch explains its
+    own payment days. Per occurrence: lag_days[i], the positive whole number of business days
+    after a contract's expiry the occurrence pays, `+2bd` read once as 2, and calendar[i], the
+    holiday calendar those days are counted on, the object the ticket's handle stood for, held by
+    reference. Per component: date[k], the day it pays, counted from its contract's expiry by its
+    occurrence's lag on its occurrence's calendar."""
+
+    lag_days: NDArray[np.int64]
+    calendar: tuple[HolidayCalendar, ...]
+    date: NDArray[np.datetime64]
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedTrades:
     """The instrument, the definition the terms were resolved under; the index, by reference, its
     futures schedule, the same object the index holds, typed as the kind rule found it, and the
@@ -72,8 +89,8 @@ class ResolvedTrades:
     whole when the field was not given, each a label kept as typed and read for nothing. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, lots[k] the signed whole
-    number of lots, fixed_price[k] the price agreed, in the index's quote units, and
-    payment_date[k] the day it pays, an array for a financial settlement and None for a physical
+    number of lots and fixed_price[k] the price agreed, in the index's quote units. Then payment,
+    the terms a financial settlement pays by and the days they give, and None for a physical
     one, which pays on no day."""
 
     instrument: Instrument
@@ -93,7 +110,7 @@ class ResolvedTrades:
     contract: NDArray[np.intp]
     lots: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
-    payment_date: NDArray[np.datetime64] | None
+    payment: PaymentTerms | None
 
     def named(self, component: int) -> str:
         """A component's trade named in a message, by its label when the ticket gave one and by
@@ -124,7 +141,7 @@ def resolved_trades(
     contract: NDArray[np.intp],
     lots: NDArray[np.float64],
     fixed_price: NDArray[np.float64],
-    payment_date: NDArray[np.datetime64] | None,
+    payment: PaymentTerms | None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first future profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
@@ -139,17 +156,17 @@ def resolved_trades(
     month has no economics; each contract is a row of the schedule; each lot count is a whole,
     nonzero number, the first profile's convention, a signed count of lots; each fixed price is
     a finite number, the lots and the price named by the trade they belong to, as the sheet
-    counts its rows. A financial settlement has one payment date per component and a physical
-    one has none: a physical future pays on no day, and giving it one would invent a payment the
-    contract does not make. The instrument is kept as the definition the terms stand under, and
-    read for nothing here.
+    counts its rows. A financial settlement has payment terms, a lag and a calendar per
+    occurrence and one payment day per component, and a physical one has none: a physical future
+    pays on no day, and giving it terms would invent a payment the contract does not make. The
+    instrument is kept as the definition the terms stand under, and read for nothing here.
     """
     schedule = _the_batch(index, specification, quantity_unit)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_components(
         occurrence, contract, lots, fixed_price, labels, occurrences, len(schedule.codes)
     )
-    pays = _the_payment_dates(settlement, payment_date, occurrence.size)
+    pays = _the_payment(settlement, payment, occurrences, occurrence.size)
     return ResolvedTrades(
         instrument,
         index,
@@ -253,49 +270,63 @@ def _the_components(
             f"contract row {k + 1} is {contract[k]}, "
             f"expected a row of the schedule, 0 to {schedule_rows - 1}"
         )
+    whole_lots(lots, lambda k: f"lots of {_named(labels, int(occurrence[k]))}")
+    finite_prices(fixed_price, lambda k: f"fixed_price of {_named(labels, int(occurrence[k]))}")
+
+
+def whole_lots(lots: NDArray[np.float64], where: Callable[[int], str]) -> None:
+    """Each lot count a whole, nonzero number, the first profile's convention, a signed count of
+    lots: the first that is not is refused, named by the caller's words for its position, the
+    trade it belongs to in a batch and the field in a template."""
     fractional = ~np.isfinite(lots) | (lots != np.round(lots))
     if fractional.any():
         k = int(fractional.argmax())
-        raise ValueError(
-            f"lots of {_named(labels, int(occurrence[k]))} is {float(lots[k])!r}, "
-            "expected a whole number of lots"
-        )
+        raise ValueError(f"{where(k)} is {float(lots[k])!r}, expected a whole number of lots")
     if (lots == 0).any():
         k = int((lots == 0).argmax())
-        raise ValueError(
-            f"lots of {_named(labels, int(occurrence[k]))} is {float(lots[k])!r}, "
-            "expected a nonzero quantity"
-        )
-    unfinished = ~np.isfinite(fixed_price)
+        raise ValueError(f"{where(k)} is {float(lots[k])!r}, expected a nonzero quantity")
+
+
+def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> None:
+    """Each price a finite number, the first that is not refused in the caller's words."""
+    unfinished = ~np.isfinite(prices)
     if unfinished.any():
         k = int(unfinished.argmax())
-        raise ValueError(
-            f"fixed_price of {_named(labels, int(occurrence[k]))} is "
-            f"{float(fixed_price[k])!r}, expected a finite price"
-        )
+        raise ValueError(f"{where(k)} is {float(prices[k])!r}, expected a finite price")
 
 
-def _the_payment_dates(
-    settlement: Settlement, payment_date: NDArray[np.datetime64] | None, components: int
-) -> NDArray[np.datetime64] | None:
-    """One per component for a financial settlement, none for a physical one, frozen."""
+def _the_payment(
+    settlement: Settlement, payment: PaymentTerms | None, occurrences: int, components: int
+) -> PaymentTerms | None:
+    """For a financial settlement the terms, a lag and a calendar per occurrence and a day per
+    component, the arrays frozen; for a physical one none."""
     match settlement:
         case Settlement.FINANCIAL:
-            if payment_date is None:
+            if payment is None:
                 raise ValueError(
-                    "payment_date is missing, expected one date per component "
-                    "with a financial settlement"
+                    "payment is missing, expected a lag and a calendar per occurrence and one "
+                    "date per component with a financial settlement"
                 )
-            if payment_date.size != components:
+            for name, count in (
+                ("lag_days", payment.lag_days.size),
+                ("calendar", len(payment.calendar)),
+            ):
+                if count != occurrences:
+                    raise ValueError(
+                        f"payment {name} has {count}, expected {occurrences}, one per occurrence"
+                    )
+            if payment.date.size != components:
                 raise ValueError(
-                    f"payment_date has {payment_date.size} dates, expected {components}, "
+                    f"payment date has {payment.date.size} dates, expected {components}, "
                     "one per component"
                 )
-            return _frozen_days(payment_date)
+            lag_days = np.array(payment.lag_days, dtype=np.int64)
+            lag_days.setflags(write=False)
+            return PaymentTerms(lag_days, payment.calendar, _frozen_days(payment.date))
         case Settlement.PHYSICAL:
-            if payment_date is not None:
+            if payment is not None:
                 raise ValueError(
-                    f"payment_date has {payment_date.size} dates, "
+                    f"payment has {payment.date.size} dates, "
                     "expected none with a physical settlement, which pays on no day"
                 )
             return None

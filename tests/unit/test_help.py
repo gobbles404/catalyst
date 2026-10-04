@@ -542,7 +542,7 @@ def test_the_trades_creator_explains_itself() -> None:
     assert arguments == [
         (
             "index",
-            "The index handle: the cell showing _CreateIndex's result, such as B6, or a name for "
+            "The index handle: the cell showing _CreateIndex's result, such as I3, or a name for "
             "it, the one index every trade of the batch is on.",
         ),
         (
@@ -558,7 +558,7 @@ def test_the_trades_creator_explains_itself() -> None:
         (
             "template",
             "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as "
-            "B2, or a name for it, which selects the instrument and supplies the shared fields.",
+            "B3, or a name for it, which selects the instrument and supplies the shared fields.",
         ),
     ]
 

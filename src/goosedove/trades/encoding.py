@@ -106,18 +106,19 @@ def _one_payment_day_per_input(
 ) -> NDArray[np.datetime64] | None:
     """A financial settlement's one payment day per input, after the input's expiry; None for a
     physical settlement, which pays on no day."""
-    if terms.payment_date is None:
+    if terms.payment is None:
         return None
+    dates = terms.payment.date
     codes = terms.schedule.codes
     pays = np.empty(inputs.size, dtype="datetime64[D]")
-    pays[input_of_component] = terms.payment_date  # the last component's day on each input
-    differs = pays[input_of_component] != terms.payment_date
+    pays[input_of_component] = dates  # the last component's day on each input
+    differs = pays[input_of_component] != dates
     if differs.any():
         k = int(differs.argmax())
         code = codes[int(terms.contract[k])]
         day = pays[input_of_component[k]]
         raise ValueError(
-            f"payment_date of {terms.named(k)} is {terms.payment_date[k]}, expected {day}, "
+            f"payment_date of {terms.named(k)} is {dates[k]}, expected {day}, "
             f"the one day {code} pays"
         )
     expiries = terms.schedule.future_expiry[inputs]

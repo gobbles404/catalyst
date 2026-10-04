@@ -48,6 +48,8 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 | `quantity_per` | `month`, the one basis built | `quantity_per is 'day', expected month, the one basis built` |
 | `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd` |
 | `contract_code` | a contract or strip the period grammar reads, in either case | `contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
+| `quantity` | a whole nonzero number of lots, the kernel's own rule | `quantity is 1.5, expected a whole number of lots`; `quantity is 0.0, expected a nonzero quantity` |
+| `fixed_price` | a finite number, the kernel's own rule | `fixed_price is inf, expected a finite price` |
 
 Nothing is required of a template: not `trade_date`, `contract_code`, `quantity` or `fixed_price`, which a ticket supplies, and not the payment fields of a financial settlement. The conditions, which fields are required and which present, whether the template and the ticket overlap, whether a specification is the index's, whether a code is a contract of the schedule, need the ticket and the index, and `_CreateTrades` checks them against the completed batch, so there is no second validator here anticipating every ticket. The seam owns shape, type and the reference's resolution; the library reads meaning and never parses a handle or coerces a number from text.
 
@@ -75,8 +77,8 @@ The same template supplies its fields to one or many ticket rows. Template field
 |---|---|
 | LOT and lastday make the page's template; one field and the NG template's seven take one path; each value the scalar its type names and a calendar the object itself | `tests/unit/test_trade_template.py` |
 | A template selects its instrument for a ticket; a field the ticket must supply is not required | the same |
-| Twelve values against their fields' rules refused naming the field; the builder takes one row | the same |
-| The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 21 in all |
+| Sixteen values against their fields' rules refused naming the field, a fraction and a zero of a lot and an infinite price among them; a template's numbers passing the kernel's rules; the builder takes one row | the same |
+| The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 26 in all |
 | One read per value and one publication, 2,412 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
 | A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |
 | The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289 |

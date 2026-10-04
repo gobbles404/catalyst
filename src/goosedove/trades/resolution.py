@@ -36,6 +36,7 @@ from goosedove.trades.template import (
     settlement_of,
 )
 from goosedove.trades.terms import (
+    PaymentTerms,
     ResolvedTrades,
     Route,
     Settlement,
@@ -132,7 +133,7 @@ def resolved(
     months = _the_schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract = _the_contracts(fields, months)
-    payment_date = _the_payment_days(settlement, fields, schedule, occurrence, contract)
+    payment = _the_payment_terms(settlement, fields, schedule, occurrence, contract)
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     return resolved_trades(
@@ -152,7 +153,7 @@ def resolved(
         contract,
         fields.numbers("quantity")[occurrence],
         fields.numbers("fixed_price")[occurrence],
-        payment_date,
+        payment,
     )
 
 
@@ -372,35 +373,38 @@ def _month(count: object) -> str:
 # --- the payment days of a financial settlement ---------------------------------------------
 
 
-def _the_payment_days(
+def _the_payment_terms(
     settlement: Settlement,
     fields: _Fields,
     schedule: FuturesSchedule,
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
-) -> NDArray[np.datetime64] | None:
-    """For a financial settlement, each component's payment day: its occurrence's lag in business
-    days counted strictly after its contract's expiry on its occurrence's payment calendar, Monday
-    to Friday less the calendar's holidays, the expiry rolled back to the last eligible day on or
-    before it first, so that an expiry the calendar closes is not itself counted; one busday
-    offset over the components on each distinct calendar. None for a physical settlement."""
+) -> PaymentTerms | None:
+    """For a financial settlement, the payment terms: each occurrence's lag in business days and
+    its payment calendar, retained, and each component's payment day, the lag counted strictly
+    after its contract's expiry on that calendar, Monday to Friday less the calendar's holidays,
+    the expiry rolled back to the last eligible day on or before it first, so that an expiry the
+    calendar closes is not itself counted; one busday offset over the components on each distinct
+    calendar. None for a physical settlement."""
     match settlement:
         case Settlement.PHYSICAL:
             return None
         case Settlement.FINANCIAL:
             lags, by_lag = _each_distinct(fields, "payment_time_lag", business_days_of)
-            lag = np.array(lags, dtype=np.int64)[by_lag][occurrence]
+            lag_days = np.array(lags, dtype=np.int64)[by_lag]
+            lag = lag_days[occurrence]
             anchors = schedule.future_expiry[contract]
-            calendars = fields.objects("payment_holiday_calendar")
+            calendars = cast(
+                tuple[HolidayCalendar, ...], fields.objects("payment_holiday_calendar")
+            )
             ids = np.fromiter(map(id, calendars), dtype=np.int64, count=len(calendars))
             _, first_rows, inverse = np.unique(ids, return_index=True, return_inverse=True)
             pays = np.empty(contract.size, dtype="datetime64[D]")
             for g, row in enumerate(first_rows):
                 on = inverse[occurrence] == g
-                holidays = cast(HolidayCalendar, calendars[int(row)]).holiday
                 pays[on] = np.busday_offset(
-                    anchors[on], lag[on], roll="backward", holidays=holidays
+                    anchors[on], lag[on], roll="backward", holidays=calendars[int(row)].holiday
                 )
-            return pays
+            return PaymentTerms(lag_days, calendars, pays)
         case _:
             assert_never(settlement)

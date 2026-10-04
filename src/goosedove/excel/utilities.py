@@ -333,50 +333,55 @@ def trade_template_table(obj: TradeTemplate) -> MixedArray:
 
 @shown.register
 def trades_table(obj: Trades) -> MixedArray:
-    # One row per component, the terms with what the encoding made of them: the ticket row the
-    # component belongs to, as the sheet counts rows, its label, clearing house and broker where
-    # the batch has them, the day it was struck, its contract's code, its lots, its quantity in
-    # the quote unit, its fixed price, its coefficient and offset in the settlement currency,
-    # and, for a financial settlement, the day it pays. The batch's own facts, the route, the
-    # settlement, the method and the specification, are the template's to show.
+    # One row per component: the ticket row it belongs to, as the sheet counts rows, then the
+    # resolved terms under the definition's own field names in the definition's order, the batch's
+    # facts repeated on every row since a reader of one row should see the whole deal and the
+    # template need not have supplied them, then what the encoding made of the terms. trade_id,
+    # clearing_house and broker where the batch has them; the payment lag and the day it gives
+    # for a financial settlement; quote_quantity the lots in the index's quote quantity unit,
+    # coefficient and offset in the settlement currency.
     terms, encoding = obj.resolved, obj.encoded
     rows = terms.occurrence
+    n = rows.size
     codes = np.array(terms.schedule.codes, dtype=object)[terms.contract]
     headers: list[str] = ["row"]
     types: list[str] = ["int64"]
     columns: list[NDArray[Any] | tuple[str, ...]] = [(rows + 1).astype(np.int64)]
-    for name, labels in (
-        ("trade_id", terms.labels),
-        ("clearing_house", terms.clearing_house),
-        ("broker", terms.broker),
-    ):
-        if labels is not None:
-            headers.append(name)
-            types.append("str")
-            columns.append(tuple(np.array(labels, dtype=object)[rows]))
-    headers += [
-        "trade_date",
-        "contract_code",
-        "lots",
-        "quantity",
-        "fixed_price",
-        "coefficient",
-        "offset",
-    ]
-    types += ["datetime64[D]", "str", "float64", "float64", "float64", "float64", "float64"]
-    columns += [
-        terms.trade_dates[rows],
-        tuple(codes),
-        terms.lots,
-        encoding.quantity,
-        terms.fixed_price,
-        encoding.coefficient,
-        encoding.offset,
-    ]
-    if terms.payment_date is not None:
-        headers.append("payment_date")
-        types.append("datetime64[D]")
-        columns.append(terms.payment_date)
+
+    def text(name: str, column: tuple[str, ...]) -> None:
+        headers.append(name)
+        types.append("str")
+        columns.append(column)
+
+    def numbers(name: str, kind: str, column: NDArray[Any]) -> None:
+        headers.append(name)
+        types.append(kind)
+        columns.append(column)
+
+    def labels(name: str, given: tuple[str, ...] | None) -> None:
+        if given is not None:
+            text(name, tuple(np.array(given, dtype=object)[rows]))
+
+    labels("trade_id", terms.labels)
+    numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
+    text("contract_specification", (terms.index.specifications.names[terms.specification],) * n)
+    text("contract_code", tuple(codes))
+    text("schedule_method", (terms.schedule_method.value,) * n)
+    text("route", (terms.route.value,) * n)
+    text("settlement_method", (terms.settlement.value,) * n)
+    labels("clearing_house", terms.clearing_house)
+    labels("broker", terms.broker)
+    numbers("quantity", "float64", terms.lots)
+    text("quantity_unit", (terms.quantity_unit,) * n)
+    text("quantity_per", (terms.quantity_per.value,) * n)
+    numbers("fixed_price", "float64", terms.fixed_price)
+    if terms.payment is not None:
+        lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
+        text("payment_time_lag", tuple(lags[rows]))
+        numbers("payment_date", "datetime64[D]", terms.payment.date)
+    numbers("quote_quantity", "float64", encoding.quantity)
+    numbers("coefficient", "float64", encoding.coefficient)
+    numbers("offset", "float64", encoding.offset)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 

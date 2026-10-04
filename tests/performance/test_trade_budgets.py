@@ -30,7 +30,14 @@ from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import results
 from goosedove.trades.preparation import prepared
-from goosedove.trades.terms import QuantityPer, Route, ScheduleMethod, Settlement, resolved_trades
+from goosedove.trades.terms import (
+    PaymentTerms,
+    QuantityPer,
+    Route,
+    ScheduleMethod,
+    Settlement,
+    resolved_trades,
+)
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 SIZES = [(5, 2), (2_000, 24)]  # components over contracts: the page's five, and two thousand
@@ -55,6 +62,7 @@ PAYS: NDArray[np.datetime64] = np.array(
     (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D"),
     dtype="datetime64[D]",
 )
+PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
 GAS = index(
     "gas",
     futures_schedule(CODES, EXPIRIES, None),
@@ -92,7 +100,7 @@ def a_batch(components: int, contracts: int) -> Encoded:
         rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         3.0 + (np.arange(components) % 7) / 100,
-        PAYS[rows],
+        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
     return encoded(terms, UNITS, WorkCounter())
 
