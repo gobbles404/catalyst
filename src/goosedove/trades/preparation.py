@@ -57,7 +57,7 @@ class Prepared:
 
 
 def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> Prepared:
-    """The one way to make a Prepared: four rules, checked once, in this order, the first failure
+    """The one way to make a Prepared: three rules, checked once, in this order, the first failure
     being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
     The history is over the trades' index, the one object the terms hold, as the history itself
@@ -71,8 +71,9 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
     delivery is not modeled, and nothing is omitted, zeroed, kept in mark or moved to cash in its
     place; the contract's expiry decides, not an earlier observation's fixing. A fixed slot takes
     its settle off the history, the settle on its day, which the history holds for every fixed
-    and priced day; a slot on a day the calendar does not price, a weekend or a holiday of the
-    schedule's own making, has no settle and is refused by name. A group is settled when every
+    and priced day, and every slot's day is priced, since the encoding refused a closed one
+    against the same holiday calendar the history's calendar was built from. A group is settled
+    when every
     slot of it has fixed and its payment day is on or before the valuation date, the inclusive
     cutoff of the pipeline; fixed is not paid. Delta is settled here too, since nothing a tick
     brings changes it: the live exposure summed by reference, zero where everything has fixed.
@@ -112,12 +113,6 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
     else:
         unfixed = np.bincount(encoded.slot_group, weights=~is_fixed, minlength=encoded.groups.size)
         is_settled = (unfixed == 0) & (encoded.payment_date <= as_of)
-    unpriced = is_fixed & ~calendar.is_priced[slot_rows]
-    if unpriced.any():
-        s = int(unpriced.argmax())
-        raise ValueError(
-            f"{encoded.named_slot(s)}, a day its calendar does not price; no settle exists"
-        )
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
     set_of_slot = np.zeros(is_fixed.size)

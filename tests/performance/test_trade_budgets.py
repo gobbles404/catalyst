@@ -13,6 +13,7 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 from numpy.typing import NDArray
+from test_seam_allocation import SLACK, least_peak
 
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.unit_conversions import UNITS
@@ -30,11 +31,12 @@ from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import results
-from goosedove.trades.observations import observed
+from goosedove.trades.observations import observations, observed
 from goosedove.trades.preparation import prepared
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
+    ResolvedTrades,
     Route,
     ScheduleMethod,
     Settlement,
@@ -84,8 +86,13 @@ AS_OF = "2027-03-10"
 def a_batch(components: int, contracts: int) -> Encoded:
     """That many single-month trades spread over the first contracts after the boundary, lots
     and prices varying, encoded on a counter of its own."""
+    terms = some_terms(components, contracts)
+    return encoded(terms, observed(terms), UNITS, WorkCounter())
+
+
+def some_terms(components: int, contracts: int) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
-    terms = resolved_trades(
+    return resolved_trades(
         FUTURE,
         GAS,
         0,
@@ -104,7 +111,40 @@ def a_batch(components: int, contracts: int) -> Encoded:
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
-    return encoded(terms, observed(terms), UNITS, WorkCounter())
+
+
+# The daily batch: the same trades, each observing the last `days` business days of its contract,
+# the expiry among them, with a share each, as a daily average would; the days are the fixture's
+# own arithmetic, business days counted back from the expiry on the index's holidays, and never
+# the kernel's. Two thousand trades over twenty-four contracts and fifteen days make thirty
+# thousand observations and 360 slots, fifteen a contract.
+DAILY = [(5, 2, 3), (2_000, 24, 15)]
+DAILY_IDS = ["five trades, three days", "two thousand trades, fifteen days"]
+
+
+def daily_days(components: int, contracts: int, days: int) -> NDArray[np.datetime64]:
+    rows = 1 + np.arange(components, dtype=np.intp) % contracts
+    back = np.tile(-np.arange(days)[::-1], components)
+    return np.busday_offset(
+        np.repeat(EXPIRIES[rows], days), back, roll="backward", holidays=HOLIDAYS
+    )
+
+
+def a_daily_batch(components: int, contracts: int, days: int) -> Encoded:
+    terms = some_terms(components, contracts)
+    obs = observations(
+        np.repeat(np.arange(components, dtype=np.intp), days),
+        daily_days(components, contracts, days),
+        np.full(components * days, 1 / days),
+        components,
+    )
+    return encoded(terms, obs, UNITS, WorkCounter())
+
+
+def daily_fixed_slots(components: int, contracts: int, days: int, as_of: str = AS_OF) -> int:
+    """How many of the batch's slots have fixed by the valuation day, from the fixture's own
+    dates: the distinct days before it."""
+    return int((np.unique(daily_days(components, contracts, days)) < np.datetime64(as_of)).sum())
 
 
 def a_history(as_of: str = AS_OF) -> MarketHistory:
@@ -160,12 +200,12 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
 
 # --- which functions run, and how many times, whatever the size -----------------------------
 
-# The preparation's numpy, the same at any size: the two looks that refuse a slot before the
-# calendar or on a closed day, the unique over the live references with its sort, the searches
-# of the history's fixed rows and the live references, the bincounts' reductions and the sums,
-# the frozen arrays.
+# The preparation's numpy, the same at any size: the one look that refuses a slot before the
+# calendar begins, the unique over the live references with its sort, the search of the history's
+# fixed rows, the bincounts' reductions and the sums, the frozen arrays; a closed day is the
+# encoding's to refuse, so no look here.
 PREPARATION_NUMPY = {
-    "ndarray.any": 2,
+    "ndarray.any": 1,
     "ndarray.argsort": 1,
     "ndarray.astype": 1,
     "ndarray.cumsum": 1,
@@ -179,7 +219,7 @@ PREPARATION_NUMPY = {
     "numpy.asanyarray": 3,
     "numpy.zeros": 1,
     "numpy.empty": 2,
-    "ufunc.reduce": 6,
+    "ufunc.reduce": 5,
 }
 
 
@@ -214,21 +254,28 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
 ) -> None:
     terms = a_batch(components, contracts).terms
     obs = observed(terms)
-    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == {
-        "encoded": 1,
-        "_the_references": 1,
-        "contract_on": 1,  # the calendar's rule, one search over the schedule
-        "_the_slots": 1,
-        "_one_payment_day_per_group": 1,
-        "UnitConversions.factor": 2,
-        "UnitConversions.category": 2,
-        "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 3,
-    }
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
     assert call_profile(lambda: observed(terms)) == {
         "observed": 1,
         "observations": 1,
     }
+
+
+# The encoding's functions, each once: the two calendar rules read once over every observation,
+# the open days and the pricing contract, the slots found in one sort, the payment day per group.
+ENCODING_LEDGER = {
+    "encoded": 1,
+    "_the_references": 1,
+    "with_holiday_calendar": 1,
+    "open_days": 1,
+    "contract_on": 1,
+    "_the_slots": 1,
+    "_one_payment_day_per_group": 1,
+    "UnitConversions.factor": 2,
+    "UnitConversions.category": 2,
+    "WorkCounter.__init__": 1,
+    "WorkCounter.hit": 3,
+}
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
@@ -244,3 +291,115 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     }
     numpy = numpy_calls(lambda: prepared(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
+
+
+# --- many observations on one contract: the daily batch -----------------------------------
+# The dated axis is sized by slots, the distinct days of each contract, and never by trades or
+# observations: two thousand trades over fifteen days are thirty thousand observations into 360
+# slots, and the tick, the preparation and the result know only the slots and the references.
+
+
+@pytest.mark.parametrize(("components", "contracts", "days"), DAILY, ids=DAILY_IDS)
+def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
+    components: int, contracts: int, days: int
+) -> None:
+    counter = WorkCounter()
+    terms = some_terms(components, contracts)
+    obs = observations(
+        np.repeat(np.arange(components, dtype=np.intp), days),
+        daily_days(components, contracts, days),
+        np.full(components * days, 1 / days),
+        components,
+    )
+    enc = encoded(terms, obs, UNITS, counter)
+    slots = contracts * days
+    assert counter.freeze().as_dict() == {
+        "encoded_components": components,
+        "encoded_observations": components * days,
+        "encoded_slots": slots,
+    }
+    assert enc.slot_group.size == slots and enc.references.size == contracts
+    np.testing.assert_array_equal(enc.slot_reference, enc.groups[enc.slot_group])
+    # Every component's exposure is shared out over its days and nothing is lost in the sum.
+    assert enc.slot_exposure.sum() == pytest.approx(enc.coefficient.sum(), abs=1e-6)
+    # What is retained per slot and per observation, in bytes: eight a slot for each of the
+    # four slot columns, eight an observation for each of the observations' three and its slot.
+    assert enc.slot_exposure.nbytes == 8 * slots and enc.slot_of_observation.nbytes == (
+        8 * components * days
+    )
+
+
+@pytest.mark.parametrize(("components", "contracts", "days"), DAILY, ids=DAILY_IDS)
+def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
+    components: int, contracts: int, days: int
+) -> None:
+    enc = a_daily_batch(components, contracts, days)
+    history = a_history()
+    counter = WorkCounter()
+    prep = prepared(enc, history, counter)
+    slots, fixed = contracts * days, daily_fixed_slots(components, contracts, days)
+    assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": slots}
+    assert prep.live_slot.size == slots - fixed
+    assert prep.dated_live_exposure.nbytes == 8 * slots and prep.delta.nbytes == 8 * contracts
+    counter = WorkCounter()
+    result = results(prep, a_market(history), counter)
+    live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
+    assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": live_references}
+    assert result.dated_live_contribution.nbytes == 8 * (slots - fixed)  # one per live slot
+    assert result.dated_live_contribution.sum() == pytest.approx(
+        result.mark - prep.offset_unsettled - prep.set_unsettled
+    )
+    np.testing.assert_allclose(
+        np.bincount(enc.reference_of_slot, weights=prep.dated_live_exposure, minlength=contracts),
+        prep.delta,
+    )
+
+
+@pytest.mark.parametrize(("components", "contracts", "days"), DAILY, ids=DAILY_IDS)
+def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int, days: int
+) -> None:
+    terms = some_terms(components, contracts)
+    obs = observations(
+        np.repeat(np.arange(components, dtype=np.intp), days),
+        daily_days(components, contracts, days),
+        np.full(components * days, 1 / days),
+        components,
+    )
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    enc = encoded(terms, obs, UNITS, WorkCounter())
+    history = a_history()
+    assert call_profile(lambda: prepared(enc, history, WorkCounter())) == {
+        "prepared": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    assert numpy_calls(lambda: prepared(enc, history, WorkCounter())) == PREPARATION_NUMPY
+    prep = prepared(enc, history, WorkCounter())
+    quoted = a_market(history)
+    assert call_profile(lambda: results(prep, quoted, WorkCounter())) == {
+        "results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+
+
+# Memory: the preparation and the tick allocate by slots and references, never by trades or
+# observations. Measured on 2026-10-04 for two thousand trades over twenty-four contracts and
+# fifteen days, 360 slots: the preparation 30,972 bytes, about 86 a slot, its masks, the sort
+# behind the unique live references, its set amounts and its delta; the tick 7,792 bytes, about
+# 22 a slot, the quotes, their gather onto the live slots and the contributions; the five-trade
+# batch of six slots 1,210, its records and a few small arrays, under twice the slack.
+def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> None:
+    components, contracts, days = DAILY[1]
+    enc = a_daily_batch(components, contracts, days)
+    history = a_history()
+    slots = contracts * days
+    assert least_peak(lambda: prepared(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    prep = prepared(enc, history, WorkCounter())
+    quoted = a_market(history)
+    assert least_peak(lambda: results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    small = a_daily_batch(*DAILY[0])
+    small_prep = prepared(small, history, WorkCounter())
+    assert least_peak(lambda: results(small_prep, quoted, WorkCounter())) <= 2 * SLACK

@@ -13,9 +13,10 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from goosedove.calendar.calendar import contract_on
+from goosedove.calendar.calendar import contract_on, open_days
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.index_conventions import CURRENCY
+from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.terms import ResolvedTrades
@@ -103,12 +104,16 @@ def encoded(
     them, one search; the offsets summed by group, one bincount, so that two occurrences on one
     contract are one group with their offsets added, a duplicate occurrence added twice.
 
-    The slots: each observation's reference is the contract pricing its day by the calendar's
-    rule, the first whose expiry is on or after it, one search over the schedule; a day after the
-    last expiry prices nothing and is refused; and the reference is the component's own contract,
-    else the observation is refused as unsupported, since a futures history holds one settle a
-    day, the pricing contract's, and would never fix another contract's observation on it, F27's
-    on a day Z26 prices. Then the observations are sorted by group and date, one lexsort, the
+    The slots: each observation's day is one the index's market is open on, Monday to Friday
+    less the index's holidays, by the calendar's own rule, else refused, since no settle exists
+    for a closed day or ever will, and a live observation on one would take a quote now and fail
+    the day it fixed. Each observation's reference is the contract pricing its day by the
+    calendar's rule, the first whose expiry is on or after it, one search over the schedule; a
+    day after the last expiry prices nothing and is refused; and the reference is the component's
+    own contract, else the observation is refused as unsupported, since a futures history holds
+    one settle a day, the pricing contract's, and would never fix another contract's observation
+    on it, F27's on a day Z26 prices. Then the observations are sorted by group and date, one
+    lexsort, the
     distinct pairs are the slots, and each observation's coefficient times its weight is summed
     into its slot, one bincount: two occurrences observing one day in one group are one slot
     with their exposures added. The delta axis is the distinct references, one unique.
@@ -185,10 +190,18 @@ def encoded(
 
 
 def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:
-    """Each observation's reference, the contract pricing its day: within the schedule, and the
-    component's own contract."""
+    """Each observation's reference, the contract pricing its day: the day open on the index's
+    market, within the schedule, and the component's own contract."""
     schedule = terms.schedule
     codes = schedule.codes
+    closed = ~open_days(with_holiday_calendar(terms.index.holiday_calendar), observations.date)
+    if closed.any():
+        j = int(closed.argmax())
+        component = int(observations.component[j])
+        raise ValueError(
+            f"{terms.named(component)} observes {codes[int(terms.contract[component])]} on "
+            f"{observations.date[j]}, a day the index's market is closed; no settle exists or will"
+        )
     reference = contract_on(schedule, observations.date)
     beyond = reference >= len(codes)
     if beyond.any():

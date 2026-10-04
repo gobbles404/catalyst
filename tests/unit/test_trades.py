@@ -568,8 +568,10 @@ def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices
     )
 
 
-def test_a_financial_contract_expiring_on_a_closed_day_has_no_final_price() -> None:
-    # A toy whose Z26 expires on Thanksgiving, which its own calendar closes.
+def test_a_contract_expiring_on_a_closed_day_is_refused_when_the_batch_is_encoded() -> None:
+    # A toy whose Z26 expires on Thanksgiving, which its own calendar closes: no settle will ever
+    # exist for that day, so the batch is refused when it is made, before any history and
+    # whatever the valuation date would have been.
     closed = an_index(
         "closed",
         (
@@ -580,17 +582,12 @@ def test_a_financial_contract_expiring_on_a_closed_day_has_no_final_price() -> N
         ),
         ("2026-11-26", "2026-12-25"),
     )
-    enc = encoded(
-        terms_of(closed, Settlement.FINANCIAL, TOY_PAYS),
-        observed(terms_of(closed, Settlement.FINANCIAL, TOY_PAYS)),
-        UNITS,
-        WorkCounter(),
-    )
+    terms = terms_of(closed, Settlement.FINANCIAL, TOY_PAYS)
     with pytest.raises(ValueError) as refused:
-        prepared(enc, history_on(closed, "2026-11-27", {}), WorkCounter())
+        encoded(terms, observed(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'NG-001' at row 1 observes Z26 on 2026-11-26, a day its calendar does not price; "
-        "no settle exists"
+        "trade 'NG-001' at row 1 observes Z26 on 2026-11-26, a day the index's market is closed; "
+        "no settle exists or will"
     )
 
 
@@ -995,6 +992,25 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
         "trade 'G-1' at row 1 observes 2027-02-01, after the schedule's last expiry, 2027-01-29; "
         "nothing prices it"
     )
+
+
+@pytest.mark.parametrize(
+    ("closed_day", "why"),
+    [("2026-12-05", "a Saturday"), ("2026-12-25", "a holiday the index lists")],
+)
+def test_an_observation_on_a_closed_day_is_refused_before_it_could_fix(
+    closed_day: str, why: str
+) -> None:
+    # The review's case: ten units at 70 observing Saturday 5 December would have marked 40 with
+    # delta 10 on 1 December off a quote of 74, and failed only once the day had passed. It fails
+    # at creation instead, and the same for a holiday, with no history in sight.
+    terms = daily_terms((10.0,), (70.0,))
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, daily_observations(terms, ((closed_day,),)), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        f"trade at row 1 observes Z26 on {closed_day}, a day the index's market is closed; "
+        "no settle exists or will"
+    ), why
 
 
 def test_a_payment_before_the_last_observation_is_refused() -> None:

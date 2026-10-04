@@ -297,6 +297,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "observations": 1,
         "encoded": 1,
         "_the_references": 1,
+        "with_holiday_calendar": 1,
+        "open_days": 1,
         "contract_on": 1,
         "_the_slots": 1,
         "UnitConversions.factor": 2,

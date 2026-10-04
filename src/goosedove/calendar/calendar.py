@@ -15,6 +15,7 @@ from goosedove.globals.discount_curve import MAX_DAYS
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import Kind, with_holiday_calendar
@@ -129,9 +130,17 @@ def _futures_calendar(
     day = np.timedelta64(1, "D")
     dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
     contract = contract_on(schedule, dates)
-    is_priced = np.is_busday(dates, holidays=holidays.holiday)
+    is_priced = open_days(holidays, dates)
     is_fixed = dates < valuation_date.as_of
     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+
+
+def open_days(holidays: HolidayCalendar, days: NDArray[np.datetime64]) -> NDArray[np.bool_]:
+    """Whether a futures market is open on each day, Monday to Friday less the days its holiday
+    calendar lists: the futures calendar's rule for which days price, which the encoding of a
+    batch's observations reads by too, so that an observation on a closed day is refused when
+    the batch is made, before any history."""
+    return np.is_busday(days, holidays=holidays.holiday)
 
 
 def contract_on(schedule: FuturesSchedule, days: NDArray[np.datetime64]) -> NDArray[np.intp]:

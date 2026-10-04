@@ -239,10 +239,14 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
 def test_a_whole_year_strip_resolves_twelve_months_against_a_long_schedule() -> None:
     months = np.arange("2026-10", "2028-01", dtype="datetime64[M]")
     letters = "FGHJKMNQUVXZ"
+    # Each contract expires on the last business day on or before the 25th of its month, so that
+    # every expiry is a day the market is open, which the encoding requires of an observation.
     contracts = tuple(
         (
             f"{letters[int(m.astype(int)) % 12]}{str(m)[2:4]}",
-            str(m.astype("datetime64[D]") + np.timedelta64(24, "D")),
+            str(
+                np.busday_offset(m.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, "backward")
+            ),
         )
         for m in months
     )
@@ -300,7 +304,10 @@ def one_payment_day(expiry: str, holidays: tuple[str, ...], lag: str) -> np.date
     """The payment day of one Z26 lot on an index whose Z26 expires that day, under a payment
     calendar of those holidays and that lag."""
     ix = an_index(
-        "pay", (("X26", "2026-10-28"), ("Z26", expiry)), lots=(("TOY", 10_000.0, "MMBTU"),)
+        "pay",
+        (("X26", "2026-10-28"), ("Z26", expiry)),
+        holidays=(),  # the market is open on the expiry; the payment calendar may not be
+        lots=(("TOY", 10_000.0, "MMBTU"),),
     )
     batch, _ = created(
         ix,
