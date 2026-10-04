@@ -66,14 +66,10 @@ TEMPLATE_FIELDS: dict[str, object] = {
 }
 
 
-def a_template() -> TradeTemplate:
+def a_template(method: str = "lastday") -> TradeTemplate:
+    fields = {**TEMPLATE_FIELDS, "schedule_method": method}
     return trade_template(
-        FieldValues(
-            FUTURE,
-            1,
-            tuple(TEMPLATE_FIELDS),
-            {name: (value,) for name, value in TEMPLATE_FIELDS.items()},
-        )
+        FieldValues(FUTURE, 1, tuple(fields), {name: (value,) for name, value in fields.items()})
     )
 
 
@@ -133,7 +129,9 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_required": 1,
         "_the_specification": 1,
         "_the_conditions": 1,
-        "futures_schedule_of": 2,  # the resolution's, then the kernel's
+        "observed": 1,  # the method's observations, made here so that payment counts from them
+        "observations": 1,
+        "futures_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
         "_the_schedule_months": 1,
         "month_and_year": 25,
         "_the_contracts": 1,
@@ -164,6 +162,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "FieldValues.dates": 1,
         "resolved_trades": 1,
         "_the_batch": 1,
+        "_the_method": 1,
         "_the_occurrences": 1,
         "_the_components": 1,
         "whole_lots": 1,
@@ -177,17 +176,14 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
     }
 
 
-@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
-def test_resolution_reads_each_distinct_code_once_and_nothing_per_row(
-    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
-) -> None:
-    ticket, template = a_ticket(rows, contracts), a_template()
-    assert call_profile(
-        lambda: resolved(GAS, ticket, template, WorkCounter())
-    ) == resolution_ledger(contracts)
-    assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
+# The resolution's numpy, the same at both sizes but for the two months of each distinct code: the
+# contracts' arithmetic, the observations' builder, which checks the order and the weights, counts
+# twice and copies and freezes three columns, the payment offset and the kernel's frozen copies.
+def resolution_numpy(contracts: int) -> dict[str, int]:
+    return {
         "generic.astype": 2 * contracts,  # each distinct code's two months as counts
-        "ndarray.any": 7,
+        "ndarray.all": 1,
+        "ndarray.any": 12,
         "ndarray.argsort": 4,
         "ndarray.astype": 3,
         "ndarray.clip": 1,
@@ -200,13 +196,61 @@ def test_resolution_reads_each_distinct_code_once_and_nothing_per_row(
         "ndarray.repeat": 1,
         "ndarray.reshape": 4,
         "ndarray.round": 1,
-        "ndarray.setflags": 7,  # the kernel's frozen copies, the payment lags among them
-        "numpy.array": 11,
-        "numpy.asanyarray": 7,
-        "numpy.arange": 3,
-        "numpy.empty": 9,
+        "ndarray.setflags": 10,  # the kernel's frozen copies and the observations' three
+        "numpy.array": 14,
+        "numpy.asanyarray": 8,
+        "numpy.arange": 4,
+        "numpy.empty": 10,
         "numpy.fromiter": 1,
-        "ufunc.reduce": 9,
+        "numpy.normalize_axis_index": 1,
+        "ufunc.reduce": 15,
+    }
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_resolution_reads_each_distinct_code_once_and_nothing_per_row(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    ticket, template = a_ticket(rows, contracts), a_template()
+    assert call_profile(
+        lambda: resolved(GAS, ticket, template, WorkCounter())
+    ) == resolution_ledger(contracts)
+    assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == resolution_numpy(
+        contracts
+    )
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_row(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # The pen's observations read the index's holiday calendar once and ask once whether every
+    # expiry is open; the step back and the payment offset are numpy's business-day functions,
+    # dispatched in C and unseen. The counts the batch reports are lastday's.
+    ticket, template = a_ticket(rows, contracts), a_template("penultimate")
+    counter = WorkCounter()
+    terms, observations = resolved(GAS, ticket, template, counter)
+    assert terms.payment is not None
+    np.testing.assert_array_equal(
+        observations.date, np.busday_offset(EXPIRIES[terms.contract], -1, holidays=HOLIDAYS)
+    )
+    np.testing.assert_array_equal(
+        terms.payment.date, np.busday_offset(observations.date, 2, holidays=HOLIDAYS)
+    )
+    assert counter.freeze().as_dict() == {
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+    }
+    assert call_profile(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
+        **resolution_ledger(contracts),
+        "with_holiday_calendar": 1,
+        "open_days": 1,
+    }
+    assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
+        **resolution_numpy(contracts),
+        "ndarray.any": 13,  # whether any expiry is closed
+        "ufunc.reduce": 16,
     }
 
 
@@ -293,8 +337,6 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_one_row": 1,
         "_CreateTrades": 1,
         "trades": 1,
-        "observed": 1,  # the lastday rule, one observation per component
-        "observations": 1,
         "encoded": 1,
         "_the_references": 1,
         "with_holiday_calendar": 1,

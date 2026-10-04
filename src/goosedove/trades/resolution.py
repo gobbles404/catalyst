@@ -3,11 +3,12 @@ shared values and a ticket's rows into the resolved terms of one batch on one in
 from exactly one of the two, the required fields present and the conditional ones present when
 their condition holds, one route, settlement, method, unit and basis for the batch, the
 specification named among the index's, every code of the index's schedule read for its month
-once, each contract code or strip of the ticket resolved by month to the schedule's rows, and for
-a financial settlement each component's payment day counted strictly after its contract's expiry
-on the payment calendar. Then the kernel: resolved_trades checks the first profile's rules and
-encoded turns the terms into arrays, and the batch holds both. Nothing here reads a history, a
-price or a valuation date. docs/library/trades/create-trades.md is the page."""
+once, each contract code or strip of the ticket resolved by month to the schedule's rows, the
+schedule method's observations made once, and for a financial settlement each component's payment
+day counted strictly after its observation day on the payment calendar. Then the kernel:
+resolved_trades checks the first profile's rules and encoded turns the terms and the observations
+into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
+docs/library/trades/create-trades.md is the page."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -26,7 +27,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FUTURE, FieldType
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
-from goosedove.trades.observations import observed
+from goosedove.trades.observations import Observations, observed
 from goosedove.trades.template import (
     TradeTemplate,
     business_days_of,
@@ -86,18 +87,20 @@ def trades(
     units: UnitConversions,
     counter: WorkCounter,
 ) -> Trades:
-    """The one way to make Trades: resolution, then the observations the schedule method gives
-    the terms, then encoding, the unit tables and the counter passed in and never looked up; a
-    failure in any publishes nothing."""
-    terms = resolved(index, ticket, template, counter)
-    return Trades(terms, encoded(terms, observed(terms), units, counter))
+    """The one way to make Trades: resolution, which makes the schedule method's observations on
+    the way to the payment days, then encoding over the terms and those observations, the unit
+    tables and the counter passed in and never looked up; a failure in any publishes nothing."""
+    terms, observations = resolved(index, ticket, template, counter)
+    return Trades(terms, encoded(terms, observations, units, counter))
 
 
 def resolved(
     index: Index, ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
-) -> ResolvedTrades:
+) -> tuple[ResolvedTrades, Observations]:
     """The resolution child: the terms of a batch from a template and a ticket, checked in this
-    order, the first failure being the message, and then the kernel's own rules.
+    order, the first failure being the message, and then the kernel's own rules; with them the
+    observations the schedule method gave the components, made once here and handed on to the
+    encoding, since the payment days count from them.
 
     The ticket is bound against the template's instrument, the future, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
@@ -113,11 +116,14 @@ def resolved(
     distinct text, through the period grammar, in either case, for the months it spans, and each
     month is resolved to its schedule row, a month the schedule lacks refused by the trade's row
     and the month; a strip makes one component per month, in order, all on the one occurrence.
-    For a financial settlement, each occurrence's lag is read once per distinct text and each
-    component pays that many business days strictly after its contract's expiry, counted on its
-    occurrence's payment calendar with Monday to Friday eligible, the expiry itself rolled back
-    first so that a closed expiry is not counted. Then the kernel's rules, through resolved_trades:
-    the quantity unit LOT, whole nonzero lots and finite prices, each named by its trade.
+    The schedule method gives each component its observation day, the expiry under lastday and
+    the business day before it under penultimate. For a financial settlement, each occurrence's
+    lag is read once per distinct text and each component pays that many business days strictly
+    after its observation day, counted on its occurrence's payment calendar with Monday to Friday
+    eligible, the observation day itself rolled back first so that a day the payment calendar
+    closes is not counted; the rule of the two methods built, a later method stating its own.
+    Then the kernel's rules, through resolved_trades: the quantity unit LOT, whole nonzero lots
+    and finite prices, each named by its trade, and a financial settlement with penultimate.
 
     Work: one occurrence per ticket row, one component per contract month and one schedule code
     per row of the schedule, reported to the counter.
@@ -135,10 +141,11 @@ def resolved(
     months = _the_schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract = _the_contracts(fields, months)
-    payment = _the_payment_terms(settlement, fields, schedule, occurrence, contract)
+    observations = observed(schedule_method, index, contract)
+    payment = _the_payment_terms(settlement, fields, observations.date, occurrence)
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
-    return resolved_trades(
+    terms = resolved_trades(
         template.instrument,
         index,
         specification,
@@ -157,6 +164,7 @@ def resolved(
         fields.numbers("fixed_price")[occurrence],
         payment,
     )
+    return terms, observations
 
 
 # --- the fields of the batch, each from the template or the ticket --------------------------
@@ -378,16 +386,15 @@ def _month(count: object) -> str:
 def _the_payment_terms(
     settlement: Settlement,
     fields: _Fields,
-    schedule: FuturesSchedule,
+    anchors: NDArray[np.datetime64],
     occurrence: NDArray[np.intp],
-    contract: NDArray[np.intp],
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's lag in business days and
     its payment calendar, retained, and each component's payment day, the lag counted strictly
-    after its contract's expiry on that calendar, Monday to Friday less the calendar's holidays,
-    the expiry rolled back to the last eligible day on or before it first, so that an expiry the
-    calendar closes is not itself counted; one busday offset over the components on each distinct
-    calendar. None for a physical settlement."""
+    after its anchor, its one observation day under the two methods built, on that calendar,
+    Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
+    on or before it first, so that a day the calendar closes is not itself counted; one busday
+    offset over the components on each distinct calendar. None for a physical settlement."""
     match settlement:
         case Settlement.PHYSICAL:
             return None
@@ -395,13 +402,12 @@ def _the_payment_terms(
             lags, by_lag = _each_distinct(fields, "payment_time_lag", business_days_of)
             lag_days = np.array(lags, dtype=np.int64)[by_lag]
             lag = lag_days[occurrence]
-            anchors = schedule.future_expiry[contract]
             calendars = cast(
                 tuple[HolidayCalendar, ...], fields.objects("payment_holiday_calendar")
             )
             ids = np.fromiter(map(id, calendars), dtype=np.int64, count=len(calendars))
             _, first_rows, inverse = np.unique(ids, return_index=True, return_inverse=True)
-            pays = np.empty(contract.size, dtype="datetime64[D]")
+            pays = np.empty(anchors.size, dtype="datetime64[D]")
             for g, row in enumerate(first_rows):
                 on = inverse[occurrence] == g
                 pays[on] = np.busday_offset(

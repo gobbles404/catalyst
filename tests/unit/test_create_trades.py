@@ -54,6 +54,7 @@ def an_index(
     ),
     holidays: tuple[str, ...] = ("2026-11-26", "2026-12-25"),
     lots: tuple[tuple[str, float, str], ...] = (("NYMEX NG", 10_000.0, "MMBTU"),),
+    measure: tuple[str, str] = ("ENERGY", "MMBTU"),
 ) -> Index:
     codes = tuple(code for code, _ in contracts)
     schedule = futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
@@ -61,7 +62,7 @@ def an_index(
     return index(
         name,
         schedule,
-        index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+        index_conventions("USD", measure[1], "USD", measure[0], measure[1], UNITS),
         contract_specifications(
             names,
             np.array([size for _, size, _ in lots]),
@@ -367,6 +368,134 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     assert payment.calendar == (closes_two_days, open_calendar)
 
 
+# --- the penultimate method: the pen day observed, the payment counted from it ---------------
+# penultimate-trades.md: the pen observes the business day before the underlying's expiry on the
+# index's pricing calendar and pays its lag after that day on the payment calendar. The exchange
+# cases are the page's, each checked against ICE's published expiry tables: PHH Z26, M27 and N27
+# on the NG index, M27 the month Memorial Day closes the last business day before the contract
+# month, and ICE WTI T F27 on a CL index in barrels.
+
+CLEARING = holiday_calendar(dates("2026-12-25", "2026-12-28", "2027-01-01", "2027-05-31"))
+PEN_TEMPLATE: dict[str, object] = {
+    **NG_TEMPLATE,
+    "contract_specification": "ICE PHH",
+    "schedule_method": "penultimate",
+    "settlement_method": "financial",
+    "clearing_house": "ICE Clear Europe",
+    "payment_time_lag": "+1bd",
+    "payment_holiday_calendar": CLEARING,
+}
+NG_2026 = an_index(
+    contracts=(("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")),
+    lots=(("NYMEX NG", 10_000.0, "MMBTU"), ("ICE PHH", 2_500.0, "MMBTU")),
+)
+NG_2027 = an_index(
+    contracts=(("M27", "2027-05-26"), ("N27", "2027-06-28"), ("Q27", "2027-07-28")),
+    holidays=("2027-05-31", "2027-07-05"),
+    lots=(("NYMEX NG", 10_000.0, "MMBTU"), ("ICE PHH", 2_500.0, "MMBTU")),
+)
+CL_2026 = an_index(
+    "WTI NYMEX",
+    (("Z26", "2026-11-20"), ("F27", "2026-12-21"), ("G27", "2027-01-20")),
+    ("2026-11-26", "2026-12-25", "2027-01-01", "2027-01-18"),
+    (("NYMEX CL", 1_000.0, "BBL"), ("ICE WTI T", 1_000.0, "BBL")),
+    ("VOLUME", "BBL"),
+)
+
+
+def pen_days(
+    ix: Index, codes: list[str], template: Mapping[str, object] = PEN_TEMPLATE
+) -> tuple[list[str], list[str]]:
+    """One lot of each code under the template: each component's observation day and payment day
+    as the batch retains them."""
+    ticket: dict[str, list[object]] = {
+        "trade_id": [f"p{i}" for i in range(len(codes))],
+        "trade_date": ["2026-09-24"] * len(codes),
+        "contract_code": list(codes),
+        "quantity": [1] * len(codes),
+        "fixed_price": [3.0] * len(codes),
+    }
+    batch, _ = created(ix, ticket, template)
+    assert batch.resolved.payment is not None
+    observed = [str(d) for d in batch.encoded.observations.date]
+    return observed, [str(d) for d in batch.resolved.payment.date]
+
+
+def test_the_exchange_cases_of_the_page_observe_and_pay_on_its_days() -> None:
+    assert pen_days(NG_2026, ["Z26"]) == (["2026-11-24"], ["2026-11-25"])
+    assert pen_days(NG_2027, ["M27", "N27"]) == (
+        ["2027-05-25", "2027-06-25"],
+        ["2027-05-26", "2027-06-28"],
+    )
+    wti = {**PEN_TEMPLATE, "contract_specification": "ICE WTI T"}
+    assert pen_days(CL_2026, ["F27"], wti) == (["2026-12-18"], ["2026-12-21"])
+
+
+def test_a_strip_under_the_pen_observes_each_month_on_its_own_pen_day() -> None:
+    assert pen_days(NG_2027, ["M27-N27"]) == (
+        ["2027-05-25", "2027-06-25"],
+        ["2027-05-26", "2027-06-28"],
+    )
+
+
+def test_each_calendar_serves_its_own_operation() -> None:
+    # A Friday closed on the pricing calendar alone: the pen steps over it to Thursday, and the
+    # payment calendar, open that Friday, pays on it.
+    friday_closed = an_index(
+        contracts=(("M27", "2027-05-26"), ("N27", "2027-06-28")),
+        holidays=("2027-06-25",),
+        lots=(("ICE PHH", 2_500.0, "MMBTU"),),
+    )
+    open_calendar = holiday_calendar(dates())
+    assert pen_days(
+        friday_closed, ["N27"], {**PEN_TEMPLATE, "payment_holiday_calendar": open_calendar}
+    ) == (["2027-06-24"], ["2027-06-25"])
+    # A Monday closed on the payment calendar alone: the pen day is the Friday as before, and
+    # +1bd pays Tuesday.
+    monday_closed = holiday_calendar(dates("2027-06-28"))
+    assert pen_days(
+        NG_2027, ["N27"], {**PEN_TEMPLATE, "payment_holiday_calendar": monday_closed}
+    ) == (["2027-06-25"], ["2027-06-29"])
+    # The pen day itself closed on the payment calendar: rolled back to Thursday first, then one
+    # business day on, Monday, the first clearing day after the pen day and not the Tuesday a
+    # second roll would give.
+    friday_closed_for_payment = holiday_calendar(dates("2027-06-25"))
+    assert pen_days(
+        NG_2027, ["N27"], {**PEN_TEMPLATE, "payment_holiday_calendar": friday_closed_for_payment}
+    ) == (["2027-06-25"], ["2027-06-28"])
+
+
+def test_lastday_on_the_same_expiries_still_pays_from_the_expiry() -> None:
+    lastday = {**PEN_TEMPLATE, "schedule_method": "lastday"}
+    assert pen_days(NG_2027, ["M27", "N27"], lastday) == (
+        ["2027-05-26", "2027-06-28"],
+        ["2027-05-27", "2027-06-29"],
+    )
+    assert pen_days(NG_2026, ["Z26"], lastday) == (["2026-11-25"], ["2026-11-26"])
+
+
+def test_an_expiry_the_market_closes_is_refused_by_its_contract_under_the_pen() -> None:
+    thanksgiving = an_index(
+        contracts=(("X26", "2026-10-28"), ("Z26", "2026-11-26")),
+        holidays=("2026-11-26",),
+        lots=(("ICE PHH", 2_500.0, "MMBTU"),),
+    )
+    assert refused(
+        thanksgiving,
+        {
+            "trade_id": ["p"],
+            "trade_date": ["2026-09-24"],
+            "contract_code": ["Z26"],
+            "quantity": [1],
+            "fixed_price": [3.0],
+        },
+        PEN_TEMPLATE,
+    ) == (
+        "Z26 expires on 2026-11-26, a day the index's market is closed; the penultimate method "
+        "takes the business day before an expiry the market prices"
+    )
+
+
 # --- what is refused, naming the field and the sheet's row ----------------------------------
 
 
@@ -397,8 +526,14 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
         ),
         (
             NG_TICKET,
+            {**NG_TEMPLATE, "schedule_method": "asian"},
+            "schedule_method is 'asian', expected lastday or penultimate, the two methods built",
+        ),
+        (
+            NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "penultimate"},
-            "schedule_method is 'penultimate', expected lastday, the one method built",
+            "settlement is 'physical', expected 'financial' with the penultimate method; a "
+            "penultimate future is cash settled on the business day before its contract's expiry",
         ),
         (
             NG_TICKET,

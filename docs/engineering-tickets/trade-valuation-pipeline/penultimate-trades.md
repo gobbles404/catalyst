@@ -3,10 +3,10 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Dated exposure](dated-exposure.md) · [Fixing and payment state](fixing-and-payment-state.md)
 
-**Status:** Agreed implementation ticket, 4 October 2026, reviewed the same day. Build on the
-reviewed pipeline through #142, stacked on it. This replaces R1's earlier research-only scope
-and adjusted-lag proposal. This page specifies the work; penultimate booking is not
-implemented yet.
+**Status:** Built in #NN, stacked on #143, the page as a ticket, itself stacked on #142. Agreed
+4 October 2026 and reviewed the same day; this replaced R1's earlier research-only scope and
+adjusted-lag proposal. The build is as the page says, and the section at the end records what
+it settled.
 
 ## Outcome
 
@@ -213,3 +213,38 @@ day, fixed and unpaid, then cash on the payment day, with the price tick and the
 fixing, beside the toy lifecycle I6 built under `lastday` in #142. Asian and last3day booking,
 physical penultimate delivery, bilateral rates, alternate fixing sources, differing payment
 dates within one contract group and general payment-rule machinery remain later work.
+
+## As built
+
+Built in #NN. `penultimate` is a member of the kernel's `ScheduleMethod` beside `lastday`, and
+the one place that turns a method into observations, `observed`, takes the method, the index
+and the components' schedule rows: `lastday` gives each component its expiry day, `penultimate`
+the business day before it, one `numpy.busday_offset` of -1 over the components on the index's
+holiday calendar, an expiry the market is closed on refused by its contract, `Z26 expires on
+2026-11-26, a day the index's market is closed; the penultimate method takes the business day
+before an expiry the market prices`, never rolled. Resolution makes those observations once,
+before the payment terms, and counts each occurrence's lag from each component's observation
+day on its payment calendar, the day rolled back first where that calendar closes it, so the
+payment resolver no longer reads the schedule's expiries; the encoding takes the same
+observations and nothing is kept twice. The kernel refuses a physical settlement with the
+method, `settlement is 'physical', expected 'financial' with the penultimate method; a
+penultimate future is cash settled on the business day before its contract's expiry`, so a
+Python caller is held to the rule as the sheet is. Preparation, evaluation, the reports and the
+readers are untouched: the pen's slot is its pen day, its reference the contract pricing that
+day, its own, and its fixing the history's settle of that day; the underlying's final settle
+is another day's fixing and changes nothing of it. The definition's rule for
+`schedule_method` says lastday and penultimate are built, and `_ShowInstrument` shows it.
+
+Pinned: the exchange cases of the table, Z26, M27 and N27 for PHH and F27 for WTI T, each day
+the derivation gives; the three synthetic calendar cases and a `lastday` regression on the same
+expiries; a strip observing each month on its own pen day; the N27 lifecycle in the kernel and
+through the worksheet entries, long and short, with the quotes and fixings read per state,
+the tick over the same preparation, the corrected fixing through a new history, the
+underlying's final settle moved and the pen unmoved, a fixed pen inside a live market reading
+no quote; the WTI pen's thousand-barrel lots in dollars a barrel; the batch of the long and the
+short against each alone and in either order; a series without the pen day's settle refused by
+the fixings creator for the gap and by the history for the missing day, before any trade; the
+resolution's ledgers at five rows and two thousand, the pen adding one read of the holiday
+calendar and one look at the expiries and nothing per row. The smoke runs the WTI T analogue on
+its chain, the host the pen on its, and the kept workbook holds the PHH lifecycle from row 1366
+of the handles sheet, eight states as rows beside the toy's seven.

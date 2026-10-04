@@ -268,7 +268,8 @@ payment from it, for PHH and ICE WTI. I6, #142, uses the dated representation fo
 financial payment lifecycle under `lastday`. Observation dates must never be replaced by
 payment dates to join these pieces.
 
-Penultimate booking belongs to R1. Asian/last3day booking, hourly or other time grids,
+Penultimate booking is R1's, built in #NN on this dated path. Asian/last3day booking, hourly or
+other time grids,
 bilateral discounting and DV01, physical delivery, an entirely ended market calendar, incremental fixing updates,
 selective tick recalculation and several contracts on one observation date remain separate
 slices. Compact arrays versus dense storage is an implementation choice; the dated identities

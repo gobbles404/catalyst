@@ -41,7 +41,7 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 
 | Field | Rule | Refused as |
 |---|---|---|
-| `schedule_method` | `lastday`, the one method built; `asian`, `penultimate` and `last3day` fail by name until they are | `schedule_method is 'asian', expected lastday, the one method built` |
+| `schedule_method` | `lastday` and `penultimate`, the two methods built; `asian` and `last3day` fail by name until they are | `schedule_method is 'asian', expected lastday or penultimate, the two methods built` |
 | `route` | `cleared` or `bilateral`, exactly | `route is 'Cleared', expected cleared or bilateral` |
 | `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
 | `quantity_unit` | `LOT`, the one unit built, the kernel's own rule | `quantity_unit is 'lot', expected LOT, the one quantity unit built` |

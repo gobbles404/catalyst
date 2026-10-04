@@ -52,7 +52,7 @@ The batch and the history by reference; per slot whether it has fixed and its li
 
 | Where | What |
 |---|---|
-| `tests/unit/test_trade_valuation.py` | the NG example prepared and read back; the toy's seven states, Z26 fixed and paid on 30 November read back; the seam's refusals in order, a blank, a dead text, a market where the history should be; the library's, another index's history, a physical contract past its expiry |
+| `tests/unit/test_trade_valuation.py` | the NG example prepared and read back; the toy's seven states, Z26 fixed and paid on 30 November read back; the PHH pen's slot on its pen day, live, then fixed; the seam's refusals in order, a blank, a dead text, a market where the history should be; the library's, another index's history, a physical contract past its expiry |
 | `tests/performance/test_trade_valuation_budgets.py` | the call resolves two handles and runs `prepared_trades` and nothing of the encoding, the same at five trades and at two thousand; 8,912 bytes at 2,500 trades over 24 slots, by slot and never by trade |
 | `tools/excel_smoke.ps1` | the smoke's chain, the handle's text, the reader, the three refusals |
 | `tools/excel_lifetime.ps1 -Groups trades` | prepared against the chain's history, reused as it is through a price tick |

@@ -50,10 +50,12 @@ class Settlement(Enum):
 
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day, is the one method built; asian, penultimate and last3day join it here when
-    they are built, and until then are refused by name where a ticket names them."""
+    last trading day, and penultimate, the settlement on the business day before it, are the two
+    methods built; asian and last3day join them here when they are built, and until then are
+    refused by name where a ticket names them."""
 
     LASTDAY = "lastday"
+    PENULTIMATE = "penultimate"
 
 
 class QuantityPer(Enum):
@@ -67,10 +69,11 @@ class QuantityPer(Enum):
 class PaymentTerms:
     """How a financial settlement pays, kept with the days it gives so that a batch explains its
     own payment days. Per occurrence: lag_days[i], the positive whole number of business days
-    after a contract's expiry the occurrence pays, `+2bd` read once as 2, and calendar[i], the
-    holiday calendar those days are counted on, the object the ticket's handle stood for, held by
-    reference. Per component: date[k], the day it pays, counted from its contract's expiry by its
-    occurrence's lag on its occurrence's calendar."""
+    after a component's last observation day the occurrence pays, `+2bd` read once as 2, and
+    calendar[i], the holiday calendar those days are counted on, the object the ticket's handle
+    stood for, held by reference. Per component: date[k], the day it pays, counted from its last
+    observation day, its contract's expiry under lastday and the business day before under
+    penultimate, by its occurrence's lag on its occurrence's calendar."""
 
     lag_days: NDArray[np.int64]
     calendar: tuple[HolidayCalendar, ...]
@@ -150,7 +153,10 @@ def resolved_trades(
     its final price the settlement on that row's expiry day. The specification is a row of the
     index's specifications, since the lot size is read there. The quantity unit is LOT, the one
     unit built; a quantity in MMBTU or barrels waits for the conversion rule that would read it.
-    The occurrences are the ticket's rows: one date each, and one label, clearing house and
+    A penultimate future settles financially: it is cash settled against the settle on the
+    business day before its contract's expiry, and a physical settlement would say a delivery
+    the contract does not make. The occurrences are the ticket's rows: one date each, and one
+    label, clearing house and
     broker each where those are given. The components are aligned, one or more, each belonging
     to an occurrence, every occurrence holding at least one, since a trade with no contract
     month has no economics; each contract is a row of the schedule; each lot count is a whole,
@@ -162,6 +168,7 @@ def resolved_trades(
     instrument is kept as the definition the terms stand under, and read for nothing here.
     """
     schedule = _the_batch(index, specification, quantity_unit)
+    _the_method(schedule_method, settlement)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_components(
         occurrence, contract, lots, fixed_price, labels, occurrences, len(schedule.codes)
@@ -211,6 +218,24 @@ def _the_batch(index: Index, specification: int, quantity_unit: str) -> FuturesS
         )
     lot_unit("quantity_unit", quantity_unit)
     return schedule
+
+
+def _the_method(schedule_method: ScheduleMethod, settlement: Settlement) -> None:
+    """The method and the settlement together: a penultimate future is cash settled against the
+    settle on the business day before its contract's expiry, so a physical settlement is refused;
+    lastday settles either way."""
+    match schedule_method:
+        case ScheduleMethod.LASTDAY:
+            return
+        case ScheduleMethod.PENULTIMATE:
+            if settlement is Settlement.PHYSICAL:
+                raise ValueError(
+                    "settlement is 'physical', expected 'financial' with the penultimate method; "
+                    "a penultimate future is cash settled on the business day before its "
+                    "contract's expiry"
+                )
+        case _:
+            assert_never(schedule_method)
 
 
 def _the_occurrences(

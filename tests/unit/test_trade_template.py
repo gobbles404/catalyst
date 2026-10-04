@@ -144,11 +144,11 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
         ),
         (
             {"schedule_method": "asian"},
-            "schedule_method is 'asian', expected lastday, the one method built",
+            "schedule_method is 'asian', expected lastday or penultimate, the two methods built",
         ),
         (
             {"schedule_method": "Lastday"},
-            "schedule_method is 'Lastday', expected lastday, the one method built",
+            "schedule_method is 'Lastday', expected lastday or penultimate, the two methods built",
         ),
         ({"route": "Cleared"}, "route is 'Cleared', expected cleared or bilateral"),
         (
@@ -182,7 +182,7 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
         ),
         (
             {"quantity_unit": "LOT", "route": "cleared", "schedule_method": "pen"},
-            "schedule_method is 'pen', expected lastday, the one method built",
+            "schedule_method is 'pen', expected lastday or penultimate, the two methods built",
         ),
         ({"quantity": 0.0}, "quantity is 0.0, expected a nonzero quantity"),
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number of lots"),

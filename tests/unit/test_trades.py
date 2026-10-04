@@ -61,6 +61,11 @@ def numbers(*values: float) -> NDArray[np.float64]:
     return np.array(values, dtype=np.float64)
 
 
+def observed_of(terms: ResolvedTrades) -> Observations:
+    """The observations the terms' schedule method gives them, as resolution makes them."""
+    return observed(terms.schedule_method, terms.index, terms.contract)
+
+
 # --- the page's static facts ----------------------------------------------------------------
 # Henry Hub NYMEX: USD per MMBTU, ENERGY measured in MMBTU; one specification, NYMEX NG, 10,000
 # MMBTU a lot and no fees; the schedule X26, Z26 and F27, X26 the preceding contract the calendar
@@ -184,7 +189,7 @@ def evaluated(
     counter = WorkCounter()
     enc = encoded(
         terms_of(ix, settlement, pays, keep),
-        observed(terms_of(ix, settlement, pays, keep)),
+        observed_of(terms_of(ix, settlement, pays, keep)),
         UNITS,
         counter,
     )
@@ -355,7 +360,7 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
 
 def test_the_ng_rows_encode_as_the_page_says() -> None:
     counter = WorkCounter()
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, counter)
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, counter)
     np.testing.assert_array_equal(enc.quantity, [100_000, -40_000, 70_000, -120_000, 100_000])
     np.testing.assert_array_equal(enc.coefficient, enc.quantity)  # dollars quoted, dollars paid
     np.testing.assert_array_equal(enc.offset, [-310_000, 126_000, -238_000, 402_000, -310_000])
@@ -384,9 +389,9 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
 
 
 def test_a_duplicate_occurrence_adds_its_exposure_twice() -> None:
-    whole = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    whole = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     without = encoded(
-        terms_of(keep=slice(0, 4)), observed(terms_of(keep=slice(0, 4))), UNITS, WorkCounter()
+        terms_of(keep=slice(0, 4)), observed_of(terms_of(keep=slice(0, 4))), UNITS, WorkCounter()
     )
     assert whole.slot_exposure[0] - without.slot_exposure[0] == 100_000
     assert whole.offset_of_group[0] - without.offset_of_group[0] == -310_000
@@ -397,14 +402,14 @@ def test_a_lot_in_another_unit_than_the_quote_is_converted_once() -> None:
     crude = an_index(
         "crude", quote=("USD", "GAL"), measure=("VOLUME", "BBL"), lot=("NYMEX", 1_000.0, "BBL")
     )
-    enc = encoded(terms_of(crude), observed(terms_of(crude)), UNITS, WorkCounter())
+    enc = encoded(terms_of(crude), observed_of(terms_of(crude)), UNITS, WorkCounter())
     np.testing.assert_allclose(enc.quantity, LOTS * 42_000)
     np.testing.assert_allclose(enc.offset, -LOTS * 42_000 * FIXED_PRICE)
 
 
 def test_a_price_in_cents_settles_in_dollars() -> None:
     cents = an_index("cents", quote=("CENT", "MMBTU"))
-    enc = encoded(terms_of(cents), observed(terms_of(cents)), UNITS, WorkCounter())
+    enc = encoded(terms_of(cents), observed_of(terms_of(cents)), UNITS, WorkCounter())
     np.testing.assert_array_equal(enc.quantity, LOTS * 10_000)  # MMBTU, the physical quantity
     np.testing.assert_allclose(enc.coefficient, LOTS * 100)  # USD per cent per MMBTU
     np.testing.assert_allclose(enc.offset, -LOTS * 100 * FIXED_PRICE)
@@ -433,7 +438,7 @@ def one_lot_in_cents(
         numbers(1), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
     history = history_on(CENTS, as_of, finals)
-    prep = prepared_trades(encoded(terms, observed(terms), UNITS, counter), history, counter)
+    prep = prepared_trades(encoded(terms, observed_of(terms), UNITS, counter), history, counter)
     return trade_results(prep, quoted(history, *quotes), counter), counter
 
 
@@ -475,7 +480,7 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
 def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
     enc = encoded(
         terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS),
-        observed(terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)),
+        observed_of(terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)),
         UNITS,
         WorkCounter(),
     )
@@ -505,7 +510,7 @@ def test_payment_days_that_cannot_be_encoded_say_why(
     with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
         encoded(
             terms_of(TOY, Settlement.FINANCIAL, pays),
-            observed(terms_of(TOY, Settlement.FINANCIAL, pays)),
+            observed_of(terms_of(TOY, Settlement.FINANCIAL, pays)),
             UNITS,
             WorkCounter(),
         )
@@ -516,7 +521,7 @@ def test_payment_days_that_cannot_be_encoded_say_why(
 
 def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> None:
     counter = WorkCounter()
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     prep = prepared_trades(enc, history_on(NG, "2026-11-24", {}), counter)
     np.testing.assert_array_equal(prep.is_fixed, [False, False])
     np.testing.assert_array_equal(prep.is_settled, [False, False])
@@ -532,7 +537,7 @@ def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> No
 
 
 def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() -> None:
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     on_the_day = prepared_trades(enc, history_on(NG, "2026-11-25", {}), WorkCounter())
     np.testing.assert_array_equal(on_the_day.is_fixed, [False, False])
     with pytest.raises(ValueError) as refused:
@@ -544,7 +549,7 @@ def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() 
 
 
 def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     twin = an_index()  # the same facts, another object
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(twin, "2026-11-24", {}), WorkCounter())
@@ -559,7 +564,7 @@ def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices
         QuantityPer.MONTH, None, None, None, dates("2026-09-24"), rows(0), rows(0), numbers(1),
         numbers(3.0), None,
     )  # fmt: skip
-    enc = encoded(boundary, observed(boundary), UNITS, WorkCounter())
+    enc = encoded(boundary, observed_of(boundary), UNITS, WorkCounter())
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
@@ -584,7 +589,7 @@ def test_a_contract_expiring_on_a_closed_day_is_refused_when_the_batch_is_encode
     )
     terms = terms_of(closed, Settlement.FINANCIAL, TOY_PAYS)
     with pytest.raises(ValueError) as refused:
-        encoded(terms, observed(terms), UNITS, WorkCounter())
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
         "trade 'NG-001' at row 1 observes Z26 on 2026-11-26, a day the index's market is closed; "
         "no settle exists or will"
@@ -632,7 +637,7 @@ def test_the_batch_equals_its_five_singletons_summed_and_the_duplicate_counts() 
 
 
 def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
     prep = prepared_trades(enc, history, WorkCounter())
     before = (
@@ -653,7 +658,7 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
 
 
 def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -> None:
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     prep = prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     other = history_on(NG, "2026-11-23", {})  # the same index, another valuation date
     with pytest.raises(ValueError) as refused:
@@ -665,7 +670,7 @@ def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -
 
 
 def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market() -> None:
-    enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
+    enc = encoded(terms_of(), observed_of(terms_of()), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
     prep = prepared_trades(enc, history, WorkCounter())
     with pytest.raises(
@@ -677,7 +682,7 @@ def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market()
 def test_a_bilateral_batch_is_refused_until_rates_exist() -> None:
     enc = encoded(
         terms_of(route=Route.BILATERAL),
-        observed(terms_of(route=Route.BILATERAL)),
+        observed_of(terms_of(route=Route.BILATERAL)),
         UNITS,
         WorkCounter(),
     )
@@ -769,7 +774,7 @@ def test_the_settled_contracts_amounts_are_the_singletons_summed() -> None:
 def test_a_fully_fixed_batch_inside_a_live_market_reads_no_quote() -> None:
     enc = encoded(
         terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS),
-        observed(terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)),
+        observed_of(terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)),
         UNITS,
         WorkCounter(),
     )
@@ -782,6 +787,215 @@ def test_a_fully_fixed_batch_inside_a_live_market_reads_no_quote() -> None:
     assert result.dated_live_contribution.size == 0
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 0}
     assert result.market.first_contract == 3  # G27, quoted and held by no trade
+
+
+# --- the penultimate method: ICE PHH on the NYMEX NG index -----------------------------------
+# penultimate-trades.md's N27 example: the NG index of 2027 with M27 before and Q27 after, each
+# expiring on the third-last business day of the month before, the pricing calendar closing
+# Memorial Day and the observed Independence Day; the ICE lot of 2,500 MMBTU a specification of
+# the index; two long lots at 3.00. The pen observes the business day before N27's expiry, Friday
+# 25 June, and pays one clearing business day after it, Monday 28 June, the resolved day supplied
+# here beside the lag and the calendar that gave it, as the toy's are.
+
+PHH = an_index(
+    "Henry Hub NYMEX",
+    (("M27", "2027-05-26"), ("N27", "2027-06-28"), ("Q27", "2027-07-28")),
+    ("2027-05-31", "2027-07-05"),
+    lot=("ICE PHH", 2_500.0, "MMBTU"),
+)
+CLEARING_CALENDAR = holiday_calendar(dates("2027-05-31", "2027-08-30"))
+
+
+def pen_terms(
+    lots: float = 2.0,
+    method: ScheduleMethod = ScheduleMethod.PENULTIMATE,
+    settlement: Settlement = Settlement.FINANCIAL,
+    pays: str = "2027-06-28",
+) -> ResolvedTrades:
+    """One trade of that many lots of N27 at 3.00 on the PHH index, financial unless said."""
+    payment = (
+        None
+        if settlement is Settlement.PHYSICAL
+        else PaymentTerms(np.full(1, 1), (CLEARING_CALENDAR,), dates(pays))
+    )
+    return resolved_trades(
+        FUTURE,
+        PHH,
+        0,
+        Route.CLEARED,
+        settlement,
+        method,
+        "LOT",
+        QuantityPer.MONTH,
+        ("PHH-1",),
+        ("ICE Clear Europe",),
+        None,
+        dates("2027-06-01"),
+        rows(0),
+        rows(1),
+        numbers(lots),
+        numbers(3.0),
+        payment,
+    )
+
+
+def history_by_day(ix: Index, as_of: str, settles: dict[str, float]) -> MarketHistory:
+    """The index's history valued on that day: a settle of 3.00 on every fixed business day of
+    its calendar, the settles given standing on their days, newest first as the creator takes
+    them."""
+    cal = calendar(valuation_date(day(as_of), 0.5), ix)
+    priced = cal.dates[cal.is_fixed & cal.is_priced]
+    prices = np.full(priced.size, 3.0)
+    for text, price in settles.items():
+        prices[priced == day(text)] = price
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+
+
+def pen_evaluated(
+    as_of: str, settles: dict[str, float], quotes: tuple[float, ...], lots: float = 2.0
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = pen_terms(lots)
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_by_day(PHH, as_of, settles)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_the_penultimate_method_observes_the_business_day_before_each_expiry() -> None:
+    obs = observed(ScheduleMethod.PENULTIMATE, PHH, rows(0, 1, 2))
+    np.testing.assert_array_equal(obs.date, dates("2027-05-25", "2027-06-25", "2027-07-27"))
+    np.testing.assert_array_equal(obs.component, [0, 1, 2])
+    np.testing.assert_array_equal(obs.weight, [1.0, 1.0, 1.0])
+    # The synthetic case: a Friday the market closes before a Monday expiry gives Thursday, the
+    # pricing calendar's business day, whatever the payment calendar says of that Friday.
+    friday_closed = an_index(
+        "x",
+        (("M27", "2027-05-26"), ("N27", "2027-06-28")),
+        ("2027-06-25",),
+        lot=("p", 1.0, "MMBTU"),
+    )
+    assert observed(ScheduleMethod.PENULTIMATE, friday_closed, rows(1)).date[0] == day("2027-06-24")
+    # lastday is the expiry itself, as before.
+    np.testing.assert_array_equal(
+        observed(ScheduleMethod.LASTDAY, PHH, rows(0, 1)).date, dates("2027-05-26", "2027-06-28")
+    )
+
+
+def test_an_expiry_the_market_closes_is_refused_under_penultimate_rather_than_rolled() -> None:
+    thanksgiving = an_index(
+        "x",
+        (("X26", "2026-10-28"), ("Z26", "2026-11-26")),
+        ("2026-11-26",),
+        lot=("p", 1.0, "MMBTU"),
+    )
+    with pytest.raises(ValueError) as refused:
+        observed(ScheduleMethod.PENULTIMATE, thanksgiving, rows(1))
+    assert str(refused.value) == (
+        "Z26 expires on 2026-11-26, a day the index's market is closed; the penultimate method "
+        "takes the business day before an expiry the market prices"
+    )
+
+
+def test_a_physical_penultimate_future_is_refused_by_the_kernel() -> None:
+    with pytest.raises(ValueError) as refused:
+        pen_terms(settlement=Settlement.PHYSICAL)
+    assert str(refused.value) == (
+        "settlement is 'physical', expected 'financial' with the penultimate method; a "
+        "penultimate future is cash settled on the business day before its contract's expiry"
+    )
+
+
+def test_the_pen_encodes_one_slot_on_the_day_before_expiry_referencing_its_contract() -> None:
+    terms = pen_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.slot_date, dates("2027-06-25"))
+    np.testing.assert_array_equal(enc.slot_reference, [1])  # N27 prices its own pen day
+    np.testing.assert_array_equal(enc.slot_exposure, [5_000.0])  # two lots of 2,500 MMBTU
+    np.testing.assert_array_equal(enc.offset, [-15_000.0])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-06-28"))
+    assert enc.named_slot(0) == "trade 'PHH-1' at row 1 observes N27 on 2027-06-25"
+
+
+# The page's three states and the hand answers: live on the pen day itself, fixed on the Saturday
+# after with Monday's payment ahead, paid on the Monday; the quotes those of N27 and Q27, the
+# contracts the market still quotes, and the quotes and fixings read.
+PEN_LIFECYCLE: list[tuple[str, dict[str, float], tuple[float, ...], int, int, int, int, int]] = [
+    ("2027-06-25", {}, (3.10, 3.15), 500, 0, 5_000, 1, 0),
+    ("2027-06-26", {"2027-06-25": 3.20}, (3.10, 3.15), 1_000, 0, 0, 0, 1),
+    ("2027-06-28", {"2027-06-25": 3.20}, (3.10, 3.15), 0, 1_000, 0, 0, 1),
+]
+
+
+@pytest.mark.parametrize(
+    ("as_of", "settles", "quotes", "mark", "cash", "delta", "live_reads", "fixings_read"),
+    PEN_LIFECYCLE,
+    ids=["live on the pen day", "fixed, unpaid", "paid"],
+)
+@pytest.mark.parametrize("lots", [2.0, -2.0], ids=["long", "short"])
+def test_the_phh_pen_marks_fixes_and_pays_as_the_page_says(
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+    live_reads: int,
+    fixings_read: int,
+    lots: float,
+) -> None:
+    sign = 1 if lots > 0 else -1
+    result, counter = pen_evaluated(as_of, settles, quotes, lots)
+    assert result.mark == pytest.approx(sign * mark)
+    assert result.cash == pytest.approx(sign * cash)
+    assert result.delta_total == pytest.approx(sign * delta)
+    assert result.codes() == ("N27",)
+    assert result.dv01 == 0.0
+    counts = counter.freeze()
+    assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
+        live_reads,
+        fixings_read,
+        1,
+    )
+
+
+def test_a_tick_moves_the_live_pen_and_a_corrected_fixing_takes_a_new_history() -> None:
+    terms = pen_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    live = history_by_day(PHH, "2027-06-25", {})
+    prep = prepared_trades(enc, live, WorkCounter())
+    assert trade_results(prep, quoted(live, 3.10, 3.15), WorkCounter()).mark == pytest.approx(500)
+    assert trade_results(prep, quoted(live, 3.11, 3.15), WorkCounter()).mark == pytest.approx(550)
+    fixed = history_by_day(PHH, "2027-06-26", {"2027-06-25": 3.20})
+    corrected = history_by_day(PHH, "2027-06-26", {"2027-06-25": 3.21})
+    assert trade_results(
+        prepared_trades(enc, fixed, WorkCounter()), quoted(fixed, 3.10, 3.15), WorkCounter()
+    ).mark == pytest.approx(1_000)
+    assert trade_results(
+        prepared_trades(enc, corrected, WorkCounter()),
+        quoted(corrected, 3.10, 3.15),
+        WorkCounter(),
+    ).mark == pytest.approx(1_050)
+    # The underlying's own final settle, on 28 June, is another day's fixing: it stands in the
+    # history and changes nothing of the pen, which read the 25th.
+    for final in (3.25, 3.35):
+        paid = history_by_day(PHH, "2027-06-29", {"2027-06-25": 3.21, "2027-06-28": final})
+        result = trade_results(
+            prepared_trades(enc, paid, WorkCounter()), quoted(paid, 3.15), WorkCounter()
+        )
+        assert (result.mark, result.cash) == (0.0, pytest.approx(1_050))
+
+
+def test_a_fixed_pen_inside_a_live_market_reads_no_quote_whatever_the_underlying_does() -> None:
+    results = [
+        pen_evaluated("2027-06-26", {"2027-06-25": 3.20}, quotes)
+        for quotes in ((3.10, 3.15), (3.50, 3.55))
+    ]
+    for result, counter in results:
+        assert (result.mark, result.delta_total) == (pytest.approx(1_000), 0.0)
+        assert counter.freeze()["live_prices_read"] == 0
+        assert result.prepared.live_references.size == 0
+    assert results[0][0].market.first_contract == 1  # N27, still quoted, read by no slot
 
 
 # --- the dated axis: the daily toy of dated-exposure.md ---------------------------------------
@@ -1156,7 +1370,7 @@ def test_any_batch_equals_its_singletons_summed(
         )  # fmt: skip
         history = history_on(NG, "2026-11-24", {})
         prep = prepared_trades(
-            encoded(terms, observed(terms), UNITS, WorkCounter()), history, WorkCounter()
+            encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
         )
         return trade_results(prep, quoted(history, *quotes), WorkCounter())
 

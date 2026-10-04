@@ -68,19 +68,24 @@ NG_ROWS: list[list[object]] = [
 
 
 def an_index(
-    name: str, contracts: list[tuple[str, str]], holidays: list[str], lot: tuple[str, float]
+    name: str,
+    contracts: list[tuple[str, str]],
+    holidays: list[str],
+    lot: tuple[str, float],
+    measure: tuple[str, str] = ("ENERGY", "MMBTU"),
 ) -> tuple[str, str]:
-    """An index of those contracts and holidays through the seam, and its holiday calendar."""
+    """An index of those contracts and holidays through the seam, quoted in USD per the measure's
+    unit with one specification of that many units a lot, and its holiday calendar."""
     schedule = ENTRY["_CreateFuturesSchedule"](
         rows(*[[code] for code, _ in contracts]),
         column([serial(expiry) for _, expiry in contracts]),
         bridge.MISSING,
     )
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in holidays]))
-    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    conventions = ENTRY["_CreateIndexConventions"]("USD", measure[1], "USD", measure[0], measure[1])
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
-        row(lot[0], lot[1], "MMBTU", 0.0, 0.0),
+        row(lot[0], lot[1], measure[1], 0.0, 0.0),
     )
     return str(ENTRY["_CreateIndex"](name, schedule, conventions, specifications, calendar)), str(
         calendar
@@ -366,6 +371,257 @@ def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(
         "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-11-25, "
         "expected a fixing for every fixed day in calendar"
     )
+
+
+# --- the penultimate futures on the sheet: ICE PHH and ICE WTI T ------------------------------
+# penultimate-trades.md's example: the NG index of 2027, M27 before and Q27 after N27, the pricing
+# calendar closing Memorial Day and the observed Independence Day, the ICE lot of 2,500 MMBTU one
+# of its specifications; the pen template, cleared through ICE Clear Europe, paying one business
+# day after the pen day on a clearing calendar; two long lots of N27 at 3.00.
+
+PHH_HOLIDAYS = ["2027-05-31", "2027-07-05"]
+PEN_FIELDS = (
+    "contract_specification",
+    "quantity_unit",
+    "quantity_per",
+    "schedule_method",
+    "route",
+    "settlement_method",
+    "clearing_house",
+    "payment_time_lag",
+    "payment_holiday_calendar",
+)
+
+
+def pen_template(specification: str, clearing: str) -> str:
+    return str(
+        ENTRY["_CreateTradeTemplate"](
+            "future",
+            row(*PEN_FIELDS),
+            row(
+                specification,
+                "LOT",
+                "month",
+                "penultimate",
+                "cleared",
+                "financial",
+                "ICE Clear Europe",
+                "+1bd",
+                clearing,
+            ),
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def phh() -> dict[str, Any]:
+    index, _ = an_index(
+        "Henry Hub NYMEX",
+        [("M27", "2027-05-26"), ("N27", "2027-06-28"), ("Q27", "2027-07-28")],
+        PHH_HOLIDAYS,
+        ("ICE PHH", 2_500.0),
+    )
+    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
+    template = pen_template("ICE PHH", str(clearing))
+    headers = row(*NG_HEADERS)
+    long = ["PHH-1", serial("2027-06-01"), "N27", 2.0, 3.0]
+    short = ["PHH-2", serial("2027-06-01"), "n27", -2.0, 3.0]
+    return {
+        "index": index,
+        "template": template,
+        "headers": headers,
+        "long": long,
+        "short": short,
+        "trades": ENTRY["_CreateTrades"](index, headers, rows(long), template),
+    }
+
+
+def phh_state(
+    phh: dict[str, Any], as_of: str, settles: dict[str, float], quotes: tuple[float, ...]
+) -> tuple[str, str, str]:
+    """One state of the pen's life: the history valued that day with those settles on their
+    days, the market quoting from the prompt on, the batch prepared and evaluated; the history,
+    the prepared and the results handles."""
+    history = a_history(phh["index"], "2027-05-27", as_of, PHH_HOLIDAYS, settles)
+    market = a_market(history, "Henry Hub NYMEX", *quotes)
+    prepared = ENTRY["_PrepareTrades"](phh["trades"], history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+PEN_FIXED = {"2027-06-25": 3.20}
+PEN_CORRECTED = {"2027-06-25": 3.21}
+
+
+@pytest.mark.parametrize(
+    ("as_of", "settles", "quotes", "mark", "cash", "delta"),
+    [
+        ("2027-06-25", {}, (3.10, 3.15), 500, 0, 5_000),
+        ("2027-06-26", PEN_FIXED, (3.10, 3.15), 1_000, 0, 0),
+        ("2027-06-28", PEN_FIXED, (3.10, 3.15), 0, 1_000, 0),
+    ],
+    ids=["25 Jun, live on the pen day", "26 Jun, fixed, unpaid", "28 Jun, paid"],
+)
+def test_the_phh_pen_values_on_the_sheet_as_the_page_says(
+    phh: dict[str, Any],
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, _, results = phh_state(phh, as_of, settles, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+    values = spilled(ENTRY["_ReportValues"](results))[2]
+    assert values[2:] == ["USD", serial(as_of)]
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per USD/MMBTU"
+
+
+def test_the_pens_dates_read_back_from_the_batch_and_the_preparation(phh: dict[str, Any]) -> None:
+    batch = spilled(ENTRY["util_ReadHandle"](phh["trades"]))
+    assert batch[0][batch[0].index("payment_date")] == "payment_date"
+    assert batch[2][batch[0].index("payment_time_lag")] == "+1bd"
+    assert batch[2][batch[0].index("payment_date")] == serial("2027-06-28")
+    assert batch[2][batch[0].index("contract_code")] == "N27"
+    assert batch[2][batch[0].index("quote_quantity")] == 5_000.0
+    _, prepared, _ = phh_state(phh, "2027-06-25", {}, (3.10, 3.15))
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))
+    assert slots[2] == ["N27", serial("2027-06-25"), False, False, 5_000.0]
+
+
+def test_a_tick_moves_the_live_pen_on_the_same_preparation(phh: dict[str, Any]) -> None:
+    history, prepared, results = phh_state(phh, "2027-06-25", {}, (3.10, 3.15))
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "Henry Hub NYMEX", 3.11, 3.15))
+    assert valued(str(ticked))[0] == pytest.approx(550)
+    assert valued(results)[0] == pytest.approx(500)
+
+
+def test_a_corrected_pen_fixing_takes_a_new_history_and_the_underlyings_final_changes_nothing(
+    phh: dict[str, Any],
+) -> None:
+    _, _, corrected = phh_state(phh, "2027-06-26", PEN_CORRECTED, (3.10, 3.15))
+    assert valued(corrected) == (pytest.approx(1_050), 0.0, 0.0)
+    # On 29 June the pen has paid and N27 has expired; its settle of the 28th stands in the
+    # history, at 3.25 or at 3.35, and the pen's amount is the 25th's either way.
+    for final in (3.25, 3.35):
+        _, _, paid = phh_state(phh, "2027-06-29", {**PEN_CORRECTED, "2027-06-28": final}, (3.15,))
+        assert valued(paid) == (0.0, pytest.approx(1_050), 0.0)
+
+
+def test_a_fixed_pen_inside_a_live_market_is_unmoved_by_the_underlyings_quote(
+    phh: dict[str, Any],
+) -> None:
+    _, prepared, quiet = phh_state(phh, "2027-06-26", PEN_FIXED, (3.10, 3.15))
+    _, _, loud = phh_state(phh, "2027-06-26", PEN_FIXED, (3.50, 3.55))
+    assert valued(quiet) == valued(loud) == (pytest.approx(1_000), 0.0, 0.0)
+    assert spilled(ENTRY["util_ReadHandle"](prepared))[2] == [
+        "N27",
+        serial("2027-06-25"),
+        True,
+        False,
+        0.0,
+    ]
+
+
+def test_the_short_pen_and_the_long_sum_to_nothing_and_each_equals_itself_alone(
+    phh: dict[str, Any],
+) -> None:
+    both = ENTRY["_CreateTrades"](
+        phh["index"], phh["headers"], rows(phh["long"], phh["short"]), phh["template"]
+    )
+    reversed_rows = ENTRY["_CreateTrades"](
+        phh["index"], phh["headers"], rows(phh["short"], phh["long"]), phh["template"]
+    )
+    short = ENTRY["_CreateTrades"](
+        phh["index"], phh["headers"], rows(phh["short"]), phh["template"]
+    )
+    history = a_history(phh["index"], "2027-05-27", "2027-06-28", PHH_HOLIDAYS, PEN_FIXED)
+    market = a_market(history, "Henry Hub NYMEX", 3.10, 3.15)
+
+    def cash_of(batch: object) -> float:
+        results = ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](batch, history), market)
+        return valued(str(results))[1]
+
+    assert cash_of(short) == pytest.approx(-1_000)
+    assert cash_of(both) == pytest.approx(0.0) == cash_of(reversed_rows)
+    assert cash_of(phh["trades"]) + cash_of(short) == pytest.approx(cash_of(both))
+
+
+def test_a_series_without_the_pen_days_settle_is_refused_before_any_trade_is_prepared(
+    phh: dict[str, Any],
+) -> None:
+    # The settle of the 25th is a fixing like any other. A series that skips it but holds the
+    # underlying's final settle of the 28th is refused by the fixings creator for the gap; a
+    # series that stops the day before is refused by the history valued after the 25th. Either
+    # way no trade is prepared, and the final settle never stands in for the pen fixing.
+    days = np.arange(np.datetime64("2027-05-27", "D"), np.datetime64("2027-06-29", "D"))
+    days = days[np.is_busday(days, holidays=np.array(PHH_HOLIDAYS, dtype="datetime64[D]"))]
+    gap = days[days != np.datetime64("2027-06-25", "D")]
+    assert ENTRY["_CreateFuturesFixings"](
+        column([serial(str(d)) for d in gap[::-1]]), column([3.0] * gap.size), phh["index"]
+    ) == (
+        "#ERROR _CreateFuturesFixings: ValueError: date row 2 is 2027-06-24, expected "
+        "2027-06-25, the business day before row 1's 2027-06-28"
+    )
+    short = days[days < np.datetime64("2027-06-25", "D")]
+    fixings = ENTRY["_CreateFuturesFixings"](
+        column([serial(str(d)) for d in short[::-1]]), column([3.0] * short.size), phh["index"]
+    )
+    calendar = ENTRY["_CreateCalendar"](
+        ENTRY["_CreateValuationDate"](serial("2027-06-29"), 0.5), phh["index"]
+    )
+    assert ENTRY["_CreateMarketHistory"](calendar, fixings) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2027-06-25, "
+        "expected a fixing for every fixed day in calendar"
+    )
+
+
+def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -> None:
+    fields = tuple(name for name in PEN_FIELDS if not name.startswith("payment_"))
+    physical = ENTRY["_CreateTradeTemplate"](
+        "future",
+        row(*fields),
+        row("ICE PHH", "LOT", "month", "penultimate", "cleared", "physical", "ICE Clear Europe"),
+    )
+    assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
+        "#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with "
+        "the penultimate method; a penultimate future is cash settled on the business day before "
+        "its contract's expiry"
+    )
+
+
+def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> None:
+    # ICE WTI T F27 on a CL index in barrels: the pen day Friday 18 December 2026, the payment
+    # Monday the 21st, the underlying's expiry. Three lots at 60.00: live on 17 December at 61.00,
+    # 3,000 of mark and a delta of 3,000 USD per USD/BBL; paid on the 21st at a pen fixing of
+    # 61.50, 4,500 of cash.
+    holidays = ["2026-11-26", "2026-12-25", "2027-01-01", "2027-01-18"]
+    index, _ = an_index(
+        "WTI NYMEX",
+        [("Z26", "2026-11-20"), ("F27", "2026-12-21"), ("G27", "2027-01-20")],
+        holidays,
+        ("ICE WTI T", 1_000.0),
+        ("VOLUME", "BBL"),
+    )
+    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2026-12-25"), serial("2026-12-28")]))
+    template = pen_template("ICE WTI T", str(clearing))
+    trades = ENTRY["_CreateTrades"](
+        index, row(*NG_HEADERS), rows(["T-1", serial("2026-12-01"), "F27", 3.0, 60.0]), template
+    )
+    batch = spilled(ENTRY["util_ReadHandle"](trades))
+    assert batch[2][batch[0].index("payment_date")] == serial("2026-12-21")
+    assert batch[2][batch[0].index("quote_quantity")] == 3_000.0
+    live = a_history(index, "2026-11-23", "2026-12-17", holidays, {})
+    results = ENTRY["_EvaluateTrades"](
+        ENTRY["_PrepareTrades"](trades, live), a_market(live, "WTI NYMEX", 61.0, 61.5)
+    )
+    assert valued(str(results)) == (pytest.approx(3_000), 0.0, pytest.approx(3_000))
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per USD/BBL"
+    paid = a_history(index, "2026-11-23", "2026-12-21", holidays, {"2026-12-18": 61.5})
+    results = ENTRY["_EvaluateTrades"](
+        ENTRY["_PrepareTrades"](trades, paid), a_market(paid, "WTI NYMEX", 61.0, 61.5)
+    )
+    assert valued(str(results)) == (0.0, pytest.approx(4_500), 0.0)
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------
