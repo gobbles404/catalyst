@@ -261,6 +261,13 @@ def test_the_cell_builder_lays_cells_out_as_given_with_the_texts_in_sheet_order(
     np.testing.assert_array_equal(grid.numeric_slots[:, 1:], [[1.0, 2.5], [0.0, 3.0]])
     assert grid.texts == ("a", "b")
     assert MixedArray.cells([["x"]]).shape == (1, 1)
+    # A whole number a cell holds exactly, 2^53 either side, goes out as the float it is; one
+    # beyond is refused rather than rounded, as the number and table results refuse it.
+    edge = MixedArray.cells([[2**53, -(2**53), 0.5]])
+    np.testing.assert_array_equal(
+        edge.numeric_slots, [[9007199254740992.0, -9007199254740992.0, 0.5]]
+    )
+    assert (edge.kinds == NUMBER_CODE).all()
 
 
 BAD_GRIDS: list[tuple[list[list[object]], str]] = [
@@ -269,6 +276,11 @@ BAD_GRIDS: list[tuple[list[list[object]], str]] = [
     ([["a", "b"], ["c"]], "row 2 holds 1 cells, expected 2, as row 1 does"),
     ([["a", None]], r"cell \(1, 2\) holds nothing, expected a value"),
     ([["a"], [MISSING]], r"cell \(2, 1\) holds nothing, expected a value"),
+    ([[2**53 + 1]], r"cell \(1, 1\) is 9007199254740993, beyond what a cell holds exactly"),
+    (
+        [["a", -(2**53) - 1]],
+        r"cell \(1, 2\) is -9007199254740993, beyond what a cell holds exactly",
+    ),
 ]
 
 

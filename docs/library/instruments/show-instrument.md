@@ -234,14 +234,16 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
-| the cell-wise builder: kinds and texts in sheet order, a ragged grid and a cell holding nothing refused | example |
+| the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
 | twelve functions, the classification once per cell, 112 for the future, and the mixed way out's numpy; a peak of 11,204 bytes, about 100 a cell, within a hundred a cell and the slack; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which
 the mixed way out carries and the seam's table builder, columns of one kind, could not build:
 `MixedArray.cells` lays a small grid out one cell at a time, the way in's classification of a
-cell used once per cell, for grids of a few hundred cells and never for data.
+cell used once per cell, for grids of a few hundred cells and never for data; a whole number
+beyond what a cell holds exactly is refused before it becomes a float, as the number and table
+results refuse one.
 
 ## Not here
 

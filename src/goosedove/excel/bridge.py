@@ -175,7 +175,9 @@ class MixedArray:
         arrangement, for a small descriptive grid whose columns hold more than one kind, such as
         an instrument's schema with its fields across the columns and a row of booleans among its
         rows of text. Every row holds the same count of cells, at least one, and every cell holds
-        a value: a blank or a missing cell is refused here, naming it, before the way out would.
+        a value: a blank or a missing cell is refused here, naming it, before the way out would,
+        and so is a whole number beyond what a cell holds exactly, 2^53 either side, as the
+        number and table results refuse one, before the float it would become could hide it.
 
         Each cell is classified once, the one classification the way in uses, so this costs a
         Python step per cell and is for grids of a few hundred cells, never for data: the table
@@ -197,6 +199,10 @@ class MixedArray:
                 kind, number = _classify(cell)
                 if kind is Kind.BLANK or kind is Kind.MISSING:
                     raise ValueError(f"cell ({r + 1}, {c + 1}) holds nothing, expected a value")
+                if kind is Kind.NUMBER and isinstance(cell, int) and abs(cell) > EXACT:
+                    raise ValueError(
+                        f"cell ({r + 1}, {c + 1}) is {cell}, beyond what a cell holds exactly"
+                    )
                 kinds[r, c], slots[r, c] = int(kind), number
                 if kind is Kind.TEXT:
                     texts.append(str(cell))
