@@ -1,6 +1,6 @@
 # _ListInstruments
 
-Agreed starting reader contract. Not implemented; the seam declaration still needs engineering verification.
+Built in #NN as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md).
 
 Lists the library-defined instrument schemas that can be inspected with
 [_ShowInstrument](show-instrument.md). This is the first read-only surface for the
@@ -24,10 +24,12 @@ It spills a header and one row per inspectable definition, with exactly these tw
 |---|---|
 | future | A position tied to a specified reference contract, with explicit settlement terms. |
 
-This is the proposed first catalog, not a claim that this function currently exists. Start
-with the future schema; add another row when that instrument's field contract is defined and
-inspectable. Catalog inspection can precede construction and evaluation implementation.
-Being listed establishes schema availability, not support for every product or valuation measure.
+This is the first catalog, the one row. Another row comes when that instrument's field contract
+is defined and inspectable. Being listed establishes schema availability, not support for
+every product or valuation measure. The definitions are `src/goosedove/instruments/definitions.py`,
+frozen library data authored and checked there, each name once and nonempty, each description
+nonempty; the function is `src/goosedove/excel/instruments.py`, which lays them out as one table
+of two text columns through the seam's table builder.
 
 The order is the explicit library declaration order. Every identifier is unique and can be
 passed unchanged to `_ShowInstrument`. An empty catalog returns the header alone. Neither
@@ -76,18 +78,18 @@ records the distinction between the reference contract and the actual trade's te
 
 ## Tests
 
-These are implementation acceptance cases, not new tests added by this documentation change.
+`tests/unit/test_instruments.py` holds the examples, `tests/unit/test_help.py` pins the help,
+`tests/performance/test_seam_budgets.py` and `test_seam_allocation.py` the cost, `tools/excel_smoke.ps1`
+the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| Exact two headers, catalog order, descriptions and row count | Example |
-| Every listed identifier is inspectable by `_ShowInstrument` | Property across the shipped catalog |
-| Empty definition collection produces a header-only spill | Example |
-| Repeated reads return equal cells and create no handles or trade/market work | Example and work budget |
-| Real Excel spill preserves headers and text; no implicit type row | Excel smoke |
-
-Formatting/publication has a cost; count its work under the existing measurement policy.
-There must be zero trade resolution, encoding, binding, fixing gathering or evaluation work.
+| the two headers, the future's row and its description, every cell text | example |
+| every listed name is shown by `_ShowInstrument` | example across the catalog |
+| an empty catalog spills the header alone | example |
+| three reads publish nothing: the store's live handles as they were | example |
+| seven calls across seven functions and the mixed way out's numpy, no trade, market or history among them; a peak of 994 bytes, within twice the slack | budget |
+| the header, `future` and the two counts in a real Excel | Excel smoke |
 
 ## Not here
 

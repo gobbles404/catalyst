@@ -355,6 +355,23 @@ $formulas = [ordered]@{
     '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
     "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
     "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
+    # The instrument catalog: the list and the shown future read one cell at a time with INDEX, the
+    # required row booleans among rows of text; a name in another case fails in the library's words
+    # and a blank in the seam's.
+    "=INDEX(_ListInstruments(),1,1)"  = "instrument"
+    "=INDEX(_ListInstruments(),2,1)"  = "future"
+    "=ROWS(_ListInstruments())"       = "2"
+    "=COLUMNS(_ListInstruments())"    = "2"
+    '=INDEX(_ShowInstrument("future"),1,1)'  = "field"
+    '=INDEX(_ShowInstrument("future"),1,2)'  = "trade_id"
+    '=INDEX(_ShowInstrument("future"),3,2)'  = "FALSE"
+    '=INDEX(_ShowInstrument("future"),3,3)'  = "TRUE"
+    '=INDEX(_ShowInstrument("future"),4,9)'  = "route = cleared"
+    '=INDEX(_ShowInstrument("future"),5,16)' = "holiday calendar handle"
+    '=ROWS(_ShowInstrument("future"))'       = "7"
+    '=COLUMNS(_ShowInstrument("future"))'    = "16"
+    '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'"
+    "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the

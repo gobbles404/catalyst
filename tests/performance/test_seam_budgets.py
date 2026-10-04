@@ -2012,3 +2012,62 @@ def test_a_price_vector_is_a_name_and_one_column_in_and_one_copy_out(
         "numpy.array": 1,  # the one copy the vector keeps
         "ndarray.setflags": 1,  # frozen
     }
+
+
+# --- the instrument catalog -------------------------------------------------------------------
+# Two readers of library data, no handle and no numpy of the library's: the list is one table of
+# two text columns, seven calls across seven functions and the mixed way out's looks, the two
+# contiguity checks that copy nothing, the count of the text cells, and two arrays made for the
+# way out. The shown schema is the same way out over seven rows and sixteen columns laid out one
+# cell at a time, the one classification per cell and the generator that feeds it, 112 of each
+# for the future's fifteen fields: the one spill the seam builds per cell, and a new field adds
+# seven to each count.
+def test_the_instrument_list_is_one_table_out(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["_ListInstruments"]()
+    assert call_profile(lambda: PATH["_ListInstruments"]()) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_ListInstruments": 1,
+        "catalog_cells": 1,
+        "MixedArray.table": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    assert numpy_calls(lambda: PATH["_ListInstruments"]()) == {
+        "ndarray.any": 3,
+        "numpy.asarray": 1,
+        "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,
+        "numpy.empty": 2,  # the kinds and the slots of the table
+        "ufunc.reduce": 3,
+    }
+
+
+def test_the_shown_instrument_is_laid_out_once_per_cell(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    PATH["_ShowInstrument"]("future")
+    assert call_profile(lambda: PATH["_ShowInstrument"]("future")) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_text": 1,
+        "_ShowInstrument": 1,
+        "instrument": 1,
+        "schema_cells": 1,
+        "schema_cells.<locals>.<genexpr>": 112,  # seven rows of fifteen fields, and the labels
+        "MixedArray.cells": 1,
+        "_classify": 112,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    assert numpy_calls(lambda: PATH["_ShowInstrument"]("future")) == {
+        "ndarray.any": 3,
+        "numpy.asarray": 1,
+        "numpy.ascontiguousarray": 2,
+        "numpy.count_nonzero": 1,
+        "numpy.empty": 2,
+        "ufunc.reduce": 3,
+    }
