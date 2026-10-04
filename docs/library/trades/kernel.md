@@ -1,6 +1,6 @@
 # The trade kernel
 
-Built in #NN as ticket I1 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md). No worksheet function reaches it yet: the resolved terms are supplied in Python, as the tests supply them, until `_CreateTrades` resolves them from a template and a ticket in ticket I4, and `_PrepareTrades`, `_EvaluateTrades` and the two reports stand on it in ticket I5.
+Built in #136 as ticket I1 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md). No worksheet function reaches it yet: the resolved terms are supplied in Python, as the tests supply them, until `_CreateTrades` resolves them from a template and a ticket in ticket I4, and `_PrepareTrades`, `_EvaluateTrades` and the two reports stand on it in ticket I5.
 
 The four steps of the pipeline as library code, `src/goosedove/trades/`: the resolved terms of a batch, their static encoding, the batch prepared against one market history, and its evaluation against one market. One occurrence takes the same path as a thousand and every occurrence counts, a duplicate twice. The [NG example](../../engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) is the acceptance fixture: every hand answer on that page, the real NG rows before expiry and the toy lifecycle through its seven states, is pinned in `tests/unit/test_trades.py`, and the work of each step in `tests/performance/test_trade_budgets.py`.
 

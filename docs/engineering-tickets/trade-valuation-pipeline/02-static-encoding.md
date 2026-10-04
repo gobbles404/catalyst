@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Previous](01-trade-representation.md) · [Next: binding](03-market-binding.md)
 
-Built in #NN as the encoding of the trade kernel, `src/goosedove/trades/encoding.py`, on the NG example and
+Built in #136 as the encoding of the trade kernel, `src/goosedove/trades/encoding.py`, on the NG example and
 with no worksheet function yet; [kernel.md](../../library/trades/kernel.md) is the page.
 
 ## Responsibility
