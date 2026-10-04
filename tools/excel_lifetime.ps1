@@ -17,7 +17,8 @@
 #          index: the calendar's change reaching the template and the batch's payment day; the
 #          template deleted and the batch failing with it, both recovered; the batch prepared
 #          against the chain's history and evaluated against its market, a price tick making new
-#          results over the same preparation. check.ps1 runs this group beside core.
+#          results over the same preparation, a changed fixing making a new history, preparation
+#          and results. check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -577,6 +578,20 @@ $trades = {
     Check "while the preparation is reused as it is" ((Text $state $sheet "D17") -eq $prepared) (Text $state $sheet "D17")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 8 }
     Check "the old vector, market and results are released; sixteen live, three more published" ($c.Live -eq 16 -and $c.Released -eq 8 -and $c.Published -eq 24 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # A changed fixing: the fixings, the history, the market over it, the preparation and the
+    # results publish anew and the old five are released; the vector stands, and so does the
+    # mark, no slot of the batch having fixed.
+    $vector = Text $state $sheet "D10"
+    $results = Text $state $sheet "D18"
+    Put $state $sheet "B7" "71.3"
+    $reprepared = Text $state $sheet "D17"
+    Check "a changed fixing gives the preparation a new handle" ($reprepared -ne $prepared -and $reprepared.StartsWith("${id}:prepared_trades:WTI NYMEX:")) $reprepared
+    Check "and the results a new one" ((Text $state $sheet "D18") -ne $results -and (Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "the mark is unmoved, no slot having fixed" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
+    Check "the vector stands" ((Text $state $sheet "D10") -eq $vector) (Text $state $sheet "D10")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 13 }
+    Check "the old fixings, history, market, preparation and results are released; sixteen live, five more published" ($c.Live -eq 16 -and $c.Released -eq 13 -and $c.Published -eq 29 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 $quit = {

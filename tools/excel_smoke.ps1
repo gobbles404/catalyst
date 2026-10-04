@@ -441,7 +441,8 @@ $formulas = [ordered]@{
     # against the market in CW1, n26 quoted at 74.25: the handles named for the index; the values
     # report, a mark of 8,500 and no cash, in dollars, on the valuation day; the risk report, a
     # total delta of 2,000 dollars per dollar a barrel and a DV01 of zero; the two readers one row
-    # per slot, n26 on its expiry day, live, its exposure and its contribution; a history over
+    # per slot, n26 on its expiry day, live, its exposure, its contribution and its contract's
+    # delta named as the contract's; a history over
     # another index of the same name, a market over another history and a trade on m26, the
     # schedule's first contract, which only bounds the calendar, refused in the library's words,
     # a handle naming nothing, a market left out and a blank where the results should be in the
@@ -464,8 +465,10 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG6),3,3)" = "FALSE"
     "=INDEX(util_ReadHandle(FG6),3,5)" = "2000"
     "=ROWS(util_ReadHandle(FG6))"      = "3"
-    "=INDEX(util_ReadHandle(FG7),3,4)" = "148500"
-    "=INDEX(util_ReadHandle(FG7),3,5)" = "2000"
+    "=INDEX(util_ReadHandle(FG7),1,6)" = "contract_delta"
+    "=INDEX(util_ReadHandle(FG7),3,4)" = "2000"
+    "=INDEX(util_ReadHandle(FG7),3,5)" = "148500"
+    "=INDEX(util_ReadHandle(FG7),3,6)" = "2000"
     "=_PrepareTrades(FG5,CW5)"  = "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
     "=_PrepareTrades(FG8,CT7)"  = "#ERROR _PrepareTrades: ValueError: trade 'V3' at row 1 observes m26 on 2026-05-19, before the calendar begins; the schedule's first contract bounds the calendar and nothing prices it"
     "=_EvaluateTrades(FG6,CW6)" = "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against"

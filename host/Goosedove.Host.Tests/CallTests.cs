@@ -464,9 +464,12 @@ namespace Goosedove.Host.Tests
             Assert.Equal(20000.0, slots[2, 4]);
             Assert.Equal(-10000.0, slots[3, 4]);
             var contributions = (object[,])Seam.Call("util_ReadHandle", results);
-            Assert.Equal("live_contribution", contributions[0, 3]);
-            Assert.Equal(1442000.0, (double)contributions[2, 3], 6);
-            Assert.Equal(20000.0, contributions[2, 4]);
+            Assert.Equal("live_exposure", contributions[0, 3]);
+            Assert.Equal("live_contribution", contributions[0, 4]);
+            Assert.Equal("contract_delta", contributions[0, 5]);
+            Assert.Equal(20000.0, contributions[2, 3]);
+            Assert.Equal(1442000.0, (double)contributions[2, 4], 6);
+            Assert.Equal(20000.0, contributions[2, 5]);
             var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
             var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked);
             Assert.NotEqual(results, later);

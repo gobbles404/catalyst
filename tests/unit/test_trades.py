@@ -965,6 +965,27 @@ def test_offsetting_dates_keep_their_slots_though_the_contract_delta_nets_to_zer
     np.testing.assert_allclose(fixed.dated_live_contribution, [-740])
 
 
+def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_named() -> None:
+    # The review's case: after 1 December fixes, the slots' live exposure is 0, 10, 10, their
+    # contributions 0, 740, 740, and Z26's delta 20 stands beside each as the contract's.
+    from goosedove.excel.utilities import shown
+
+    result, _ = daily_evaluated("2026-12-02")
+    table = shown(result)
+    assert table.texts[:6] == (
+        "contract_code",
+        "observation_date",
+        "is_fixed",
+        "live_exposure",
+        "live_contribution",
+        "contract_delta",
+    )
+    np.testing.assert_array_equal(table.numeric_slots[2:, 2], [1.0, 0.0, 0.0])  # is_fixed
+    np.testing.assert_allclose(table.numeric_slots[2:, 3], [0.0, 10.0, 10.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 740.0, 740.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 5], [20.0, 20.0, 20.0])
+
+
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
     terms = daily_terms()
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,) * 2), UNITS, WorkCounter())

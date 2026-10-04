@@ -411,9 +411,11 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
 @shown.register
 def trade_results_table(obj: TradeResults) -> MixedArray:
     # One row per slot, the dated contents of the result: the contract pricing the day, the
-    # observation day, whether it has fixed, its live contribution, exposure times its contract's
-    # quote and zero where it has fixed, and the delta of its contract, the retained vector read
-    # by each slot's reference; the mark, the cash and the totals are the two reports' to show.
+    # observation day, whether it has fixed, the slot's own live exposure and its live
+    # contribution, exposure times its contract's quote, both zero where it has fixed, and the
+    # delta of its contract, the retained vector read by each slot's reference and so the same
+    # number on every slot of one contract, named contract_delta so that it is not read as the
+    # slot's; the mark, the cash and the totals are the two reports' to show.
     prepared = obj.prepared
     encoding = prepared.encoded
     codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
@@ -421,12 +423,20 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     contribution[prepared.live_slot] = obj.dated_live_contribution
     return MixedArray.table(
         [
-            ("contract_code", "observation_date", "is_fixed", "live_contribution", "delta"),
-            ("str", "datetime64[D]", "bool", "float64", "float64"),
+            (
+                "contract_code",
+                "observation_date",
+                "is_fixed",
+                "live_exposure",
+                "live_contribution",
+                "contract_delta",
+            ),
+            ("str", "datetime64[D]", "bool", "float64", "float64", "float64"),
         ],
         tuple(codes),
         encoding.slot_date,
         prepared.is_fixed,
+        prepared.dated_live_exposure,
         contribution,
         obj.delta[encoding.reference_of_slot],
     )

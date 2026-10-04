@@ -180,12 +180,19 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
     ]
     table = spilled(ENTRY["util_ReadHandle"](ng["results"]))
     assert table[:2] == [
-        ["contract_code", "observation_date", "is_fixed", "live_contribution", "delta"],
-        ["str", "datetime64[D]", "bool", "float64", "float64"],
+        [
+            "contract_code",
+            "observation_date",
+            "is_fixed",
+            "live_exposure",
+            "live_contribution",
+            "contract_delta",
+        ],
+        ["str", "datetime64[D]", "bool", "float64", "float64", "float64"],
     ]
-    assert table[2][:3] == ["Z26", serial("2026-11-25"), False]
-    assert table[2][3] == pytest.approx(512_000.0) and table[2][4] == 160_000.0
-    assert table[3][3] == pytest.approx(-175_000.0) and table[3][4] == -50_000.0
+    assert table[2][:4] == ["Z26", serial("2026-11-25"), False, 160_000.0]
+    assert table[2][4] == pytest.approx(512_000.0) and table[2][5] == 160_000.0
+    assert table[3][4] == pytest.approx(-175_000.0) and table[3][5] == -50_000.0
 
 
 def test_a_tick_makes_new_results_over_the_same_preparation_and_the_old_stand(
@@ -249,9 +256,9 @@ def test_the_toys_paid_contract_is_cash_and_the_rest_marks(ng: dict[str, Any]) -
     risk = spilled(ENTRY["_ReportRisk"](results))
     assert risk[2][0] == -50_000.0
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[2] == ["Z26", serial("2026-11-25"), True, 0.0, 0.0]
-    assert table[3][:3] == ["F27", serial("2026-12-29"), False]
-    assert table[3][3] == pytest.approx(-175_000.0) and table[3][4] == -50_000.0
+    assert table[2] == ["Z26", serial("2026-11-25"), True, 0.0, 0.0, 0.0]
+    assert table[3][:4] == ["F27", serial("2026-12-29"), False, -50_000.0]
+    assert table[3][4] == pytest.approx(-175_000.0) and table[3][5] == -50_000.0
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------

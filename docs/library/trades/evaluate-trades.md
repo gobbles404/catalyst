@@ -46,7 +46,7 @@ The preparation and the market by reference; the route, the currency and the val
 
 ## Reading it back
 
-The two reports spill the scalars, [report-values.md](report-values.md) and [report-risk.md](report-risk.md). `util_ReadHandle` spills the dated contents, one row per slot: `contract_code`, `observation_date`, `is_fixed`, `live_contribution`, zero where fixed, and `delta`, the contract's, read by each slot's reference. The NG example spills Z26 with 512,000 and 160,000 and F27 with -175,000 and -50,000.
+The two reports spill the scalars, [report-values.md](report-values.md) and [report-risk.md](report-risk.md). `util_ReadHandle` spills the dated contents, one row per slot: `contract_code`, `observation_date`, `is_fixed`, `live_exposure` and `live_contribution`, the slot's own, zero where fixed, and `contract_delta`, the contract's delta read by each slot's reference and so the same number on every slot of one contract, named for whose it is: in the daily toy after 1 December fixes the slots show 0, 10 and 10 of exposure beside 20 of contract delta on each. The NG example spills Z26 with 160,000, 512,000 and 160,000 and F27 with -50,000, -175,000 and -50,000.
 
 ## Tests
 
