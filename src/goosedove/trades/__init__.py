@@ -9,7 +9,8 @@ occurrence counts, a duplicate twice.
 
 Four frozen records, each with one builder that checks its meaning once, every array owned and
 read-only. Built first for the NG example of docs/engineering-tickets/trade-valuation-pipeline/,
-as ticket I1 of its README; nothing here imports the Excel bridge, and no worksheet function
-reaches it yet, so the resolved terms are supplied in Python until _CreateTrades resolves them
-from a template and a ticket. docs/library/trades/kernel.md is the page.
+as ticket I1 of its README, and reached from the sheet since ticket I4: the template and the
+resolution modules make the terms from a template and a ticket, and _CreateTrades publishes
+the batch. Nothing here imports the Excel bridge. docs/library/trades/kernel.md,
+trade-template.md and create-trades.md are the pages.
 """

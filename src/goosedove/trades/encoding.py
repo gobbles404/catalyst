@@ -67,8 +67,8 @@ def encoded(terms: ResolvedTrades, units: UnitConversions, counter: WorkCounter)
     them, one search; the sums over components by input, one bincount each, so that two
     occurrences on one contract are one input with their coefficients added, a duplicate
     occurrence added twice. For a financial settlement, every component on a
-    contract pays on the one day that contract pays, else the contract and its two days are
-    named, since a group that paid on two days could not be settled as one; and that day is
+    contract pays on the one day that contract pays, else the trade, the contract and its two
+    days are named, since a group that paid on two days could not be settled as one; and that day is
     after the contract's expiry, else named, since a payment before the final price exists
     would have nothing to pay. The fees of the specification are read by nothing here: they are
     reserves, never a contribution to value.
@@ -117,7 +117,7 @@ def _one_payment_day_per_input(
         code = codes[int(terms.contract[k])]
         day = pays[input_of_component[k]]
         raise ValueError(
-            f"payment_date row {k + 1} is {terms.payment_date[k]}, expected {day}, "
+            f"payment_date of {terms.named(k)} is {terms.payment_date[k]}, expected {day}, "
             f"the one day {code} pays"
         )
     expiries = terms.schedule.future_expiry[inputs]

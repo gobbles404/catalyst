@@ -7,7 +7,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
 from functools import singledispatch
-from typing import Annotated, Any
+from typing import Annotated, Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,13 +36,17 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.index_conventions import IndexConventions
+from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.periods import end_date, start_date
+from goosedove.instruments.definitions import FieldType
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.resolution import Trades
+from goosedove.trades.template import TradeTemplate
 
 
 @singledispatch
@@ -296,6 +300,84 @@ def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
         obj.brokerage_rates_per_lot,
         obj.clearing_rates_per_lot,
     )
+
+
+@shown.register
+def trade_template_table(obj: TradeTemplate) -> MixedArray:
+    # The instrument, then each default under its field name in the sheet's order, one row: a
+    # number, a day and text as they are, a holiday calendar as the words of its kind, since the
+    # spill shows what the template holds and is no round trip of a handle.
+    headers: list[str] = ["instrument"]
+    types: list[str] = ["str"]
+    columns: list[NDArray[Any] | tuple[str, ...]] = [(obj.instrument.name,)]
+    for name, value in obj.defaults.items():
+        headers.append(name)
+        field_type = next(field for field in obj.instrument.fields if field.name == name).type
+        match field_type:
+            case FieldType.NUMBER:
+                types.append("float64")
+                columns.append(np.array([value], dtype=np.float64))
+            case FieldType.DATE:
+                types.append("datetime64[D]")
+                columns.append(np.array([value], dtype="datetime64[D]"))
+            case FieldType.TEXT | FieldType.CODE:
+                types.append("str")
+                columns.append((str(value),))
+            case FieldType.HOLIDAY_CALENDAR:
+                types.append("str")
+                columns.append((named(value),))
+            case _:
+                assert_never(field_type)
+    return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+@shown.register
+def trades_table(obj: Trades) -> MixedArray:
+    # One row per component, the terms with what the encoding made of them: the ticket row the
+    # component belongs to, as the sheet counts rows, its label, clearing house and broker where
+    # the batch has them, the day it was struck, its contract's code, its lots, its quantity in
+    # the quote unit, its fixed price, its coefficient and offset in the settlement currency,
+    # and, for a financial settlement, the day it pays. The batch's own facts, the route, the
+    # settlement, the method and the specification, are the template's to show.
+    terms, encoding = obj.resolved, obj.encoded
+    rows = terms.occurrence
+    codes = np.array(terms.schedule.codes, dtype=object)[terms.contract]
+    headers: list[str] = ["row"]
+    types: list[str] = ["int64"]
+    columns: list[NDArray[Any] | tuple[str, ...]] = [(rows + 1).astype(np.int64)]
+    for name, labels in (
+        ("trade_id", terms.labels),
+        ("clearing_house", terms.clearing_house),
+        ("broker", terms.broker),
+    ):
+        if labels is not None:
+            headers.append(name)
+            types.append("str")
+            columns.append(tuple(np.array(labels, dtype=object)[rows]))
+    headers += [
+        "trade_date",
+        "contract_code",
+        "lots",
+        "quantity",
+        "fixed_price",
+        "coefficient",
+        "offset",
+    ]
+    types += ["datetime64[D]", "str", "float64", "float64", "float64", "float64", "float64"]
+    columns += [
+        terms.trade_dates[rows],
+        tuple(codes),
+        terms.lots,
+        encoding.quantity,
+        terms.fixed_price,
+        encoding.coefficient,
+        encoding.offset,
+    ]
+    if terms.payment_date is not None:
+        headers.append("payment_date")
+        types.append("datetime64[D]")
+        columns.append(terms.payment_date)
+    return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
 @excel_function

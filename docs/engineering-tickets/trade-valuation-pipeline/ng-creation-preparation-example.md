@@ -7,7 +7,7 @@ Design fixture, 3 October 2026, complete as a booking under the `future` definit
 review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
-the proposed `_CreateTrades` and `_PrepareTrades` are not yet implemented.
+`_CreateTradeTemplate` and `_CreateTrades` are built in #NN, `_PrepareTrades` is ticket I5.
 
 ## What this example proves
 
@@ -77,7 +77,7 @@ in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
 =_ReportRisk(Results)
 ```
 
-None of these is implemented yet; the calls are the agreed signatures.
+The first two are built in #NN; the rest are the agreed signatures, ticket I5.
 
 The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and `fixed_price`:
 

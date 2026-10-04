@@ -24,8 +24,9 @@ on the next clearing business day after that trading cutoff.
 payment_holiday_calendar as static trade-row or template inputs. The supported product
 definition establishes the anchor and counting convention. CreateTrades parses the lag
 once and resolves and stores payment_date per monthly component. This is the accepted
-starting design; the payment-date API is not implemented yet. Broader bilateral conventions
-remain deferred, with their limited coverage explicitly accepted for this first step.
+starting design, built in #NN as [create-trades.md](../../library/trades/create-trades.md)
+describes under payment days. Broader bilateral conventions remain deferred, with their
+limited coverage explicitly accepted for this first step.
 
 The anchor need not be user-entered when supported product terms establish it, but it
 cannot be assumed universally from a reference index. For example, a hypothetical bilateral

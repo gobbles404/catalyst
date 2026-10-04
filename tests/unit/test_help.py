@@ -514,6 +514,55 @@ def test_the_catalog_show_explains_itself() -> None:
     ]
 
 
+def test_the_template_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateTradeTemplate"]
+    assert not hidden
+    assert description == (
+        "Creates shared defaults for an instrument and shows their handle, the text other "
+        "formulas take as the trade template."
+    )
+    assert arguments == [
+        ("instrument", "One instrument name from _ListInstruments, such as future."),
+        (
+            "fields",
+            "The field-name cells in one row, such as A1:B1, using names shown by _ShowInstrument.",
+        ),
+        ("values", "The values in one row beneath those fields, such as A2:B2."),
+    ]
+
+
+def test_the_trades_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateTrades"]
+    assert not hidden
+    assert description == (
+        "Creates a batch of trades on one index from a template's shared fields and a ticket's "
+        "rows, each contract code resolved against the index's schedule, and shows its handle, "
+        "the text other formulas take as the trades."
+    )
+    assert arguments == [
+        (
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as B6, or a name for "
+            "it, the one index every trade of the batch is on.",
+        ),
+        (
+            "fields",
+            "The ticket's header cells in one row, such as A4:E4, using names shown by "
+            "_ShowInstrument and none the template supplies.",
+        ),
+        (
+            "trade_rows",
+            "The rows under the headers, such as A5:E9, one trade per row, a repeated row a "
+            "second trade.",
+        ),
+        (
+            "template",
+            "The trade-template handle: the cell showing _CreateTradeTemplate's result, such as "
+            "B2, or a name for it, which selects the instrument and supplies the shared fields.",
+        ),
+    ]
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

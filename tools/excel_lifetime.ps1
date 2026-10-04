@@ -13,6 +13,10 @@
 #          under two process IDs; a handle of one read in the other; every workbook closed
 #          in one; a workbook saved by one and fully calculated in the other. check.ps1 runs
 #          this group beside core.
+#   trades a trade template holding a payment calendar and a batch of trades on the chain's
+#          index: the calendar's change reaching the template and the batch's payment day; the
+#          template deleted and the batch failing with it, both recovered. check.ps1 runs this
+#          group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -497,6 +501,63 @@ $processes = {
 
 # --- quit ---------------------------------------------------------------------------------------
 
+# --- trades ---------------------------------------------------------------------------------------
+# The chain, then a payment calendar of its own in D13 over the day in C13, a financial trade
+# template in D14 holding that calendar, and a batch of one n26 trade on the chain's index in D15,
+# its one payment day read in D16: n26 expires on Monday 22 June 2026 and pays one business day
+# after. The day in C13 moves onto that Tuesday, so the calendar publishes anew and with it the
+# template that holds it and the batch, whose payment day moves to the Wednesday; then the
+# template's cell is cleared, the batch fails as its consumer, both are released, and the
+# template typed back rebuilds the batch.
+
+$trades = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "C13" "1-Jan-2026"
+    Put $state $sheet "K1" "contract_specification"; Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "route"; Put $state $sheet "P1" "settlement_method"; Put $state $sheet "Q1" "clearing_house"; Put $state $sheet "R1" "payment_time_lag"; Put $state $sheet "S1" "payment_holiday_calendar"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "LOT"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "cleared"; Put $state $sheet "P2" "financial"; Put $state $sheet "Q2" "ICE Clear"; Put $state $sheet "R2" "+1bd"; Put $state $sheet "S2" "=D13"
+    Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
+    Put $state $sheet "K5" "24-Sep-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
+    Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
+    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
+    Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
+    Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,10)"
+    $id = Id $state
+    $template = Text $state $sheet "D14"
+    Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:trade_template:")) $template
+    $trades = Text $state $sheet "D15"
+    Check "the batch's cell shows its handle, named for the index" ($trades.StartsWith("${id}:trades:WTI NYMEX:")) $trades
+    Check "the batch pays n26 one business day after its Monday expiry" ((Text $state $sheet "D16") -eq "46196") (Text $state $sheet "D16")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
+    Check "fourteen creators, fourteen live publications" ($c.Live -eq 14 -and $c.Published -eq 14 -and $c.Released -eq 0) $c.Text
+
+    # The holiday moves onto the payment day: the calendar publishes anew, and with it the template
+    # that holds it and the batch; the chain, which never read that calendar, stands.
+    Put $state $sheet "C13" "23-Jun-2026"
+    $moved = Text $state $sheet "D14"
+    Check "a changed holiday calendar gives the template a new handle" ($moved -ne $template -and $moved.StartsWith("${id}:trade_template:")) $moved
+    $rebuilt = Text $state $sheet "D15"
+    Check "and the batch a new one" ($rebuilt -ne $trades -and $rebuilt.StartsWith("${id}:trades:WTI NYMEX:")) $rebuilt
+    Check "whose payment day steps over the new holiday" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) -and $c.Released -ge 3 }
+    Check "the old calendar, template and batch are released; fourteen live, three more published" ($c.Live -eq 14 -and $c.Released -eq 3 -and $c.Published -eq 17) $c.Text
+    Check "the chain's index is untouched" ((Text $state $sheet "D5").StartsWith("${id}:index:WTI NYMEX:")) (Text $state $sheet "D5")
+
+    # The template deleted: the batch fails as its consumer and owns nothing; typed back, both live.
+    Clear-Cell $state $sheet "D14"
+    $failed = Text $state $sheet "D15"
+    Check "a cleared template fails the batch in the seam's words" ($failed -eq "#ERROR _CreateTrades: template is blank, expected trade template handle") $failed
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 1) }
+    Check "the template and the batch are released, twelve live" ($c.Live -eq 12 -and $c.Released -eq 5 -and $c.Published -eq 17) $c.Text
+    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
+    Check "the template typed back rebuilds the batch" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
+    Check "fourteen live again, two more published, no misses, no disposal errors" ($c.Live -eq 14 -and $c.Published -eq 19 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+}
+
 $quit = {
     param($state)
     $book = New-Book $state
@@ -515,7 +576,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

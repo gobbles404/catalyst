@@ -1,6 +1,6 @@
 # The trade kernel
 
-Built in #136 as ticket I1 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md). No worksheet function reaches it yet: the resolved terms are supplied in Python, as the tests supply them, until `_CreateTrades` resolves them from a template and a ticket in ticket I4, and `_PrepareTrades`, `_EvaluateTrades` and the two reports stand on it in ticket I5.
+Built in #136 as ticket I1 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md). Since #NN, ticket I4, [_CreateTrades](create-trades.md) resolves the terms from a template and a ticket on the sheet and publishes the batch, the terms and the encoding together; the record gained the instrument and the clearing house and broker labels, and a lot count or a price is refused naming the trade's own row, which a strip's component row is not. `_PrepareTrades`, `_EvaluateTrades` and the two reports stand on it in ticket I5.
 
 The four steps of the pipeline as library code, `src/goosedove/trades/`: the resolved terms of a batch, their static encoding, the batch prepared against one market history, and its evaluation against one market. One occurrence takes the same path as a thousand and every occurrence counts, a duplicate twice. The [NG example](../../engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) is the acceptance fixture: every hand answer on that page, the real NG rows before expiry and the toy lifecycle through its seven states, is pinned in `tests/unit/test_trades.py`, and the work of each step in `tests/performance/test_trade_budgets.py`.
 
@@ -8,7 +8,7 @@ The four steps of the pipeline as library code, `src/goosedove/trades/`: the res
 
 | Record | Builder | What it holds | What makes a new one |
 |---|---|---|---|
-| `ResolvedTrades` | `resolved_trades` | the index and its futures schedule, the specification row, the route, the settlement, the schedule method, the quantity unit and basis; per occurrence its trade date and label; per component its occurrence, its schedule row, its signed lots, its fixed price and, for a financial settlement, its payment day | a change to the ticket, the template or a definition used |
+| `ResolvedTrades` | `resolved_trades` | the instrument, the index and its futures schedule, the specification row, the route, the settlement, the schedule method, the quantity unit and basis; per occurrence its trade date and, where given, its label, clearing house and broker; per component its occurrence, its schedule row, its signed lots, its fixed price and, for a financial settlement, its payment day | a change to the ticket, the template or a definition used |
 | `Encoded` | `encoded` | per component the signed quantity in the quote quantity unit, the coefficient, the settlement currency it makes per unit of quote price, and the entry-price offset in the settlement currency; the inputs, one per contract held, in the schedule's order; per input the summed quantity, the summed coefficient, which is the exposure every price multiplies, the summed offset and the one payment day | the same |
 | `Prepared` | `prepared` | per input whether it is live and whether it is settled, and its set amount; the live contracts and their exposure; the unsettled offsets and set amounts summed, and the cash; delta by contract and its total, which no tick changes | a new history: a fixing arrived or corrected, or the valuation date rolled |
 | `Results` | `results` | the route, the currency and the valuation day; mark and cash; the batch's contract axis, the preparation's delta and total shared, and DV01, with their unit | a new market: a tick, or anything that made a new preparation |
@@ -17,24 +17,24 @@ Each record keeps the one before it by reference, so a result explains itself ba
 
 ## What each step does, and refuses
 
-**The terms.** A futures index, since a future's contract is a row of a futures schedule and its final price the settlement on that row's expiry day; a row of its specifications, since the lot size is read there; `LOT` as the quantity unit, the one unit built. One or more occurrences, a date each and a label each when labels are given; one or more components, each of an occurrence, every occurrence holding at least one, each contract a row of the schedule, each lot count a whole nonzero number, each fixed price finite. A financial settlement has one payment day per component; a physical one has none, since it pays on no day and a date given would invent a payment.
+**The terms.** A futures index, since a future's contract is a row of a futures schedule and its final price the settlement on that row's expiry day; a row of its specifications, since the lot size is read there; `LOT` as the quantity unit, the one unit built. One or more occurrences, a date each and, for each label tuple given, a text each; one or more components, each of an occurrence, every occurrence holding at least one, each contract a row of the schedule, each lot count a whole nonzero number, each fixed price finite, the lots and the price named by the trade they belong to, as the sheet counts its rows. A financial settlement has one payment day per component; a physical one has none, since it pays on no day and a date given would invent a payment. The instrument is kept as the definition the terms stand under and read for nothing here.
 
 | Rule broken | Message |
 |---|---|
 | the index is not a futures index | `index is a Gas Daily index, expected a futures index for a future` |
 | the specification is no row of the index's | `specification is 1, expected a row of the index's specifications, 0 to 0` |
 | the quantity unit is not lots | `quantity_unit is 'MMBTU', expected LOT, the one quantity unit built` |
-| an occurrence holds no component | `trade at row 5 has no component, expected at least one` |
+| an occurrence holds no component | `trade 'NG-001' at row 5 has no component, expected at least one` |
 | a contract is no row of the schedule | `contract row 4 is 3, expected a row of the schedule, 0 to 2` |
-| a lot count is fractional, or zero | `lots row 3 is 7.5, expected a whole number of lots`; `lots row 2 is 0.0, expected a nonzero quantity` |
-| a fixed price is not finite | `fixed_price row 4 is inf, expected a finite price` |
+| a lot count is fractional, or zero | `lots of trade 'NG-003' at row 3 is 7.5, expected a whole number of lots`; `lots of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity` |
+| a fixed price is not finite | `fixed_price of trade 'NG-004' at row 4 is inf, expected a finite price` |
 | a financial settlement without its days, or a physical one with days | `payment_date is missing, expected one date per component with a financial settlement`; `payment_date has 5 dates, expected none with a physical settlement, which pays on no day` |
 
 **The encoding.** Quantity is lots times the specification's lot size, restated in the conventions' quote quantity unit through the unit tables, both units of the quantity type as the index checked. The coefficient is the quantity restated from the quote currency to the settlement currency, so that a price in cents times it is an amount in dollars; every price the batch meets, a quote, a final settlement or the fixed price, multiplies the coefficient and never the quantity, which is kept apart as the physical fact. The offset is minus the coefficient times the fixed price. The inputs are the distinct contracts held, sorted, which is the schedule's order; the sums by input are one bincount each, so two occurrences on one contract are one input with their coefficients added, a duplicate twice. For a financial settlement every component on a contract pays on that contract's one day, and that day is after its expiry. The fees of the specification are read by nothing: reserves, never a contribution to value.
 
 | Rule broken | Message |
 |---|---|
-| two payment days on one contract | `payment_date row 2 is 2026-12-01, expected 2026-11-30, the one day Z26 pays` |
+| two payment days on one contract | `payment_date of trade 'NG-002' at row 2 is 2026-12-01, expected 2026-11-30, the one day Z26 pays` |
 | a payment on or before the expiry | `F27 pays on 2026-12-29, expected a day after its expiry 2026-12-29, when its final price exists` |
 
 For the NG rows, quantity `[100000, -40000, 70000, -120000, 100000]` MMBTU, the coefficient the same since dollars are quoted and paid, offset `[-310000, 126000, -238000, 402000, -310000]` USD, inputs Z26 and F27 at rows 1 and 2, exposure `[160000, -50000]`, offsets `[-494000, 164000]`, as the page says. One lot bought at 300 cents on an index quoted in cents and settled in dollars has a quantity of 10,000 MMBTU, a coefficient of 100 USD per cent per MMBTU and an offset of -30,000 USD: at 300 cents it marks zero, a cent moves it 100 dollars, and ten cents up it marks 1,000, live, fixed or paid.
@@ -93,4 +93,4 @@ Each builder reports to its counter what it did, in counts: the encoding one com
 
 ## Not here
 
-No worksheet function, handle or report: tickets I4 and I5. No template, no ticket, no field names, no contract codes read for their month: the terms arrive resolved, and I4 resolves them. No payment-day derivation from a lag and a calendar: the toy's days arrive resolved, and R1 and I6 derive them. No bilateral valuation, discount factor or DV01 convention, no `asian`, `penultimate` or `last3day`, no `day` quantity basis, no quantity unit but `LOT`, no strip, no cash instrument, and no market whose whole calendar has ended.
+No preparation, evaluation or report on the sheet: ticket I5. The template, the ticket, the field names, the contract codes read for their month and the payment days counted from a lag and a calendar are [create-trades.md](create-trades.md)'s, which hands the kernel resolved terms; the toy's days still arrive resolved in these tests. No bilateral valuation, discount factor or DV01 convention, no `asian`, `penultimate` or `last3day`, no `day` quantity basis, no quantity unit but `LOT`, no cash instrument, and no market whose whole calendar has ended.

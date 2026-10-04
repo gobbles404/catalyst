@@ -49,7 +49,7 @@ pid:kind:count
 |---|---|
 | `pid` | the process ID of the Excel holding the object: the number Windows gives each running program, shown in the PID column of Task Manager and by `Get-Process EXCEL` in PowerShell, written whole in decimal, nothing cut, hashed or padded, `30512`. Python runs inside Excel's own process, so the seam reads its own process ID once, when it starts, and every handle that Excel publishes carries it, whichever workbook the creator is in |
 | `kind` | the kind's tag, its class name in lowercase words joined by underscores: `valuation_date`, `market_history`; Python types and worksheet functions keep their PascalCase names |
-| `index-name` | the name the index was created with, `_CreateIndex`'s first argument, read off the stored object when it is published and written whole as typed: case, spaces, punctuation, colons and any character kept, nothing trimmed, re-cased or shortened; present for the eight kinds below, absent for the rest |
+| `index-name` | the name the index was created with, `_CreateIndex`'s first argument, read off the stored object when it is published and written whole as typed: case, spaces, punctuation, colons and any character kept, nothing trimmed, re-cased or shortened; present for the nine kinds below, absent for the rest |
 | `count` | the runtime's publication count, a plain number with no padding: 1 for the first object published after Python starts, then 2, shared by every kind and every workbook open in that Excel, never reset and never repeated while Python runs |
 
 | Object | Shows | The name read from |
@@ -62,7 +62,8 @@ pid:kind:count
 | market history | `30512:market_history:WTI:34` | `calendar.index.name` |
 | price vector | `30512:price_vector:WTI:35` | `index_name`, the text typed to `_CreatePriceVector` since #112 |
 | market | `30512:market:WTI:36` | `market_history.calendar.index.name` |
-| valuation date, discount curve | `30512:valuation_date:1`, `30512:discount_curve:2` | none |
+| trades | `30512:trades:WTI:41` | `resolved.index.name`, the index the batch was resolved against, since #NN |
+| valuation date, discount curve, trade template | `30512:valuation_date:1`, `30512:discount_curve:2`, `30512:trade_template:40` | none: a template serves any compatible index and carries none |
 | the three schedules, the holiday calendar, the conventions, the contract specifications | `30512:futures_schedule:12`, `30512:holiday_calendar:13`, `30512:index_conventions:14`, `30512:contract_specifications:15` | none: an index uses them, which names them nothing, and their creators gain no argument |
 
 Every sample on this page and on the library's pages uses one process ID, `30512`; a real Excel shows its own, and two Excels open at once show two.

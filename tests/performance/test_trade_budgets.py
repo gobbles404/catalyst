@@ -22,6 +22,7 @@ from goosedove.index_definitions.holiday_calendar import holiday_calendar
 from goosedove.index_definitions.index import index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.definitions import FUTURE
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -75,6 +76,7 @@ def a_batch(components: int, contracts: int) -> Encoded:
     and prices varying, encoded on a counter of its own."""
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     terms = resolved_trades(
+        FUTURE,
         GAS,
         0,
         Route.CLEARED,
@@ -82,6 +84,8 @@ def a_batch(components: int, contracts: int) -> Encoded:
         ScheduleMethod.LASTDAY,
         "LOT",
         QuantityPer.MONTH,
+        None,
+        None,
         None,
         np.repeat(np.datetime64("2026-09-24", "D"), components),
         np.arange(components, dtype=np.intp),

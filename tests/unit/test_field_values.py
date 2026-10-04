@@ -351,7 +351,7 @@ def test_field_values_take_no_default_and_a_listed_function_declares_them_with_h
     ):
         register(Defaulted, hidden=True)
 
-    def Listed(
+    def ListedFields(
         instrument: Annotated[str, "An instrument."],
         fields: Annotated[TextRow, "The headers."],
         values: Annotated[FieldRow[str], "The values."],
@@ -359,6 +359,6 @@ def test_field_values_take_no_default_and_a_listed_function_declares_them_with_h
         """Lists, for the test of its help."""
         return 0.0
 
-    register(Listed, hidden=False)
-    arguments = next(a for name, _, a, _, _ in bridge.function_specs() if name == "Listed")
+    register(ListedFields, hidden=False)
+    arguments = next(a for name, _, a, _, _ in bridge.function_specs() if name == "ListedFields")
     assert arguments[2] == ("values", "The values.")

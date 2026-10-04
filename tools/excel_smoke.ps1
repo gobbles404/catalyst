@@ -387,6 +387,46 @@ $formulas = [ordered]@{
     '=EchoFieldRow("future",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("future",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=CountFieldRows("future",EP4:EQ4,EP5:EP7)' = "#ERROR CountFieldRows: fields has 2 headers, expected 1, one per column of rows"
+    # The trade template and the trades: a template of the future's seven shared fields over the
+    # lots specification BY1 names, in EW3, read back through util_ReadHandle as one row with the
+    # instrument first; a batch of three rows on the futures index in EB1, in EW8, a code in
+    # lowercase and one in uppercase resolving to the schedule's u26, a repeated row counting
+    # twice, read back one row per component with the kernel's numbers, ten lots of a thousand
+    # barrels at 70 an offset of -700,000; a financial template in EW11 whose strip of q26-u26, in
+    # EW13, pays two business days after each expiry on the calendar in AM1; the handles' texts;
+    # the name in another case and a value against its field's rule, the library's words, and a
+    # header row of another width, the seam's; a template field repeated in the ticket, a code the
+    # schedule lacks, a fraction of a lot and an IFERC index, the library's words, and a template
+    # handle naming nothing, the seam's.
+    '=MID(EW3,FIND(":",EW3)+1,15)' = "trade_template:"
+    '=MID(EW8,FIND(":",EW8)+1,23)' = "trades:Henry Hub NYMEX:"
+    "=INDEX(util_ReadHandle(EW3),1,1)" = "instrument"
+    "=INDEX(util_ReadHandle(EW3),3,1)" = "future"
+    "=INDEX(util_ReadHandle(EW3),3,8)" = "CME Clearing"
+    "=COLUMNS(util_ReadHandle(EW3))"   = "8"
+    "=INDEX(util_ReadHandle(EW8),1,5)" = "contract_code"
+    "=INDEX(util_ReadHandle(EW8),3,5)" = "u26"
+    "=INDEX(util_ReadHandle(EW8),4,5)" = "X26"
+    "=INDEX(util_ReadHandle(EW8),5,5)" = "u26"
+    "=INDEX(util_ReadHandle(EW8),5,1)" = "3"
+    "=INDEX(util_ReadHandle(EW8),3,7)" = "10000"
+    "=INDEX(util_ReadHandle(EW8),3,10)" = "-700000"
+    "=ROWS(util_ReadHandle(EW8))"      = "5"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "10"
+    "=INDEX(util_ReadHandle(EW13),1,10)" = "payment_date"
+    "=INDEX(util_ReadHandle(EW13),3,4)"  = "q26"
+    "=INDEX(util_ReadHandle(EW13),4,4)"  = "u26"
+    "=INDEX(util_ReadHandle(EW13),3,10)" = "46226"
+    "=INDEX(util_ReadHandle(EW13),4,10)" = "46258"
+    "=ROWS(util_ReadHandle(EW13))"       = "4"
+    '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
+    '=_CreateTradeTemplate("future",EZ1,EY2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, the one method built"
+    '=_CreateTradeTemplate("future",EW1:FC1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: fields has 7 headers, expected 6, one per column of values"
+    "=_CreateTrades(EB1,EW1:FC1,EW2:FC2,EW3)"    = "#ERROR _CreateTrades: ValueError: contract_specification is supplied by the template and by the ticket, expected by one of them"
+    "=_CreateTrades(EB1,EW4:FA4,EW14:FA14,EW3)"  = "#ERROR _CreateTrades: ValueError: contract_code row 1 is 'F27', expected months the index's schedule has a contract for; it has none for 2027-01"
+    "=_CreateTrades(EB1,EW4:FA4,EW15:FA15,EW3)"  = "#ERROR _CreateTrades: ValueError: lots of trade 'T8' at row 1 is 2.5, expected a whole number of lots"
+    "=_CreateTrades(EB2,EW4:FA4,EW5:FA7,EW3)"    = "#ERROR _CreateTrades: ValueError: index is an IFERC index, expected a futures index for a future"
+    '=_CreateTrades(EB1,EW4:FA4,EW5:FA7,"x:trade_template:9")' = "#ERROR _CreateTrades: template is text 'x:trade_template:9' naming no live object, expected trade template handle"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -671,6 +711,27 @@ $cells = [ordered]@{
     "EP5" = "1"; "EQ5" = "3.1"; "EP6" = "2"; "EQ6" = "3.2"; "EP7" = "3"; "EQ7" = "3.3"
     "EP9" = "Quantity"; "EP10" = "ten"
     "EN12" = "=_CreateContractSpecifications(EI1:EM1,EI12:EM12)"
+    # The trade template's seven shared fields over the lots specification in BY1, the template
+    # creator in EW3; the ticket's headers and three rows, a code in lowercase and one in uppercase
+    # and a repeated row, the trades creator in EW8 over the futures index in EB1; a financial
+    # template of nine fields, its payment calendar the holiday calendar in AM1, in EW11, and a
+    # strip row under four of the ticket's headers, in EW13; a row with a code the schedule lacks
+    # and a row with a fraction of a lot, for the creator to refuse.
+    "EW1" = "contract_specification"; "EX1" = "quantity_unit"; "EY1" = "quantity_per"; "EZ1" = "schedule_method"; "FA1" = "route"; "FB1" = "settlement_method"; "FC1" = "clearing_house"
+    "EW2" = "lots"; "EX2" = "LOT"; "EY2" = "month"; "EZ2" = "lastday"; "FA2" = "cleared"; "FB2" = "physical"; "FC2" = "CME Clearing"
+    "EW3" = '=_CreateTradeTemplate("future",EW1:FC1,EW2:FC2)'
+    "EW4" = "trade_id"; "EX4" = "trade_date"; "EY4" = "contract_code"; "EZ4" = "quantity"; "FA4" = "fixed_price"
+    "EW5" = "T1"; "EX5" = "24-Sep-2026"; "EY5" = "u26"; "EZ5" = "10"; "FA5" = "70"
+    "EW6" = "T2"; "EX6" = "24-Sep-2026"; "EY6" = "X26"; "EZ6" = "-4"; "FA6" = "71.5"
+    "EW7" = "T1"; "EX7" = "24-Sep-2026"; "EY7" = "U26"; "EZ7" = "10"; "FA7" = "70"
+    "EW8" = "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,EW3)"
+    "EW9" = "contract_specification"; "EX9" = "quantity_unit"; "EY9" = "quantity_per"; "EZ9" = "schedule_method"; "FA9" = "route"; "FB9" = "settlement_method"; "FC9" = "clearing_house"; "FD9" = "payment_time_lag"; "FE9" = "payment_holiday_calendar"
+    "EW10" = "lots"; "EX10" = "LOT"; "EY10" = "month"; "EZ10" = "lastday"; "FA10" = "cleared"; "FB10" = "financial"; "FC10" = "ICE Clear"; "FD10" = "+2bd"; "FE10" = "=AM1"
+    "EW11" = '=_CreateTradeTemplate("future",EW9:FE9,EW10:FE10)'
+    "EX12" = "24-Sep-2026"; "EY12" = "q26-u26"; "EZ12" = "2"; "FA12" = "71"
+    "EW13" = "=_CreateTrades(EB1,EX4:FA4,EX12:FA12,EW11)"
+    "EW14" = "T9"; "EX14" = "24-Sep-2026"; "EY14" = "F27"; "EZ14" = "1"; "FA14" = "70"
+    "EW15" = "T8"; "EX15" = "24-Sep-2026"; "EY15" = "u26"; "EZ15" = "2.5"; "FA15" = "70"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
