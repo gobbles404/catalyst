@@ -143,13 +143,13 @@ payment_holiday_calendar, supplied in the trade row or template and required whe
 supported product definition establishes the actual traded contract's last-trading-day
 anchor and strict-after counting. PHH uses "+1bd" and ETE "+2bd". CreateTrades parses the
 lag once and stores a resolved payment_date per monthly component. Reuse the existing
-HolidayCalendar handle and NumPy business-day arithmetic. No schedule field is added for
-the anchor: before extending the schedule, derive the dates from the contract month,
-business-day rules and the two calendars, establishing the relation between ICE's own last
-trading day and the NYMEX penultimate pricing date rather than assuming the dates or the
-calendars coincide; a documented adjusted-lag convention is acceptable where it produces the
-correct dates, and is not a universal rule. Pricing calendars and final fixing dates are
-separate.
+HolidayCalendar handle and NumPy business-day arithmetic. [R1](penultimate-trades.md) now
+specifies penultimate booking: derive the pen expiry by stepping back one pricing business
+day from the underlying NYMEX expiry, then apply the entered payment lag from that pen
+expiry on the payment calendar. Retain both dates during creation. The existing schedule
+keeps its underlying expiry; no extra schedule field or adjusted-lag workaround is needed.
+Pricing and payment calendars retain their separate meanings. R1 includes PHH and ICE WTI
+examples and identifies the latter's modeled payment deadline explicitly.
 Broader bilateral payment conventions remain deferred; their limited coverage is accepted
 for this first step. This design agreement does not imply implementation. Exact-date inputs
 and zero-day adjustment semantics also remain deferred.
@@ -373,9 +373,10 @@ Review a small runnable path and its independent expected answers before broaden
 
 ### Delivery: the tickets
 
-The contract review is done; its decisions are in these pages. Each ticket is one pull
-request from main, reviewed on its own, and the pages are the ticket: a pull request builds
-what its pages say and changes the pages where it learns something.
+The contract review is done; its decisions are in these pages. Each ticket is one focused
+pull request, reviewed on its own, and the pages are the ticket: a pull request builds what
+its pages say and changes the pages where it learns something. While dependencies are open,
+stack on their branch; once they are merged, start from main containing those dependencies.
 
 | | Ticket | What it proves | After |
 |---|---|---|---|
@@ -387,13 +388,13 @@ what its pages say and changes the pages where it learns something.
 | I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3; built in #139, [trade-template.md](../../library/trades/trade-template.md) and [create-trades.md](../../library/trades/create-trades.md) |
 | I4a | dated exposure and market alignment | the kernel's axis becomes the observation date within its payment group, the reference the contract pricing that date, derived and retained; the dated live exposures, the gather of unique live quotes onto them and the dated contributions; the NG numbers kept, a daily toy and offsetting dates by hand | I4; built in #140, [dated-exposure.md](dated-exposure.md) and [kernel.md](../../library/trades/kernel.md) |
 | I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4a; built in #141, [prepare-trades.md](../../library/trades/prepare-trades.md), [evaluate-trades.md](../../library/trades/evaluate-trades.md), [report-values.md](../../library/trades/report-values.md) and [report-risk.md](../../library/trades/report-risk.md) |
-| R1 | PHH payment dates derived from the schedule and the calendars | the relation between ICE's last trading day and the NYMEX penultimate pricing date, worked dates, whether an adjusted lag gives them | I1 |
-| I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5; built in #142 on I5 alone, [the example page](ng-creation-preparation-example.md#on-a-sheet), the toy paying by its lag on its own calendar, so R1 stands apart |
+| R1 | [penultimate futures and payment dates](penultimate-trades.md) | public penultimate booking for PHH and ICE WTI: derive pen expiry from underlying expiry, apply the payment lag from pen expiry, retain the dates, reuse dated preparation/evaluation and prove the lifecycle | I5; specified, not built; its own worksheet example comes with the build |
+| I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5; built in #142 on I5 alone, [the example page](ng-creation-preparation-example.md#on-a-sheet), the toy paying by its lag on its own calendar under `lastday`; R1 adds penultimate support beside it |
 
 Averaging, with independently reviewed ethane examples, and payment valuation with a defined
 DV01 follow. Use one thin vertical example early, then broaden each stage as new cases demand.
-PR119 is closed and is evidence only; every ticket starts from main. This packet creates no
-branch and changes no production code.
+PR119 is closed and is evidence only. The ticket packet specifies implementation work;
+editing it changes no production code.
 
 The [golden harness plan](../ethane-golden-validation-harness.md) supplies the separate
 financial-reference and snapshot workflow. Snapshots of a standalone specimen do not become

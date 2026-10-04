@@ -10,9 +10,9 @@ rule and retained, and the fixing source is kept once on the shared object. Buil
 records and the daily toy among them; `src/goosedove/trades/observations.py` is the new module,
 `encoding.py`, `preparation.py` and `evaluation.py` the reshaped ones.
 
-**Placement:** I4 → **I4a** → I5 → I6. I4 is built, #139, and I4a stacked on it. R1 can proceed in
-parallel: its payment date research is separate from this slice's observation dates and price
-references.
+**Placement:** I4 → **I4a** → I5 → R1 → I6. I4 is built, #139, and I4a stacked on it.
+[R1](penultimate-trades.md) now specifies public penultimate booking using this dated path,
+with payment lag applied from the derived pen expiry.
 
 ## Outcome
 
@@ -262,12 +262,13 @@ The two reports still return the agreed aggregate scalars; stored contract and d
 remain available without recalculation. No new public creator or mandatory reporting argument
 is introduced here.
 
-R1 establishes the PHH pricing/payment-date relationship independently. I6 uses the dated
+[R1](penultimate-trades.md) derives the pen observation/payment anchor from the underlying
+expiry and then resolves payment separately, for PHH and ICE WTI. I6 uses the dated
 representation for its financial payment lifecycle. Observation dates must never be replaced
 by payment dates to join these pieces.
 
-Full Asian/penultimate/last3day booking, hourly or other time grids, bilateral discounting and
-DV01, physical delivery, an entirely ended market calendar, incremental fixing updates,
+Penultimate booking belongs to R1. Asian/last3day booking, hourly or other time grids,
+bilateral discounting and DV01, physical delivery, an entirely ended market calendar, incremental fixing updates,
 selective tick recalculation and several contracts on one observation date remain separate
 slices. Compact arrays versus dense storage is an implementation choice; the dated identities
 and reconciliation requirements are not.
