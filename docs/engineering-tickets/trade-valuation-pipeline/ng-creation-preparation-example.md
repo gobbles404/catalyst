@@ -7,7 +7,7 @@ Design fixture, 3 October 2026, complete as a booking under the `future` definit
 review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
-`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #141.
+`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #141, and the toy lifecycle below runs on a sheet in #NN, ticket I6.
 
 ## What this example proves
 
@@ -225,8 +225,11 @@ from the row headers. Payment dates are computed once, strictly after the anchor
 
 For this test definition only, a final observation is required when its date is strictly
 before as-of. It stays live on that date, matching the current futures calendar's daily cutoff.
-If the required final price is absent, preparation fails. Final prices in the following rows
-are fixture inputs, not externally sourced exchange values.
+If the required final price is absent, nothing is valued: as built, the settle on the expiry day
+is a fixing like any other, and `_CreateMarketHistory` refuses a series that skips it, `fixings
+has no fixing for 2026-11-25, expected a fixing for every fixed day in calendar`, before any
+trade is prepared, so no forecast ever stands in for a final price. Final prices in the following
+rows are fixture inputs, not externally sourced exchange values.
 
 These final prices are only the observations consumed by this toy trade adapter, not a
 complete input table for today's MarketHistory. Its futures-history constructor requires
@@ -275,6 +278,35 @@ totaling 22,800. For F27 at 3.45, they are `[3500, -12000]`, totaling -8,500. Th
 show why equal and opposite live exposures do not justify discarding entry-price offsets.
 Modeled cash is cumulative economic P&L assigned to settled fixture components. It is not an
 assertion that these amounts are the actual final clearing transfers or a cash reconciliation.
+
+### On a sheet
+
+Built in #NN, ticket I6, through the functions of #139 and #141 and no new one. The kept
+workbook's handles sheet holds the lifecycle from row 1320: the index `TOY_GAS` over the schedule
+above with G27, energy conventions in MMBTU, one specification of 10,000 MMBTU a lot and the
+payment calendar, which is also the index's holiday calendar; the financial template, cleared
+through `TEST_CLEARER` and paying `+2bd` on that calendar; the five rows as one batch; and a
+settle for every business day from 29 October to 30 December, newest first, in two columns,
+the first print with 3.22 on Z26's expiry day and the corrected series with 3.23 there and 3.45 on
+F27's, since the history needs the complete series, not the two finals alone. Each of rows 1342
+to 1348 is one state of the table above: its valuation day, then its own valuation date,
+calendar, fixings from the day before down, history, price vector from the prompt contract on,
+market, preparation and results, and the mark, the cash and the total delta the two reports
+give, every one the table's number. The tick evaluates the first row's preparation as it is
+against a new market over the same history; the correction is a new history and so a new
+preparation; the two reads below the states show the paid state's Z26 fixed and settled with
+no exposure and F27 live with -50,000 MMBTU and its contribution of -175,000. The payment days
+are the table's, counted by the template's lag on the payment calendar, not by any exchange
+rule: R1, the PHH payment dates, stands apart and changes nothing here.
+
+`tests/unit/test_trade_valuation.py` runs the seven states through the worksheet entries and
+pins the mark, the cash, the total delta and the as-of of each, the mark and the cash summing to
+the table's total P&L; the tick reusing the initial state's preparation while the old results
+stand; the paid contract read back fixed and settled; the fully fixed batch inside a market
+still quoting G27 reading no quote and reporting 14,300 of cash; and a series without the
+25 November settle refused by the history. `tools/excel_smoke.ps1` runs the paid state on a
+sheet, two trades, Z26's 13,000 as cash beside F27's live 7,000. The kernel's own pins of the
+seven states, with the quotes and fixings read, are [kernel.md](../../library/trades/kernel.md).
 
 ## Work boundaries and acceptance
 
