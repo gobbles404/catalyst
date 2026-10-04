@@ -1,6 +1,6 @@
 # _ShowInstrument
 
-Built in #NN as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is generated from the definitions and a test keeps the two equal, cell for cell.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is generated from the definitions and a test keeps the two equal, cell for cell.
 
 Shows one library-defined instrument schema with fields across columns and metadata down
 rows, including descriptions, requirements and defined options. This is the read-only counterpart of

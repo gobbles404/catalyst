@@ -1,6 +1,6 @@
 # _ListInstruments
 
-Built in #NN as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md).
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md).
 
 Lists the library-defined instrument schemas that can be inspected with
 [_ShowInstrument](show-instrument.md). This is the first read-only surface for the

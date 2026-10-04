@@ -109,7 +109,7 @@ contains `field`, `description`, `required`, `required_when`, `type`, `options` 
 row labels, giving seven rows and N + 1 columns for N fields. Field names span the first row
 to match trade-row entry; metadata includes conditional requirements and the source of
 contextual choices. Both return tables
-from the same definitions used by construction, built in #NN. Specifications
+from the same definitions used by construction, built in #137. Specifications
 for template creation and the CreateTrades wrapper now accompany them; final worksheet
 declarations and later functions follow their own reviews. A library-owned schema does not
 require building a separate product-catalog system:
@@ -381,7 +381,7 @@ what its pages say and changes the pages where it learns something.
 | D1 | the packet carries the review's decisions | these pages agree with the decisions and with one another | |
 | D2 | the NG example as a complete booking | the NG template complete under its own definition; a three-contract schedule and G27 in the toy market, so every state has a valid market | D1 |
 | I1 | the NG kernel | private modules for static encoding from resolved terms, preparation against a real history and evaluation against a real market; every hand answer of the NG example and the toy lifecycle pinned; batch equals summed singletons; duplicates count; a fixed batch inside a live market; an expired physical component refused; a tick folds nothing | D2; built in #136, [kernel.md](../../library/trades/kernel.md) |
-| I2 | `_ListInstruments` and `_ShowInstrument` with the `future` definition | the field set in code and on a sheet; the cell-wise table builder | D1; built in #NN, [list-instruments.md](../../library/instruments/list-instruments.md) and [show-instrument.md](../../library/instruments/show-instrument.md) |
+| I2 | `_ListInstruments` and `_ShowInstrument` with the `future` definition | the field set in code and on a sheet; the cell-wise table builder | D1; built in #137, [list-instruments.md](../../library/instruments/list-instruments.md) and [show-instrument.md](../../library/instruments/show-instrument.md) |
 | I3 | the seam extension: instrument-selected tables and reference cells | the transport, proved with probes and recorded in inputs.md | I2 |
 | I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3 |
 | I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4 |
