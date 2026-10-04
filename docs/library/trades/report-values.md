@@ -1,6 +1,6 @@
 # _ReportValues
 
-Built in #NN as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportRisk](report-risk.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
+Built in #141 as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportRisk](report-risk.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
 
 The batch's values from its results, as evaluation stored them: the mark and the cash under the route's labels, the currency and the valuation day. A report selects and labels; it values nothing, reads no market and infers no settlement, so a report of an older result stands after a later tick, and two reports of one result agree. The code is `src/goosedove/excel/trades.py`.
 

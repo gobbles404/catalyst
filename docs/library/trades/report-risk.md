@@ -1,6 +1,6 @@
 # _ReportRisk
 
-Built in #NN as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportValues](report-values.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
+Built in #141 as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportValues](report-values.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
 
 The batch's risk from its results, as evaluation stored them: the total delta, the change in mark for a move of one quote unit in every contract at once, with its unit; the DV01 with its unit; and the valuation day. The delta by contract on the batch's axis is retained in the result and not spilled here, `util_ReadHandle` on the results showing it slot by slot. A report values nothing and bumps nothing. The code is `src/goosedove/excel/trades.py`.
 

@@ -7,7 +7,7 @@ Design fixture, 3 October 2026, complete as a booking under the `future` definit
 review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
-`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #NN.
+`_CreateTradeTemplate` and `_CreateTrades` are built in #139, `_PrepareTrades`, `_EvaluateTrades` and the two reports in #141.
 
 ## What this example proves
 
@@ -77,7 +77,7 @@ in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
 =_ReportRisk(Results)
 ```
 
-The first two are built in #139 and the rest in #NN; every number below is pinned on a sheet.
+The first two are built in #139 and the rest in #141; every number below is pinned on a sheet.
 
 The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and `fixed_price`:
 

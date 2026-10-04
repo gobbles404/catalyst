@@ -1,6 +1,6 @@
 # _PrepareTrades
 
-Built in #NN as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_EvaluateTrades](evaluate-trades.md), [_ReportValues](report-values.md) and [_ReportRisk](report-risk.md); the design is [market binding](../../engineering-tickets/trade-valuation-pipeline/03-market-binding.md).
+Built in #141 as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_EvaluateTrades](evaluate-trades.md), [_ReportValues](report-values.md) and [_ReportRisk](report-risk.md); the design is [market binding](../../engineering-tickets/trade-valuation-pipeline/03-market-binding.md).
 
 A batch of trades prepared against one market history: each observation whose day has passed fixed at that day's settle, each payment that has fallen due settled into cash, the live slots and the distinct contracts they quote off set out for the tick, and delta by contract settled once, since no tick changes it. One record per history: a fixing arrived or corrected, or the valuation date rolled, makes a new one, and a quote moving makes none. The kernel's `prepared_trades` does the work, [kernel.md](kernel.md); the code is `src/goosedove/excel/trades.py`.
 
