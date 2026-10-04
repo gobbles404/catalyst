@@ -182,6 +182,16 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { 1.0 }, "#ERROR _ShowInstrument: instrument is number 1.0, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { ExcelMissing.Value }, "#ERROR _ShowInstrument: instrument is missing, expected text" };
+            // A row or rows of an instrument's fields, through the two probes: the name in another case in the library's words, then the width, the headers in input order, exact, and the cells column by column, in the seam's; a handle cell naming no live object; two rows where one is wanted.
+            yield return new object[] { "CountFieldRows", new object[] { "future", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
+            yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'future'" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_specification, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("payment_holiday_calendar"), "x:holiday_calendar:9" }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity"), Column(1.0, 2.0) }, "#ERROR EchoFieldRow: values is 2x1 array, expected one row of field values" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -297,6 +307,26 @@ namespace Goosedove.Host.Tests
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
+        // A row of the future's fields bound against the instrument named: the holiday calendar cell
+        // resolved to the object behind the handle and echoed as the words of its kind, the date as
+        // its serial, the number as itself, under the field names in the sheet's order.
+        [Fact]
+        public void a_row_of_fields_is_bound_against_the_instrument_named_and_its_handle_cell_resolved()
+        {
+            var calendar = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
+            var headers = Row("quantity_unit", "payment_holiday_calendar", "trade_date", "quantity");
+            var spill = (object[,])Seam.Call("EchoFieldRow", "future", headers, Row("LOT", calendar, 46164.0, 10.0));
+            Assert.Equal(2, spill.GetLength(0));
+            Assert.Equal(4, spill.GetLength(1));
+            Assert.Equal("payment_holiday_calendar", spill[0, 1]);
+            Assert.Equal("LOT", spill[1, 0]);
+            Assert.Equal("a holiday calendar", spill[1, 1]);
+            Assert.Equal(46164.0, spill[1, 2]);
+            Assert.Equal(10.0, spill[1, 3]);
+            var date = (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5);
+            Assert.Equal("#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle '" + date + "', expected holiday calendar handle", Seam.Call("EchoFieldRow", "future", Row("payment_holiday_calendar"), date));
+        }
+
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
         // the shown future spills seven rows by sixteen columns, the labels down the first column, the
         // fields across the first row and the required row booleans, every other cell text.

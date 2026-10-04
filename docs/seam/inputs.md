@@ -100,7 +100,15 @@ Built in the table pull request. A table is two arguments: a row of text holding
 |---|---|---|---|---|
 | a schema, a subclass of `Table` with one line per column, after a `TextRow` | a body of exactly the schema's columns, in any order, every cell of a column what its column type takes | `=TotalQuantity(A1:D1, A2:D4)` | one record with one typed column per header, dates as dates, numbers as numbers, text as a plain list, booleans as TRUE and FALSE, aligned by row | a header unknown, missing or given twice, a header count that is not the body's width, a cell that fails its column's type, named |
 
-The schema is declared beside the function:
+A row or rows of an instrument's fields, since #NN, is a table whose schema is not declared
+beside the function but chosen on the call, by the instrument another argument selects:
+
+| Declared | Accepts | Example | Hands over | Fails on |
+|---|---|---|---|---|
+| `FieldRow[S]`, after a `TextRow`, `S` the type of the one parameter that selects the instrument, `str` for its name or a class whose handle holds one | a body of one row whose headers are any of the instrument's fields, exactly spelled, in any order | `=_CreateTradeTemplate("future", A1:G1, A2:G2)` | a `FieldValues`: the instrument, the fields present in the sheet's order, each column typed by its field, a handle column as the objects the handles stood for | a header unknown or given twice, a header count that is not the body's width, a body of more than one row, a cell that fails its field's type, named; a handle cell naming no live object or an object of another kind, named |
+| `FieldRows[S]`, likewise | a body of one or more rows | `=_CreateTrades(B2, A4:E4, A5:E9, B3)` | the same, with a value per row in each column | the same, but for the row count |
+
+The schema of a table is declared beside the function:
 
 ```python
 class Trades(Table):
@@ -213,6 +221,30 @@ Decided 2026-09-15, a handle of any kind.
 Decided 2026-09-17, the whole number's bound.
 
 41. A whole number in is one a cell holds exactly, from −2^53 to 2^53, the line the way out already holds ([outputs.md](outputs.md) decision 6), so whatever a creator keeps can be read back. Beyond it the argument fails in the way out's words, `lot_size is number 1e+16, beyond what a cell holds exactly`, not as `expected whole number`, since 1E16 is whole: this is the one scalar rejection that says why in place of what was expected. 2^53 itself passes either side, and the next double past it fails. Found in review of #69, where a lot size of 1E16 made a contract spec that `util_ReadHandle` could not show.
+
+Decided 2026-10-03 and 2026-10-04, a row or rows of an instrument's fields, by the owner, as
+decisions 9 to 12 of the trade-valuation review; built in #NN.
+
+42. A template's row and a ticket's rows cross as a table whose schema is the instrument's
+definition, chosen on the call: `FieldRow[S]` for exactly one row, `FieldRows[S]` for one or
+more, each after a `TextRow` holding the headers, and `S` naming the type of the one parameter
+whose value selects the instrument, `str` for an instrument named as `_CreateTradeTemplate`
+names it, or a class whose handle holds one, as `_CreateTrades`'s template will; registration
+refuses a function with none or two such parameters, and the library says which kinds select,
+through `goosedove.instruments.fields.selected`. Any subset of the instrument's fields, in any
+order; the headers match the field names exactly, case and all, decision 29 standing for the
+tables declared beside a function, so that `Quantity` is unknown where `quantity` is a field
+and `quantity ` is another header, and the message lists the instrument's fields. Each column
+is checked against its field's type with the table rules, text for a code, and a field that
+holds a handle, `holiday calendar handle`, is a column of handle texts resolved one cell at a
+time through decision 35's rule, each cell named as a scalar handle argument is named; a blank
+cell fails as the mixed range refuses it, and leaving a field out is the only way not to
+supply it. The order of failures is the review's decision 11: each argument alone, in signature
+order, the instrument selected, the width, the headers in input order, the cells column by
+column left to right, and then the function, which checks meaning, the template and the
+ticket disjoint, the required fields present, the choices supported. The function receives a
+`FieldValues`, defined in the library, which never imports the seam: the instrument, the fields
+present and each typed column by name. `EchoFieldRow` and `CountFieldRows` are the probes.
 
 ## Not supported
 

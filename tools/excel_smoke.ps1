@@ -372,6 +372,21 @@ $formulas = [ordered]@{
     '=COLUMNS(_ShowInstrument("future"))'    = "16"
     '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
+    # A row of an instrument's fields bound against the instrument named, the handle cell resolved
+    # to its calendar and echoed as the words of its kind; rows of two fields counted; the name in
+    # another case, a header the future does not have, two rows where one is wanted and a header
+    # row of another width refused, in that order of checking.
+    '=INDEX(EchoFieldRow("future",EP1:EU1,EP2:EU2),1,4)' = "payment_holiday_calendar"
+    '=INDEX(EchoFieldRow("future",EP1:EU1,EP2:EU2),2,4)' = "a holiday calendar"
+    '=INDEX(EchoFieldRow("future",EP1:EU1,EP2:EU2),2,5)' = "46164"
+    '=INDEX(EchoFieldRow("future",EP1:EU1,EP2:EU2),2,6)' = "10"
+    '=COLUMNS(EchoFieldRow("future",EP1:EU1,EP2:EU2))'  = "6"
+    '=CountFieldRows("future",EP4:EQ4,EP5:EQ7)'        = "3"
+    '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'future'"
+    '=EchoFieldRow("future",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_specification, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar"
+    '=EchoFieldRow("future",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
+    '=EchoFieldRow("future",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
+    '=CountFieldRows("future",EP4:EQ4,EP5:EP7)' = "#ERROR CountFieldRows: fields has 2 headers, expected 1, one per column of rows"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -648,6 +663,13 @@ $cells = [ordered]@{
     "EI10" = "lots"; "EJ10" = "1000"; "EK10" = "BBL"; "EL10" = "-0.5"; "EM10" = "2"
     "EI11" = "lots"; "EJ11" = "1000"; "EK11" = "usd"; "EL11" = "3"; "EM11" = "2"
     "EI12" = "mmbtu"; "EJ12" = "1"; "EK12" = "MMBTU"; "EL12" = "0"; "EM12" = "0"
+    # A row of the future's fields and rows of two of them, for the field-value probes: the handle
+    # cell refers to the holiday calendar creator in AM1, as a sheet does.
+    "EP1" = "quantity_unit"; "EQ1" = "schedule_method"; "ER1" = "payment_time_lag"; "ES1" = "payment_holiday_calendar"; "ET1" = "trade_date"; "EU1" = "quantity"
+    "EP2" = "LOT"; "EQ2" = "lastday"; "ER2" = "+2bd"; "ES2" = "=AM1"; "ET2" = "22-May-2026"; "EU2" = "10"
+    "EP4" = "quantity"; "EQ4" = "fixed_price"
+    "EP5" = "1"; "EQ5" = "3.1"; "EP6" = "2"; "EQ6" = "3.2"; "EP7" = "3"; "EQ7" = "3.3"
+    "EP9" = "Quantity"; "EP10" = "ten"
     "EN12" = "=_CreateContractSpecifications(EI1:EM1,EI12:EM12)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.

@@ -983,3 +983,22 @@ def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() 
     cells = 7 * 16
     assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 100 * cells + SLACK
     assert bridge.live_handles() == live
+
+
+# --- a row or rows of an instrument's fields --------------------------------------------------
+# Rows of three fields bound through CountFieldRows: the number columns are views of the mixed
+# storage and the one text column the host's tuple itself, so the peak is one look's mask over
+# the rows at a time and the record's small objects: measured 3,837 bytes at 2,500 rows on
+# 2026-10-04, one byte a row and the slack twice over. A row of four fields with a handle cell
+# echoed back through EchoFieldRow, the handle resolved and the table built: 2,033 bytes.
+def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
+    rows = N // 4
+    headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
+    body = Cells.from_rows([[float(i), 3.0 + i / 100, f"c{i}"] for i in range(rows)])
+    assert least_peak(lambda: ENTRY["CountFieldRows"]("future", headers, body)) <= rows + 2 * SLACK
+    calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
+    one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
+    row = Cells.from_rows([["LOT", calendar, 46164.0, 10.0]])
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["EchoFieldRow"]("future", one, row)) <= 4 * SLACK
+    assert bridge.live_handles() == live

@@ -2071,3 +2071,83 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "numpy.empty": 2,
         "ufunc.reduce": 3,
     }
+
+
+# --- a row or rows of an instrument's fields --------------------------------------------------
+# The binding of a sheet's columns against the instrument another argument selects, through the
+# two probes. Rows of three fields, two of numbers and one of text: the arguments alone, the
+# name's rule and the mixed range's, then the instrument looked up by name, then the binding,
+# one look per column and nothing per row, the number columns views of the mixed storage and the
+# text column the host's tuple itself; the same eighteen calls across eighteen functions and
+# three looks at five rows and at 2,500. One row with a handle cell adds the handle's one
+# resolution and the date's conversion, then the echo's own table out.
+@pytest.mark.parametrize("rows", [5, 2_500], ids=["five rows", "2,500 rows"])
+def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int
+) -> None:
+    headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
+    body = Cells.from_rows([[float(i), 3.0 + i / 100, f"c{i}"] for i in range(rows)])
+    assert PATH["CountFieldRows"]("future", headers, body) == float(rows)
+    assert call_profile(lambda: PATH["CountFieldRows"]("future", headers, body)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 1,  # the name's rule
+        "_text_row": 1,  # the headers
+        "_texts": 1,
+        "_one_row": 1,
+        "_shape": 1,
+        "_mixed": 1,  # the body, accepted on the host's summary
+        "by_name": 1,  # the instrument looked up by its name
+        "instrument": 1,
+        "_bind_fields": 1,
+        "_numbers_of": 2,
+        "_texts_of": 1,
+        "MixedArray.shape": 2,
+        "CountFieldRows": 1,
+        "_number_out": 1,
+        "_scalar": 1,
+    }
+    assert numpy_calls(lambda: PATH["CountFieldRows"]("future", headers, body)) == {
+        "ndarray.any": 3,  # one look per column
+        "ufunc.reduce": 3,
+    }
+
+
+def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
+    headers = Cells.from_rows(
+        [["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]]
+    )
+    row = Cells.from_rows([["LOT", calendar, 46164.0, 10.0]])
+    PATH["EchoFieldRow"]("future", headers, row)
+    profile = call_profile(lambda: PATH["EchoFieldRow"]("future", headers, row))
+    binding = {
+        name: count
+        for name, count in profile.items()
+        if name
+        in {
+            "_bind_fields",
+            "_texts_of",
+            "_numbers_of",
+            "_dates_of",
+            "_handles_of",
+            "_resolve",
+            "_field_row",
+            "by_name",
+            "instrument",
+        }
+    }
+    assert binding == {
+        "_field_row": 1,  # one row, the template's shape
+        "by_name": 1,
+        "instrument": 1,
+        "_bind_fields": 1,
+        "_texts_of": 2,  # the code column, and the handle column's texts before their resolution
+        "_handles_of": 1,
+        "_resolve": 1,  # one handle cell, one lookup
+        "_dates_of": 1,
+        "_numbers_of": 1,
+    }
