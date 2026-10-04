@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Dated exposure](dated-exposure.md) · [Fixing and payment state](fixing-and-payment-state.md)
 
-**Status:** Built in #NN, stacked on #143, the page as a ticket, itself stacked on #142. Agreed
+**Status:** Built in #144, stacked on #143, the page as a ticket, itself stacked on #142. Agreed
 4 October 2026 and reviewed the same day; this replaced R1's earlier research-only scope and
 adjusted-lag proposal. The build is as the page says, and the section at the end records what
 it settled.
@@ -216,7 +216,7 @@ dates within one contract group and general payment-rule machinery remain later 
 
 ## As built
 
-Built in #NN. `penultimate` is a member of the kernel's `ScheduleMethod` beside `lastday`, and
+Built in #144. `penultimate` is a member of the kernel's `ScheduleMethod` beside `lastday`, and
 the one place that turns a method into observations, `observed`, takes the method, the index
 and the components' schedule rows: `lastday` gives each component its expiry day, `penultimate`
 the business day before it, one `numpy.busday_offset` of -1 over the components on the index's

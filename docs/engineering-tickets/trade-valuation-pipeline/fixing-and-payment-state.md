@@ -71,7 +71,7 @@ HolidayCalendar object transported by its Excel handle. No separate public ancho
 numeric lag field or payment-rule constructor is needed for this starting scope.
 Listed-product terms must still validate together; a supplied lag/calendar cannot redefine
 the traded product.
-The [R1 implementation](penultimate-trades.md), built in #NN, derives the pen expiry from the
+The [R1 implementation](penultimate-trades.md), built in #144, derives the pen expiry from the
 underlying NYMEX expiry and pricing calendar, then applies `payment_time_lag` from the pen
 expiry on the payment calendar. For its supported pen products, the pen expiry is both the
 observation date and payment anchor. `lastday` keeps its existing expiry anchor. Both resolved
