@@ -1012,7 +1012,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # occurrence and component, and the observations' component, day, weight and slot by observation,
 # one per component under lastday, and on the way makes the months, the rows, the anchors and the
 # payment days of the components, the references and the sort that finds the slots, and the
-# masks over them: measured 510,492 bytes at 2,500 rows, about 204 a row, which 208 a row and
+# masks over them: measured 509,786 bytes at 2,500 rows, about 204 a row, which 208 a row and
 # twice the slack cover; the ticket's own columns are the seam's views and cost nothing here.
 def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() -> None:
     letters = "FGHJKMNQUVXZ"
