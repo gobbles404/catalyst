@@ -2145,7 +2145,7 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
-        "_texts_of": 2,  # the code column, and the handle column's texts before their resolution
+        "_texts_of": 1,  # the code column; the handle column finds its cells' texts itself
         "_handles_of": 1,
         "_resolve": 1,  # one handle cell, one lookup
         "_dates_of": 1,

@@ -237,7 +237,9 @@ tables declared beside a function, so that `Quantity` is unknown where `quantity
 and `quantity ` is another header, and the message lists the instrument's fields. Each column
 is checked against its field's type with the table rules, text for a code, and a field that
 holds a handle, `holiday calendar handle`, is a column of handle texts resolved one cell at a
-time through decision 35's rule, each cell named as a scalar handle argument is named; a blank
+time through decision 35's rule, in row order, each cell's text found at its own place in the
+body and each cell named as a scalar handle argument is named, the first bad cell down the
+column whichever way it is bad; a blank
 cell fails as the mixed range refuses it, and leaving a field out is the only way not to
 supply it. The order of failures is the review's decision 11: each argument alone, in signature
 order, the instrument selected, the width, the headers in input order, the cells column by

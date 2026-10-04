@@ -181,7 +181,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "future",
             row("payment_holiday_calendar"),
             row(46023.0),
-            "values cell (1, 1) is number 46023.0, expected text",
+            "values cell (1, 1) is number 46023.0, expected holiday calendar handle",
         ),
     ],
 )
@@ -189,6 +189,44 @@ def test_a_row_that_cannot_be_bound_says_why_in_the_decided_order(
     instrument: object, headers: Cells, body: Cells, message: str
 ) -> None:
     assert ENTRY["EchoFieldRow"](instrument, headers, body) == f"#ERROR EchoFieldRow: {message}"
+
+
+def test_handles_are_resolved_from_their_own_cells_in_row_order(calendar: str) -> None:
+    # The review's case: a good handle, then text where a number is wanted. The handle column is
+    # checked first and passes; the text is named in its own cell, not as a second handle in a row
+    # that is not there.
+    out = ENTRY["EchoFieldRow"](
+        "future", row("payment_holiday_calendar", "quantity"), row(calendar, "ten")
+    )
+    assert out == "#ERROR EchoFieldRow: values cell (1, 2) is text 'ten', expected number"
+    # Down a handle column the first bad cell is the one named, whichever way it is bad.
+    dead_then_number = rows(["x:holiday_calendar:9"], [1.0])
+    assert ENTRY["CountFieldRows"]("future", row("payment_holiday_calendar"), dead_then_number) == (
+        "#ERROR CountFieldRows: rows cell (1, 1) is text 'x:holiday_calendar:9' naming no live "
+        "object, expected holiday calendar handle"
+    )
+    number_then_dead = rows([1.0], ["x:holiday_calendar:9"])
+    assert ENTRY["CountFieldRows"]("future", row("payment_holiday_calendar"), number_then_dead) == (
+        "#ERROR CountFieldRows: rows cell (1, 1) is number 1.0, expected holiday calendar handle"
+    )
+    # A text column before the handle column and a text column after it: each handle is found at
+    # its own place among the body's texts, and the rows come through.
+    good = rows(["cleared", calendar, "lastday"], ["bilateral", calendar, "lastday"])
+    values = bound(
+        "future", row("route", "payment_holiday_calendar", "schedule_method"), good, one_row=False
+    )
+    assert values.texts("route") == ("cleared", "bilateral")
+    assert values.texts("schedule_method") == ("lastday", "lastday")
+    assert all(type(held) is HolidayCalendar for held in values.objects("payment_holiday_calendar"))
+    mixed_rows = rows(
+        ["cleared", calendar, "lastday"], ["bilateral", "x:holiday_calendar:9", "lastday"]
+    )
+    assert ENTRY["CountFieldRows"](
+        "future", row("route", "payment_holiday_calendar", "schedule_method"), mixed_rows
+    ) == (
+        "#ERROR CountFieldRows: rows cell (2, 2) is text 'x:holiday_calendar:9' naming no live "
+        "object, expected holiday calendar handle"
+    )
 
 
 def test_a_handle_of_another_kind_in_a_handle_column_is_refused_naming_the_cell() -> None:

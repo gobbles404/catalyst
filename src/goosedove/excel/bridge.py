@@ -843,17 +843,29 @@ class FieldsSchema:
 
 
 def _handles_of(kind: type[object], expected: str, body: _Body, j: int) -> tuple[object, ...]:
-    """A column of handles resolved to the objects they stand for, one per row: each cell text,
-    as a text column is, then each text through the handle rule, which names the cell as the
-    argument a scalar handle names: a creator's failure relayed, text naming no live object, or
-    a handle of another kind. Per cell, since each is its own lookup."""
-    texts = _texts_of(body, j)
-    return tuple(
-        [
-            _resolve(kind, expected, f"{body.argument} cell ({r + 1}, {j + 1})", text)
-            for r, text in enumerate(texts)
-        ]
-    )
+    """A column of handles resolved to the objects they stand for, one per row, in row order:
+    each cell text, else named as a text column names a cell that is not, then its text through
+    the handle rule, which names the cell as the argument a scalar handle names: a creator's
+    failure relayed, text naming no live object, or a handle of another kind. The first bad cell
+    down the column is the one named, whichever way it is bad.
+
+    Each cell's text is found at its own place in the body's texts, counted in sheet order over
+    the whole body once: the resolution acts on the texts here, before the columns to the right
+    have been checked, so the text column's slice, which is right only once every column has
+    passed, would hand a text from a number column over as a handle and name a cell that is not
+    there. Per cell, since each is its own lookup.
+    """
+    mixed = body.mixed
+    kinds = mixed.kinds
+    places = np.cumsum(kinds.ravel() == TEXT_CODE).reshape(kinds.shape) - 1
+    not_text = kinds[:, j] != TEXT_CODE
+    held: list[object] = []
+    for r in range(kinds.shape[0]):
+        if not_text[r]:
+            raise _bad_cell(body, j, not_text, expected)
+        text = mixed.texts[int(places[r, j])]
+        held.append(_resolve(kind, expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
+    return tuple(held)
 
 
 # Each field type's words for a cell and its column rule: the four of the tables, text for a code,
