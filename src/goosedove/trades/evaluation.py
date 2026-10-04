@@ -1,9 +1,10 @@
-"""The prepared batch evaluated against one market: the quotes of its live inputs read off the
-market, aligned by schedule row, one multiplication and one addition for the mark; the cash as
-the preparation settled it; delta by contract on the batch's own axis and its total, shared with
-the preparation that settled them, since no tick changes them; and DV01, zero by the
-undiscounted cleared model. One snapshot for the
-batch as a whole, immutable, retained with everything that explains it.
+"""The prepared batch evaluated against one market: the quotes of its live references read off
+the market once each, gathered onto the live slots and multiplied by their exposure, one
+multiplication and one sum for the live amount, which the unsettled offsets and set amounts
+complete into the mark; the cash as the preparation settled it; delta by reference on the batch's
+own axis and its total, shared with the preparation that settled them, since no tick changes
+them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch as a whole,
+immutable, retained with everything that explains it, the dated live contributions among it.
 docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
@@ -16,23 +17,26 @@ from goosedove.market.market import Market
 from goosedove.trades.preparation import Prepared
 from goosedove.trades.terms import Route
 
-LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live input
+LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
 
 
 @dataclass(frozen=True, slots=True)
 class Results:
     """The preparation and the market, by reference, and the snapshot they make, read-only. The
     route and the currency name what the numbers are: for a cleared batch, mark is the
-    undiscounted entry-to-current-price P&L of the inputs not yet settled, live at their quotes
-    and fixed at their final prices, and cash the cumulative entry-to-final-price P&L of the
-    inputs settled by the valuation date, both in the settlement currency. contracts is the
-    batch's axis, the schedule rows of its inputs in the schedule's order, the same whatever has
-    fixed; delta[m] is the change in mark for a move of one quote unit in contract m, the
-    exposure where it is live and zero where it has fixed, in delta_unit, currency per quote
-    currency per quote quantity unit, the preparation's own array shared and never written;
-    delta_total is the change for a common move of one in every contract, the sum. dv01 is zero:
-    the cleared model is undiscounted, so a rate move changes nothing, a result of the model and
-    not a placeholder. as_of is the history's valuation day."""
+    undiscounted entry-to-current-price P&L of the groups not yet settled, live slots at their
+    references' quotes and fixed slots at their settles, and cash the cumulative
+    entry-to-final-price P&L of the groups settled by the valuation date, both in the settlement
+    currency. dated_live_contribution[i] is live slot i's exposure times its reference's quote,
+    paired with the preparation's live_slot; their sum is the live amount, and they allocate
+    neither the offsets nor the mark among dates. contracts is the batch's axis, the schedule
+    rows of its references in the schedule's order, the same whatever has fixed; delta[r] is the
+    change in mark for a move of one quote unit in contract r, the live exposure referencing it
+    and zero where every slot of it has fixed, in delta_unit, currency per quote currency per
+    quote quantity unit, the preparation's own array shared and never written; delta_total is the
+    change for a common move of one in every contract, the sum. dv01 is zero: the cleared model
+    is undiscounted, so a rate move changes nothing, a result of the model and not a placeholder.
+    as_of is the history's valuation day."""
 
     prepared: Prepared
     market: Market
@@ -41,6 +45,7 @@ class Results:
     as_of: np.datetime64
     mark: float
     cash: float
+    dated_live_contribution: NDArray[np.float64]
     contracts: NDArray[np.intp]
     delta: NDArray[np.float64]
     delta_total: float
@@ -58,20 +63,23 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
     being the message; then the quotes read, one kernel call, and the snapshot.
 
     The market is over the history the batch was prepared against, the one object: a market over
-    another history, a new fixing or another valuation date, is refused, and the batch prepared
-    again outside, never silently here. The route is cleared: a bilateral batch needs discount
-    factors and a DV01 convention that are not built, so it is refused by name rather than valued
-    as if undiscounted. Then the market answers the quotes of the live contracts, in the batch's
-    order, and refuses by name a contract before or past its coverage, as it does for every
-    reader; the live amount is the exposure times the quotes, one dot product; the mark adds the
-    unsettled offsets and set amounts; the cash is the preparation's, and so are delta and its
-    total, shared and not made again, since nothing a tick brings changes them.
+    another history, a later valuation date or a corrected fixing, is refused, and the batch is
+    prepared again outside, never silently here. The route is cleared: a bilateral batch is
+    refused by name, since its value needs discount factors and a DV01 convention that are not
+    built, and valuing it as if undiscounted would be a wrong number without a word.
 
-    Work: one kernel call and one quote read per live input, reported to the counter; no fixing
-    read, nothing per component, nothing of the encoding or the preparation done again.
+    The market answers the quotes of the live references in the batch's order, one per distinct
+    contract, and refuses a contract past its coverage by name, as it does for every reader; the
+    quotes are gathered onto the live slots, each slot's exposure times its reference's quote is
+    its contribution, and the live amount is their sum. The mark is the unsettled offsets and set
+    amounts plus the live amount; the cash is the preparation's. Delta and its total are the
+    preparation's, shared.
+
+    Work: one kernel call, one quote per live reference, reported to the counter; nothing of the
+    encoding or the preparation is done again, and nothing per slot but the gather and the
+    multiplication over the live ones.
     """
-    encoded = prepared.encoded
-    terms = encoded.terms
+    terms = prepared.encoded.terms
     if market.market_history is not prepared.history:
         name = market.market_history.calendar.index.name
         raise ValueError(
@@ -83,10 +91,14 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
             f"route is {terms.route.value}, expected cleared; bilateral valuation needs discount "
             "factors and a DV01 convention, not built yet"
         )
-    quotes = market.live_prices(prepared.live_contracts)
-    counter.hit(LIVE_PRICES_READ, int(quotes.size))
-    live = float(prepared.live_exposure @ quotes)
+    quotes = market.live_prices(prepared.live_references)
+    dated_live_contribution = (
+        prepared.dated_live_exposure[prepared.live_slot] * quotes[prepared.reference_of_live_slot]
+    )
+    live = float(dated_live_contribution.sum())
     counter.hit(KERNEL)
+    counter.hit(LIVE_PRICES_READ, int(prepared.live_references.size))
+    dated_live_contribution.setflags(write=False)
     conventions = terms.index.conventions
     return Results(
         prepared,
@@ -96,7 +108,8 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
         prepared.history.calendar.valuation_date.as_of,
         prepared.offset_unsettled + prepared.set_unsettled + live,
         prepared.cash,
-        encoded.inputs,
+        dated_live_contribution,
+        prepared.encoded.references,
         prepared.delta,
         prepared.delta_total,
         0.0,

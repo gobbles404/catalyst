@@ -121,13 +121,6 @@ def _futures_calendar(
         have = f"{len(codes)} {'contract' if len(codes) == 1 else 'contracts'}"
         raise ValueError(f"index has {have}, expected at least 2")
     _each_code_once(codes)
-    unordered = expiries[1:] <= expiries[:-1]
-    if unordered.any():
-        k = int(unordered.argmax())  # expiries[k + 1] is the first expiry not after the one before
-        raise ValueError(
-            f"future_expiry row {k + 2} is {expiries[k + 1]}, "
-            f"expected a date after row {k + 1}'s {expiries[k]}"
-        )
     if expiries[-1] - expiries[0] > np.timedelta64(MAX_DAYS, "D"):
         raise ValueError(
             f"future_expiry row {expiries.size} is {expiries[-1]}, "
@@ -135,10 +128,29 @@ def _futures_calendar(
         )
     day = np.timedelta64(1, "D")
     dates = np.arange(expiries[0] + day, expiries[-1] + day, dtype="datetime64[D]")
-    contract = np.searchsorted(expiries, dates, side="left")
+    contract = contract_on(schedule, dates)
     is_priced = np.is_busday(dates, holidays=holidays.holiday)
     is_fixed = dates < valuation_date.as_of
     return _frozen(valuation_date, index, dates, contract, is_priced, is_fixed)
+
+
+def contract_on(schedule: FuturesSchedule, days: NDArray[np.datetime64]) -> NDArray[np.intp]:
+    """The row of the contract pricing each day, the first whose expiry is on or after it: the
+    futures calendar's rule, which the encoding of a batch's observations reads by too, so that
+    an observation's reference is the contract the calendar would price that day with. Each
+    future expires after the one above, in the order given, else the first that does not is
+    refused by row; a day after the last expiry is the row past the schedule's end, the caller's
+    to refuse, and a day on or before the first expiry is row 0, the contract that only bounds
+    the calendar."""
+    expiries = schedule.future_expiry
+    unordered = expiries[1:] <= expiries[:-1]
+    if unordered.any():
+        k = int(unordered.argmax())  # expiries[k + 1] is the first expiry not after the one before
+        raise ValueError(
+            f"future_expiry row {k + 2} is {expiries[k + 1]}, "
+            f"expected a date after row {k + 1}'s {expiries[k]}"
+        )
+    return np.searchsorted(expiries, days, side="left")
 
 
 def _gas_daily_calendar(

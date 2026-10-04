@@ -1,11 +1,12 @@
-"""What the trade kernel costs, called directly, with no worksheet surface yet: the work each
-step reports to its counter, which of the package's functions run and how many times, and which
-numpy C calls cProfile sees, at five components and at two thousand alike. The pins are the
-pipeline's work rules: a tick reads the quotes of the live inputs and makes one kernel call,
-and does nothing of the encoding or the preparation again; a preparation reads one fixing per
-fixed input and nothing per component or per day of the calendar; an encoding does one pass
-over the components and one over the inputs. Every ledger here is the same at any batch size,
-which is what makes it a ledger and not a count of trades."""
+"""What the trade kernel costs, called directly: the work each step reports to its counter,
+which of the package's functions run and how many times, and which numpy C calls cProfile sees,
+at five components and at two thousand alike. The pins are the pipeline's work rules: a tick
+reads one quote per live reference, gathers them onto the live slots and makes one kernel call,
+and does nothing of the encoding or the preparation again; a preparation reads one settle per
+fixed slot and nothing per component, per observation or per day of the calendar; an encoding
+does one pass over the components, one over the observations and one over the slots. Every
+ledger here is the same at any batch size, which is what makes it a ledger and not a count of
+trades."""
 
 from collections.abc import Callable
 
@@ -29,6 +30,7 @@ from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import results
+from goosedove.trades.observations import observed
 from goosedove.trades.preparation import prepared
 from goosedove.trades.terms import (
     PaymentTerms,
@@ -102,7 +104,7 @@ def a_batch(components: int, contracts: int) -> Encoded:
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
-    return encoded(terms, UNITS, WorkCounter())
+    return encoded(terms, observed(terms), UNITS, WorkCounter())
 
 
 def a_history(as_of: str = AS_OF) -> MarketHistory:
@@ -123,28 +125,30 @@ def a_market(history: MarketHistory) -> Market:
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
-def test_the_encoding_reports_one_pass_over_the_components_and_one_over_the_inputs(
+def test_the_encoding_reports_its_components_its_observations_and_its_slots(
     components: int, contracts: int
 ) -> None:
     counter = WorkCounter()
-    encoded(a_batch(components, contracts).terms, UNITS, counter)
+    terms = a_batch(components, contracts).terms
+    encoded(terms, observed(terms), UNITS, counter)
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
-        "encoded_inputs": contracts,
+        "encoded_observations": components,  # lastday: one per component
+        "encoded_slots": contracts,  # one per contract, on its expiry day
     }
 
 
 @pytest.mark.parametrize(("components", "contracts", "fixed"), [(5, 2, 2), (2_000, 24, 4)], ids=IDS)
-def test_the_preparation_reports_its_inputs_and_one_fixing_read_per_fixed_input(
+def test_the_preparation_reports_its_slots_and_one_settle_read_per_fixed_slot(
     components: int, contracts: int, fixed: int
 ) -> None:
     counter = WorkCounter()
     prepared(a_batch(components, contracts), a_history(), counter)
-    assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_inputs": contracts}
+    assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": contracts}
 
 
 @pytest.mark.parametrize(("components", "contracts", "live"), [(5, 2, 0), (2_000, 24, 20)], ids=IDS)
-def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_input(
+def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
     components: int, contracts: int, live: int
 ) -> None:
     history = a_history()
@@ -155,6 +159,28 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_input(
 
 
 # --- which functions run, and how many times, whatever the size -----------------------------
+
+# The preparation's numpy, the same at any size: the two looks that refuse a slot before the
+# calendar or on a closed day, the unique over the live references with its sort, the searches
+# of the history's fixed rows and the live references, the bincounts' reductions and the sums,
+# the frozen arrays.
+PREPARATION_NUMPY = {
+    "ndarray.any": 2,
+    "ndarray.argsort": 1,
+    "ndarray.astype": 1,
+    "ndarray.cumsum": 1,
+    "ndarray.flatten": 1,
+    "ndarray.nonzero": 1,
+    "ndarray.ravel": 1,
+    "ndarray.reshape": 1,
+    "ndarray.searchsorted": 1,
+    "ndarray.setflags": 8,
+    "ndarray.sum": 4,
+    "numpy.asanyarray": 3,
+    "numpy.zeros": 1,
+    "numpy.empty": 2,
+    "ufunc.reduce": 6,
+}
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
@@ -170,12 +196,15 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
-    # The dot product is dispatched in C and unseen; delta and its total are the preparation's,
-    # shared and not made again. What is seen is the market's one look at the contracts asked
-    # for, with its reduction.
+    # The gather and the multiplication are dispatched in C and unseen; delta and its total are
+    # the preparation's, shared and not made again. What is seen is the market's one look at the
+    # references asked for, with its reduction, the sum of the dated contributions, and the
+    # contributions frozen.
     assert numpy_calls(lambda: results(prep, quoted, WorkCounter())) == {
         "ndarray.any": 1,
-        "ufunc.reduce": 1,
+        "ndarray.setflags": 1,
+        "ndarray.sum": 1,
+        "ufunc.reduce": 2,
     }
 
 
@@ -184,19 +213,27 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     call_profile: CallProfile, components: int, contracts: int
 ) -> None:
     terms = a_batch(components, contracts).terms
-    assert call_profile(lambda: encoded(terms, UNITS, WorkCounter())) == {
+    obs = observed(terms)
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == {
         "encoded": 1,
-        "_one_payment_day_per_input": 1,
+        "_the_references": 1,
+        "contract_on": 1,  # the calendar's rule, one search over the schedule
+        "_the_slots": 1,
+        "_one_payment_day_per_group": 1,
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
+    }
+    assert call_profile(lambda: observed(terms)) == {
+        "observed": 1,
+        "observations": 1,
     }
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
 def test_the_preparation_runs_the_same_functions_at_any_size(
-    call_profile: CallProfile, components: int, contracts: int
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
 ) -> None:
     enc = a_batch(components, contracts)
     history = a_history()
@@ -205,3 +242,5 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
     }
+    numpy = numpy_calls(lambda: prepared(enc, history, WorkCounter()))
+    assert numpy == PREPARATION_NUMPY, numpy

@@ -190,11 +190,13 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     np.testing.assert_array_equal(
         batch.encoded.offset, [-310_000, 126_000, -238_000, 402_000, -310_000]
     )
-    np.testing.assert_array_equal(batch.encoded.inputs, [1, 2])
-    np.testing.assert_array_equal(batch.encoded.exposure, [160_000, -50_000])
+    np.testing.assert_array_equal(batch.encoded.groups, [1, 2])
+    np.testing.assert_array_equal(batch.encoded.slot_exposure, [160_000, -50_000])
+    np.testing.assert_array_equal(batch.encoded.slot_date, dates("2026-11-25", "2026-12-29"))
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
-        "encoded_inputs": 2,
+        "encoded_observations": 5,
+        "encoded_slots": 2,
         "resolved_components": 5,
         "resolved_occurrences": 5,
         "schedule_codes_read": 3,
@@ -258,7 +260,8 @@ def test_a_whole_year_strip_resolves_twelve_months_against_a_long_schedule() -> 
     assert long.schedule.codes[3] == "F27"
     np.testing.assert_array_equal(batch.resolved.contract, np.arange(3, 15))
     np.testing.assert_array_equal(batch.resolved.occurrence, np.zeros(12, dtype=np.intp))
-    np.testing.assert_array_equal(batch.encoded.quantity_of_input, np.full(12, 20_000.0))
+    np.testing.assert_array_equal(batch.encoded.quantity, np.full(12, 20_000.0))
+    assert batch.encoded.slot_exposure.size == 12  # one slot per month, on its expiry
 
 
 def test_a_templates_field_applies_to_every_row_and_a_tickets_varies() -> None:
@@ -582,7 +585,7 @@ def test_any_ticket_of_single_months_resolves_row_by_row(
     )
     np.testing.assert_array_equal(terms.lots, [q for _, q, _ in rows])
     assert counter.freeze()["resolved_components"] == n
-    assert batch.encoded.inputs.size == len({code.upper() for code, _, _ in rows})
+    assert batch.encoded.groups.size == len({code.upper() for code, _, _ in rows})
 
 
 # --- the creator on the sheet ---------------------------------------------------------------
@@ -659,7 +662,7 @@ def test_the_creator_publishes_the_batch_named_for_its_index(sheet: dict[str, An
     assert bridge.call("CatchTrades", [handle]) == 0.0
     batch = CAUGHT.pop()
     np.testing.assert_array_equal(batch.resolved.contract, [1, 1, 2, 2, 1])
-    np.testing.assert_array_equal(batch.encoded.exposure, [160_000, -50_000])
+    np.testing.assert_array_equal(batch.encoded.slot_exposure, [160_000, -50_000])
     assert batch.resolved.labels == ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
 
 

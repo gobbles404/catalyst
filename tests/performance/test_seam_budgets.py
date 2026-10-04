@@ -1312,6 +1312,7 @@ def test_a_calendar_is_two_handles_in_and_four_columns_out(
         "_futures_calendar": 1,
         "with_holiday_calendar": 1,
         "_each_code_once": 1,
+        "contract_on": 1,  # the pricing contract of each day, the rule the encoding reads by too
         "_frozen": 1,
         "_publish": 1,
     }

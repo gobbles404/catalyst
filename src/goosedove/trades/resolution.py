@@ -26,6 +26,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FUTURE, FieldType
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
+from goosedove.trades.observations import observed
 from goosedove.trades.template import (
     TradeTemplate,
     business_days_of,
@@ -85,10 +86,11 @@ def trades(
     units: UnitConversions,
     counter: WorkCounter,
 ) -> Trades:
-    """The one way to make Trades: resolution, then encoding, the unit tables and the counter
-    passed in and never looked up; a failure in either publishes nothing."""
+    """The one way to make Trades: resolution, then the observations the schedule method gives
+    the terms, then encoding, the unit tables and the counter passed in and never looked up; a
+    failure in any publishes nothing."""
     terms = resolved(index, ticket, template, counter)
-    return Trades(terms, encoded(terms, units, counter))
+    return Trades(terms, encoded(terms, observed(terms), units, counter))
 
 
 def resolved(
