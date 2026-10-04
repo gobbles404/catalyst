@@ -5,7 +5,7 @@
 
 **Status:** Agreed engineering slice, 4 October 2026, with the two narrowings of the review of
 the same day: the market reference is derived from the observation date by the calendar's own
-rule and retained, and the fixing source is kept once on the shared object. Built in #NN:
+rule and retained, and the fixing source is kept once on the shared object. Built in #140:
 [kernel.md](../../library/trades/kernel.md) is the page of the kernel as it stands, the five
 records and the daily toy among them; `src/goosedove/trades/observations.py` is the new module,
 `encoding.py`, `preparation.py` and `evaluation.py` the reshaped ones.
