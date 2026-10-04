@@ -2,6 +2,9 @@
 
 [Pipeline overview](README.md) · [Previous](02-static-encoding.md) · [Next: evaluation](04-evaluation.md)
 
+Built in #NN as the preparation of the trade kernel, `src/goosedove/trades/preparation.py`, on the NG example and
+with no worksheet function yet; [kernel.md](../../library/trades/kernel.md) is the page.
+
 ## Responsibility
 
 Connect the static encoding's market inputs to an explicit market state. Establish where

@@ -2,6 +2,9 @@
 
 [Pipeline overview](README.md) · [Previous](03-market-binding.md) · [Next: results](05-results.md)
 
+Built in #NN as the evaluation of the trade kernel, `src/goosedove/trades/evaluation.py`, on the NG example and
+with no worksheet function yet; [kernel.md](../../library/trades/kernel.md) is the page.
+
 ## Responsibility
 
 Evaluate named financial measures and risks from valid prepared trade data and one coherent
