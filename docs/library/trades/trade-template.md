@@ -1,6 +1,6 @@
 # _CreateTradeTemplate
 
-Agreed contract. The seam's part is built in #NN, `FieldRow[str]` and the `FieldValues` it hands over, [inputs.md](../../seam/inputs.md) decision 42; the creator itself comes in ticket I4. Not implemented.
+Agreed contract. The seam's part is built in #138, `FieldRow[str]` and the `FieldValues` it hands over, [inputs.md](../../seam/inputs.md) decision 42; the creator itself comes in ticket I4. Not implemented.
 
 Creates shared trade fields under a library-owned instrument definition, reducing repeated
 ticket entry. The template is allowed to be incomplete. It has no market-state dependency.

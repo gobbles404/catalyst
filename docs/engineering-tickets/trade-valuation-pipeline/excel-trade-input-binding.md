@@ -65,7 +65,7 @@ extension. This document does not change existing table functions.
 ## Bounded seam extension, built
 
 One extension for library-defined, typed partial tables, agreed in the review of 3 October
-2026 as its decisions 9 to 12 and built in #NN as ticket I3: `FieldRow[S]` and `FieldRows[S]` in
+2026 as its decisions 9 to 12 and built in #138 as ticket I3: `FieldRow[S]` and `FieldRows[S]` in
 `src/goosedove/excel/bridge.py`, bound by `_bind_fields`, the `FieldValues` record and the
 `selected` rule in `src/goosedove/instruments/fields.py`, and [inputs.md](../../seam/inputs.md)
 decision 42 recording it; the probes `EchoFieldRow` and `CountFieldRows` prove it without a

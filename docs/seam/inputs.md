@@ -100,7 +100,7 @@ Built in the table pull request. A table is two arguments: a row of text holding
 |---|---|---|---|---|
 | a schema, a subclass of `Table` with one line per column, after a `TextRow` | a body of exactly the schema's columns, in any order, every cell of a column what its column type takes | `=TotalQuantity(A1:D1, A2:D4)` | one record with one typed column per header, dates as dates, numbers as numbers, text as a plain list, booleans as TRUE and FALSE, aligned by row | a header unknown, missing or given twice, a header count that is not the body's width, a cell that fails its column's type, named |
 
-A row or rows of an instrument's fields, since #NN, is a table whose schema is not declared
+A row or rows of an instrument's fields, since #138, is a table whose schema is not declared
 beside the function but chosen on the call, by the instrument another argument selects:
 
 | Declared | Accepts | Example | Hands over | Fails on |
@@ -223,7 +223,7 @@ Decided 2026-09-17, the whole number's bound.
 41. A whole number in is one a cell holds exactly, from −2^53 to 2^53, the line the way out already holds ([outputs.md](outputs.md) decision 6), so whatever a creator keeps can be read back. Beyond it the argument fails in the way out's words, `lot_size is number 1e+16, beyond what a cell holds exactly`, not as `expected whole number`, since 1E16 is whole: this is the one scalar rejection that says why in place of what was expected. 2^53 itself passes either side, and the next double past it fails. Found in review of #69, where a lot size of 1E16 made a contract spec that `util_ReadHandle` could not show.
 
 Decided 2026-10-03 and 2026-10-04, a row or rows of an instrument's fields, by the owner, as
-decisions 9 to 12 of the trade-valuation review; built in #NN.
+decisions 9 to 12 of the trade-valuation review; built in #138.
 
 42. A template's row and a ticket's rows cross as a table whose schema is the instrument's
 definition, chosen on the call: `FieldRow[S]` for exactly one row, `FieldRows[S]` for one or
