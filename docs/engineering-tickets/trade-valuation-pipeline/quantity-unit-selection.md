@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Instrument definitions](00-instrument-definitions.md) · [Show instrument](../../library/instruments/show-instrument.md)
 
-**Status:** Built in #NN, stacked on #144. Agreed 5 October 2026; it changes the trade
+**Status:** Built in #145, stacked on #144. Agreed 5 October 2026; it changes the trade
 implementation of PRs #136–#144, reviewed through `7650bfe`, and supersedes the two-field
 quantity selection of the earlier pipeline pages, which say the new rule now. The section
 at the end records what the build settled.
@@ -163,7 +163,7 @@ batch feature, or change to settlement, valuation or risk.
 
 ## As built
 
-Built in #NN. The `future` has fourteen fields: `contract_specification` is gone and
+Built in #145. The `future` has fourteen fields: `contract_specification` is gone and
 `quantity_unit` is text whose options are the index's specification names, its rule that it
 selects the lot size and unit from the index given to `_CreateTrades`, exactly as named there;
 `quantity` is a signed whole count of it. `_ShowInstrument` spills seven rows by fifteen

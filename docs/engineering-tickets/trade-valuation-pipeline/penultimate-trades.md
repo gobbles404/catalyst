@@ -68,7 +68,7 @@ Use the existing `future` definition and exact field names:
 | `payment_time_lag` | `+1bd` | `+1bd`, modeled at the rule deadline |
 | `payment_holiday_calendar` | Clearing-organization calendar handle | Calendar handle for the rule's Trading Days |
 
-Specification names above are example data, not magic strings that dispatch code. Since #NN
+Specification names above are example data, not magic strings that dispatch code. Since #145
 the `quantity_unit` field names the specification and the former `contract_specification`
 field is gone. Select the actual traded product's lot size from the index's supplied
 specifications. PHH must not inherit the 10,000 MMBtu size of its NYMEX reference. Clearing-house text remains a retained label.

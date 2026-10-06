@@ -59,7 +59,7 @@ or a ticket column, each from one source, a field supplied by both refused even 
 `quantity` is a signed whole count of `quantity_unit`, and `quantity_unit` names one of the
 index's contract specifications exactly as the index spells it, the desk's word for a quantity of
 the index: `NYMEX NG` for the 10,000 MMBtu lot, `ICE PHH` for the 2,500 MMBtu lot, `MMBTU` where
-the index defines a specification of that name with a size of one. Since #NN there is no separate
+the index defines a specification of that name with a size of one. Since #145 there is no separate
 specification field and `LOT` has no meaning of its own; the Show cannot list an index's names,
 since it takes no index, and `_CreateTrades` refuses a name the index does not spell,
 `quantity_unit is 'ICE NG', expected one of the index's specifications: 'NYMEX NG'`. The
@@ -158,7 +158,7 @@ this generic schema reader for now.
 | counterparty, marketer | Candidate attribution fields; add when their meaning and retention are agreed |
 | clearing_house | Distinguish the clearing house from a clearing firm/account; agree whether selected specifications supply or constrain it |
 | marketing_reserve | Defer until defined: currency/units, per-unit versus total, sign, and whether it changes value or is reporting-only |
-| trade_date, contract_specification | Add the missing executed date and unambiguous specification selection; since #NN the selection is `quantity_unit`'s, a name among the index's specifications, and there is no separate field |
+| trade_date, contract_specification | Add the missing executed date and unambiguous specification selection; since #145 the selection is `quantity_unit`'s, a name among the index's specifications, and there is no separate field |
 | schedule_method, quantity_per | Retain these field names; library-defined methods, lastday supported first, and month/day quantity basis; exact and cfd outside v1 |
 | settlement_method | Retain physical/financial identification; physical-delivery handling is outside v1 and does not set payment dates |
 

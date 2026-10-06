@@ -51,7 +51,7 @@ are never worksheet parameters; the encoder does not discover them through an am
 
 CreateTrades reads static reference facts through the selected Index object. The template
 or ticket supplies quantity_unit, selecting one named row within that index's
-specifications, since #NN; there is no separate specification field.
+specifications, since #145; there is no separate specification field.
 There is no separate conventions/specification handle in the proposed trade call, no
 first-specification fallback, and no global lookup using the index's display name.
 

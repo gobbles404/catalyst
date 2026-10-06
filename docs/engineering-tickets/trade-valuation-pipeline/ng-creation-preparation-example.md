@@ -55,7 +55,7 @@ The template is created for `future` and supplies the shared facts in one row:
 |---|---|---|---|---|---|
 | NYMEX NG | month | lastday | cleared | physical | CME Clearing |
 
-Since #NN `quantity_unit` names the specification, the 10,000 MMBtu NYMEX lot, and there is
+Since #145 `quantity_unit` names the specification, the 10,000 MMBtu NYMEX lot, and there is
 no separate `contract_specification` field; the quantity counts the named lot.
 
 With the ticket's five columns below, every field the `future` definition requires is supplied
