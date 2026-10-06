@@ -79,7 +79,7 @@ The same template supplies its fields to one or many ticket rows. Template field
 | A template selects its instrument for a ticket; a field the ticket must supply is not required | the same |
 | Fifteen values against their fields' rules refused naming the field, a fraction and a zero of a quantity and an infinite price among them; a template's numbers passing the kernel's rules; the builder takes one row | the same |
 | The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 26 in all |
-| One read per value and one publication, 2,412 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
+| One read per value and one publication, 2,331 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
 | A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |
 | The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289 |
 

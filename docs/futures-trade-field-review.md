@@ -44,7 +44,7 @@ Contract selection and fixing method are separate: one contract can average dail
 
 “Bullet” can remain a desk term, but it should not silently mean both “one listed maturity” and “one observation or payment.” Those are separate facts.
 
-The current [creation contract](engineering-tickets/trade-valuation-pipeline/create-trade.md) defines the initial strip form: `contract_code` resolves monthly constituents, `quantity_per` establishes the quantity basis, and one `fixed_price` applies to each constituent. For example, `CAL27` with `quantity = +10`, `quantity_unit = LOT` and `quantity_per = month` contributes +10 lots in each month. This is an explicitly booked flat-price strip, not an inference that a package-average execution price applies to every month. Package allocation and arbitrary component ratios from the earlier survey are not additional v1 input fields.
+The current [creation contract](engineering-tickets/trade-valuation-pipeline/create-trade.md) defines the initial strip form: `contract_code` resolves monthly constituents, `quantity_per` establishes the quantity basis, and one `fixed_price` applies to each constituent. For example, `CAL27` with `quantity = +10`, a `quantity_unit` naming the index's lot specification and `quantity_per = month` contributes +10 of that lot in each month. This is an explicitly booked flat-price strip, not an inference that a package-average execution price applies to every month. Package allocation and arbitrary component ratios from the earlier survey are not additional v1 input fields.
 
 ## 2. Contract survey
 
