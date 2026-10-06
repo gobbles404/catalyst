@@ -587,19 +587,12 @@ def indices_for(*pairs: tuple[str, float], over: Index = IFERC_INDEX) -> IfercFi
 IFERC = an_iferc_calendar()
 
 
-# The page's sample, the months as the desk keeps them, the newest in the first row: the
-# history's rows and prices run in the calendar's order, October then November.
+# The page's sample, the months as the desk keeps them, the newest in the first row, and
+# kept oldest first by their creator: the history's rows and prices run in the calendar's
+# order, October then November.
 def test_the_iferc_sample_prices_the_published_months_and_no_other() -> None:
     made = market_history(IFERC, indices_for(("X26", 2.10), ("V26", 1.85)))
     assert made.calendar is IFERC
-    assert made.fixed_rows.tolist() == [0, 1]
-    assert made.fixing_prices.tolist() == [1.85, 2.10]
-
-
-# The same months the other way up, the oldest first, make the same history: an index finds its
-# row by its code, so neither direction is the only one taken.
-def test_iferc_indices_come_back_in_the_calendars_order_whatever_order_they_came_in() -> None:
-    made = market_history(IFERC, indices_for(("V26", 1.85), ("X26", 2.10)))
     assert made.fixed_rows.tolist() == [0, 1]
     assert made.fixing_prices.tolist() == [1.85, 2.10]
 
@@ -618,13 +611,13 @@ def test_an_iferc_calendar_of_one_month_and_one_with_nothing_published() -> None
 
 def test_an_index_for_the_month_published_on_the_valuation_day_is_refused() -> None:
     with pytest.raises(ValueError) as failure:
-        market_history(an_iferc_calendar("2026-11-02"), indices_for(("V26", 1.85), ("X26", 2.10)))
+        market_history(an_iferc_calendar("2026-11-02"), indices_for(("X26", 2.10), ("V26", 1.85)))
     assert str(failure.value) == (
         "fixings contract_code 'X26' is a month not yet fixed in calendar, "
         "expected an index for fixed months alone"
     )
     the_day_after = market_history(
-        an_iferc_calendar("2026-11-03"), indices_for(("V26", 1.85), ("X26", 2.10))
+        an_iferc_calendar("2026-11-03"), indices_for(("X26", 2.10), ("V26", 1.85))
     )
     assert the_day_after.fixed_rows.tolist() == [0, 1]
 
@@ -633,7 +626,7 @@ def test_an_index_for_the_month_published_on_the_valuation_day_is_refused() -> N
     ("pairs", "message"),
     [
         (
-            (("V26", 1.85), ("X26", 2.10), ("Z26", 2.20)),
+            (("Z26", 2.20), ("X26", 2.10), ("V26", 1.85)),
             "fixings contract_code 'Z26' is a month not yet fixed in calendar, "
             "expected an index for fixed months alone",
         ),
@@ -856,10 +849,10 @@ def test_every_fixed_month_takes_its_own_index_in_the_calendars_order(
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(gaps.sum()) + 10)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed).tolist()
-    order = data.draw(st.permutations(fixed))
+    newest_first = fixed[::-1]  # as the desk keeps them, the one order the creator takes
     fixings = iferc_fixings(
-        tuple(codes[i] for i in order),
-        np.array([100.0 + i for i in order], dtype=np.float64),
+        tuple(codes[i] for i in newest_first),
+        np.array([100.0 + i for i in newest_first], dtype=np.float64),
         made.index,
     )
     history = market_history(made, fixings)

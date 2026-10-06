@@ -249,14 +249,14 @@ $formulas = [ordered]@{
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5)" = "#ERROR _CreateFuturesFixings: index is missing, expected index handle"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,BJ2)" = "#ERROR _CreateFuturesFixings: index is number 95.08, expected index handle"
     "=_CreateFuturesFixings(BI2:BI5,BJ2:BJ5,EB3)" = "#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, expected a futures index"
-    # The IFERC fixings: a creator over a column of contract codes, the newest month first, a
-    # column of indices and the index in EE2, whose schedule holds those four months the other way
-    # up, read back through util_ReadHandle in the order typed; the creator again over the two
-    # columns of that spill, in BQ2, whose own spill reads the same cell for cell; a price column
-    # one row short, a code given twice, a code the index does not hold and a futures index where
-    # the IFERC index should be, the library's words; a blank among the prices, a number among the
-    # codes, the prices left out, the index left out and a row where a column is expected, the
-    # seam's.
+    # The IFERC fixings: a creator over a column of contract codes, the newest month first as the
+    # creator requires, a column of indices and the index in EE2, whose schedule holds those four
+    # months the other way up, read back through util_ReadHandle newest first; the creator again
+    # over the two columns of that spill, in BQ2, whose own spill reads the same cell for cell; a
+    # price column one row short, a code given twice, a code the index does not hold, the four
+    # months oldest first, the schedule's own column, and a futures index where the IFERC index
+    # should be, the library's words; a blank among the prices, a number among the codes, the
+    # prices left out, the index left out and a row where a column is expected, the seam's.
     '=MID(BQ1,FIND(":",BQ1)+1,14)' = "iferc_fixings:"
     "=INDEX(util_ReadHandle(BQ1),1,1)" = "contract_code"
     "=INDEX(util_ReadHandle(BQ1),2,2)" = "float64"
@@ -270,6 +270,7 @@ $formulas = [ordered]@{
     "=AND(util_ReadHandle(BQ2)=util_ReadHandle(BQ1))" = "TRUE"
     "=_CreateIfercFixings(BO2:BO5,BP2:BP4,EE2)" = "#ERROR _CreateIfercFixings: ValueError: price has 3 prices, expected 4, one per contract_code"
     "=_CreateIfercFixings(BR2:BR3,BP2:BP3,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'F26', already given at row 1"
+    "=_CreateIfercFixings(BV2:BV5,BP2:BP5,EE2)" = "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-02, expected a month published before row 1's 'F26', published 2026-01-05"
     "=_CreateIfercFixings(BO2:BO3,BT2:BT3,EE2)" = "#ERROR _CreateIfercFixings: price cell (2, 1) is blank, expected number"
     "=_CreateIfercFixings(BS2:BS3,BP2:BP3,EE2)" = "#ERROR _CreateIfercFixings: contract_code cell (2, 1) is number 46023.0, expected text"
     "=_CreateIfercFixings(BO2:BO5)" = "#ERROR _CreateIfercFixings: price is missing, expected column of numbers"
@@ -1183,8 +1184,8 @@ $formulas = [ordered]@{
     "=_CreateMarketHistory(CT5)" = "#ERROR _CreateMarketHistory: fixings is missing, expected a handle"
     # The market history over the other two calendars: the Gas Daily history in DU2 read back,
     # every flow day through the valuation day priced and the next unfixed, and the IFERC history
-    # in DW4, one row per month, the two published months priced in the calendar's order whatever
-    # order the indices came in and December unfixed; a print for the day after the valuation
+    # in DW4, one row per month, the two published months priced in the calendar's order, the
+    # indices given newest first, and December unfixed; a print for the day after the valuation
     # day, IFERC fixings over another index than the Gas Daily calendar's and a history where the
     # fixings should be, the library's words.
     '=MID(DU2,FIND(":",DU2)+1,15)' = "market_history:"
@@ -2215,12 +2216,12 @@ $cells = [ordered]@{
     "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_time_lag"; "NX14" = "payment_holiday_calendar"
     "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+3bd"; "NX15" = "=NK2"
     "NR16" = '=_CreateTradeTemplate("fixed_float",NR14:NX14,NR15:NX15)'
-    "OA1" = "X26"; "OB1" = "-0.4"
-    "OA2" = "Z26"; "OB2" = "-0.2"
+    "OA1" = "Z26"; "OB1" = "-0.2"
+    "OA2" = "X26"; "OB2" = "-0.4"
     "OC1" = "1-Dec-2026"
     "OC2" = "=_CreateValuationDate(OC1,0.5)"
     "OC3" = "=_CreateCalendar(OC2,NH5)"
-    "OC4" = "=_CreateIfercFixings(OA1,OB1,NH5)"
+    "OC4" = "=_CreateIfercFixings(OA2,OB2,NH5)"
     "OC5" = "=_CreateMarketHistory(OC3,OC4)"
     "OC10" = "-0.3"; "OC11" = "-0.1"
     "OC6" = '=_CreatePriceVector("WAHA",OC10:OC11)'
@@ -2356,7 +2357,8 @@ $cells = [ordered]@{
     "BK3" = "=_CreateFuturesFixings(INDEX(util_ReadHandle(BK1),{3;4;5;6},1),INDEX(util_ReadHandle(BK1),{3;4;5;6},2),EB1)"
     # IFERC fixings: four contract months of Waha, April back to January 2026, the newest first
     # as the desk keeps them, and an illustrative index beside each; the same four months the
-    # other way up, January first, for their schedule; a pair of codes with one given twice; a
+    # other way up, January first, for their schedule and as the series the creator refuses; a
+    # pair of codes with one given twice; a
     # code over a number; the first price over a blank; one creator cell over the four months and
     # their index in EE2; and the creator once more over the two columns of BQ1's spill.
     "BO2" = "J26"; "BP2" = "1.6"
@@ -2517,9 +2519,9 @@ $cells = [ordered]@{
     "DZ8" = "15-Dec-2026"
     "EA5" = "=_CreateValuationDate(DZ8,0.5)"
     "EA6" = "=_CreateCalendar(EA5,EB2)"
-    "DX5" = "V26"; "DY5" = "1.85"
+    "DX5" = "Z26"; "DY5" = "2.2"
     "DX6" = "X26"; "DY6" = "2.1"
-    "DX7" = "Z26"; "DY7" = "2.2"
+    "DX7" = "V26"; "DY7" = "1.85"
     "EA7" = "=_CreateIfercFixings(DX5:DX7,DY5:DY7,EB2)"
     "EA8" = "=_CreateMarketHistory(EA6,EA7)"
     # The index: three names, and creator cells over the futures schedule in AI1 with the holiday

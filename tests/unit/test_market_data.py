@@ -447,7 +447,7 @@ def the_iferc_index() -> str:
 
 
 # The market history reads IFERC fixings, but this hidden reader proves on its own that a handle
-# resolves to the fixings the seam kept, the codes as typed and the prices as numbers.
+# resolves to the fixings the seam kept, the codes and the prices as kept, oldest first.
 @probe
 def ReadIfercFixings(fixings: Handle[IfercFixings]) -> str:
     return f"{' '.join(fixings.codes)} | {' '.join(repr(float(p)) for p in fixings.prices)}"
@@ -459,17 +459,24 @@ def iferc(codes: object, prices: object) -> str:
     return text
 
 
+# Given newest first, as the desk keeps them, and kept the other way up, each price beside its
+# own code.
 def test_iferc_fixings_are_created_from_two_columns_and_read_back() -> None:
     made = iferc(IFERC_CODES, IFERC_PRICES)
-    assert bridge.call("ReadIfercFixings", [made]) == "J26 H26 G26 F26 | 1.6 1.95 2.1 1.85"
+    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
     assert made.startswith(f"{PID}:iferc_fixings:Waha IFERC:")  # the index's name, as typed
 
 
-# The same months the other way up, the schedule's own order, are taken as they always were: a
-# code carries no date for a direction to be read from, and the fixings keep the order typed.
-def test_iferc_months_given_oldest_first_are_taken_and_kept_as_typed() -> None:
-    made = iferc(IFERC_MONTHS, Cells.from_rows([[1.85], [2.10], [1.95], [1.60]]))
-    assert bridge.call("ReadIfercFixings", [made]) == "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6"
+# The same months the other way up, the schedule's own order, are refused at their second row
+# in the library's words, the two months named with the days their indices published.
+def test_iferc_months_given_oldest_first_are_refused_at_their_second_row() -> None:
+    assert bridge.call(
+        "_CreateIfercFixings",
+        [IFERC_MONTHS, Cells.from_rows([[1.85], [2.10], [1.95], [1.60]]), the_iferc_index()],
+    ) == (
+        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-"
+        "02, expected a month published before row 1's 'F26', published 2026-01-05"
+    )
 
 
 # A single cell is a column of one, so the fixings of one month need no range.
@@ -601,6 +608,13 @@ def test_a_failed_iferc_construction_publishes_no_object_and_no_handle() -> None
     ) == (
         "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'K26', "
         "expected one of the index's months"
+    )
+    oldest_first = Cells.from_rows([["F26"], ["G26"]])
+    assert bridge.call(
+        "_CreateIfercFixings", [oldest_first, Cells.from_rows([[1.85], [2.10]]), index]
+    ) == (
+        "#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-"
+        "02, expected a month published before row 1's 'F26', published 2026-01-05"
     )
     assert (
         bridge.call(
@@ -984,24 +998,20 @@ def test_a_gas_daily_fixings_spill_fed_back_to_its_creator_makes_equal_fixings()
     )
 
 
-# IFERC fixings spill their codes in the order typed, whichever it was, so the round trip keeps
-# that order and each index beside its own code: the desk's order, the schedule's and neither.
+# IFERC fixings spill their months newest first, the direction the creator takes, so the round
+# trip keeps that order and each index beside its own code, while the kept columns, which the
+# hidden reader shows, run the other way: the desk's four months, and a month left out.
 @pytest.mark.parametrize(
     ("codes", "prices", "kept"),
     [
         (
             ("J26", "H26", "G26", "F26"),
             (1.60, 1.95, 2.10, 1.85),
-            "J26 H26 G26 F26 | 1.6 1.95 2.1 1.85",
-        ),
-        (
-            ("F26", "G26", "H26", "J26"),
-            (1.85, 2.10, 1.95, 1.60),
             "F26 G26 H26 J26 | 1.85 2.1 1.95 1.6",
         ),
-        (("H26", "F26", "J26"), (1.95, 1.85, 1.60), "H26 F26 J26 | 1.95 1.85 1.6"),
+        (("J26", "G26", "F26"), (1.60, 2.10, 1.85), "F26 G26 J26 | 1.85 2.1 1.6"),
     ],
-    ids=["newest first", "oldest first", "in neither order, a month left out"],
+    ids=["newest first", "a month left out"],
 )
 def test_an_iferc_fixings_spill_fed_back_to_its_creator_makes_equal_fixings(
     codes: tuple[str, ...], prices: tuple[float, ...], kept: str
@@ -1065,6 +1075,27 @@ def test_any_gas_daily_series_survives_the_round_trip_with_every_price_beside_it
     assert bridge.call("ReadGasDailyFixings", [second]) == bridge.call(
         "ReadGasDailyFixings", [first]
     )
+
+
+# For any one or more of the index's four months given newest first with no two prices alike:
+# the spill shows the rows as they were given, and its columns handed back to the creator make
+# fixings that keep the same months and prices and spill the same rows.
+@settings(deadline=None, max_examples=50)
+@given(chosen=st.sets(st.integers(0, 3), min_size=1), data=st.data())
+def test_any_iferc_series_survives_the_round_trip_with_every_price_beside_its_code(
+    chosen: set[int], data: st.DataObject
+) -> None:
+    months = ("F26", "G26", "H26", "J26")  # the schedule's order, oldest first
+    codes = [months[i] for i in sorted(chosen, reverse=True)]
+    prices = data.draw(
+        st.lists(st.floats(-100, 100), min_size=len(codes), max_size=len(codes), unique=True)
+    )
+    first = iferc(Cells.from_rows([[c] for c in codes]), Cells.from_rows([[p] for p in prices]))
+    spilled = rows(read(first))
+    assert spilled[2:] == [[c, p] for c, p in zip(codes, prices, strict=True)]
+    second = iferc(*columns(spilled))
+    assert rows(read(second)) == spilled
+    assert bridge.call("ReadIfercFixings", [second]) == bridge.call("ReadIfercFixings", [first])
 
 
 # --- _CreatePriceVector -----------------------------------------------------------

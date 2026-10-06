@@ -240,8 +240,14 @@ def gas_daily_fixings_table(obj: GasDailyFixings) -> MixedArray:
 
 @shown.register
 def iferc_fixings_table(obj: IfercFixings) -> MixedArray:
-    # In the order the desk gave the codes, whichever it was: nothing here is dated.
-    return MixedArray.table([("contract_code", "price"), ("str", "float64")], obj.codes, obj.prices)
+    # Newest first, as the creator takes them: the columns are kept oldest first, and each is
+    # read here from its last row back, the codes as a tuple the other way up and the prices
+    # through a view, each price beside its own code, so the spill pasted back into the creator
+    # makes the same fixings. No code is resolved and no day is read: the order was settled when
+    # the fixings were made.
+    return MixedArray.table(
+        [("contract_code", "price"), ("str", "float64")], obj.codes[::-1], obj.prices[::-1]
+    )
 
 
 @shown.register

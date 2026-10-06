@@ -364,9 +364,10 @@ def test_gas_daily_fixings_spill_flow_days_as_serials_and_prices_exactly() -> No
     assert kinds[2:].tolist() == [[NUMBER_CODE, NUMBER_CODE]] * 4
 
 
-# Four months of Waha IFERC, the codes as typed, the newest month in the first row as the desk
-# keeps them, and an index beside each, a zero and a negative among four kept in their places:
-# the spill shows the codes in the order typed, over a schedule that lists them the other way.
+# Four months of Waha IFERC, the newest month in the first row as the desk keeps them and the
+# creator takes them, and an index beside each, a zero and a negative among four kept in their
+# places: the spill shows the months newest first, as they went in, over a schedule that lists
+# them the other way, the creator having kept them oldest first.
 def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
     codes = Cells.from_rows([["J26"], ["H26"], ["G26"], ["F26"]])
     prices = Cells.from_rows([[1.60], [-0.5], [0.0], [1.85]])

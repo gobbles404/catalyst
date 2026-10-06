@@ -2111,18 +2111,24 @@ def test_gas_daily_fixings_are_two_columns_and_an_index_in_and_one_publication_o
 
 
 def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
-    """That many contract months' indices as the sheet sends them: the codes of schedule_columns
-    and a price beside each."""
-    codes, _, _, _ = schedule_columns(count)
-    return codes, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+    """That many contract months' indices as the sheet sends them, the newest month in the first
+    row: the codes of schedule_columns from the last back to the first, since the schedule's
+    publication days increase down the column, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
+    return (
+        Cells.from_rows([[f"c{i}"] for i in newest_first]),
+        Cells.from_rows([[2.0 + i / 100] for i in newest_first]),
+    )
 
 
-# Ten years of monthly indices: the text column handed over as it is, the number column accepted
-# on the host's summary alone, the index by handle through its text rule and one lookup, the
-# builder's kind check and count, its one pass over the codes against the index's months and for
-# repeats, its one copy of the prices, and one publication. Eighteen calls across fourteen
-# functions, the accept rule once per argument; nothing is asked of numpy but the copy and its
-# freeze.
+# Ten years of monthly indices, newest first: the text column handed over as it is, the number
+# column accepted on the host's summary alone, the index by handle through its text rule and
+# one lookup, the builder's kind check and count, its one pass over the codes against the
+# index's months and for repeats, the rows of the codes' months as one array and one look at
+# the days they published, its one copy of the prices, and one publication. Eighteen calls
+# across fourteen functions, the accept rule once per argument, as before the order rule; on
+# numpy the rows, the look and its reduce beside the copy and its freeze, where the copy and
+# the freeze were all.
 def test_iferc_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -2146,8 +2152,10 @@ def test_iferc_fixings_are_two_columns_and_an_index_in_and_one_publication_out(
         "_publish": 1,
     }
     assert numpy_calls(lambda: PATH["_CreateIfercFixings"](codes, prices, index)) == {
-        "numpy.array": 1,  # the one copy the fixings keep
+        "ndarray.any": 1,  # one look, at the order of the publication days
+        "numpy.array": 2,  # the rows of the codes' months, and the one copy the fixings keep
         "ndarray.setflags": 1,  # frozen
+        "ufunc.reduce": 1,
     }
 
 
