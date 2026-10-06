@@ -370,7 +370,7 @@ namespace Goosedove.Host.Tests
         }
 
         // The NG example of the trade-valuation pipeline: a template of the future's six shared
-        // fields, a batch of its five rows on the NG index, the codes in either case, the handle
+        // fields, a batch of its five rows and a sixth kept ready at nothing on the NG index, the codes in either case, the handle
         // named for the index, the spill one row per component with the kernel's numbers; a
         // template field repeated in the ticket refused, and a financial template whose strip
         // pays two business days after each expiry.
@@ -391,11 +391,12 @@ namespace Goosedove.Host.Tests
                 { "NG-003", 46290.0, "F27", 7.0, 3.4 },
                 { "NG-004", 46290.0, "F27", -12.0, 3.35 },
                 { "NG-001", 46289.0, "Z26", 10.0, 3.1 },
+                { "ENTRY-000", 46289.0, "F27", 0.0, 3.3 },
             };
             var trades = (string)Seam.Call("_CreateTrades", ng, headers, rows, template);
             Assert.StartsWith(Pid + ":trades:Henry Hub NYMEX:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(7, spill.GetLength(0));
+            Assert.Equal(8, spill.GetLength(0));
             Assert.Equal(15, spill.GetLength(1));
             Assert.Equal("row", spill[0, 0]);
             Assert.Equal("offset", spill[0, 14]);
@@ -407,6 +408,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal("NYMEX NG", spill[2, 9]);
             Assert.Equal(100000.0, spill[2, 12]);
             Assert.Equal(-310000.0, spill[6, 14]);
+            Assert.Equal("ENTRY-000", spill[7, 1]);
+            Assert.Equal(0.0, spill[7, 8]);
+            Assert.Equal(0.0, spill[7, 12]);
+            Assert.Equal(0.0, spill[7, 14]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price", "route"), Row(46289.0, "Z26", 1.0, 3.0, "cleared"), template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity of trade 'a' at row 1 is 2.5, expected a whole number", Seam.Call("_CreateTrades", ng, headers, Row("a", 46289.0, "Z26", 2.5, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: template is holiday calendar handle '" + holidays + "', expected trade template handle", Seam.Call("_CreateTrades", ng, headers, rows, holidays));

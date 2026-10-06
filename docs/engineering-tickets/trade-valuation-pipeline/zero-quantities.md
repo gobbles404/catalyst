@@ -3,11 +3,10 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Quantity unit selection](quantity-unit-selection.md) · [Create trades](../../library/trades/create-trades.md)
 
-**Status:** Requested 6 October 2026 following UAT of
-[PR #145](https://github.com/gobbles404/goosedove/pull/145), reviewed at `df7f4d7`.
-Implement as one focused follow-up PR on the quantity-selection change, or on main once
-it contains that change. This ticket supersedes the earlier requirement that a trade
-quantity be nonzero; the other quantity and entry rules remain.
+**Status:** Built in #NN, stacked on #145. Requested 6 October 2026 following UAT of
+[PR #145](https://github.com/gobbles404/goosedove/pull/145), reviewed at `df7f4d7`; it
+supersedes the earlier requirement that a trade quantity be nonzero, the other quantity and
+entry rules standing. The section at the end records what the build settled.
 
 ## Outcome
 
@@ -122,3 +121,33 @@ their separate reviewed PR.
 The implementation PR should show the zero-to-nonzero worksheet interaction, its hand
 values and the updated instrument rule. Completion is support for explicit zero quantity
 on otherwise valid rows; it is not support for empty or partially entered rows.
+
+## As built
+
+Built in #NN. `whole_quantities` keeps the finite and whole-number rule and nothing else,
+`quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number`, so a zero, negative
+zero included, is a count like any other through `quantity_of` in the template and
+`resolved_trades` in the kernel. The definition's `quantity` says `a signed whole count, zero
+included`, its rule that a zero row is kept, contributes nothing and can be filled in later,
+and `_ShowInstrument` shows both. Nothing else changed: the page's two rows mark 2,000 with a
+delta of 20,000, F27 on the axis at nothing, and 1,000 with a delta of 10,000 once the row is
+sold at one lot, a new batch, preparation and results over the same history and market, the
+old results standing; an all-zero batch publishes its handles and reports nothing with its
+axis kept; two spare rows change no number of the five NG rows; a zero financial trade on the
+toy stays at nothing live, fixed and paid; a quote missing for a zero row's contract and a
+physical contract past its expiry are refused as before; a zero row is refused for a code the
+schedule lacks, a unit the index does not spell or a fraction as any row is; and text, a
+boolean, a blank or empty text in the quantity cell keep the seam's words, a zero crossing
+only as a number. The kernel's quantity generators run over zero now, so any batch of up to
+eight rows, rows of nothing among them, still equals its singletons summed.
+
+Counts: the resolution's numpy ledger loses the one look the zero rule made, `ndarray.any`
+12 to 11 and `ufunc.reduce` 15 to 14, 13 to 12 and 16 to 15 under penultimate; every count the
+creators, the preparation and the tick report is unchanged, and no ceiling moved. The smoke
+holds a batch of the two lots of n26 beside a row of nothing on n26 at 72, one slot of two
+components, marking the two lots' 8,500 and reading the zero row back; the host's NG fact a
+sixth row kept ready at nothing; the lifetime's trades group types the ticket's quantity to 0
+and back, the batch, the preparation and the results remade each time and the old three
+released while the template, the history and the market stand, the mark 0 and then 7 again;
+the kept workbook holds the block at row 1405, two lots of n26 at 70 beside a row of nothing on
+q26 at 72, 4,200 of mark and 2,000 of delta, the -1 of the block above one keystroke away.

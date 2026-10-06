@@ -602,7 +602,7 @@ def test_a_strip_counts_the_selected_unit_in_every_month() -> None:
     )
     np.testing.assert_array_equal(batch.encoded.quote_quantity, [5_000.0, 5_000.0])
     np.testing.assert_array_equal(batch.resolved.quantity, [5_000.0, 5_000.0])
-    for quantity in (0.0, 0.5, float("nan")):
+    for quantity in (0.5, float("nan")):
         assert refused(
             TWO_LOTS, one_row("MMBTU", quantity), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
         ).startswith("quantity of trade 'q' at row 1 is ")
@@ -612,6 +612,69 @@ def test_the_old_field_is_unknown_to_the_definition() -> None:
     assert "contract_specification" not in {field.name for field in FUTURE.fields}
     with pytest.raises(StopIteration):
         typed(FUTURE, "contract_specification", ["NYMEX NG"])
+
+
+# --- a quantity of zero: a row kept ready --------------------------------------------------------
+# zero-quantities.md: a numeric zero quantity, from the template or the ticket, is a count like
+# any other, the row kept with its label, its code and its amounts of nothing.
+
+ENTRY_TICKET: dict[str, list[object]] = {
+    "trade_id": ["NG-001", "ENTRY-002"],
+    "trade_date": ["2026-10-06", "2026-10-06"],
+    "contract_code": ["Z26", "F27"],
+    "quantity": [2, 0],
+    "fixed_price": [3.0, 3.3],
+}
+
+
+def test_a_zero_quantity_in_the_ticket_is_kept_with_its_row() -> None:
+    batch, counter = created(NG, ENTRY_TICKET)
+    terms = batch.resolved
+    assert terms.labels == ("NG-001", "ENTRY-002")
+    np.testing.assert_array_equal(terms.quantity, [2.0, 0.0])
+    np.testing.assert_array_equal(terms.contract, [1, 2])
+    np.testing.assert_array_equal(batch.encoded.quote_quantity, [20_000.0, 0.0])
+    np.testing.assert_array_equal(batch.encoded.offset, [-60_000.0, 0.0])
+    np.testing.assert_array_equal(batch.encoded.slot_exposure, [20_000.0, 0.0])
+    assert counter.freeze()["resolved_occurrences"] == 2
+    negative_zero, _ = created(NG, {**ENTRY_TICKET, "quantity": [2, -0.0]})
+    assert negative_zero.resolved.quantity[1] == 0.0
+
+
+def test_a_zero_quantity_in_the_template_puts_every_row_at_nothing() -> None:
+    template = {**NG_TEMPLATE, "quantity": 0.0}
+    ticket = {name: values for name, values in NG_TICKET.items() if name != "quantity"}
+    batch, _ = created(NG, ticket, template)
+    np.testing.assert_array_equal(batch.resolved.quantity, [0.0] * 5)
+    np.testing.assert_array_equal(batch.encoded.quote_quantity, [0.0] * 5)
+    assert batch.encoded.groups.tolist() == [1, 2]  # both contracts held, at nothing
+    assert refused(NG, {**NG_TICKET, "quantity": [0, 0, 0, 0, 0]}, template) == (
+        "quantity is supplied by the template and by the ticket, expected by one of them"
+    )
+
+
+def test_a_zero_row_bypasses_no_other_rule() -> None:
+    assert refused(NG, {**ENTRY_TICKET, "contract_code": ["Z26", "G27"]}) == (
+        "contract_code row 2 is 'G27', expected months the index's schedule has a contract for; "
+        "it has none for 2027-02"
+    )
+    assert refused(NG, ENTRY_TICKET, {**NG_TEMPLATE, "quantity_unit": "ICE PHH"}) == (
+        "quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'"
+    )
+    assert refused(NG, {**ENTRY_TICKET, "quantity": [2, 0.5]}) == (
+        "quantity of trade 'ENTRY-002' at row 2 is 0.5, expected a whole number"
+    )
+
+
+def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
+    assert quote_quantity(TWO_LOTS, "ICE PHH", 0.0) == 0.0  # the second row's specification
+    assert quote_quantity(TWO_LOTS, "MMBTU", 0.0) == 0.0  # the size-one unit
+    strip, _ = created(
+        TWO_LOTS, one_row("MMBTU", 0.0, "Z26-F27"), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
+    )
+    np.testing.assert_array_equal(strip.resolved.contract, [1, 2])  # both months kept
+    np.testing.assert_array_equal(strip.encoded.quote_quantity, [0.0, 0.0])
+    np.testing.assert_array_equal(strip.encoded.offset_of_group, [0.0, 0.0])
 
 
 # --- what is refused, naming the field and the sheet's row ----------------------------------
@@ -722,11 +785,6 @@ def test_the_old_field_is_unknown_to_the_definition() -> None:
             NG_TEMPLATE,
             "quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number",
         ),
-        (
-            {**NG_TICKET, "quantity": [10, 0, 7, -12, 10]},
-            NG_TEMPLATE,
-            "quantity of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity",
-        ),
     ],
 )
 def test_a_batch_that_cannot_be_resolved_says_why(
@@ -817,7 +875,7 @@ def test_the_ticket_and_the_template_are_of_one_instrument_the_future() -> None:
     rows=st.lists(
         st.tuples(
             st.sampled_from(["Z26", "z26", "F27", "f27"]),
-            st.integers(min_value=-20, max_value=20).filter(lambda q: q != 0),
+            st.integers(min_value=-20, max_value=20),  # zero included, a row kept ready
             st.floats(min_value=1.0, max_value=5.0, allow_nan=False),
         ),
         min_size=1,
@@ -1125,3 +1183,37 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
     assert [line[7] for line in table[2:]] == ["ION", "ION"]
     assert [line[12] for line in table[2:]] == ["+2bd", "+2bd"]  # the lag beside the day it gave
     assert [line[13] for line in table[2:]] == [46356.0, 46387.0]  # 30 Nov and 31 Dec 2026
+
+
+def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing(
+    sheet: dict[str, Any],
+) -> None:
+    handle = ENTRY["_CreateTrades"](
+        sheet["index"],
+        sheet["headers"],
+        cells(["NG-001", 46301.0, "Z26", 2.0, 3.0], ["ENTRY-002", 46301.0, "F27", 0.0, 3.3]),
+        sheet["template"],
+    )
+    table = spilled(handle)
+    assert len(table) == 4  # two heading rows and both components, the second kept at nothing
+    assert table[3][:4] == [2.0, "ENTRY-002", 46301.0, "F27"]
+    assert table[3][8] == 0.0 and table[3][12:] == [0.0, 0.0, 0.0]
+    # Zero is a number: the seam's words for anything else stand, and text is never coerced.
+    create = ENTRY["_CreateTrades"]
+    for cell, words in (
+        ("0", "text '0'"),
+        (True, "boolean TRUE"),
+        (None, "blank"),
+        ("", "empty text"),
+    ):
+        message = str(
+            create(
+                sheet["index"],
+                sheet["headers"],
+                cells(["a", 46301.0, "Z26", cell, 3.0]),
+                sheet["template"],
+            )
+        )
+        assert message.startswith(
+            f"#ERROR _CreateTrades: trade_rows cell (1, 4) is {words}, expected number"
+        ), message

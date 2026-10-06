@@ -182,7 +182,6 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
             {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
             "schedule_method is 'pen', expected lastday or penultimate, the two methods built",
         ),
-        ({"quantity": 0.0}, "quantity is 0.0, expected a nonzero quantity"),
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
@@ -244,3 +243,12 @@ def test_the_reader_spills_the_instrument_and_each_default_under_its_field() -> 
         ["str", "str", "float64", "datetime64[D]", "str"],
         ["future", "LOT", 10.0, 46289.0, "a holiday calendar"],
     ]
+
+
+def test_a_zero_quantity_is_held_as_a_row_kept_ready() -> None:
+    # zero-quantities.md: nothing is a whole count, so a template may hold it and every row under
+    # the template is then kept ready at nothing; negative zero is a number like any other.
+    assert a_template(quantity=0.0).defaults["quantity"] == 0.0
+    assert a_template(quantity=-0.0).defaults["quantity"] == 0.0
+    handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity"), row(0.0))
+    assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
