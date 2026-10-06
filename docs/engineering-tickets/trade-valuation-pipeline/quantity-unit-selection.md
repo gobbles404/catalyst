@@ -112,7 +112,7 @@ conversion. Price ticks continue to consume the prepared arrays. Market/history 
 dated slots, payment handling, risk vectors and result meanings are unchanged.
 
 The existing finite, signed, nonzero, whole-number quantity rule remains for this slice; the
-nonzero part of it is superseded by [zero-quantities.md](zero-quantities.md), #NN.
+nonzero part of it is superseded by [zero-quantities.md](zero-quantities.md), #146.
 Adding fractional quantities requires a separate decision; accepting a specification named
 `MMBTU` does not silently introduce different numeric rules.
 
@@ -148,7 +148,7 @@ the old literal `LOT` rule is described.
 | Non-first specification | Use an NG index with NYMEX NG first and ICE PHH second. Two PHH units encode 5000 MMBTU, not 20000. At fixed price 3.00 and live price 3.10, mark is 500 and delta is 5000. A 3.20 pen fixing gives 1000 fixed-unpaid mark, then 1000 cash on payment, with zero delta after fixing. |
 | Selected size and unit | Include a second specification whose lot unit differs from the first. Pin both row selections independently; choosing row zero's size or unit must fail the tests. Include a CENT/USD case where quote quantity and coefficient differ, including their readbacks and risk labels. |
 | Equivalent quantities | Different selections representing the same underlying quantity, with all other economic terms equal, produce equal values and risk. |
-| Quantity and strips | Signed whole quantities and explicit size-one units follow the same encoding path. Fractional and nonfinite quantities remain refused; zero did too, until [zero-quantities.md](zero-quantities.md), #NN. Monthly strips retain per-month quantity semantics. |
+| Quantity and strips | Signed whole quantities and explicit size-one units follow the same encoding path. Fractional and nonfinite quantities remain refused; zero did too, until [zero-quantities.md](zero-quantities.md), #146. Monthly strips retain per-month quantity semantics. |
 | Cardinality and compression | One trade follows the same path as many; duplicates count, ticket order does not change economics, and a compatible batch equals its summed singletons. |
 | Cutover equivalence | Migrated NG, PHH and WTI examples preserve mark, cash, dates and risk. Preserve independent financial expectations; do not regenerate answers to make the field change pass. |
 | Excel dependency path | Changing a template or ticket selection creates the corresponding new trade/preparation/result chain. A price-only update still reuses preparation. Unknown selection publishes no trade handle. |

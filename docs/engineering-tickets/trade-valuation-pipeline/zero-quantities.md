@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Quantity unit selection](quantity-unit-selection.md) · [Create trades](../../library/trades/create-trades.md)
 
-**Status:** Built in #NN, stacked on #145. Requested 6 October 2026 following UAT of
+**Status:** Built in #146, stacked on #145. Requested 6 October 2026 following UAT of
 [PR #145](https://github.com/gobbles404/goosedove/pull/145), reviewed at `df7f4d7`; it
 supersedes the earlier requirement that a trade quantity be nonzero, the other quantity and
 entry rules standing. The section at the end records what the build settled.
@@ -124,7 +124,7 @@ on otherwise valid rows; it is not support for empty or partially entered rows.
 
 ## As built
 
-Built in #NN. `whole_quantities` keeps the finite and whole-number rule and nothing else,
+Built in #146. `whole_quantities` keeps the finite and whole-number rule and nothing else,
 `quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number`, so a zero, negative
 zero included, is a count like any other through `quantity_of` in the template and
 `resolved_trades` in the kernel. The definition's `quantity` says `a signed whole count, zero

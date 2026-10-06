@@ -56,7 +56,7 @@ it as its first argument, once for the whole batch.
 argument of `_CreateTrades`, once for the batch, and every other fact arrives as a template default
 or a ticket column, each from one source, a field supplied by both refused even to the same value.
 
-`quantity` is a signed whole count of `quantity_unit`, zero included since #NN, a row kept
+`quantity` is a signed whole count of `quantity_unit`, zero included since #146, a row kept
 ready for a deal, and `quantity_unit` names one of the
 index's contract specifications exactly as the index spells it, the desk's word for a quantity of
 the index: `NYMEX NG` for the 10,000 MMBtu lot, `ICE PHH` for the 2,500 MMBtu lot, `MMBTU` where
