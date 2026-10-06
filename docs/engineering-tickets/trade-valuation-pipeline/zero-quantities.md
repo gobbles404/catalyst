@@ -135,7 +135,8 @@ sold at one lot, a new batch, preparation and results over the same history and 
 old results standing; an all-zero batch publishes its handles and reports nothing with its
 axis kept; two spare rows change no number of the five NG rows; a zero financial trade on the
 toy stays at nothing live, fixed and paid; a quote missing for a zero row's contract and a
-physical contract past its expiry are refused as before; a zero row is refused for a code the
+physical contract past its expiry are refused as before, and an all-zero batch is held to the
+identity rules, another index's history and another history's market refused; a zero row is refused for a code the
 schedule lacks, a unit the index does not spell or a fraction as any row is; and text, a
 boolean, a blank or empty text in the quantity cell keep the seam's words, a zero crossing
 only as a number. The kernel's quantity generators run over zero now, so any batch of up to
@@ -148,6 +149,7 @@ holds a batch of the two lots of n26 beside a row of nothing on n26 at 72, one s
 components, marking the two lots' 8,500 and reading the zero row back; the host's NG fact a
 sixth row kept ready at nothing; the lifetime's trades group types the ticket's quantity to 0
 and back, the batch, the preparation and the results remade each time and the old three
-released while the template, the history and the market stand, the mark 0 and then 7 again;
+released while the template, the history and the market stand, the mark 0 and the delta 0, then
+7 and 2 again;
 the kept workbook holds the block at row 1405, two lots of n26 at 70 beside a row of nothing on
 q26 at 72, 4,200 of mark and 2,000 of delta, the -1 of the block above one keystroke away.

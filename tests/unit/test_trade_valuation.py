@@ -820,7 +820,9 @@ def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(toy: dict[s
     assert slots[2] == ["Z26", serial("2026-11-25"), True, True, 0.0]  # fixed and paid, at nothing
 
 
-def test_zero_bypasses_neither_coverage_nor_expiry_on_the_sheet(ng: dict[str, Any]) -> None:
+def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
+    ng: dict[str, Any],
+) -> None:
     trades, prepared, _ = entry_state(ng, 0.0)
     assert ENTRY["_EvaluateTrades"](prepared, a_market(ng["history"], "Henry Hub NYMEX", 3.10)) == (
         "#ERROR _EvaluateTrades: ValueError: requested contract 'F27' is beyond live-price "
@@ -831,6 +833,29 @@ def test_zero_bypasses_neither_coverage_nor_expiry_on_the_sheet(ng: dict[str, An
         "#ERROR _PrepareTrades: ValueError: trade 'NG-001' at row 1 on Z26 expired 2026-11-25, "
         "before valuation date 2026-11-26; a physical future after its expiry is not supported"
     )
+    # An all-zero batch is held to the identity rules as any batch is: a history over another
+    # index of the same facts and name, and a market over another history of the same index.
+    nothing = ENTRY["_CreateTrades"](
+        ng["index"],
+        row(*NG_HEADERS),
+        rows([*ENTRY_ROWS[0][:3], 0.0, 3.0], ENTRY_ROWS[1]),
+        ng["template"],
+    )
+    twin, _ = an_index("Henry Hub NYMEX", NG_CONTRACTS, NG_HOLIDAYS, [("NYMEX NG", 10_000.0)])
+    other = a_history(twin, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
+    assert ENTRY["_PrepareTrades"](nothing, other) == (
+        "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', "
+        "expected the trades', 'Henry Hub NYMEX'"
+    )
+    prepared_nothing = ENTRY["_PrepareTrades"](nothing, ng["history"])
+    yesterday = a_history(ng["index"], "2026-10-29", "2026-11-23", NG_HOLIDAYS, {})
+    assert ENTRY["_EvaluateTrades"](
+        prepared_nothing, a_market(yesterday, "Henry Hub NYMEX", 3.10, 3.40)
+    ) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index "
+        "'Henry Hub NYMEX', expected the one the trades were prepared against"
+    )
+    assert valued(str(ENTRY["_EvaluateTrades"](prepared_nothing, ng["market"]))) == (0.0, 0.0, 0.0)
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------

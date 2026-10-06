@@ -1451,9 +1451,10 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     assert spared.codes() == whole.codes() and prep.live_slot.size == 2
 
 
-def test_a_zero_row_bypasses_no_rule_of_the_market_or_the_calendar() -> None:
-    # A quote missing for the zero row's contract is still missing, and a physical contract past
-    # its expiry is still past it, whether anything is held on it or nothing.
+def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() -> None:
+    # A quote missing for the zero row's contract is still missing, a physical contract past its
+    # expiry is still past it, and an all-zero batch is held to the identity rules, whether
+    # anything is held on a contract or nothing.
     terms = entry_terms((2.0, 0.0))
     enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
@@ -1469,6 +1470,18 @@ def test_a_zero_row_bypasses_no_rule_of_the_market_or_the_calendar() -> None:
     assert str(refused.value) == (
         "trade 'NG-001' at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
         "a physical future after its expiry is not supported"
+    )
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(an_index(), "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
+    )
+    prep = prepared_trades(enc, history, WorkCounter())
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(history_on(NG, "2026-11-23", {}), 3.10, 3.40), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'Henry Hub NYMEX', "
+        "expected the one the trades were prepared against"
     )
 
 
