@@ -721,7 +721,7 @@ def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
 # off, one set checking membership and repeats alike, then the dict of the months' rows, the
 # rows of the codes' months as a list and an array, the publication days gathered through it
 # and the mask of the look at their order: measured 10,600 bytes at 120 months on 2026-09-24
-# with the set alone, and 15,191 on 2026-10-06 with the order rule of #NN, about 127 bytes per
+# with the set alone, and 15,191 on 2026-10-06 with the order rule of #147, about 127 bytes per
 # month at that size on top of a creator's small objects, which 120 per month covers with twice
 # the slack; 42,888 at 1,200 before and 115,931 after, 97 bytes per month, the dict and the set
 # growing slower than the count. Reading the fixings back was 6,197 bytes at 120 months before
