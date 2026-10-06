@@ -50,14 +50,15 @@ are never worksheet parameters; the encoder does not discover them through an am
 ### Where conventions and specifications enter
 
 CreateTrades reads static reference facts through the selected Index object. The template
-or ticket supplies contract_specification, selecting one named row within that index.
+or ticket supplies quantity_unit, selecting one named row within that index's
+specifications, since #NN; there is no separate specification field.
 There is no separate conventions/specification handle in the proposed trade call, no
 first-specification fallback, and no global lookup using the index's display name.
 
 | Static source | What creation obtains | What the ticket/template supplies |
 |---|---|---|
 | index.conventions | Quote currency/unit, amount currency, quantity category and base quantity unit | Executed quantity/unit and fixed_price, checked against those conventions |
-| index.specifications | Named lot sizes, lot units and per-lot brokerage/clearing rates | contract_specification selects the intended named row |
+| index.specifications | Named lot sizes, lot units and per-lot brokerage/clearing rates | quantity_unit selects the intended named row, and quantity counts it |
 | index.schedule | Contract identities and reference dates used to resolve codes, strips and supported observation rules | contract_code and schedule_method |
 | index.holiday_calendar | Pricing holidays where applicable to the index | No duplicate pricing-calendar field in the ticket |
 | Explicit payment_holiday_calendar | Business days for the supported payment rule | This separate calendar reference and payment_time_lag, each supplied once |

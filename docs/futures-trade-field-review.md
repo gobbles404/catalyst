@@ -118,7 +118,7 @@ This research identifies facts the design must obtain from an appropriate source
 | Research distinction | Current design boundary |
 |---|---|
 | Quote currency/unit, amount currency and quantity category | Static Index conventions; creation validates compatible quantity and price terms |
-| Lot size/unit and per-lot fee rates | Named row in `index.specifications`, selected by `contract_specification` |
+| Lot size/unit and per-lot fee rates | Named row in `index.specifications`, selected by `quantity_unit`, the desk's word for a quantity of the index |
 | Listed contract and observation dates | Static schedule and supported `schedule_method`, resolved once during creation |
 | Published observations versus current prices | History enters PrepareTrades; live prices enter EvaluateTrades |
 | Observation, expiry and payment dates | Distinct facts; supported payment terms resolve explicit payment dates during creation |
@@ -148,7 +148,7 @@ Missing observations cannot be silently treated as zero or skipped. Preparation 
 
 ## 5. A small trade entry still refers to richer definitions
 
-A hypothetical HG trade with `contract_code = Z26`, `quantity = +10`, `quantity_unit = LOT`, `quantity_per = month` and `fixed_price = 4.25` has nominal exposure of +250,000 LB under the 25,000-LB contract specification. The user does not type copper grade, tick or eligible warehouse lists into every trade. [Copper specification](https://www.cmegroup.com/rulebook/COMEX/1a/111.pdf), [COMEX clearing membership](https://www.cmegroup.com/clearing/membership/comex.html).
+A hypothetical HG trade with `contract_code = Z26`, `quantity = +10`, a `quantity_unit` naming the index's 25,000-LB contract specification, `quantity_per = month` and `fixed_price = 4.25` has nominal exposure of +250,000 LB under that specification. The user does not type copper grade, tick or eligible warehouse lists into every trade. [Copper specification](https://www.cmegroup.com/rulebook/COMEX/1a/111.pdf), [COMEX clearing membership](https://www.cmegroup.com/clearing/membership/comex.html).
 
 This is an economic illustration, not a complete constructible v1 ticket or a claim that the copper product path is implemented. The current [NG worked example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) demonstrates shared template terms, disjoint ticket fields, static encoding and preparation. Immutable resolved values/references preserve executed terms when a user later constructs a different template.
 

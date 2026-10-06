@@ -49,8 +49,7 @@ def spilled(result: object) -> list[list[object]]:
 
 
 NG_TEMPLATE = {
-    "contract_specification": "NYMEX NG",
-    "quantity_unit": "LOT",
+    "quantity_unit": "NYMEX NG",
     "quantity_per": "month",
     "schedule_method": "lastday",
     "route": "cleared",
@@ -71,21 +70,25 @@ def an_index(
     name: str,
     contracts: list[tuple[str, str]],
     holidays: list[str],
-    lot: tuple[str, float],
+    lots: list[tuple[str, float]],
     measure: tuple[str, str] = ("ENERGY", "MMBTU"),
+    quoted_in: str = "USD",
 ) -> tuple[str, str]:
-    """An index of those contracts and holidays through the seam, quoted in USD per the measure's
-    unit with one specification of that many units a lot, and its holiday calendar."""
+    """An index of those contracts and holidays through the seam, quoted in that currency unit per
+    the measure's unit and settled in USD, with one specification per name given, that many of the
+    measure's unit a lot, in the order given, and its holiday calendar."""
     schedule = ENTRY["_CreateFuturesSchedule"](
         rows(*[[code] for code, _ in contracts]),
         column([serial(expiry) for _, expiry in contracts]),
         bridge.MISSING,
     )
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(day) for day in holidays]))
-    conventions = ENTRY["_CreateIndexConventions"]("USD", measure[1], "USD", measure[0], measure[1])
+    conventions = ENTRY["_CreateIndexConventions"](
+        quoted_in, measure[1], "USD", measure[0], measure[1]
+    )
     specifications = ENTRY["_CreateContractSpecifications"](
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
-        row(lot[0], lot[1], measure[1], 0.0, 0.0),
+        rows(*[[name, size, measure[1], 0.0, 0.0] for name, size in lots]),
     )
     return str(ENTRY["_CreateIndex"](name, schedule, conventions, specifications, calendar)), str(
         calendar
@@ -126,7 +129,7 @@ def ng() -> dict[str, Any]:
         "Henry Hub NYMEX",
         [("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")],
         holidays,
-        ("NYMEX NG", 10_000.0),
+        [("NYMEX NG", 10_000.0)],
     )
     template = ENTRY["_CreateTradeTemplate"](
         "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
@@ -239,11 +242,11 @@ def toy() -> dict[str, Any]:
             ("G27", "2027-01-27"),
         ],
         TOY_HOLIDAYS,
-        ("TOY", 10_000.0),
+        [("TOY", 10_000.0)],
     )
     fields = {
         **NG_TEMPLATE,
-        "contract_specification": "TOY",
+        "quantity_unit": "TOY",
         "settlement_method": "financial",
         "clearing_house": "TEST_CLEARER",
         "payment_time_lag": "+2bd",
@@ -381,7 +384,6 @@ def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(
 
 PHH_HOLIDAYS = ["2027-05-31", "2027-07-05"]
 PEN_FIELDS = (
-    "contract_specification",
     "quantity_unit",
     "quantity_per",
     "schedule_method",
@@ -400,7 +402,6 @@ def pen_template(specification: str, clearing: str) -> str:
             row(*PEN_FIELDS),
             row(
                 specification,
-                "LOT",
                 "month",
                 "penultimate",
                 "cleared",
@@ -419,7 +420,7 @@ def phh() -> dict[str, Any]:
         "Henry Hub NYMEX",
         [("M27", "2027-05-26"), ("N27", "2027-06-28"), ("Q27", "2027-07-28")],
         PHH_HOLIDAYS,
-        ("ICE PHH", 2_500.0),
+        [("NYMEX NG", 10_000.0), ("ICE PHH", 2_500.0)],
     )
     clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
     template = pen_template("ICE PHH", str(clearing))
@@ -581,7 +582,7 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
     physical = ENTRY["_CreateTradeTemplate"](
         "future",
         row(*fields),
-        row("ICE PHH", "LOT", "month", "penultimate", "cleared", "physical", "ICE Clear Europe"),
+        row("ICE PHH", "month", "penultimate", "cleared", "physical", "ICE Clear Europe"),
     )
     assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with "
@@ -600,7 +601,7 @@ def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> No
         "WTI NYMEX",
         [("Z26", "2026-11-20"), ("F27", "2026-12-21"), ("G27", "2027-01-20")],
         holidays,
-        ("ICE WTI T", 1_000.0),
+        [("NYMEX CL", 1_000.0), ("ICE WTI T", 1_000.0)],
         ("VOLUME", "BBL"),
     )
     clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2026-12-25"), serial("2026-12-28")]))
@@ -622,6 +623,103 @@ def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> No
         ENTRY["_PrepareTrades"](trades, paid), a_market(paid, "WTI NYMEX", 61.0, 61.5)
     )
     assert valued(str(results)) == (0.0, pytest.approx(4_500), 0.0)
+
+
+# --- the quantity unit on the sheet ---------------------------------------------------------------
+# quantity-unit-selection.md through the entries: the PHH fixture above already selects the second
+# of the NG index's two specifications; here two selections of one quantity value alike, the name
+# reads back under quantity_unit, and a cents index shows quote quantity and coefficient apart.
+
+NG_CONTRACTS = [("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")]
+NG_HOLIDAYS = ["2026-11-26", "2026-12-25"]
+
+
+def valued_on_24_nov(
+    index: str, name: str, template_fields: dict[str, object], row_: list[object]
+) -> tuple[tuple[float, float, float], list[list[object]]]:
+    template = ENTRY["_CreateTradeTemplate"](
+        "future", row(*template_fields), row(*template_fields.values())
+    )
+    trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(row_), template)
+    history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
+    results = ENTRY["_EvaluateTrades"](
+        ENTRY["_PrepareTrades"](trades, history), a_market(history, name, 3.20, 3.50)
+    )
+    return valued(str(results)), spilled(ENTRY["util_ReadHandle"](trades))
+
+
+def test_two_selections_of_one_quantity_value_and_risk_alike() -> None:
+    index, _ = an_index(
+        "Henry Hub NYMEX",
+        NG_CONTRACTS,
+        NG_HOLIDAYS,
+        [("NYMEX NG", 10_000.0), ("ICE PHH", 2_500.0), ("MMBTU", 1.0)],
+    )
+    as_lots, lots_spill = valued_on_24_nov(
+        index,
+        "Henry Hub NYMEX",
+        {**NG_TEMPLATE, "quantity_unit": "ICE PHH"},
+        ["E-1", serial("2026-09-24"), "Z26", 2.0, 3.1],
+    )
+    as_units, units_spill = valued_on_24_nov(
+        index,
+        "Henry Hub NYMEX",
+        {**NG_TEMPLATE, "quantity_unit": "MMBTU"},
+        ["E-2", serial("2026-09-24"), "Z26", 5_000.0, 3.1],
+    )
+    assert as_lots == as_units == (pytest.approx(500.0), 0.0, pytest.approx(5_000.0))
+    unit = lots_spill[0].index("quantity_unit")
+    assert lots_spill[2][unit] == "ICE PHH" and units_spill[2][unit] == "MMBTU"
+    assert "contract_specification" not in lots_spill[0]
+    quote = lots_spill[0].index("quote_quantity")
+    assert lots_spill[2][quote] == units_spill[2][quote] == 5_000.0
+    assert lots_spill[2][lots_spill[0].index("quantity")] == 2.0
+    assert units_spill[2][units_spill[0].index("quantity")] == 5_000.0
+
+
+def test_a_cents_index_reads_back_the_quote_quantity_apart_from_the_coefficient() -> None:
+    # One lot of 10,000 MMBTU quoted in cents and settled in dollars, as the kernel page has it:
+    # a quote quantity of 10,000 MMBTU, a coefficient of 100 dollars a cent, and the risk in
+    # dollars per cent per MMBTU.
+    index, _ = an_index(
+        "cents", NG_CONTRACTS, NG_HOLIDAYS, [("NYMEX NG", 10_000.0)], quoted_in="CENT"
+    )
+    template = ENTRY["_CreateTradeTemplate"](
+        "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
+    )
+    trades = ENTRY["_CreateTrades"](
+        index, row(*NG_HEADERS), rows(["C-1", serial("2026-09-24"), "Z26", 1.0, 300.0]), template
+    )
+    spill = spilled(ENTRY["util_ReadHandle"](trades))
+    assert spill[2][spill[0].index("quote_quantity")] == 10_000.0
+    assert spill[2][spill[0].index("coefficient")] == pytest.approx(100.0)
+    assert spill[2][spill[0].index("offset")] == pytest.approx(-30_000.0)
+    history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
+    results = ENTRY["_EvaluateTrades"](
+        ENTRY["_PrepareTrades"](trades, history), a_market(history, "cents", 310.0, 350.0)
+    )
+    assert valued(str(results)) == (pytest.approx(1_000.0), 0.0, pytest.approx(100.0))
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per CENT/MMBTU"
+
+
+def test_the_old_field_is_refused_at_the_seam_as_unknown(ng: dict[str, Any]) -> None:
+    message = str(
+        ENTRY["_CreateTradeTemplate"](
+            "future", row("contract_specification", "quantity_unit"), row("NYMEX NG", "NYMEX NG")
+        )
+    )
+    assert message.startswith(
+        "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'contract_specification', "
+        "expected a field of future: trade_id, trade_date, contract_code, "
+    )
+    assert str(
+        ENTRY["_CreateTrades"](
+            ng["index"],
+            row(*NG_HEADERS, "contract_specification"),
+            rows([*NG_ROWS[0], "NYMEX NG"]),
+            ng["template"],
+        )
+    ).startswith("#ERROR _CreateTrades: fields cell (1, 6) is text 'contract_specification', ")
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------
@@ -661,7 +759,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "Henry Hub NYMEX",
         [("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29")],
         ["2026-11-26", "2026-12-25"],
-        ("NYMEX NG", 10_000.0),
+        [("NYMEX NG", 10_000.0)],
     )
     other = a_history(twin, "2026-10-29", "2026-11-24", ["2026-11-26", "2026-12-25"], {})
     assert prepare(ng["trades"], other) == (
@@ -679,15 +777,8 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )
     bilateral = ENTRY["_CreateTradeTemplate"](
         "future",
-        row(
-            "contract_specification",
-            "quantity_unit",
-            "quantity_per",
-            "schedule_method",
-            "route",
-            "settlement_method",
-        ),
-        row("NYMEX NG", "LOT", "month", "lastday", "bilateral", "physical"),
+        row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method"),
+        row("NYMEX NG", "month", "lastday", "bilateral", "physical"),
     )
     trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*NG_ROWS), bilateral)
     assert evaluate(prepare(trades, ng["history"]), ng["market"]) == (

@@ -27,8 +27,7 @@ from goosedove.trades.terms import (
     ScheduleMethod,
     Settlement,
     finite_prices,
-    lot_unit,
-    whole_lots,
+    whole_quantities,
 )
 
 
@@ -130,9 +129,9 @@ def business_days_of(where: str, text: str) -> int:
     return int(found.group(1))
 
 
-def lots_of(where: str, number: float) -> float:
-    """A lot count by the kernel's rule, whole and nonzero, named by its field."""
-    whole_lots(np.array([number]), lambda _: where)
+def quantity_of(where: str, number: float) -> float:
+    """A quantity by the kernel's rule, whole and nonzero, named by its field."""
+    whole_quantities(np.array([number]), lambda _: where)
     return number
 
 
@@ -162,11 +161,10 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "schedule_method": schedule_method_of,
         "route": route_of,
         "settlement_method": settlement_of,
-        "quantity_unit": lot_unit,
         "quantity_per": quantity_per_of,
         "payment_time_lag": business_days_of,
     }
 )
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float]]] = MappingProxyType(
-    {"quantity": lots_of, "fixed_price": price_of}
+    {"quantity": quantity_of, "fixed_price": price_of}
 )

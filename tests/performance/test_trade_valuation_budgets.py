@@ -61,7 +61,6 @@ def sheet() -> dict[str, Any]:
     )
     index = PATH["_CreateIndex"]("gas", schedule, conventions, specifications, holidays)
     fields = [
-        "contract_specification",
         "quantity_unit",
         "quantity_per",
         "schedule_method",
@@ -75,7 +74,7 @@ def sheet() -> dict[str, Any]:
         "future",
         Cells.from_rows([fields]),
         Cells.from_rows(
-            [["lot", "LOT", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
+            [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
         ),
     )
     days = np.arange(EXPIRIES[0] + np.timedelta64(1, "D"), AS_OF)

@@ -117,7 +117,7 @@ require building a separate product-catalog system:
 the existing static definition objects can supply the initial reference facts.
 
 The template constructor is [_CreateTradeTemplate](../../library/trades/trade-template.md),
-`_CreateTradeTemplate(instrument, fields, values)`, with a small LOT defaults row. Its partial
+`_CreateTradeTemplate(instrument, fields, values)`, with a small defaults row. Its partial
 typed values and reference cells are the seam extension agreed in the
 [Excel binding page](excel-trade-input-binding.md), built in #138; the constructor and
 [_CreateTrades](../../library/trades/create-trades.md) are built in #139, ticket I4.
@@ -390,7 +390,7 @@ stack on their branch; once they are merged, start from main containing those de
 | I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4a; built in #141, [prepare-trades.md](../../library/trades/prepare-trades.md), [evaluate-trades.md](../../library/trades/evaluate-trades.md), [report-values.md](../../library/trades/report-values.md) and [report-risk.md](../../library/trades/report-risk.md) |
 | R1 | [penultimate futures and payment dates](penultimate-trades.md) | public penultimate booking for PHH and ICE WTI: derive pen expiry from underlying expiry, apply the payment lag from pen expiry, retain the dates, reuse dated preparation/evaluation and prove the lifecycle | I5; built in #144 on #143, the page as a ticket, with the PHH lifecycle in the kept workbook |
 | I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5; built in #142 on I5 alone, [the example page](ng-creation-preparation-example.md#on-a-sheet), the toy paying by its lag on its own calendar under `lastday`; R1 adds penultimate support beside it |
-| I7 | [quantity units from the index's specifications](quantity-unit-selection.md) | `quantity_unit` names one of the index's contract specifications and `contract_specification` goes; one selection, resolved once at creation, the kernel's quantities a count of it; the Show spill, the spills, the examples and the kept workbook cut over | R1; the page as a ticket, agreed 5 October 2026, not built |
+| I7 | [quantity units from the index's specifications](quantity-unit-selection.md) | `quantity_unit` names one of the index's contract specifications and `contract_specification` goes; one selection, resolved once at creation, the kernel's quantities a count of it; the Show spill, the spills, the examples and the kept workbook cut over | R1; built in #NN, stacked on #144 |
 
 Averaging, with independently reviewed ethane examples, and payment valuation with a defined
 DV01 follow. Use one thin vertical example early, then broaden each stage as new cases demand.

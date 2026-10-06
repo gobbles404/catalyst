@@ -2059,9 +2059,9 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_ShowInstrument": 1,
         "instrument": 1,
         "schema_cells": 1,
-        "schema_cells.<locals>.<genexpr>": 112,  # seven rows of fifteen fields, and the labels
+        "schema_cells.<locals>.<genexpr>": 105,  # seven rows of fifteen fields, and the labels
         "MixedArray.cells": 1,
-        "_classify": 112,
+        "_classify": 105,
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }
@@ -2123,7 +2123,7 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
     headers = Cells.from_rows(
         [["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]]
     )
-    row = Cells.from_rows([["LOT", calendar, 46164.0, 10.0]])
+    row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
     PATH["EchoFieldRow"]("future", headers, row)
     profile = call_profile(lambda: PATH["EchoFieldRow"]("future", headers, row))
     binding = {

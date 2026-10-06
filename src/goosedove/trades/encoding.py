@@ -31,11 +31,12 @@ class Encoded:
     """The terms and the observations, by reference, and the arrays derived from them once, all
     read-only.
 
-    Per component, aligned with the terms' components: quantity[k], the signed quantity in the
-    quote quantity unit, lots times the lot size, converted where the lot unit differs;
-    coefficient[k], the settlement currency the component makes for a move of one unit of quote
-    price, the quantity converted from the quote currency to the settlement currency, so that a
-    cent-quoted price settles in dollars, and the quantity itself where the two are one; and
+    Per component, aligned with the terms' components: quote_quantity[k], the signed quantity in
+    the quote quantity unit, the count times the specification's lot size, converted where the
+    lot unit differs; coefficient[k], the settlement currency the component makes for a move of
+    one unit of quote price, the quote quantity converted from the quote currency to the
+    settlement currency, so that a cent-quoted price settles in dollars, and the quote quantity
+    itself where the two are one; and
     offset[k], the entry-price offset in the settlement currency, minus the coefficient times the
     fixed price, so that the coefficient times the contract's price plus the offset is the
     component's entry-to-price P&L.
@@ -58,7 +59,7 @@ class Encoded:
 
     terms: ResolvedTrades
     observations: Observations
-    quantity: NDArray[np.float64]
+    quote_quantity: NDArray[np.float64]
     coefficient: NDArray[np.float64]
     offset: NDArray[np.float64]
     groups: NDArray[np.intp]
@@ -136,8 +137,8 @@ def encoded(
         conventions.quantity_type, lot_unit, conventions.quote_quantity_unit
     )
     to_currency = units.factor(CURRENCY, conventions.quote_currency_unit, conventions.currency_unit)
-    quantity = terms.lots * (lot_size * to_quote_unit)
-    coefficient = quantity * to_currency
+    quote_quantity = terms.quantity * (lot_size * to_quote_unit)
+    coefficient = quote_quantity * to_currency
     offset = -coefficient * terms.fixed_price
     groups = np.unique(terms.contract)
     group_of_component = np.searchsorted(groups, terms.contract).astype(np.intp)
@@ -159,7 +160,7 @@ def encoded(
     counter.hit(ENCODED_OBSERVATIONS, int(observations.component.size))
     counter.hit(ENCODED_SLOTS, int(slot_group.size))
     arrays = (
-        quantity,
+        quote_quantity,
         coefficient,
         offset,
         groups,
@@ -178,7 +179,7 @@ def encoded(
     return Encoded(
         terms,
         observations,
-        quantity,
+        quote_quantity,
         coefficient,
         offset,
         groups,

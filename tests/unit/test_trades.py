@@ -145,7 +145,6 @@ def terms_of(
         route,
         settlement,
         ScheduleMethod.LASTDAY,
-        "LOT",
         QuantityPer.MONTH,
         None if labels is None else labels[keep],
         None,
@@ -204,16 +203,16 @@ def evaluated(
 def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), np.full(5, 2)
     terms = resolved_trades(
-        FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, LABELS, ("CME Clearing",) * 5, None, TRADE_DATES,
         np.arange(5, dtype=np.intp), CONTRACT, lots, FIXED_PRICE,
         PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
     )  # fmt: skip
     lots[0], pays[0], lags[0] = 99.0, day("2030-01-01"), 9  # the arrays passed, changed after
-    assert terms.lots[0] == 10.0 and terms.schedule is TOY.schedule
+    assert terms.quantity[0] == 10.0 and terms.schedule is TOY.schedule
     assert terms.payment is not None and terms.payment.date[0] == day("2026-11-30")
     assert terms.payment.lag_days[0] == 2 and terms.payment.calendar[0] is PAYMENT_CALENDAR
-    for column in (terms.trade_dates, terms.occurrence, terms.contract, terms.lots):
+    for column in (terms.trade_dates, terms.occurrence, terms.contract, terms.quantity):
         assert not column.flags.writeable
     assert not terms.payment.date.flags.writeable and not terms.payment.lag_days.flags.writeable
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
@@ -245,10 +244,6 @@ GAS_DAILY = index(
             "specification is 1, expected a row of the index's specifications, 0 to 0",
         ),
         (
-            {"quantity_unit": "MMBTU"},
-            "quantity_unit is 'MMBTU', expected LOT, the one quantity unit built",
-        ),
-        (
             {"trade_dates": dates()},
             "trade_dates has 0 dates, expected at least 1, one per occurrence",
         ),
@@ -265,7 +260,12 @@ GAS_DAILY = index(
             "broker has 4 texts, expected 5, one per occurrence",
         ),
         (
-            {"occurrence": rows(), "contract": rows(), "lots": numbers(), "fixed_price": numbers()},
+            {
+                "occurrence": rows(),
+                "contract": rows(),
+                "quantity": numbers(),
+                "fixed_price": numbers(),
+            },
             "occurrence has 0 rows, expected at least 1, one per component",
         ),
         (
@@ -273,8 +273,8 @@ GAS_DAILY = index(
             "contract has 2 rows, expected 5, one per component",
         ),
         (
-            {"lots": numbers(1.0)},
-            "lots has 1 rows, expected 5, one per component",
+            {"quantity": numbers(1.0)},
+            "quantity has 1 rows, expected 5, one per component",
         ),
         (
             {"occurrence": rows(0, 1, 2, 3, 5)},
@@ -289,16 +289,16 @@ GAS_DAILY = index(
             "contract row 4 is 3, expected a row of the schedule, 0 to 2",
         ),
         (
-            {"lots": numbers(10, -4, 7.5, -12, 10)},
-            "lots of trade 'NG-003' at row 3 is 7.5, expected a whole number of lots",
+            {"quantity": numbers(10, -4, 7.5, -12, 10)},
+            "quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number",
         ),
         (
-            {"lots": numbers(10, -4, np.nan, -12, 10)},
-            "lots of trade 'NG-003' at row 3 is nan, expected a whole number of lots",
+            {"quantity": numbers(10, -4, np.nan, -12, 10)},
+            "quantity of trade 'NG-003' at row 3 is nan, expected a whole number",
         ),
         (
-            {"lots": numbers(10, 0, 7, -12, 10)},
-            "lots of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity",
+            {"quantity": numbers(10, 0, 7, -12, 10)},
+            "quantity of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity",
         ),
         (
             {"fixed_price": numbers(3.1, 3.15, 3.4, np.inf, 3.1)},
@@ -338,7 +338,6 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "route": Route.CLEARED,
         "settlement": Settlement.PHYSICAL,
         "schedule_method": ScheduleMethod.LASTDAY,
-        "quantity_unit": "LOT",
         "quantity_per": QuantityPer.MONTH,
         "labels": LABELS,
         "clearing_house": None,
@@ -346,7 +345,7 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "trade_dates": TRADE_DATES,
         "occurrence": rows(0, 1, 2, 3, 4),
         "contract": CONTRACT,
-        "lots": LOTS,
+        "quantity": LOTS,
         "fixed_price": FIXED_PRICE,
         "payment": None,
     }
@@ -361,8 +360,10 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
 def test_the_ng_rows_encode_as_the_page_says() -> None:
     counter = WorkCounter()
     enc = encoded(terms_of(), observed_of(terms_of()), UNITS, counter)
-    np.testing.assert_array_equal(enc.quantity, [100_000, -40_000, 70_000, -120_000, 100_000])
-    np.testing.assert_array_equal(enc.coefficient, enc.quantity)  # dollars quoted, dollars paid
+    np.testing.assert_array_equal(enc.quote_quantity, [100_000, -40_000, 70_000, -120_000, 100_000])
+    np.testing.assert_array_equal(
+        enc.coefficient, enc.quote_quantity
+    )  # dollars quoted, dollars paid
     np.testing.assert_array_equal(enc.offset, [-310_000, 126_000, -238_000, 402_000, -310_000])
     np.testing.assert_array_equal(enc.groups, [1, 2])
     np.testing.assert_array_equal(enc.group_of_component, [0, 0, 1, 1, 0])
@@ -384,7 +385,13 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
         "encoded_observations": 5,
         "encoded_slots": 2,
     }
-    for array in (enc.quantity, enc.offset, enc.groups, enc.slot_exposure, enc.offset_of_group):
+    for array in (
+        enc.quote_quantity,
+        enc.offset,
+        enc.groups,
+        enc.slot_exposure,
+        enc.offset_of_group,
+    ):
         assert not array.flags.writeable
 
 
@@ -403,14 +410,14 @@ def test_a_lot_in_another_unit_than_the_quote_is_converted_once() -> None:
         "crude", quote=("USD", "GAL"), measure=("VOLUME", "BBL"), lot=("NYMEX", 1_000.0, "BBL")
     )
     enc = encoded(terms_of(crude), observed_of(terms_of(crude)), UNITS, WorkCounter())
-    np.testing.assert_allclose(enc.quantity, LOTS * 42_000)
+    np.testing.assert_allclose(enc.quote_quantity, LOTS * 42_000)
     np.testing.assert_allclose(enc.offset, -LOTS * 42_000 * FIXED_PRICE)
 
 
 def test_a_price_in_cents_settles_in_dollars() -> None:
     cents = an_index("cents", quote=("CENT", "MMBTU"))
     enc = encoded(terms_of(cents), observed_of(terms_of(cents)), UNITS, WorkCounter())
-    np.testing.assert_array_equal(enc.quantity, LOTS * 10_000)  # MMBTU, the physical quantity
+    np.testing.assert_array_equal(enc.quote_quantity, LOTS * 10_000)  # MMBTU, the physical quantity
     np.testing.assert_allclose(enc.coefficient, LOTS * 100)  # USD per cent per MMBTU
     np.testing.assert_allclose(enc.offset, -LOTS * 100 * FIXED_PRICE)
     np.testing.assert_allclose(enc.slot_exposure, [1_600, -500])
@@ -433,7 +440,7 @@ def one_lot_in_cents(
 ) -> tuple[TradeResults, WorkCounter]:
     counter = WorkCounter()
     terms = resolved_trades(
-        FUTURE, CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        FUTURE, CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("C-1",), None, None, dates("2026-09-24"), rows(0), rows(1),
         numbers(1), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -560,7 +567,7 @@ def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
 
 def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices_it() -> None:
     boundary = resolved_trades(
-        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
+        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, None, None, None, dates("2026-09-24"), rows(0), rows(0), numbers(1),
         numbers(3.0), None,
     )  # fmt: skip
@@ -825,7 +832,6 @@ def pen_terms(
         Route.CLEARED,
         settlement,
         method,
-        "LOT",
         QuantityPer.MONTH,
         ("PHH-1",),
         ("ICE Clear Europe",),
@@ -1020,7 +1026,7 @@ def daily_terms(
 ) -> ResolvedTrades:
     n = len(lots)
     return resolved_trades(
-        FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, None, None, None, np.repeat(day("2026-11-20"), n),
         np.arange(n, dtype=np.intp), np.ones(n, dtype=np.intp), numbers(*lots), numbers(*prices),
         paying(np.repeat(day(pays), n), n),
@@ -1076,7 +1082,7 @@ def test_the_daily_toy_encodes_three_slots_off_one_contract_for_two_components()
     terms = daily_terms()
     counter = WorkCounter()
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,) * 2), UNITS, counter)
-    np.testing.assert_array_equal(enc.quantity, [60, -30])
+    np.testing.assert_array_equal(enc.quote_quantity, [60, -30])
     np.testing.assert_array_equal(enc.offset, [-4_200, 2_160])
     np.testing.assert_array_equal(enc.groups, [1])
     np.testing.assert_array_equal(enc.offset_of_group, [-2_040])
@@ -1216,7 +1222,7 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     # A component on G27 observed on 1 December, a day Z26 prices: the history holds no G27
     # settle for it, so it is refused rather than priced off Z26.
     terms = resolved_trades(
-        FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("G-1",), None, None, dates("2026-11-20"), rows(0), rows(2), numbers(1),
         numbers(70.0), paying(dates("2027-02-02"), 1),
     )  # fmt: skip
@@ -1363,7 +1369,7 @@ def test_any_batch_equals_its_singletons_summed(
     def valued(selected: list[tuple[int, int, float]]) -> TradeResults:
         n = len(selected)
         terms = resolved_trades(
-            FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
+            FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
             QuantityPer.MONTH, None, None, None, np.repeat(day("2026-09-24"), n),
             np.arange(n, dtype=np.intp), rows(*(c for c, _, _ in selected)),
             numbers(*(q for _, q, _ in selected)), numbers(*(p for _, _, p in selected)), None,

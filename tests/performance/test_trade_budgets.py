@@ -106,7 +106,6 @@ def some_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         method,
-        "LOT",
         QuantityPer.MONTH,
         None,
         None,

@@ -76,26 +76,28 @@ def spilled(handle: object) -> list[list[object]]:
 
 
 def test_the_page_example_makes_a_template_of_its_two_fields() -> None:
-    template = a_template(quantity_unit="LOT", schedule_method="lastday")
+    template = a_template(quantity_unit="NYMEX NG", schedule_method="lastday")
     assert template.instrument is FUTURE
-    assert dict(template.defaults) == {"quantity_unit": "LOT", "schedule_method": "lastday"}
+    assert dict(template.defaults) == {"quantity_unit": "NYMEX NG", "schedule_method": "lastday"}
     assert list(template.defaults) == ["quantity_unit", "schedule_method"]  # the sheet's order
     assert isinstance(template.defaults, MappingProxyType)
 
 
-def test_one_field_and_the_ng_templates_seven_take_one_path() -> None:
+def test_one_field_and_the_ng_templates_six_take_one_path() -> None:
     one = a_template(route="cleared")
     assert dict(one.defaults) == {"route": "cleared"}
     ng = a_template(
-        contract_specification="NYMEX NG",
-        quantity_unit="LOT",
+        quantity_unit="NYMEX NG",
         quantity_per="month",
         schedule_method="lastday",
         route="cleared",
         settlement_method="physical",
         clearing_house="CME Clearing",
     )
-    assert len(ng.defaults) == 7 and ng.defaults["clearing_house"] == "CME Clearing"
+    assert len(ng.defaults) == 6 and ng.defaults["clearing_house"] == "CME Clearing"
+    # The unit is a name the index will be asked for; the template holds it as typed and asks
+    # nothing of it, since it has no index.
+    assert a_template(quantity_unit="ICE PHH").defaults["quantity_unit"] == "ICE PHH"
 
 
 def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itself() -> None:
@@ -139,10 +141,6 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
     ("fields", "message"),
     [
         (
-            {"quantity_unit": "lot"},
-            "quantity_unit is 'lot', expected LOT, the one quantity unit built",
-        ),
-        (
             {"schedule_method": "asian"},
             "schedule_method is 'asian', expected lastday or penultimate, the two methods built",
         ),
@@ -181,12 +179,12 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
             "contract_code is 'Z27-F27', expected range endpoints in chronological order",
         ),
         (
-            {"quantity_unit": "LOT", "route": "cleared", "schedule_method": "pen"},
+            {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
             "schedule_method is 'pen', expected lastday or penultimate, the two methods built",
         ),
         ({"quantity": 0.0}, "quantity is 0.0, expected a nonzero quantity"),
-        ({"quantity": 1.5}, "quantity is 1.5, expected a whole number of lots"),
-        ({"quantity": -2.5}, "quantity is -2.5, expected a whole number of lots"),
+        ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
+        ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
     ],
 )
@@ -207,7 +205,7 @@ def test_the_builder_takes_one_row_of_field_values() -> None:
 
 
 def test_the_creator_publishes_a_template_handle_with_no_index_name() -> None:
-    handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity_unit"), row("LOT"))
+    handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity_unit"), row("NYMEX NG"))
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
 
 
@@ -223,15 +221,14 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
         "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'Quantity_unit', "
         "expected a field of future: trade_id, "
     )
-    assert create("future", row("quantity_unit"), Cells.from_rows([["LOT"], ["LOT"]])) == (
+    assert create("future", row("quantity_unit"), Cells.from_rows([["lots"], ["lots"]])) == (
         "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     )
     assert create("future", row("quantity_unit"), row(1.0)) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text"
     )
-    assert create("future", row("quantity_unit"), row("lot")) == (
-        "#ERROR _CreateTradeTemplate: ValueError: quantity_unit is 'lot', "
-        "expected LOT, the one quantity unit built"
+    assert create("future", row("quantity"), row(1.5)) == (
+        "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number"
     )
 
 

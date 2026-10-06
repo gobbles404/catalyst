@@ -3,11 +3,10 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Instrument definitions](00-instrument-definitions.md) · [Show instrument](../../library/instruments/show-instrument.md)
 
-**Status:** Agreed 5 October 2026; ready for implementation. This ticket changes the
-trade implementation in PRs #136–#144, reviewed through `7650bfe`. Implement as one focused
-PR on the completed trade stack while it remains open, or on main once it contains that
-stack. This ticket supersedes the two-field quantity selection in the earlier pipeline
-pages; update those pages with the implementation.
+**Status:** Built in #NN, stacked on #144. Agreed 5 October 2026; it changes the trade
+implementation of PRs #136–#144, reviewed through `7650bfe`, and supersedes the two-field
+quantity selection of the earlier pipeline pages, which say the new rule now. The section
+at the end records what the build settled.
 
 ## Outcome
 
@@ -161,3 +160,40 @@ lifetime checks, and verify the migrated kept workbook's formulas and spills in 
 Follow the repository's separate-review rule for changes to existing goldens. This is one
 field-selection change, not a new product catalog, fractional-quantity feature, mixed-spec
 batch feature, or change to settlement, valuation or risk.
+
+## As built
+
+Built in #NN. The `future` has fourteen fields: `contract_specification` is gone and
+`quantity_unit` is text whose options are the index's specification names, its rule that it
+selects the lot size and unit from the index given to `_CreateTrades`, exactly as named there;
+`quantity` is a signed whole count of it. `_ShowInstrument` spills seven rows by fifteen
+columns, the layout as before and one column fewer. The template's readers no longer read the
+unit at all, since a template has no index to ask; resolution looks the batch's one
+`quantity_unit` up in `index.specifications.names`, exactly, and refuses any other text with
+the field, the value and the index's names, the ticket's row named where the ticket supplied
+it, `quantity_unit row 1 is 'ICE NG', expected one of the index's specifications: 'NYMEX NG',
+'ICE PHH', 'MMBTU'`; `LOT` and `MWH` are refused like any name the index does not spell, and
+accepted where it does. The kernel keeps `specification`, the row, as the one selection and
+drops its `quantity_unit` string; its `lots` are `quantity`, a count of the specification,
+its `whole_lots` rule `whole_quantities`, `quantity of trade 'NG-003' at row 3 is 7.5,
+expected a whole number`, and the encoding's `quantity` is `quote_quantity`, the spill's
+word already. The trades spill drops the specification column and shows the selected name
+under `quantity_unit`, fifteen columns for the physical NG batch and seventeen for a
+financial one with a trade_id; the template spill shows the name as typed. Preparation,
+evaluation, the reports and their spills are untouched.
+
+Pinned: the page's table, two of each name and the bare `MMBTU`; a template holding `ICE PHH`
+made into a batch on an index that spells it and refused by one that does not; seven names
+the index does not spell, case, spaces, `LOT`, `lot` and `MWH`, each refused with the index's
+names; `LOT` accepted where an index defines it; the unit in the ticket naming its row and
+agreeing on every row; a megawatt hour beside the NYMEX lot, each read by its own row; a
+strip counting the selected unit in every month; the old field unknown to the definition and
+to the seam; through the entries, two ICE PHH lots and 5,000 MMBTU valuing and risking alike,
+500 and 5,000, with their spills; a cents index reading back 10,000 MMBtu of quote quantity
+against a coefficient of 100, its risk in USD per CENT/MMBTU; the PHH lifecycle on an index
+whose ICE lot is the second specification. The smoke's templates lose the field and its
+spills a column, a `LOT` template refused by the index; the host's facts likewise; the
+lifetime's trades group changes the template's unit to the index's barrel of 42 gallons and
+the template, the batch, the preparation and the results publish anew, the mark 7 for two
+barrels where two lots marked 7,000; the kept workbook's four templates lose the column, its
+readers follow, and every number of its blocks stands.

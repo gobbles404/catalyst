@@ -339,9 +339,10 @@ def trades_table(obj: Trades) -> MixedArray:
     # resolved terms under the definition's own field names in the definition's order, the batch's
     # facts repeated on every row since a reader of one row should see the whole deal and the
     # template need not have supplied them, then what the encoding made of the terms. trade_id,
-    # clearing_house and broker where the batch has them; the payment lag and the day it gives
-    # for a financial settlement; quote_quantity the lots in the index's quote quantity unit,
-    # coefficient and offset in the settlement currency.
+    # clearing_house and broker where the batch has them; quantity_unit the specification's name
+    # as the index spells it; the payment lag and the day it gives for a financial settlement;
+    # quote_quantity the quantity in the index's quote quantity unit, coefficient and offset in
+    # the settlement currency.
     terms, encoding = obj.resolved, obj.encoded
     rows = terms.occurrence
     n = rows.size
@@ -366,22 +367,21 @@ def trades_table(obj: Trades) -> MixedArray:
 
     labels("trade_id", terms.labels)
     numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
-    text("contract_specification", (terms.index.specifications.names[terms.specification],) * n)
     text("contract_code", tuple(codes))
     text("schedule_method", (terms.schedule_method.value,) * n)
     text("route", (terms.route.value,) * n)
     text("settlement_method", (terms.settlement.value,) * n)
     labels("clearing_house", terms.clearing_house)
     labels("broker", terms.broker)
-    numbers("quantity", "float64", terms.lots)
-    text("quantity_unit", (terms.quantity_unit,) * n)
+    numbers("quantity", "float64", terms.quantity)
+    text("quantity_unit", (terms.index.specifications.names[terms.specification],) * n)
     text("quantity_per", (terms.quantity_per.value,) * n)
     numbers("fixed_price", "float64", terms.fixed_price)
     if terms.payment is not None:
         lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
         text("payment_time_lag", tuple(lags[rows]))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
-    numbers("quote_quantity", "float64", encoding.quantity)
+    numbers("quote_quantity", "float64", encoding.quote_quantity)
     numbers("coefficient", "float64", encoding.coefficient)
     numbers("offset", "float64", encoding.offset)
     return MixedArray.table([tuple(headers), tuple(types)], *columns)

@@ -186,19 +186,19 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "future", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'future'" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_specification, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "EchoFieldRow", new object[] { "future", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("payment_holiday_calendar"), "x:holiday_calendar:9" }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity"), Column(1.0, 2.0) }, "#ERROR EchoFieldRow: values is 2x1 array, expected one row of field values" };
             // The trade template: the name in another case in the library's words; two rows where one is wanted and a number where a code is expected in the seam's; a value against its field's own rule in the library's. The trades: the index and the template left out, and a text naming no live object, in the seam's words, before any binding; the batch itself is in the fact below.
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "LOT" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("LOT", "LOT") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("NYMEX NG", "NYMEX NG") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("LOT", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday or penultimate, the two methods built" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday or penultimate, the two methods built" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("payment_time_lag"), "+0bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number of lots" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
@@ -343,7 +343,7 @@ namespace Goosedove.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown future spills seven rows by sixteen columns, the labels down the first column, the
+        // the shown future spills seven rows by fifteen columns, the labels down the first column, the
         // fields across the first row and the required row booleans, every other cell text.
         [Fact]
         public void the_instrument_catalog_is_listed_and_the_future_shown()
@@ -356,19 +356,20 @@ namespace Goosedove.Host.Tests
             Assert.Equal("future", listed[1, 0]);
             var shown = (object[,])Seam.Call("_ShowInstrument", "future");
             Assert.Equal(7, shown.GetLength(0));
-            Assert.Equal(16, shown.GetLength(1));
+            Assert.Equal(15, shown.GetLength(1));
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 15]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 14]);
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);
-            Assert.Equal("route = cleared", shown[3, 8]);
-            Assert.Equal("holiday calendar handle", shown[4, 15]);
-            Assert.Equal("month, day", shown[5, 12]);
+            Assert.Equal("route = cleared", shown[3, 7]);
+            Assert.Equal("holiday calendar handle", shown[4, 14]);
+            Assert.Equal("the index's specification names", shown[5, 10]);
+            Assert.Equal("month, day", shown[5, 11]);
         }
 
-        // The NG example of the trade-valuation pipeline: a template of the future's seven shared
+        // The NG example of the trade-valuation pipeline: a template of the future's six shared
         // fields, a batch of its five rows on the NG index, the codes in either case, the handle
         // named for the index, the spill one row per component with the kernel's numbers; a
         // template field repeated in the ticket refused, and a financial template whose strip
@@ -379,8 +380,8 @@ namespace Goosedove.Host.Tests
             var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
             var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0));
             var ng = Index(schedule, holidays, "Henry Hub NYMEX");
-            var fields = Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "LOT", "month", "lastday", "cleared", "physical", "CME Clearing"));
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "month", "lastday", "cleared", "physical", "CME Clearing"));
             Assert.StartsWith(Pid + ":trade_template:", template);
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,]
@@ -395,26 +396,29 @@ namespace Goosedove.Host.Tests
             Assert.StartsWith(Pid + ":trades:Henry Hub NYMEX:", trades);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(7, spill.GetLength(0));
-            Assert.Equal(16, spill.GetLength(1));
+            Assert.Equal(15, spill.GetLength(1));
             Assert.Equal("row", spill[0, 0]);
-            Assert.Equal("offset", spill[0, 15]);
+            Assert.Equal("offset", spill[0, 14]);
             Assert.Equal(1.0, spill[2, 0]);
-            Assert.Equal("Z26", spill[3, 4]);
-            Assert.Equal("cleared", spill[2, 6]);
-            Assert.Equal("physical", spill[2, 7]);
-            Assert.Equal(100000.0, spill[2, 13]);
-            Assert.Equal(-310000.0, spill[6, 15]);
+            Assert.Equal("Z26", spill[3, 3]);
+            Assert.Equal("cleared", spill[2, 5]);
+            Assert.Equal("physical", spill[2, 6]);
+            Assert.Equal("quantity_unit", spill[0, 9]);
+            Assert.Equal("NYMEX NG", spill[2, 9]);
+            Assert.Equal(100000.0, spill[2, 12]);
+            Assert.Equal(-310000.0, spill[6, 14]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price", "route"), Row(46289.0, "Z26", 1.0, 3.0, "cleared"), template));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: lots of trade 'a' at row 1 is 2.5, expected a whole number of lots", Seam.Call("_CreateTrades", ng, headers, Row("a", 46289.0, "Z26", 2.5, 3.0), template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: quantity of trade 'a' at row 1 is 2.5, expected a whole number", Seam.Call("_CreateTrades", ng, headers, Row("a", 46289.0, "Z26", 2.5, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: template is holiday calendar handle '" + holidays + "', expected trade template handle", Seam.Call("_CreateTrades", ng, headers, rows, holidays));
-            var financial = (string)Seam.Call("_CreateTradeTemplate", "future", Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("NYMEX NG", "LOT", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
+            var financial = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("NYMEX NG", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
             var strip = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price"), Row(46289.0, "Z26-F27", 3.0, 3.2), financial));
             Assert.Equal(4, strip.GetLength(0));
-            Assert.Equal(17, strip.GetLength(1));
-            Assert.Equal("payment_date", strip[0, 13]);
-            Assert.Equal("+2bd", strip[2, 12]);
-            Assert.Equal(46356.0, strip[2, 13]);
-            Assert.Equal(46387.0, strip[3, 13]);
+            Assert.Equal(16, strip.GetLength(1));
+            Assert.Equal("payment_date", strip[0, 12]);
+            Assert.Equal("+2bd", strip[2, 11]);
+            Assert.Equal(46356.0, strip[2, 12]);
+            Assert.Equal(46387.0, strip[3, 12]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'", Seam.Call("_CreateTrades", ng, headers, rows, (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("ICE PHH", "month", "lastday", "cleared", "physical", "CME Clearing"))));
         }
 
         // The valuation path from the host's side: the market fact's chain, valued on 26 May 2026 with
@@ -432,8 +436,8 @@ namespace Goosedove.Host.Tests
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
-            var fields = Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "LOT", "month", "lastday", "cleared", "physical", "CME Clearing"));
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "month", "lastday", "cleared", "physical", "CME Clearing"));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { "V1", 46153.0, "n26", 2.0, 70.0 }, { "V2", 46153.0, "q26", -1.0, 72.0 } }, template);
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
@@ -495,17 +499,17 @@ namespace Goosedove.Host.Tests
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
-            var fields = Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "LOT", "month", "penultimate", "cleared", "financial", "ICE Clear Europe", "+1bd", holidays));
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "month", "penultimate", "cleared", "financial", "ICE Clear Europe", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { "V1", 46153.0, "n26", 2.0, 70.0 }, { "V2", 46153.0, "q26", -1.0, 72.0 } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(18, spill.GetLength(1));
-            Assert.Equal("penultimate", spill[2, 5]);
-            Assert.Equal("payment_date", spill[0, 14]);
-            Assert.Equal(46195.0, spill[2, 14]);
-            Assert.Equal(46224.0, spill[3, 14]);
+            Assert.Equal(17, spill.GetLength(1));
+            Assert.Equal("penultimate", spill[2, 4]);
+            Assert.Equal("payment_date", spill[0, 13]);
+            Assert.Equal(46195.0, spill[2, 13]);
+            Assert.Equal(46224.0, spill[3, 13]);
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal("observation_date", slots[0, 1]);
@@ -515,7 +519,7 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", (string)Seam.Call("_EvaluateTrades", prepared, market));
             Assert.Equal(34000.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, values[2, 1]);
-            var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("NYMEX NG", "LOT", "month", "penultimate", "cleared", "physical", "CME Clearing"));
+            var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("NYMEX NG", "month", "penultimate", "cleared", "physical", "CME Clearing"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
         }
 
