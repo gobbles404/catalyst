@@ -36,7 +36,7 @@ Nothing: the result is complete when it is published or it is not published, so 
 |---|---|
 | `tests/unit/test_trade_valuation.py` | the NG example's spill cell for cell, 7,000 and 0 in USD on 24 November; the toy's seven states, 7,000 of mark and no cash to no mark and 14,300 of cash, each pair summing to the page's total; a report of the old results unmoved by a tick; one trade's -18,000; a blank and a prepared-trades handle refused |
 | `tests/performance/test_trade_valuation_budgets.py` | one handle resolved, one row laid out, no kernel call, nothing published; 1,967 bytes |
-| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups trades`, `workbooks/handles.xlsx` | the chain's mark read through the report on a sheet, from the host, through a tick, and at the foot of the handles sheet, B1304 and the toy's seven states in K1342 to L1348 |
+| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups trades,valuation`, `workbooks/handles.xlsx` | the chain's mark read through the report on a sheet, from the host, through a tick, through the valuation day's roll past n26's expiry, 5,000 of cash and a mark of 0, and through the market's failure, the report spilled showing the failure in the creator's words and a read through INDEX showing #REF!, since #NN, and at the foot of the handles sheet, B1304 and the toy's seven states in K1342 to L1348 |
 
 ## Not here
 
