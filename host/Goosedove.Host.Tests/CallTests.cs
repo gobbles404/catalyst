@@ -322,7 +322,6 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46161.0, plain[2, 1]);
         }
 
-        // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
         // A row of the future's fields bound against the instrument named: the holiday calendar cell
         // resolved to the object behind the handle and echoed as the words of its kind, the date as
         // its serial, the number as itself, under the field names in the sheet's order.
@@ -529,6 +528,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
         }
 
+        // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
         public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()

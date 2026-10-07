@@ -837,13 +837,12 @@ def _refine(schema: Schema, headers: tuple[str, ...], body: MixedArray) -> Table
 @dataclass(frozen=True, slots=True)
 class FieldsSchema:
     """A FieldRow or FieldRows parameter as registration resolved it: the names of the header-row
-    and body parameters for messages, the position of the parameter whose value selects the
-    instrument, and whether the body is one row, a template's, or one or more, a ticket's."""
+    and body parameters for messages and the position of the parameter whose value selects the
+    instrument; whether the body is one row or more is the accept rule's, chosen by _declared."""
 
     header_row: str
     body: str
     selector: int
-    one_row: bool
 
 
 def _handles_of(kind: type[object], expected: str, body: _Body, j: int) -> tuple[object, ...]:
@@ -1664,8 +1663,7 @@ def _fields_schema(function: str, specs: Sequence[inspect.Parameter], i: int) ->
             f"{function}: {spec.name} selects its instrument by the {words} parameter, "
             f"of which the function has {len(candidates)}, expected exactly 1"
         )
-    one_row = _fields_form(spec.annotation)
-    return FieldsSchema(specs[i - 1].name, spec.name, candidates[0], bool(one_row))
+    return FieldsSchema(specs[i - 1].name, spec.name, candidates[0])
 
 
 def _declared(
