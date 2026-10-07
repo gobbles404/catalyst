@@ -15,8 +15,8 @@ def _EvaluateTrades(
 
 | | A | B |
 |---|---|---|
-| 11 | `=_PrepareTrades(A10, B12)` | shows `30512:prepared_trades:Henry Hub NYMEX:43` |
-| 12 | `=_EvaluateTrades(A11, B13)` | shows `30512:trade_results:Henry Hub NYMEX:45`, B13 the market over B12 quoting Z26 at 3.20 and F27 at 3.50 |
+| 11 | `=_PrepareTrades(A10, I11)` | shows `30512:prepared_trades:Henry Hub NYMEX:43` |
+| 12 | `=_EvaluateTrades(A11, I12)` | shows `30512:trade_results:Henry Hub NYMEX:45`, I12 the market over the history in I11 quoting Z26 at 3.20 and F27 at 3.50, the two handles beside the index in I3 and outside the reports' spills, A13:D15 and A17:E19 |
 
 Two handles, both required, neither with a default: the prepared trades, the cell showing `_PrepareTrades`'s result or a name for it, and the market over the history they were prepared against, the cell showing `_CreateMarket`'s result or a name for it, with the day's quotes. The seam resolves the two handles and nothing else; a cell of another kind fails in the seam's words, `prepared is trades handle '30512:trades:Henry Hub NYMEX:41', expected prepared trades handle`. The result is a handle, `30512:trade_results:Henry Hub NYMEX:45`, named for the index. A successful call publishes results and changes neither input; a recalculation with the same arguments shares the live results; a new market makes new results and the old are released when Excel disconnects their last creator, a report referring to the old cell holding them meanwhile.
 
@@ -26,7 +26,7 @@ Two handles, both required, neither with a default: the prepared trades, the cel
 |---|---|
 | Function | Evaluates prepared trades against one market, the live observations at their contracts' quotes and the fixed at their settles, into the batch's mark, cash and delta, and shows its handle, the text the two reports take as the results. |
 | prepared | The prepared-trades handle: the cell showing _PrepareTrades's result, such as A11, or a name for it. |
-| market | The market handle over the history the trades were prepared against: the cell showing _CreateMarket's result, such as B13, or a name for it, with the day's quotes. |
+| market | The market handle over the history the trades were prepared against: the cell showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes. |
 
 ## The library checks
 
