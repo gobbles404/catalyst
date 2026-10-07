@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Dated exposure](dated-exposure.md) · [Penultimate futures](penultimate-trades.md)
 
-**Status:** Built in #NN on the prototype stack above #156, the page as a ticket. Agreed
+**Status:** Built in #157 on the prototype stack above #156, the page as a ticket. Agreed
 direction, 7 October 2026. Next prototype slice after the hardening stack, reviewed through PR
 #156 at `1971c8c`. Implemented as one focused PR on the prototype branch. This ticket does not
 prescribe merging the prototype into main or the later rebuild. The section at the end records
@@ -231,7 +231,7 @@ number of observations per component; it must not hard-code a stride of three in
 payment machinery. Oil averages crossing a futures roll require a separate decision about
 market references and history coverage.
 
-## As built, #NN
+## As built, #157
 
 Built as the page says, on the path the two one-observation methods take, with these
 particulars.
