@@ -2,7 +2,7 @@
 
 Built in #141 as ticket I5 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_ReportValues](report-values.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md) and [result fields by route](../../engineering-tickets/trade-valuation-pipeline/result-fields-by-route.md).
 
-The batch's risk from its results, as evaluation stored them: the total delta, the change in mark for a move of one quote unit in every contract at once, with its unit; the DV01 with its unit; and the valuation day. The delta by contract on the batch's axis is retained in the result and not spilled here, `util_ReadHandle` on the results showing it on each slot of the contract as `contract_delta`. A report values nothing and bumps nothing. The code is `src/goosedove/excel/trades.py`.
+The batch's risk from its results: the total delta, the change in mark for a move of one quote unit in every contract at once, with its unit, the DV01 and the valuation day, as evaluation stored them; the DV01's unit is the report's own words, the settlement currency per basis point, composed here and stored nowhere. The delta by contract on the batch's axis is retained in the result and not spilled here, `util_ReadHandle` on the results showing it on each slot of the contract as `contract_delta`. A report values nothing and bumps nothing. The code is `src/goosedove/excel/trades.py`.
 
 ## Worksheet contract
 
@@ -12,18 +12,18 @@ def _ReportRisk(results: Handle[TradeResults]) -> MixedArray: ...
 
 | | A | B | C | D | E |
 |---|---|---|---|---|---|
-| 14 | `=_ReportRisk(A12)` | | | | |
+| 17 | `=_ReportRisk(A12)` | | | | |
 | | delta_total | delta_unit | dv01 | dv01_unit | as_of |
 | | float64 | str | float64 | str | datetime64[D] |
 | | 110000 | USD per USD/MMBTU | 0 | USD per basis point | 24-Nov-2026 |
 
-One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it. The spill is three rows by five columns. `delta_total` is the sum of the deltas by contract, each the live exposure referencing that contract, zero where every slot of it has fixed: for the NG example 160,000 less 50,000; its unit is the settlement currency per quote unit, `USD per USD/MMBTU`, so a one-cent move in every contract changes the mark by 1,100 dollars. `dv01` is the change for a one basis point move in rates: zero for the cleared route, the undiscounted model's own answer and not a placeholder, and the bilateral route, whose DV01 needs a curve, a bump and a sign convention, is refused at evaluation rather than reported as zero. The delta's value basis is the route's mark; a settled group contributes to neither.
+One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it. The spill is three rows by five columns, so the formula sits at A17, below the values' three rows at A13:D15; at A14 it would spill into them and show `#SPILL!`. `delta_total` is the sum of the deltas by contract, each the live exposure referencing that contract, zero where every slot of it has fixed: for the NG example 160,000 less 50,000; its unit is the settlement currency per quote unit, `USD per USD/MMBTU`, so a one-cent move in every contract changes the mark by 1,100 dollars. `dv01` is the change for a one basis point move in rates: zero for the cleared route, the undiscounted model's own answer and not a placeholder, and the bilateral route, whose DV01 needs a curve, a bump and a sign convention, is refused at evaluation rather than reported as zero. The delta's value basis is the route's mark; a settled group contributes to neither.
 
 ## Excel help
 
 | Item | Text |
 |---|---|
-| Function | Reports the batch's risk from its results: the total delta, the change in mark for a move of one quote unit in every contract, with its unit, the DV01 with its unit, and the valuation day, as evaluation stored them. |
+| Function | Reports the batch's risk from its results: the total delta, the change in mark for a move of one quote unit in every contract, with its unit, the DV01 and the valuation day, as evaluation stored them, and the DV01's unit, the currency per basis point. |
 | results | The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name for it. |
 
 ## The library checks

@@ -38,6 +38,8 @@ The kernel's rules, in [kernel.md](kernel.md)'s words after `#ERROR _EvaluateTra
 | The route is cleared; bilateral valuation needs discount factors and a DV01 convention | `route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet` |
 | Every live contract is quoted, the market's own rule | `requested contract 'F27' is beyond live-price coverage ending at 'Z26'` |
 
+The quotes carry no labels, as [market.md](../market/market.md#when-the-first-contract-rolls) records: the first price is the first unfixed contract's and the rest follow the schedule. A batch prepared again after the valuation date rolls past a contract's expiry takes the first quote for the next contract, so a vector left in place across the roll values the batch's live contracts at the quotes of the contracts before them, and nothing refuses it unless the vector reached the schedule's end, where it is now a price too many. Move the vector with the date; labels for the vector are deferred work, recorded under [Accepted constraints](../../engineering-tickets/trade-valuation-pipeline/README.md#accepted-constraints).
+
 For the NG example on 24 November 2026 at 3.20 and 3.50: a mark of 7,000 USD, no cash, delta 160,000 and -50,000 USD per USD/MMBTU, total 110,000; at 3.21 the mark is 8,600 and the delta unchanged. For the toy on 30 November, Z26 fixed at 3.23 and paid, F27 at 3.50: a mark of -11,000 and cash of 22,800; its seven states are the example page's table, and [kernel.md](kernel.md) has them with the quotes and fixings read.
 
 ## What it retains

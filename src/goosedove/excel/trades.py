@@ -157,8 +157,8 @@ def _ReportRisk(
     ],
 ) -> MixedArray:
     """Reports the batch's risk from its results: the total delta, the change in mark for a move
-    of one quote unit in every contract, with its unit, the DV01 with its unit, and the
-    valuation day, as evaluation stored them."""
+    of one quote unit in every contract, with its unit, the DV01 and the valuation day, as
+    evaluation stored them, and the DV01's unit, the currency per basis point."""
     return MixedArray.table(
         [
             ("delta_total", "delta_unit", "dv01", "dv01_unit", "as_of"),

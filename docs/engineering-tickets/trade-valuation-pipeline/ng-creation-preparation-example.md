@@ -62,9 +62,9 @@ With the ticket's five columns below, every field the `future` definition requir
 once: `payment_time_lag` and `payment_holiday_calendar` are required only when
 `settlement_method` is `financial`, and this physical contract supplies neither; `trade_id` and
 `broker` are optional, and the ticket carries the first. `CME Clearing` is a label retained as
-typed, and nothing is inferred from it. `lastday` is the one schedule method supported first;
-for a future valued on its own contract's mark it names the settlement on the contract's last
-trading day as the final price, and the other methods fail by name until built. The index is
+typed, and nothing is inferred from it. `lastday` and `penultimate` are built;
+under `lastday` a future valued on its own contract's mark names the settlement on the contract's
+last trading day as the final price, and `asian` and `last3day` fail by name until built. The index is
 not a template field: it is the argument of the call, so this template serves another NG index
 whose specifications name `NYMEX NG` and fails, by name, against one whose do not.
 
@@ -80,7 +80,7 @@ in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
 =_ReportRisk(Results)
 ```
 
-The first two are built in #139 and the rest in #141; every number below is pinned on a sheet.
+The first two are built in #139 and the rest in #141; every number below is pinned, on a sheet in `tests/unit/test_trade_valuation.py` or in the kernel's `tests/unit/test_trades.py`.
 
 The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and `fixed_price`:
 
@@ -229,9 +229,11 @@ from the row headers. Payment dates are computed once, strictly after the anchor
 For this test definition only, a final observation is required when its date is strictly
 before as-of. It stays live on that date, matching the current futures calendar's daily cutoff.
 If the required final price is absent, nothing is valued: as built, the settle on the expiry day
-is a fixing like any other, and `_CreateMarketHistory` refuses a series that skips it, `fixings
-has no fixing for 2026-11-25, expected a fixing for every fixed day in calendar`, before any
-trade is prepared, so no forecast ever stands in for a final price. Final prices in the following
+is a fixing like any other. A series that stops before it is refused by `_CreateMarketHistory`,
+`fixings has no fixing for 2026-11-25, expected a fixing for every fixed day in calendar`, and a
+series that skips it in the middle by `_CreateFuturesFixings` first, `date row 2 is 2026-11-24,
+expected 2026-11-25, the business day before row 1's 2026-11-27`, either before any trade is
+prepared, so no forecast ever stands in for a final price. Final prices in the following
 rows are fixture inputs, not externally sourced exchange values.
 
 These final prices are only the observations consumed by this toy trade adapter, not a

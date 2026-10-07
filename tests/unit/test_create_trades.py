@@ -222,7 +222,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     terms = batch.resolved
     np.testing.assert_array_equal(terms.occurrence, [0, 0, 1])
     np.testing.assert_array_equal(terms.contract, [1, 2, 2])
-    np.testing.assert_array_equal(terms.quantity, [3, 3, -1])  # the strip's lots in every month
+    np.testing.assert_array_equal(terms.quantity, [3, 3, -1])  # the strip's quantity in every month
     np.testing.assert_array_equal(terms.fixed_price, [3.2, 3.2, 3.3])
     assert terms.payment is not None
     np.testing.assert_array_equal(
@@ -890,7 +890,7 @@ def test_a_batch_that_cannot_be_resolved_says_why(
     assert refused(NG, ticket, template) == message
 
 
-def test_a_lot_count_is_named_by_its_trades_row_though_a_strip_sits_before_it() -> None:
+def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -> None:
     message = refused(
         TOY,
         {
@@ -987,6 +987,52 @@ def test_a_batch_field_the_ticket_supplies_is_named_with_its_row() -> None:
     assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "route": "Cleared"}) == (
         "route is 'Cleared', expected cleared or bilateral"
     )
+
+
+def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
+    # The page's order is the code's: the quantity unit, then the method, the route, the
+    # settlement and the basis, each read for its meaning once the rows agree. The ticket
+    # supplies every batch field wrong at once, every row agreeing, since a template reads its
+    # own values when it is made and would name the first wrong one in its row's order. The
+    # unit is named, and each field put right names the next, until the batch is made.
+    template = {"clearing_house": "CME Clearing"}
+    ticket: dict[str, list[object]] = {
+        **NG_TICKET,
+        "quantity_unit": ["ICE PHH"] * 5,
+        "schedule_method": ["asian"] * 5,
+        "route": ["Cleared"] * 5,
+        "settlement_method": ["Physical"] * 5,
+        "quantity_per": ["day"] * 5,
+    }
+    in_order = (
+        (
+            "quantity_unit",
+            "NYMEX NG",
+            "quantity_unit row 1 is 'ICE PHH', expected one of the index's specifications: "
+            "'NYMEX NG'",
+        ),
+        (
+            "schedule_method",
+            "lastday",
+            "schedule_method row 1 is 'asian', expected lastday or penultimate, the two methods "
+            "built",
+        ),
+        ("route", "cleared", "route row 1 is 'Cleared', expected cleared or bilateral"),
+        (
+            "settlement_method",
+            "physical",
+            "settlement_method row 1 is 'Physical', expected physical or financial",
+        ),
+        (
+            "quantity_per",
+            "month",
+            "quantity_per row 1 is 'day', expected month, the one basis built",
+        ),
+    )
+    for name, right, message in in_order:
+        assert refused(NG, ticket, template) == message
+        ticket[name] = [right] * 5
+    created(NG, ticket, template)
 
 
 def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None:
@@ -1109,7 +1155,7 @@ def row(*values: object) -> Cells:
 
 @pytest.fixture(scope="module")
 def sheet() -> dict[str, Any]:
-    """The NG example's cells: the index, the template over its seven fields and the ticket's
+    """The NG example's cells: the index, the template over its six fields and the ticket's
     headers and five rows, with 24 September 2026 as 46289 and 25 September as 46290."""
     schedule = ENTRY["_CreateFuturesSchedule"](
         cells(["X26"], ["Z26"], ["F27"]), cells([46323.0], [46351.0], [46385.0]), bridge.MISSING

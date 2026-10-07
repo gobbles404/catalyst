@@ -624,8 +624,8 @@ def test_the_two_reports_explain_themselves() -> None:
     assert not hidden and arguments == [results]
     assert description == (
         "Reports the batch's risk from its results: the total delta, the change in mark for a "
-        "move of one quote unit in every contract, with its unit, the DV01 with its unit, and the "
-        "valuation day, as evaluation stored them."
+        "move of one quote unit in every contract, with its unit, the DV01 and the valuation "
+        "day, as evaluation stored them, and the DV01's unit, the currency per basis point."
     )
 
 

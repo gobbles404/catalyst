@@ -976,8 +976,9 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by fifteen
 # columns, 105 cells of which 91 are text, is laid out one cell at a time and joined for the way
-# out: measured 11,246 bytes on 2026-10-06, about 107 bytes a cell, which a hundred a cell and
-# the slack cover.
+# out: measured 11,429 bytes on 2026-10-07, about 109 bytes a cell, which a hundred a cell and
+# the slack cover by 95 bytes; the peak follows the length of the rule texts, which #146
+# lengthened, and not the count of cells alone.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()

@@ -290,7 +290,7 @@ It is the only value that takes a default: `Rate(None)` is `x is blank, expected
 
 ## The probes and what each proves
 
-The probes are the sixteen hidden worksheet functions in the probes module. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
+The probes are the eighteen hidden worksheet functions in the probes module, `EchoFieldRow` and `CountFieldRows` among them since #138. Each proves one thing the host can tell apart, on the way in or the way out, or one rule the bridge applies to what the host cannot. Together they are the knobs a capacity run turns: how many calls, how many cells in, how many cells out. They ship in the build everyone loads and stay as long as the seam does.
 
 | Probe | In and out | Proves |
 |---|---|---|

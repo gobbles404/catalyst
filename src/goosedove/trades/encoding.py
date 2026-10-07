@@ -93,13 +93,14 @@ def encoded(
     each over the components, the observations and the slots, and the rules of the dated axis and
     of a financial settlement, checked once, the first failure being the message.
 
-    The quantity: lots times the specification's lot size restates a count of lots in the lot
-    unit, and the unit tables' factor restates that in the conventions' quote quantity unit,
-    both units of the conventions' quantity type, as the index checked when it was made; one
-    multiplication over the array, the sign kept. The coefficient: the quantity times the factor
-    from the quote currency to the settlement currency, USD or CENT to USD or CENT, so that a
-    price in cents times it is an amount in dollars; every price the batch meets, a quote, a
-    settle or the fixed price, multiplies the coefficient and never the quantity. The offset:
+    The quote quantity: the quantity times the specification's lot size restates a count of the
+    named row in its lot unit, and the unit tables' factor restates that in the conventions'
+    quote quantity unit, both units of the conventions' quantity type, as the index checked when
+    it was made; one multiplication over the array, the sign kept. The coefficient: the quote
+    quantity times the factor from the quote currency to the settlement currency, USD or CENT to
+    USD or CENT, so that a price in cents times it is an amount in dollars; every price the batch
+    meets, a quote, a settle or the fixed price, multiplies the coefficient and never the
+    quantity. The offset:
     minus the coefficient times the fixed price. The groups: the distinct contracts the
     components hold, sorted, which is the schedule's order, and each component's place among
     them, one search; the offsets summed by group, one bincount, so that two occurrences on one

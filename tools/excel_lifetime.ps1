@@ -18,7 +18,11 @@
 #          template deleted and the batch failing with it, both recovered; the batch prepared
 #          against the chain's history and evaluated against its market, a price tick making new
 #          results over the same preparation, a changed fixing making a new history, preparation
-#          and results. check.ps1 runs this group beside core.
+#          and results; the quantity unit changed to the index's barrel row, remaking the
+#          template, the batch, the preparation and the results with the mark following the lot
+#          size; a quantity typed to nothing and back, remaking the batch, the preparation and
+#          the results each time while the template, the history and the market stand. check.ps1
+#          runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is

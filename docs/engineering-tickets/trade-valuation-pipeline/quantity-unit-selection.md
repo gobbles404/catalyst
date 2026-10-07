@@ -198,3 +198,7 @@ lifetime's trades group changes the template's unit to the index's barrel of 42 
 the template, the batch, the preparation and the results publish anew, the mark 7 for two
 barrels where two lots marked 7,000; the kept workbook's four templates lose the column, its
 readers follow, and every number of its blocks stands.
+
+The boundary this page settled, `quantity_unit` as the exact specification name, nothing inferred from it and no size rule for a unit-named row, is recorded with the others under
+[Accepted constraints](README.md#accepted-constraints) in the packet's README, the one record
+the library pages link to.
