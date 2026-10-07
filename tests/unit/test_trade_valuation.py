@@ -410,6 +410,10 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "2026-11-25 to 10076-05-06, expected a payment day on or before 9999-12-31, the last a "
         "sheet can show"
     )
+    long_lag = {**fields, "payment_time_lag": "+" + "9" * 4301 + "bd"}
+    shown = str(ENTRY["_CreateTradeTemplate"]("future", row(*long_lag), row(*long_lag.values())))
+    assert shown.startswith("#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+9999")
+    assert shown.endswith("the sheet's calendar from 1900-03-01 to 9999-12-31 end to end")
 
 
 def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(

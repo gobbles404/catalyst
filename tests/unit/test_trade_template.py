@@ -143,6 +143,11 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
     assert dict(template.defaults) == {"settlement_method": "financial", "route": "bilateral"}
 
 
+# A lag of 4,301 digits fits a cell and would fail Python's own conversion, which refuses more
+# than 4,300 digits with words of its own; the bound names it before any digit is converted.
+LONG_LAG = "+" + "9" * 4301 + "bd"
+
+
 @pytest.mark.parametrize(
     ("fields", "message"),
     [
@@ -192,6 +197,11 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
+        (
+            {"payment_time_lag": LONG_LAG},
+            f"payment_time_lag is {LONG_LAG!r}, expected at most 2,113,146 business days, "
+            "the sheet's calendar from 1900-03-01 to 9999-12-31 end to end",
+        ),
         (
             {"payment_time_lag": "+99999999999999999999bd"},
             "payment_time_lag is '+99999999999999999999bd', expected at most 2,113,1"

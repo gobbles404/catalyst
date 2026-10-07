@@ -134,20 +134,24 @@ def business_days_of(where: str, text: str) -> int:
     strictly after the anchor by the resolution, so zero, which would need a rule for a closed
     anchor, is refused with every other spelling; and at most the business days of the sheet's
     calendar end to end, since a longer lag could pay on no day a cell can show, and a longer
-    number still would overflow the day arithmetic unnamed. The day itself is checked where it
-    is made, against the calendar it is counted on."""
+    number still would fail unnamed, in the day arithmetic or, past 4,300 digits, in Python's
+    own conversion. The day itself is checked where it is made, against the calendar it is
+    counted on."""
     found = _LAG.fullmatch(text)
     if found is None:
         raise ValueError(
             f"{where} is {text!r}, expected a positive whole number of business days, such as +1bd"
         )
-    days = int(found.group(1))
-    if days > MOST_BUSINESS_DAYS:
+    digits = found.group(1)
+    # Counted before any is converted: a cell holds up to 32,767 characters and Python refuses
+    # to convert more than 4,300 digits with words of its own, so a lag with more digits than
+    # the bound has is refused here by name, and only a shorter one is read as a number.
+    if len(digits) > len(str(MOST_BUSINESS_DAYS)) or int(digits) > MOST_BUSINESS_DAYS:
         raise ValueError(
             f"{where} is {text!r}, expected at most {MOST_BUSINESS_DAYS:,} business days, "
             f"the sheet's calendar from {SHEET_FIRST_DAY} to {SHEET_LAST_DAY} end to end"
         )
-    return days
+    return int(digits)
 
 
 def quantity_of(where: str, number: float) -> float:

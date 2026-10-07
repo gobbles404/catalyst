@@ -387,6 +387,16 @@ def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day
         "payment_time_lag row 1 is '+99999999999999999999bd', expected at most 2,113,146 business "
         "days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
     )
+    long_lag = "+" + "9" * 4301 + "bd"  # fits a cell, and would fail Python's own conversion
+    bound = (
+        "expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to "
+        "9999-12-31 end to end"
+    )
+    assert payment_refusal(long_lag) == f"payment_time_lag is {long_lag!r}, {bound}"
+    assert (
+        payment_refusal(long_lag, in_ticket=True)
+        == f"payment_time_lag row 1 is {long_lag!r}, {bound}"
+    )
     longest = int(np.busday_count(day("2026-11-25"), day("9999-12-31")))
     assert longest == 2_080_082
     assert one_payment_day("2026-11-25", (), f"+{longest}bd") == day("9999-12-31")
