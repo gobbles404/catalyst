@@ -387,6 +387,7 @@ $formulas = [ordered]@{
     '=EchoFieldRow("future",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar"
     '=EchoFieldRow("future",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("future",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
+    '=EchoFieldRow("future",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
     '=CountFieldRows("future",EP4:EQ4,EP5:EP7)' = "#ERROR CountFieldRows: fields has 2 headers, expected 1, one per column of rows"
     # The trade template and the trades: a template of the future's six shared fields, the
     # quantity unit the lots specification BY1 names, in EW3, read back through util_ReadHandle
@@ -436,6 +437,7 @@ $formulas = [ordered]@{
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
     '=_CreateTradeTemplate("future",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
     '=_CreateTradeTemplate("future",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
+    '=_CreateTradeTemplate("future",EY1,EY2:EY3)'     = "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     "=_CreateTrades(EB1,EW1:FB1,EW2:FB2,EW3)"    = "#ERROR _CreateTrades: ValueError: quantity_unit is supplied by the template and by the ticket, expected by one of them"
     "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,GP11)"   = "#ERROR _CreateTrades: ValueError: quantity_unit is 'LOT', expected one of the index's specifications: 'lots', 'gal'"
     "=_CreateTrades(EB1,EW4:FA4,EW14:FA14,EW3)"  = "#ERROR _CreateTrades: ValueError: contract_code row 1 is 'F27', expected months the index's schedule has a contract for; it has none for 2027-01"

@@ -241,8 +241,11 @@ time through decision 35's rule, in row order, each cell's text found at its own
 body and each cell named as a scalar handle argument is named, the first bad cell down the
 column whichever way it is bad; a blank
 cell fails as the mixed range refuses it, and leaving a field out is the only way not to
-supply it. The order of failures is the review's decision 11: each argument alone, in signature
-order, the instrument selected, the width, the headers in input order, the cells column by
+supply it. A row of field values is held to its one row before any cell is looked at, since
+#NN, as decision 15 holds every row type: a range one row too tall fails by its shape, whatever
+its extra row holds. The order of failures is the review's decision 11: each argument alone, in
+signature order, the instrument selected, the shape of a row, the width, the headers in input
+order, the cells column by
 column left to right, and then the function, which checks meaning, the template and the
 ticket disjoint, the required fields present, the choices supported. The function receives a
 `FieldValues`, defined in the library, which never imports the seam: the instrument, the fields
