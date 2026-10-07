@@ -646,9 +646,9 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
         row("ICE PHH", "month", "penultimate", "cleared", "physical", "ICE Clear Europe"),
     )
     assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
-        "#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with "
-        "the penultimate method; a penultimate future is cash settled on the business day before "
-        "its contract's expiry"
+        "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
+        "with the penultimate method; a penultimate future is cash settled on the business day "
+        "before its contract's expiry"
     )
 
 

@@ -567,8 +567,8 @@ def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
     [
         (
             dates("2026-11-30", "2026-12-01", "2026-12-31", "2026-12-31", "2026-11-30"),
-            "payment_date of trade 'NG-002' at row 2 is 2026-12-01, expected 2026-11-30, "
-            "the one day Z26 pays",
+            "Z26 pays on 2026-11-30 for trade 'NG-001' at row 1 and on 2026-12-01 for trade 'NG-002"
+            "' at row 2, expected one payment day per contract",
         ),
         (
             dates("2026-11-30", "2026-11-30", "2026-12-29", "2026-12-29", "2026-11-30"),
@@ -996,8 +996,8 @@ def test_a_physical_penultimate_future_is_refused_by_the_kernel() -> None:
     with pytest.raises(ValueError) as refused:
         pen_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement is 'physical', expected 'financial' with the penultimate method; a "
-        "penultimate future is cash settled on the business day before its contract's expiry"
+        "settlement_method is 'physical', expected 'financial' with the penultimate method; a"
+        " penultimate future is cash settled on the business day before its contract's expiry"
     )
 
 

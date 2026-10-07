@@ -525,7 +525,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(34000.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, values[2, 1]);
             var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("NYMEX NG", "month", "penultimate", "cleared", "physical", "CME Clearing"));
-            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
         }
 
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.

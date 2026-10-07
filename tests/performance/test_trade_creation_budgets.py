@@ -116,8 +116,9 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
 # --- the resolution's ledger ----------------------------------------------------------------------
 # The same functions at both sizes, each once or a few times, but for four counts that follow the
 # distinct contract codes of the ticket: each is read once through the period grammar, months_of,
-# period_months and _label_months, and named once for its first row, _Fields.where, which the lag
-# is named for as well. The schedule's 25 codes are read once each, month_and_year, whatever the
+# period_months and _label_months, and named once for its first row, _Fields.where, which the lag,
+# the quantity unit and the four other batch fields are named for as well, the ticket's row or the
+# template's name. The schedule's 25 codes are read once each, month_and_year, whatever the
 # ticket holds. Nothing runs per row.
 
 
@@ -138,7 +139,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "months_of": distinct,
         "period_months": distinct,
         "_label_months": distinct,
-        "_Fields.where": distinct + 2,  # and once for the quantity unit's name
+        "_Fields.where": distinct + 6,  # and once each for the lag and the five batch fields
         "business_days_of": 1,  # one distinct lag
         "_the_payment_terms": 1,
         "schedule_method_of": 1,
@@ -179,13 +180,14 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
 # twice and copies and freezes three columns, the payment offset and the kernel's frozen copies;
 # the quantity rule is one look, whole or not, since zero is a count, zero-quantities.md; and the
 # payment days are one look against the sheet's last day, 31 December 9999, since a later day
-# could reach no cell.
+# could reach no cell; and the distinct codes and the distinct lags are each sorted once by their
+# first rows, so that a refusal names the first bad row and not the first bad spelling.
 def resolution_numpy(contracts: int) -> dict[str, int]:
     return {
         "generic.astype": 2 * contracts,  # each distinct code's two months as counts
         "ndarray.all": 1,
         "ndarray.any": 12,
-        "ndarray.argsort": 4,
+        "ndarray.argsort": 6,  # two of them the distinct texts by their first rows
         "ndarray.astype": 3,
         "ndarray.clip": 1,
         "ndarray.cumsum": 4,

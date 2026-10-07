@@ -258,12 +258,16 @@ def _one_payment_day_per_group(
     pays[group_of_component] = dates  # the last component's day in each group
     differs = pays[group_of_component] != dates
     if differs.any():
+        # Two days in one group: the group's first component and the first that pays on another
+        # day are both named with their days, neither held to be the right one, since the
+        # library cannot know which terms the desk meant.
         k = int(differs.argmax())
-        code = codes[int(terms.contract[k])]
-        day = pays[group_of_component[k]]
+        members = np.flatnonzero(group_of_component == group_of_component[k])
+        a = int(members[0])
+        b = int(members[np.flatnonzero(dates[members] != dates[a])[0]])
         raise ValueError(
-            f"payment_date of {terms.named(k)} is {dates[k]}, expected {day}, "
-            f"the one day {code} pays"
+            f"{codes[int(terms.contract[a])]} pays on {dates[a]} for {terms.named(a)} and on "
+            f"{dates[b]} for {terms.named(b)}, expected one payment day per contract"
         )
     last = np.ones(slot_group.size, dtype=np.bool_)
     last[:-1] = slot_group[1:] != slot_group[:-1]  # each group's last slot, its last observation
