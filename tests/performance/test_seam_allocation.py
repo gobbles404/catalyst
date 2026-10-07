@@ -1017,9 +1017,10 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # masks over them: measured 509,786 bytes at 2,500 rows on 2026-10-04 and 508,917 on 2026-10-06,
 # about 204 a row, which 208 a row and twice the slack cover; the ticket's own columns are the
 # seam's views and cost nothing here. The expiries are rolled off the index's two holidays, so
-# that Z26 expires on 24 December and not on the closed 25th, and the call is checked to have
-# published a batch: from #140 to #146 the expiries were rolled on weekends alone, every call
-# measured was the closed-day refusal, 384,835 bytes, and nothing noticed.
+# that Z26 expires on 24 December and not on the closed 25th, and every call measured is checked,
+# inside the measured call, to have published a batch: from #140 to #146 the expiries were rolled
+# on weekends alone, every call measured was the closed-day refusal, 384,835 bytes, and nothing
+# noticed.
 def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() -> None:
     letters = "FGHJKMNQUVXZ"
     months = np.arange("2026-10", "2028-11", dtype="datetime64[M]")
@@ -1073,7 +1074,13 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
             for i in range(rows)
         ]
     )
-    batch = ENTRY["_CreateTrades"](ix, headers, body, template)
-    assert isinstance(batch, str) and re.fullmatch(r"\d+:trades:gas:\d+", batch), batch
-    peak = least_peak(lambda: ENTRY["_CreateTrades"](ix, headers, body, template))
+
+    def created() -> str:
+        # Asserted inside the measured call, so each of the calls measured, the warm-ups as much
+        # as the traced ones, is a batch published and never a refusal.
+        batch = ENTRY["_CreateTrades"](ix, headers, body, template)
+        assert isinstance(batch, str) and re.fullmatch(r"\d+:trades:gas:\d+", batch), batch
+        return batch
+
+    peak = least_peak(created)
     assert peak <= 208 * rows + 2 * SLACK
