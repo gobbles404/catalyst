@@ -434,6 +434,7 @@ $formulas = [ordered]@{
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
     '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday or penultimate, the two methods built"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
+    '=_CreateTradeTemplate("future",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
     '=_CreateTradeTemplate("future",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
     "=_CreateTrades(EB1,EW1:FB1,EW2:FB2,EW3)"    = "#ERROR _CreateTrades: ValueError: quantity_unit is supplied by the template and by the ticket, expected by one of them"
     "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,GP11)"   = "#ERROR _CreateTrades: ValueError: quantity_unit is 'LOT', expected one of the index's specifications: 'lots', 'gal'"

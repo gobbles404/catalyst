@@ -383,6 +383,35 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
 
+def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_librarys_words(
+    toy: dict[str, Any],
+) -> None:
+    # The grammar's bound is the template's to refuse, the day the batch's: a lag of three million
+    # business days reads as a lag, and the batch it would make pays Z26 in the year 10076, which
+    # no cell could show, so nothing is published and nothing unnamed reaches the sheet.
+    fields = {
+        **NG_TEMPLATE,
+        "quantity_unit": "TOY",
+        "settlement_method": "financial",
+        "clearing_house": "TEST_CLEARER",
+        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")])),
+    }
+    beyond = {**fields, "payment_time_lag": "+99999999999999999999bd"}
+    assert ENTRY["_CreateTradeTemplate"]("future", row(*beyond), row(*beyond.values())) == (
+        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is "
+        "'+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's "
+        "calendar from 1900-03-01 to 9999-12-31 end to end"
+    )
+    far = {**fields, "payment_time_lag": "+2100000bd"}
+    template = ENTRY["_CreateTradeTemplate"]("future", row(*far), row(*far.values()))
+    assert ":trade_template:" in str(template)  # a lag the template cannot yet see past
+    assert ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template) == (
+        "#ERROR _CreateTrades: ValueError: payment_time_lag is '+2100000bd', counted from "
+        "2026-11-25 to 10076-05-06, expected a payment day on or before 9999-12-31, the last a "
+        "sheet can show"
+    )
+
+
 def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(
     toy: dict[str, Any],
 ) -> None:

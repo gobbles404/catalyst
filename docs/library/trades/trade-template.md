@@ -46,7 +46,7 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 | `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
 | `quantity_unit` | any nonempty text, held as typed: it names one of the index's specifications, and the template has no index to ask, so `_CreateTrades` checks the name against the index it is given | nothing here; `quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'` at `_CreateTrades` |
 | `quantity_per` | `month`, the one basis built | `quantity_per is 'day', expected month, the one basis built` |
-| `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd` |
+| `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, at most the 2,113,146 of the sheet's calendar end to end since #NN, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd`; `payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end` |
 | `contract_code` | a contract or strip the period grammar reads, in either case | `contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
 | `quantity` | a whole count of the quantity unit, zero included since #146, a row kept ready, the kernel's own rule | `quantity is 1.5, expected a whole number` |
 | `fixed_price` | a finite number, the kernel's own rule | `fixed_price is inf, expected a finite price` |
@@ -77,7 +77,7 @@ The same template supplies its fields to one or many ticket rows. Template field
 |---|---|
 | NYMEX NG and lastday make the page's template; one field and the NG template's six take one path; each value the scalar its type names and a calendar the object itself; a unit held as typed, the index asked later | `tests/unit/test_trade_template.py` |
 | A template selects its instrument for a ticket; a field the ticket must supply is not required | the same |
-| Fifteen values against their fields' rules refused naming the field, a fraction of a quantity, an infinite quantity and an infinite price among them; a quantity of zero, negative zero too, held as a row kept ready; a template's numbers passing the kernel's rules; the builder takes one row | the same |
+| Sixteen values against their fields' rules refused naming the field, a fraction of a quantity, an infinite quantity, an infinite price and a lag beyond the sheet's calendar among them; the two days the lag is held to the seam's own, pinned; a quantity of zero, negative zero too, held as a row kept ready; a template's numbers passing the kernel's rules; the builder takes one row | the same |
 | The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 26 in all |
 | One read per value and one publication, 2,331 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
 | A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |

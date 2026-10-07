@@ -2,7 +2,8 @@
 template's row and taken, last and required, by every batch of trades whose ticket supplies the
 rest. The template retains the definition and its own values and no index, so one template
 serves every compatible index. It reads each value it holds for the rule intrinsic to its field,
-a code from its list, a lag of positive business days, a contract code or strip the period
+a code from its list, a lag of positive business days within the sheet's calendar, a contract
+code or strip the period
 grammar reads, a whole quantity, zero included, a finite price, and leaves the rules that need
 the
 ticket or the index, which fields are required, whether the two overlap, the schedule, to the
@@ -117,17 +118,36 @@ def quantity_per_of(where: str, text: str) -> QuantityPer:
 
 _LAG: Final = re.compile(r"\+([1-9]\d*)bd")
 
+# The sheet's calendar, as the seam holds it: serial 61, 1 March 1900, the first day Excel's
+# serials and the real calendar agree on, to serial 2958465, 31 December 9999, the last day a
+# cell can show. A payment day outside it could never reach a cell, so a lag is held to it
+# here, where the lag is read, and the day it makes is held to it where the day is made.
+SHEET_FIRST_DAY: Final = np.datetime64("1900-03-01", "D")
+SHEET_LAST_DAY: Final = np.datetime64("9999-12-31", "D")
+# The business days from the first day to the last, Monday to Friday: the most a lag can count
+# between two days a sheet can show, since a holiday calendar only lowers the count.
+MOST_BUSINESS_DAYS: Final = int(np.busday_count(SHEET_FIRST_DAY, SHEET_LAST_DAY))
+
 
 def business_days_of(where: str, text: str) -> int:
     """The positive whole number of business days a payment lag states, `+1bd` or `+2bd`: counted
     strictly after the anchor by the resolution, so zero, which would need a rule for a closed
-    anchor, is refused with every other spelling."""
+    anchor, is refused with every other spelling; and at most the business days of the sheet's
+    calendar end to end, since a longer lag could pay on no day a cell can show, and a longer
+    number still would overflow the day arithmetic unnamed. The day itself is checked where it
+    is made, against the calendar it is counted on."""
     found = _LAG.fullmatch(text)
     if found is None:
         raise ValueError(
             f"{where} is {text!r}, expected a positive whole number of business days, such as +1bd"
         )
-    return int(found.group(1))
+    days = int(found.group(1))
+    if days > MOST_BUSINESS_DAYS:
+        raise ValueError(
+            f"{where} is {text!r}, expected at most {MOST_BUSINESS_DAYS:,} business days, "
+            f"the sheet's calendar from {SHEET_FIRST_DAY} to {SHEET_LAST_DAY} end to end"
+        )
+    return days
 
 
 def quantity_of(where: str, number: float) -> float:

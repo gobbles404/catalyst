@@ -338,6 +338,64 @@ def test_payment_days_are_counted_strictly_after_the_expiry() -> None:
     assert one_payment_day("2026-11-25", (), "+1bd") == day("2026-11-26")  # no holiday given
 
 
+def payment_refusal(lag: str, in_ticket: bool = False) -> str:
+    """The refusal of one Z26 lot, its expiry 25 November 2026, under that lag on a payment calendar
+    closing nothing, the lag in the template or, when asked, in the ticket's own column."""
+    ix = an_index(
+        "pay",
+        (("X26", "2026-10-28"), ("Z26", "2026-11-25")),
+        holidays=(),
+        lots=(("TOY", 10_000.0, "MMBTU"),),
+    )
+    ticket: dict[str, list[object]] = {
+        "trade_id": ["p"],
+        "trade_date": ["2026-09-24"],
+        "contract_code": ["Z26"],
+        "quantity": [1],
+        "fixed_price": [3.0],
+    }
+    template = {
+        **TOY_TEMPLATE,
+        "payment_time_lag": lag,
+        "payment_holiday_calendar": holiday_calendar(dates()),
+    }
+    if in_ticket:
+        return refused(
+            ix,
+            {**ticket, "payment_time_lag": [lag]},
+            {k: v for k, v in template.items() if k != "payment_time_lag"},
+        )
+    return refused(ix, ticket, template)
+
+
+def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day() -> None:
+    # Representability and no term of business: a day past 31 December 9999 could reach no cell,
+    # so the lag that would pay there is refused naming the lag, the anchor and the day, with
+    # the row when the ticket supplied it, and the longest lag that still pays on the last day
+    # is taken: from Z26's 25 November 2026 that is 2,080,082 business days on an open calendar.
+    # A lag beyond the sheet's whole calendar, 2,113,146 business days, is refused by the grammar
+    # before any day is counted, so no number overflows the arithmetic unnamed.
+    assert payment_refusal("+2100000bd") == (
+        "payment_time_lag is '+2100000bd', counted from 2026-11-25 to 10076-05-06, "
+        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+    )
+    assert payment_refusal("+2100000bd", in_ticket=True) == (
+        "payment_time_lag row 1 is '+2100000bd', counted from 2026-11-25 to 10076-05-06, "
+        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+    )
+    assert payment_refusal("+99999999999999999999bd", in_ticket=True) == (
+        "payment_time_lag row 1 is '+99999999999999999999bd', expected at most 2,113,146 business "
+        "days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
+    )
+    longest = int(np.busday_count(day("2026-11-25"), day("9999-12-31")))
+    assert longest == 2_080_082
+    assert one_payment_day("2026-11-25", (), f"+{longest}bd") == day("9999-12-31")
+    assert payment_refusal(f"+{longest + 1}bd") == (
+        "payment_time_lag is '+2080083bd', counted from 2026-11-25 to 10000-01-03, "
+        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+    )
+
+
 def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     # Each row's calendar closes a day that would move the other row's payment and not its
     # own: the first closes 26 November, the day after Z26 expires, the second 31 December,
