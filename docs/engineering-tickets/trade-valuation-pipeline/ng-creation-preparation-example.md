@@ -62,9 +62,9 @@ With the ticket's five columns below, every field the `future` definition requir
 once: `payment_time_lag` and `payment_holiday_calendar` are required only when
 `settlement_method` is `financial`, and this physical contract supplies neither; `trade_id` and
 `broker` are optional, and the ticket carries the first. `CME Clearing` is a label retained as
-typed, and nothing is inferred from it. `lastday` and `penultimate` are built;
+typed, and nothing is inferred from it. `lastday`, `penultimate` and `last3day` are built;
 under `lastday` a future valued on its own contract's mark names the settlement on the contract's
-last trading day as the final price, and `asian` and `last3day` fail by name until built. The index is
+last trading day as the final price, and `asian` fails by name until built. The index is
 not a template field: it is the argument of the call, so this template serves another NG index
 whose specifications name `NYMEX NG` and fails, by name, against one whose do not.
 

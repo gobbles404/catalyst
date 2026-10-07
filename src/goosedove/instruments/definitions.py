@@ -88,8 +88,8 @@ FUTURE = Instrument(
             NONE,
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
-            "A library rule selected by the trade; lastday and penultimate are built, the others "
-            "fail by name until they are",
+            "A library rule selected by the trade; lastday, penultimate and last3day are built, "
+            "asian fails by name until it is",
         ),
         Field(
             "route",

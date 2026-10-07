@@ -17,7 +17,7 @@ whether those desk terms are synonyms is needed for this scope.
 
 The candidate methods are `asian`, `lastday`, `penultimate` and `last3day`. Use
 `penultimate` as the proposed canonical spelling rather than introducing a second `pen`
-alias. `lastday` and `penultimate` are built; `asian` and `last3day` fail by name until they are,
+alias. `lastday`, `penultimate` and `last3day` are built; `asian` fails by name until it is,
 never accepted and ignored. Their precise definitions remain proposals for review:
 
 | schedule_method | Static observations selected | Proposed weights |
@@ -240,7 +240,7 @@ product/profile can narrow it.
 | start_date, end_date | Explicit contractually chosen period where supported; otherwise derived from the selected contract and not independently overrideable |
 | settle_freq, settle_time_lag | Use payment_time_lag for the agreed lag string, such as "+1bd", with payment_holiday_calendar and a product-defined anchor; payment frequency stays separate |
 | quantity_per | V1 month or day only; proposed day meaning is calendar day, independently of pricing-day weights |
-| schedule_method | Trade-selected library definition: asian, lastday, penultimate or last3day; lastday supported first; exact and cfd excluded from v1 |
+| schedule_method | Trade-selected library definition: asian, lastday, penultimate or last3day; lastday, penultimate and last3day built; exact and cfd excluded from v1 |
 | quantity, quantity_unit | Explicit signed amount and measure; reference-compatible conversion and lot rules are static work |
 | fixed_price | Chosen name for the agreed fixed price in the future schema as well; replaces the proposed trade_price name without adding an alias |
 | index_spread | A possible contractual adjustment to the floating reference; define sign, price units, weighting and payment treatment before enabling it |

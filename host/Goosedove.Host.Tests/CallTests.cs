@@ -197,7 +197,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("NYMEX NG", "NYMEX NG") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday or penultimate, the two methods built" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday, penultimate or last3day, the three methods built" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("payment_time_lag"), "+0bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
@@ -526,6 +526,57 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, values[2, 1]);
             var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("NYMEX NG", "month", "penultimate", "cleared", "physical", "CME Clearing"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
+        }
+
+        // The last three pricing days, last3day-trades.md: the synthetic index of X26, Z26 and F27,
+        // 46356, 46363 and 46394, closed on 4 December, 46360, one specification UNIT of one MMBTU;
+        // the template last3day, cleared, financial, paying two weekdays after the last observation;
+        // A, 60 of Z26 at 70, and B, -30 at 72. The batch observes the 2nd, 3rd and 7th, 46358,
+        // 46359 and 46363, a third each, and pays the 9th, 46365; on 3 December, the 2nd fixed at
+        // 71, the mark is 150, the cash 0 and the delta 20; a tick to 75 marks 170 on the same
+        // preparation while the first results stand; a physical last3day template makes no batch.
+        [Fact]
+        public void a_last3day_batch_observes_three_days_a_third_each_and_pays_after_the_last()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46363.0, 46394.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46360.0);
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
+            var index = (string)Seam.Call("_CreateIndex", "SYN", schedule, conventions, specifications, holidays);
+            var weekdays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("UNIT", "month", "last3day", "cleared", "financial", "Prototype Clearing", "+2bd", weekdays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var rows = new object[,] { { "A", 46346.0, "Z26", 60.0, 70.0 }, { "B", 46346.0, "Z26", -30.0, 72.0 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
+            var spill = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal("last3day", spill[2, 4]);
+            Assert.Equal(46365.0, spill[2, 13]);
+            Assert.Equal(46365.0, spill[3, 13]);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46359.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46358.0, 46357.0), Column(71.0, 70.0), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(5, slots.GetLength(0));
+            Assert.Equal(46358.0, slots[2, 1]);
+            Assert.Equal(46359.0, slots[3, 1]);
+            Assert.Equal(46363.0, slots[4, 1]);
+            Assert.Equal(true, slots[2, 2]);
+            Assert.Equal(false, slots[3, 2]);
+            Assert.Equal(0.0, slots[2, 4]);
+            Assert.Equal(10.0, (double)slots[4, 4], 6);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "SYN", Column(74.0, 80.0)));
+            var results = (string)Seam.Call("_EvaluateTrades", prepared, market);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(150.0, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            var ticked = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "SYN", Column(75.0, 80.0))));
+            Assert.Equal(170.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
+            Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("UNIT", "month", "last3day", "cleared", "physical", "Prototype Clearing"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method; a last3day future is cash settled on the average of its last three pricing days", Seam.Call("_CreateTrades", index, headers, rows, physical));
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and

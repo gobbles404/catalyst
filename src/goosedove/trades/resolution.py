@@ -5,8 +5,8 @@ their condition holds, one quantity unit, method, route, settlement and basis fo
 that order, the quantity unit naming one of the index's specifications, every code of the index's
 schedule read for its month once, each contract code or strip of the ticket resolved by month to
 the schedule's rows, the schedule method's observations made once, and for a financial settlement
-each component's payment day counted strictly after its observation day on the payment calendar.
-Then the kernel:
+each component's payment day counted strictly after its last observation day on the payment
+calendar. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -112,12 +112,13 @@ def resolved(
     through the period grammar, in either case, for the months it spans, and each month is
     resolved to its schedule row, a month the schedule lacks refused by the trade's row and the
     month; a strip makes one component per month, in order, all on the one occurrence.
-    The schedule method gives each component its observation day, the expiry under lastday and
-    the business day before it under penultimate. For a financial settlement, each occurrence's
-    lag is read once per distinct text and each component pays that many business days strictly
-    after its observation day, counted on its occurrence's payment calendar with Monday to Friday
-    eligible, the observation day itself rolled back first so that a day the payment calendar
-    closes is not counted; the rule of the two methods built, a later method stating its own.
+    The schedule method gives each component its observation days, the expiry under lastday, the
+    business day before it under penultimate, and the expiry and the two business days before it
+    under last3day, a third each. For a financial settlement, each occurrence's lag is read once
+    per distinct text and each component pays that many business days strictly after its last
+    observation day, counted on its occurrence's payment calendar with Monday to Friday eligible,
+    that day itself rolled back first so that a day the payment calendar closes is not counted;
+    the rule of the three methods built, a later method stating its own.
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, and a financial settlement with penultimate.
 
@@ -143,7 +144,9 @@ def resolved(
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract = _the_contracts(fields, months)
     observations = observed(schedule_method, index, contract)
-    payment = _the_payment_terms(settlement, fields, observations.date, occurrence)
+    payment = _the_payment_terms(
+        settlement, fields, _last_days(observations, occurrence.size), occurrence
+    )
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     terms = resolved_trades(
@@ -388,6 +391,17 @@ def _month(count: object) -> str:
 # --- the payment days of a financial settlement ---------------------------------------------
 
 
+def _last_days(observations: Observations, components: int) -> NDArray[np.datetime64]:
+    """Each component's last observation day, the anchor its payment counts from: the observations
+    are in component order, each component's days increasing and every component holding at
+    least one, so the last of each sits just before the first of the next, however many a
+    method gives; one search over the components for the position after each."""
+    after = np.searchsorted(
+        observations.component, np.arange(components, dtype=np.intp), side="right"
+    )
+    return observations.date[after - 1]
+
+
 def _the_payment_terms(
     settlement: Settlement,
     fields: _Fields,
@@ -396,7 +410,8 @@ def _the_payment_terms(
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's lag in business days and
     its payment calendar, retained, and each component's payment day, the lag counted strictly
-    after its anchor, its one observation day under the two methods built, on that calendar,
+    after its anchor, its last observation day, the one day under lastday and penultimate and
+    the third under last3day, on that calendar,
     Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
     on or before it first, so that a day the calendar closes is not itself counted; one busday
     offset over the components on each distinct calendar. Each day made is on or before the

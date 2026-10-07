@@ -433,7 +433,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(EW13))"       = "4"
     "=COLUMNS(util_ReadHandle(EW13))"    = "16"
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
-    '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday or penultimate, the two methods built"
+    '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate or last3day, the three methods built"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
     '=_CreateTradeTemplate("future",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
     '=_CreateTradeTemplate("future",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
@@ -538,6 +538,27 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
     "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
+    # The last three pricing days: the batch in HS5 under the last3day template in HJ3, two trades
+    # of Z26 on the synthetic index, observing 2, 3 and 7 December and paying the 9th, 46365;
+    # prepared on 3 December in HY14, the 2nd fixed at 71 and the two later days live at 74, the
+    # mark 150, no cash and a delta of 20, the three slots read back; a physical last3day refused
+    # by the kernel.
+    "=INDEX(util_ReadHandle(HS5),3,5)"   = "last3day"
+    "=INDEX(util_ReadHandle(HS5),3,14)"  = "46365"
+    "=INDEX(util_ReadHandle(HS5),4,14)"  = "46365"
+    "=ROWS(util_ReadHandle(HY14))"       = "5"
+    "=INDEX(util_ReadHandle(HY14),3,2)"  = "46358"
+    "=INDEX(util_ReadHandle(HY14),4,2)"  = "46359"
+    "=INDEX(util_ReadHandle(HY14),5,2)"  = "46363"
+    "=INDEX(util_ReadHandle(HY14),3,3)"  = "TRUE"
+    "=INDEX(util_ReadHandle(HY14),4,3)"  = "FALSE"
+    "=INDEX(util_ReadHandle(HY14),3,5)"  = "0"
+    "=INDEX(util_ReadHandle(HY14),5,5)"  = "10"
+    "=INDEX(_ReportValues(HY15),3,1)"    = "150"
+    "=INDEX(_ReportValues(HY15),3,2)"    = "0"
+    "=INDEX(_ReportRisk(HY15),3,1)"      = "20"
+    "=INDEX(util_ReadHandle(HY15),4,6)"  = "20"
+    "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method; a last3day future is cash settled on the average of its last three pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -936,6 +957,51 @@ $cells = [ordered]@{
     # by the index, whose specifications are lots and gal, when a batch is made under it.
     "GP10" = "LOT"; "GQ10" = "month"; "GR10" = "lastday"; "GS10" = "cleared"; "GT10" = "physical"; "GU10" = "CME Clearing"
     "GP11" = '=_CreateTradeTemplate("future",GP1:GU1,GP10:GU10)'
+    # The last three pricing days, last3day-trades.md: the synthetic index of X26, Z26 and F27
+    # expiring 30-Nov-2026, 7-Dec-2026 and 7-Jan-2027 in HA1:HB3 and its schedule in HA4, the
+    # pricing calendar closed on 4 December in HC1 over HC3, the energy conventions in HD1, one
+    # specification UNIT of one MMBTU in HE2:HI2 under the headers in EI1:EM1 and in HE1, the
+    # index SYN in HA5; a payment calendar closed on New Year's Day alone in HC2 over HC4; the
+    # template in HJ3 over its eight fields in HJ1:HQ2, last3day, cleared, financial, paying two
+    # business days after the last observation on that calendar; the ticket's headers and two
+    # rows, A, 60 of Z26 at 70, and B, -30 at 72, in HS1:HW3, and their batch in HS5; the
+    # valuation day, 3-Dec-2026 at midday, in HY1 and HY2, the settles of 2 and 1 December newest
+    # first in HY3:HZ4, the calendar, the fixings and the history in HY6:HY8, the quotes 74 and
+    # 80 in HY10:HY11, the vector and the market in HY12:HY13, the batch prepared in HY14 and
+    # evaluated in HY15; and a physical last3day template over six fields in HJ6, which no batch
+    # can be made under.
+    "HA1" = "X26"; "HB1" = "30-Nov-2026"
+    "HA2" = "Z26"; "HB2" = "7-Dec-2026"
+    "HA3" = "F27"; "HB3" = "7-Jan-2027"
+    "HA4" = "=_CreateFuturesSchedule(HA1:HA3,HB1:HB3)"
+    "HC3" = "4-Dec-2026"; "HC4" = "1-Jan-2026"
+    "HC1" = "=_CreateHolidayCalendar(HC3)"
+    "HC2" = "=_CreateHolidayCalendar(HC4)"
+    "HD1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
+    "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
+    "HA5" = '=_CreateIndex("SYN",HA4,HD1,HE1,HC1)'
+    "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_time_lag"; "HQ1" = "payment_holiday_calendar"
+    "HJ2" = "UNIT"; "HK2" = "month"; "HL2" = "last3day"; "HM2" = "cleared"; "HN2" = "financial"; "HO2" = "Prototype Clearing"; "HP2" = "+2bd"; "HQ2" = "=HC2"
+    "HJ3" = '=_CreateTradeTemplate("future",HJ1:HQ1,HJ2:HQ2)'
+    "HJ5" = "UNIT"; "HK5" = "month"; "HL5" = "last3day"; "HM5" = "cleared"; "HN5" = "physical"; "HO5" = "Prototype Clearing"
+    "HJ6" = '=_CreateTradeTemplate("future",HJ1:HO1,HJ5:HO5)'
+    "HS1" = "trade_id"; "HT1" = "trade_date"; "HU1" = "contract_code"; "HV1" = "quantity"; "HW1" = "fixed_price"
+    "HS2" = "A"; "HT2" = "20-Nov-2026"; "HU2" = "Z26"; "HV2" = "60"; "HW2" = "70"
+    "HS3" = "B"; "HT3" = "20-Nov-2026"; "HU3" = "Z26"; "HV3" = "-30"; "HW3" = "72"
+    "HS5" = "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ3)"
+    "HY1" = "3-Dec-2026"
+    "HY2" = "=_CreateValuationDate(HY1,0.5)"
+    "HY3" = "2-Dec-2026"; "HZ3" = "71"
+    "HY4" = "1-Dec-2026"; "HZ4" = "70"
+    "HY6" = "=_CreateCalendar(HY2,HA5)"
+    "HY7" = "=_CreateFuturesFixings(HY3:HY4,HZ3:HZ4,HA5)"
+    "HY8" = "=_CreateMarketHistory(HY6,HY7)"
+    "HY10" = "74"; "HY11" = "80"
+    "HY12" = '=_CreatePriceVector("SYN",HY10:HY11)'
+    "HY13" = "=_CreateMarket(HY8,HY12)"
+    "HY14" = "=_PrepareTrades(HS5,HY8)"
+    "HY15" = "=_EvaluateTrades(HY14,HY13)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
