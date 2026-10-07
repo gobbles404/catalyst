@@ -14,6 +14,7 @@ change that removes one lowers the ceiling in its own PR.
 """
 
 import ctypes
+import re
 import tracemalloc
 from collections.abc import Callable
 
@@ -1013,22 +1014,30 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # occurrence and component, and the observations' component, day, weight and slot by observation,
 # one per component under lastday, and on the way makes the months, the rows, the anchors and the
 # payment days of the components, the references and the sort that finds the slots, and the
-# masks over them: measured 509,786 bytes at 2,500 rows, about 204 a row, which 208 a row and
-# twice the slack cover; the ticket's own columns are the seam's views and cost nothing here.
+# masks over them: measured 509,786 bytes at 2,500 rows on 2026-10-04 and 508,917 on 2026-10-06,
+# about 204 a row, which 208 a row and twice the slack cover; the ticket's own columns are the
+# seam's views and cost nothing here. The expiries are rolled off the index's two holidays, so
+# that Z26 expires on 24 December and not on the closed 25th, and the call is checked to have
+# published a batch: from #140 to #146 the expiries were rolled on weekends alone, every call
+# measured was the closed-day refusal, 384,835 bytes, and nothing noticed.
 def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() -> None:
     letters = "FGHJKMNQUVXZ"
     months = np.arange("2026-10", "2028-11", dtype="datetime64[M]")
     codes = [f"{letters[int(m.astype(int)) % 12]}{str(m)[2:4]}" for m in months]
-    expiries = np.busday_offset(
-        months.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, roll="backward"
-    )
     first = np.datetime64("1899-12-30", "D")
+    closed = [46381.0, 46388.0]  # 25 December 2026 and New Year's Day
+    expiries = np.busday_offset(
+        months.astype("datetime64[D]") + np.timedelta64(24, "D"),
+        0,
+        roll="backward",
+        holidays=first + np.array(closed, dtype=np.int64).astype("timedelta64[D]"),
+    )
     schedule = ENTRY["_CreateFuturesSchedule"](
         Cells.from_rows([[code] for code in codes]),
         Cells.from_rows([[float((day - first).astype(np.int64))] for day in expiries]),
         MISSING,
     )
-    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46381.0], [46388.0]]))
+    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[day] for day in closed]))
     conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
         Cells.from_rows(
@@ -1064,5 +1073,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
             for i in range(rows)
         ]
     )
+    batch = ENTRY["_CreateTrades"](ix, headers, body, template)
+    assert isinstance(batch, str) and re.fullmatch(r"\d+:trades:gas:\d+", batch), batch
     peak = least_peak(lambda: ENTRY["_CreateTrades"](ix, headers, body, template))
     assert peak <= 208 * rows + 2 * SLACK

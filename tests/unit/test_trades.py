@@ -6,6 +6,7 @@ against a real market, every hand answer of the pages pinned, the batch equal to
 summed, duplicates counting, a fixed batch inside a live market, an expired physical component
 refused, the daily toy's four states and the offsetting dates, and nothing redone on a tick."""
 
+import itertools
 import re
 from typing import Any, cast
 
@@ -297,6 +298,10 @@ GAS_DAILY = index(
             "quantity of trade 'NG-003' at row 3 is nan, expected a whole number",
         ),
         (
+            {"quantity": numbers(10, -4, np.inf, -12, 10)},
+            "quantity of trade 'NG-003' at row 3 is inf, expected a whole number",
+        ),
+        (
             {"fixed_price": numbers(3.1, 3.15, 3.4, np.inf, 3.1)},
             "fixed_price of trade 'NG-004' at row 4 is inf, expected a finite price",
         ),
@@ -478,6 +483,71 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
     np.testing.assert_allclose(result.delta, [delta])
     assert result.delta_total == pytest.approx(delta)
     assert result.delta_unit == "USD per CENT/MMBTU" and result.currency == "USD"
+
+
+# Quoted in dollars and settled in cents, the other way round from CENTS: four rows on the toy's
+# four contracts, a strip among them, valued live on 20 November. By hand, in dollars: Z26's
+# six lots at 3.10 against 3.20 make 6,000; F27's two lots sold at 3.40 against 3.50 make
+# -2,000; the strip's lot sold at 3.55 makes +500 on F27 against 3.50 and -1,000 on G27 against
+# 3.65. The mark is 3,500 dollars, 350,000 cents, and a dollar's move is 100 cents per MMBTU of
+# exposure: the coefficient is the quote quantity times 100, the delta 6,000,000, -3,000,000 and
+# -1,000,000 cents per dollar per MMBTU, and the unit names both currencies.
+CENT_SETTLED = index(
+    "cents settled",
+    futures_schedule(
+        ("X26", "Z26", "F27", "G27"),
+        dates("2026-10-28", "2026-11-25", "2026-12-29", "2027-01-27"),
+        None,
+    ),
+    index_conventions("USD", "MMBTU", "CENT", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("NG",), numbers(10_000.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
+    ),
+    holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01")),
+    UNITS,
+)
+
+
+def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None:
+    terms = resolved_trades(
+        FUTURE, CENT_SETTLED, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH, ("A", "B", "C", "D"), None, None, dates(*["2026-09-24"] * 4),
+        rows(0, 1, 2, 2, 3), rows(1, 2, 2, 3, 1), numbers(3, -2, -1, -1, 3),
+        numbers(3.10, 3.40, 3.55, 3.55, 3.10), None,
+    )  # fmt: skip
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    np.testing.assert_array_equal(enc.quote_quantity, [30_000, -20_000, -10_000, -10_000, 30_000])
+    np.testing.assert_allclose(enc.coefficient, enc.quote_quantity * 100)
+    history = history_on(CENT_SETTLED, "2026-11-20", {})
+    prep = prepared_trades(enc, history, counter)
+    result = trade_results(prep, quoted(history, 3.20, 3.50, 3.65), counter)
+    assert result.mark == pytest.approx(350_000) and result.cash == 0
+    np.testing.assert_allclose(result.delta, [6_000_000, -3_000_000, -1_000_000])
+    assert result.delta_total == pytest.approx(2_000_000)
+    assert result.codes() == ("Z26", "F27", "G27")
+    assert result.delta_unit == "CENT per USD/MMBTU" and result.currency == "CENT"
+
+
+# Fees are reserves, outside value: the index's brokerage and clearing rates per lot change no
+# offset, no mark and no delta, the owner's decision the valuation pages record.
+def test_fees_per_lot_are_reserves_and_move_no_value() -> None:
+    with_fees = index(
+        "Henry Hub NYMEX",
+        NG.schedule,
+        NG.conventions,
+        contract_specifications(
+            ("NYMEX NG",), numbers(10_000.0), ("MMBTU",), numbers(12.5), numbers(3.75), UNITS
+        ),
+        NG.holiday_calendar,
+        UNITS,
+    )
+    plain, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
+    charged, _ = evaluated(with_fees, "2026-11-24", {}, (3.20, 3.50))
+    assert charged.mark == pytest.approx(plain.mark) == pytest.approx(7_000)
+    np.testing.assert_array_equal(charged.delta, plain.delta)
+    np.testing.assert_array_equal(charged.delta, [160_000, -50_000])
+    np.testing.assert_array_equal(charged.prepared.encoded.offset, plain.prepared.encoded.offset)
 
 
 def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
@@ -670,6 +740,29 @@ def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -
         "market is over another history of index 'Henry Hub NYMEX', "
         "expected the one the trades were prepared against"
     )
+
+
+def test_a_corrected_history_of_the_same_day_is_another_history_until_prepared_again() -> None:
+    # The toy on 26 November with Z26's final at 3.22, and the same index on the same day with
+    # the final corrected to 3.23: the market over the corrected history is refused by object,
+    # the index and the day being the same, and preparing again against it gives the page's
+    # 11,800 where the first history gave 10,200.
+    terms = terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    first = history_on(TOY, "2026-11-26", {"Z26": 3.22})
+    corrected = history_on(TOY, "2026-11-26", {"Z26": 3.23})
+    prep = prepared_trades(enc, first, WorkCounter())
+    on_first = trade_results(prep, quoted(first, 3.50, 3.60), WorkCounter())
+    assert on_first.mark == pytest.approx(10_200)
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(corrected, 3.50, 3.60), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'TOY_GAS', "
+        "expected the one the trades were prepared against"
+    )
+    again = prepared_trades(enc, corrected, WorkCounter())
+    on_corrected = trade_results(again, quoted(corrected, 3.50, 3.60), WorkCounter())
+    assert on_corrected.mark == pytest.approx(11_800)
 
 
 def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market() -> None:
@@ -1431,6 +1524,56 @@ def test_an_all_zero_batch_values_to_nothing_with_its_axis_kept() -> None:
     assert counter.freeze()["live_prices_read"] == 2
 
 
+def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -> None:
+    # The zero row on Z26 sorts before the held F27: Z26 stays on the axis at nothing and F27
+    # carries the lot, so a delta on the wrong contract would show while the mark and the total
+    # stayed right. By hand: one lot of F27 sold at 3.30 against 3.40 is -1,000, and -10,000
+    # per dollar on F27 alone.
+    first_nothing = resolved_trades(
+        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH, ("ENTRY-002", "NG-001"), None, None, dates("2026-10-06", "2026-10-06"),
+        rows(0, 1), rows(1, 2), numbers(0.0, -1.0), numbers(3.0, 3.3), None,
+    )  # fmt: skip
+    history = history_on(NG, "2026-11-24", {})
+    prep = prepared_trades(
+        encoded(first_nothing, observed_of(first_nothing), UNITS, WorkCounter()),
+        history,
+        WorkCounter(),
+    )
+    result = trade_results(prep, quoted(history, 3.10, 3.40), WorkCounter())
+    assert result.mark == pytest.approx(-1_000) and result.delta_total == pytest.approx(-10_000)
+    np.testing.assert_array_equal(result.delta, [0, -10_000])
+    assert result.codes() == ("Z26", "F27")
+
+
+def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
+    # Two lots of Z26 at 3.00, a row of F27 at 3.30 kept ready, one lot of Z26 sold at 3.05 and
+    # a row of F27 at 3.20 kept ready, against 3.10 and 3.40. By hand: 2,000 less 500 is 1,500 of
+    # mark, 10,000 of delta on Z26 and nothing on F27, in whichever of the 24 orders the rows come.
+    given_rows = (
+        ("A", 1, 2.0, 3.00),
+        ("B", 2, 0.0, 3.30),
+        ("C", 1, -1.0, 3.05),
+        ("D", 2, 0.0, 3.20),
+    )
+    history = history_on(NG, "2026-11-24", {})
+    for order in itertools.permutations(given_rows):
+        labels, contracts, quantities, prices = zip(*order, strict=True)
+        terms = resolved_trades(
+            FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
+            QuantityPer.MONTH, labels, None, None, np.repeat(day("2026-10-06"), 4),
+            np.arange(4, dtype=np.intp), rows(*contracts), numbers(*quantities),
+            numbers(*prices), None,
+        )  # fmt: skip
+        prep = prepared_trades(
+            encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+        )
+        result = trade_results(prep, quoted(history, 3.10, 3.40), WorkCounter())
+        assert result.mark == pytest.approx(1_500), order
+        np.testing.assert_array_equal(result.delta, [10_000, 0])
+        assert result.codes() == ("Z26", "F27") and result.delta_total == pytest.approx(10_000)
+
+
 def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     whole, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
     spares = resolved_trades(
@@ -1520,7 +1663,9 @@ lots_strategy = st.integers(min_value=-20, max_value=20)  # zero included, a row
 prices_strategy = st.floats(min_value=1.0, max_value=9.0, allow_nan=False, allow_infinity=False)
 
 
-@settings(max_examples=60, deadline=None)
+# Bounded and repeatable: sixty examples drawn from a fixed seed, so a failure here is the same
+# failure on every machine and every run.
+@settings(max_examples=60, deadline=None, derandomize=True)
 @given(
     trades=st.lists(
         st.tuples(st.integers(min_value=1, max_value=2), lots_strategy, prices_strategy),
@@ -1529,7 +1674,7 @@ prices_strategy = st.floats(min_value=1.0, max_value=9.0, allow_nan=False, allow
     ),
     quotes=st.tuples(prices_strategy, prices_strategy),
 )
-def test_any_batch_equals_its_singletons_summed(
+def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contracts(
     trades: list[tuple[int, int, float]], quotes: tuple[float, float]
 ) -> None:
     def valued(selected: list[tuple[int, int, float]]) -> TradeResults:
@@ -1554,6 +1699,16 @@ def test_any_batch_equals_its_singletons_summed(
     assert whole.mark == pytest.approx(by_hand, abs=1e-6)
     doubled = valued(trades + trades)
     assert doubled.mark == pytest.approx(2 * whole.mark, abs=1e-6)
-    assert whole.codes() == tuple(
-        sorted({("Z26", "F27")[c - 1] for c, _, _ in trades}, key=("Z26", "F27").index)
-    )
+    np.testing.assert_allclose(doubled.delta, 2 * whole.delta)
+    axis = tuple(sorted({("Z26", "F27")[c - 1] for c, _, _ in trades}, key=("Z26", "F27").index))
+    assert whole.codes() == axis
+    # The delta contract by contract, by hand on the batch's own axis: the lots held on each
+    # contract times the lot size, nothing where only rows kept ready hold it.
+    by_contract = [
+        sum(q * 10_000 for c, q, _ in trades if ("Z26", "F27")[c - 1] == code) for code in axis
+    ]
+    np.testing.assert_allclose(whole.delta, by_contract)
+    # The rows the other way round make the same batch: mark, axis and delta.
+    turned = valued(trades[::-1])
+    assert turned.mark == pytest.approx(whole.mark, abs=1e-6) and turned.codes() == axis
+    np.testing.assert_allclose(turned.delta, whole.delta)
