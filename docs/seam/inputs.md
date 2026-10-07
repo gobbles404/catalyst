@@ -242,7 +242,7 @@ body and each cell named as a scalar handle argument is named, the first bad cel
 column whichever way it is bad; a blank
 cell fails as the mixed range refuses it, and leaving a field out is the only way not to
 supply it. A row of field values is held to its one row before any cell is looked at, since
-#NN, as decision 15 holds every row type: a range one row too tall fails by its shape, whatever
+#151, as decision 15 holds every row type: a range one row too tall fails by its shape, whatever
 its extra row holds. The order of failures is the review's decision 11: each argument alone, in
 signature order, the instrument selected, the shape of a row, the width, the headers in input
 order, the cells column by
