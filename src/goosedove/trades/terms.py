@@ -4,8 +4,9 @@ tests supply them in Python. One instrument and one index for the batch, one spe
 the index, the quantity unit its quantities count, one route, one settlement and one schedule
 method; then the occurrences, the ticket's rows, each with its date, its label, its clearing
 house and its broker where given; then the components, one per contract month an occurrence
-holds, each with its occurrence, its contract, its signed quantity as entered, the calendar days
-it covers, the quantity the basis gives it and its fixed price; and for a financial settlement
+holds, each with its occurrence, its contract, its signed quantity as entered, the days it covers
+within its contract's month, the quantity the basis gives it and its fixed price; and for a
+financial settlement
 the payment terms, the lag and the calendar each occurrence pays by and the day each component
 pays. docs/library/trades/kernel.md is the page."""
 
@@ -90,8 +91,10 @@ class ResolvedTrades:
     whole when the field was not given, each a label kept as typed and read for nothing. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
-    count of the specification as entered, per the basis, covered_days[k] the calendar days the
-    component covers, the whole of its contract's month, weekends and holidays included,
+    count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
+    and the last day the component covers, within its contract's calendar month, the whole month
+    from a contract code and a booked period's share of it from explicit dates, covered_days[k]
+    the calendar days between them inclusive, weekends and holidays included, derived here,
     component_quantity[k] the count the component holds, the entered quantity under month and
     the entered quantity times the covered days under calday, formed once here, the one quantity
     the encoding converts and nothing later scales again, and fixed_price[k] the price agreed, in
@@ -113,6 +116,8 @@ class ResolvedTrades:
     occurrence: NDArray[np.intp]
     contract: NDArray[np.intp]
     quantity: NDArray[np.float64]
+    start_date: NDArray[np.datetime64]
+    end_date: NDArray[np.datetime64]
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
@@ -145,7 +150,8 @@ def resolved_trades(
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
     quantity: NDArray[np.float64],
-    covered_days: NDArray[np.int64],
+    start_date: NDArray[np.datetime64],
+    end_date: NDArray[np.datetime64],
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
 ) -> ResolvedTrades:
@@ -162,9 +168,10 @@ def resolved_trades(
     the ticket's rows: one date each, and one label, clearing house and broker each where those
     are given. The components are aligned, one or more, each belonging to an occurrence, every
     occurrence holding at least one, since a trade with no contract month has no economics; each
-    contract is a row of the schedule; each component covers a positive count of calendar days,
-    the resolution's count of its contract's month, since a quantity per day over no day states
-    nothing; each quantity is a whole number, positive, negative or zero, the first profile's
+    contract is a row of the schedule; each component covers the days from its start date to its
+    end date, the end on or after the start and both in one calendar month, since a component is
+    one contract month's and a quantity per day over no day states nothing, the days counted
+    here; each quantity is a whole number, positive, negative or zero, the first profile's
     convention, a signed count of the specification, a zero row kept ready for a deal and
     contributing nothing; each fixed price is a finite number, the quantity, the days and the
     price named by the trade they belong to, as the sheet counts its rows. Each component's
@@ -183,7 +190,8 @@ def resolved_trades(
         occurrence,
         contract,
         quantity,
-        covered_days,
+        start_date,
+        end_date,
         fixed_price,
         labels,
         occurrences,
@@ -191,7 +199,9 @@ def resolved_trades(
     )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
     quantities = _frozen_numbers(quantity)
-    days = _frozen_counts(covered_days)
+    starts, ends = _frozen_days(start_date), _frozen_days(end_date)
+    days = (ends - starts).astype(np.int64) + 1  # made here and owned here: frozen below
+    days.setflags(write=False)
     return ResolvedTrades(
         instrument,
         index,
@@ -208,6 +218,8 @@ def resolved_trades(
         _frozen_rows(occurrence),
         _frozen_rows(contract),
         quantities,
+        starts,
+        ends,
         days,
         _the_component_quantity(quantity_per, quantities, days, labels, occurrence),
         _frozen_numbers(fixed_price),
@@ -309,23 +321,26 @@ def _the_components(
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
     quantity: NDArray[np.float64],
-    covered_days: NDArray[np.int64],
+    start_date: NDArray[np.datetime64],
+    end_date: NDArray[np.datetime64],
     fixed_price: NDArray[np.float64],
     labels: tuple[str, ...] | None,
     occurrences: int,
     schedule_rows: int,
 ) -> None:
     """Aligned, one or more, each of an occurrence and every occurrence holding one; each
-    contract a row of the schedule, each component covering a positive count of calendar days,
-    each quantity whole, zero included, each price finite, the days, a quantity or a price
-    refused naming the trade it belongs to, since a strip's component is no row of the sheet."""
+    contract a row of the schedule, each component's end on or after its start and both in one
+    calendar month, each quantity whole, zero included, each price finite, the days, a quantity
+    or a price refused naming the trade it belongs to, since a strip's component is no row of
+    the sheet."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")
     for name, column in (
         ("contract", contract),
         ("quantity", quantity),
-        ("covered_days", covered_days),
+        ("start_date", start_date),
+        ("end_date", end_date),
         ("fixed_price", fixed_price),
     ):
         if column.size != components:
@@ -350,12 +365,19 @@ def _the_components(
             f"contract row {k + 1} is {contract[k]}, "
             f"expected a row of the schedule, 0 to {schedule_rows - 1}"
         )
-    uncovered = covered_days <= 0
-    if uncovered.any():
-        k = int(uncovered.argmax())
+    backwards = end_date < start_date
+    if backwards.any():
+        k = int(backwards.argmax())
         raise ValueError(
-            f"covered_days of {_named(labels, int(occurrence[k]))} is {int(covered_days[k])}, "
-            "expected a positive count of calendar days"
+            f"end_date of {_named(labels, int(occurrence[k]))} is {end_date[k]}, expected a day "
+            f"on or after its start_date, {start_date[k]}"
+        )
+    two_months = start_date.astype("datetime64[M]") != end_date.astype("datetime64[M]")
+    if two_months.any():
+        k = int(two_months.argmax())
+        raise ValueError(
+            f"{_named(labels, int(occurrence[k]))} covers {start_date[k]} to {end_date[k]}, "
+            "expected one calendar month per component"
         )
     whole_quantities(quantity, lambda k: f"quantity of {_named(labels, int(occurrence[k]))}")
     finite_prices(fixed_price, lambda k: f"fixed_price of {_named(labels, int(occurrence[k]))}")
@@ -468,12 +490,6 @@ def _frozen_numbers(column: NDArray[np.float64]) -> NDArray[np.float64]:
     numbers = np.array(column, dtype=np.float64)
     numbers.setflags(write=False)
     return numbers
-
-
-def _frozen_counts(column: NDArray[np.int64]) -> NDArray[np.int64]:
-    counts = np.array(column, dtype=np.int64)
-    counts.setflags(write=False)
-    return counts
 
 
 def _frozen_days(column: NDArray[np.datetime64]) -> NDArray[np.datetime64]:

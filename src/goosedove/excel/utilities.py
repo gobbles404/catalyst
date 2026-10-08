@@ -341,9 +341,11 @@ def trades_table(obj: Trades) -> MixedArray:
     # template need not have supplied them, then what the encoding made of the terms. trade_id,
     # clearing_house and broker where the batch has them; quantity_unit the specification's name
     # as the index spells it; the payment lag and the day it gives for a financial settlement;
-    # then what the resolution derived, covered_days, the calendar days the component covers, and
-    # component_quantity, the quantity the basis gives it, the entered quantity times those days
-    # under calday, so that a reader never takes the month's total for the entered daily quantity;
+    # then what the resolution derived, start_date and end_date, the days the component covers,
+    # its whole month from a code and its share of a booked period from dates, covered_days, the
+    # calendar days between them, and component_quantity, the quantity the basis gives it, the
+    # entered quantity times those days under calday, so that a reader never takes the month's
+    # total for the entered daily quantity;
     # then what the encoding made, quote_quantity the component quantity in the index's quote
     # quantity unit, coefficient and offset in the settlement currency.
     terms, encoding = obj.resolved, obj.encoded
@@ -384,6 +386,8 @@ def trades_table(obj: Trades) -> MixedArray:
         lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
         text("payment_time_lag", tuple(lags[rows]))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
+    numbers("start_date", "datetime64[D]", terms.start_date)
+    numbers("end_date", "datetime64[D]", terms.end_date)
     numbers("covered_days", "int64", terms.covered_days)
     numbers("component_quantity", "float64", terms.component_quantity)
     numbers("quote_quantity", "float64", encoding.quote_quantity)

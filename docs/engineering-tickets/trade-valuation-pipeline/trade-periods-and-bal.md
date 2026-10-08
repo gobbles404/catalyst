@@ -3,8 +3,8 @@
 [Pipeline overview](README.md) · [Calendar month Asian trades](asian-trades.md) ·
 [Last three pricing days](last3day-trades.md)
 
-**Status:** Slices A and B built in #159 and #160 on the prototype stack above #158, the page as a
-ticket; slice C not started. The sections at the end record what each slice built. Draft engineering ticket, 7
+**Status:** Built, the three slices as three PRs on the prototype stack above #158, A in #159, B in
+#160 and C in #NN, the page as a ticket. The sections at the end record what each slice built. Draft engineering ticket, 7
 October 2026. Extends the prototype after the
 [full-month Asian slice](asian-trades.md). The inspected baseline is PR #157 at `592a6bc`;
 Asian is specified separately and must be available before the final integration slice.
@@ -400,3 +400,61 @@ Built as the page says for slice B, on the two date utilities, with these partic
 - **Not in this slice.** No `BAL` in a trade's `contract_code`; no clamping of a reference and
   no whole-period reading of an early one, the ordinary label being that; no business-day rule on
   the reference; slice C, the dates through creation and valuation, not started.
+
+## As built, slice C, #NN
+
+Built as the page says for slice C, on the path every batch takes, with these particulars.
+
+- **The fields.** The `future` gains `start_date` and `end_date` after `contract_code`, dates that
+  may stand in for the code, so `contract_code` is no longer always required: the three say their
+  rule in the Show spill's `required_when` row, `no start_date and end_date` and `no contract_code`,
+  and the shown future is seven rows by seventeen columns. The period form is checked at the code's
+  place in the definition's order, so a missing period is still named before a missing method:
+  `contract_code is supplied with start_date, expected one period form, a contract_code or
+  start_date with end_date`, `start_date is supplied without end_date, expected both dates, the
+  period's first and last day, or a contract_code`, `contract_code is missing, expected a value in
+  the template or a column in the ticket, or start_date and end_date in its place`.
+- **The resolution.** `_the_periods` in `src/goosedove/trades/resolution.py` resolves either form
+  to components in one pass: from a code every month of the code, each covered whole; from dates
+  the months from the start's to the end's, each covered whole but the first from the start date
+  and the last to the end date, an end before its start refused by its row, `end_date row 1 is
+  2026-12-15, expected a day on or after start_date row 1, 2026-12-31`, and a month the schedule
+  lacks by the row and the month in the form's own words. `month_bounds` gives each component's
+  month its first and last day, four conversions over the components, and the clipping is one
+  maximum and one minimum; the day count of slice A is gone, the kernel counting the days.
+- **The kernel.** `resolved_trades` takes `start_date` and `end_date` per component in place of
+  the day count, keeps them, holds the end on or after the start and both in one calendar month,
+  and derives `covered_days` as the days between them inclusive; `component_quantity` follows as
+  in slice A. The observations builder, `observed`, takes the two days as well: `asian` counts and
+  offsets the pricing days of the days each component covers, the whole month from a code and the
+  booked part from dates, and refuses a part with none, `Z26 has no pricing day from 2026-12-26 to
+  2026-12-27, expected a Monday to Friday of the days it covers the index's market is open on; the
+  asian method averages the pricing days a component covers`, the month's refusal of #158 now in
+  these words for a whole month too; `lastday`, `penultimate` and `last3day` take a component that
+  covers its whole month and refuse a part of one, `Z26 is covered from 2026-12-15 to 2026-12-31,
+  part of its month, expected the whole month under lastday; the expiry-based methods take the
+  contract's month entire, and a part of it prices under asian`. Payment counts from the last
+  observation as before, so a shorter end pays earlier, and one payment day per contract still
+  holds: two rows from different starts to one end share a batch, two ends are refused.
+- **The readback.** The trades spill gains `start_date` and `end_date`, both `datetime64[D]`, after
+  the payment terms and before `covered_days`, so the days each component covers, their count and
+  the quantity read side by side; a code-based trade shows its whole months, a dated one the split
+  period, and either shows the code the resolution bound under `contract_code`. The shown future
+  gains the two fields' columns.
+- **The numbers pinned.** The page's booked period: 17 covered days, twelve observations a twelfth
+  each, the fixed leg -500, the payment 5 January; on the 15th 60 of mark and 2,000 of delta, on
+  the 16th 160/3 and 5,500/3, on 1 January 50 unpaid, on the 5th 50 of cash; the calday twin
+  34,000 units, 1,020 of mark and 850 of cash, seventeen times each number; the dates through
+  the helpers on `BALZ26` and typed alike; 12 November to 31 December as X26 over 19 days and Z26
+  over 31, 1,900 and 3,100 at 100 a day; two starts to one end 126 and 4,100 on 2 December as the
+  singletons summed, the kept workbook's P and Q 122 with the 1st fixed at 0.24. The work: the
+  resolution's ledger under dates runs the same functions as under codes but the grammar's,
+  nothing per distinct text, the two date columns read once each and their order in one look,
+  four conversions for their months; the expiry-based methods add one whole-month look, two
+  conversions and one look; the batch of 2,500 rows keeps two more columns, 16 bytes a row,
+  571,112 bytes against 530,549; the shown future's peak 12,869 bytes, about 108 a cell, pinned at
+  110 a cell and the slack, what a text cell costs, where a hundred a cell covered fifteen columns
+  and would cover seventeen by 55 bytes only.
+- **Not in this slice.** No `exact` method, as the page says; no `BAL` in `contract_code`; no
+  mixing of forms in a batch and no partial month under an expiry-based method; no change to the
+  payment groups; a `start_date` or `end_date` given with a code is refused, never ignored.
