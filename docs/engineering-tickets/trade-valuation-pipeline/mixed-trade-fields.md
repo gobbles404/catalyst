@@ -2,9 +2,11 @@
 
 [Pipeline overview](README.md) · [Multiple payment groups](multiple-payment-groups.md)
 
-**Status:** Next prototype slice, 8 October 2026. One focused PR following #162,
-reviewed at `fa7cb93`. Continue the prototype; this does not decide how the full stack
-will land or what will be rebuilt on main.
+**Status:** Built in #NN on the prototype stack above #162, the page as a ticket; the
+[As built](#as-built-nn) section at the end says what was built and what was not. Written
+8 October 2026 as the next prototype slice after PR #162, reviewed at `fa7cb93`, a
+continuation of the prototype that does not decide how the full stack will land or what
+will be rebuilt on main.
 
 **Suggested PR title:** `feat(trades): allow mixed methods and quantity terms in a batch`
 
@@ -285,3 +287,71 @@ Completion means one mixed ticket produces the hand-priced lifecycle, preserves 
 row's meaning in readback, and reaches the same compressed evaluation path as one
 trade. The next step is realistic mixed-batch Excel UAT and a review of the prototype's
 shape before adding bilateral rates or deciding what to rebuild on main.
+
+## As built, #NN
+
+Engineering's record of what landed, in the ticket's terms.
+[create-trades.md](../../library/trades/create-trades.md) and
+[kernel.md](../../library/trades/kernel.md) are the pages.
+
+- **The selections.** The kernel's `ResolvedTrades` keeps `specification`, `schedule_method` and
+  `quantity_per` per occurrence, each an array of positions among the members, `METHODS` and
+  `BASES` in the definition's order and the index's specification rows, so that the kernel gathers
+  and compares positions and never texts and a reader turns a position back into its name;
+  `one_choice` gives a batch whose rows all chose alike its arrays, and the tests use it. The
+  resolution reads each distinct text of the three fields once, through the one distinct-text
+  reader the codes and the lags already use, in the order its first row comes, so that the first
+  offending row is the one named, and gathers the rows; the route and the settlement stay one
+  across the batch, and `one_text` serves them alone. The `a batch has one quantity_unit` refusal
+  is gone; a selection not one per occurrence or out of range is refused by its row in the kernel.
+- **The observations.** `observed` takes each component's method. The whole-month rule is looked
+  at over the expiry-based components in their order and the open-expiry rule over the penultimate
+  and last3day ones, so the first component at fault is named with its own method; each method
+  present makes its components' observations once, the finite set dispatched over and never the
+  rows; when the batch mixes methods the observations are put back in component order and by day,
+  one lexsort, since the payment anchors are found by that order, and a batch of one method is in
+  order as made. The index's holiday calendar is typed once per batch for the methods that read it,
+  lastday batches now included.
+- **The encoding and the readback.** The lot size and the unit factor are formed once per distinct
+  specification the batch selects and gathered onto the components; the payment grouping, the
+  slots, the preparation and the tick are untouched, a mixed batch valuing through the one path.
+  The trades spill shows each row's own method, unit and basis, a strip's components their owning
+  row's. The prepared and results spills are as #162 left them.
+- **The numbers pinned.** The ticket's example on the MIXED index, USD per GAL with GAL and BBL of
+  one unit each, X26, Z26, F27 and G27, the market closed on 25 December and the payment calendar
+  on New Year's Day: 42, -62, 126 and 22 gallons of quote quantity, the fixed legs -420, 620,
+  -1,260 and -220, two groups of Z26, B paying the 31st and the rest 4 January, 27 observations
+  into 23 slots, a gallon on each of nineteen days, 43 on the 29th and the 30th and 85 on the 31st
+  beside B's -62 on the 30th, one reference; 256 and 128 on 1 December, 194 and 66 on the 30th,
+  275 of mark with -62 of cash and 85 on the 31st, 190 unpaid on 1 January, 128 of cash on the 4th;
+  a tick to 260 on the same preparation, the 29th corrected to 12 taking a new history and 237.
+  The singletons summed in every state and order, with a duplicate, a row kept ready and a strip of
+  a gallon a day over January and February, 93 + 112 of mark and 31 and 28 of delta on two more
+  contracts; A as 42 gallons a month identical in encoding and value; a lot of ten thousand beside
+  ten thousand units on a cent-quoted index, one slot of 200 and 2,000 dollars ten cents up, the
+  price in cents for both rows; the clearing labels swapped changing nothing, B at +2bd coalescing
+  into one group of 22 slots, A on a payment calendar closed on 4 January a third group; a partial
+  asian row beside a whole lastday month, 84 of mark beside 15 of cash and 42 of delta on
+  16 December, a partial penultimate row refused by its contract, its days and its own method;
+  interleaved methods with a strip keeping component order and anchors, S's F27 paying 1 February;
+  a physical batch with a penultimate row refused by that method, one of lastday rows mixing units
+  and bases standing; a method not one per component refused. The same through the creator and the
+  seam, the readback row by row with a strip showing its own row's choices, a uniform field from
+  the template or the ticket alike and both refused, the refusals naming the first offending row;
+  and on the host, in the smoke and in the kept workbook.
+- **The work.** The resolution's ledger: `_each_distinct` five times for two, `_Fields.one_text`
+  twice for five, `_the_selections` for `_the_batch`, `_frozen_rows` five for two, `_the_days` and
+  `with_holiday_calendar` once; its numpy six more looks, six more sorts and three more conversions
+  for the three distinct reads, three more frozen copies, numpy's unique over the methods present,
+  nine more arrays and seventeen more `asanyarray`s, measured and pinned with the reasons. The
+  mixed ticket's ledger reads two units, four methods and two bases once each, makes the four
+  methods once each and nothing per row, the same at eight rows and at two thousand. The mixed
+  batch of two thousand trades over twenty-four contracts: 48 groups, 13,071 observations, 543
+  slots, four methods dispatched once each, two conversions, the preparation and the tick as any
+  batch's; peaks 45,298 and 11,440 bytes, within 90 and 24 a slot. The 2,500-row batch's creation
+  peak 569,243 to 668,580 bytes, the three selections 24 bytes a row retained and their distinct
+  reads' temporaries, the pin 232 to 272 a row.
+- **Not in this slice.** No mixed route or settlement in one batch; no discounting, DV01
+  convention, delivery or margining; bilateral evaluation still refused; no `exact` method, no
+  blank-based switching between codes and dates, no moving BAL periods; the lifetime example not
+  extended, the smoke, the host and the kept workbook carrying the mixed example.

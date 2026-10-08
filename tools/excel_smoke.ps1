@@ -687,6 +687,41 @@ $formulas = [ordered]@{
     "=COLUMNS(util_ReadHandle(KA14))"    = "7"
     "=INDEX(util_ReadHandle(KA14),1,7)"  = "contract_delta"
     "=INDEX(util_ReadHandle(KA14),6,7)"  = "0"
+    # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
+    # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;
+    # on 31 December, every settle 11 and the projection 12, B fixed and paid, -62 of cash, and
+    # the rest 275 of mark with 85 of delta, the preparation in LC33 spilling 23 slots in two
+    # groups, B's day paying the 31st and settled, the others 4 January and not; a template
+    # holding the method beside the ticket's column refused, and a unit the index does not define
+    # refused by its row.
+    "=INDEX(util_ReadHandle(KU7),3,5)"   = "lastday"
+    "=INDEX(util_ReadHandle(KU7),4,5)"   = "penultimate"
+    "=INDEX(util_ReadHandle(KU7),5,5)"   = "last3day"
+    "=INDEX(util_ReadHandle(KU7),6,5)"   = "asian"
+    "=INDEX(util_ReadHandle(KU7),3,8)"   = "Clearer A"
+    "=INDEX(util_ReadHandle(KU7),4,8)"   = "Clearer B"
+    "=INDEX(util_ReadHandle(KU7),3,10)"  = "BBL"
+    "=INDEX(util_ReadHandle(KU7),4,10)"  = "GAL"
+    "=INDEX(util_ReadHandle(KU7),4,11)"  = "calday"
+    "=INDEX(util_ReadHandle(KU7),3,14)"  = "46391"
+    "=INDEX(util_ReadHandle(KU7),4,14)"  = "46387"
+    "=INDEX(util_ReadHandle(KU7),4,18)"  = "-62"
+    "=INDEX(util_ReadHandle(KU7),3,19)"  = "42"
+    "=INDEX(util_ReadHandle(KU7),5,19)"  = "126"
+    "=INDEX(util_ReadHandle(KU7),6,19)"  = "22"
+    "=INDEX(util_ReadHandle(KU7),3,21)"  = "-420"
+    "=INDEX(_ReportValues(LC34),3,1)"    = "275"
+    "=INDEX(_ReportValues(LC34),3,2)"    = "-62"
+    "=INDEX(_ReportRisk(LC34),3,1)"      = "85"
+    "=INDEX(_ReportRisk(LC34),3,2)"      = "USD per USD/GAL"
+    "=ROWS(util_ReadHandle(LC33))"       = "25"
+    "=INDEX(util_ReadHandle(LC33),3,3)"  = "46387"
+    "=INDEX(util_ReadHandle(LC33),4,3)"  = "46391"
+    "=INDEX(util_ReadHandle(LC33),3,5)"  = "TRUE"
+    "=INDEX(util_ReadHandle(LC33),4,5)"  = "FALSE"
+    "=INDEX(util_ReadHandle(LC33),25,6)" = "85"
+    "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
+    '=_CreateTrades(KD6,KU1:LA1,{"E","Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
     "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
     '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one period form, a contract_code or start_date with end_date"
     '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date is supplied without end_date, expected both dates, the period's first and last day, or a contract_code"
@@ -1258,6 +1293,78 @@ $cells = [ordered]@{
     "KA12" = "=_CreateMarket(KA9,KA11)"
     "KA13" = "=_PrepareTrades(JT5,KA9)"
     "KA14" = "=_EvaluateTrades(KA13,KA12)"
+    # Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
+    # and G27 expiring 30-Nov-2026, 31-Dec-2026, 29-Jan-2027 and 26-Feb-2027 in KD1:KE4 and its
+    # schedule in KD5, the market closed on 25 December in KF1 over KF3, the payment calendar
+    # closed on New Year's Day in KF2 over KF4, the volume conventions in gallons in KG1, two
+    # specifications in KH2:KL3 under the headers in EI1:EM1, GAL of one gallon and BBL of one
+    # barrel, in KH1, the index in KD6; the template over six fields in KN1:KS2, the route, the
+    # settlement, the trade date, the price of 10, +1bd and the payment calendar, in KN3, and one
+    # over seven holding the method too in KN4:KT5 and KN6, which no ticket with a method column
+    # can be made under; the ticket's headers and four rows, each its own unit, basis, method and
+    # clearing house, A a barrel a month under lastday, B two gallons a day sold under
+    # penultimate, C three barrels a month under last3day and D 22 gallons a month under asian,
+    # in KU1:LA5, and their batch in KU7; the valuation day, 31-Dec-2026 at midday, in LC1 and
+    # LC2, the settles of the 21 pricing days from the 30th back to the 1st, all 11, newest first
+    # in LC3:LD23, the calendar, the fixings and the history in LC25:LC27, the quotes 12, 13 and
+    # 14 in LC28:LC30, the vector and the market in LC31:LC32, the batch prepared in LC33 and
+    # evaluated in LC34.
+    "KD1" = "X26"; "KE1" = "30-Nov-2026"
+    "KD2" = "Z26"; "KE2" = "31-Dec-2026"
+    "KD3" = "F27"; "KE3" = "29-Jan-2027"
+    "KD4" = "G27"; "KE4" = "26-Feb-2027"
+    "KD5" = "=_CreateFuturesSchedule(KD1:KD4,KE1:KE4)"
+    "KF3" = "25-Dec-2026"; "KF4" = "1-Jan-2027"
+    "KF1" = "=_CreateHolidayCalendar(KF3)"
+    "KF2" = "=_CreateHolidayCalendar(KF4)"
+    "KG1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
+    "KH2" = "GAL"; "KI2" = "1"; "KJ2" = "GAL"; "KK2" = "0"; "KL2" = "0"
+    "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
+    "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
+    "KD6" = '=_CreateIndex("MIXED",KD5,KG1,KH1,KF1)'
+    "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_time_lag"; "KS1" = "payment_holiday_calendar"
+    "KN2" = "cleared"; "KO2" = "financial"; "KP2" = "30-Nov-2026"; "KQ2" = "10"; "KR2" = "+1bd"; "KS2" = "=KF2"
+    "KN3" = '=_CreateTradeTemplate("future",KN1:KS1,KN2:KS2)'
+    "KN4" = "route"; "KO4" = "settlement_method"; "KP4" = "trade_date"; "KQ4" = "fixed_price"; "KR4" = "payment_time_lag"; "KS4" = "payment_holiday_calendar"; "KT4" = "schedule_method"
+    "KN5" = "cleared"; "KO5" = "financial"; "KP5" = "30-Nov-2026"; "KQ5" = "10"; "KR5" = "+1bd"; "KS5" = "=KF2"; "KT5" = "lastday"
+    "KN6" = '=_CreateTradeTemplate("future",KN4:KT4,KN5:KT5)'
+    "KU1" = "trade_id"; "KV1" = "contract_code"; "KW1" = "quantity"; "KX1" = "quantity_unit"; "KY1" = "quantity_per"; "KZ1" = "schedule_method"; "LA1" = "clearing_house"
+    "KU2" = "A"; "KV2" = "Z26"; "KW2" = "1"; "KX2" = "BBL"; "KY2" = "month"; "KZ2" = "lastday"; "LA2" = "Clearer A"
+    "KU3" = "B"; "KV3" = "Z26"; "KW3" = "-2"; "KX3" = "GAL"; "KY3" = "calday"; "KZ3" = "penultimate"; "LA3" = "Clearer B"
+    "KU4" = "C"; "KV4" = "Z26"; "KW4" = "3"; "KX4" = "BBL"; "KY4" = "month"; "KZ4" = "last3day"; "LA4" = "Clearer A"
+    "KU5" = "D"; "KV5" = "Z26"; "KW5" = "22"; "KX5" = "GAL"; "KY5" = "month"; "KZ5" = "asian"; "LA5" = "Clearer B"
+    "KU7" = "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN3)"
+    "LC1" = "31-Dec-2026"
+    "LC2" = "=_CreateValuationDate(LC1,0.5)"
+    "LC3" = "30-Dec-2026"; "LD3" = "11"
+    "LC4" = "29-Dec-2026"; "LD4" = "11"
+    "LC5" = "28-Dec-2026"; "LD5" = "11"
+    "LC6" = "24-Dec-2026"; "LD6" = "11"
+    "LC7" = "23-Dec-2026"; "LD7" = "11"
+    "LC8" = "22-Dec-2026"; "LD8" = "11"
+    "LC9" = "21-Dec-2026"; "LD9" = "11"
+    "LC10" = "18-Dec-2026"; "LD10" = "11"
+    "LC11" = "17-Dec-2026"; "LD11" = "11"
+    "LC12" = "16-Dec-2026"; "LD12" = "11"
+    "LC13" = "15-Dec-2026"; "LD13" = "11"
+    "LC14" = "14-Dec-2026"; "LD14" = "11"
+    "LC15" = "11-Dec-2026"; "LD15" = "11"
+    "LC16" = "10-Dec-2026"; "LD16" = "11"
+    "LC17" = "9-Dec-2026"; "LD17" = "11"
+    "LC18" = "8-Dec-2026"; "LD18" = "11"
+    "LC19" = "7-Dec-2026"; "LD19" = "11"
+    "LC20" = "4-Dec-2026"; "LD20" = "11"
+    "LC21" = "3-Dec-2026"; "LD21" = "11"
+    "LC22" = "2-Dec-2026"; "LD22" = "11"
+    "LC23" = "1-Dec-2026"; "LD23" = "11"
+    "LC25" = "=_CreateCalendar(LC2,KD6)"
+    "LC26" = "=_CreateFuturesFixings(LC3:LC23,LD3:LD23,KD6)"
+    "LC27" = "=_CreateMarketHistory(LC25,LC26)"
+    "LC28" = "12"; "LC29" = "13"; "LC30" = "14"
+    "LC31" = '=_CreatePriceVector("MIXED",LC28:LC30)'
+    "LC32" = "=_CreateMarket(LC27,LC31)"
+    "LC33" = "=_PrepareTrades(KU7,LC27)"
+    "LC34" = "=_EvaluateTrades(LC33,LC32)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

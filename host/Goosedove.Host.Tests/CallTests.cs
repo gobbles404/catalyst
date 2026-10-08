@@ -824,6 +824,77 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, contributions[5, 6]);
         }
 
+        // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
+        // and G27, 46356, 46387, 46416 and 46444, the market closed on 25 December, 46381, GAL of one
+        // gallon and BBL of one barrel; a template of six fields, the route, the settlement, the trade
+        // date, the price of 10, +1bd and a payment calendar closed on New Year's Day, 46388; four rows
+        // of Z26, each its own unit, basis, method and clearing house, read back row by row. Every
+        // settle 11 and the projection 12: on 30 December, 46386, the 29th and before fixed, 194 of mark
+        // and 66 of delta, a tick to 13 marking 260 on the same preparation; on the 31st, 46387, B fixed
+        // and paid, -62 of cash, 275 of mark and 85 of delta, the preparation's 23 slots in two groups;
+        // a template holding the method beside the ticket's column refused, and a unit the index does
+        // not define refused by its row.
+        [Fact]
+        public void a_mixed_batch_values_each_row_by_its_own_unit_basis_and_method()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0);
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "GAL", 1.0, "GAL", 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "MIXED", schedule, conventions, specifications, holidays);
+            var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
+            var fields = Row("route", "settlement_method", "trade_date", "fixed_price", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments));
+            var headers = Row("trade_id", "contract_code", "quantity", "quantity_unit", "quantity_per", "schedule_method", "clearing_house");
+            var rows = new object[,] { { "A", "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { "B", "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B" }, { "C", "Z26", 3.0, "BBL", "month", "last3day", "Clearer A" }, { "D", "Z26", 22.0, "GAL", "month", "asian", "Clearer B" } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
+            var spill = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(6, spill.GetLength(0));
+            Assert.Equal("lastday", spill[2, 4]);
+            Assert.Equal("penultimate", spill[3, 4]);
+            Assert.Equal("last3day", spill[4, 4]);
+            Assert.Equal("asian", spill[5, 4]);
+            Assert.Equal("Clearer B", spill[3, 7]);
+            Assert.Equal("BBL", spill[2, 9]);
+            Assert.Equal("GAL", spill[3, 9]);
+            Assert.Equal("calday", spill[3, 10]);
+            Assert.Equal(46391.0, spill[2, 13]);
+            Assert.Equal(46387.0, spill[3, 13]);
+            Assert.Equal(-62.0, spill[3, 17]);
+            Assert.Equal(42.0, spill[2, 18]);
+            Assert.Equal(126.0, spill[4, 18]);
+            Assert.Equal(22.0, spill[5, 18]);
+            var thirtieth = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46386.0, 0.5), index);
+            var early = (string)Seam.Call("_CreateMarketHistory", thirtieth, (string)Seam.Call("_CreateFuturesFixings", Column(46385.0, 46384.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0, 46371.0, 46370.0, 46367.0, 46366.0, 46365.0, 46364.0, 46363.0, 46360.0, 46359.0, 46358.0, 46357.0), Column(11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0), index));
+            var live = (string)Seam.Call("_PrepareTrades", trades, early);
+            var market = (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(12.0, 13.0, 14.0)));
+            var results = (string)Seam.Call("_EvaluateTrades", live, market);
+            Assert.Equal(194.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            Assert.Equal(66.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            var ticked = (string)Seam.Call("_EvaluateTrades", live, (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(13.0, 13.0, 14.0))));
+            Assert.Equal(260.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
+            var last = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46387.0, 0.5), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", last, (string)Seam.Call("_CreateFuturesFixings", Column(46386.0, 46385.0, 46384.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0, 46371.0, 46370.0, 46367.0, 46366.0, 46365.0, 46364.0, 46363.0, 46360.0, 46359.0, 46358.0, 46357.0), Column(11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0, 11.0), index));
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(25, slots.GetLength(0));
+            Assert.Equal(46387.0, slots[2, 2]);
+            Assert.Equal(46391.0, slots[3, 2]);
+            Assert.Equal(true, slots[2, 4]);
+            Assert.Equal(false, slots[3, 4]);
+            Assert.Equal(85.0, (double)slots[24, 5], 6);
+            var paid = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(12.0, 13.0, 14.0))));
+            var values = (object[,])Seam.Call("_ReportValues", paid);
+            Assert.Equal(275.0, (double)values[2, 0], 6);
+            Assert.Equal(-62.0, (double)values[2, 1], 6);
+            var risk = (object[,])Seam.Call("_ReportRisk", paid);
+            Assert.Equal(85.0, (double)risk[2, 0], 6);
+            Assert.Equal("USD per USD/GAL", risk[2, 1]);
+            var withMethod = (string)Seam.Call("_CreateTradeTemplate", "future", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_time_lag", "payment_holiday_calendar", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, headers, rows, withMethod));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit row 2 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'", Seam.Call("_CreateTrades", index, headers, new object[,] { { "A", "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { "E", "Z26", 1.0, "ICE", "month", "lastday", "Clearer A" } }, template));
+        }
+
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
