@@ -568,9 +568,13 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FM14),3,6)" = "0"
     "=INDEX(util_ReadHandle(FM14),4,4)" = "FALSE"
     "=INDEX(util_ReadHandle(FM14),4,6)" = "70000"
-    "=INDEX(util_ReadHandle(FM15),4,6)" = "245000"
-    "=INDEX(util_ReadHandle(FM15),3,7)" = "0"
-    "=INDEX(util_ReadHandle(FM15),4,7)" = "70000"
+    "=INDEX(util_ReadHandle(FM14),4,7)" = "7"
+    "=INDEX(util_ReadHandle(FM15),4,5)" = "70000"
+    "=INDEX(util_ReadHandle(FM15),4,6)" = "7"
+    "=INDEX(util_ReadHandle(FM15),4,7)" = "245000"
+    "=INDEX(util_ReadHandle(FM15),3,9)" = "0"
+    "=INDEX(util_ReadHandle(FM15),4,8)" = "70000"
+    "=INDEX(util_ReadHandle(FM15),4,9)" = "7"
     # The penultimate method on the smoke's index: the template in GP3 is the ICE WTI T analogue,
     # financial, paying one business day after the pen day on the holiday calendar in AM1, and
     # GP4 the I5 ticket's two lots of n26 at 70 under it. n26 expires Monday 22-Jun-2026, so the
@@ -587,6 +591,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "46195"
     "=INDEX(util_ReadHandle(GP5),3,4)"   = "FALSE"
     "=INDEX(util_ReadHandle(GP5),3,6)"   = "2000"
+    "=INDEX(util_ReadHandle(GP5),3,7)"   = "2"
     "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2"
@@ -611,7 +616,8 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(HY15),3,1)"    = "150"
     "=INDEX(_ReportValues(HY15),3,2)"    = "0"
     "=INDEX(_ReportRisk(HY15),3,1)"      = "20"
-    "=INDEX(util_ReadHandle(HY15),4,7)"  = "20"
+    "=INDEX(util_ReadHandle(HY15),4,7)"  = "740"
+    "=INDEX(util_ReadHandle(HY15),4,9)"  = "20"
     "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method of trade 'A' at row 1; a last3day future is cash settled on the average of its last three pricing days"
     # Calendar month Asian trades: the batch in IS5 under the asian template in IJ3, two trades of
     # Z26 on the synthetic ethane index, observing every pricing day of December, 22 of them, and
@@ -633,7 +639,8 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(IY16),3,2)"    = "0"
     "=INDEX(_ReportRisk(IY16),3,1)"      = "2100"
     "=INDEX(_ReportRisk(IY16),3,2)"      = "lots of GAL (1 GAL)"
-    "=INDEX(util_ReadHandle(IY16),4,7)"  = "2100"
+    "=INDEX(util_ReadHandle(IY16),4,7)"  = "28"
+    "=INDEX(util_ReadHandle(IY16),4,9)"  = "2100"
     # Calendar day quantities, trade-periods-and-bal.md slice A: the batch in IS12 under the
     # calday template in IJ9, C over the strip X26-Z26 at 100 gallons a day and D of Z26 at 110 a
     # day, read back with the days each month covers, 30 and 31, and the months' quantities,
@@ -692,7 +699,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(JT5),3,14)"  = "46363"
     "=INDEX(util_ReadHandle(JT5),4,14)"  = "46365"
     "=ROWS(util_ReadHandle(KA13))"       = "8"
-    "=COLUMNS(util_ReadHandle(KA13))"    = "6"
+    "=COLUMNS(util_ReadHandle(KA13))"    = "7"
     "=INDEX(util_ReadHandle(KA13),1,3)"  = "payment_date"
     "=INDEX(util_ReadHandle(KA13),3,2)"  = "46358"
     "=INDEX(util_ReadHandle(KA13),6,2)"  = "46358"
@@ -705,9 +712,9 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     "=INDEX(_ReportRisk(KA14),3,1)"      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "7"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "9"
     "=INDEX(util_ReadHandle(KA14),1,9)"  = "contract_lot_delta"
-    "=INDEX(util_ReadHandle(KA14),6,7)"  = "0"
+    "=INDEX(util_ReadHandle(KA14),6,9)"  = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
     # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;
     # on 31 December, every settle 11 and the projection 12, B fixed and paid, -62 of cash, and
@@ -741,6 +748,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(LC33),3,5)"  = "TRUE"
     "=INDEX(util_ReadHandle(LC33),4,5)"  = "FALSE"
     "=INDEX(util_ReadHandle(LC33),25,6)" = "85"
+    "=INDEX(util_ReadHandle(LC33),25,7)" = "85"
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{"E","Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
     "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
