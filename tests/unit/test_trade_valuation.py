@@ -1311,3 +1311,264 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_she
         "with the last3day method; a last3day future is cash settled on the average of its last "
         "three pricing days"
     )
+
+
+# --- the asian method on the sheet -----------------------------------------------------------
+# asian-trades.md's synthetic ethane example through the entries: the index ETHANE, quoted in USD
+# per gallon with one specification GAL of one gallon, X26 expiring 30 November 2026, Z26 31
+# December, F27 29 January 2027 and G27 26 February, the market closed on 25 December and 1
+# January; the template asian, cleared, financial, paying two weekdays after the month's last
+# pricing day on a calendar closed on 1 January; A 4,400 gallons of Z26 at 0.25 and B -2,200 at
+# 0.26. The live input is the projection of the month's remaining days, not a quote of the whole
+# month's average, and the delta is to that input.
+
+ETHANE_HOLIDAYS = ["2026-12-25", "2027-01-01"]
+
+
+def ethane_settles() -> dict[str, float]:
+    """The page's daily series: 0.28 from 30 November, 0.24 on 1 December, 0.30 on the 2nd, 0.26
+    on the 31st and 0.30 on every January pricing day."""
+    days = np.arange(np.datetime64("2026-11-30"), np.datetime64("2027-02-01"))
+    days = days[np.is_busday(days, holidays=np.array(ETHANE_HOLIDAYS, dtype="datetime64[D]"))]
+    series = {str(d): (0.30 if str(d) >= "2027-01-01" else 0.28) for d in days}
+    series.update({"2026-12-01": 0.24, "2026-12-02": 0.30, "2026-12-31": 0.26})
+    return series
+
+
+ETHANE_SETTLES = ethane_settles()
+ETHANE_A: list[object] = ["A", serial("2026-11-20"), "Z26", 4_400.0, 0.25]
+ETHANE_B: list[object] = ["B", serial("2026-11-20"), "Z26", -2_200.0, 0.26]
+ETHANE_STRIP: list[object] = ["S", serial("2026-11-20"), "Z26-F27", 2_200.0, 0.25]
+LIVE_QUOTES = (0.28, 0.30, 0.32)
+LATER_QUOTES = (0.30, 0.32)
+
+
+def asian_template(payment_holidays: list[str], settlement: str = "financial") -> str:
+    fields = PEN_FIELDS if settlement == "financial" else PEN_FIELDS[:6]
+    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in payment_holidays]))
+    values: list[object] = [
+        "GAL",
+        "month",
+        "asian",
+        "cleared",
+        settlement,
+        "Prototype Clearing",
+        "+2bd",
+        calendar,
+    ]
+    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values[: len(fields)])))
+
+
+@pytest.fixture(scope="module")
+def ethane() -> dict[str, Any]:
+    index, _ = an_index(
+        "ETHANE",
+        [
+            ("X26", "2026-11-30"),
+            ("Z26", "2026-12-31"),
+            ("F27", "2027-01-29"),
+            ("G27", "2027-02-26"),
+        ],
+        ETHANE_HOLIDAYS,
+        [("GAL", 1.0)],
+        ("VOLUME", "GAL"),
+    )
+    template = asian_template(["2027-01-01"])
+    headers = row(*NG_HEADERS)
+    return {
+        "index": index,
+        "template": template,
+        "headers": headers,
+        "trades": ENTRY["_CreateTrades"](index, headers, rows(ETHANE_A, ETHANE_B), template),
+    }
+
+
+def ethane_state(
+    ethane: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    trades: object | None = None,
+    settles: dict[str, float] = ETHANE_SETTLES,
+) -> tuple[str, str, str]:
+    """One state: the history valued that day over the page's series from 30 November, the
+    market quoting from the prompt contract on, the batch prepared and evaluated."""
+    history = a_history(ethane["index"], "2026-11-30", as_of, ETHANE_HOLIDAYS, settles)
+    market = a_market(history, "ETHANE", *quotes)
+    prepared = ENTRY["_PrepareTrades"](ethane["trades"] if trades is None else trades, history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "delta"),
+    [
+        ("2026-12-01", LIVE_QUOTES, 88, 0, 2_200),
+        ("2026-12-02", LIVE_QUOTES, 84, 0, 2_100),
+        ("2026-12-03", LIVE_QUOTES, 86, 0, 2_000),
+        ("2026-12-25", LIVE_QUOTES, 86, 0, 400),
+        ("2026-12-31", LIVE_QUOTES, 86, 0, 100),
+        ("2027-01-01", LATER_QUOTES, 84, 0, 0),
+        ("2027-01-04", LATER_QUOTES, 84, 0, 0),
+        ("2027-01-05", LATER_QUOTES, 0, 84, 0),
+    ],
+    ids=[
+        "1 Dec, all live",
+        "2 Dec, one fixed",
+        "3 Dec, two fixed",
+        "25 Dec, eighteen fixed",
+        "31 Dec, the last live on its own day",
+        "1 Jan, all fixed, unpaid",
+        "4 Jan, still unpaid",
+        "5 Jan, paid",
+    ],
+)
+def test_the_asian_batch_values_on_the_sheet_as_the_page_says(
+    ethane: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, _, results = ethane_state(ethane, as_of, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of)]
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per USD/GAL"
+    slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+    assert len(slots) == 22 and [line[0] for line in slots] == ["Z26"] * 22
+    assert [line[5] for line in slots] == [pytest.approx(delta)] * 22  # the contract's delta
+    assert sum(1 for line in slots if line[3] != 0) * 100 == delta
+
+
+def test_the_asian_days_and_payment_read_back_from_the_batch_and_the_preparation(
+    ethane: dict[str, Any],
+) -> None:
+    batch = spilled(ENTRY["util_ReadHandle"](ethane["trades"]))
+    columns = batch[0]
+    assert [line[columns.index("payment_date")] for line in batch[2:]] == [serial("2027-01-05")] * 2
+    assert [line[columns.index("quote_quantity")] for line in batch[2:]] == [4_400.0, -2_200.0]
+    assert [line[columns.index("offset")] for line in batch[2:]] == [
+        pytest.approx(-1_100.0),
+        pytest.approx(572.0),
+    ]
+    _, prepared, _ = ethane_state(ethane, "2026-12-02", LIVE_QUOTES)
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))[2:]
+    assert len(slots) == 22
+    assert slots[0] == ["Z26", serial("2026-12-01"), True, False, 0.0]
+    assert slots[1] == ["Z26", serial("2026-12-02"), False, False, pytest.approx(100.0)]
+    assert slots[-1] == ["Z26", serial("2026-12-31"), False, False, pytest.approx(100.0)]
+    _, paid, _ = ethane_state(ethane, "2027-01-05", LATER_QUOTES)
+    assert [line[2:4] for line in spilled(ENTRY["util_ReadHandle"](paid))[2:]] == [
+        [True, True]
+    ] * 22
+
+
+def test_a_tick_moves_the_live_asian_slots_and_the_old_results_stand(
+    ethane: dict[str, Any],
+) -> None:
+    history, prepared, results = ethane_state(ethane, "2026-12-02", LIVE_QUOTES)
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETHANE", 0.29, 0.30, 0.32))
+    assert valued(str(ticked)) == (pytest.approx(105), 0.0, pytest.approx(2_100))
+    assert valued(results) == (pytest.approx(84), 0.0, pytest.approx(2_100))
+
+
+def test_a_corrected_asian_fixing_takes_a_new_history_and_a_new_preparation(
+    ethane: dict[str, Any],
+) -> None:
+    _, prepared, _ = ethane_state(ethane, "2026-12-02", LIVE_QUOTES)
+    corrected = a_history(
+        ethane["index"],
+        "2026-11-30",
+        "2026-12-02",
+        ETHANE_HOLIDAYS,
+        {**ETHANE_SETTLES, "2026-12-01": 0.25},
+    )
+    market = a_market(corrected, "ETHANE", *LIVE_QUOTES)
+    assert ENTRY["_EvaluateTrades"](prepared, market) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'ETHANE', "
+        "expected the one the trades were prepared against"
+    )
+    again = ENTRY["_PrepareTrades"](ethane["trades"], corrected)
+    assert valued(str(ENTRY["_EvaluateTrades"](again, market))) == (
+        pytest.approx(85),
+        0.0,
+        pytest.approx(2_100),
+    )
+
+
+def test_a_payment_calendar_closed_on_the_fourth_pays_on_the_sixth_on_the_sheet(
+    ethane: dict[str, Any],
+) -> None:
+    closed_fourth = asian_template(["2027-01-01", "2027-01-04"])
+    batch = ENTRY["_CreateTrades"](
+        ethane["index"], ethane["headers"], rows(ETHANE_A, ETHANE_B), closed_fourth
+    )
+    spill = spilled(ENTRY["util_ReadHandle"](batch))
+    pay = spill[0].index("payment_date")
+    assert [line[pay] for line in spill[2:]] == [serial("2027-01-06")] * 2
+    _, _, fifth = ethane_state(ethane, "2027-01-05", LATER_QUOTES, batch)
+    _, _, sixth = ethane_state(ethane, "2027-01-06", LATER_QUOTES, batch)
+    assert valued(fifth) == (pytest.approx(84), 0.0, 0.0)
+    assert valued(sixth) == (0.0, pytest.approx(84), 0.0)
+
+
+def test_an_asian_strip_marks_176_with_2200_on_each_month_and_its_duplicate_twice(
+    ethane: dict[str, Any],
+) -> None:
+    for lines, mark, delta, exposures in (
+        (rows(ETHANE_STRIP), 176, 2_200.0, (100.0, 110.0)),
+        (rows(ETHANE_STRIP, ETHANE_STRIP), 352, 4_400.0, (200.0, 220.0)),
+    ):
+        strip = ENTRY["_CreateTrades"](
+            ethane["index"], ethane["headers"], lines, ethane["template"]
+        )
+        batch = spilled(ENTRY["util_ReadHandle"](strip))
+        columns = batch[0]
+        months = [line[columns.index("contract_code")] for line in batch[2:]]
+        pays = [line[columns.index("payment_date")] for line in batch[2:]]
+        assert months == ["Z26", "F27"] * (len(months) // 2)
+        assert pays == [serial("2027-01-05"), serial("2027-02-02")] * (len(months) // 2)
+        _, _, results = ethane_state(ethane, "2026-12-01", LIVE_QUOTES, strip)
+        assert valued(results) == (pytest.approx(mark), 0.0, pytest.approx(2 * delta))
+        slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+        assert [line[0] for line in slots] == ["Z26"] * 22 + ["F27"] * 20
+        assert slots[22][1] == serial("2027-01-04") and slots[-1][1] == serial("2027-01-29")
+        assert [line[5] for line in slots] == [pytest.approx(delta)] * 42  # each month's delta
+        assert [line[3] for line in slots] == [pytest.approx(exposures[0])] * 22 + [
+            pytest.approx(exposures[1])
+        ] * 20
+
+
+def test_the_asian_batch_equals_its_singletons_summed_in_either_order(
+    ethane: dict[str, Any],
+) -> None:
+    def marked(lines: Cells) -> tuple[float, float, float]:
+        batch = ENTRY["_CreateTrades"](
+            ethane["index"], ethane["headers"], lines, ethane["template"]
+        )
+        return valued(ethane_state(ethane, "2026-12-02", LIVE_QUOTES, batch)[2])
+
+    a, b = marked(rows(ETHANE_A)), marked(rows(ETHANE_B))
+    both, reversed_rows = marked(rows(ETHANE_A, ETHANE_B)), marked(rows(ETHANE_B, ETHANE_A))
+    assert (a[0], b[0]) == (pytest.approx(124), pytest.approx(-40))
+    assert both == reversed_rows == (pytest.approx(84), 0.0, pytest.approx(2_100))
+    assert both[0] == pytest.approx(a[0] + b[0]) and both[2] == pytest.approx(a[2] + b[2])
+    zero: list[object] = ["Z", serial("2026-11-20"), "F27", 0.0, 0.27]
+    kept = ENTRY["_CreateTrades"](
+        ethane["index"], ethane["headers"], rows(ETHANE_A, ETHANE_B, zero), ethane["template"]
+    )
+    _, _, results = ethane_state(ethane, "2026-12-02", LIVE_QUOTES, kept)
+    assert valued(results) == (pytest.approx(84), 0.0, pytest.approx(2_100))
+    slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+    assert [line[0] for line in slots] == ["Z26"] * 22 + ["F27"] * 20
+    assert [line[5] for line in slots] == [pytest.approx(2_100)] * 22 + [0.0] * 20
+
+
+def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
+    ethane: dict[str, Any],
+) -> None:
+    physical = asian_template(["2027-01-01"], "physical")
+    assert ENTRY["_CreateTrades"](ethane["index"], ethane["headers"], rows(ETHANE_A), physical) == (
+        "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
+        "with the asian method; an asian future is cash settled on the average of its month's "
+        "pricing days"
+    )

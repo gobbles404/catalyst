@@ -53,6 +53,24 @@ GAS = index(
     UNITS,
 )
 PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
+# The asian method's index: the same months, each contract expiring on its month's last business
+# day, so that every pricing day of a month prices its own contract.
+MONTH_ENDS = np.busday_offset(
+    (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D"),
+    0,
+    roll="backward",
+    holidays=HOLIDAYS,
+)
+ASIAN_GAS = index(
+    "gas",
+    futures_schedule(CODES, MONTH_ENDS, None),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
+    ),
+    holiday_calendar(HOLIDAYS),
+    UNITS,
+)
 TEMPLATE_FIELDS: dict[str, object] = {
     "quantity_unit": "lot",
     "quantity_per": "month",
@@ -133,7 +151,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "observations": 1,
         "_last_days": 1,  # each component's last observation, the day its payment counts from
         "futures_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
-        "_the_schedule_months": 1,
+        "schedule_months": 1,
         "month_and_year": 25,
         "_the_contracts": 1,
         "_each_distinct": 2,  # the codes, then the lags
@@ -301,6 +319,57 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
         "ndarray.ravel": 2,  # the three days of each component laid out in one column
         "numpy.asarray": 1,  # the three offsets, taken as an array by the business-day offset
         "ufunc.reduce": 16,
+    }
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_after_the_last(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # Every pricing day of each component's calendar month, an equal share each, on an index
+    # whose contracts expire at their month's end: the holiday calendar read once, one count of
+    # the days per month over the components and one offset over the observations, in C and
+    # unseen but for the arrays they take and give; the payment counted from the month's last
+    # pricing day. Nothing runs per row, and the counts the batch reports are the components'.
+    ticket, template = a_ticket(rows, contracts), a_template("asian")
+    counter = WorkCounter()
+    terms, observations = resolved(ASIAN_GAS, ticket, template, counter)
+    assert terms.payment is not None
+    months = MONTHS[terms.contract]
+    firsts = months.astype("datetime64[D]")
+    afters = (months + np.timedelta64(1, "M")).astype("datetime64[D]")
+    days = np.busday_count(firsts, afters, holidays=HOLIDAYS)
+    np.testing.assert_array_equal(observations.component, np.repeat(np.arange(rows), days))
+    np.testing.assert_allclose(observations.weight, np.repeat(1.0 / days, days))
+    expected_days = np.concatenate(
+        [
+            np.busday_offset(first, np.arange(n), roll="forward", holidays=HOLIDAYS)
+            for first, n in zip(firsts, days, strict=True)
+        ]
+    )
+    np.testing.assert_array_equal(observations.date, expected_days)
+    np.testing.assert_array_equal(
+        terms.payment.date, np.busday_offset(MONTH_ENDS[terms.contract], 2, holidays=HOLIDAYS)
+    )
+    assert counter.freeze().as_dict() == {
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+    }
+    assert call_profile(lambda: resolved(ASIAN_GAS, ticket, template, WorkCounter())) == {
+        **resolution_ledger(contracts),
+        "with_holiday_calendar": 1,
+    }
+    assert numpy_calls(lambda: resolved(ASIAN_GAS, ticket, template, WorkCounter())) == {
+        **resolution_numpy(contracts),
+        "ndarray.any": 13,  # whether any month has no pricing day
+        "ndarray.astype": 7,  # each component's month as its first day and the next month's
+        "ndarray.cumsum": 5,  # where each component's observations start
+        "ndarray.repeat": 5,  # the components, their starts, their first days and their weights
+        "ndarray.sum": 1,  # how many observations in all
+        "numpy.arange": 6,  # the place of each observation within its component
+        "numpy.empty": 9,  # one fewer: no array of ones for the weights
+        "ufunc.reduce": 17,
     }
 
 

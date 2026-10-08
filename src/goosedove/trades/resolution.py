@@ -113,12 +113,14 @@ def resolved(
     resolved to its schedule row, a month the schedule lacks refused by the trade's row and the
     month; a strip makes one component per month, in order, all on the one occurrence.
     The schedule method gives each component its observation days, the expiry under lastday, the
-    business day before it under penultimate, and the expiry and the two business days before it
-    under last3day, a third each. For a financial settlement, each occurrence's lag is read once
-    per distinct text and each component pays that many business days strictly after its last
-    observation day, counted on its occurrence's payment calendar with Monday to Friday eligible,
+    business day before it under penultimate, the expiry and the two business days before it
+    under last3day, a third each, and every pricing day of its calendar month under asian, an
+    equal share each, the month the one read of the code gave. For a financial settlement, each
+    occurrence's lag is read once per distinct text and each component pays that many business days
+    strictly after its last observation day, counted on its occurrence's payment calendar with
+    Monday to Friday eligible,
     that day itself rolled back first so that a day the payment calendar closes is not counted;
-    the rule of the three methods built, a later method stating its own.
+    the rule of the four methods.
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
     prices, each named by its trade, and a financial settlement with penultimate.
 
@@ -140,10 +142,10 @@ def resolved(
     quantity_per = quantity_per_of(fields.where("quantity_per", 0), fields.one_text("quantity_per"))
     _the_conditions(fields, route, settlement)
     schedule = futures_schedule_of(index)
-    months = _the_schedule_months(schedule)
+    months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract = _the_contracts(fields, months)
-    observations = observed(schedule_method, index, contract)
+    observations = observed(schedule_method, index, contract, months)
     payment = _the_payment_terms(
         settlement, fields, _last_days(observations, occurrence.size), occurrence
     )
@@ -309,10 +311,12 @@ def _the_specification(index: Index, where: str, name: str) -> int:
 # --- the contracts: every schedule code read, each ticket code resolved by month -------------
 
 
-def _the_schedule_months(schedule: FuturesSchedule) -> NDArray[np.int64]:
+def schedule_months(schedule: FuturesSchedule) -> NDArray[np.int64]:
     """The month of every code of the schedule, as numpy counts months, one read per code: a
     code that is no contract code is refused by row, and so are two rows for one month, since a
-    month resolved to two rows would name no contract."""
+    month resolved to two rows would name no contract. The resolution reads them once, resolves
+    the ticket's codes against them and hands them to the observations, whose asian method takes
+    each component's month from them rather than reading its code again."""
     codes = schedule.codes
     months = np.empty(len(codes), dtype=np.int64)
     for i, code in enumerate(codes):
@@ -410,8 +414,8 @@ def _the_payment_terms(
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's lag in business days and
     its payment calendar, retained, and each component's payment day, the lag counted strictly
-    after its anchor, its last observation day, the one day under lastday and penultimate and
-    the third under last3day, on that calendar,
+    after its anchor, its last observation day, the one day under lastday and penultimate, the
+    third under last3day and the month's last pricing day under asian, on that calendar,
     Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
     on or before it first, so that a day the calendar closes is not itself counted; one busday
     offset over the components on each distinct calendar. Each day made is on or before the

@@ -433,7 +433,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(EW13))"       = "4"
     "=COLUMNS(util_ReadHandle(EW13))"    = "16"
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
-    '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate or last3day, the three methods built"
+    '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
     '=_CreateTradeTemplate("future",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
     '=_CreateTradeTemplate("future",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
@@ -559,6 +559,27 @@ $formulas = [ordered]@{
     "=INDEX(_ReportRisk(HY15),3,1)"      = "20"
     "=INDEX(util_ReadHandle(HY15),4,6)"  = "20"
     "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method; a last3day future is cash settled on the average of its last three pricing days"
+    # Calendar month Asian trades: the batch in IS5 under the asian template in IJ3, two trades of
+    # Z26 on the synthetic ethane index, observing every pricing day of December, 22 of them, and
+    # paying 5 January, 46392; prepared on 2 December in IY15, the 1st fixed at 0.24 and the other
+    # 21 days live at the projection of 0.28, the mark 84, no cash and a delta of 2,100 to that
+    # projection, the slots read back; a physical asian refused by the kernel.
+    "=INDEX(util_ReadHandle(IS5),3,5)"   = "asian"
+    "=INDEX(util_ReadHandle(IS5),3,14)"  = "46392"
+    "=INDEX(util_ReadHandle(IS5),4,14)"  = "46392"
+    "=ROWS(util_ReadHandle(IY15))"       = "24"
+    "=INDEX(util_ReadHandle(IY15),3,2)"  = "46357"
+    "=INDEX(util_ReadHandle(IY15),24,2)" = "46387"
+    "=INDEX(util_ReadHandle(IY15),3,3)"  = "TRUE"
+    "=INDEX(util_ReadHandle(IY15),4,3)"  = "FALSE"
+    "=INDEX(util_ReadHandle(IY15),3,5)"  = "0"
+    "=INDEX(util_ReadHandle(IY15),4,5)"  = "100"
+    "=INDEX(_ReportValues(IY16),3,1)"    = "84"
+    "=INDEX(_ReportValues(IY16),3,2)"    = "0"
+    "=INDEX(_ReportRisk(IY16),3,1)"      = "2100"
+    "=INDEX(_ReportRisk(IY16),3,2)"      = "USD per USD/GAL"
+    "=INDEX(util_ReadHandle(IY16),4,6)"  = "2100"
+    "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method; an asian future is cash settled on the average of its month's pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -1002,6 +1023,54 @@ $cells = [ordered]@{
     "HY13" = "=_CreateMarket(HY8,HY12)"
     "HY14" = "=_PrepareTrades(HS5,HY8)"
     "HY15" = "=_EvaluateTrades(HY14,HY13)"
+    # Calendar month Asian trades, asian-trades.md: the synthetic ethane index of X26, Z26, F27 and
+    # G27 expiring 30-Nov-2026, 31-Dec-2026, 29-Jan-2027 and 26-Feb-2027 in IA1:IB4 and its
+    # schedule in IA5, the pricing calendar closed on 25 December and 1 January in IC1 over
+    # IC3:IC4, the volume conventions in gallons in ID1, one specification GAL of one gallon in
+    # IE2:II2 under the headers in EI1:EM1 and in IE1, the index ETHANE in IA6; a payment calendar
+    # closed on 1 January in IC2 over IC5; the template in IJ3 over its eight fields in IJ1:IQ2,
+    # asian, cleared, financial, paying two business days after the month's last pricing day; the
+    # ticket's headers and two rows, A, 4,400 gallons of Z26 at 0.25, and B, -2,200 at 0.26, in
+    # IS1:IW3, and their batch in IS5; the valuation day, 2-Dec-2026 at midday, in IY1 and IY2,
+    # the settles of 1 December and 30 November newest first in IY3:IZ4, the calendar, the fixings
+    # and the history in IY6:IY8, the projections 0.28, 0.30 and 0.32 in IY10:IY12, the vector
+    # and the market in IY13:IY14, the batch prepared in IY15 and evaluated in IY16; and a
+    # physical asian template over six fields in IJ6, which no batch can be made under. The live
+    # input is the projection of the month's remaining days at one price, not a quote of the
+    # whole month's average, which the market does not convert.
+    "IA1" = "X26"; "IB1" = "30-Nov-2026"
+    "IA2" = "Z26"; "IB2" = "31-Dec-2026"
+    "IA3" = "F27"; "IB3" = "29-Jan-2027"
+    "IA4" = "G27"; "IB4" = "26-Feb-2027"
+    "IA5" = "=_CreateFuturesSchedule(IA1:IA4,IB1:IB4)"
+    "IC3" = "25-Dec-2026"; "IC4" = "1-Jan-2027"; "IC5" = "1-Jan-2027"
+    "IC1" = "=_CreateHolidayCalendar(IC3:IC4)"
+    "IC2" = "=_CreateHolidayCalendar(IC5)"
+    "ID1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
+    "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
+    "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
+    "IA6" = '=_CreateIndex("ETHANE",IA5,ID1,IE1,IC1)'
+    "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_time_lag"; "IQ1" = "payment_holiday_calendar"
+    "IJ2" = "GAL"; "IK2" = "month"; "IL2" = "asian"; "IM2" = "cleared"; "IN2" = "financial"; "IO2" = "Prototype Clearing"; "IP2" = "+2bd"; "IQ2" = "=IC2"
+    "IJ3" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ2:IQ2)'
+    "IJ5" = "GAL"; "IK5" = "month"; "IL5" = "asian"; "IM5" = "cleared"; "IN5" = "physical"; "IO5" = "Prototype Clearing"
+    "IJ6" = '=_CreateTradeTemplate("future",IJ1:IO1,IJ5:IO5)'
+    "IS1" = "trade_id"; "IT1" = "trade_date"; "IU1" = "contract_code"; "IV1" = "quantity"; "IW1" = "fixed_price"
+    "IS2" = "A"; "IT2" = "20-Nov-2026"; "IU2" = "Z26"; "IV2" = "4400"; "IW2" = "0.25"
+    "IS3" = "B"; "IT3" = "20-Nov-2026"; "IU3" = "Z26"; "IV3" = "-2200"; "IW3" = "0.26"
+    "IS5" = "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ3)"
+    "IY1" = "2-Dec-2026"
+    "IY2" = "=_CreateValuationDate(IY1,0.5)"
+    "IY3" = "1-Dec-2026"; "IZ3" = "0.24"
+    "IY4" = "30-Nov-2026"; "IZ4" = "0.28"
+    "IY6" = "=_CreateCalendar(IY2,IA6)"
+    "IY7" = "=_CreateFuturesFixings(IY3:IY4,IZ3:IZ4,IA6)"
+    "IY8" = "=_CreateMarketHistory(IY6,IY7)"
+    "IY10" = "0.28"; "IY11" = "0.3"; "IY12" = "0.32"
+    "IY13" = '=_CreatePriceVector("ETHANE",IY10:IY12)'
+    "IY14" = "=_CreateMarket(IY8,IY13)"
+    "IY15" = "=_PrepareTrades(IS5,IY8)"
+    "IY16" = "=_EvaluateTrades(IY15,IY14)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
