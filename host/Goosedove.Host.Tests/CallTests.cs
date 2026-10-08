@@ -809,8 +809,9 @@ namespace Goosedove.Host.Tests
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(8, slots.GetLength(0));
-            Assert.Equal(6, slots.GetLength(1));
+            Assert.Equal(7, slots.GetLength(1));
             Assert.Equal("payment_date", slots[0, 2]);
+            Assert.Equal("live_lots", slots[0, 6]);
             Assert.Equal(46358.0, slots[2, 1]);
             Assert.Equal(46358.0, slots[5, 1]);
             Assert.Equal(46363.0, slots[2, 2]);
@@ -825,10 +826,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid))[2, 0], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(7, contributions.GetLength(1));
-            Assert.Equal("contract_delta", contributions[0, 6]);
+            Assert.Equal(9, contributions.GetLength(1));
+            Assert.Equal("contract_lot_delta", contributions[0, 8]);
             Assert.Equal(46365.0, contributions[5, 2]);
-            Assert.Equal(0.0, contributions[5, 6]);
+            Assert.Equal(0.0, contributions[5, 8]);
         }
 
         // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
