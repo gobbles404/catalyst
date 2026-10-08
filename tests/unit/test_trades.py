@@ -3862,27 +3862,33 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
     assert str(refused.value) == "method has 2, expected 1, one per component"
 
 
+# The review's extreme input: a BTU as the reporting lot on the cent-quoted index, a coefficient
+# of 1e-8 dollars a cent an MMBTU a lot, so that quantities hundreds of orders of magnitude above
+# any book count their lots past the largest number while every monetary number stays finite.
+TINY_LOT = index(
+    "tiny lot",
+    CENTS.schedule,
+    CENTS.conventions,
+    contract_specifications(
+        ("BTU", "MMBTU"),
+        numbers(1.0, 1.0),
+        ("BTU", "MMBTU"),
+        numbers(0.0, 0.0),
+        numbers(0.0, 0.0),
+        UNITS,
+    ),
+    CENTS.holiday_calendar,
+    "BTU",
+    UNITS,
+)
+
+
 def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() -> None:
     # The review's case: a BTU as the reporting lot on a cent-quoted index and a quantity of 1e303
     # MMBTU, whole and finite as a quantity, finite as a sensitivity, 1e301 dollars a cent, and not
     # as lots, 1e301 over a coefficient of 1e-8; refused when the batch is prepared, by its slot,
     # before anything a reader would fail on is published. Extreme-input hardening, not pricing.
-    tiny = index(
-        "tiny lot",
-        CENTS.schedule,
-        CENTS.conventions,
-        contract_specifications(
-            ("BTU", "MMBTU"),
-            numbers(1.0, 1.0),
-            ("BTU", "MMBTU"),
-            numbers(0.0, 0.0),
-            numbers(0.0, 0.0),
-            UNITS,
-        ),
-        CENTS.holiday_calendar,
-        "BTU",
-        UNITS,
-    )
+    tiny = TINY_LOT
     assert tiny.reporting_lot is not None
     assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
     terms = resolved_trades(
@@ -3923,4 +3929,26 @@ def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract(
     assert str(refused.value) == (
         "Z26 has inf of lot delta, expected a finite number of lots of NYMEX NG (10000 MMBTU); "
         "the exposure in lots outruns the largest number"
+    )
+
+
+def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_batch() -> None:
+    # The review's third case: Z26 and F27 each 1e302 MMBTU, 1e300 dollars a cent of sensitivity
+    # and 1e308 lots, finite by the slot and by the contract, and their sum past the largest
+    # number; refused for the batch before the record is made, so that the risk report never
+    # meets an infinite total. The sum runs with the overflow flag down and the rule judges.
+    terms = resolved_trades(
+        FUTURE, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("Z", "F"), None, None,
+        dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 2),
+        numbers(1e302, 1e302), *bounds_of(TINY_LOT, rows(1, 2)), numbers(300.0, 300.0),
+        paying(dates("2026-11-30", "2026-12-31"), 2),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.coefficient, [1e300, 1e300])  # finite, in dollars a cent
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(TINY_LOT, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "the batch has inf of lot delta in all, expected a finite number of lots of BTU (1 BTU); "
+        "the contracts' deltas, each finite, sum past the largest number"
     )

@@ -45,8 +45,8 @@ class PreparedTrades:
     currency the mark moves for a move of one unit of quote price in that contract; lot_delta[r],
     the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
-    half of whose observation weight has fixed a half; and lot_delta_total, their sum; the result
-    shares them."""
+    half of whose observation weight has fixed a half; and lot_delta_total, their sum, checked
+    finite before the record is made; the result shares them."""
 
     encoded: Encoded
     history: MarketHistory
@@ -94,10 +94,11 @@ def prepared_trades(
     reporting lot's coefficient, the conversion the index resolved once, so that the delta is
     counted in lots of the index's reporting specification whatever words the rows were entered
     in, and no specification is looked up and nothing is converted here or on a tick. Every live
-    lot and every lot delta is finite, else the first that is not is refused by its slot or its
-    contract, the fourth rule: a lot small enough, a BTU against quantities in the trillions of
-    MMBTU, divides a finite exposure past the largest number once it is counted in lots, and
-    nothing is published that a reader would then fail on.
+    lot, every lot delta and their total are finite, else the first that is not is refused by its
+    slot, its contract or the batch, the fourth rule: a lot small enough, a BTU against quantities
+    in the trillions of MMBTU, divides a finite exposure past the largest number once it is counted
+    in lots, or two contracts' finite deltas sum past it, and nothing is published that a reader
+    would then fail on.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
     counter; nothing per component, nothing per observation, nothing per day of the calendar.
@@ -157,6 +158,7 @@ def prepared_trades(
     with np.errstate(over="ignore"):  # a finite exposure may outrun the largest number in lots
         dated_live_lots = dated_live_exposure / lot.coefficient
         lot_delta = price_sensitivity / lot.coefficient
+        lot_delta_total = float(lot_delta.sum())
     words = lot.words
     outrun = ~np.isfinite(dated_live_lots)
     if outrun.any():
@@ -171,6 +173,11 @@ def prepared_trades(
         raise ValueError(
             f"{codes[int(encoded.references[r])]} has {float(lot_delta[r])!r} of lot delta, "
             f"expected a finite number of {words}; the exposure in lots outruns the largest number"
+        )
+    if not np.isfinite(lot_delta_total):
+        raise ValueError(
+            f"the batch has {lot_delta_total!r} of lot delta in all, expected a finite number of "
+            f"{words}; the contracts' deltas, each finite, sum past the largest number"
         )
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
@@ -196,5 +203,5 @@ def prepared_trades(
         float((encoded.offset_of_group + set_amount)[is_settled].sum()),
         price_sensitivity,
         lot_delta,
-        float(lot_delta.sum()),
+        lot_delta_total,
     )
