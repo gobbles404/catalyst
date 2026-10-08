@@ -281,15 +281,20 @@ Engineering's record of what landed, in the ticket's terms.
   `delta_total` are gone from both records, so a stale reader fails rather than reads lots as dollars
   or dollars as lots. The results hold both vectors with their units, `price_sensitivity_unit`,
   `USD per CENT/GAL`, and `lot_unit`, `lots of LOT (1000 BBL)`; a tick shares all of them and makes
-  none again.
+  none again. Every live lot and every lot delta is finite before anything is published, else the
+  preparation refuses the first that is not by its slot, then by its contract, `trade 'H' at row 1
+  observes Z26 on 2026-11-25 with inf live lots, expected a finite number of lots of BTU (1 BTU);
+  the exposure in lots outruns the largest number`: a BTU lot against 10^303 MMBTU keeps a finite
+  sensitivity, 10^301 dollars a cent, and divides it past the largest number in lots.
 - **The surface.** `_ReportRisk` keeps its five columns: `delta_total` is the lot total and
   `delta_unit` the lot's words. `util_ReadHandle` on an index adds `reporting_lot` and, with a lot
   named, `lot_size`, `lot_unit`, `lot_quote_quantity` and `lot_coefficient`, or the word `unset`; on
   prepared trades `live_coefficient`, the column `live_exposure` was, and `live_lots`; on results
   `live_coefficient`, `live_lots`, `live_contribution`, `contract_sensitivity` and
   `contract_lot_delta`, the two contract columns the stored vectors read by each slot's reference
-  and so the same number on every slot of the contract, the readers converting nothing. The trades
-  spill and the templates are as #163 left them.
+  and so the same number on every slot of the contract, then `sensitivity_unit` and `lot_unit`,
+  the two units those numbers are in, the batch's on every row so that a row reads whole, the
+  readers converting nothing. The trades spill and the templates are as #163 left them.
 - **The numbers pinned.** The ticket's ETE rows, a lot, a thousand barrels and 42,000 gallons, each
   1,260 of mark, 420 of sensitivity and one lot, three together 3,780, 1,260 and three; the partial
   Asian period of 14 to 17 December valued on the 16th with the 14th at 26 and the 15th at 27,
@@ -303,13 +308,23 @@ Engineering's record of what landed, in the ticket's terms.
   thousand-barrel lots, the lifetime's two barrels 0.002 of one. The same through the seam, on the
   host, in the smoke and in the kept workbook, whose risk cells now read lots.
 - **The work.** The preparation's numpy ledger freezes two arrays more, `ndarray.setflags` 8 to 10,
-  and its functions are unchanged; the resolution's ledger has `reporting_lot_of` twice, the
+  looks twice more, `ndarray.any` 1 to 3 and `ufunc.reduce` 5 to 7, whether the lots and the lot
+  delta are finite, and sets the error state once, `numpy._make_extobj`, the overflow the rule's to
+  catch; its functions are unchanged; the resolution's ledger has `reporting_lot_of` twice, the
   resolution's check and the kernel's; the seam validates six declared arguments for
   `_CreateIndex`, `_validate` 5 to 6, the lot left out validated as missing; the tick's ledger is
   unchanged, reading each distinct live quote once and converting nothing. Memory: eight bytes a
   slot and eight a contract more retained, the daily batch of 360 slots preparing at 33,964 bytes,
   30,972 before, the pin 90 to 98 bytes a slot with the reason beside it, the two-day and mixed
   batches under the same ceiling; the index record one reference larger.
+- **After review.** The owner's review at 55e2734 found two P3s and a cleanup, fixed on the branch.
+  The results spill showed `contract_sensitivity` without the unit it is in, so equal ETE positions
+  quoted in cents and in dollars a gallon read 420 and 42,000 under one heading: it ends with
+  `sensitivity_unit` and `lot_unit` on every row. A finite sensitivity could divide to an infinite
+  lot delta and be published, the risk reader failing after: the preparation refuses it first, by
+  the slot and by the contract, the fourth rule above. The pipeline's 05-results.md and
+  06-readers.md said monetary sensitivity where the reported delta is lots; they distinguish the
+  two now.
 - **Not in this slice.** No bilateral lot reporting: how reported lots relate to a discounted
   sensitivity is left to the bilateral ticket, as this one says; no DV01 beyond zero; no exposure
   total across indices; the trades spill, the templates and the specifications table unchanged;
