@@ -31,7 +31,7 @@ from goosedove.instruments.definitions import FUTURE, NONE, FieldType, Instrumen
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import CONDITIONS, Trades, resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import QuantityPer, Route, ScheduleMethod, Settlement
+from goosedove.trades.terms import BASES, METHODS, QuantityPer, Route, ScheduleMethod, Settlement
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -164,12 +164,12 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     batch, counter = created()
     terms = batch.resolved
     assert terms.instrument is FUTURE and terms.index is NG and terms.schedule is NG.schedule
-    assert terms.specification == 0
+    np.testing.assert_array_equal(terms.specification, [0] * 5)
     assert (terms.route, terms.settlement) == (Route.CLEARED, Settlement.PHYSICAL)
-    assert (terms.schedule_method, terms.quantity_per) == (
-        ScheduleMethod.LASTDAY,
-        QuantityPer.MONTH,
+    np.testing.assert_array_equal(
+        terms.schedule_method, [METHODS.index(ScheduleMethod.LASTDAY)] * 5
     )
+    np.testing.assert_array_equal(terms.quantity_per, [BASES.index(QuantityPer.MONTH)] * 5)
     assert terms.labels == ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
     assert terms.clearing_house == ("CME Clearing",) * 5  # the template's, for every row
     assert terms.broker is None
@@ -906,7 +906,7 @@ def test_100_a_day_is_3000_in_november_3100_in_december_and_2800_and_2900_in_feb
     assert entered == [100, 100, 100, 100]
     assert quoted == [30_000_000, 31_000_000, 28_000_000, 29_000_000]  # lots of 10,000 MMBtu
     batch, _ = created(LEAP, ticket, CALDAY_TEMPLATE)
-    assert batch.resolved.quantity_per is QuantityPer.CALDAY
+    assert (batch.resolved.quantity_per == BASES.index(QuantityPer.CALDAY)).all()
 
 
 def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_100() -> None:
@@ -1177,7 +1177,7 @@ WITHOUT_UNIT = {name: value for name, value in NG_TEMPLATE.items() if name != "q
 
 def quote_quantity(ix: Index, unit: str, quantity: float = 2.0, code: str = "Z26") -> float:
     batch, _ = created(ix, one_row(quantity, code), {**NG_TEMPLATE, "quantity_unit": unit})
-    assert batch.resolved.specification == ix.specifications.names.index(unit)
+    assert batch.resolved.specification.tolist() == [ix.specifications.names.index(unit)]
     return float(batch.encoded.quote_quantity.sum())
 
 
@@ -1194,7 +1194,7 @@ def test_a_template_holds_the_name_and_the_index_asked_at_creation_owns_it() -> 
     template = a_template({**NG_TEMPLATE, "quantity_unit": "ICE PHH"})
     assert template.defaults["quantity_unit"] == "ICE PHH"
     with_both = trades(TWO_LOTS, a_ticket(one_row()), template, UNITS, WorkCounter())
-    assert with_both.resolved.specification == 1
+    assert with_both.resolved.specification.tolist() == [1]
     with pytest.raises(ValueError) as refused:
         trades(NG, a_ticket(one_row()), template, UNITS, WorkCounter())
     assert str(refused.value) == (
@@ -1244,10 +1244,10 @@ def test_lot_is_a_name_like_any_other_accepted_only_where_the_index_defines_it()
     assert quote_quantity(with_lot, "LOT") == 20_000.0
 
 
-def test_the_unit_in_the_ticket_names_its_row_and_must_agree_on_every_row() -> None:
+def test_the_unit_in_the_ticket_names_its_row_and_each_row_counts_its_own() -> None:
     template = {name: value for name, value in NG_TEMPLATE.items() if name != "quantity_unit"}
     batch, _ = created(TWO_LOTS, {**NG_TICKET, "quantity_unit": ["ICE PHH"] * 5}, template)
-    assert batch.resolved.specification == 1
+    np.testing.assert_array_equal(batch.resolved.specification, [1] * 5)
     np.testing.assert_array_equal(
         batch.encoded.quote_quantity, [25_000, -10_000, 17_500, -30_000, 25_000]
     )
@@ -1255,10 +1255,12 @@ def test_the_unit_in_the_ticket_names_its_row_and_must_agree_on_every_row() -> N
         "quantity_unit row 1 is 'ICE NG', expected one of the index's specifications: "
         "'NYMEX NG', 'ICE PHH', 'MMBTU'"
     )
+    # Since #NN a row's unit is its own: NG-002 in ICE PHH lots of 2,500 beside the NYMEX rows.
     mixed: list[object] = ["NYMEX NG", "ICE PHH", "NYMEX NG", "NYMEX NG", "NYMEX NG"]
-    assert refused(TWO_LOTS, {**NG_TICKET, "quantity_unit": mixed}, template) == (
-        "quantity_unit row 2 is 'ICE PHH', expected 'NYMEX NG' as at row 1; "
-        "a batch has one quantity_unit"
+    two, _ = created(TWO_LOTS, {**NG_TICKET, "quantity_unit": mixed}, template)
+    np.testing.assert_array_equal(two.resolved.specification, [0, 1, 0, 0, 0])
+    np.testing.assert_array_equal(
+        two.encoded.quote_quantity, [100_000, -10_000, 70_000, -120_000, 100_000]
     )
 
 

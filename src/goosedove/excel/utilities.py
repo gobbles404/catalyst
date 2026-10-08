@@ -50,6 +50,7 @@ from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.template import TradeTemplate
+from goosedove.trades.terms import BASIS_NAMES, METHOD_NAMES
 
 
 @singledispatch
@@ -337,9 +338,10 @@ def trade_template_table(obj: TradeTemplate) -> MixedArray:
 @shown.register
 def trades_table(obj: Trades) -> MixedArray:
     # One row per component: the ticket row it belongs to, as the sheet counts rows, then the
-    # resolved terms under the definition's own field names in the definition's order, the batch's
-    # facts repeated on every row since a reader of one row should see the whole deal and the
-    # template need not have supplied them, then what the encoding made of the terms. trade_id,
+    # resolved terms under the definition's own field names in the definition's order, the row's
+    # own method, unit and basis and the batch's route and settlement on every row, since a
+    # reader of one row should see the whole deal and the template need not have supplied them,
+    # then what the encoding made of the terms. trade_id,
     # clearing_house and broker where the batch has them; quantity_unit the specification's name
     # as the index spells it; the payment lag and the day it gives for a financial settlement;
     # then what the resolution derived, start_date and end_date, the days the component covers,
@@ -374,14 +376,17 @@ def trades_table(obj: Trades) -> MixedArray:
     labels("trade_id", terms.labels)
     numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
     text("contract_code", tuple(codes))
-    text("schedule_method", (terms.schedule_method.value,) * n)
+    text("schedule_method", tuple(METHOD_NAMES[terms.schedule_method[rows]]))
     text("route", (terms.route.value,) * n)
     text("settlement_method", (terms.settlement.value,) * n)
     labels("clearing_house", terms.clearing_house)
     labels("broker", terms.broker)
     numbers("quantity", "float64", terms.quantity)
-    text("quantity_unit", (terms.index.specifications.names[terms.specification],) * n)
-    text("quantity_per", (terms.quantity_per.value,) * n)
+    text(
+        "quantity_unit",
+        tuple(np.array(terms.index.specifications.names, dtype=object)[terms.specification[rows]]),
+    )
+    text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
     numbers("fixed_price", "float64", terms.fixed_price)
     if terms.payment is not None:
         lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)

@@ -1,11 +1,12 @@
 """The two children of _CreateTrades and the batch they make. Resolution completes a template's
 shared values and a ticket's rows into the resolved terms of one batch on one index: every field
 from exactly one of the two, the required fields present and the conditional ones present when
-their condition holds, one quantity unit, method, route, settlement and basis for the batch, in
-that order, the quantity unit naming one of the index's specifications, every code of the index's
+their condition holds, one route and one settlement for the batch and a quantity unit, a method
+and a basis per row, in that order, each distinct text of the three read once, the quantity unit
+naming one of the index's specifications, every code of the index's
 schedule read for its month once, each contract code or strip of the ticket resolved by month to
 the schedule's rows, or each start and end date of the ticket split at month ends, every component
-with the days it covers, the schedule method's observations made once over those days, and for a
+with the days it covers, its method's observations made once over those days, and for a
 financial settlement each component's payment day counted strictly after its last observation day
 on the payment calendar. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
@@ -14,6 +15,7 @@ docs/library/trades/create-trades.md is the page."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Final, assert_never, cast
 
 import numpy as np
@@ -41,6 +43,8 @@ from goosedove.trades.template import (
     settlement_of,
 )
 from goosedove.trades.terms import (
+    BASES,
+    METHODS,
     PaymentTerms,
     ResolvedTrades,
     Route,
@@ -98,11 +102,15 @@ def resolved(
 
     The ticket is bound against the template's instrument, the future, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
-    in one of them. The batch fields are one each, the template's value or a column every row
-    agrees on, and each is read for its meaning: the quantity unit by name among the index's
-    specifications, exactly as the index names them, the method, the route, the settlement and
-    the basis from their lists, each named with its row where the ticket supplied it, since the
-    page promises a ticket's field its row. Each conditional field is present exactly when its
+    in one of them. The route and the settlement are one each, the template's value or a column
+    every row agrees on; the quantity unit, the method and the basis are each row's own, the
+    template's value for every row or the ticket's column, so that one batch mixes them row by
+    row, each distinct text read once for its meaning in the order its first row comes: the
+    quantity unit by name among the index's specifications, exactly as the index names them,
+    the method and the basis from their lists, the route and the settlement likewise, each named
+    with its row where the ticket supplied it, since the page promises a ticket's field its row,
+    the unit, the method, the route, the settlement and the basis in that order. Each conditional
+    field is present exactly when its
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
@@ -141,23 +149,24 @@ def resolved(
     """
     fields = _fields(template, ticket)
     _the_required(fields)
-    specification = _the_specification(
-        index, fields.where("quantity_unit", 0), fields.one_text("quantity_unit")
+    specifications, by_unit = _each_distinct(
+        fields, "quantity_unit", partial(_the_specification, index)
     )
-    schedule_method = schedule_method_of(
-        fields.where("schedule_method", 0), fields.one_text("schedule_method")
-    )
+    methods, by_method = _each_distinct(fields, "schedule_method", schedule_method_of)
     route = route_of(fields.where("route", 0), fields.one_text("route"))
     settlement = settlement_of(
         fields.where("settlement_method", 0), fields.one_text("settlement_method")
     )
-    quantity_per = quantity_per_of(fields.where("quantity_per", 0), fields.one_text("quantity_per"))
+    bases, by_basis = _each_distinct(fields, "quantity_per", quantity_per_of)
     _the_conditions(fields, route, settlement)
+    specification = np.array(specifications, dtype=np.intp)[by_unit]
+    schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
+    quantity_per = np.array([BASES.index(b) for b in bases], dtype=np.intp)[by_basis]
     schedule = futures_schedule_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract, start, end = _the_periods(fields, months)
-    observations = observed(schedule_method, index, contract, start, end)
+    observations = observed(schedule_method[occurrence], index, contract, start, end)
     payment = _the_payment_terms(
         settlement, fields, _last_days(observations, occurrence.size), occurrence
     )

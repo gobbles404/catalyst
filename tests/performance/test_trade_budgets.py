@@ -35,12 +35,15 @@ from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.resolution import month_bounds, schedule_months
 from goosedove.trades.terms import (
+    BASES,
+    METHODS,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
     ScheduleMethod,
     Settlement,
+    one_choice,
     resolved_trades,
 )
 
@@ -57,7 +60,11 @@ def observed_of(terms: ResolvedTrades) -> Observations:
     """The observations the terms' schedule method gives them over the days each component
     covers, as resolution makes them."""
     return observed(
-        terms.schedule_method, terms.index, terms.contract, terms.start_date, terms.end_date
+        terms.schedule_method[terms.occurrence],
+        terms.index,
+        terms.contract,
+        terms.start_date,
+        terms.end_date,
     )
 
 
@@ -113,11 +120,11 @@ def some_terms(
     return resolved_trades(
         FUTURE,
         GAS,
-        0,
+        np.zeros(components, dtype=np.intp),
         Route.CLEARED,
         Settlement.FINANCIAL,
-        method,
-        basis,
+        one_choice(METHODS, method, components),
+        one_choice(BASES, basis, components),
         None,
         None,
         None,
@@ -277,7 +284,9 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
         "futures_schedule_of": 1,
+        "with_holiday_calendar": 1,  # the index's calendar typed once for the methods that read it
         "_whole_months": 1,  # each component covers its whole month, the expiry-based rule
+        "_the_days": 1,  # one method present, its observations once
         "observations": 1,
     }
     # The penultimate method reads the holiday calendar and looks once at the expiries; the
@@ -290,6 +299,7 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
         "_with_expiries_priced": 1,
         "with_holiday_calendar": 1,
         "open_days": 1,
+        "_the_days": 1,
         "observations": 1,
     }
     assert call_profile(lambda: observed_of(pen)) == with_expiries
@@ -373,11 +383,11 @@ def asian_terms(components: int, contracts: int) -> ResolvedTrades:
     return resolved_trades(
         FUTURE,
         ASIAN_GAS,
-        0,
+        np.zeros(components, dtype=np.intp),
         Route.CLEARED,
         Settlement.FINANCIAL,
-        ScheduleMethod.ASIAN,
-        QuantityPer.MONTH,
+        one_choice(METHODS, ScheduleMethod.ASIAN, components),
+        one_choice(BASES, QuantityPer.MONTH, components),
         None,
         None,
         None,
@@ -404,6 +414,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "observed": 1,
         "futures_schedule_of": 1,
         "with_holiday_calendar": 1,
+        "_the_days": 1,
         "observations": 1,
     }
     counter = WorkCounter()
@@ -641,11 +652,11 @@ def two_day_terms(components: int, contracts: int) -> ResolvedTrades:
     return resolved_trades(
         FUTURE,
         GAS,
-        0,
+        np.zeros(components, dtype=np.intp),
         Route.CLEARED,
         Settlement.FINANCIAL,
-        ScheduleMethod.LASTDAY,
-        QuantityPer.MONTH,
+        one_choice(METHODS, ScheduleMethod.LASTDAY, components),
+        one_choice(BASES, QuantityPer.MONTH, components),
         None,
         None,
         None,
