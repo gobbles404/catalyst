@@ -867,24 +867,21 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open
         "open_days": 1,
     }
-    assert (
-        numpy_calls(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter()))
-        == {
-            **resolution_numpy(contracts),
-            **WHOLE_MONTHS_NUMPY,
-            "ndarray.any": 24,  # the open expiries, the asian pricing days and the calday products
-            "ndarray.astype": 17,  # the observations' days as counts, to put them back in order
-            "ndarray.cumsum": 8,  # where each asian component's observations start
-            "ndarray.nonzero": 5,  # the components of each of the four methods
-            "ndarray.ravel": 6,  # the same, and the last3day days laid out in one column
-            "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-            "ndarray.setflags": 17,  # the calday products frozen
-            "ndarray.sum": 1,  # how many asian observations in all
-            "numpy._make_extobj": 1,  # the error state set once for the calday products
-            "numpy.arange": 5,  # the place of each asian observation within its component
-            "numpy.asanyarray": 20,
-            "numpy.asarray": 1,  # the three last3day offsets taken as an array
-            "numpy.empty": 18,
-            "ufunc.reduce": 28,
-        }
-    )
+    assert numpy_calls(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter())) == {
+        **resolution_numpy(contracts),
+        **WHOLE_MONTHS_NUMPY,
+        "ndarray.any": 24,  # the open expiries, the asian pricing days and the calday products
+        "ndarray.astype": 17,  # the observations' days as counts, to put them back in order
+        "ndarray.cumsum": 8,  # where each asian component's observations start
+        "ndarray.nonzero": 5,  # the components of each of the four methods
+        "ndarray.ravel": 6,  # the same, and the last3day days laid out in one column
+        "ndarray.repeat": 6,  # last3day's components, asian's four repeats
+        "ndarray.setflags": 17,  # the calday products frozen
+        "ndarray.sum": 1,  # how many asian observations in all
+        "numpy._make_extobj": 1,  # the error state set once for the calday products
+        "numpy.arange": 5,  # the place of each asian observation within its component
+        "numpy.asanyarray": 20,
+        "numpy.asarray": 1,  # the three last3day offsets taken as an array
+        "numpy.empty": 18,
+        "ufunc.reduce": 28,
+    }
