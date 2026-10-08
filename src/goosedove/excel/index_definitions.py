@@ -180,12 +180,24 @@ def _CreateIndex(
         "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an IFERC "
         "or Gas Daily schedule.",
     ] = None,
+    reporting_lot: Annotated[
+        str | None,
+        "The name of the specification a batch's delta is reported in lots of, such as NYMEX NG, "
+        "exactly as the specifications spell it; left out for an index that only builds markets "
+        "and prices no trades.",
+    ] = None,
 ) -> Handle[Index]:
-    """Creates the index behind one reference price, its name with its schedule, conventions,
-    contract specifications and, for a futures index, holiday calendar, and shows its handle,
-    the text other formulas take as the index."""
+    """Creates the index behind one reference price from its name, schedule, conventions,
+    specifications, a futures index's holiday calendar and the lot its delta is reported in, and
+    shows its handle, the text other formulas take as the index."""
     return index(
-        name, schedule, index_conventions, contract_specifications, holiday_calendar, UNITS
+        name,
+        schedule,
+        index_conventions,
+        contract_specifications,
+        holiday_calendar,
+        reporting_lot,
+        UNITS,
     )
 
 

@@ -423,9 +423,9 @@ def test_the_index_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndex"]
     assert not hidden
     assert description == (
-        "Creates the index behind one reference price, its name with its schedule, conventions, "
-        "contract specifications and, for a futures index, holiday calendar, and shows its "
-        "handle, the text other formulas take as the index."
+        "Creates the index behind one reference price from its name, schedule, conventions, "
+        "specifications, a futures index's holiday calendar and the lot its delta is reported in, "
+        "and shows its handle, the text other formulas take as the index."
     )
     assert arguments == [
         (
@@ -452,6 +452,12 @@ def test_the_index_creator_explains_itself() -> None:
             "The market's holiday-calendar handle with a futures schedule: the cell showing "
             "_CreateHolidayCalendar's result, such as B3, or a name for it; left out for an "
             "IFERC or Gas Daily schedule.",
+        ),
+        (
+            "[reporting_lot]",
+            "The name of the specification a batch's delta is reported in lots of, such as "
+            "NYMEX NG, exactly as the specifications spell it; left out for an index that only "
+            "builds markets and prices no trades.",
         ),
     ]
 
@@ -627,9 +633,9 @@ def test_the_two_reports_explain_themselves() -> None:
     description, arguments, hidden = SPECS["_ReportRisk"]
     assert not hidden and arguments == [results]
     assert description == (
-        "Reports the batch's risk from its results: the total delta, the change in mark for a "
-        "move of one quote unit in every contract, with its unit, the DV01 and the valuation "
-        "day, as evaluation stored them, and the DV01's unit, the currency per basis point."
+        "Reports the batch's risk from its results: the total delta in lots of the index's "
+        "reporting specification, with that unit, the DV01 and the valuation day, as evaluation "
+        "stored them, and the DV01's unit, the currency per basis point."
     )
 
 

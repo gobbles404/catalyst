@@ -96,6 +96,7 @@ GAS = index(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 # Valued on 10 March 2027: the contracts of October 2026 to February 2027, rows 0 to 4, have
@@ -241,7 +242,7 @@ PREPARATION_NUMPY = {
     "ndarray.ravel": 1,
     "ndarray.reshape": 1,
     "ndarray.searchsorted": 1,
-    "ndarray.setflags": 8,
+    "ndarray.setflags": 10,  # the eight, and the two lot arrays frozen since the lot delta
     "ndarray.sum": 4,
     "numpy.asanyarray": 3,
     "numpy.zeros": 1,
@@ -370,6 +371,7 @@ ASIAN_GAS = index(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 MONTH_DAYS = np.busday_count(
@@ -535,7 +537,12 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     slots, fixed = contracts * days, daily_fixed_slots(components, contracts, days)
     assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": slots}
     assert prep.live_slot.size == slots - fixed
-    assert prep.dated_live_exposure.nbytes == 8 * slots and prep.delta.nbytes == 8 * contracts
+    assert (
+        prep.dated_live_exposure.nbytes == 8 * slots
+        and prep.dated_live_lots.nbytes == 8 * slots  # the lot view per slot
+        and prep.price_sensitivity.nbytes == 8 * contracts
+        and prep.lot_delta.nbytes == 8 * contracts
+    )
     counter = WorkCounter()
     result = trade_results(prep, a_market(history), counter)
     live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
@@ -546,7 +553,7 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     )
     np.testing.assert_allclose(
         np.bincount(enc.reference_of_slot, weights=prep.dated_live_exposure, minlength=contracts),
-        prep.delta,
+        prep.price_sensitivity,
     )
 
 
@@ -583,7 +590,9 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
 # Memory: the preparation and the tick allocate by slots and references, never by trades or
 # observations. Measured on 2026-10-04 for two thousand trades over twenty-four contracts and
 # fifteen days, 360 slots: the preparation 30,972 bytes, about 86 a slot, its masks, the sort
-# behind the unique live references, its set amounts and its delta; the tick 7,792 bytes, about
+# behind the unique live references, its set amounts and its delta, and 33,964 on 2026-10-08,
+# about 94 a slot, with the lot view per slot and per contract beside them, the pin 98; the
+# tick 7,792 bytes, about
 # 22 a slot, the quotes, their gather onto the live slots and the contributions; the five-trade
 # batch of six slots 1,210, its records and a few small arrays, under twice the slack.
 def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> None:
@@ -591,7 +600,7 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     enc = a_daily_batch(components, contracts, days)
     history = a_history()
     slots = contracts * days
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
     prep = prepared_trades(enc, history, WorkCounter())
     quoted = a_market(history)
     assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
@@ -722,7 +731,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     }
     # The same trades, the same exposure per contract: the delta is the one-group batch's.
     one_group = prepared_trades(a_batch(components, contracts), history, WorkCounter())
-    np.testing.assert_allclose(prep.delta, one_group.delta)
+    np.testing.assert_allclose(prep.price_sensitivity, one_group.price_sensitivity)
 
 
 def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None:
@@ -742,7 +751,7 @@ def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None
     assert enc.slot_group.size == slots and enc.references.size == contracts
     assert enc.slot_of_observation.size == components * days
     history = a_history()
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
     prep = prepared_trades(enc, history, WorkCounter())
     quoted = a_market(history)
     assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
@@ -774,6 +783,7 @@ MIXED_GAS = index(
         UNITS,
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 METHOD_LAPS = np.array(
@@ -908,7 +918,7 @@ def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     history = a_history(ix=MIXED_GAS)
     slots = mixed_slots(contracts)
     assert enc.slot_group.size == slots
-    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 98 * slots + SLACK
     prep = prepared_trades(enc, history, WorkCounter())
     quoted = a_market(history)
     assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK

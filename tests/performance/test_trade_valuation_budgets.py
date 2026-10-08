@@ -59,7 +59,7 @@ def sheet() -> dict[str, Any]:
         ),
         Cells.from_rows([["lot", 10000.0, "MMBTU", 0.0, 0.0]]),
     )
-    index = PATH["_CreateIndex"]("gas", schedule, conventions, specifications, holidays)
+    index = PATH["_CreateIndex"]("gas", schedule, conventions, specifications, holidays, "lot")
     fields = [
         "quantity_unit",
         "quantity_per",

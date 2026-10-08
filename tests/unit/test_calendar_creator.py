@@ -64,7 +64,9 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
             Cells.from_rows([["NYMEX", 1000.0, "BBL", 0.0, 0.0]]),
         ],
     )
-    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    text = bridge.call(
+        "_CreateIndex", ["sample", schedule, conventions, specifications, holidays, MISSING]
+    )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 

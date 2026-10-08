@@ -83,6 +83,7 @@ GAS = index(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
@@ -102,6 +103,7 @@ ASIAN_GAS = index(
         ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 TEMPLATE_FIELDS: dict[str, object] = {
@@ -188,6 +190,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "observations": 1,
         "_last_days": 1,  # each component's last observation, the day its payment counts from
         "futures_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
+        "reporting_lot_of": 2,  # the resolution's and then the kernel's: the lot delta counts in
         "schedule_months": 1,
         "month_and_year": 25,
         "_the_periods": 1,  # each period to its components, with the days each covers
@@ -470,7 +473,9 @@ def sheet() -> dict[str, object]:
         for name, value in TEMPLATE_FIELDS.items()
     ]
     return {
-        "index": PATH["_CreateIndex"]("gas", schedule, conventions, specifications, holidays),
+        "index": PATH["_CreateIndex"](
+            "gas", schedule, conventions, specifications, holidays, "lot"
+        ),
         "template": PATH["_CreateTradeTemplate"](
             "future", Cells.from_rows([list(TEMPLATE_FIELDS)]), Cells.from_rows([values])
         ),
@@ -773,6 +778,7 @@ MIXED_GAS = index(
         UNITS,
     ),
     holiday_calendar(HOLIDAYS),
+    "lot",
     UNITS,
 )
 METHOD_NAMES_BY_LAP = ("lastday", "penultimate", "last3day", "asian")

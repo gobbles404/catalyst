@@ -174,7 +174,9 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
             Cells.from_rows([["NYMEX", 1000.0, "BBL", 0.0, 0.0]]),
         ],
     )
-    text = bridge.call("_CreateIndex", ["sample", schedule, conventions, specifications, holidays])
+    text = bridge.call(
+        "_CreateIndex", ["sample", schedule, conventions, specifications, holidays, MISSING]
+    )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
 
@@ -951,25 +953,34 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
         ],
     )
     made = bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, holidays]
+        "_CreateIndex",
+        ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING],
     )
     kinds, slots, joined = read(made)
     assert rows((kinds, slots, joined)) == [
-        ["name", "kind", "contracts", "specifications", "has_holiday_calendar"],
-        ["str", "str", "int64", "int64", "bool"],
-        ["Henry Hub NYMEX", "futures", 2.0, 1.0, 1.0],
+        ["name", "kind", "contracts", "specifications", "has_holiday_calendar", "reporting_lot"],
+        ["str", "str", "int64", "int64", "bool", "str"],
+        ["Henry Hub NYMEX", "futures", 2.0, 1.0, 1.0, "unset"],
     ]
-    assert kinds[2].tolist() == [TEXT_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE, BOOLEAN_CODE]
+    assert kinds[2].tolist() == [
+        TEXT_CODE,
+        TEXT_CODE,
+        NUMBER_CODE,
+        NUMBER_CODE,
+        BOOLEAN_CODE,
+        TEXT_CODE,
+    ]
     month = bridge.call(
         "_CreateIfercSchedule",
         [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
     )
     kinds, slots, joined = read(
         bridge.call(
-            "_CreateIndex", ["Henry Hub IFERC", month, conventions, specifications, MISSING]
+            "_CreateIndex",
+            ["Henry Hub IFERC", month, conventions, specifications, MISSING, MISSING],
         )
     )
-    assert rows((kinds, slots, joined))[2] == ["Henry Hub IFERC", "IFERC", 1.0, 1.0, 0.0]
+    assert rows((kinds, slots, joined))[2] == ["Henry Hub IFERC", "IFERC", 1.0, 1.0, 0.0, "unset"]
     assert kinds[2, 4] == BOOLEAN_CODE
 
 

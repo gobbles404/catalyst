@@ -39,7 +39,7 @@ def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, UNITS)
+    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
 
 # The page's sample as the desk keeps it, the newest flow day in the first row: Henry Hub Gas
@@ -54,6 +54,7 @@ FUTURES_INDEX = index(
     CONVENTIONS,
     SPECIFICATIONS,
     holiday_calendar(dates("2026-05-25")),
+    None,
     UNITS,
 )
 IFERC_INDEX = an_index(
