@@ -184,8 +184,20 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EB1),3,3)" = "6"
     "=INDEX(util_ReadHandle(EB1),3,4)" = "2"
     "=INDEX(util_ReadHandle(EB1),3,5)" = "TRUE"
+    "=INDEX(util_ReadHandle(EB1),1,6)" = "reporting_lot"
+    "=INDEX(util_ReadHandle(EB1),3,6)" = "lots"
+    "=INDEX(util_ReadHandle(EB1),1,7)" = "lot_size"
+    "=INDEX(util_ReadHandle(EB1),3,7)" = "1000"
+    "=INDEX(util_ReadHandle(EB1),3,8)" = "BBL"
+    "=INDEX(util_ReadHandle(EB1),1,9)" = "lot_quote_quantity"
+    "=INDEX(util_ReadHandle(EB1),3,9)" = "1000"
+    "=INDEX(util_ReadHandle(EB1),1,10)" = "lot_coefficient"
+    "=INDEX(util_ReadHandle(EB1),3,10)" = "1000"
+    "=COLUMNS(util_ReadHandle(EB1))"   = "10"
     "=INDEX(util_ReadHandle(EB2),3,2)" = "IFERC"
     "=INDEX(util_ReadHandle(EB2),3,5)" = "FALSE"
+    "=INDEX(util_ReadHandle(EB2),3,6)" = "unset"
+    "=COLUMNS(util_ReadHandle(EB2))"   = "6"
     "=INDEX(util_ReadHandle(EB3),3,2)" = "Gas Daily"
     "=INDEX(util_ReadHandle(EB3),3,3)" = "3"
     "=_CreateIndex(EC2,AI1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
@@ -193,6 +205,9 @@ $formulas = [ordered]@{
     "=_CreateIndex(EC2,AM1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
     "=_CreateIndex(EC2,AI1,AP1)" = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
     "=_CreateIndex(C2,AI1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: name is blank, expected text"
+    '=_CreateIndex(EC2,AI1,AP1,BY1,AM1,"LOT")' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
+    "=_CreateIndex(EC2,AI1,AP1,BY1,AM1,C2)" = "#ERROR _CreateIndex: reporting_lot is blank, expected text"
+    "=_CreateTrades(ED2,FG1:FK1,FG2:FK2,EW3)" = "#ERROR _CreateTrades: ValueError: index 'Henry Hub NYMEX' has no reporting_lot, expected one of its specifications named when the index was made; a batch's delta is reported in lots of it"
     # The futures fixings: a creator over a column of four days, newest first, and a column of
     # their settles and the futures index in EB1, and over the first row alone, read back through
     # util_ReadHandle in the order given, each settle beside its own day; the creator again over
@@ -475,8 +490,9 @@ $formulas = [ordered]@{
     # prepared in FG6 against the history in CT7, valued on 26-May-2026, and evaluated in FG7
     # against the market in CW1, n26 quoted at 74.25: the handles named for the index; the values
     # report, a mark of 8,500 and no cash, in dollars, on the valuation day; the risk report, a
-    # total delta of 2,000 dollars per dollar a barrel and a DV01 of zero; the two readers one row
-    # per slot, n26 on its expiry day, live, its exposure, its contribution and its contract's
+    # total delta of 2 lots of a thousand barrels, 2,000 dollars per dollar a barrel of
+    # sensitivity, and a DV01 of zero; the two readers one row per slot, n26 on its expiry day,
+    # live, its coefficient, its lots, its contribution and its contract's sensitivity and lot
     # delta named as the contract's; a history over
     # another index of the same name, a market over another history and a trade on m26, the
     # schedule's first contract, which only bounds the calendar, refused in the library's words,
@@ -491,22 +507,27 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(FG7),3,4)" = "46168"
     "=COLUMNS(_ReportValues(FG7))"   = "4"
     "=INDEX(_ReportRisk(FG7),1,1)" = "delta_total"
-    "=INDEX(_ReportRisk(FG7),3,1)" = "2000"
-    "=INDEX(_ReportRisk(FG7),3,2)" = "USD per USD/BBL"
+    "=INDEX(_ReportRisk(FG7),3,1)" = "2"
+    "=INDEX(_ReportRisk(FG7),3,2)" = "lots of lots (1000 BBL)"
     "=INDEX(_ReportRisk(FG7),3,3)" = "0"
     "=INDEX(_ReportRisk(FG7),3,4)" = "USD per basis point"
     "=COLUMNS(_ReportRisk(FG7))"   = "5"
     "=INDEX(util_ReadHandle(FG6),3,1)" = "n26"
     "=INDEX(util_ReadHandle(FG6),3,3)" = "FALSE"
     "=INDEX(util_ReadHandle(FG6),3,5)" = "2000"
+    "=INDEX(util_ReadHandle(FG6),1,6)" = "live_lots"
+    "=INDEX(util_ReadHandle(FG6),3,6)" = "2"
     "=ROWS(util_ReadHandle(FG6))"      = "3"
-    "=INDEX(util_ReadHandle(FG7),1,6)" = "contract_delta"
+    "=INDEX(util_ReadHandle(FG7),1,6)" = "live_contribution"
+    "=INDEX(util_ReadHandle(FG7),1,8)" = "contract_lot_delta"
     "=INDEX(util_ReadHandle(FG7),3,4)" = "2000"
-    "=INDEX(util_ReadHandle(FG7),3,5)" = "148500"
-    "=INDEX(util_ReadHandle(FG7),3,6)" = "2000"
+    "=INDEX(util_ReadHandle(FG7),3,5)" = "2"
+    "=INDEX(util_ReadHandle(FG7),3,6)" = "148500"
+    "=INDEX(util_ReadHandle(FG7),3,7)" = "2000"
+    "=INDEX(util_ReadHandle(FG7),3,8)" = "2"
     # A quantity of zero, a row kept ready: the batch in FG12 holds the two lots of n26 beside a
     # row of nothing on n26 at 72, FG10:FK11; prepared in FG13 and evaluated in FG14 as FG5 is, it
-    # marks the two lots' 8,500 with their delta of 2,000, one slot of the two components, and
+    # marks the two lots' 8,500 with their delta of 2 lots, one slot of the two components, and
     # the zero row reads back with its label and its amounts of nothing; a template holding a
     # quantity of nothing is a template.
     "=ROWS(util_ReadHandle(FG12))"       = "4"
@@ -519,7 +540,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(FG13))"       = "3"
     "=INDEX(util_ReadHandle(FG13),3,5)"  = "2000"
     "=INDEX(_ReportValues(FG14),3,1)"    = "8500"
-    "=INDEX(_ReportRisk(FG14),3,1)"      = "2000"
+    "=INDEX(_ReportRisk(FG14),3,1)"      = "2"
     '=MID(_CreateTradeTemplate("future",EZ4,FJ11),FIND(":",_CreateTradeTemplate("future",EZ4,FJ11))+1,15)' = "trade_template:"
     "=_PrepareTrades(FG5,CW5)"  = "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
     "=_PrepareTrades(FG8,CT7)"  = "#ERROR _PrepareTrades: ValueError: trade 'V3' at row 1 observes m26 on 2026-05-19, before the calendar begins; the schedule's first contract bounds the calendar and nothing prices it"
@@ -532,12 +553,12 @@ $formulas = [ordered]@{
     # 3.23 on 25 November among its fixings, F27 quoted at 3.50 and G27 at 3.60 in FM11; two trades,
     # ten lots of Z26 at 3.10 and seven of F27 at 3.40, prepared in FM14 and evaluated in FM15. Z26
     # has fixed and paid, so its 13,000 is cash and nothing of it is live; F27 marks 7,000 with a
-    # delta of 70,000; the readers show Z26 fixed and settled with no exposure and F27 live with
+    # delta of 7 lots; the readers show Z26 fixed and settled with no exposure and F27 live with
     # its contribution.
     "=INDEX(_ReportValues(FM15),3,1)" = "7000"
     "=INDEX(_ReportValues(FM15),3,2)" = "13000"
     "=INDEX(_ReportValues(FM15),3,4)" = "46356"
-    "=INDEX(_ReportRisk(FM15),3,1)"   = "70000"
+    "=INDEX(_ReportRisk(FM15),3,1)"   = "7"
     "=INDEX(util_ReadHandle(FM14),3,1)" = "Z26"
     "=INDEX(util_ReadHandle(FM14),1,3)" = "payment_date"
     "=INDEX(util_ReadHandle(FM14),3,3)" = "46356"
@@ -568,7 +589,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP5),3,6)"   = "2000"
     "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
-    "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
+    "=INDEX(_ReportRisk(GP6),3,1)"       = "2"
     "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method of trade 'V1' at row 1; a penultimate future is cash settled on the business day before its contract's expiry"
     # The last three pricing days: the batch in HS5 under the last3day template in HJ3, two trades
     # of Z26 on the synthetic index, observing 2, 3 and 7 December and paying the 9th, 46365;
@@ -611,7 +632,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(IY16),3,1)"    = "84"
     "=INDEX(_ReportValues(IY16),3,2)"    = "0"
     "=INDEX(_ReportRisk(IY16),3,1)"      = "2100"
-    "=INDEX(_ReportRisk(IY16),3,2)"      = "USD per USD/GAL"
+    "=INDEX(_ReportRisk(IY16),3,2)"      = "lots of GAL (1 GAL)"
     "=INDEX(util_ReadHandle(IY16),4,7)"  = "2100"
     # Calendar day quantities, trade-periods-and-bal.md slice A: the batch in IS12 under the
     # calday template in IJ9, C over the strip X26-Z26 at 100 gallons a day and D of Z26 at 110 a
@@ -685,7 +706,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     "=INDEX(_ReportRisk(KA14),3,1)"      = "0"
     "=COLUMNS(util_ReadHandle(KA14))"    = "7"
-    "=INDEX(util_ReadHandle(KA14),1,7)"  = "contract_delta"
+    "=INDEX(util_ReadHandle(KA14),1,9)"  = "contract_lot_delta"
     "=INDEX(util_ReadHandle(KA14),6,7)"  = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
     # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;
@@ -713,7 +734,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(LC34),3,1)"    = "275"
     "=INDEX(_ReportValues(LC34),3,2)"    = "-62"
     "=INDEX(_ReportRisk(LC34),3,1)"      = "85"
-    "=INDEX(_ReportRisk(LC34),3,2)"      = "USD per USD/GAL"
+    "=INDEX(_ReportRisk(LC34),3,2)"      = "lots of GAL (1 GAL)"
     "=ROWS(util_ReadHandle(LC33))"       = "25"
     "=INDEX(util_ReadHandle(LC33),3,3)"  = "46387"
     "=INDEX(util_ReadHandle(LC33),4,3)"  = "46391"
@@ -1097,7 +1118,7 @@ $cells = [ordered]@{
     "FM2" = "=_CreateContractSpecifications(EI1:EM1,FN2:FR2)"
     "FM3" = "=_CreateFuturesSchedule(FS1:FS4,FT1:FT4)"
     "FM4" = "=_CreateHolidayCalendar(FU1:FU3)"
-    "FM5" = '=_CreateIndex("TOY_GAS",FM3,FM1,FM2,FM4)'
+    "FM5" = '=_CreateIndex("TOY_GAS",FM3,FM1,FM2,FM4,"TOY")'
     "FM6" = "=_CreateValuationDate(FV1,0.5)"
     "FM7" = "=_CreateCalendar(FM6,FM5)"
     "FM8" = "=_CreateFuturesFixings(FW1:FW21,FX1:FX21,FM5)"
@@ -1148,7 +1169,7 @@ $cells = [ordered]@{
     "HD1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
     "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
-    "HA5" = '=_CreateIndex("SYN",HA4,HD1,HE1,HC1)'
+    "HA5" = '=_CreateIndex("SYN",HA4,HD1,HE1,HC1,"UNIT")'
     "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_time_lag"; "HQ1" = "payment_holiday_calendar"
     "HJ2" = "UNIT"; "HK2" = "month"; "HL2" = "last3day"; "HM2" = "cleared"; "HN2" = "financial"; "HO2" = "Prototype Clearing"; "HP2" = "+2bd"; "HQ2" = "=HC2"
     "HJ3" = '=_CreateTradeTemplate("future",HJ1:HQ1,HJ2:HQ2)'
@@ -1196,7 +1217,7 @@ $cells = [ordered]@{
     "ID1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
     "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
     "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
-    "IA6" = '=_CreateIndex("ETHANE",IA5,ID1,IE1,IC1)'
+    "IA6" = '=_CreateIndex("ETHANE",IA5,ID1,IE1,IC1,"GAL")'
     "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_time_lag"; "IQ1" = "payment_holiday_calendar"
     "IJ2" = "GAL"; "IK2" = "month"; "IL2" = "asian"; "IM2" = "cleared"; "IN2" = "financial"; "IO2" = "Prototype Clearing"; "IP2" = "+2bd"; "IQ2" = "=IC2"
     "IJ3" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ2:IQ2)'
@@ -1271,7 +1292,7 @@ $cells = [ordered]@{
     "JE1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "JF2" = "UNIT"; "JG2" = "1"; "JH2" = "MMBTU"; "JI2" = "0"; "JJ2" = "0"
     "JF1" = "=_CreateContractSpecifications(EI1:EM1,JF2:JJ2)"
-    "JB5" = '=_CreateIndex("PAYS",JB4,JE1,JF1,JD1)'
+    "JB5" = '=_CreateIndex("PAYS",JB4,JE1,JF1,JD1,"UNIT")'
     "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_holiday_calendar"
     "JL2" = "UNIT"; "JM2" = "month"; "JN2" = "last3day"; "JO2" = "cleared"; "JP2" = "financial"; "JQ2" = "Prototype Clearing"; "JR2" = "=JD1"
     "JL3" = '=_CreateTradeTemplate("future",JL1:JR1,JL2:JR2)'
@@ -1321,7 +1342,7 @@ $cells = [ordered]@{
     "KH2" = "GAL"; "KI2" = "1"; "KJ2" = "GAL"; "KK2" = "0"; "KL2" = "0"
     "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
     "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
-    "KD6" = '=_CreateIndex("MIXED",KD5,KG1,KH1,KF1)'
+    "KD6" = '=_CreateIndex("MIXED",KD5,KG1,KH1,KF1,"GAL")'
     "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_time_lag"; "KS1" = "payment_holiday_calendar"
     "KN2" = "cleared"; "KO2" = "financial"; "KP2" = "30-Nov-2026"; "KQ2" = "10"; "KR2" = "+1bd"; "KS2" = "=KF2"
     "KN3" = '=_CreateTradeTemplate("future",KN1:KS1,KN2:KS2)'
@@ -1569,14 +1590,14 @@ $cells = [ordered]@{
     # calendar in AM1, the IFERC schedule in DE1 and the Gas Daily schedule in DK1, each with the
     # conventions in AP1 and the specifications in BY1.
     "EC2" = "Henry Hub NYMEX"; "EC3" = "Henry Hub IFERC"; "EC4" = "Henry Hub Gas Daily"
-    "EB1" = "=_CreateIndex(EC2,AI1,AP1,BY1,AM1)"
+    "EB1" = '=_CreateIndex(EC2,AI1,AP1,BY1,AM1,"lots")'
     "EB2" = "=_CreateIndex(EC3,DE1,AP1,BY1)"
     "EB3" = "=_CreateIndex(EC4,DK1,AP1,BY1)"
     # The indices the calendars and the futures fixings take, the schedule and the holiday calendar
     # reached through them: over the two-contract schedule in CT4 with the holiday calendar in AM1
     # and with the one in CT10, over the two contracts after m26 in CW3, over the four schedules
     # the calendar refuses, AR2 to AR5, and over the Gas Daily schedule with a gap in DK3.
-    "ED1" = "=_CreateIndex(EC2,CT4,AP1,BY1,AM1)"
+    "ED1" = '=_CreateIndex(EC2,CT4,AP1,BY1,AM1,"lots")'
     "ED2" = "=_CreateIndex(EC2,CT4,AP1,BY1,CT10)"
     "ED3" = "=_CreateIndex(EC2,CW3,AP1,BY1,AM1)"
     "ED4" = "=_CreateIndex(EC2,AR2,AP1,BY1,AM1)"

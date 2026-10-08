@@ -189,7 +189,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
     Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
     Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I3)"
-    Put $State $Sheet "D5" "=_CreateIndex(A1,D1,D3,D4,D2)"
+    Put $State $Sheet "D5" '=_CreateIndex(A1,D1,D3,D4,D2,"NYMEX")'
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"
     Put $State $Sheet "D7" "=_CreateCalendar(D6,D5)"
     Put $State $Sheet "D8" "=_CreateFuturesFixings(A7:A9,B7:B9,D5)"
@@ -631,9 +631,10 @@ $trades = {
     # A quantity of zero, a row kept ready: the ticket's two barrels become none and the batch,
     # the preparation and the results publish anew, the old three released, the mark 0 and the
     # delta 0; the template, the history and the market stand. Typed back to two, the mark is
-    # 7 and the delta 2 again. The risk report in D20 reads the delta, publishing nothing.
+    # 7 and the delta 0.002 again, two barrels of the thousand-barrel reporting lot. The risk
+    # report in D20 reads the delta, publishing nothing.
     Put $state $sheet "D20" "=INDEX(_ReportRisk(D18),3,1)"
-    Check "the risk report reads the delta, 2 for two barrels" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
+    Check "the risk report reads the delta, 0.002 lots for two barrels" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
     $template = Text $state $sheet "D14"
     $trades = Text $state $sheet "D15"
     $prepared = Text $state $sheet "D17"
@@ -650,7 +651,7 @@ $trades = {
     Check "the old batch, preparation and results are released; sixteen live, three more published" ($c.Live -eq 16 -and $c.Released -eq 20 -and $c.Published -eq 36 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Put $state $sheet "M5" "2"
     Check "typed back to two barrels, the mark is 7 again" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
-    Check "and the delta 2 again" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
+    Check "and the delta 0.002 again" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 23 }
     Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 23 -and $c.Published -eq 39 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
@@ -658,7 +659,7 @@ $trades = {
 # --- valuation ------------------------------------------------------------------------------------
 # The chain, a financial template and a batch of two NYMEX lots of n26 at 70, as the trades group
 # makes them, prepared in D17, evaluated in D18 and read through the reports: the mark 4,200 at
-# the quote of 72.1, the delta 2,000 and no cash. Beside them, in F10 to F13, a second vector over
+# the quote of 72.1, the delta 2 lots and no cash. Beside them, in F10 to F13, a second vector over
 # a copy of the two prices in B10:B11 and a market, results and mark over it, equal calls sharing
 # the live chain's publications; a tick to 73.5 remakes the live vector, market and results and the
 # mark follows, 7,000, while the copy keeps the old three alive and reads 4,200 as it did, nothing
@@ -717,7 +718,7 @@ $valuation = {
     $results = Text $state $sheet "D18"
     Check "the results' cell shows its handle, named for the index" ($results.StartsWith("${id}:trade_results:WTI NYMEX:")) $results
     Check "the values report reads the mark, 4,200 at a quote of 72.1" ((Text $state $sheet "D19") -eq "4200") (Text $state $sheet "D19")
-    Check "the risk report reads the delta, 2,000 for two lots" ((Text $state $sheet "D20") -eq "2000") (Text $state $sheet "D20")
+    Check "the risk report reads the delta, 2 for two lots" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
     Check "and no cash, nothing having paid" ((Text $state $sheet "D21") -eq "0") (Text $state $sheet "D21")
     Check "the preparation shows n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
     Check "the report spilled shows its first header" ((Text $state $sheet "D23") -eq "cleared_mark") (Text $state $sheet "D23")
@@ -763,7 +764,7 @@ $valuation = {
     Check "the day moved onto the expiry gives the history a new handle" ((Text $state $sheet "D9") -ne $history -and (Text $state $sheet "D9").StartsWith("${id}:market_history:WTI NYMEX:")) (Text $state $sheet "D9")
     Check "and the preparation a new one" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
     Check "n26 is live on its own expiry day, the mark at the quote, 7,000" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
-    Check "the delta 2,000 still" ((Text $state $sheet "D20") -eq "2000") (Text $state $sheet "D20")
+    Check "the delta 2 still" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
     Check "and n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 10 }
     Check "the old date, calendar, fixings, history, market, preparation and results are released; sixteen live, seven more published" ($c.Live -eq 16 -and $c.Released -eq 10 -and $c.Published -eq 26 -and $c.Misses -eq 0) $c.Text
