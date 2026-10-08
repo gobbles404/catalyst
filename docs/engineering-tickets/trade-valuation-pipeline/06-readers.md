@@ -19,7 +19,7 @@ The two reports are committed from the start:
 
 ```python
 _ReportValues(results) -> MixedArray  # mark and cash under the route's labels
-_ReportRisk(results) -> MixedArray    # total delta; DV01 where supported
+_ReportRisk(results) -> MixedArray    # total delta in lots of the index's reporting lot; DV01 where supported
 ```
 
 Both take the results handle and spill what evaluation stored; neither selects a measure,
@@ -28,11 +28,14 @@ of the stored contents and replaces neither. These reports close the initial end
 trade-evaluation path. A decomposition view for retained fixed/set/live amounts is a possible
 later view, not a third required report. The values layout shows the two monetary fields
 together under their route labels; the risk layout shows the scalar aggregates, the total
-delta, the batch's change for a common one-price-unit move across its contracts, with its
-units, and DV01 where supported, named unsupported where not. The delta by contract on the
-batch's stable axis is retained in the result with its axis, labels and units, for later use
-without recalculation; this report does not spill it. The exact spill shapes are pinned in
-the pull request that builds them.
+delta, since #164 the batch's exposure still to price counted in lots of the specification
+the index names as its reporting lot, with that unit, and DV01 where supported, named
+unsupported where not; the monetary sensitivity, the change for a common one-price-unit move
+across the contracts, is retained under its own name and is not what the report calls
+delta, [lot-delta-reporting.md](lot-delta-reporting.md). The delta by contract in lots and
+the sensitivity by contract on the batch's stable axis are retained in the result with their
+axis, labels and units, for later use without recalculation; this report does not spill
+them. The exact spill shapes are pinned in the pull request that builds them.
 
 The selected pipeline returns a results handle from `_EvaluateTrades`; the two reports spill
 views from that handle and calculate nothing independently.
@@ -68,7 +71,8 @@ substitute zero or trigger lazy repricing, calendar work, fixing gathering, a ri
 another market bind. No optional-measure framework is introduced for the four-output target.
 
 Display the retained route, currency, as-of, value basis, date cutoff and cumulative
-modeled-settlement scope, plus delta's commodity axis and DV01's curve/bucket, bump and sign.
+modeled-settlement scope, plus delta's commodity axis and reporting lot and DV01's
+curve/bucket, bump and sign.
 The proposed cutoff is payment date on or before as-of; the proposed cumulative scope is
 all settled components in the supplied batch. Evaluation applies that convention before
 publishing results. Readers neither infer payment nor move an amount between value buckets.
@@ -96,6 +100,10 @@ the aggregate amount path, not the completed route-specific four-field result:
 | Bound market point | Batch amount delta, USD per USD/unit |
 |---|---:|
 | TOY Z26 remaining-assessment projection | 30 |
+
+Since #164 the reported delta is this amount delta over the index's reporting lot's
+coefficient, a count of lots, 30 lots for a reporting lot of one unit; the monetary number
+reads back as the contract's sensitivity and is not reported as delta.
 
 An aggregate decomposition view can show fixed leg `-4120`, floating leg set `2040`, and
 floating leg live `2220`, which sum to `140`. These are the batch's retained amounts.
