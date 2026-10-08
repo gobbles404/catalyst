@@ -69,7 +69,7 @@ and nothing later looks the name up again.
 
 `contract_code` is one month or a monthly strip in the period grammar behind `util_StartDate`,
 `Z26`, `z26`, `CAL27`, `Z27-X28`, resolved by month against the index's schedule, every code of
-the schedule read. Since #NN `start_date` and `end_date` are the other period form, in place of the
+the schedule read. Since #161 `start_date` and `end_date` are the other period form, in place of the
 code and never beside it: the first and the last day the deal covers, split at month ends into
 components, a whole month by dates the code's own components; a part of a month prices under
 `asian` alone, and [util_StartDate](../utilities/start-date.md) and
@@ -186,7 +186,7 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| the future's sixteen fields in order, which are required, the conditions, the period form's three among them since #NN, the types and the codes | example |
+| the future's sixteen fields in order, which are required, the conditions, the period form's three among them since #161, the types and the codes | example |
 | a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
 | the name matched exactly, `Future` and ` future` refused naming `future`, an empty catalog saying so, two instruments both named | example |
 | seven rows and seventeen columns, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
@@ -195,7 +195,7 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 119 for the future, and the mixed way out's numpy; a peak of 12,869 bytes since #NN's two period fields, 103 cells of text, about 108 a cell, within 110 a cell and the slack, what a text cell costs, where a hundred a cell and the slack covered fifteen columns and would cover seventeen by 55 bytes; nothing published | budget |
+| twelve functions, the classification once per cell, 119 for the future, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, within 110 a cell and the slack, what a text cell costs, where a hundred a cell and the slack covered fifteen columns and would cover seventeen by 55 bytes; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which

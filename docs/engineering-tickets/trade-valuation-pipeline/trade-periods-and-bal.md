@@ -4,7 +4,7 @@
 [Last three pricing days](last3day-trades.md)
 
 **Status:** Built, the three slices as three PRs on the prototype stack above #158, A in #159, B in
-#160 and C in #NN, the page as a ticket. The sections at the end record what each slice built. Draft engineering ticket, 7
+#160 and C in #161, the page as a ticket. The sections at the end record what each slice built. Draft engineering ticket, 7
 October 2026. Extends the prototype after the
 [full-month Asian slice](asian-trades.md). The inspected baseline is PR #157 at `592a6bc`;
 Asian is specified separately and must be available before the final integration slice.
@@ -401,7 +401,7 @@ Built as the page says for slice B, on the two date utilities, with these partic
   no whole-period reading of an early one, the ordinary label being that; no business-day rule on
   the reference; slice C, the dates through creation and valuation, not started.
 
-## As built, slice C, #NN
+## As built, slice C, #161
 
 Built as the page says for slice C, on the path every batch takes, with these particulars.
 

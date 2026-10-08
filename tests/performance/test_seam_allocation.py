@@ -981,7 +981,7 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # --- the instrument catalog -------------------------------------------------------------------
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by
-# seventeen columns since #NN, 119 cells of which 103 are text, is laid out one cell at a time
+# seventeen columns since #161, 119 cells of which 103 are text, is laid out one cell at a time
 # and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell. The peak
 # follows the length of the texts, the rule texts above all, which #146 lengthened, #158 and
 # #159 kept short and the two period fields add two columns of, kept short too; a text cell
@@ -1021,7 +1021,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # the library already holds: measured 2,331 bytes on 2026-10-06, which four times the slack
 # covers. A batch of 2,500 single-month rows keeps nineteen columns of eight bytes a row, the
 # terms' eight by component, the covered days among them since #159 and the two dates each
-# component covers since #NN, while the month's quantity shares the entered quantity's column
+# component covers since #161, while the month's quantity shares the entered quantity's column
 # under month, and the encoding's three by component, the payment
 # terms' lag, calendar and day by occurrence and component, and the observations' component, day,
 # weight and slot by observation, one per component under lastday, and on the way makes the
