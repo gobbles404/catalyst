@@ -4,7 +4,7 @@
 [Mixed trade fields](mixed-trade-fields.md) ·
 [Bilateral planning](bilateral-discounting-and-dv01.md)
 
-**Status:** Built in #NN on the prototype stack above #163, the page as a ticket; the
+**Status:** Built in #164 on the prototype stack above #163, the page as a ticket; the
 [As built](#as-built-nn) section at the end says what was built and what was not. Written
 8 October 2026, following Excel UAT of the prototype through PR #163, reviewed at
 `14130240`. Reporting delta in lots and designating a reporting specification per index are
@@ -250,7 +250,7 @@ produces PV-weighted equivalent lots; that is not automatically nominal remainin
 volume. Preserve both meanings and resolve their presentation before enabling bilateral
 evaluation. This ticket leaves that bilateral reporting choice open.
 
-## As built, #NN
+## As built, #164
 
 Engineering's record of what landed, in the ticket's terms.
 [index.md](../../library/index-definitions/index.md),
