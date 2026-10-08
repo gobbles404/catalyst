@@ -585,5 +585,6 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
         **resolution_numpy(contracts),
         "ndarray.any": 14,  # whether any product would outrun the largest number
         "ndarray.setflags": 12,  # the product frozen
+        "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
         "ufunc.reduce": 17,
     }

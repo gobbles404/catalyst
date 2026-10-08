@@ -2579,3 +2579,24 @@ def test_the_covered_days_are_per_component_and_positive_and_the_product_finite(
     )
     # The same entered quantity is a whole, finite count under month and stands.
     assert basis_terms(NG, (1,), (1e308,), QuantityPer.MONTH).component_quantity[0] == 1e308
+
+
+def test_a_quantity_at_the_rounded_bound_is_refused_with_its_infinite_product() -> None:
+    # The review of #159: the largest finite number over 31 days is a quotient that rounds up, so a
+    # quantity exactly at it passed a look at the bound and its product was infinite, the offset a
+    # NaN. The product itself is looked at now, the overflow handled where it happens, positive or
+    # negative; one step below the bound the product is finite and stands.
+    at_bound = 5.799010112459083e306
+    assert at_bound * 31 == float("inf")
+    for quantity in (at_bound, -at_bound):
+        with pytest.raises(ValueError) as refused:
+            basis_terms(NG, (1,), (quantity,))
+        assert str(refused.value) == (
+            f"quantity of trade 'C-1' at row 1 is {quantity!r} over 31 days, expected a finite "
+            "quantity"
+        )
+    below = float(np.nextafter(at_bound, 0))
+    terms = basis_terms(NG, (1,), (below,))
+    assert terms.component_quantity[0] == below * 31 and np.isfinite(terms.component_quantity[0])
+    month = basis_terms(NG, (1,), (-below,), QuantityPer.MONTH)  # a whole count under month
+    assert month.component_quantity[0] == -below and month.covered_days[0] == 31

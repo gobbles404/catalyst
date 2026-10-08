@@ -12,7 +12,7 @@ pays. docs/library/trades/kernel.md is the page."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final, assert_never, cast
+from typing import assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,10 +22,6 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
-
-# The largest finite number: what a component's quantity, the entered quantity times its covered
-# days, is held under before the multiplication, which would warn as it overflowed.
-_LARGEST: Final = float(np.finfo(np.float64).max)
 
 
 class Route(Enum):
@@ -396,20 +392,23 @@ def _the_component_quantity(
     nothing later to scale again. Under month the entered quantity itself, the frozen column
     shared, since the entered quantity stands in every month the trade covers; under calday the
     entered quantity times the component's covered days, one multiplication over the components,
-    frozen, and finite, the first product past the largest number refused by its trade, since the
-    whole-number rule admits entered quantities the product outruns."""
+    frozen, and finite: the product itself is looked at, since a bound on the entered quantity
+    is a rounded quotient a quantity at it can pass and still overflow, the overflow let happen
+    here quietly and the first infinite product refused by its trade, since the whole-number
+    rule admits entered quantities the product outruns."""
     match quantity_per:
         case QuantityPer.MONTH:
             return quantity
         case QuantityPer.CALDAY:
-            outsize = np.abs(quantity) > _LARGEST / covered_days
-            if outsize.any():
-                k = int(outsize.argmax())
+            with np.errstate(over="ignore"):  # the overflow is this rule's to catch, below
+                expanded = quantity * covered_days
+            overflow = ~np.isfinite(expanded)
+            if overflow.any():
+                k = int(overflow.argmax())
                 raise ValueError(
                     f"quantity of {_named(labels, int(occurrence[k]))} is {float(quantity[k])!r} "
                     f"over {int(covered_days[k])} days, expected a finite quantity"
                 )
-            expanded = quantity * covered_days
             expanded.setflags(write=False)  # made here and owned here: no copy to freeze
             return expanded
         case _:

@@ -332,9 +332,10 @@ Built as the page says for slice A, on the path every batch takes, with these pa
   positive, and keeps them as `covered_days`.
 - **The component quantity.** The kernel forms `component_quantity` once, by the basis: under
   `month` the entered quantity's own frozen column, shared; under `calday` the entered quantity
-  times the covered days, held under the largest finite number before the multiplication so that
-  no product overflows unnamed, `quantity of trade 'C-1' at row 1 is 1e+308 over 31 days, expected
-  a finite quantity`. `quantity` stays the entered quantity. The encoding converts
+  times the covered days, the product itself looked at for finiteness and the overflow handled
+  where it happens, since a bound on the entered quantity is a rounded quotient a quantity at it
+  can pass, as the review of #159 found, `quantity of trade 'C-1' at row 1 is 1e+308 over 31
+  days, expected a finite quantity`. `quantity` stays the entered quantity. The encoding converts
   `component_quantity` and nothing else changes: the preparation, a tick and the reports take the
   coefficients as they are, so a calday batch of 110 gallons a day values as the month batch of
   3,410 to the bit, 96.1 of mark and 3,255 of delta on the ethane example's 2 December and 96.1 of
