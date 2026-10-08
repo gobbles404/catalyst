@@ -288,3 +288,85 @@ def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
         index(
             name, schedule, CONVENTIONS, specifications, None if holidays else HOLIDAYS, None, UNITS
         )
+
+
+# --- the reporting lot, lot-delta-reporting.md ----------------------------------------------
+# The ticket's ETE index: VOLUME in gallons, a LOT of a thousand barrels beside a barrel and a
+# gallon of one each, quoted in cents a gallon and settled in dollars unless said.
+ETE_SPECIFICATIONS = contract_specifications(
+    ("LOT", "BBL", "GAL"),
+    np.array([1000.0, 1.0, 1.0]),
+    ("BBL", "BBL", "GAL"),
+    np.zeros(3),
+    np.zeros(3),
+    UNITS,
+)
+ETE_FUTURES = futures_schedule(("X26", "Z26"), dates("2026-11-30", "2026-12-31"), None)
+
+
+def ete(
+    quote: tuple[str, str] = ("CENT", "GAL"),
+    settled: str = "USD",
+    reporting_lot: str | None = "LOT",
+) -> Index:
+    conventions = index_conventions(quote[0], quote[1], settled, "VOLUME", "GAL", UNITS)
+    return index(
+        "ETE", ETE_FUTURES, conventions, ETE_SPECIFICATIONS, HOLIDAYS, reporting_lot, UNITS
+    )
+
+
+def test_the_reporting_lot_is_resolved_once_into_its_quantity_and_its_coefficient() -> None:
+    lot = ete().reporting_lot
+    assert lot is not None
+    assert (lot.specification, lot.name, lot.lot_size, lot.lot_unit) == (0, "LOT", 1000.0, "BBL")
+    assert lot.quote_quantity == pytest.approx(42_000.0) and lot.coefficient == pytest.approx(420.0)
+    assert lot.words == "lots of LOT (1000 BBL)"
+    # The same lot in every quote and settlement unit: 42,000 gallons or a thousand barrels, and
+    # the dollars or cents a live lot makes per unit of quote price.
+    for quote, settled, quantity, coefficient in (
+        (("USD", "GAL"), "USD", 42_000.0, 42_000.0),
+        (("USD", "BBL"), "USD", 1_000.0, 1_000.0),
+        (("CENT", "BBL"), "USD", 1_000.0, 10.0),
+        (("CENT", "GAL"), "CENT", 42_000.0, 42_000.0),
+    ):
+        other = ete(quote, settled).reporting_lot
+        assert other is not None
+        assert other.quote_quantity == pytest.approx(quantity)
+        assert other.coefficient == pytest.approx(coefficient)
+    # A row that is not the first, a bare unit: the choice is the name's, nothing inferred.
+    gallon = ete(reporting_lot="GAL").reporting_lot
+    assert gallon is not None
+    assert (gallon.specification, gallon.words) == (2, "lots of GAL (1 GAL)")
+    assert gallon.coefficient == pytest.approx(0.01)
+
+
+def test_an_index_made_without_a_reporting_lot_has_none() -> None:
+    assert ete(reporting_lot=None).reporting_lot is None
+    assert an_index().reporting_lot is None
+
+
+@pytest.mark.parametrize("name", ["lot", " LOT", "LOTS", "", "MMBTU"])
+def test_a_reporting_lot_names_one_of_the_specifications_exactly(name: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        ete(reporting_lot=name)
+    assert str(failure.value) == (
+        f"reporting_lot is {name!r}, expected one of the specifications: 'LOT', 'BBL', 'GAL'"
+    )
+
+
+def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() -> None:
+    huge = contract_specifications(
+        ("LOT",), np.array([1e308]), ("BBL",), np.zeros(1), np.zeros(1), UNITS
+    )
+    conventions = index_conventions("CENT", "GAL", "USD", "VOLUME", "GAL", UNITS)
+    with pytest.raises(ValueError) as failure:
+        index("ETE", ETE_FUTURES, conventions, huge, HOLIDAYS, "LOT", UNITS)
+    assert str(failure.value) == (
+        "reporting_lot 'LOT' is inf GAL a lot, expected a finite quantity; the lot size outruns "
+        "the largest number"
+    )
+    # The lot-unit rule comes first: an energy lot under volume conventions is named before any
+    # lot is looked for.
+    with pytest.raises(ValueError) as failure:
+        index("ETE", ETE_FUTURES, conventions, SPECIFICATIONS, HOLIDAYS, "LOT", UNITS)
+    assert str(failure.value).startswith("specifications row 1 lot_unit is 'MMBTU'")

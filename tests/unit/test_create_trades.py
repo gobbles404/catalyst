@@ -2312,3 +2312,16 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     }
     batch, _ = created(MIXED, lastday_rows, physical)
     np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])
+
+
+def test_an_index_without_a_reporting_lot_refuses_a_batch_before_any_row_is_read() -> None:
+    lotless = an_index(reporting_lot=None)
+    message = (
+        "index 'Henry Hub NYMEX' has no reporting_lot, expected one of its specifications named "
+        "when the index was made; a batch's delta is reported in lots of it"
+    )
+    assert refused(lotless) == message
+    assert refused(lotless, {**NG_TICKET, "contract_code": ["Z2026"] * 5}) == message
+    batch, _ = created(NG, NG_TICKET, NG_TEMPLATE)
+    assert NG.reporting_lot is not None and batch.resolved.reporting_lot is NG.reporting_lot
+    assert NG.reporting_lot.words == "lots of NYMEX NG (10000 MMBTU)"

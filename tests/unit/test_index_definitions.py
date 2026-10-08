@@ -1375,3 +1375,35 @@ def test_a_dead_index_handle_cannot_be_read() -> None:
         "#ERROR util_ReadHandle: handle is text 'index:9999999' naming no live object, "
         "expected a handle"
     )
+
+
+def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, "ICE NG")
+    kinds, slots, joined = read(made)
+    assert rows((kinds, slots, joined)) == [
+        [*INDEX_HEADERS, "lot_size", "lot_unit", "lot_quote_quantity", "lot_coefficient"],
+        [*INDEX_TYPES, "float64", "str", "float64", "float64"],
+        ["Henry Hub NYMEX", "futures", 3.0, 2.0, 1.0, "ICE NG", 2500.0, "MMBTU", 2500.0, 2500.0],
+    ]
+    assert kinds[2].tolist()[5:] == [TEXT_CODE, NUMBER_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE]
+    assert bridge.call(
+        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, "LOT"]
+    ) == (
+        "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the "
+        "specifications: 'NYMEX NG', 'ICE NG'"
+    )
+    assert (
+        bridge.call(
+            "_CreateIndex",
+            ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, None],
+        )
+        == "#ERROR _CreateIndex: reporting_lot is blank, expected text"
+    )
+    assert (
+        bridge.call(
+            "_CreateIndex",
+            ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, 1.0],
+        )
+        == "#ERROR _CreateIndex: reporting_lot is number 1.0, expected text"
+    )
