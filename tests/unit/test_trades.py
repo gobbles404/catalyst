@@ -2627,6 +2627,8 @@ def test_a_quantity_at_the_rounded_bound_is_refused_with_its_infinite_product() 
     assert terms.component_quantity[0] == below * 31 and np.isfinite(terms.component_quantity[0])
     month = basis_terms(NG, (1,), (-below,), QuantityPer.MONTH)  # a whole count under month
     assert month.component_quantity[0] == -below and month.covered_days[0] == 31
+
+
 # --- explicit dates: a booked period within a month, its days and its value --------------------
 # trade-periods-and-bal.md, slice C: a component covers the days it is given, start to end, within
 # its contract's month; the kernel counts the days and the schedule method prices over them, asian
