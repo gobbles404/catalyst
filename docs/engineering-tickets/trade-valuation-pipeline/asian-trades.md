@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade creation](create-trade.md) ·
 [Dated exposure](dated-exposure.md) · [Last three pricing days](last3day-trades.md)
 
-**Status:** Built in #NN on the prototype stack above #157, the page as a ticket. Engineering
+**Status:** Built in #158 on the prototype stack above #157, the page as a ticket. Engineering
 ticket, 7 October 2026. Next prototype slice after PR #157, reviewed at `592a6bc`. Implemented
 as one focused PR on the prototype's current head with that work included. This ticket does not
 decide how the prototype will reach main. The section at the end records what was built.
@@ -270,7 +270,7 @@ checked lifecycle and strip values, preserved tick reuse, and inspectable saved 
 After this slice, discuss mixed methods and payment groups using the actual implementations.
 Broader pricing references and conversion from whole-month quotes remain explicit follow-ups.
 
-## As built, #NN
+## As built, #158
 
 Built as the page says, on the path the other methods take, with these particulars.
 

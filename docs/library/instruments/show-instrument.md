@@ -190,7 +190,7 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 105 for the future, and the mixed way out's numpy; a peak of 11,390 bytes since #NN's shorter method rule, about 109 a cell, within a hundred a cell and the slack; nothing published | budget |
+| twelve functions, the classification once per cell, 105 for the future, and the mixed way out's numpy; a peak of 11,390 bytes since #158's shorter method rule, about 109 a cell, within a hundred a cell and the slack; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which
