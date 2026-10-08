@@ -12,7 +12,7 @@ decide how the prototype will reach main. The section at the end records what wa
 supersedes this initial slice's requirement that each observation reference its booked
 month's contract. The general rule takes the nearby reference from the supplied index
 schedule/calendar for each pricing day; month-aligned and rolling references share one path.
-This page otherwise records the original slice and its acceptance examples. Built in #NN.
+This page otherwise records the original slice and its acceptance examples. Built in #165.
 
 ## Outcome and scope
 
@@ -298,7 +298,7 @@ Built as the page says, on the path the other methods take, with these particula
   anchor through #157's `_last_days`. A day that another contract prices is the encoding's
   existing refusal, `trade 'A' at row 1 observes Z26 on 2026-12-01, a day F27 prices; an
   observation of a contract other than the day's pricing contract has no settle in a futures
-  history, not supported`, and nothing is truncated or substituted. Superseded in #NN: an
+  history, not supported`, and nothing is truncated or substituted. Superseded in #165: an
   asian day another contract prices takes that contract as its reference, the booked contract
   keeping the fixed leg and the payment,
   [calendar-driven-asian-references.md](calendar-driven-asian-references.md).

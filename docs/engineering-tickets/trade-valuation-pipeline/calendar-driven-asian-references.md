@@ -1,7 +1,7 @@
 # Calendar driven Asian pricing references
 
-**Status:** Built in #NN on the prototype stack above #164, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not.
+**Status:** Built in #165 on the prototype stack above #164, the page as a ticket; the
+[As built](#as-built-165) section at the end says what was built and what was not.
 Engineering ticket, 8 October 2026. Owner direction agreed during Excel UAT.
 The inspected prototype is `14130240` through PR #163. Implemented on its current successor
 as one focused PR; this ticket makes no decision about landing or rebuilding the prototype.
@@ -276,7 +276,7 @@ expiry-method behavior and no extra work on ticks. No new signature, instrument 
 rate model, quote adapter, roll convention, or general trade-input blank policy is part
 of this PR.
 
-## As built, #NN
+## As built, #165
 
 Engineering's record of what landed, in the ticket's terms.
 [kernel.md](../../library/trades/kernel.md),
