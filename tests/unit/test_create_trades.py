@@ -1255,7 +1255,7 @@ def test_the_unit_in_the_ticket_names_its_row_and_each_row_counts_its_own() -> N
         "quantity_unit row 1 is 'ICE NG', expected one of the index's specifications: "
         "'NYMEX NG', 'ICE PHH', 'MMBTU'"
     )
-    # Since #NN a row's unit is its own: NG-002 in ICE PHH lots of 2,500 beside the NYMEX rows.
+    # Since #163 a row's unit is its own: NG-002 in ICE PHH lots of 2,500 beside the NYMEX rows.
     mixed: list[object] = ["NYMEX NG", "ICE PHH", "NYMEX NG", "NYMEX NG", "NYMEX NG"]
     two, _ = created(TWO_LOTS, {**NG_TICKET, "quantity_unit": mixed}, template)
     np.testing.assert_array_equal(two.resolved.specification, [0, 1, 0, 0, 0])

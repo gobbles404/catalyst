@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Multiple payment groups](multiple-payment-groups.md)
 
-**Status:** Built in #NN on the prototype stack above #162, the page as a ticket; the
+**Status:** Built in #163 on the prototype stack above #162, the page as a ticket; the
 [As built](#as-built-nn) section at the end says what was built and what was not. Written
 8 October 2026 as the next prototype slice after PR #162, reviewed at `fa7cb93`, a
 continuation of the prototype that does not decide how the full stack will land or what
@@ -288,7 +288,7 @@ row's meaning in readback, and reaches the same compressed evaluation path as on
 trade. The next step is realistic mixed-batch Excel UAT and a review of the prototype's
 shape before adding bilateral rates or deciding what to rebuild on main.
 
-## As built, #NN
+## As built, #163
 
 Engineering's record of what landed, in the ticket's terms.
 [create-trades.md](../../library/trades/create-trades.md) and
