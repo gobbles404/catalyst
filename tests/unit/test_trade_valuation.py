@@ -765,8 +765,8 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
     )
     assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the penultimate method; a penultimate future is cash settled on the business day "
-        "before its contract's expiry"
+        "with the penultimate method of trade 'PHH-1' at row 1; a penultimate future is cash "
+        "settled on the business day before its contract's expiry"
     )
 
 
@@ -1317,8 +1317,8 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_she
     physical = l3d_template(["2026-01-01"], "physical")
     assert ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], rows(L3D_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the last3day method; a last3day future is cash settled on the average of its last "
-        "three pricing days"
+        "with the last3day method of trade 'A' at row 1; a last3day future is cash settled on the "
+        "average of its last three pricing days"
     )
 
 
@@ -1581,8 +1581,8 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
     physical = asian_template(["2027-01-01"], "physical")
     assert ENTRY["_CreateTrades"](ethane["index"], ethane["headers"], rows(ETHANE_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the asian method; an asian future is cash settled on the average of its month's "
-        "pricing days"
+        "with the asian method of trade 'A' at row 1; an asian future is cash settled on the "
+        "average of its month's pricing days"
     )
 
 

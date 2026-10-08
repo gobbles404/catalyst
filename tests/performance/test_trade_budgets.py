@@ -65,6 +65,7 @@ def observed_of(terms: ResolvedTrades) -> Observations:
         terms.contract,
         terms.start_date,
         terms.end_date,
+        terms.named,
     )
 
 

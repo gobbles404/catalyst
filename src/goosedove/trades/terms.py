@@ -146,10 +146,13 @@ class ResolvedTrades:
     def named(self, component: int) -> str:
         """A component's trade named in a message, by its label when the ticket gave one and by
         its row as the sheet counts rows either way: `trade 'NG-001' at row 1`, `trade at row 3`."""
-        return _named(self.labels, int(self.occurrence[component]))
+        return named_trade(self.labels, int(self.occurrence[component]))
 
 
-def _named(labels: tuple[str, ...] | None, row: int) -> str:
+def named_trade(labels: tuple[str, ...] | None, row: int) -> str:
+    """A trade named in a message, by its label when the ticket gave one and by its row as
+    the sheet counts rows either way, `trade 'NG-001' at row 1`, `trade at row 3`: the words
+    every refusal of a row's own fact uses, in the kernel and in the observations alike."""
     if labels is None:
         return f"trade at row {row + 1}"
     return f"trade {labels[row]!r} at row {row + 1}"
@@ -188,8 +191,8 @@ def resolved_trades(
     range refused. A penultimate, last3day or asian row settles financially, each being cash
     settled against settles on or before its contract's expiry, and a physical settlement would
     say a delivery the contract does not make: a physical batch takes lastday rows alone, the
-    first other row refused by its method. The components are aligned, one or more, each
-    belonging to an occurrence, every
+    first other row refused by its method and named by its row. The components are aligned, one
+    or more, each belonging to an occurrence, every
     occurrence holding at least one, since a trade with no contract month has no economics; each
     contract is a row of the schedule; each component covers the days from its start date to its
     end date, the end on or after the start and both in one calendar month, since a component is
@@ -210,7 +213,7 @@ def resolved_trades(
     schedule = futures_schedule_of(index)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
-    _the_method(schedule_method, settlement)
+    _the_method(schedule_method, settlement, labels)
     _the_components(
         occurrence,
         contract,
@@ -296,13 +299,15 @@ def _the_selections(
             )
 
 
-def _the_method(schedule_method: NDArray[np.intp], settlement: Settlement) -> None:
+def _the_method(
+    schedule_method: NDArray[np.intp], settlement: Settlement, labels: tuple[str, ...] | None
+) -> None:
     """Each occurrence's method with the batch's settlement: a penultimate future is cash settled
     against the settle on the business day before its contract's expiry, a last3day future
     against the average of its last three pricing days and an asian future against the average
     of its month's pricing days, so a physical settlement is refused with the first row that
-    chose any of the three; lastday settles either way, and a physical batch is lastday rows
-    alone."""
+    chose any of the three, named by its label and its row; lastday settles either way, and a
+    physical batch is lastday rows alone."""
     match settlement:
         case Settlement.FINANCIAL:
             return
@@ -310,27 +315,29 @@ def _the_method(schedule_method: NDArray[np.intp], settlement: Settlement) -> No
             other = schedule_method != METHODS.index(ScheduleMethod.LASTDAY)
             if not other.any():
                 return
-            method = METHODS[int(schedule_method[int(other.argmax())])]
+            i = int(other.argmax())
+            method = METHODS[int(schedule_method[i])]
+            trade = named_trade(labels, i)
             match method:
                 case ScheduleMethod.LASTDAY:
                     return
                 case ScheduleMethod.ASIAN:
                     raise ValueError(
                         "settlement_method is 'physical', expected 'financial' with the asian "
-                        "method; an asian future is cash settled on the average of its month's "
-                        "pricing days"
+                        f"method of {trade}; an asian future is cash settled on the average of "
+                        "its month's pricing days"
                     )
                 case ScheduleMethod.LAST3DAY:
                     raise ValueError(
                         "settlement_method is 'physical', expected 'financial' with the last3day "
-                        "method; a last3day future is cash settled on the average of its last "
-                        "three pricing days"
+                        f"method of {trade}; a last3day future is cash settled on the average of "
+                        "its last three pricing days"
                     )
                 case ScheduleMethod.PENULTIMATE:
                     raise ValueError(
                         "settlement_method is 'physical', expected 'financial' with the "
-                        "penultimate method; a penultimate future is cash settled on the "
-                        "business day before its contract's expiry"
+                        f"penultimate method of {trade}; a penultimate future is cash settled on "
+                        "the business day before its contract's expiry"
                     )
                 case _:
                     assert_never(method)
@@ -396,7 +403,7 @@ def _the_components(
     held = np.bincount(occurrence, minlength=occurrences)
     if (held == 0).any():
         i = int((held == 0).argmax())
-        raise ValueError(f"{_named(labels, i)} has no component, expected at least one")
+        raise ValueError(f"{named_trade(labels, i)} has no component, expected at least one")
     outside = (contract < 0) | (contract >= schedule_rows)
     if outside.any():
         k = int(outside.argmax())
@@ -408,18 +415,20 @@ def _the_components(
     if backwards.any():
         k = int(backwards.argmax())
         raise ValueError(
-            f"end_date of {_named(labels, int(occurrence[k]))} is {end_date[k]}, expected a day "
-            f"on or after its start_date, {start_date[k]}"
+            f"end_date of {named_trade(labels, int(occurrence[k]))} is {end_date[k]}, expected a "
+            f"day on or after its start_date, {start_date[k]}"
         )
     two_months = start_date.astype("datetime64[M]") != end_date.astype("datetime64[M]")
     if two_months.any():
         k = int(two_months.argmax())
         raise ValueError(
-            f"{_named(labels, int(occurrence[k]))} covers {start_date[k]} to {end_date[k]}, "
+            f"{named_trade(labels, int(occurrence[k]))} covers {start_date[k]} to {end_date[k]}, "
             "expected one calendar month per component"
         )
-    whole_quantities(quantity, lambda k: f"quantity of {_named(labels, int(occurrence[k]))}")
-    finite_prices(fixed_price, lambda k: f"fixed_price of {_named(labels, int(occurrence[k]))}")
+    whole_quantities(quantity, lambda k: f"quantity of {named_trade(labels, int(occurrence[k]))}")
+    finite_prices(
+        fixed_price, lambda k: f"fixed_price of {named_trade(labels, int(occurrence[k]))}"
+    )
 
 
 def whole_quantities(quantity: NDArray[np.float64], where: Callable[[int], str]) -> None:
@@ -467,7 +476,7 @@ def _the_component_quantity(
     if overflow.any():
         k = int(overflow.argmax())
         raise ValueError(
-            f"quantity of {_named(labels, int(occurrence[k]))} is {float(quantity[k])!r} "
+            f"quantity of {named_trade(labels, int(occurrence[k]))} is {float(quantity[k])!r} "
             f"over {int(covered_days[k])} days, expected a finite quantity"
         )
     expanded.setflags(write=False)  # made here and owned here: no copy to freeze

@@ -10,6 +10,7 @@ makes its components' observations, and the whole is put back in component order
 observations of their own through the same builder, a daily toy among them, without a public
 method naming them. docs/library/trades/kernel.md is the page."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -110,27 +111,30 @@ def observed(
     contract: NDArray[np.intp],
     start: NDArray[np.datetime64],
     end: NDArray[np.datetime64],
+    named: Callable[[int], str],
 ) -> Observations:
     """The observations the schedule methods give a batch's components, each component's method
     its occurrence's, a position among METHODS, each component a row of the index's futures
     schedule covering the days from start to end inclusive, within its contract's calendar month,
-    the components in order: lastday, the contract's expiry day with the whole weight;
-    penultimate, the business day before it, Monday to Friday less the index's holiday calendar,
-    with the whole weight, one business-day offset over the components; last3day, the expiry day
-    and the two business days before it, a third each, one business-day offset over the
-    components and the three offsets at once, the three days of a component increasing; the three
-    take a component that covers its whole month, since their observations are the contract's
-    expiry days, which a part of a month has no share of, and refuse a part of one by its contract
-    and its days; asian, every Monday to Friday of the days the component covers the index's
-    market is open on, an equal share each, the whole month from a contract code and a booked
-    period's share of it from dates: one business-day count over the components for the days of
-    each, and one business-day offset over the observations, the first day covered rolled forward
-    and counted on. An expiry the index's market is closed on is refused by its contract under
-    penultimate and last3day, since the days before a closed expiry are not the last days the
-    market priced the contract, and rolling the expiry would change the schedule the desk gave;
-    under lastday the encoding refuses the observation itself; under asian a closed day is simply
-    no observation, and a component with no pricing day at all is refused by its contract and its
-    days.
+    the components in order, and `named` the words for a component's trade in a refusal, as
+    ResolvedTrades.named gives them, `trade 'B' at row 2`: lastday, the contract's expiry day with
+    the whole weight; penultimate, the business day before it, Monday to Friday less the index's
+    holiday calendar, with the whole weight, one business-day offset over the components;
+    last3day, the expiry day and the two business days before it, a third each, one business-day
+    offset over the components and the three offsets at once, the three days of a component
+    increasing; the three take a component that covers its whole month, since their observations
+    are the contract's expiry days, which a part of a month has no share of, and refuse a part of
+    one by its contract, its trade and its days; asian, every Monday to Friday of the days the
+    component covers the index's market is open on, an equal share each, the whole month from a
+    contract code and a booked period's share of it from dates: one business-day count over the
+    components for the days of each, and one business-day offset over the observations, the first
+    day covered rolled forward and counted on. An expiry the index's market is closed on is
+    refused by its contract and no trade under penultimate and last3day, the schedule's day being
+    every row's, since the days before a closed expiry are not the last days the market priced
+    the contract, and rolling the expiry would change the schedule the desk gave; under lastday
+    the encoding refuses the observation itself; under asian a closed day is simply no
+    observation, and a component with no pricing day at all is refused by its contract, its trade
+    and its days.
 
     The rules are looked at over the components in their order, whatever their methods, so that
     the first component at fault is the one named: the whole-month rule over the components of
@@ -151,7 +155,7 @@ def observed(
     holidays = with_holiday_calendar(index.holiday_calendar)
     expiry_based = method != METHODS.index(ScheduleMethod.ASIAN)
     if expiry_based.any():
-        _whole_months(schedule, contract, start, end, method, expiry_based)
+        _whole_months(schedule, contract, start, end, method, expiry_based, named)
     before_expiry = (method == METHODS.index(ScheduleMethod.PENULTIMATE)) | (
         method == METHODS.index(ScheduleMethod.LAST3DAY)
     )
@@ -159,7 +163,15 @@ def observed(
         _with_expiries_priced(schedule, contract, expiry, method, before_expiry, holidays)
     parts = [
         _the_days(
-            METHODS[int(code)], on, expiry[on], start[on], end[on], schedule, contract, holidays
+            METHODS[int(code)],
+            on,
+            expiry[on],
+            start[on],
+            end[on],
+            schedule,
+            contract,
+            holidays,
+            named,
         )
         for code in np.unique(method)
         for on in (np.flatnonzero(method == code),)
@@ -183,10 +195,11 @@ def _the_days(
     schedule: FuturesSchedule,
     contract: NDArray[np.intp],
     holidays: HolidayCalendar,
+    named: Callable[[int], str],
 ) -> tuple[NDArray[np.intp], NDArray[np.datetime64], NDArray[np.float64]]:
     """One method's observations for the components that chose it, `on`, in their order: each
     observation's component, its day and its weight by the method's rule, the days of the
-    components given aligned with `on`."""
+    components given aligned with `on`, a component refused named through `named`."""
     count = on.size
     match kind:
         case ScheduleMethod.LASTDAY:
@@ -207,11 +220,12 @@ def _the_days(
             days = np.busday_count(start, end + np.timedelta64(1, "D"), holidays=holidays.holiday)
             if (days == 0).any():
                 k = int((days == 0).argmax())
+                component = int(on[k])
                 raise ValueError(
-                    f"{schedule.codes[contract[on[k]]]} has no pricing day from {start[k]} to "
-                    f"{end[k]}, expected a Monday to Friday of the days it covers the index's "
-                    "market is open on; the asian method averages the pricing days a component "
-                    "covers"
+                    f"{schedule.codes[contract[component]]} of {named(component)} has no pricing "
+                    f"day from {start[k]} to {end[k]}, expected a Monday to Friday of the days it "
+                    "covers the index's market is open on; the asian method averages the pricing "
+                    "days a component covers"
                 )
             total = int(days.sum())
             component = np.repeat(on, days)
@@ -231,12 +245,13 @@ def _whole_months(
     end: NDArray[np.datetime64],
     method: NDArray[np.intp],
     expiry_based: NDArray[np.bool_],
+    named: Callable[[int], str],
 ) -> None:
     """Under the expiry-based methods each component covers its whole calendar month: their
     observations are the contract's expiry days, which a part of a month has no share of, so a
-    part of a month is refused by its contract, its days and its own method rather than priced on
-    the whole month's expiry as if it were the whole; two conversions and one look over the
-    components, the first expiry-based component at fault named."""
+    part of a month is refused by its contract, its trade, its days and its own method rather than
+    priced on the whole month's expiry as if it were the whole; two conversions and one look over
+    the components, the first expiry-based component at fault named."""
     month = start.astype("datetime64[M]")
     first = month.astype("datetime64[D]")
     last = (month + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D")
@@ -244,10 +259,10 @@ def _whole_months(
     if partial.any():
         k = int(partial.argmax())
         raise ValueError(
-            f"{schedule.codes[contract[k]]} is covered from {start[k]} to {end[k]}, part of its "
-            f"month, expected the whole month under {METHODS[int(method[k])].value}; the "
-            "expiry-based methods take the contract's month entire, and a part of it prices under "
-            "asian"
+            f"{schedule.codes[contract[k]]} of {named(k)} is covered from {start[k]} to {end[k]}, "
+            f"part of its month, expected the whole month under {METHODS[int(method[k])].value}; "
+            "the expiry-based methods take the contract's month entire, and a part of it prices "
+            "under asian"
         )
 
 

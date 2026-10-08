@@ -46,6 +46,7 @@ from goosedove.trades.terms import (
     ScheduleMethod,
     Settlement,
     futures_schedule_of,
+    named_trade,
     one_choice,
     resolved_trades,
 )
@@ -88,6 +89,7 @@ def observed_of(terms: ResolvedTrades) -> Observations:
         terms.contract,
         terms.start_date,
         terms.end_date,
+        terms.named,
     )
 
 
@@ -106,6 +108,12 @@ def picks(
 def by(method: ScheduleMethod, components: int) -> NDArray[np.intp]:
     """One method for every component, as observed takes them."""
     return one_choice(METHODS, method, components)
+
+
+def unlabeled(k: int) -> str:
+    """Component k's trade when observed is called on bare arrays, each component a row of its
+    own with no label, as named_trade words it: `trade at row 1`."""
+    return named_trade(None, k)
 
 
 # --- the page's static facts ----------------------------------------------------------------
@@ -311,8 +319,9 @@ GAS_DAILY = index(
         ),
         (
             {"schedule_method": np.array([0, 2, 1, 0, 0], dtype=np.intp)},
-            "settlement_method is 'physical', expected 'financial' with the last3day method; a "
-            "last3day future is cash settled on the average of its last three pricing days",
+            "settlement_method is 'physical', expected 'financial' with the last3day method of "
+            "trade 'NG-002' at row 2; a last3day future is cash settled on the average of its last "
+            "three pricing days",
         ),
         (
             {"trade_dates": dates()},
@@ -1039,7 +1048,11 @@ def pen_evaluated(
 
 def test_the_penultimate_method_observes_the_business_day_before_each_expiry() -> None:
     obs = observed(
-        by(ScheduleMethod.PENULTIMATE, 3), PHH, rows(0, 1, 2), *bounds_of(PHH, rows(0, 1, 2))
+        by(ScheduleMethod.PENULTIMATE, 3),
+        PHH,
+        rows(0, 1, 2),
+        *bounds_of(PHH, rows(0, 1, 2)),
+        unlabeled,
     )
     np.testing.assert_array_equal(obs.date, dates("2027-05-25", "2027-06-25", "2027-07-27"))
     np.testing.assert_array_equal(obs.component, [0, 1, 2])
@@ -1057,10 +1070,13 @@ def test_the_penultimate_method_observes_the_business_day_before_each_expiry() -
         friday_closed,
         rows(1),
         *bounds_of(friday_closed, rows(1)),
+        unlabeled,
     ).date[0] == day("2027-06-24")
     # lastday is the expiry itself, as before.
     np.testing.assert_array_equal(
-        observed(by(ScheduleMethod.LASTDAY, 2), PHH, rows(0, 1), *bounds_of(PHH, rows(0, 1))).date,
+        observed(
+            by(ScheduleMethod.LASTDAY, 2), PHH, rows(0, 1), *bounds_of(PHH, rows(0, 1)), unlabeled
+        ).date,
         dates("2027-05-26", "2027-06-28"),
     )
 
@@ -1078,6 +1094,7 @@ def test_an_expiry_the_market_closes_is_refused_under_penultimate_rather_than_ro
             thanksgiving,
             rows(1),
             *bounds_of(thanksgiving, rows(1)),
+            unlabeled,
         )
     assert str(refused.value) == (
         "Z26 expires on 2026-11-26, a day the index's market is closed; the penultimate method "
@@ -1089,8 +1106,9 @@ def test_a_physical_penultimate_future_is_refused_by_the_kernel() -> None:
     with pytest.raises(ValueError) as refused:
         pen_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement_method is 'physical', expected 'financial' with the penultimate method; a"
-        " penultimate future is cash settled on the business day before its contract's expiry"
+        "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+        "trade 'PHH-1' at row 1; a penultimate future is cash settled on the business day before "
+        "its contract's expiry"
     )
 
 
@@ -2032,7 +2050,9 @@ def l3d_evaluated(
 
 
 def test_last3day_observes_the_expiry_and_the_two_business_days_before_it() -> None:
-    obs = observed(by(ScheduleMethod.LAST3DAY, 2), SYN, rows(1, 2), *bounds_of(SYN, rows(1, 2)))
+    obs = observed(
+        by(ScheduleMethod.LAST3DAY, 2), SYN, rows(1, 2), *bounds_of(SYN, rows(1, 2)), unlabeled
+    )
     np.testing.assert_array_equal(obs.component, [0, 0, 0, 1, 1, 1])
     np.testing.assert_array_equal(
         obs.date,
@@ -2041,11 +2061,15 @@ def test_last3day_observes_the_expiry_and_the_two_business_days_before_it() -> N
     np.testing.assert_allclose(obs.weight, [1 / 3] * 6)
     # Z26's days step over the closed Friday the 4th; lastday and penultimate are as they were.
     np.testing.assert_array_equal(
-        observed(by(ScheduleMethod.LASTDAY, 1), SYN, rows(1), *bounds_of(SYN, rows(1))).date,
+        observed(
+            by(ScheduleMethod.LASTDAY, 1), SYN, rows(1), *bounds_of(SYN, rows(1)), unlabeled
+        ).date,
         L3D_DAYS[2:],
     )
     np.testing.assert_array_equal(
-        observed(by(ScheduleMethod.PENULTIMATE, 1), SYN, rows(1), *bounds_of(SYN, rows(1))).date,
+        observed(
+            by(ScheduleMethod.PENULTIMATE, 1), SYN, rows(1), *bounds_of(SYN, rows(1)), unlabeled
+        ).date,
         L3D_DAYS[1:2],
     )
 
@@ -2058,7 +2082,9 @@ def test_an_expiry_the_market_closes_is_refused_under_last3day_rather_than_rolle
         lot=("UNIT", 1.0, "MMBTU"),
     )
     with pytest.raises(ValueError) as refused:
-        observed(by(ScheduleMethod.LAST3DAY, 1), closed, rows(1), *bounds_of(closed, rows(1)))
+        observed(
+            by(ScheduleMethod.LAST3DAY, 1), closed, rows(1), *bounds_of(closed, rows(1)), unlabeled
+        )
     assert str(refused.value) == (
         "Z26 expires on 2026-12-04, a day the index's market is closed; the last3day method takes "
         "an expiry the market prices and the two business days before it"
@@ -2089,8 +2115,9 @@ def test_a_physical_last3day_future_is_refused_by_the_kernel() -> None:
     with pytest.raises(ValueError) as refused:
         l3d_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement_method is 'physical', expected 'financial' with the last3day method; a "
-        "last3day future is cash settled on the average of its last three pricing days"
+        "settlement_method is 'physical', expected 'financial' with the last3day method of "
+        "trade 'A' at row 1; a last3day future is cash settled on the average of its last three "
+        "pricing days"
     )
 
 
@@ -2326,7 +2353,9 @@ def asian_evaluated(
 
 
 def test_asian_observes_every_pricing_day_of_the_contracts_month() -> None:
-    obs = observed(by(ScheduleMethod.ASIAN, 2), ETHANE, rows(1, 2), *bounds_of(ETHANE, rows(1, 2)))
+    obs = observed(
+        by(ScheduleMethod.ASIAN, 2), ETHANE, rows(1, 2), *bounds_of(ETHANE, rows(1, 2)), unlabeled
+    )
     assert len(DECEMBER) == 22 and len(JANUARY) == 20
     np.testing.assert_array_equal(obs.component, [0] * 22 + [1] * 20)
     np.testing.assert_array_equal(obs.date, dates(*DECEMBER, *JANUARY))
@@ -2346,11 +2375,13 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_under_asian() 
         ("GAL", 1.0, "GAL"),
     )
     with pytest.raises(ValueError) as refused:
-        observed(by(ScheduleMethod.ASIAN, 1), closed, rows(1), *bounds_of(closed, rows(1)))
+        observed(
+            by(ScheduleMethod.ASIAN, 1), closed, rows(1), *bounds_of(closed, rows(1)), unlabeled
+        )
     assert str(refused.value) == (
-        "G27 has no pricing day from 2027-02-01 to 2027-02-28, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "G27 of trade at row 1 has no pricing day from 2027-02-01 to 2027-02-28, expected a Monday "
+        "to Friday of the days it covers the index's market is open on; the asian method averages "
+        "the pricing days a component covers"
     )
 
 
@@ -2385,8 +2416,8 @@ def test_a_physical_asian_future_is_refused_by_the_kernel() -> None:
     with pytest.raises(ValueError) as refused:
         asian_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement_method is 'physical', expected 'financial' with the asian method; an asian "
-        "future is cash settled on the average of its month's pricing days"
+        "settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' "
+        "at row 1; an asian future is cash settled on the average of its month's pricing days"
     )
 
 
@@ -2877,20 +2908,27 @@ def test_the_expiry_based_methods_refuse_a_part_of_a_month_and_asian_a_part_with
         (ScheduleMethod.LAST3DAY, SYN),
     ):
         with pytest.raises(ValueError) as refused:
-            observed(by(method, 1), ix, rows(1), dates("2026-12-15"), dates("2026-12-31"))
+            observed(
+                by(method, 1), ix, rows(1), dates("2026-12-15"), dates("2026-12-31"), unlabeled
+            )
         assert str(refused.value) == (
-            f"Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole "
-            f"month under {method.value}; the expiry-based methods take the contract's month "
-            "entire, and a part of it prices under asian"
+            "Z26 of trade at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, "
+            f"expected the whole month under {method.value}; the expiry-based methods take the "
+            "contract's month entire, and a part of it prices under asian"
         )
     with pytest.raises(ValueError) as refused:
         observed(
-            by(ScheduleMethod.ASIAN, 1), ETHANE, rows(1), dates("2026-12-26"), dates("2026-12-27")
+            by(ScheduleMethod.ASIAN, 1),
+            ETHANE,
+            rows(1),
+            dates("2026-12-26"),
+            dates("2026-12-27"),
+            unlabeled,
         )
     assert str(refused.value) == (
-        "Z26 has no pricing day from 2026-12-26 to 2026-12-27, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "Z26 of trade at row 1 has no pricing day from 2026-12-26 to 2026-12-27, expected a Monday "
+        "to Friday of the days it covers the index's market is open on; the asian method averages "
+        "the pricing days a component covers"
     )
 
 
@@ -3709,9 +3747,9 @@ def test_a_partial_asian_row_stands_beside_whole_months_under_other_methods() ->
     with pytest.raises(ValueError) as refused:
         observed_of(part_under_pen)
     assert str(refused.value) == (
-        "Z26 is covered from 2026-12-01 to 2026-12-15, part of its month, expected the whole month "
-        "under penultimate; the expiry-based methods take the contract's month entire, and a part "
-        "of it prices under asian"
+        "Z26 of trade 'B' at row 2 is covered from 2026-12-01 to 2026-12-15, part of its month, "
+        "expected the whole month under penultimate; the expiry-based methods take the contract's "
+        "month entire, and a part of it prices under asian"
     )
 
 
@@ -3757,13 +3795,15 @@ def test_interleaved_methods_and_a_strip_keep_their_components_and_anchors() -> 
 
 
 def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
-    # A physical batch takes lastday rows alone, the first other row's method named; a method per
+    # A physical batch takes lastday rows alone, the first other row named with its method; a
+    # method per
     # component is one per component; a row's selection out of range is refused by its row.
     with pytest.raises(ValueError) as refused:
         mixed_terms(MIXED_ROWS[:2], settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement_method is 'physical', expected 'financial' with the penultimate method; a "
-        "penultimate future is cash settled on the business day before its contract's expiry"
+        "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+        "trade 'B' at row 2; a penultimate future is cash settled on the business day before its "
+        "contract's expiry"
     )
     lastday_rows = (
         Mixed("A", 1.0, "BBL", "month", "lastday"),
@@ -3772,5 +3812,7 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
     physical = mixed_terms(lastday_rows, settlement=Settlement.PHYSICAL)
     np.testing.assert_array_equal(physical.component_quantity, [1.0, 310.0])
     with pytest.raises(ValueError) as refused:
-        observed(by(ScheduleMethod.LASTDAY, 2), MIXED, rows(1), *bounds_of(MIXED, rows(1)))
+        observed(
+            by(ScheduleMethod.LASTDAY, 2), MIXED, rows(1), *bounds_of(MIXED, rows(1)), unlabeled
+        )
     assert str(refused.value) == "method has 2, expected 1, one per component"

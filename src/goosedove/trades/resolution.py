@@ -50,6 +50,7 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     futures_schedule_of,
+    named_trade,
     resolved_trades,
 )
 
@@ -133,16 +134,18 @@ def resolved(
     The schedule method gives each component its observation days, the expiry under lastday, the
     business day before it under penultimate, the expiry and the two business days before it
     under last3day, a third each, the three refusing a component that covers a part of its
-    month, and every pricing day of the days it covers under asian, an equal share each, a
-    partial month's share of them. For a financial settlement, each
+    month by its contract, its trade and its days, and every pricing day of the days it covers
+    under asian, an equal share each, a partial month's share of them, a part with none refused
+    the same way. For a financial settlement, each
     occurrence's lag is read once per distinct text and each component pays that many business days
     strictly after its last observation day, counted on its occurrence's payment calendar with
     Monday to Friday eligible,
     that day itself rolled back first so that a day the payment calendar closes is not counted;
     the rule of the four methods.
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
-    prices, each named by its trade, a financial settlement with penultimate, and each component's
-    quantity formed once by the basis, the entered quantity times its covered days under calday.
+    prices, each named by its trade, a financial settlement with penultimate, last3day and asian,
+    the first row of them named under a physical one, and each component's quantity formed once
+    by the basis, the entered quantity times its covered days under calday.
 
     Work: one occurrence per ticket row, one component per contract month and one schedule code
     per row of the schedule, reported to the counter.
@@ -166,7 +169,15 @@ def resolved(
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract, start, end = _the_periods(fields, months)
-    observations = observed(schedule_method[occurrence], index, contract, start, end)
+    labels = fields.labels("trade_id")
+    observations = observed(
+        schedule_method[occurrence],
+        index,
+        contract,
+        start,
+        end,
+        lambda k: named_trade(labels, int(occurrence[k])),
+    )
     payment = _the_payment_terms(
         settlement, fields, _last_days(observations, occurrence.size), occurrence
     )
@@ -180,7 +191,7 @@ def resolved(
         settlement,
         schedule_method,
         quantity_per,
-        fields.labels("trade_id"),
+        labels,
         fields.labels("clearing_house"),
         fields.labels("broker"),
         fields.dates("trade_date"),

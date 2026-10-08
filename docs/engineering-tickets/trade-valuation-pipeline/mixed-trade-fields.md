@@ -2,8 +2,9 @@
 
 [Pipeline overview](README.md) · [Multiple payment groups](multiple-payment-groups.md)
 
-**Status:** Built in #163 on the prototype stack above #162, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Written
+**Status:** Built in #163 on the prototype stack above #162, the page as a ticket, reviewed at
+`d9768f9` with two P3s fixed on the branch; the [As built](#as-built-nn) section at the end says
+what was built and what was not. Written
 8 October 2026 as the next prototype slice after PR #162, reviewed at `fa7cb93`, a
 continuation of the prototype that does not decide how the full stack will land or what
 will be rebuilt on main.
@@ -306,7 +307,8 @@ Engineering's record of what landed, in the ticket's terms.
   is gone; a selection not one per occurrence or out of range is refused by its row in the kernel.
 - **The observations.** `observed` takes each component's method. The whole-month rule is looked
   at over the expiry-based components in their order and the open-expiry rule over the penultimate
-  and last3day ones, so the first component at fault is named with its own method; each method
+  and last3day ones, so the first component at fault is named by its trade and its own method;
+  each method
   present makes its components' observations once, the finite set dispatched over and never the
   rows; when the batch mixes methods the observations are put back in component order and by day,
   one lexsort, since the payment anchors are found by that order, and a batch of one method is in
@@ -332,9 +334,11 @@ Engineering's record of what landed, in the ticket's terms.
   price in cents for both rows; the clearing labels swapped changing nothing, B at +2bd coalescing
   into one group of 22 slots, A on a payment calendar closed on 4 January a third group; a partial
   asian row beside a whole lastday month, 84 of mark beside 15 of cash and 42 of delta on
-  16 December, a partial penultimate row refused by its contract, its days and its own method;
+  16 December, a partial penultimate row refused by its contract, its trade, its days and its
+  own method;
   interleaved methods with a strip keeping component order and anchors, S's F27 paying 1 February;
-  a physical batch with a penultimate row refused by that method, one of lastday rows mixing units
+  a physical batch with a penultimate row refused by that method and named by its row, one of
+  lastday rows mixing units
   and bases standing; a method not one per component refused. The same through the creator and the
   seam, the readback row by row with a strip showing its own row's choices, a uniform field from
   the template or the ticket alike and both refused, the refusals naming the first offending row;
@@ -351,6 +355,19 @@ Engineering's record of what landed, in the ticket's terms.
   batch's; peaks 45,298 and 11,440 bytes, within 90 and 24 a slot. The 2,500-row batch's creation
   peak 569,243 to 668,580 bytes, the three selections 24 bytes a row retained and their distinct
   reads' temporaries, the pin 232 to 272 a row.
+- **After review.** The owner's review at d9768f9 found two P3s, fixed on the branch. The
+  whole-month and the pricing-day refusals of `observed` and the physical batch's refusal in
+  the kernel named no row, so once a strip or a dated period had made components the row at
+  fault could not be told: `observed` now takes the words for a component's trade, as
+  `whole_quantities` takes them, the resolution handing it the labels and the occurrences, and
+  the three refusals name the trade, `Z26 of trade 'B' at row 2 is covered from 2026-12-01 to
+  2026-12-15, part of its month, expected the whole month under penultimate; the expiry-based
+  methods take the contract's month entire, and a part of it prices under asian` and
+  `settlement_method is 'physical', expected 'financial' with the penultimate method of trade
+  'B' at row 2; a penultimate future is cash settled on the business day before its contract's
+  expiry`; the closed-expiry refusal keeps naming the contract alone, the schedule's day being
+  every row's, the owner's earlier decision. And create-trades.md still said no two bases in
+  one batch and that two units wait for their own ticket; it says what this ticket built.
 - **Not in this slice.** No mixed route or settlement in one batch; no discounting, DV01
   convention, delivery or margining; bilateral evaluation still refused; no `exact` method, no
   blank-based switching between codes and dates, no moving BAL periods; the lifetime example not

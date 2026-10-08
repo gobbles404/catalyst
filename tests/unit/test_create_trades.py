@@ -706,8 +706,9 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
         if name not in ("payment_time_lag", "payment_holiday_calendar")
     }
     assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' with the last3day method; a "
-        "last3day future is cash settled on the average of its last three pricing days"
+        "settlement_method is 'physical', expected 'financial' with the last3day method of "
+        "trade 'A' at row 1; a last3day future is cash settled on the average of its last three "
+        "pricing days"
     )
 
 
@@ -825,9 +826,9 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_when_the_batch
         ("VOLUME", "GAL"),
     )
     assert refused(closed, {**ASIAN_TICKET, "contract_code": ["G27", "G27"]}, ASIAN_TEMPLATE) == (
-        "G27 has no pricing day from 2027-02-01 to 2027-02-28, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "G27 of trade 'A' at row 1 has no pricing day from 2027-02-01 to 2027-02-28, expected a "
+        "Monday to Friday of the days it covers the index's market is open on; the asian method "
+        "averages the pricing days a component covers"
     )
 
 
@@ -858,8 +859,8 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
         if name not in ("payment_time_lag", "payment_holiday_calendar")
     }
     assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' with the asian method; an asian "
-        "future is cash settled on the average of its month's pricing days"
+        "settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' "
+        "at row 1; an asian future is cash settled on the average of its month's pricing days"
     )
 
 
@@ -1070,9 +1071,9 @@ def test_a_part_of_a_month_observes_its_own_pricing_days_and_pays_after_the_last
     assert shorter.resolved.payment is not None
     assert str(shorter.resolved.payment.date[0]) == "2027-01-04"
     assert refused(ETHANE, dated("2026-12-26", "2026-12-27"), ASIAN_TEMPLATE) == (
-        "Z26 has no pricing day from 2026-12-26 to 2026-12-27, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "Z26 of trade 'P' at row 1 has no pricing day from 2026-12-26 to 2026-12-27, expected a "
+        "Monday to Friday of the days it covers the index's market is open on; the asian method "
+        "averages the pricing days a component covers"
     )
 
 
@@ -1089,10 +1090,24 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
         assert refused(
             ix, dated("2026-12-15", "2026-12-31", 10), {**template, "schedule_method": method}
         ) == (
-            f"Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole "
-            f"month under {method}; the expiry-based methods take the contract's month entire, and "
-            "a part of it prices under asian"
+            "Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its "
+            f"month, expected the whole month under {method}; the expiry-based methods take the "
+            "contract's month entire, and a part of it prices under asian"
         )
+    # Two rows, the second a part of its month: the refusal names the second, not the first.
+    two_rows: dict[str, list[object]] = {
+        "trade_id": ["P", "Q"],
+        "trade_date": ["2026-11-20", "2026-11-20"],
+        "start_date": ["2026-12-01", "2026-12-15"],
+        "end_date": ["2026-12-31", "2026-12-31"],
+        "quantity": [10, 10],
+        "fixed_price": [0.25, 0.25],
+    }
+    assert refused(NG, two_rows, NG_TEMPLATE) == (
+        "Z26 of trade 'Q' at row 2 is covered from 2026-12-15 to 2026-12-31, part of its month, "
+        "expected the whole month under lastday; the expiry-based methods take the contract's "
+        "month entire, and a part of it prices under asian"
+    )
 
 
 def test_the_period_form_is_one_of_two_and_the_dates_run_forward() -> None:
@@ -1387,8 +1402,9 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "penultimate"},
-            "settlement_method is 'physical', expected 'financial' with the penultimate method; a"
-            " penultimate future is cash settled on the business day before its contract's expiry",
+            "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+            "trade 'NG-001' at row 1; a penultimate future is cash settled on the business day "
+            "before its contract's expiry",
         ),
         (
             NG_TICKET,
@@ -2135,9 +2151,10 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
             sheet["template"],
         )
     ) == (
-        "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part "
-        "of its month, expected the whole month under lastday; the expiry-based methods take "
-        "the contract's month entire, and a part of it prices under asian"
+        "#ERROR _CreateTrades: ValueError: Z26 of trade 'NG-001' at row 1 is covered from "
+        "2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; "
+        "the expiry-based methods take the contract's month entire, and a part of it prices "
+        "under asian"
     )
     assert str(
         ENTRY["_CreateTrades"](
@@ -2268,7 +2285,8 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     assert refused(
         MIXED, {**MIXED_TICKET, "quantity_per": ["month", "day", "calday", "x"]}, MIXED_TEMPLATE
     ) == ("quantity_per row 2 is 'day', expected month or calday")
-    # A physical batch takes lastday rows alone: B's method is named, the first row that is not.
+    # A physical batch takes lastday rows alone: B is named with its method, the first row that
+    # is not.
     physical = {
         "route": "cleared",
         "settlement_method": "physical",
@@ -2276,8 +2294,9 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
         "fixed_price": 10.0,
     }
     assert refused(MIXED, MIXED_TICKET, physical) == (
-        "settlement_method is 'physical', expected 'financial' with the penultimate method; a "
-        "penultimate future is cash settled on the business day before its contract's expiry"
+        "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+        "trade 'B' at row 2; a penultimate future is cash settled on the business day before its "
+        "contract's expiry"
     )
     lastday_rows: dict[str, list[object]] = {
         **MIXED_TICKET,

@@ -569,7 +569,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
-    "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
+    "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method of trade 'V1' at row 1; a penultimate future is cash settled on the business day before its contract's expiry"
     # The last three pricing days: the batch in HS5 under the last3day template in HJ3, two trades
     # of Z26 on the synthetic index, observing 2, 3 and 7 December and paying the 9th, 46365;
     # prepared on 3 December in HY14, the 2nd fixed at 71 and the two later days live at 74, the
@@ -591,7 +591,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(HY15),3,2)"    = "0"
     "=INDEX(_ReportRisk(HY15),3,1)"      = "20"
     "=INDEX(util_ReadHandle(HY15),4,7)"  = "20"
-    "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method; a last3day future is cash settled on the average of its last three pricing days"
+    "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method of trade 'A' at row 1; a last3day future is cash settled on the average of its last three pricing days"
     # Calendar month Asian trades: the batch in IS5 under the asian template in IJ3, two trades of
     # Z26 on the synthetic ethane index, observing every pricing day of December, 22 of them, and
     # paying 5 January, 46392; prepared on 2 December in IY15, the 1st fixed at 0.24 and the other
@@ -722,11 +722,11 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(LC33),25,6)" = "85"
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{"E","Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
-    "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
+    "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
     '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one period form, a contract_code or start_date with end_date"
     '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date is supplied without end_date, expected both dates, the period's first and last day, or a contract_code"
     '=_CreateTradeTemplate("future",IK1,IL2)' = "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'asian', expected month or calday"
-    "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method; an asian future is cash settled on the average of its month's pricing days"
+    "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' at row 1; an asian future is cash settled on the average of its month's pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
