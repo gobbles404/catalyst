@@ -521,12 +521,18 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
 
 # A period's first or last day makes two months and one day, then pays the seam's way out for a
 # date: measured 1,264 bytes on 2026-10-02 for one month and for the whole century alike, which
-# twice the slack covers; nothing grows with the period, and nothing is published.
+# twice the slack covers; the balance of one, since #NN, adds its reference date's check and the
+# second bound, a day; nothing grows with the period, and nothing is published.
 @pytest.mark.parametrize("name", ["util_StartDate", "util_EndDate"])
-@pytest.mark.parametrize("period", ["F26", "F00-Z99", "w28-w29"])
-def test_a_periods_day_costs_the_same_for_a_month_and_a_century(name: str, period: str) -> None:
+@pytest.mark.parametrize(
+    ("period", "reference"),
+    [("F26", MISSING), ("F00-Z99", MISSING), ("w28-w29", MISSING), ("BALZ26", 46371.0)],
+)
+def test_a_periods_day_costs_the_same_for_a_month_and_a_century(
+    name: str, period: str, reference: object
+) -> None:
     live = bridge.live_handles()
-    assert least_peak(lambda: ENTRY[name](period)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY[name](period, reference)) <= 2 * SLACK
     assert bridge.live_handles() == live
 
 

@@ -3,8 +3,8 @@
 [Pipeline overview](README.md) · [Calendar month Asian trades](asian-trades.md) ·
 [Last three pricing days](last3day-trades.md)
 
-**Status:** Slice A built in #159 on the prototype stack above #158, the page as a ticket; slices B
-and C not started. The section at the end records what slice A built. Draft engineering ticket, 7
+**Status:** Slices A and B built in #159 and #NN on the prototype stack above #158, the page as a
+ticket; slice C not started. The sections at the end record what each slice built. Draft engineering ticket, 7
 October 2026. Extends the prototype after the
 [full-month Asian slice](asian-trades.md). The inspected baseline is PR #157 at `592a6bc`;
 Asian is specified separately and must be available before the final integration slice.
@@ -360,3 +360,43 @@ Built as the page says for slice A, on the path every batch takes, with these pa
   explicit dates clip them. No mixing of bases in a batch, no change to the payment groups, no BAL
   parsing, slice B, and no `exact` method. The encoding's own multiplications, by the lot size and
   the unit factors, check no finiteness, as before.
+
+## As built, slice B, #NN
+
+Built as the page says for slice B, on the two date utilities, with these particulars.
+
+- **The prefix.** `balance_of` in `src/goosedove/index_definitions/periods.py` strips one `BAL` in
+  either case and hands the rest to the grammar's own reader, so `balx27`, `BALCAL26` and
+  `BalX26-Z26` read as their labels do, and `BALBALZ26`, `BAL` alone and a malformed or reversed
+  label under the prefix are refused with the grammar's words, naming the whole expression as it
+  arrived. `period_months`, which a ticket's `contract_code` reads through, is untouched and takes
+  no `BAL`.
+- **The reference.** `util_StartDate(period, [reference_date])` and
+  `util_EndDate(period, [reference_date])`: the second argument is a date that may be left out,
+  decision 39's form in [inputs.md](../../seam/inputs.md), so a blank cell is refused by the seam
+  while a left-out argument reaches the library as nothing. For a `BAL` label the library requires
+  it, `reference_date is missing, expected a date with 'BALZ26', the first day the balance of a
+  period covers`, and holds it inside the label's own period, either end included,
+  `reference_date is 2027-01-05, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31`, never
+  clamping; the start is the reference date itself and the end the label's last day, both
+  utilities running both checks whichever day is asked for. For an ordinary label a reference is
+  read for nothing, so one pair of formulas serves a column of both kinds. A Saturday is a day
+  like any other.
+- **The numbers pinned.** The page's table: `balx27` from 12 November 2027 to the 30th,
+  `balcal26` from 7 October 2026 to 31 December, `balx26-z26` from 12 November 2026 to
+  31 December, `BALZ26` from 15 December to the 31st, `Z26` with or without a reference the whole
+  of December; the leap day `BALG28` from 29 February 2028, one day; the year-end range
+  `BALZ26-F27` from 31 December 2026 to 31 January 2027; a reference on the first day the whole
+  period, on the last day one day; a Saturday kept; the day before and the day after a month, a
+  strip and a winter refused with the bounds. The work: the ordinary readings cost the second
+  argument's check and the prefix's look and no conversion more, fourteen calls across thirteen
+  functions for one label and fifteen for a range; the balance adds the reference's two checks,
+  as a number and as a date, and the bound, one conversion more for the last day; the peak the
+  same for a month, a century and a balance, within twice the slack, nothing published.
+- **Where it shows.** The smoke's period rows and the host's replay pass the left-out reference
+  explicitly, since the seam holds every call to its arity and the host pads nothing, and gain
+  the balance's rows; the kept workbook's rows 1529 to 1536 hold the page's table beside an
+  ordinary label with a reference and a late reference refused.
+- **Not in this slice.** No `BAL` in a trade's `contract_code`; no clamping of a reference and
+  no whole-period reading of an early one, the ordinary label being that; no business-day rule on
+  the reference; slice C, the dates through creation and valuation, not started.

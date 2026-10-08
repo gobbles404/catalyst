@@ -135,23 +135,27 @@ def test_the_two_date_helpers_explain_themselves() -> None:
 
 def test_the_two_period_functions_explain_themselves() -> None:
     line = (
-        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, typed or in "
-        "a cell such as A2."
+        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
+        "balance, BALZ26, typed or in a cell such as A2."
+    )
+    reference = (
+        "For a BAL label, the first day the deal covers, such as B2 or DATE(2026,12,15), a day of "
+        "the label's period; left out for any other label."
     )
     description, arguments, hidden = SPECS["util_StartDate"]
     assert not hidden
     assert description == (
         "Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for "
-        "W29 and the first day of the left label of F26-Z28."
+        "W29 and the first day of the left label of F26-Z28; of its balance, the reference date."
     )
-    assert arguments == [("period", line)]
+    assert arguments == [("period", line), ("[reference_date]", reference)]
     description, arguments, hidden = SPECS["util_EndDate"]
     assert not hidden
     assert description == (
         "Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for "
-        "W29 and the last day of the right label of F26-Z28."
+        "W29 and the last day of the right label of F26-Z28; of its balance, the same last day."
     )
-    assert arguments == [("period", line)]
+    assert arguments == [("period", line), ("[reference_date]", reference)]
 
 
 def test_the_futures_schedule_creator_explains_itself() -> None:

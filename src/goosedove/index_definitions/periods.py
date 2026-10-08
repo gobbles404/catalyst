@@ -2,9 +2,11 @@
 CAL28; a winter, W29, November to the March after; a summer, S28, April to October; and a range
 of two labels joined by a hyphen, F26-Z28, from the first day of the left to the last day of the
 right. Each is read for two months, numpy's month unit, its first month and the month after its
-last, from which its first and its last calendar day follow by one conversion each. Text in and
-one date out, no object and no handle; the letters are read in either case, by the owner's
-decision for these utilities. docs/library/utilities/start-date.md holds the grammar."""
+last, from which its first and its last calendar day follow by one conversion each. The balance
+of any of them, BALZ26, runs from a reference date the desk supplies, the first day the deal
+covers, to the label's last day, the reference held inside the label's own period. Text and a
+date in and one date out, no object and no handle; the letters are read in either case, by the
+owner's decision for these utilities. docs/library/utilities/start-date.md holds the grammar."""
 
 import numpy as np
 
@@ -17,6 +19,8 @@ FORMS = "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29
 # for five months, the summer from April for seven, the calendar year from January for twelve.
 MONTHS_IN_WINTER = 5
 MONTHS_IN_SUMMER = 7
+# The balance-of-period prefix, read once in either case: BALZ26, balcal26, BalX26-Z26.
+BALANCE = "BAL"
 
 
 def period_months(period: str) -> tuple[np.datetime64, np.datetime64]:
@@ -27,9 +31,16 @@ def period_months(period: str) -> tuple[np.datetime64, np.datetime64]:
     left label's first month to the right label's last, every month between them included, so
     W28-W29 covers the summer of 2029 as well as the two winters; the right label may start and
     end no earlier than the left, since a range that cut off part of either end would say so to
-    nobody. Nothing is sorted or swapped.
+    nobody. Nothing is sorted or swapped. A BAL prefix is no label here: the contract codes of a
+    ticket read through this and take no balance, which is the two date utilities' alone.
     """
-    left, hyphen, right = period.partition("-")
+    return _period_months(period, period)
+
+
+def _period_months(expression: str, period: str) -> tuple[np.datetime64, np.datetime64]:
+    """The reading, over the expression given, refusing in the name of the whole label as it
+    arrived, which is the expression itself but for the balance of a period."""
+    left, hyphen, right = expression.partition("-")
     first, after = _label_months(left, period)
     if hyphen:
         start, end = _label_months(right, period)
@@ -41,18 +52,63 @@ def period_months(period: str) -> tuple[np.datetime64, np.datetime64]:
     return first, after
 
 
-def start_date(period: str) -> np.datetime64:
-    """The first calendar day of the period, the first month's first day."""
-    first, _ = period_months(period)
-    return first.astype("datetime64[D]")
+def balance_of(period: str) -> str | None:
+    """The label under a BAL prefix, or None when the period has none. One prefix, in either
+    case, and the rest read as any label is: BALBALZ26 is refused as the label BALZ26 would be,
+    BAL alone as the empty label, both naming the whole expression as it arrived."""
+    return period[len(BALANCE) :] if period[: len(BALANCE)].upper() == BALANCE else None
 
 
-def end_date(period: str) -> np.datetime64:
+def start_date(period: str, reference: np.datetime64 | None = None) -> np.datetime64:
+    """The first calendar day of the period: the first month's first day, or for the balance of
+    a period the reference date itself, the first day the deal covers, which must lie inside
+    the label's own period, either end included; for an ordinary label a reference given is
+    read for nothing, so one formula serves a column of both."""
+    label = balance_of(period)
+    if label is None:
+        first, _ = period_months(period)
+        return first.astype("datetime64[D]")
+    first, after = _period_months(label, period)
+    return _covered_from(
+        reference,
+        first.astype("datetime64[D]"),
+        after.astype("datetime64[D]") - np.timedelta64(1, "D"),
+        period,
+    )
+
+
+def end_date(period: str, reference: np.datetime64 | None = None) -> np.datetime64:
     """The last calendar day of the period, the day before the month after its last begins, so
     a February's own length and a winter's March of the next year, or the next century, fall out
-    of numpy's month unit with nothing counted by hand."""
-    _, after = period_months(period)
-    return after.astype("datetime64[D]") - np.timedelta64(1, "D")
+    of numpy's month unit with nothing counted by hand; the balance of a period ends on the same
+    day, its reference held inside the label's period here too, so that asking for an end cannot
+    hide a reference that is no day of it."""
+    label = balance_of(period)
+    first, after = period_months(period) if label is None else _period_months(label, period)
+    last = after.astype("datetime64[D]") - np.timedelta64(1, "D")
+    if label is not None:
+        _covered_from(reference, first.astype("datetime64[D]"), last, period)
+    return last
+
+
+def _covered_from(
+    reference: np.datetime64 | None, first: np.datetime64, last: np.datetime64, period: str
+) -> np.datetime64:
+    """The reference date of a balance, the first day the deal covers: given, since the balance of
+    a period starts on no day the label names, and a day of the label's own period, either end
+    included, since a day before it would cover more than the label and a day after it nothing;
+    refused with the period's bounds, never clamped. A Saturday is a day like any other: no
+    business-day rule applies here, the schedule method choosing the pricing days later."""
+    if reference is None:
+        raise ValueError(
+            f"reference_date is missing, expected a date with {period!r}, the first day the "
+            "balance of a period covers"
+        )
+    if reference < first or reference > last:
+        raise ValueError(
+            f"reference_date is {reference}, expected a day of {period!r}, {first} to {last}"
+        )
+    return reference
 
 
 def _label_months(label: str, period: str) -> tuple[np.datetime64, np.datetime64]:

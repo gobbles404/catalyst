@@ -355,6 +355,29 @@ $formulas = [ordered]@{
     '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
     "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
     "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
+    # The balance of a period, trade-periods-and-bal.md slice B: one BAL prefix in either case on
+    # any label, the reference date the first day the deal covers, a day of the label's own
+    # period, either end included; a strip's balance, a leap day and a Saturday; an ordinary label
+    # with a reference reads as before; a reference left out, one after the period, a repeated
+    # prefix, the library's words, and a blank, a text and a fraction of a day, the seam's.
+    '=util_StartDate("balx27",DATE(2027,11,12))' = "46703"
+    '=util_EndDate("balx27",DATE(2027,11,12))' = "46721"
+    '=util_StartDate("balcal26",DATE(2026,10,7))' = "46302"
+    '=util_EndDate("balcal26",DATE(2026,10,7))' = "46387"
+    '=util_StartDate("balx26-z26",DATE(2026,11,12))' = "46338"
+    '=util_EndDate("balx26-z26",DATE(2026,11,12))' = "46387"
+    '=util_StartDate("BALZ26",DATE(2026,12,15))' = "46371"
+    '=util_EndDate("BALZ26",DATE(2026,12,15))' = "46387"
+    '=util_StartDate("BALG28",DATE(2028,2,29))' = "46812"
+    '=util_StartDate("BALZ26",DATE(2026,12,12))' = "46368"
+    '=util_StartDate("Z26",DATE(2026,12,15))' = "46357"
+    '=util_EndDate("Z26",DATE(2026,12,15))' = "46387"
+    '=util_StartDate("BALZ26")' = "#ERROR util_StartDate: ValueError: reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers"
+    '=util_EndDate("BALZ26",DATE(2027,1,5))' = "#ERROR util_EndDate: ValueError: reference_date is 2027-01-05, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31"
+    '=util_StartDate("BALBALZ26",DATE(2026,12,15))' = "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_StartDate("BALZ26",C2)' = "#ERROR util_StartDate: reference_date is blank, expected date"
+    '=util_StartDate("BALZ26",E1)' = "#ERROR util_StartDate: reference_date is text 'x', expected date"
+    '=util_EndDate("BALZ26",Y2+0.5)' = "#ERROR util_EndDate: reference_date is number 46276.5, expected date"
     # The instrument catalog: the list and the shown future read one cell at a time with INDEX, the
     # required row booleans among rows of text; a name in another case fails in the library's words
     # and a blank in the seam's.
