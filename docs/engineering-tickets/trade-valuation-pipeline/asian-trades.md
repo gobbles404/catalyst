@@ -80,7 +80,7 @@ For each resolved contract component:
    The schedule's preceding boundary contract is still required for preparation.
 5. Count payment from the component's **last observation day**, using its existing
    payment lag and payment calendar. Use PR #157's shared anchor derivation. One payment
-   per contract group was the compression boundary until #NN,
+   per contract group was the compression boundary until #162,
    [multiple-payment-groups.md](multiple-payment-groups.md), made the payment day part of
    the group's key.
 

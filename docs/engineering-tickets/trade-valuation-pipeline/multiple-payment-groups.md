@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Trade periods and BAL](trade-periods-and-bal.md)
 
-**Status:** Built in #NN on the prototype stack above #161, the page as a ticket; the
+**Status:** Built in #162 on the prototype stack above #161, the page as a ticket; the
 [As built](#as-built-nn) section at the end says what was built and what was not. Written
 8 October 2026 as the next prototype slice after PR #161, reviewed at `3f6c93b`, a
 continuation of the prototype, with no decision to merge the full stack or rebuild it on main.
@@ -263,7 +263,7 @@ and the stored contract risk vector remains unique and reusable. Mixed schedule 
 quantity units and quantity bases are the next slice. The inherited #159 quantity-overflow
 P3 remains a small separate correction; it is not a payment-group feature requirement.
 
-## As built, #NN
+## As built, #162
 
 Engineering's record of what landed, in the ticket's terms. [kernel.md](../../library/trades/kernel.md)
 is the page; [prepare-trades.md](../../library/trades/prepare-trades.md),

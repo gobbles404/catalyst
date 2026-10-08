@@ -205,7 +205,7 @@ using the booked lag/calendar. Shortening the end can therefore change payment. 
 kernel still requires **one payment date per contract group**: incompatible payment
 dates in one batch fail visibly. Do not widen that grouping in this PR. Different start
 dates with compatible payment dates can share a batch and compress by dated exposure.
-(Widened after these slices by [multiple-payment-groups.md](multiple-payment-groups.md), #NN:
+(Widened after these slices by [multiple-payment-groups.md](multiple-payment-groups.md), #162:
 a payment group is a contract and its payment day.)
 
 Retain both entered quantity/basis and resolved component quantities and dates in the
@@ -319,7 +319,7 @@ Existing `_ReportValues`, `_ReportRisk` and saved vectors retain their meaning.
 ## Next prototype slice
 
 After slices A through C, [multiple payment groups](multiple-payment-groups.md) removes
-the one-payment-date-per-contract restriction through the existing pipeline, built in #NN. It
+the one-payment-date-per-contract restriction through the existing pipeline, built in #162. It
 preserves the period and quantity meanings here and prepares for mixed schedule methods,
 quantity units and quantity bases in a later PR.
 
@@ -445,7 +445,7 @@ Built as the page says for slice C, on the path every batch takes, with these pa
   contract's month entire, and a part of it prices under asian`. Payment counts from the last
   observation as before, so a shorter end pays earlier, and one payment day per contract still
   held in this slice: two rows from different starts to one end share a batch, two ends were
-  refused, until #NN made them two groups.
+  refused, until #162 made them two groups.
 - **The readback.** The trades spill gains `start_date` and `end_date`, both `datetime64[D]`, after
   the payment terms and before `covered_days`, so the days each component covers, their count and
   the quantity read side by side; a code-based trade shows its whole months, a dated one the split
