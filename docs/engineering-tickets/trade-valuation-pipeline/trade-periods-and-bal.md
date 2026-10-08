@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Calendar month Asian trades](asian-trades.md) ·
 [Last three pricing days](last3day-trades.md)
 
-**Status:** Slice A built in #NN on the prototype stack above #158, the page as a ticket; slices B
+**Status:** Slice A built in #159 on the prototype stack above #158, the page as a ticket; slices B
 and C not started. The section at the end records what slice A built. Draft engineering ticket, 7
 October 2026. Extends the prototype after the
 [full-month Asian slice](asian-trades.md). The inspected baseline is PR #157 at `592a6bc`;
@@ -314,7 +314,7 @@ No new row-wise blank policy, mixed quantity bases or methods, payment-group red
 rate valuation, reader family or retained preparation cache belongs in these slices.
 Existing `_ReportValues`, `_ReportRisk` and saved vectors retain their meaning.
 
-## As built, slice A, #NN
+## As built, slice A, #159
 
 Built as the page says for slice A, on the path every batch takes, with these particulars.
 

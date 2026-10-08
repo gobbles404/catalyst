@@ -1012,7 +1012,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # A template of the toy's eight fields, one with a handle cell, keeps eight scalars and the objects
 # the library already holds: measured 2,331 bytes on 2026-10-06, which four times the slack
 # covers. A batch of 2,500 single-month rows keeps seventeen columns of eight bytes a row, the
-# terms' six by component, the covered days among them since #NN while the month's quantity shares
+# terms' six by component, the covered days among them since #159 while the month's quantity shares
 # the entered quantity's column under month, and the encoding's three by component, the payment
 # terms' lag, calendar and day by occurrence and component, and the observations' component, day,
 # weight and slot by observation, one per component under lastday, and on the way makes the

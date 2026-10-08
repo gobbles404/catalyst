@@ -160,7 +160,7 @@ this generic schema reader for now.
 | clearing_house | Distinguish the clearing house from a clearing firm/account; agree whether selected specifications supply or constrain it |
 | marketing_reserve | Defer until defined: currency/units, per-unit versus total, sign, and whether it changes value or is reporting-only |
 | trade_date, contract_specification | Add the missing executed date and unambiguous specification selection; since #145 the selection is `quantity_unit`'s, a name among the index's specifications, and there is no separate field |
-| schedule_method, quantity_per | Retain these field names; library-defined methods, all four built, and the month and calday quantity bases, both built since #NN; exact and cfd outside v1 |
+| schedule_method, quantity_per | Retain these field names; library-defined methods, all four built, and the month and calday quantity bases, both built since #159; exact and cfd outside v1 |
 | settlement_method | Retain physical/financial identification; physical-delivery handling is outside v1 and does not set payment dates |
 
 Omitted candidates are not silently supported or discarded at ingestion. The creators
@@ -190,7 +190,7 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 105 for the future, and the mixed way out's numpy; a peak of 11,411 bytes since #NN's basis texts, kept short, about 109 a cell, within a hundred a cell and the slack; nothing published | budget |
+| twelve functions, the classification once per cell, 105 for the future, and the mixed way out's numpy; a peak of 11,411 bytes since #159's basis texts, kept short, about 109 a cell, within a hundred a cell and the slack; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which
