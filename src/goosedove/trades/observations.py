@@ -143,10 +143,10 @@ def observed(
     method present makes its components' observations, the finite set of methods dispatched over
     once and never the rows, and when the batch mixes methods the observations are put back in
     component order and by day, one lexsort over them, since the payment anchors are found by
-    that order; a batch of one method is in order as made. Whether each day prices the
-    component's own contract is the encoding's rule, under every method. The method is the
-    resolution's to read before any payment is counted, so that a payment day counts from the
-    component's last observation."""
+    that order; a batch of one method is in order as made. Which contract prices each day is the
+    encoding's to derive from the calendar: the component's own under the expiry-based methods,
+    whichever the calendar gives under asian. The method is the resolution's to read before any
+    payment is counted, so that a payment day counts from the component's last observation."""
     schedule = futures_schedule_of(index)
     count = contract.size
     if method.size != count:

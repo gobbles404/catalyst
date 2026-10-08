@@ -6,8 +6,9 @@ contract that pay on one day, a contract whose components pay on two days being 
 the components of one contract under a physical settlement, which pays on no day: the contract,
 the summed offset and, for a financial settlement, the day it pays. Per slot, the dated market
 input the batch consumes, an observation date within a payment group: the date, the contract
-pricing that date, derived by the calendar's rule and retained, and the summed exposure every
-settle or quote of that date multiplies. Nothing here changes on a tick, a fixing or a roll of
+pricing that date, derived by the calendar's rule and retained, the group's own under the
+expiry-based methods and whichever the calendar gives under asian, and the summed exposure
+every settle or quote of that date multiplies. Nothing here changes on a tick, a fixing or a roll of
 the valuation date. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ from goosedove.index_definitions.index_conventions import CURRENCY
 from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
-from goosedove.trades.terms import ResolvedTrades
+from goosedove.trades.terms import METHODS, ResolvedTrades, ScheduleMethod
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -45,7 +46,8 @@ class Encoded:
     component's entry-to-price P&L.
 
     Per payment group, the components of one contract that pay on one day: group_contract[g], the
-    schedule row of the g-th group's contract, the groups in the schedule's order and, within a
+    schedule row of the g-th group's contract, the contract its components were booked on, which
+    owns their fixed leg and their payment, the groups in the schedule's order and, within a
     contract, by the day they pay, so that a contract whose components pay on two days is two
     groups and a contract under a physical settlement, which pays on no day, one;
     group_of_component[k]; offset_of_group[g], the components' offsets summed; payment_date[g],
@@ -54,7 +56,10 @@ class Encoded:
     Per slot, the dated inputs: slot_group[s], the group the slot belongs to; slot_date[s], the
     observation day; slot_reference[s], the schedule row of the contract pricing that day, the
     calendar's rule derived once and retained, whose settle on the day fixes the slot and whose
-    quote projects it while live; slot_exposure[s], the sum over the slot's observations of the
+    quote projects it while live, the group's own contract under the expiry-based methods and,
+    under asian, whichever contract the calendar prices the day with, F27 and then G27 for a
+    December booked as Z26 on a schedule whose contracts expire the month before;
+    slot_exposure[s], the sum over the slot's observations of the
     component's coefficient times the observation's weight, what every price of the slot
     multiplies. The slots are in group order and by date within a group, so a group's slots are
     together with its last observation last, and one day observed by two groups of one contract
@@ -80,13 +85,18 @@ class Encoded:
     references: NDArray[np.intp]
     reference_of_slot: NDArray[np.intp]
 
-    def named_slot(self, slot: int) -> str:
-        """A slot's first trade named in a message, with the slot's contract and day: `trade
-        'NG-001' at row 1 observes Z26 on 2026-11-25`."""
+    def slot_trade(self, slot: int) -> str:
+        """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
+        'NG-001' at row 1`."""
         j = int((self.slot_of_observation == slot).argmax())  # its first observation
-        component = int(self.observations.component[j])
+        return self.terms.named(int(self.observations.component[j]))
+
+    def named_slot(self, slot: int) -> str:
+        """A slot's first trade named in a message with the slot's day and the contract pricing
+        it, which under asian need not be the trade's own: `trade 'NG-001' at row 1 on
+        2026-11-25, a day Z26 prices`."""
         code = self.terms.schedule.codes[int(self.slot_reference[slot])]
-        return f"{self.terms.named(component)} observes {code} on {self.slot_date[slot]}"
+        return f"{self.slot_trade(slot)} on {self.slot_date[slot]}, a day {code} prices"
 
 
 def encoded(
@@ -124,15 +134,19 @@ def encoded(
     for a closed day or ever will, and a live observation on one would take a quote now and fail
     the day it fixed. Each observation's reference is the contract pricing its day by the
     calendar's rule, the first whose expiry is on or after it, one search over the schedule; a
-    day after the last expiry prices nothing and is refused; and the reference is the component's
-    own contract, else the observation is refused as unsupported, since a futures history holds
-    one settle a day, the pricing contract's, and would never fix another contract's observation
-    on it, F27's on a day Z26 prices. Then the observations are sorted by group and date, one
-    lexsort, the distinct pairs are the slots, and each observation's coefficient times its
-    weight is summed into its slot, one bincount: two occurrences observing one day in one group
-    are one slot with their exposures added, and one day observed by two groups of one contract
-    is two slots, each with its own payment. The delta axis is the distinct references, one
-    unique, each contract once whatever groups hold it.
+    day after the last expiry prices nothing and is refused. Under the expiry-based methods the
+    reference is the component's own contract, else the observation is refused by its method,
+    since those methods take the contract's own days and a futures history holds one settle a
+    day, the pricing contract's, never Z26's on a day X26 prices; under asian the reference is
+    whatever the calendar gives, F27 and then G27 for a December booked as Z26 on a schedule
+    whose contracts expire the month before, the booked contract keeping the fixed leg and the
+    payment and the day's contract supplying its settle and its quote. Then the observations are
+    sorted by group and date, one lexsort, the distinct pairs are the slots, and each
+    observation's coefficient times its weight is summed into its slot, one bincount: two
+    occurrences observing one day in one group are one slot with their exposures added, and one
+    day observed by two groups of one contract is two slots, each with its own payment. The delta
+    axis is the distinct references, one unique, each contract once whatever groups hold it, the
+    contracts that price the batch's days and not the ones it was booked on.
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
@@ -231,16 +245,17 @@ def _distinct(
 
 def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:
     """Each observation's reference, the contract pricing its day: the day open on the index's
-    market, within the schedule, and the component's own contract."""
+    market, within the schedule, and under the expiry-based methods the component's own
+    contract; under asian whichever contract the calendar gives, one gather of the methods onto
+    the observations."""
     schedule = terms.schedule
     codes = schedule.codes
     closed = ~open_days(with_holiday_calendar(terms.index.holiday_calendar), observations.date)
     if closed.any():
         j = int(closed.argmax())
-        component = int(observations.component[j])
         raise ValueError(
-            f"{terms.named(component)} observes {codes[int(terms.contract[component])]} on "
-            f"{observations.date[j]}, a day the index's market is closed; no settle exists or will"
+            f"{terms.named(int(observations.component[j]))} observes {observations.date[j]}, "
+            "a day the index's market is closed; no settle exists or will"
         )
     reference = contract_on(schedule, observations.date)
     beyond = reference >= len(codes)
@@ -250,15 +265,18 @@ def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArra
             f"{terms.named(int(observations.component[j]))} observes {observations.date[j]}, "
             f"after the schedule's last expiry, {schedule.future_expiry[-1]}; nothing prices it"
         )
-    other = reference != terms.contract[observations.component]
+    method = terms.schedule_method[terms.occurrence][observations.component]
+    own = method != METHODS.index(ScheduleMethod.ASIAN)
+    other = own & (reference != terms.contract[observations.component])
     if other.any():
         j = int(other.argmax())
         component = int(observations.component[j])
+        code = codes[int(terms.contract[component])]
+        pricing = codes[int(reference[j])]
         raise ValueError(
-            f"{terms.named(component)} observes {codes[int(terms.contract[component])]} on "
-            f"{observations.date[j]}, a day {codes[int(reference[j])]} prices; an observation of "
-            "a contract other than the day's pricing contract has no settle in a futures history, "
-            "not supported"
+            f"{terms.named(component)} observes {code} on {observations.date[j]}, a day "
+            f"{pricing} prices; the {METHODS[int(method[j])].value} method takes the contract's "
+            f"own days, and a futures history holds no settle of {code} for a day {pricing} prices"
         )
     return reference
 
