@@ -10,6 +10,8 @@ Record observations and decisions here before turning them into implementation t
 | 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Agreed; [engineering ticket](lot-delta-reporting.md) drafted |
 | 2. `trade_id` | Treat it as an **alphanumeric identifier**, rather than a quantity. | Proposed; entry details to confirm |
 | 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
+| 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
+| 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Agreed; [engineering ticket](calendar-driven-asian-references.md) drafted |
 
 ## 1. Delta reporting
 
@@ -70,12 +72,92 @@ explicit reference requirement. A valid reference supplied with an ordinary labe
 explicit date does not change the result; supplied arguments still undergo normal validation.
 Keep the helpers deterministic and nonvolatile, with existing missing/blank distinctions.
 
-The helper outputs populate the ticket's `start_date` and `end_date` columns, with no
-`contract_code` column. A BAL label can feed both helpers; independently entered start and
+The helper outputs populate the ticket's `start_date` and `end_date` columns. Today's
+prototype requires omitting `contract_code`; item 4 proposes allowing it alongside them.
+A BAL label can feed both helpers; independently entered start and
 end dates feed their respective helpers. The booking reference stays fixed as market
 `as_of` advances. These formulas do not snapshot a changing reference cell.
 
 Acceptance should cover the table, existing BAL refusals, date validation through the seam,
 and one worksheet example containing ordinary labels, BAL labels and explicit dates. This
-is a helper-input extension; `_CreateTrades` and the trade-period rules stay as specified in
-[Calendar day quantities and fixed BAL trade periods](trade-periods-and-bal.md).
+is a helper-input extension; the separate ticket-period change is specified below.
+
+## 4. Contract codes and dates on one ticket
+
+The ticket should support all three period columns together. Resolve the period **per
+row**, after combining the template and ticket, without changing `_CreateTrades`' arguments.
+This replaces the prototype's requirement for one exclusive period form across the batch.
+
+| `contract_code` | `start_date` | `end_date` | Proposed resolution |
+|---|---|---|---|
+| `V26` | blank | blank | Full October 2026 from the code |
+| `V26` | 8-Oct-2026 | 31-Oct-2026 | Explicit dates take precedence |
+| blank | 8-Oct-2026 | 31-Oct-2026 | Explicit dates |
+| `V26` | 8-Oct-2026 | blank | Fail: incomplete date pair |
+| blank | blank | blank | Fail: no period supplied |
+
+A complete date pair selects the period; the code does not constrain or expand it.
+Invalid or reversed dates fail rather than falling back to the code. With neither date,
+the code must resolve normally. Missing columns can still supply neither date; retaining
+all three columns requires a bounded allowance for unused period cells, not a general
+relaxation of required-field validation.
+
+Proposed inactive-code handling: require text when populated, but skip code parsing and
+schedule lookup when dates select the period. This lets a BAL entry label stay on the
+ticket beside its helper-generated dates. Any retained entered code must be clearly
+distinguished from the resolved component contracts; readback must make the effective
+dates and contracts unambiguous.
+
+Before implementation, settle one worksheet detail: whether formula-generated empty text
+(`""`) counts as absent in these three fields as well as a truly blank cell. They are
+different inputs today; do not silently broaden blank handling throughout the seam.
+
+Keep the refusal of duplicate fields across template and ticket. Dates still resolve
+against the supplied index; partial-month method restrictions and zero-quantity validation
+still apply. Resolution and encoding happen once at creation, with no new market-date
+dependency. Mixed code/date rows must match their separately created singletons, including
+the same dates entered with and without a superseded code.
+
+## 5. Asian crude observations across a futures roll
+
+The general correction is specified in [Calendar driven Asian pricing references](calendar-driven-asian-references.md):
+one calendar-driven rule across supported commodities, independent of the booked month.
+
+UAT of a December 2026 Asian fails at creation: the trade's December component is Z26,
+but 1 December is a day of F27 prices in its index calendar. The downstream results
+error propagates that creation failure.
+
+The requested economics are supported by the exchange examples. [ICE WTI 1st Line](https://www.ice.com/products/6753542/WTI-1st-Line-Future)
+averages NYMEX front-month WTI settlement prices over the production month.
+[CME WTI Financial Futures, chapter 510](https://www.cmegroup.com/rulebook/NYMEX/5/510.pdf)
+likewise averages first-nearby settlements over the calendar month. December names the
+averaging period; its observations can reference January futures and then February futures.
+
+In prototype `14130240`, `encoding._the_references` already derives the reference from
+each observation date, then refuses it when it differs from the component's named contract.
+The [first Asian slice](asian-trades.md) deliberately restricted support to a month whose
+observations all reference that same contract. This UAT case requires extending that scope.
+
+Agreed approach for this daily-prompt Asian:
+
+- Keep the booked month/window, quantity, fixed leg and payment ownership together.
+- Resolve each observation's pricing reference from the index calendar, even when that
+  differs from the booked month. Preserve the own-contract checks for expiry-based methods.
+- Apply history by observation date; project live observations from their resolved futures
+  references. Attribute contract delta to those references, not the averaging-month label.
+- Retain the date/reference mapping at creation. A tick reads the distinct live references
+  and does no observation expansion or fixing work.
+
+The existing dated slots already distinguish payment groups from pricing references.
+The one-settle-per-day history can support this case when its daily reference convention
+matches the swap's. Pin the roll boundary explicitly: today's calendar includes the
+expiring contract on its expiry day and switches the following day. Do not apply that
+convention indiscriminately to other products: the
+[Brent leg of ICE's WTI/Brent BALMO specification](https://www.ice.com/products/31687082/Crude-Diff---WTI-1st-Line-vs-Brent-1st-Line-Balmo-Future)
+explicitly rolls on expiry day.
+
+Acceptance needs a calendar-month example spanning a real futures roll: observations on
+both sides and on expiry day, separate forward prices and deltas, partial fixing, payment
+and cash, and mixed batches with existing futures and month-aligned Asians. Readback must
+distinguish the booked period from its pricing references. No signature change is indicated
+by this research; this note records the extension, not an implemented fix.

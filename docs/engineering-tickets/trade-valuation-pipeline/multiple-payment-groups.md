@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Trade periods and BAL](trade-periods-and-bal.md)
 
 **Status:** Built in #162 on the prototype stack above #161, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Written
+[As built](#as-built-162) section at the end says what was built and what was not. Written
 8 October 2026 as the next prototype slice after PR #161, reviewed at `3f6c93b`, a
 continuation of the prototype, with no decision to merge the full stack or rebuild it on main.
 

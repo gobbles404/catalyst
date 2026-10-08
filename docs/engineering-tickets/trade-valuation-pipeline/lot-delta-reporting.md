@@ -5,7 +5,7 @@
 [Bilateral planning](bilateral-discounting-and-dv01.md)
 
 **Status:** Built in #164 on the prototype stack above #163, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Written
+[As built](#as-built-164) section at the end says what was built and what was not. Written
 8 October 2026, following Excel UAT of the prototype through PR #163, reviewed at
 `14130240`. Reporting delta in lots and designating a reporting specification per index are
 agreed. The concrete index-creator argument below is the recommended implementation, and
