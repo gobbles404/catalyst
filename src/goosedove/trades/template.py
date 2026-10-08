@@ -111,7 +111,7 @@ def schedule_method_of(where: str, text: str) -> ScheduleMethod:
 
 
 def quantity_per_of(where: str, text: str) -> QuantityPer:
-    return choice(where, text, QuantityPer, "month, the one basis built")
+    return choice(where, text, QuantityPer, "month or calday")
 
 
 _LAG: Final = re.compile(r"\+([1-9]\d*)bd")

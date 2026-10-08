@@ -4,14 +4,15 @@ tests supply them in Python. One instrument and one index for the batch, one spe
 the index, the quantity unit its quantities count, one route, one settlement and one schedule
 method; then the occurrences, the ticket's rows, each with its date, its label, its clearing
 house and its broker where given; then the components, one per contract month an occurrence
-holds, each with its occurrence, its contract, its signed quantity and its fixed price; and for
-a financial settlement the payment terms, the lag and the calendar each occurrence pays by and
-the day each component pays. docs/library/trades/kernel.md is the page."""
+holds, each with its occurrence, its contract, its signed quantity as entered, the calendar days
+it covers, the quantity the basis gives it and its fixed price; and for a financial settlement
+the payment terms, the lag and the calendar each occurrence pays by and the day each component
+pays. docs/library/trades/kernel.md is the page."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import assert_never, cast
+from typing import Final, assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,6 +22,10 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
+
+# The largest finite number: what a component's quantity, the entered quantity times its covered
+# days, is held under before the multiplication, which would warn as it overflowed.
+_LARGEST: Final = float(np.finfo(np.float64).max)
 
 
 class Route(Enum):
@@ -51,10 +56,14 @@ class ScheduleMethod(Enum):
 
 
 class QuantityPer(Enum):
-    """What the entered quantity is per: each contract month, or each calendar day of it. month
-    is the one basis built; day joins it when it is."""
+    """What the entered quantity is per. month: the quantity stands in every contract month the
+    trade covers, a partial month's as much as a whole one's, never prorated. calday: the
+    quantity is per calendar day, weekends and holidays included, and a month's quantity is the
+    entered quantity times the days it covers, 3,100 for 100 a day over December. The basis says
+    nothing of the pricing days, which the schedule method chooses; both are built."""
 
     MONTH = "month"
+    CALDAY = "calday"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,9 +94,13 @@ class ResolvedTrades:
     whole when the field was not given, each a label kept as typed and read for nothing. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
-    count of the specification and fixed_price[k] the price agreed, in the index's quote units.
-    Then payment, the terms a financial settlement pays by and the days they give, and None for
-    a physical one, which pays on no day."""
+    count of the specification as entered, per the basis, covered_days[k] the calendar days the
+    component covers, the whole of its contract's month, weekends and holidays included,
+    component_quantity[k] the count the component holds, the entered quantity under month and
+    the entered quantity times the covered days under calday, formed once here, the one quantity
+    the encoding converts and nothing later scales again, and fixed_price[k] the price agreed, in
+    the index's quote units. Then payment, the terms a financial settlement pays by and the days
+    they give, and None for a physical one, which pays on no day."""
 
     instrument: Instrument
     index: Index
@@ -104,6 +117,8 @@ class ResolvedTrades:
     occurrence: NDArray[np.intp]
     contract: NDArray[np.intp]
     quantity: NDArray[np.float64]
+    covered_days: NDArray[np.int64]
+    component_quantity: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
     payment: PaymentTerms | None
 
@@ -134,6 +149,7 @@ def resolved_trades(
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
     quantity: NDArray[np.float64],
+    covered_days: NDArray[np.int64],
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
 ) -> ResolvedTrades:
@@ -150,12 +166,17 @@ def resolved_trades(
     the ticket's rows: one date each, and one label, clearing house and broker each where those
     are given. The components are aligned, one or more, each belonging to an occurrence, every
     occurrence holding at least one, since a trade with no contract month has no economics; each
-    contract is a row of the schedule; each quantity is a whole number, positive, negative or
-    zero, the first profile's convention, a signed count of the specification, a zero row kept
-    ready for a deal and contributing nothing; each fixed price is a finite
-    number, the quantity and the price named by the trade they belong to, as the sheet counts
-    its rows. A financial settlement has payment terms, a lag and a calendar per occurrence and
-    one payment day per component, and a physical one has none: a physical future pays on no
+    contract is a row of the schedule; each component covers a positive count of calendar days,
+    the resolution's count of its contract's month, since a quantity per day over no day states
+    nothing; each quantity is a whole number, positive, negative or zero, the first profile's
+    convention, a signed count of the specification, a zero row kept ready for a deal and
+    contributing nothing; each fixed price is a finite number, the quantity, the days and the
+    price named by the trade they belong to, as the sheet counts its rows. Each component's
+    quantity is then formed once by the basis, the entered quantity under month and the entered
+    quantity times its covered days under calday, finite, for the encoding to convert and nothing
+    later to scale again. A financial settlement has payment terms, a lag and a calendar per
+    occurrence and one payment day per component, and a physical one has none: a physical future
+    pays on no
     day, and giving it terms would invent a payment the contract does not make. The instrument
     is kept as the definition the terms stand under, and read for nothing here.
     """
@@ -163,9 +184,18 @@ def resolved_trades(
     _the_method(schedule_method, settlement)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_components(
-        occurrence, contract, quantity, fixed_price, labels, occurrences, len(schedule.codes)
+        occurrence,
+        contract,
+        quantity,
+        covered_days,
+        fixed_price,
+        labels,
+        occurrences,
+        len(schedule.codes),
     )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
+    quantities = _frozen_numbers(quantity)
+    days = _frozen_counts(covered_days)
     return ResolvedTrades(
         instrument,
         index,
@@ -181,7 +211,9 @@ def resolved_trades(
         _frozen_days(trade_dates),
         _frozen_rows(occurrence),
         _frozen_rows(contract),
-        _frozen_numbers(quantity),
+        quantities,
+        days,
+        _the_component_quantity(quantity_per, quantities, days, labels, occurrence),
         _frozen_numbers(fixed_price),
         pays,
     )
@@ -281,21 +313,23 @@ def _the_components(
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
     quantity: NDArray[np.float64],
+    covered_days: NDArray[np.int64],
     fixed_price: NDArray[np.float64],
     labels: tuple[str, ...] | None,
     occurrences: int,
     schedule_rows: int,
 ) -> None:
     """Aligned, one or more, each of an occurrence and every occurrence holding one; each
-    contract a row of the schedule, each quantity whole, zero included, each price finite, a
-    quantity or a price refused naming the trade it belongs to, since a strip's component is no
-    row of the sheet."""
+    contract a row of the schedule, each component covering a positive count of calendar days,
+    each quantity whole, zero included, each price finite, the days, a quantity or a price
+    refused naming the trade it belongs to, since a strip's component is no row of the sheet."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")
     for name, column in (
         ("contract", contract),
         ("quantity", quantity),
+        ("covered_days", covered_days),
         ("fixed_price", fixed_price),
     ):
         if column.size != components:
@@ -320,6 +354,13 @@ def _the_components(
             f"contract row {k + 1} is {contract[k]}, "
             f"expected a row of the schedule, 0 to {schedule_rows - 1}"
         )
+    uncovered = covered_days <= 0
+    if uncovered.any():
+        k = int(uncovered.argmax())
+        raise ValueError(
+            f"covered_days of {_named(labels, int(occurrence[k]))} is {int(covered_days[k])}, "
+            "expected a positive count of calendar days"
+        )
     whole_quantities(quantity, lambda k: f"quantity of {_named(labels, int(occurrence[k]))}")
     finite_prices(fixed_price, lambda k: f"fixed_price of {_named(labels, int(occurrence[k]))}")
 
@@ -342,6 +383,37 @@ def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> N
     if unfinished.any():
         k = int(unfinished.argmax())
         raise ValueError(f"{where(k)} is {float(prices[k])!r}, expected a finite price")
+
+
+def _the_component_quantity(
+    quantity_per: QuantityPer,
+    quantity: NDArray[np.float64],
+    covered_days: NDArray[np.int64],
+    labels: tuple[str, ...] | None,
+    occurrence: NDArray[np.intp],
+) -> NDArray[np.float64]:
+    """Each component's quantity by the basis, formed once here for the encoding to convert and
+    nothing later to scale again. Under month the entered quantity itself, the frozen column
+    shared, since the entered quantity stands in every month the trade covers; under calday the
+    entered quantity times the component's covered days, one multiplication over the components,
+    frozen, and finite, the first product past the largest number refused by its trade, since the
+    whole-number rule admits entered quantities the product outruns."""
+    match quantity_per:
+        case QuantityPer.MONTH:
+            return quantity
+        case QuantityPer.CALDAY:
+            outsize = np.abs(quantity) > _LARGEST / covered_days
+            if outsize.any():
+                k = int(outsize.argmax())
+                raise ValueError(
+                    f"quantity of {_named(labels, int(occurrence[k]))} is {float(quantity[k])!r} "
+                    f"over {int(covered_days[k])} days, expected a finite quantity"
+                )
+            expanded = quantity * covered_days
+            expanded.setflags(write=False)  # made here and owned here: no copy to freeze
+            return expanded
+        case _:
+            assert_never(quantity_per)
 
 
 def _the_payment(
@@ -397,6 +469,12 @@ def _frozen_numbers(column: NDArray[np.float64]) -> NDArray[np.float64]:
     numbers = np.array(column, dtype=np.float64)
     numbers.setflags(write=False)
     return numbers
+
+
+def _frozen_counts(column: NDArray[np.int64]) -> NDArray[np.int64]:
+    counts = np.array(column, dtype=np.int64)
+    counts.setflags(write=False)
+    return counts
 
 
 def _frozen_days(column: NDArray[np.datetime64]) -> NDArray[np.datetime64]:

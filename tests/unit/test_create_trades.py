@@ -180,6 +180,8 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     np.testing.assert_array_equal(terms.occurrence, [0, 1, 2, 3, 4])
     np.testing.assert_array_equal(terms.contract, [1, 1, 2, 2, 1])  # Z26 and F27 by row
     np.testing.assert_array_equal(terms.quantity, [10, -4, 7, -12, 10])
+    np.testing.assert_array_equal(terms.covered_days, [31, 31, 31, 31, 31])  # December, January
+    np.testing.assert_array_equal(terms.component_quantity, terms.quantity)  # month: as entered
     np.testing.assert_array_equal(terms.fixed_price, [3.1, 3.15, 3.4, 3.35, 3.1])
     assert terms.payment is None
     assert batch.encoded.terms is terms
@@ -851,6 +853,118 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
     )
 
 
+# --- the calendar day basis: the entered quantity times the days each month covers -------------
+# trade-periods-and-bal.md, slice A: `quantity_per = calday` beside `month`. The resolution counts
+# the calendar days of each component's contract month, weekends and holidays included, and the
+# kernel forms the component's quantity once, the entered quantity times those days; under month
+# the entered quantity stands in every month, unprorated. The pricing and payment calendars move
+# the observations and the payment day and never the days.
+
+LEAP = an_index(
+    "LEAP",
+    (("X26", "2026-11-25"), ("Z26", "2026-12-29"), ("G27", "2027-02-24"), ("G28", "2028-02-25")),
+)
+CALDAY_TEMPLATE: dict[str, object] = {**NG_TEMPLATE, "quantity_per": "calday"}
+
+
+def quantity_columns(
+    ticket: Mapping[str, list[object]], template: Mapping[str, object], ix: Index = NG
+) -> tuple[list[int], list[float], list[float], list[float]]:
+    """A batch's quantity columns as it retains them: the covered days, the component
+    quantities, the entered quantities and the encoding's quote quantities."""
+    batch, _ = created(ix, ticket, template)
+    terms = batch.resolved
+    return (
+        [int(d) for d in terms.covered_days],
+        [float(q) for q in terms.component_quantity],
+        [float(q) for q in terms.quantity],
+        [float(q) for q in batch.encoded.quote_quantity],
+    )
+
+
+def test_100_a_day_is_3000_in_november_3100_in_december_and_2800_and_2900_in_february() -> None:
+    ticket: dict[str, list[object]] = {
+        "trade_id": ["N", "D", "F7", "F8"],
+        "trade_date": ["2026-10-06"] * 4,
+        "contract_code": ["X26", "Z26", "G27", "G28"],
+        "quantity": [100, 100, 100, 100],
+        "fixed_price": [3.0] * 4,
+    }
+    days, components, entered, quoted = quantity_columns(ticket, CALDAY_TEMPLATE, LEAP)
+    assert days == [30, 31, 28, 29]
+    assert components == [3_000, 3_100, 2_800, 2_900]
+    assert entered == [100, 100, 100, 100]
+    assert quoted == [30_000_000, 31_000_000, 28_000_000, 29_000_000]  # lots of 10,000 MMBtu
+    batch, _ = created(LEAP, ticket, CALDAY_TEMPLATE)
+    assert batch.resolved.quantity_per is QuantityPer.CALDAY
+
+
+def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_100() -> None:
+    strip: dict[str, list[object]] = {
+        "trade_id": ["S"],
+        "trade_date": ["2026-10-06"],
+        "contract_code": ["X26-Z26"],
+        "quantity": [100],
+        "fixed_price": [3.0],
+    }
+    assert quantity_columns(strip, CALDAY_TEMPLATE)[:2] == ([30, 31], [3_000, 3_100])
+    assert quantity_columns(strip, NG_TEMPLATE)[:2] == ([30, 31], [100, 100])
+    # Signed and duplicate rows, and a row kept ready at nothing, keep the arithmetic.
+    signed: dict[str, list[object]] = {
+        "trade_id": ["S", "T", "S", "ENTRY"],
+        "trade_date": ["2026-10-06"] * 4,
+        "contract_code": ["X26-Z26"] * 4,
+        "quantity": [-100, 100, -100, 0],
+        "fixed_price": [3.0] * 4,
+    }
+    days, components, entered, _ = quantity_columns(signed, CALDAY_TEMPLATE)
+    assert days == [30, 31] * 4
+    assert components == [-3_000, -3_100, 3_000, 3_100, -3_000, -3_100, 0, 0]
+    assert entered == [-100, -100, 100, 100, -100, -100, 0, 0]
+
+
+def test_the_pricing_and_payment_calendars_move_no_covered_day() -> None:
+    # The ethane batch under asian and calday, 100 and -50 gallons a day of Z26: closing
+    # 2 December as well takes December's pricing days from 22 to 21 and each weight with them,
+    # and moves no covered day and no component quantity; a payment calendar closed on 5 January
+    # moves the payment day alone.
+    template: dict[str, object] = {**ASIAN_TEMPLATE, "quantity_per": "calday"}
+    ticket: dict[str, list[object]] = {**ASIAN_TICKET, "quantity": [100, -50]}
+    open_market, _ = created(ETHANE, ticket, template)
+    closed = an_index(
+        "ETHANE",
+        (
+            ("X26", "2026-11-30"),
+            ("Z26", "2026-12-31"),
+            ("F27", "2027-01-29"),
+            ("G27", "2027-02-26"),
+        ),
+        (*ETHANE_HOLIDAYS, "2026-12-02"),
+        (("GAL", 1.0, "GAL"),),
+        ("VOLUME", "GAL"),
+    )
+    closed_market, _ = created(closed, ticket, template)
+    for batch in (open_market, closed_market):
+        np.testing.assert_array_equal(batch.resolved.covered_days, [31, 31])
+        np.testing.assert_array_equal(batch.resolved.component_quantity, [3_100, -1_550])
+        np.testing.assert_array_equal(batch.encoded.quote_quantity, [3_100, -1_550])
+    assert open_market.encoded.observations.component.size == 44
+    assert closed_market.encoded.observations.component.size == 42
+    np.testing.assert_allclose(closed_market.encoded.observations.weight, [1 / 21] * 42)
+    paid_later, _ = created(
+        ETHANE,
+        ticket,
+        {
+            **template,
+            "payment_holiday_calendar": holiday_calendar(dates("2027-01-01", "2027-01-05")),
+        },
+    )
+    assert open_market.resolved.payment is not None and paid_later.resolved.payment is not None
+    assert [str(d) for d in open_market.resolved.payment.date] == ["2027-01-05"] * 2
+    assert [str(d) for d in paid_later.resolved.payment.date] == ["2027-01-06"] * 2
+    np.testing.assert_array_equal(paid_later.resolved.component_quantity, [3_100, -1_550])
+
+
 # --- the quantity unit selects the specification ------------------------------------------------
 # quantity-unit-selection.md: the unit is a name among the index's specifications, exactly as the
 # index spells it, and the quantity counts the row it names. A template holds the name and asks
@@ -1309,7 +1423,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
         (
             "quantity_per",
             "month",
-            "quantity_per row 1 is 'day', expected month, the one basis built",
+            "quantity_per row 1 is 'day', expected month or calday",
         ),
     )
     for name, right, message in in_order:
@@ -1569,6 +1683,8 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "quantity_unit",
         "quantity_per",
         "fixed_price",
+        "covered_days",
+        "component_quantity",
         "quote_quantity",
         "coefficient",
         "offset",
@@ -1585,6 +1701,8 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "float64",
         "str",
         "str",
+        "float64",
+        "int64",
         "float64",
         "float64",
         "float64",
@@ -1603,6 +1721,8 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "NYMEX NG",
         "month",
         3.1,
+        31.0,
+        10.0,
         100_000.0,
         100_000.0,
         -310_000.0,
@@ -1671,6 +1791,8 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "fixed_price",
         "payment_time_lag",
         "payment_date",
+        "covered_days",
+        "component_quantity",
         "quote_quantity",
         "coefficient",
         "offset",
@@ -1694,7 +1816,7 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     table = spilled(handle)
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
     assert table[3][:4] == [2.0, "ENTRY-002", 46301.0, "F27"]
-    assert table[3][8] == 0.0 and table[3][12:] == [0.0, 0.0, 0.0]
+    assert table[3][8] == 0.0 and table[3][12:] == [31.0, 0.0, 0.0, 0.0, 0.0]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
     for cell, words in (
@@ -1714,3 +1836,44 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
         assert message.startswith(
             f"#ERROR _CreateTrades: trade_rows cell (1, 4) is {words}, expected number"
         ), message
+
+
+def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_quantity(
+    sheet: dict[str, Any],
+) -> None:
+    # The NG rows at their lots a calendar day: the two columns the resolution derived sit after
+    # the payment terms and before what the encoding made, so the entered quantity, the days and
+    # the month's quantity read side by side and the month's total is never taken for the
+    # entered daily quantity.
+    template = ENTRY["_CreateTradeTemplate"](
+        "future", row(*NG_TEMPLATE), row(*{**NG_TEMPLATE, "quantity_per": "calday"}.values())
+    )
+    table = spilled(
+        ENTRY["_CreateTrades"](sheet["index"], sheet["headers"], sheet["rows"], template)
+    )
+    assert table[0][8:] == [
+        "quantity",
+        "quantity_unit",
+        "quantity_per",
+        "fixed_price",
+        "covered_days",
+        "component_quantity",
+        "quote_quantity",
+        "coefficient",
+        "offset",
+    ]
+    assert table[1][12:14] == ["int64", "float64"]
+    assert [line[8] for line in table[2:]] == [10.0, -4.0, 7.0, -12.0, 10.0]  # as entered
+    assert [line[10] for line in table[2:]] == ["calday"] * 5
+    assert [line[12] for line in table[2:]] == [31.0] * 5  # December and January
+    assert [line[13] for line in table[2:]] == [310.0, -124.0, 217.0, -372.0, 310.0]
+    assert [line[14] for line in table[2:]] == [
+        3_100_000.0,
+        -1_240_000.0,
+        2_170_000.0,
+        -3_720_000.0,
+        3_100_000.0,
+    ]
+    assert str(ENTRY["_CreateTradeTemplate"]("future", row("quantity_per"), row("day"))) == (
+        "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'day', expected month or calday"
+    )

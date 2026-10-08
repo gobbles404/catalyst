@@ -976,10 +976,10 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by fifteen
 # columns, 105 cells of which 91 are text, is laid out one cell at a time and joined for the way
-# out: measured 11,390 bytes on 2026-10-07, about 109 bytes a cell, which a hundred a cell and
-# the slack cover by 134 bytes; the peak follows the length of the rule texts, which #146
-# lengthened and the asian method's shorter method rule cut back, and not the count of cells
-# alone.
+# out: measured 11,411 bytes on 2026-10-07, about 109 bytes a cell, which a hundred a cell and
+# the slack cover by 113 bytes; the peak follows the length of the rule texts, which #146
+# lengthened, the asian method's shorter method rule cut back and the calday basis's texts,
+# kept short for it, moved by 21, and not the count of cells alone.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
@@ -1011,14 +1011,16 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # --- the trade creators -------------------------------------------------------------------------
 # A template of the toy's eight fields, one with a handle cell, keeps eight scalars and the objects
 # the library already holds: measured 2,331 bytes on 2026-10-06, which four times the slack
-# covers. A batch of 2,500 single-month rows keeps sixteen columns of eight bytes a row, the terms'
-# five and the encoding's three by component, the payment terms' lag, calendar and day by
-# occurrence and component, and the observations' component, day, weight and slot by observation,
-# one per component under lastday, and on the way makes the months, the rows, the anchors and the
-# payment days of the components, the references and the sort that finds the slots, and the
-# masks over them: measured 509,786 bytes at 2,500 rows on 2026-10-04 and 508,917 on 2026-10-06,
-# about 204 a row, which 208 a row and twice the slack cover; the ticket's own columns are the
-# seam's views and cost nothing here. The expiries are rolled off the index's two holidays, so
+# covers. A batch of 2,500 single-month rows keeps seventeen columns of eight bytes a row, the
+# terms' six by component, the covered days among them since #NN while the month's quantity shares
+# the entered quantity's column under month, and the encoding's three by component, the payment
+# terms' lag, calendar and day by occurrence and component, and the observations' component, day,
+# weight and slot by observation, one per component under lastday, and on the way makes the
+# months, the rows, the days, the anchors and the payment days of the components, the references
+# and the sort that finds the slots, and the masks over them: measured 509,786 bytes at 2,500 rows
+# on 2026-10-04, 508,917 on 2026-10-06 and 530,549 on 2026-10-07 with the covered days, about 212
+# a row, which 216 a row and twice the slack cover; the ticket's own columns are the seam's views
+# and cost nothing here. The expiries are rolled off the index's two holidays, so
 # that Z26 expires on 24 December and not on the closed 25th, and every call measured is checked,
 # inside the measured call, to have published a batch: from #140 to #146 the expiries were rolled
 # on weekends alone, every call measured was the closed-day refusal, 384,835 bytes, and nothing
@@ -1085,4 +1087,4 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert peak <= 208 * rows + 2 * SLACK
+    assert peak <= 216 * rows + 2 * SLACK

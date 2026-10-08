@@ -1343,12 +1343,14 @@ LIVE_QUOTES = (0.28, 0.30, 0.32)
 LATER_QUOTES = (0.30, 0.32)
 
 
-def asian_template(payment_holidays: list[str], settlement: str = "financial") -> str:
+def asian_template(
+    payment_holidays: list[str], settlement: str = "financial", basis: str = "month"
+) -> str:
     fields = PEN_FIELDS if settlement == "financial" else PEN_FIELDS[:6]
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in payment_holidays]))
     values: list[object] = [
         "GAL",
-        "month",
+        basis,
         "asian",
         "cleared",
         settlement,
@@ -1572,3 +1574,43 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
         "with the asian method; an asian future is cash settled on the average of its month's "
         "pricing days"
     )
+
+
+def test_a_calday_batch_values_as_the_month_batch_of_its_component_quantity(
+    ethane: dict[str, Any],
+) -> None:
+    # Z26 at 110 gallons a calendar day against Z26 at 3,410 gallons a month, both at 0.25: one
+    # deal stated two ways, so every state agrees to the bit. On 2 December, the 1st fixed at
+    # 0.24 and 21 days live at 0.28, each is 155 gallons a day, the mark 155 * (6.12 - 5.50) =
+    # 96.1 and the delta 155 * 21 = 3,255; paid on 5 January, the fixings summing to 6.12 as
+    # well, the cash is 96.1. The spill keeps 110 beside 31 days and 3,410.
+    by_day = ENTRY["_CreateTrades"](
+        ethane["index"],
+        ethane["headers"],
+        rows(["C", serial("2026-11-20"), "Z26", 110.0, 0.25]),
+        asian_template(["2027-01-01"], basis="calday"),
+    )
+    by_month = ENTRY["_CreateTrades"](
+        ethane["index"],
+        ethane["headers"],
+        rows(["M", serial("2026-11-20"), "Z26", 3_410.0, 0.25]),
+        ethane["template"],
+    )
+    for as_of, quotes, expected in (
+        ("2026-12-02", LIVE_QUOTES, (96.1, 0.0, 3_255.0)),
+        ("2027-01-05", LATER_QUOTES, (0.0, 96.1, 0.0)),
+    ):
+        _, _, daily = ethane_state(ethane, as_of, quotes, trades=by_day)
+        _, _, monthly = ethane_state(ethane, as_of, quotes, trades=by_month)
+        assert valued(daily) == valued(monthly)
+        assert valued(daily) == tuple(pytest.approx(x) for x in expected)
+    batch = spilled(ENTRY["util_ReadHandle"](by_day))
+    columns = batch[0]
+    names = ("quantity", "quantity_per", "covered_days", "component_quantity", "quote_quantity")
+    assert [batch[2][columns.index(name)] for name in names] == [
+        110.0,
+        "calday",
+        31.0,
+        3_410.0,
+        3_410.0,
+    ]
