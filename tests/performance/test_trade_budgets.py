@@ -749,3 +749,169 @@ def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None
     trade_results(prep, quoted, counter)
     live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
     assert counter.freeze()["live_prices_read"] == live_references
+
+
+# --- mixed fields in one batch: units, bases and methods row by row ------------------------------
+# mixed-trade-fields.md: the asian index with a second specification, MMBTU of one, and trades
+# whose every lap over the contracts takes the next method, the unit and the basis turning row by
+# row, so that every contract carries all four methods, two units and both bases; the penultimate
+# rows pay a business day after the expiry and the rest two, so every contract is two payment
+# groups. Eight components over two contracts hold every method once per contract; two thousand
+# over twenty-four hold each many times.
+MIXED_SIZES = [(8, 2), (2_000, 24)]
+MIXED_IDS = ["eight trades", "two thousand trades"]
+MIXED_GAS = index(
+    "gas",
+    futures_schedule(CODES, MONTH_ENDS, None),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot", "MMBTU"),
+        np.array([10_000.0, 1.0]),
+        ("MMBTU", "MMBTU"),
+        np.array([0.0, 0.0]),
+        np.array([0.0, 0.0]),
+        UNITS,
+    ),
+    holiday_calendar(HOLIDAYS),
+    UNITS,
+)
+METHOD_LAPS = np.array(
+    [
+        METHODS.index(m)
+        for m in (
+            ScheduleMethod.LASTDAY,
+            ScheduleMethod.PENULTIMATE,
+            ScheduleMethod.LAST3DAY,
+            ScheduleMethod.ASIAN,
+        )
+    ],
+    dtype=np.intp,
+)
+
+
+def mixed_terms(components: int, contracts: int) -> ResolvedTrades:
+    """The budgets' trades on MIXED_GAS, each lap over the contracts the next method, the unit
+    turning every row and the basis every two, the payment days the fixture's own arithmetic."""
+    rows = 1 + np.arange(components, dtype=np.intp) % contracts
+    method = METHOD_LAPS[(np.arange(components) // contracts) % 4]
+    pen = method == METHODS.index(ScheduleMethod.PENULTIMATE)
+    pays = np.where(pen, np.busday_offset(MONTH_ENDS[rows], 1, holidays=HOLIDAYS), ASIAN_PAYS[rows])
+    return resolved_trades(
+        FUTURE,
+        MIXED_GAS,
+        (np.arange(components) % 2).astype(np.intp),
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        method,
+        ((np.arange(components) // 2) % 2).astype(np.intp),
+        None,
+        None,
+        None,
+        np.repeat(np.datetime64("2026-09-24", "D"), components),
+        np.arange(components, dtype=np.intp),
+        rows,
+        np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
+        3.0 + (np.arange(components) % 7) / 100,
+        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, pays),
+    )
+
+
+def mixed_slots(contracts: int) -> int:
+    """The slots a mixed batch over the first contracts has, by the fixture's own arithmetic: per
+    contract the penultimate group's one day and the other group's pricing days of the month, the
+    expiry and the last3day days among them."""
+    return contracts + int(MONTH_DAYS[1 : contracts + 1].sum())
+
+
+@pytest.mark.parametrize(
+    ("components", "contracts", "fixings", "live"),
+    [(8, 2, 45, 0), (2_000, 24, 94, 20)],
+    ids=MIXED_IDS,
+)
+def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_one_path(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    components: int,
+    contracts: int,
+    fixings: int,
+    live: int,
+) -> None:
+    # The observations: the four methods present made once each, the whole-month and the open-
+    # expiry rules looked at once over the components and the index's calendar typed once; the
+    # encoding the one-method batch's functions but one conversion more, the second
+    # specification's; the preparation and a tick the same functions and numpy calls as any
+    # batch's. The counts: two groups per contract, the penultimate rows paying a day before the
+    # rest; a slot per contract for the penultimate day and one per pricing day of the month for
+    # the rest, the expiry and the last3day days among them; the fixings read per slot, every slot
+    # of the expired contracts and the March pricing days before the 10th; one quote per live
+    # contract, whatever methods and groups hold it.
+    terms = mixed_terms(components, contracts)
+    assert call_profile(lambda: observed_of(terms)) == {
+        "observed": 1,
+        "futures_schedule_of": 1,
+        "with_holiday_calendar": 1,
+        "_whole_months": 1,
+        "_with_expiries_priced": 1,
+        "open_days": 1,
+        "_the_days": 4,
+        "observations": 1,
+    }
+    obs = observed_of(terms)
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == {
+        **ENCODING_LEDGER,
+        "UnitConversions.factor": 3,
+        "UnitConversions.category": 3,
+    }
+    counter = WorkCounter()
+    enc = encoded(terms, obs, UNITS, counter)
+    history = a_history(ix=MIXED_GAS)
+    prep = prepared_trades(enc, history, counter)
+    quoted = a_market(history)
+    trade_results(prep, quoted, counter)
+    rows = 1 + np.arange(components) % contracts
+    lap = (np.arange(components) // contracts) % 4
+    observations_by_method = np.array([1, 1, 3, 0])[lap] + np.where(lap == 3, MONTH_DAYS[rows], 0)
+    assert counter.freeze().as_dict() == {
+        "encoded_components": components,
+        "encoded_groups": 2 * contracts,
+        "encoded_observations": int(observations_by_method.sum()),
+        "encoded_slots": mixed_slots(contracts),
+        "prepared_slots": mixed_slots(contracts),
+        "fixings_read": fixings,
+        "kernel": 1,
+        "live_prices_read": live,
+    }
+    assert enc.references.size == contracts and prep.live_references.size == live
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+
+
+# Memory: the mixed batch of two thousand trades over twenty-four contracts, 543 slots, measured
+# on 2026-10-08: the preparation 45,298 bytes, about 83 a slot, the tick 11,440, about 21, within
+# the one-method ceilings per slot; the eight-trade batch's tick 1,210, under twice the slack.
+def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> None:
+    components, contracts = MIXED_SIZES[1]
+    terms = mixed_terms(components, contracts)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = a_history(ix=MIXED_GAS)
+    slots = mixed_slots(contracts)
+    assert enc.slot_group.size == slots
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    prep = prepared_trades(enc, history, WorkCounter())
+    quoted = a_market(history)
+    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    small = mixed_terms(*MIXED_SIZES[0])
+    small_enc = encoded(small, observed_of(small), UNITS, WorkCounter())
+    small_prep = prepared_trades(small_enc, history, WorkCounter())
+    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK

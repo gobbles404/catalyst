@@ -26,7 +26,7 @@ from goosedove.instruments.definitions import FUTURE
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import BASES, QuantityPer
+from goosedove.trades.terms import BASES, METHODS, QuantityPer, ScheduleMethod
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 SIZES = [(5, 2), (2_000, 24)]
@@ -751,3 +751,140 @@ def test_a_part_of_each_month_under_asian_observes_its_own_days_and_nothing_per_
         "numpy.empty": 13,  # no array of ones for the weights
         "ufunc.reduce": 26,
     }
+
+
+# --- a mixed ticket: units, bases and methods row by row ------------------------------------------
+# mixed-trade-fields.md: the asian index with a second specification, MMBTU of one, and a ticket
+# whose every lap over the contracts takes the next method, the unit and the basis turning row by
+# row, under a template that leaves the three fields to the ticket. Eight rows over two contracts
+# hold every method once per contract; two thousand over twenty-four hold each many times.
+MIXED_SIZES = [(8, 2), (2_000, 24)]
+MIXED_IDS = ["eight rows", "two thousand rows"]
+MIXED_GAS = index(
+    "gas",
+    futures_schedule(CODES, MONTH_ENDS, None),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot", "MMBTU"),
+        np.array([10_000.0, 1.0]),
+        ("MMBTU", "MMBTU"),
+        np.array([0.0, 0.0]),
+        np.array([0.0, 0.0]),
+        UNITS,
+    ),
+    holiday_calendar(HOLIDAYS),
+    UNITS,
+)
+METHOD_NAMES_BY_LAP = ("lastday", "penultimate", "last3day", "asian")
+# The pricing days of each month, the asian rows' observations, the fixture's own arithmetic.
+PRICING_DAYS = np.busday_count(
+    MONTHS.astype("datetime64[D]"),
+    (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]"),
+    holidays=HOLIDAYS,
+)
+
+
+def mixed_template() -> TradeTemplate:
+    """The template with the three row fields left to the ticket."""
+    fields = {
+        name: value
+        for name, value in TEMPLATE_FIELDS.items()
+        if name not in ("quantity_unit", "quantity_per", "schedule_method")
+    }
+    return trade_template(
+        FieldValues(FUTURE, 1, tuple(fields), {name: (value,) for name, value in fields.items()})
+    )
+
+
+def a_mixed_ticket(rows: int, contracts: int) -> FieldValues:
+    """The ticket's rows with each row's unit, basis and method: the unit turning every row, the
+    basis every two, the method every lap over the contracts."""
+    on = contract_rows(rows, contracts)
+    lap = np.arange(rows) // contracts
+    return FieldValues(
+        FUTURE,
+        rows,
+        (
+            "trade_date",
+            "contract_code",
+            "quantity",
+            "fixed_price",
+            "quantity_unit",
+            "quantity_per",
+            "schedule_method",
+        ),
+        {
+            "trade_date": np.repeat(np.datetime64("2026-09-24", "D"), rows),
+            "contract_code": tuple(CODES[i] for i in on),
+            "quantity": np.where(np.arange(rows) % 3 == 0, -3.0, 2.0),
+            "fixed_price": 3.0 + (np.arange(rows) % 7) / 100,
+            "quantity_unit": tuple(("lot", "MMBTU")[i % 2] for i in range(rows)),
+            "quantity_per": tuple(("month", "calday")[(i // 2) % 2] for i in range(rows)),
+            "schedule_method": tuple(METHOD_NAMES_BY_LAP[int(i)] for i in lap % 4),
+        },
+    )
+
+
+@pytest.mark.parametrize(("rows", "contracts"), MIXED_SIZES, ids=MIXED_IDS)
+def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # Each distinct unit, method and basis read once, two, four and two, and named once for its
+    # first row; the three columns from the ticket, so three looks and three reads more and three
+    # repeats of a template value fewer; the four methods made once each with the open-expiry look
+    # the penultimate and last3day rows need; nothing per row, the same at eight rows and at two
+    # thousand.
+    ticket, template = a_mixed_ticket(rows, contracts), mixed_template()
+    counter = WorkCounter()
+    terms, observations = resolved(MIXED_GAS, ticket, template, counter)
+    assert counter.freeze().as_dict() == {
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+    }
+    np.testing.assert_array_equal(np.bincount(terms.specification), [rows // 2, rows // 2])
+    np.testing.assert_array_equal(np.bincount(terms.quantity_per), [rows // 2, rows // 2])
+    lap = (np.arange(rows) // contracts) % 4
+    np.testing.assert_array_equal(
+        terms.schedule_method,
+        [METHODS.index(ScheduleMethod(METHOD_NAMES_BY_LAP[int(i)])) for i in lap],
+    )
+    assert observations.component.size == int(
+        (np.array([1, 1, 3, 0])[lap] + np.where(lap == 3, PRICING_DAYS[terms.contract], 0)).sum()
+    )
+    assert call_profile(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter())) == {
+        **resolution_ledger(contracts),
+        **WHOLE_MONTHS,
+        "_the_specification": 2,  # two distinct units
+        "schedule_method_of": 4,  # four distinct methods
+        "quantity_per_of": 2,  # two distinct bases
+        "choice": 8,  # the methods, the bases, the route and the settlement
+        "_Fields.where": contracts + 11,  # five more distinct texts named
+        "_Fields.rows": 5,  # three fewer: the ticket's three columns, no template value repeated
+        "FieldValues.has": 12,  # three columns more looked for
+        "FieldValues.texts": 4,  # and read
+        "_the_days": 4,  # the four methods present, once each
+        "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open
+        "open_days": 1,
+    }
+    assert (
+        numpy_calls(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter()))
+        == {
+            **resolution_numpy(contracts),
+            **WHOLE_MONTHS_NUMPY,
+            "ndarray.any": 24,  # the open expiries, the asian pricing days and the calday products
+            "ndarray.astype": 17,  # the observations' days as counts, to put them back in order
+            "ndarray.cumsum": 8,  # where each asian component's observations start
+            "ndarray.nonzero": 5,  # the components of each of the four methods
+            "ndarray.ravel": 6,  # the same, and the last3day days laid out in one column
+            "ndarray.repeat": 6,  # last3day's components, asian's four repeats
+            "ndarray.setflags": 17,  # the calday products frozen
+            "ndarray.sum": 1,  # how many asian observations in all
+            "numpy._make_extobj": 1,  # the error state set once for the calday products
+            "numpy.arange": 5,  # the place of each asian observation within its component
+            "numpy.asanyarray": 20,
+            "numpy.asarray": 1,  # the three last3day offsets taken as an array
+            "numpy.empty": 18,
+            "ufunc.reduce": 28,
+        }
+    )
