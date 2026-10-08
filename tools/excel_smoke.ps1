@@ -525,6 +525,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG7),3,6)" = "148500"
     "=INDEX(util_ReadHandle(FG7),3,7)" = "2000"
     "=INDEX(util_ReadHandle(FG7),3,8)" = "2"
+    "=INDEX(util_ReadHandle(FG7),1,9)" = "sensitivity_unit"
+    "=INDEX(util_ReadHandle(FG7),3,9)" = "USD per USD/BBL"
+    "=INDEX(util_ReadHandle(FG7),3,10)" = "lots of lots (1000 BBL)"
     # A quantity of zero, a row kept ready: the batch in FG12 holds the two lots of n26 beside a
     # row of nothing on n26 at 72, FG10:FK11; prepared in FG13 and evaluated in FG14 as FG5 is, it
     # marks the two lots' 8,500 with their delta of 2 lots, one slot of the two components, and
@@ -712,7 +715,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     "=INDEX(_ReportRisk(KA14),3,1)"      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "9"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "11"
     "=INDEX(util_ReadHandle(KA14),1,9)"  = "contract_lot_delta"
     "=INDEX(util_ReadHandle(KA14),6,9)"  = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
@@ -742,6 +745,9 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(LC34),3,2)"    = "-62"
     "=INDEX(_ReportRisk(LC34),3,1)"      = "85"
     "=INDEX(_ReportRisk(LC34),3,2)"      = "lots of GAL (1 GAL)"
+    "=INDEX(util_ReadHandle(LC34),1,10)" = "sensitivity_unit"
+    "=INDEX(util_ReadHandle(LC34),3,10)" = "USD per USD/GAL"
+    "=INDEX(util_ReadHandle(LC34),3,11)" = "lots of GAL (1 GAL)"
     "=ROWS(util_ReadHandle(LC33))"       = "25"
     "=INDEX(util_ReadHandle(LC33),3,3)"  = "46387"
     "=INDEX(util_ReadHandle(LC33),4,3)"  = "46391"

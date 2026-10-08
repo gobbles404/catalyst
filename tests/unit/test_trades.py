@@ -3860,3 +3860,67 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
             by(ScheduleMethod.LASTDAY, 2), MIXED, rows(1), *bounds_of(MIXED, rows(1)), unlabeled
         )
     assert str(refused.value) == "method has 2, expected 1, one per component"
+
+
+def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() -> None:
+    # The review's case: a BTU as the reporting lot on a cent-quoted index and a quantity of 1e303
+    # MMBTU, whole and finite as a quantity, finite as a sensitivity, 1e301 dollars a cent, and not
+    # as lots, 1e301 over a coefficient of 1e-8; refused when the batch is prepared, by its slot,
+    # before anything a reader would fail on is published. Extreme-input hardening, not pricing.
+    tiny = index(
+        "tiny lot",
+        CENTS.schedule,
+        CENTS.conventions,
+        contract_specifications(
+            ("BTU", "MMBTU"),
+            numbers(1.0, 1.0),
+            ("BTU", "MMBTU"),
+            numbers(0.0, 0.0),
+            numbers(0.0, 0.0),
+            UNITS,
+        ),
+        CENTS.holiday_calendar,
+        "BTU",
+        UNITS,
+    )
+    assert tiny.reporting_lot is not None
+    assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
+    terms = resolved_trades(
+        FUTURE, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("H",), None, None,
+        dates("2026-09-24"), rows(0), rows(1),
+        numbers(1e303), *bounds_of(tiny, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.coefficient, [1e301])  # finite, in dollars a cent an MMBTU
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(tiny, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "trade 'H' at row 1 observes Z26 on 2026-11-25 with inf live lots, expected a finite "
+        "number of lots of BTU (1 BTU); the exposure in lots outruns the largest number"
+    )
+
+
+def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract() -> None:
+    # The aggregate: two rows of Z26 paying on two days, so two slots, each 9e303 lots of 10,000
+    # MMBTU, 9e307 MMBTU, finite as an exposure and as lots, 9e303 each, and their sum past the
+    # largest number as the contract's sensitivity and so as its lot delta; the sum is bincount's,
+    # which raises no flag, so the rule looks at the vector and refuses by the contract before
+    # anything is published. Paying on one day, the two rows would share a slot whose exposure
+    # is already infinite, and the slot rule would speak first. A price of zero keeps the offsets
+    # finite; this is the arithmetic's edge, not a trade anyone books.
+    terms = resolved_trades(
+        FUTURE, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("A", "B"), None, None,
+        dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 1),
+        numbers(9e303, 9e303), *bounds_of(NG, rows(1, 1)), numbers(0.0, 0.0),
+        paying(dates("2026-11-30", "2026-12-01"), 2),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.slot_exposure, [9e307, 9e307])  # two slots, finite each
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "Z26 has inf of lot delta, expected a finite number of lots of NYMEX NG (10000 MMBTU); "
+        "the exposure in lots outruns the largest number"
+    )

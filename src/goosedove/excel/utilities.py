@@ -467,12 +467,15 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # coefficient times its contract's quote, all zero where it has fixed, and its contract's
     # risk, the two retained vectors read by each slot's reference and so the same number on
     # every slot of one contract, whatever group holds it, named contract_sensitivity and
-    # contract_lot_delta so that neither is read as the slot's; the mark, the cash and the totals
-    # are the two reports' to show.
+    # contract_lot_delta so that neither is read as the slot's; then the two units those numbers
+    # are in, the sensitivity's, currency per quote unit, and the lot's words, the batch's facts
+    # on every row so that a row reads whole, as the trades spill carries the route; the mark,
+    # the cash and the totals are the two reports' to show.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
-    contribution = np.zeros(encoding.slot_group.size)
+    slots = encoding.slot_group.size
+    contribution = np.zeros(slots)
     contribution[prepared.live_slot] = obj.dated_live_contribution
     return MixedArray.table(
         [
@@ -484,8 +487,10 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
                 "live_contribution",
                 "contract_sensitivity",
                 "contract_lot_delta",
+                "sensitivity_unit",
+                "lot_unit",
             ),
-            (*types, "bool", "float64", "float64", "float64", "float64", "float64"),
+            (*types, "bool", "float64", "float64", "float64", "float64", "float64", "str", "str"),
         ],
         *columns,
         prepared.is_fixed,
@@ -494,6 +499,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
         contribution,
         obj.price_sensitivity[encoding.reference_of_slot],
         obj.lot_delta[encoding.reference_of_slot],
+        (obj.price_sensitivity_unit,) * slots,
+        (obj.lot_unit,) * slots,
     )
 
 

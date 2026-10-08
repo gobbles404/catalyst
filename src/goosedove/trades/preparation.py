@@ -69,7 +69,7 @@ class PreparedTrades:
 def prepared_trades(
     encoded: Encoded, history: MarketHistory, counter: WorkCounter
 ) -> PreparedTrades:
-    """The one way to make a PreparedTrades: three rules, checked once, in this order, the first
+    """The one way to make a PreparedTrades: four rules, checked once, in this order, the first
     failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
     The history is over the trades' index, the one object the terms hold, as the history itself
@@ -93,7 +93,11 @@ def prepared_trades(
     everything has fixed, and that sensitivity and the live exposure of each slot divided by the
     reporting lot's coefficient, the conversion the index resolved once, so that the delta is
     counted in lots of the index's reporting specification whatever words the rows were entered
-    in, and no specification is looked up and nothing is converted here or on a tick.
+    in, and no specification is looked up and nothing is converted here or on a tick. Every live
+    lot and every lot delta is finite, else the first that is not is refused by its slot or its
+    contract, the fourth rule: a lot small enough, a BTU against quantities in the trillions of
+    MMBTU, divides a finite exposure past the largest number once it is counted in lots, and
+    nothing is published that a reader would then fail on.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
     counter; nothing per component, nothing per observation, nothing per day of the calendar.
@@ -142,8 +146,6 @@ def prepared_trades(
     )
     is_live = ~is_fixed
     dated_live_exposure = np.where(is_live, encoded.slot_exposure, 0.0)
-    per_lot = terms.reporting_lot.coefficient
-    dated_live_lots = dated_live_exposure / per_lot
     live_slot = np.flatnonzero(is_live)
     live_references, reference_of_live_slot = np.unique(
         encoded.slot_reference[live_slot], return_inverse=True
@@ -151,7 +153,25 @@ def prepared_trades(
     price_sensitivity = np.bincount(
         encoded.reference_of_slot, weights=dated_live_exposure, minlength=encoded.references.size
     )
-    lot_delta = price_sensitivity / per_lot
+    lot = terms.reporting_lot
+    with np.errstate(over="ignore"):  # a finite exposure may outrun the largest number in lots
+        dated_live_lots = dated_live_exposure / lot.coefficient
+        lot_delta = price_sensitivity / lot.coefficient
+    words = lot.words
+    outrun = ~np.isfinite(dated_live_lots)
+    if outrun.any():
+        s = int(outrun.argmax())
+        raise ValueError(
+            f"{encoded.named_slot(s)} with {float(dated_live_lots[s])!r} live lots, expected a "
+            f"finite number of {words}; the exposure in lots outruns the largest number"
+        )
+    outrun = ~np.isfinite(lot_delta)
+    if outrun.any():
+        r = int(outrun.argmax())
+        raise ValueError(
+            f"{codes[int(encoded.references[r])]} has {float(lot_delta[r])!r} of lot delta, "
+            f"expected a finite number of {words}; the exposure in lots outruns the largest number"
+        )
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))

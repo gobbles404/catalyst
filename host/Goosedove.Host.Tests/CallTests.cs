@@ -520,6 +520,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1442000.0, (double)contributions[2, 5], 6);
             Assert.Equal(20000.0, contributions[2, 6]);
             Assert.Equal(2.0, contributions[2, 7]);
+            Assert.Equal("sensitivity_unit", contributions[0, 8]);
+            Assert.Equal("USD per USD/MMBTU", contributions[2, 8]);
+            Assert.Equal("lot_unit", contributions[0, 9]);
+            Assert.Equal("lots of NYMEX NG (10000 MMBTU)", contributions[2, 9]);
             var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
             var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked);
             Assert.NotEqual(results, later);
@@ -826,7 +830,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid))[2, 0], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(9, contributions.GetLength(1));
+            Assert.Equal(11, contributions.GetLength(1));
             Assert.Equal("contract_lot_delta", contributions[0, 8]);
             Assert.Equal(46365.0, contributions[5, 2]);
             Assert.Equal(0.0, contributions[5, 8]);
