@@ -335,19 +335,19 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
     counter = WorkCounter()
     terms, observations = resolved(ASIAN_GAS, ticket, template, counter)
     assert terms.payment is not None
-    months = MONTHS[terms.contract]
-    firsts = months.astype("datetime64[D]")
-    afters = (months + np.timedelta64(1, "M")).astype("datetime64[D]")
-    days = np.busday_count(firsts, afters, holidays=HOLIDAYS)
+    months: NDArray[np.datetime64] = MONTHS[terms.contract]
+    firsts: NDArray[np.datetime64] = months.astype("datetime64[D]")
+    afters: NDArray[np.datetime64] = (months + np.timedelta64(1, "M")).astype("datetime64[D]")
+    days: NDArray[np.int64] = np.busday_count(firsts, afters, holidays=HOLIDAYS)
     np.testing.assert_array_equal(observations.component, np.repeat(np.arange(rows), days))
     np.testing.assert_allclose(observations.weight, np.repeat(1.0 / days, days))
-    expected_days = np.concatenate(
-        [
-            np.busday_offset(first, np.arange(n), roll="forward", holidays=HOLIDAYS)
-            for first, n in zip(firsts, days, strict=True)
-        ]
-    )
-    np.testing.assert_array_equal(observations.date, expected_days)
+    # Each component's days counted off its month's first day, one component at a time: the
+    # fixture's own arithmetic, not the builder's one offset over every observation.
+    by_component: list[NDArray[np.datetime64]] = [
+        np.busday_offset(firsts[k], np.arange(int(days[k])), roll="forward", holidays=HOLIDAYS)
+        for k in range(rows)
+    ]
+    np.testing.assert_array_equal(observations.date, np.concatenate(by_component))
     np.testing.assert_array_equal(
         terms.payment.date, np.busday_offset(MONTH_ENDS[terms.contract], 2, holidays=HOLIDAYS)
     )
