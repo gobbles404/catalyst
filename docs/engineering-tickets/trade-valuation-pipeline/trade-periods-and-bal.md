@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Calendar month Asian trades](asian-trades.md) ·
 [Last three pricing days](last3day-trades.md)
 
-**Status:** Slices A and B built in #159 and #NN on the prototype stack above #158, the page as a
+**Status:** Slices A and B built in #159 and #160 on the prototype stack above #158, the page as a
 ticket; slice C not started. The sections at the end record what each slice built. Draft engineering ticket, 7
 October 2026. Extends the prototype after the
 [full-month Asian slice](asian-trades.md). The inspected baseline is PR #157 at `592a6bc`;
@@ -361,7 +361,7 @@ Built as the page says for slice A, on the path every batch takes, with these pa
   parsing, slice B, and no `exact` method. The encoding's own multiplications, by the lot size and
   the unit factors, check no finiteness, as before.
 
-## As built, slice B, #NN
+## As built, slice B, #160
 
 Built as the page says for slice B, on the two date utilities, with these particulars.
 

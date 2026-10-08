@@ -1,8 +1,8 @@
 # util_EndDate
 
-Built in #129; the balance of a period, a `BAL` label with a reference date, in #NN.
+Built in #129; the balance of a period, a `BAL` label with a reference date, in #160.
 
-Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #NN, the last day of the balance of any of these too, `BALZ26` with a reference date, the same last day, the reference held inside the period here as well. Text and a date in and one date out, no object and no handle, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep. The code is `src/goosedove/index_definitions/periods.py`, `end_date`, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #160, the last day of the balance of any of these too, `BALZ26` with a reference date, the same last day, the reference held inside the period here as well. Text and a date in and one date out, no object and no handle, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep. The code is `src/goosedove/index_definitions/periods.py`, `end_date`, and `src/goosedove/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -20,7 +20,7 @@ def util_EndDate(period: str, reference_date: Date | None = None) -> Date: ...
 | 6 | BALZ26 | `=util_EndDate(A6,DATE(2026,12,15))` shows `46387`, 31-Dec-2026, the label's last day from the 15th on |
 | 7 | BALZ26 | `=util_EndDate(A7,DATE(2027,1,5))` shows `#ERROR util_EndDate: ValueError: reference_date is 2027-01-05, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31` |
 
-Two arguments, the label required and, since #NN, the reference date, which may be left out with nothing in its place and is required by the library for a `BAL` label, both as [util_StartDate](start-date.md) says and the seam checks, as [inputs.md](../../seam/inputs.md) says; the result is a date, out as its serial, as [outputs.md](../../seam/outputs.md) says, which the cell formats.
+Two arguments, the label required and, since #160, the reference date, which may be left out with nothing in its place and is required by the library for a `BAL` label, both as [util_StartDate](start-date.md) says and the seam checks, as [inputs.md](../../seam/inputs.md) says; the result is a date, out as its serial, as [outputs.md](../../seam/outputs.md) says, which the cell formats.
 
 ## Excel help
 
@@ -40,7 +40,7 @@ The four rules of [util_StartDate](start-date.md), run over the whole expression
 |---|---|
 | each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
 | a range's right end starts and ends no earlier than its left | `period is 'CAL28-F28', expected range endpoints in chronological order` |
-| a `BAL` label has its reference date, since #NN | `reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers` |
+| a `BAL` label has its reference date, since #160 | `reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers` |
 | the reference date is a day of the label's own period, either end included | `reference_date is 2026-11-30, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31` |
 
 The last day is the day before the month after the period begins, one conversion of a month to a day and one day subtracted, so a February's own length, a winter's March in the year after and `W99`'s in the next century come from numpy's month unit with nothing counted by hand.
@@ -55,7 +55,7 @@ The tests are the start function's, each case asking for both days: `tests/unit/
 | every malformed label and every reversed range the start function refuses, refused here with the same words | example |
 | for any month, the last day is the day before the next month's first; for any range, the right label's last day | property |
 | the last days through the seam as serials, and both refusals in the library's words; the seam's own for a number, a blank and empty text | example, through the seam |
-| since #NN the balance of a period ending on the label's last day from any reference day of it, the ticket's four labels, the leap day, a Saturday and a year-end range among them; the reference left out or outside the period refused with the bounds, the prefix twice or over a malformed or reversed label refused naming the whole expression; the same through the seam, with a blank, a text and a fraction of a day in the seam's words | example |
+| since #160 the balance of a period ending on the label's last day from any reference day of it, the ticket's four labels, the leap day, a Saturday and a year-end range among them; the reference left out or outside the period refused with the bounds, the prefix twice or over a malformed or reversed label refused naming the whole expression; the same through the seam, with a blank, a text and a fraction of a day in the seam's words | example |
 | the last day of the schedule's own `m26`, of a quarter, a year, a winter and two ranges in a real workbook, a reversed range refused | Excel smoke |
 
 ## Not here

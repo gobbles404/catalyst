@@ -521,7 +521,7 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
 
 # A period's first or last day makes two months and one day, then pays the seam's way out for a
 # date: measured 1,264 bytes on 2026-10-02 for one month and for the whole century alike, which
-# twice the slack covers; the balance of one, since #NN, adds its reference date's check and the
+# twice the slack covers; the balance of one, since #160, adds its reference date's check and the
 # second bound, a day; nothing grows with the period, and nothing is published.
 @pytest.mark.parametrize("name", ["util_StartDate", "util_EndDate"])
 @pytest.mark.parametrize(
