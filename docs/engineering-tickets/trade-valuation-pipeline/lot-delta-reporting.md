@@ -4,10 +4,12 @@
 [Mixed trade fields](mixed-trade-fields.md) ·
 [Bilateral planning](bilateral-discounting-and-dv01.md)
 
-**Status:** Engineering ticket, 8 October 2026, following Excel UAT of the prototype
-through PR #163, reviewed at `14130240`. Reporting delta in lots and designating a
-reporting specification per index are agreed. The concrete index-creator argument
-below is the recommended implementation. No code change is claimed by this ticket.
+**Status:** Built in #NN on the prototype stack above #163, the page as a ticket; the
+[As built](#as-built-nn) section at the end says what was built and what was not. Written
+8 October 2026, following Excel UAT of the prototype through PR #163, reviewed at
+`14130240`. Reporting delta in lots and designating a reporting specification per index are
+agreed. The concrete index-creator argument below is the recommended implementation, and
+the one built.
 
 **Suggested PR title:** `feat(trades): report delta in index-defined lots`
 
@@ -247,3 +249,68 @@ monetary sensitivity. Dividing discounted NPV sensitivity by the above coefficie
 produces PV-weighted equivalent lots; that is not automatically nominal remaining
 volume. Preserve both meanings and resolve their presentation before enabling bilateral
 evaluation. This ticket leaves that bilateral reporting choice open.
+
+## As built, #NN
+
+Engineering's record of what landed, in the ticket's terms.
+[index.md](../../library/index-definitions/index.md),
+[report-risk.md](../../library/trades/report-risk.md),
+[prepare-trades.md](../../library/trades/prepare-trades.md),
+[evaluate-trades.md](../../library/trades/evaluate-trades.md) and
+[kernel.md](../../library/trades/kernel.md) are the pages.
+
+- **The reporting lot.** `_CreateIndex` takes the recommended sixth argument, `reporting_lot`,
+  optional text in the seam's decision 39 form: the name of one of the specifications, matched
+  exactly, resolved once when the index is made into the kernel's `ReportingLot`, the row, its size
+  and unit, the lot in the quote quantity unit, `lot_size * factor(lot_unit -> quote_quantity_unit)`,
+  and the coefficient, that quantity times the currency factor, the settlement currency a fully live
+  lot makes per unit of quote price, 420 for a thousand barrels quoted in cents a gallon and settled
+  in dollars, 42,000 in dollars a gallon, 1,000 in dollars a barrel, 10 in cents a barrel and
+  42,000 in cents a gallon settled in cents; both finite, else refused, `reporting_lot 'LOT' is inf
+  GAL a lot, expected a finite quantity; the lot size outruns the largest number`. A name the
+  specifications lack is refused naming them, `reporting_lot is 'LOT', expected one of the
+  specifications: 'lots', 'gal'`; left out, the index has none and builds markets as before; a blank
+  is the seam's refusal. Nothing is inferred from the index's name, the first row, a literal LOT or
+  the rows' units, and the specifications table is unchanged.
+- **The kernel.** `resolved_trades` refuses an index without a lot, as the resolution does before any
+  row is read, `index 'ETHANE' has no reporting_lot, expected one of its specifications named when
+  the index was made; a batch's delta is reported in lots of it`, and the terms carry the lot. The
+  preparation forms `price_sensitivity` by reference, the monetary vector under its own name, and
+  `lot_delta`, the sensitivity over the lot's coefficient, with `lot_delta_total`, and
+  `dated_live_lots` by slot, one division each, the coefficient the index's; the monetary `delta` and
+  `delta_total` are gone from both records, so a stale reader fails rather than reads lots as dollars
+  or dollars as lots. The results hold both vectors with their units, `price_sensitivity_unit`,
+  `USD per CENT/GAL`, and `lot_unit`, `lots of LOT (1000 BBL)`; a tick shares all of them and makes
+  none again.
+- **The surface.** `_ReportRisk` keeps its five columns: `delta_total` is the lot total and
+  `delta_unit` the lot's words. `util_ReadHandle` on an index adds `reporting_lot` and, with a lot
+  named, `lot_size`, `lot_unit`, `lot_quote_quantity` and `lot_coefficient`, or the word `unset`; on
+  prepared trades `live_coefficient`, the column `live_exposure` was, and `live_lots`; on results
+  `live_coefficient`, `live_lots`, `live_contribution`, `contract_sensitivity` and
+  `contract_lot_delta`, the two contract columns the stored vectors read by each slot's reference
+  and so the same number on every slot of the contract, the readers converting nothing. The trades
+  spill and the templates are as #163 left them.
+- **The numbers pinned.** The ticket's ETE rows, a lot, a thousand barrels and 42,000 gallons, each
+  1,260 of mark, 420 of sensitivity and one lot, three together 3,780, 1,260 and three; the partial
+  Asian period of 14 to 17 December valued on the 16th with the 14th at 26 and the 15th at 27,
+  2,835 of mark, 630 of sensitivity and 1.5 lots; the five quote and settlement units, one lot
+  each; 10,000 and 2,500 MMBTU one and a quarter NYMEX lot, four and one ICE lot, the mark and the
+  sensitivity unchanged; every method fully live one lot, a strip `[1, 1]`, twenty barrels a day
+  over 16 to 20 December a tenth; the lots gone once fixed and after payment; signed, fractional,
+  additive, reordered, duplicated and kept rows as the ticket lists. Every fixture names its lot and
+  every pinned delta of the earlier tickets is restated in lots by hand: 110,000 dollars per dollar
+  an MMBTU reads 11 lots of NYMEX NG, the pen's 5,000 two ICE lots, the smoke's 2,000 two
+  thousand-barrel lots, the lifetime's two barrels 0.002 of one. The same through the seam, on the
+  host, in the smoke and in the kept workbook, whose risk cells now read lots.
+- **The work.** The preparation's numpy ledger freezes two arrays more, `ndarray.setflags` 8 to 10,
+  and its functions are unchanged; the resolution's ledger has `reporting_lot_of` twice, the
+  resolution's check and the kernel's; the seam validates six declared arguments for
+  `_CreateIndex`, `_validate` 5 to 6, the lot left out validated as missing; the tick's ledger is
+  unchanged, reading each distinct live quote once and converting nothing. Memory: eight bytes a
+  slot and eight a contract more retained, the daily batch of 360 slots preparing at 33,964 bytes,
+  30,972 before, the pin 90 to 98 bytes a slot with the reason beside it, the two-day and mixed
+  batches under the same ceiling; the index record one reference larger.
+- **Not in this slice.** No bilateral lot reporting: how reported lots relate to a discounted
+  sensitivity is left to the bilateral ticket, as this one says; no DV01 beyond zero; no exposure
+  total across indices; the trades spill, the templates and the specifications table unchanged;
+  the older tickets' as-built records keep the monetary deltas they were written with.
