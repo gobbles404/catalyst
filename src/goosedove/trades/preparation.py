@@ -24,9 +24,10 @@ class PreparedTrades:
     fixed side of the valuation date, so its price is the history's settle on that day, else a
     quote; dated_live_exposure[s], the slot's exposure where it is live and zero where it has
     fixed, a contribution of nothing rather than a price of nothing. Per payment group, aligned
-    with the encoding's groups: set_amount[g], the sum over the group's fixed slots of exposure
-    times settle; is_settled[g], whether every slot of the group has fixed and it pays on or
-    before the valuation date, so its amount is modeled as cash.
+    with the encoding's groups, a contract paying on two days being two of them: set_amount[g],
+    the sum over the group's fixed slots of exposure times settle; is_settled[g], whether every
+    slot of the group has fixed and it pays on or before the valuation date, so its amount is
+    modeled as cash.
 
     Then the live side for the tick: live_slot, the positions of the live slots on the dated axis;
     live_references, the schedule rows of the distinct contracts those slots reference, in the
@@ -75,10 +76,12 @@ def prepared_trades(
     its settle off the history, the settle on its day, which the history holds for every fixed
     and priced day, and every slot's day is priced, since the encoding refused a closed one
     against the same holiday calendar the history's calendar was built from. A group is settled
-    when every
-    slot of it has fixed and its payment day is on or before the valuation date, the inclusive
-    cutoff of the pipeline; fixed is not paid. Delta is settled here too, since nothing a tick
-    brings changes it: the live exposure summed by reference, zero where everything has fixed.
+    when every slot of it has fixed and its payment day is on or before the valuation date, the
+    inclusive cutoff of the pipeline; fixed is not paid, and a contract whose components pay on
+    two days is two groups, one of which may be cash while the other is live or unpaid. Delta
+    is settled here too, since nothing a tick brings changes it: the live exposure summed by
+    reference over the batch's axis, each contract once whatever groups hold it, zero where
+    everything has fixed.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
     counter; nothing per component, nothing per observation, nothing per day of the calendar.
@@ -101,25 +104,30 @@ def prepared_trades(
     is_fixed = calendar.is_fixed[slot_rows]
     as_of = calendar.valuation_date.as_of
     if encoded.payment_date is None:
-        expiries = terms.schedule.future_expiry[encoded.groups]
+        expiries = terms.schedule.future_expiry[encoded.group_contract]
         expired = calendar.is_fixed[(expiries - calendar.dates[0]).astype(np.intp)]
         if expired.any():
             g = int(expired.argmax())
             k = int((encoded.group_of_component == g).argmax())  # its first component
             raise ValueError(
-                f"{terms.named(k)} on {codes[int(encoded.groups[g])]} expired {expiries[g]}, "
+                f"{terms.named(k)} on {codes[int(encoded.group_contract[g])]} expired "
+                f"{expiries[g]}, "
                 f"before valuation date {as_of}; "
                 "a physical future after its expiry is not supported"
             )
-        is_settled = np.zeros(encoded.groups.size, dtype=np.bool_)
+        is_settled = np.zeros(encoded.group_contract.size, dtype=np.bool_)
     else:
-        unfixed = np.bincount(encoded.slot_group, weights=~is_fixed, minlength=encoded.groups.size)
+        unfixed = np.bincount(
+            encoded.slot_group, weights=~is_fixed, minlength=encoded.group_contract.size
+        )
         is_settled = (unfixed == 0) & (encoded.payment_date <= as_of)
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
     set_of_slot = np.zeros(is_fixed.size)
     set_of_slot[is_fixed] = encoded.slot_exposure[is_fixed] * settles
-    set_amount = np.bincount(encoded.slot_group, weights=set_of_slot, minlength=encoded.groups.size)
+    set_amount = np.bincount(
+        encoded.slot_group, weights=set_of_slot, minlength=encoded.group_contract.size
+    )
     is_live = ~is_fixed
     dated_live_exposure = np.where(is_live, encoded.slot_exposure, 0.0)
     live_slot = np.flatnonzero(is_live)

@@ -191,6 +191,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
     encoded(terms, observed_of(terms), UNITS, counter)
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
+        "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": components,  # lastday: one per component
         "encoded_slots": contracts,  # one per contract, on its expiry day
     }
@@ -304,20 +305,24 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: encoded(three, three_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
 
 
-# The encoding's functions, each once: the two calendar rules read once over every observation,
-# the open days and the pricing contract, the slots found in one sort, the payment day per group.
+# The encoding's functions, each once: the groups found in one sort over the components and
+# the slots in one over the observations, the distinct pairs of contract and day and of group
+# and day through the one helper, the two calendar rules read once over every observation,
+# the open days and the pricing contract, and the payment rule once over the groups.
 ENCODING_LEDGER = {
     "encoded": 1,
+    "_the_groups": 1,
+    "_distinct": 2,
     "_the_references": 1,
     "with_holiday_calendar": 1,
     "open_days": 1,
     "contract_on": 1,
     "_the_slots": 1,
-    "_one_payment_day_per_group": 1,
+    "_payments_after_observations": 1,
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,
-    "WorkCounter.hit": 3,
+    "WorkCounter.hit": 4,
 }
 
 
@@ -492,11 +497,12 @@ def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
     slots = contracts * days
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
+        "encoded_groups": contracts,
         "encoded_observations": components * days,
         "encoded_slots": slots,
     }
     assert enc.slot_group.size == slots and enc.references.size == contracts
-    np.testing.assert_array_equal(enc.slot_reference, enc.groups[enc.slot_group])
+    np.testing.assert_array_equal(enc.slot_reference, enc.group_contract[enc.slot_group])
     # Every component's exposure is shared out over its days and nothing is lost in the sum.
     assert enc.slot_exposure.sum() == pytest.approx(enc.coefficient.sum(), abs=1e-6)
     # What is retained per slot and per observation, in bytes: eight a slot for each of the
@@ -618,3 +624,117 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "ndarray.sum": 1,
         "ufunc.reduce": 2,
     }
+
+
+# --- two payment days per contract: the groups and the slots double, the quotes do not ---------
+# multiple-payment-groups.md: a payment group is a contract and a payment day, so the same trades
+# with the second lap of components over the contracts paying a day after the first make two
+# groups of every contract and two slots on its one expiry day, while the delta axis, the quotes
+# a tick reads and the functions and numpy calls every step runs are the one-group batch's.
+
+
+def two_day_terms(components: int, contracts: int) -> ResolvedTrades:
+    """The budgets' trades, the second lap over the contracts at +3bd paying a day after the
+    first lap's +2bd, so that every contract has two payment groups."""
+    rows = 1 + np.arange(components, dtype=np.intp) % contracts
+    later = (np.arange(components) // contracts) % 2
+    return resolved_trades(
+        FUTURE,
+        GAS,
+        0,
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH,
+        None,
+        None,
+        None,
+        np.repeat(np.datetime64("2026-09-24", "D"), components),
+        np.arange(components, dtype=np.intp),
+        rows,
+        np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
+        3.0 + (np.arange(components) % 7) / 100,
+        PaymentTerms(
+            2 + later,
+            (PAYMENT_CALENDAR,) * components,
+            PAYS[rows] + later.astype("timedelta64[D]"),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("components", "contracts", "fixed", "live"), [(5, 2, 2, 0), (2_000, 24, 4, 20)], ids=IDS
+)
+def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_quotes(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    components: int,
+    contracts: int,
+    fixed: int,
+    live: int,
+) -> None:
+    terms = two_day_terms(components, contracts)
+    obs = observed_of(terms)
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    counter = WorkCounter()
+    enc = encoded(terms, obs, UNITS, counter)
+    history = a_history()
+    prep = prepared_trades(enc, history, counter)
+    quoted = a_market(history)
+    trade_results(prep, quoted, counter)
+    assert counter.freeze().as_dict() == {
+        "encoded_components": components,
+        "encoded_groups": 2 * contracts,
+        "encoded_observations": components,
+        "encoded_slots": 2 * contracts,  # each contract's expiry day once per group
+        "prepared_slots": 2 * contracts,
+        "fixings_read": 2 * fixed,  # one settle read per fixed slot, two slots a fixed day
+        "kernel": 1,
+        "live_prices_read": live,  # one quote per live contract, not per live group
+    }
+    assert enc.references.size == contracts and prep.live_references.size == live
+    assert prep.live_slot.size == 2 * live
+    np.testing.assert_array_equal(enc.group_contract, np.repeat(enc.references, 2))
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    # The same trades, the same exposure per contract: the delta is the one-group batch's.
+    one_group = prepared_trades(a_batch(components, contracts), history, WorkCounter())
+    np.testing.assert_allclose(prep.delta, one_group.delta)
+
+
+def test_a_two_day_daily_batch_prepares_and_ticks_by_its_doubled_slots() -> None:
+    # The daily batch with two payment days per contract: 720 slots for 360, thirty thousand
+    # observations still, the tick reading one quote per live contract, and the preparation's and
+    # the tick's peaks within the one-day batch's ceilings per slot over the slots they have.
+    components, contracts, days = DAILY[1]
+    terms = two_day_terms(components, contracts)
+    obs = observations(
+        np.repeat(np.arange(components, dtype=np.intp), days),
+        daily_days(components, contracts, days),
+        np.full(components * days, 1 / days),
+        components,
+    )
+    enc = encoded(terms, obs, UNITS, WorkCounter())
+    slots = 2 * contracts * days
+    assert enc.slot_group.size == slots and enc.references.size == contracts
+    assert enc.slot_of_observation.size == components * days
+    history = a_history()
+    assert least_peak(lambda: prepared_trades(enc, history, WorkCounter())) <= 90 * slots + SLACK
+    prep = prepared_trades(enc, history, WorkCounter())
+    quoted = a_market(history)
+    assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
+    counter = WorkCounter()
+    trade_results(prep, quoted, counter)
+    live_references = int(np.unique(enc.slot_reference[prep.live_slot]).size)
+    assert counter.freeze()["live_prices_read"] == live_references

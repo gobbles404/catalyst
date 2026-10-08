@@ -199,11 +199,12 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     np.testing.assert_array_equal(
         batch.encoded.offset, [-310_000, 126_000, -238_000, 402_000, -310_000]
     )
-    np.testing.assert_array_equal(batch.encoded.groups, [1, 2])
+    np.testing.assert_array_equal(batch.encoded.group_contract, [1, 2])
     np.testing.assert_array_equal(batch.encoded.slot_exposure, [160_000, -50_000])
     np.testing.assert_array_equal(batch.encoded.slot_date, dates("2026-11-25", "2026-12-29"))
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
+        "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
         "resolved_components": 5,
@@ -1321,7 +1322,7 @@ def test_a_zero_quantity_in_the_template_puts_every_row_at_nothing() -> None:
     batch, _ = created(NG, ticket, template)
     np.testing.assert_array_equal(batch.resolved.quantity, [0.0] * 5)
     np.testing.assert_array_equal(batch.encoded.quote_quantity, [0.0] * 5)
-    assert batch.encoded.groups.tolist() == [1, 2]  # both contracts held, at nothing
+    assert batch.encoded.group_contract.tolist() == [1, 2]  # both contracts held, at nothing
     assert refused(NG, {**NG_TICKET, "quantity": [0, 0, 0, 0, 0]}, template) == (
         "quantity is supplied by the template and by the ticket, expected by one of them"
     )
@@ -1485,20 +1486,24 @@ def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -
     assert message == "quantity of trade 'S2' at row 2 is 2.5, expected a whole number"
 
 
-def test_two_lags_for_one_contract_are_refused_by_the_trade_and_the_contract() -> None:
+def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> None:
+    # NG-002 at +3bd pays 1 December where the other Z26 rows pay 30 November: Z26 is two
+    # groups, the earlier day first, and F27 one, each row in the group of its own day.
     template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_time_lag"}
-    message = refused(
+    batch, counter = created(
         TOY,
         {**NG_TICKET, "payment_time_lag": ["+2bd", "+3bd", "+2bd", "+2bd", "+2bd"]},
         template,
     )
-    assert message == (
-        "Z26 pays on 2026-11-30 for trade 'NG-001' at row 1 and on 2026-12-01 for trade 'NG-002"
-        "' at row 2, expected one payment day per contract"
+    np.testing.assert_array_equal(batch.encoded.group_contract, [1, 1, 2])
+    np.testing.assert_array_equal(
+        batch.encoded.payment_date, dates("2026-11-30", "2026-12-01", "2026-12-31")
     )
-    # The page's case: four rows of J27 at +2bd and one at +3bd. Both days are named with their
-    # rows and neither is held to be the right one; the desk decides which terms to change.
-    four = refused(
+    np.testing.assert_array_equal(batch.encoded.group_of_component, [0, 1, 2, 2, 0])
+    assert counter.freeze()["encoded_groups"] == 3
+    # The page's case: four rows of J27 at +2bd and one at +3bd, two groups of J27, the three
+    # rows paying 31 March first and the one paying 1 April after.
+    four, _ = created(
         an_index(
             "J27",
             (("X26", "2026-10-28"), ("J27", "2027-03-29")),
@@ -1514,10 +1519,31 @@ def test_two_lags_for_one_contract_are_refused_by_the_trade_and_the_contract() -
         },
         template,
     )
-    assert four == (
-        "J27 pays on 2027-03-31 for trade 'R1' at row 1 and on 2027-04-01 for trade 'R4' at row 4, "
-        "expected one payment day per contract"
+    np.testing.assert_array_equal(four.encoded.group_contract, [1, 1])
+    np.testing.assert_array_equal(four.encoded.payment_date, dates("2027-03-31", "2027-04-01"))
+    np.testing.assert_array_equal(four.encoded.group_of_component, [0, 0, 0, 1])
+    # +1bd on a calendar closed on the 26th and the 27th reaches 30 November, as +2bd on the
+    # toy's calendar does: one group of Z26, the grouping by the day and not by the lag or the
+    # calendar that made it.
+    friday_closed = holiday_calendar(dates("2026-11-26", "2026-11-27"))
+    one, _ = created(
+        TOY,
+        {
+            **NG_TICKET,
+            "payment_time_lag": ["+1bd", "+2bd", "+2bd", "+2bd", "+1bd"],
+            "payment_holiday_calendar": [
+                friday_closed,
+                PAYMENT_CALENDAR,
+                PAYMENT_CALENDAR,
+                PAYMENT_CALENDAR,
+                friday_closed,
+            ],
+        },
+        {k: v for k, v in template.items() if k != "payment_holiday_calendar"},
     )
+    np.testing.assert_array_equal(one.encoded.group_contract, [1, 2])
+    np.testing.assert_array_equal(one.encoded.payment_date, dates("2026-11-30", "2026-12-31"))
+    np.testing.assert_array_equal(one.encoded.group_of_component, [0, 0, 1, 1, 0])
 
 
 def test_a_code_or_a_lag_the_grammar_refuses_is_named_by_its_first_bad_row() -> None:
@@ -1703,7 +1729,7 @@ def test_any_ticket_of_single_months_resolves_row_by_row(
     )
     np.testing.assert_array_equal(terms.quantity, [q for _, q, _ in rows])
     assert counter.freeze()["resolved_components"] == n
-    assert batch.encoded.groups.size == len({code.upper() for code, _, _ in rows})
+    assert batch.encoded.group_contract.size == len({code.upper() for code, _, _ in rows})
 
 
 # --- the creator on the sheet ---------------------------------------------------------------

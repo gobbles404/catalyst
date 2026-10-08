@@ -45,6 +45,7 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.encoding import Encoded
 from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
@@ -396,21 +397,33 @@ def trades_table(obj: Trades) -> MixedArray:
     return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
+def _slot_names(
+    encoding: Encoded,
+) -> tuple[list[str], list[str], list[NDArray[Any] | tuple[str, ...]]]:
+    # The columns that name a slot: the contract pricing the day, the observation day and, for a
+    # financial settlement, the day the slot's payment group pays, so that two groups of one
+    # contract observing one day read apart; a physical settlement pays on no day and shows none.
+    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
+    names = ["contract_code", "observation_date"]
+    types = ["str", "datetime64[D]"]
+    columns: list[NDArray[Any] | tuple[str, ...]] = [tuple(codes), encoding.slot_date]
+    if encoding.payment_date is not None:
+        names.append("payment_date")
+        types.append("datetime64[D]")
+        columns.append(encoding.payment_date[encoding.slot_group])
+    return names, types, columns
+
+
 @shown.register
 def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
-    # One row per slot, the dated axis as the preparation left it: the contract pricing the day,
-    # the observation day, whether it has fixed, whether its payment group has settled, and its
-    # live exposure, zero where it has fixed; nothing is made again, every column the record's
-    # own or a gather of one.
+    # One row per slot, the dated axis as the preparation left it: the slot named, whether it has
+    # fixed, whether its payment group has settled, and its live exposure, zero where it has
+    # fixed; nothing is made again, every column the record's own or a gather of one.
     encoding = obj.encoded
-    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
+    names, types, columns = _slot_names(encoding)
     return MixedArray.table(
-        [
-            ("contract_code", "observation_date", "is_fixed", "is_settled", "live_exposure"),
-            ("str", "datetime64[D]", "bool", "bool", "float64"),
-        ],
-        tuple(codes),
-        encoding.slot_date,
+        [(*names, "is_fixed", "is_settled", "live_exposure"), (*types, "bool", "bool", "float64")],
+        *columns,
         obj.is_fixed,
         obj.is_settled[encoding.slot_group],
         obj.dated_live_exposure,
@@ -419,31 +432,23 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
 
 @shown.register
 def trade_results_table(obj: TradeResults) -> MixedArray:
-    # One row per slot, the dated contents of the result: the contract pricing the day, the
-    # observation day, whether it has fixed, the slot's own live exposure and its live
-    # contribution, exposure times its contract's quote, both zero where it has fixed, and the
-    # delta of its contract, the retained vector read by each slot's reference and so the same
-    # number on every slot of one contract, named contract_delta so that it is not read as the
-    # slot's; the mark, the cash and the totals are the two reports' to show.
+    # One row per slot, the dated contents of the result: the slot named, whether it has fixed,
+    # the slot's own live exposure and its live contribution, exposure times its contract's
+    # quote, both zero where it has fixed, and the delta of its contract, the retained vector read
+    # by each slot's reference and so the same number on every slot of one contract, whatever
+    # group holds it, named contract_delta so that it is not read as the slot's; the mark, the
+    # cash and the totals are the two reports' to show.
     prepared = obj.prepared
     encoding = prepared.encoded
-    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
+    names, types, columns = _slot_names(encoding)
     contribution = np.zeros(encoding.slot_group.size)
     contribution[prepared.live_slot] = obj.dated_live_contribution
     return MixedArray.table(
         [
-            (
-                "contract_code",
-                "observation_date",
-                "is_fixed",
-                "live_exposure",
-                "live_contribution",
-                "contract_delta",
-            ),
-            ("str", "datetime64[D]", "bool", "float64", "float64", "float64"),
+            (*names, "is_fixed", "live_exposure", "live_contribution", "contract_delta"),
+            (*types, "bool", "float64", "float64", "float64"),
         ],
-        tuple(codes),
-        encoding.slot_date,
+        *columns,
         prepared.is_fixed,
         prepared.dated_live_exposure,
         contribution,
