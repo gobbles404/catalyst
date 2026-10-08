@@ -2,9 +2,10 @@
 
 [Pipeline overview](README.md) · [Trade periods and BAL](trade-periods-and-bal.md)
 
-**Status:** Next prototype slice, 8 October 2026. Implement as one focused PR after
-PR #161, reviewed at `3f6c93b`. This is a continuation of the prototype, with no decision
-to merge the full stack or rebuild it on main.
+**Status:** Built in #NN on the prototype stack above #161, the page as a ticket; the
+[As built](#as-built-nn) section at the end says what was built and what was not. Written
+8 October 2026 as the next prototype slice after PR #161, reviewed at `3f6c93b`, a
+continuation of the prototype, with no decision to merge the full stack or rebuild it on main.
 
 ## Outcome and reason for this slice
 
@@ -261,3 +262,64 @@ independently through the existing public pipeline, while the reports remain agg
 and the stored contract risk vector remains unique and reusable. Mixed schedule methods,
 quantity units and quantity bases are the next slice. The inherited #159 quantity-overflow
 P3 remains a small separate correction; it is not a payment-group feature requirement.
+
+## As built, #NN
+
+Engineering's record of what landed, in the ticket's terms. [kernel.md](../../library/trades/kernel.md)
+is the page; [prepare-trades.md](../../library/trades/prepare-trades.md),
+[evaluate-trades.md](../../library/trades/evaluate-trades.md) and
+[read-handle.md](../../library/utilities/read-handle.md) carry the readback.
+
+- **The groups.** The encoding's payment group is a contract and the day it pays: under a financial
+  settlement the distinct pairs of contract and resolved payment day among the components, in the
+  schedule's order and by day within a contract, found by one lexsort through the same helper that
+  finds the slots, the distinct pairs of group and observation day; under a physical settlement,
+  which pays on no day, the distinct contracts, as before. Two components of one contract paying on
+  one day are one group whatever lag and calendar made the day, two paying on different days two
+  groups, each with its own summed offset, its own slots and its own settlement; the refusal of two
+  payment days on one contract is gone, the rule that a group pays after its last observation stays
+  in its words. `Encoded.groups` is `group_contract`, a group's schedule row, a contract appearing
+  once per day its components pay on, so that no reader takes the group axis for the contract axis;
+  `references` is the contract axis, each once whatever groups hold it, where the delta is stored.
+  The encoding counts its groups, `encoded_groups`, beside its components, observations and slots.
+- **The preparation and the evaluation.** Unchanged in their arithmetic: set amounts and settlement
+  per group, each group settled when its slots have fixed and its day has come, so one group of a
+  contract may be cash while another is live or unpaid; the live references, the quotes read, the
+  delta and its vector per contract. A tick over two groups of one contract reads its quote once.
+- **The readback.** The prepared and results spills gain `payment_date`, the day the slot's group
+  pays, after `observation_date`, for a financial settlement, so that two groups of one contract
+  observing one day read apart; a physical settlement pays on no day and shows none, its spills as
+  they were. The columns after it move one to the right; the smoke, the host, the lifetime and the
+  kept workbook read them there.
+- **The numbers pinned.** The ticket's example on a synthetic index of its own, PAYS, X26 expiring
+  30 November 2026, Z26 Friday 4 December and F27 8 January 2027: A at +1bd paying Monday 7 December
+  and B at +3bd paying Wednesday the 9th, two groups, six slots and six observations off one
+  reference; the six states to the number, 180 and 30 of delta, 150 and 20, 160 and 10, 150 and
+  nothing live, -30 of mark beside 180 of cash, 150 of cash and nothing in mark; a tick to 170 on
+  the same preparation, a corrected 2 December fixing taking a new history, 160; B at -60 and 70
+  netting to nothing while unpaid with both groups standing, 180 of cash beside -180 of mark on the
+  7th and nothing on the 9th; both at +3bd one group, +1bd on a calendar closed on the 7th and 8th
+  one group with +3bd on the open one, Z26 and F27 paying on 13 January two groups; four groups over
+  two contracts reading two quotes with the delta on each contract once; the singletons summed in
+  every state and order, with a duplicate, a row kept ready and a second contract; the partial asian
+  periods on the ethane index, A 1 to 3 December and B 1 to 7 at +2bd, 120 of mark beside 60 of
+  cash and 10 of delta on the 7th, 160 of cash on the 9th. The same example through
+  `_CreateTrades`, `_PrepareTrades`, `_EvaluateTrades` and the reports with the lag in the ticket,
+  the two lags and the two days read back off the batch and each slot's payment day off the
+  preparation; two ends on one contract paying apart, 1,298/21 of cash beside 50 of mark on
+  4 January; the kernel's NG rows with NG-002 paying a day later, two groups of Z26 and one of F27;
+  two lags through the creator making two groups and the page's four rows of J27 likewise.
+- **The work.** The encoding's ledger names `_the_groups`, `_distinct` twice, `_the_slots` and
+  `_payments_after_observations` for `_the_slots` and `_one_payment_day_per_group`, and hits its
+  counter four times for three; nothing else in the resolution's, the preparation's or the tick's
+  ledgers moved, and no numpy ledger did. A batch with two payment days per contract has twice the
+  groups and the slots, its fixings read per slot, its quotes read per live contract and its delta
+  the one-day batch's, through the same functions and numpy calls at five components and at two
+  thousand; the daily batch with two payment days per contract, 720 slots for 360, prepares and
+  ticks within the one-day batch's ceilings per slot. The batch of 2,500 rows keeps nothing more
+  per row, the groups being per group, and its pin stands at 232 a row.
+- **Not in this slice.** No mixed schedule methods, quantity units or quantity bases in one batch,
+  the next slice; no discounting, DV01 convention, mixed route, delivery or margining; bilateral
+  evaluation still refused; the physical readback unchanged, paying on no day; no report per trade
+  or per group; the lifetime example not extended, its one-group chain reading its settled column
+  one further right, the smoke, the host and the kept workbook carrying the two-group pair.
