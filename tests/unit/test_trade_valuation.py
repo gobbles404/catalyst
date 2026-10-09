@@ -2722,12 +2722,12 @@ WTI_ROW: list[object] = [
 ]
 
 
-def wti_template(lag: str = "+2bd", method: str | None = "asian") -> str:
-    """The asian template in barrels, cleared and financial, paying that lag on the WTI-like
-    calendar; with no method, a template that leaves the method to the ticket's rows."""
+def wti_template(lag: str = "+2bd", method: str | None = "asian", unit: str = "BBL") -> str:
+    """The asian template in barrels, or the unit given, cleared and financial, paying that lag
+    on the WTI-like calendar; with no method, a template that leaves the method to the rows."""
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in WTI_HOLIDAYS]))
     fields = [f for f in PEN_FIELDS if method is not None or f != "schedule_method"]
-    values: list[object] = ["BBL", "month", method, "cleared", "financial", "Prototype Clearing"]
+    values: list[object] = [unit, "month", method, "cleared", "financial", "Prototype Clearing"]
     values = [v for v in values if v is not None] + [lag, calendar]
     return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values)))
 
@@ -2903,3 +2903,158 @@ def test_a_code_entry_and_the_dates_of_the_whole_month_agree_on_the_wti_asian(
     assert [line[9] for line in spilled(ENTRY["util_ReadHandle"](code))[2:]] == [
         pytest.approx(1.5)
     ] * 15 + [pytest.approx(0.7)] * 7
+
+
+# --- delta by day, month and year, daily-risk-vector.md ------------------------------------------
+# The ticket's month-aligned index through the seam, X26 bounding the calendar, Z26 expiring
+# 31 December and F27 29 January, closed on 25 December and New Year's Day, a barrel and a
+# thousand-barrel LOT; a template leaving the method to the rows at +1bd; 22 LOT of a December
+# asian and 3 LOT of a Z26 penultimate at 70; every settle 75 and the quote 75.
+DECEMBER_PRICING_DAYS = [
+    str(d)
+    for d in np.arange(np.datetime64("2026-12-01"), np.datetime64("2027-01-01"))
+    if np.is_busday(d, holidays=np.array(WTI_HOLIDAYS, dtype="datetime64[D]"))
+]
+SEVENTY_FIVE = {d: 75.0 for d in DECEMBER_PRICING_DAYS}
+DELTA_HEADERS = ["bucket_start", "delta", "delta_unit", "as_of"]
+DELTA_TYPES = ["datetime64[D]", "float64", "str", "datetime64[D]"]
+LOT_UNIT = "lots of LOT (1000 BBL)"
+
+
+@pytest.fixture(scope="module")
+def monthly() -> dict[str, Any]:
+    index, _ = an_index(
+        "MONTHLY",
+        [("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29")],
+        WTI_HOLIDAYS,
+        [("BBL", 1.0), ("LOT", 1_000.0)],
+        ("VOLUME", "BBL"),
+        reporting_lot="LOT",
+    )
+    template = wti_template("+1bd", None, "LOT")
+    headers = row(*NG_HEADERS, "schedule_method")
+    asian: list[object] = ["A", serial("2026-11-20"), "Z26", 22.0, 70.0, "asian"]
+    pen: list[object] = ["P", serial("2026-11-20"), "Z26", 3.0, 70.0, "penultimate"]
+    return {
+        "index": index,
+        "template": template,
+        "headers": headers,
+        "trades": ENTRY["_CreateTrades"](index, headers, rows(asian, pen), template),
+        "reversed": ENTRY["_CreateTrades"](index, headers, rows(pen, asian), template),
+    }
+
+
+def monthly_state(
+    monthly: dict[str, Any], as_of: str, trades: object | None = None
+) -> tuple[str, str, str]:
+    history = a_history(monthly["index"], "2026-11-30", as_of, WTI_HOLIDAYS, SEVENTY_FIVE)
+    market = a_market(history, "MONTHLY", 75.0)
+    prepared = ENTRY["_PrepareTrades"](monthly["trades"] if trades is None else trades, history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.mark.parametrize(
+    ("as_of", "live", "mark", "cash"),
+    [
+        ("2026-12-01", 25, 125_000, 0),
+        ("2026-12-30", 5, 125_000, 0),
+        ("2026-12-31", 1, 110_000, 15_000),
+        ("2027-01-01", 0, 110_000, 15_000),
+        ("2027-01-04", 0, 0, 125_000),
+    ],
+    ids=["1 Dec", "30 Dec", "31 Dec", "1 Jan", "4 Jan"],
+)
+def test_the_delta_reports_by_day_month_and_year_on_the_sheet_as_the_ticket_says(
+    monthly: dict[str, Any], as_of: str, live: float, mark: float, cash: float
+) -> None:
+    # The ticket's table through the registered functions: the day view 22 rows, December's
+    # pricing days with a lot each and 4 on the 30th while live and zero once fixed, the month
+    # view one row from 1 December and the year view one row from 1 January 2026, both the live
+    # lots; the unit and the valuation day on every row; the selector left out the day view; the
+    # rows reversed the same.
+    for trades in (None, monthly["reversed"]):
+        _, _, results = monthly_state(monthly, as_of, trades)
+        assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(live))
+        by_day = spilled(ENTRY["_ReportDelta"](results, "day"))
+        assert spilled(ENTRY["_ReportDelta"](results, bridge.MISSING)) == by_day
+        assert by_day[:2] == [DELTA_HEADERS, DELTA_TYPES]
+        assert [line[0] for line in by_day[2:]] == [serial(d) for d in DECEMBER_PRICING_DAYS]
+        expected = [
+            0.0 if d < as_of else (4.0 if d == "2026-12-30" else 1.0) for d in DECEMBER_PRICING_DAYS
+        ]
+        assert [line[1] for line in by_day[2:]] == [pytest.approx(x) for x in expected]
+        assert [line[2:] for line in by_day[2:]] == [[LOT_UNIT, serial(as_of)]] * 22
+        by_month = spilled(ENTRY["_ReportDelta"](results, "month"))
+        assert by_month == [
+            DELTA_HEADERS,
+            DELTA_TYPES,
+            [serial("2026-12-01"), pytest.approx(live), LOT_UNIT, serial(as_of)],
+        ]
+        by_year = spilled(ENTRY["_ReportDelta"](results, "year"))
+        assert by_year[2] == [serial("2026-01-01"), pytest.approx(live), LOT_UNIT, serial(as_of)]
+        assert sum(cast(float, line[1]) for line in by_day[2:]) == pytest.approx(
+            spilled(ENTRY["_ReportRisk"](results))[2][0]
+        )
+
+
+def test_the_delta_report_refuses_a_bucket_that_is_none_of_the_three(
+    monthly: dict[str, Any],
+) -> None:
+    _, prepared, results = monthly_state(monthly, "2026-12-01")
+    expected = "expected day, month or year"
+    assert ENTRY["_ReportDelta"](results, "quarter") == (
+        f"#ERROR _ReportDelta: ValueError: bucket is 'quarter', {expected}"
+    )
+    assert ENTRY["_ReportDelta"](results, "Day") == (
+        f"#ERROR _ReportDelta: ValueError: bucket is 'Day', {expected}"
+    )
+    assert (
+        ENTRY["_ReportDelta"](results, None)
+        == "#ERROR _ReportDelta: bucket is blank, expected text"
+    )
+    assert ENTRY["_ReportDelta"](results, "") == (
+        "#ERROR _ReportDelta: bucket is empty text, expected text"
+    )
+    assert ENTRY["_ReportDelta"](results, 1.0) == (
+        "#ERROR _ReportDelta: bucket is number 1.0, expected text"
+    )
+    assert ENTRY["_ReportDelta"](None, bridge.MISSING) == (
+        "#ERROR _ReportDelta: results is blank, expected trade results handle"
+    )
+    assert ENTRY["_ReportDelta"](prepared, bridge.MISSING) == (
+        f"#ERROR _ReportDelta: results is prepared trades handle {prepared!r}, "
+        "expected trade results handle"
+    )
+
+
+def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_none(
+    wti: dict[str, Any],
+) -> None:
+    # The rolling asian's six days at 0.2 a day on 18 December, one December bucket and one 2026
+    # bucket of 1.2; a tick over the same preparation spills the same three views; after the roll
+    # on the 22nd the first two days read zero and the axes stand.
+    history, prepared, results = wti_state(wti, "2026-12-18", (72.0, 75.0))
+    by_day = spilled(ENTRY["_ReportDelta"](results, bridge.MISSING))
+    assert [line[0] for line in by_day[2:]] == [serial(d) for d in WTI_WINDOW]
+    assert [line[1] for line in by_day[2:]] == [pytest.approx(0.2)] * 6
+    assert spilled(ENTRY["_ReportDelta"](results, "month"))[2] == [
+        serial("2026-12-01"),
+        pytest.approx(1.2),
+        LOT_UNIT,
+        serial("2026-12-18"),
+    ]
+    assert spilled(ENTRY["_ReportDelta"](results, "year"))[2][:2] == [
+        serial("2026-01-01"),
+        pytest.approx(1.2),
+    ]
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "WTI", 73.0, 76.0))
+    for bucket in ("day", "month", "year"):
+        assert spilled(ENTRY["_ReportDelta"](str(ticked), bucket)) == spilled(
+            ENTRY["_ReportDelta"](results, bucket)
+        )
+    _, _, rolled = wti_state(wti, "2026-12-22", (75.0,))
+    rolled_days = spilled(ENTRY["_ReportDelta"](rolled, bridge.MISSING))[2:]
+    assert [line[0] for line in rolled_days] == [serial(d) for d in WTI_WINDOW]
+    assert [line[1] for line in rolled_days] == [
+        pytest.approx(x) for x in (0, 0, 0.2, 0.2, 0.2, 0.2)
+    ]

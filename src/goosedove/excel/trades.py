@@ -28,9 +28,9 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.evaluation import TradeResults, trade_results
-from goosedove.trades.preparation import PreparedTrades, prepared_trades
+from goosedove.trades.preparation import Bucket, PreparedTrades, bucketed, prepared_trades
 from goosedove.trades.resolution import Trades, trades
-from goosedove.trades.template import TradeTemplate, trade_template
+from goosedove.trades.template import TradeTemplate, choice, trade_template
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
@@ -39,6 +39,7 @@ __all__ = [
     "_CreateTrades",
     "_EvaluateTrades",
     "_PrepareTrades",
+    "_ReportDelta",
     "_ReportRisk",
     "_ReportValues",
 ]
@@ -169,4 +170,33 @@ def _ReportRisk(
         np.array([results.dv01]),
         (f"{results.currency} per basis point",),
         np.array([results.as_of], dtype="datetime64[D]"),
+    )
+
+
+@excel_function
+def _ReportDelta(
+    results: Annotated[
+        Handle[TradeResults],
+        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
+        "for it.",
+    ],
+    bucket: Annotated[
+        str, "What to sum the delta by: day, month or year, exactly so; day when left out."
+    ] = "day",
+) -> MixedArray:
+    """Reports the batch's delta by observation time from its results: one row per day, calendar
+    month or calendar year the batch observes in, the lots still to price summed into it, with the
+    lot unit and the valuation day, as the preparation stored them."""
+    starts, lots = bucketed(
+        results.prepared, choice("bucket", bucket, Bucket, "day, month or year")
+    )
+    return MixedArray.table(
+        [
+            ("bucket_start", "delta", "delta_unit", "as_of"),
+            ("datetime64[D]", "float64", "str", "datetime64[D]"),
+        ],
+        starts,
+        lots,
+        (results.lot_unit,) * starts.size,
+        np.full(starts.size, results.as_of, dtype="datetime64[D]"),
     )

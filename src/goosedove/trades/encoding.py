@@ -66,7 +66,15 @@ class Encoded:
     is two slots. slot_of_observation[j] places each observation. references[r], the distinct
     slot references, increasing, is the batch's delta axis, each contract once whatever groups
     hold it, and reference_of_slot[s] each slot's place on it. A slot's position is its position
-    in this list and nothing else: not a position in any price vector."""
+    in this list and nothing else: not a position in any price vector.
+
+    Then the time axes a delta report is summed onto, since #NN, static for the batch: days[d],
+    the distinct observation days, increasing, day_of_slot[s] each slot's day and
+    day_reference[d] the contract pricing each day, one per day by the calendar's rule;
+    months[m], the first day of each calendar month those days fall in, increasing, and
+    month_of_day[d]; years[y], the first day of each calendar year, increasing, and
+    year_of_month[m]. A bucket is a day, a month or a year the batch observes in and nothing
+    else: no calendar day without an observation, and a payment day moves nothing."""
 
     terms: ResolvedTrades
     observations: Observations
@@ -84,6 +92,13 @@ class Encoded:
     slot_of_observation: NDArray[np.intp]
     references: NDArray[np.intp]
     reference_of_slot: NDArray[np.intp]
+    days: NDArray[np.datetime64]
+    day_of_slot: NDArray[np.intp]
+    day_reference: NDArray[np.intp]
+    months: NDArray[np.datetime64]
+    month_of_day: NDArray[np.intp]
+    years: NDArray[np.datetime64]
+    year_of_month: NDArray[np.intp]
 
     def slot_trade(self, slot: int) -> str:
         """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
@@ -146,7 +161,11 @@ def encoded(
     occurrences observing one day in one group are one slot with their exposures added, and one
     day observed by two groups of one contract is two slots, each with its own payment. The delta
     axis is the distinct references, one unique, each contract once whatever groups hold it, the
-    contracts that price the batch's days and not the ones it was booked on.
+    contracts that price the batch's days and not the ones it was booked on. The time axes are
+    the distinct observation days, the calendar months they fall in and the calendar years,
+    three uniques, each day's pricing contract its first slot's, so that a delta report by
+    day, month or year sums what the preparation leaves live onto them and nothing is sorted or
+    grouped when it is read.
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
@@ -185,6 +204,7 @@ def encoded(
         minlength=slot_group.size,
     )
     references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
+    buckets = _the_buckets(slot_date, slot_reference)
     if payment_date is not None:
         _payments_after_observations(terms, group_contract, payment_date, slot_group, slot_date)
         payment_date.setflags(write=False)
@@ -206,6 +226,7 @@ def encoded(
         slot_of_observation,
         references,
         reference_of_slot,
+        *buckets,
     )
     for array in arrays:
         array.setflags(write=False)
@@ -279,6 +300,36 @@ def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArra
             f"own days, and a futures history holds no settle of {code} for a day {pricing} prices"
         )
     return reference
+
+
+def _the_buckets(
+    date: NDArray[np.datetime64], reference: NDArray[np.intp]
+) -> tuple[
+    NDArray[np.datetime64],
+    NDArray[np.intp],
+    NDArray[np.intp],
+    NDArray[np.datetime64],
+    NDArray[np.intp],
+    NDArray[np.datetime64],
+    NDArray[np.intp],
+]:
+    """The time axes a delta report is summed onto, static for the batch: the distinct observation
+    days, increasing, with each slot's day and each day's pricing contract, its first slot's, the
+    calendar giving a day one contract; the first day of each calendar month those days fall in,
+    with each day's month; and the first day of each calendar year, with each month's year. Three
+    uniques over the slots, nothing per trade and no day, month or year without an observation."""
+    days, first, day_of_slot = np.unique(date, return_index=True, return_inverse=True)
+    month_keys, month_of_day = np.unique(days.astype("datetime64[M]"), return_inverse=True)
+    year_keys, year_of_month = np.unique(month_keys.astype("datetime64[Y]"), return_inverse=True)
+    return (
+        days,
+        day_of_slot,
+        reference[first],
+        month_keys.astype("datetime64[D]"),
+        month_of_day,
+        year_keys.astype("datetime64[D]"),
+        year_of_month,
+    )
 
 
 def _the_slots(
