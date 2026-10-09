@@ -49,7 +49,7 @@ class PreparedTrades:
     currency the mark moves for a move of one unit of quote price in that contract; lot_delta[r],
     the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
-    half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #NN
+    half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
     the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
     days, monthly_lots[m] those summed onto its calendar months and yearly_lots[y] onto its
     calendar years, the three views _ReportDelta selects among, a bucket's lots zero once its

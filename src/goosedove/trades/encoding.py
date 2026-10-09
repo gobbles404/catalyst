@@ -68,7 +68,7 @@ class Encoded:
     hold it, and reference_of_slot[s] each slot's place on it. A slot's position is its position
     in this list and nothing else: not a position in any price vector.
 
-    Then the time axes a delta report is summed onto, since #NN, static for the batch: days[d],
+    Then the time axes a delta report is summed onto, since #166, static for the batch: days[d],
     the distinct observation days, increasing, day_of_slot[s] each slot's day and
     day_reference[d] the contract pricing each day, one per day by the calendar's rule;
     months[m], the first day of each calendar month those days fall in, increasing, and

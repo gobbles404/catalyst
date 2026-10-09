@@ -534,7 +534,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "open_days": 1,
         "contract_on": 1,
         "_the_slots": 1,
-        "_the_buckets": 1,  # the day, month and year axes, since #NN
+        "_the_buckets": 1,  # the day, month and year axes, since #166
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,

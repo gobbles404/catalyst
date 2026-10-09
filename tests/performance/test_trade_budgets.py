@@ -331,7 +331,7 @@ ENCODING_LEDGER = {
     "open_days": 1,
     "contract_on": 1,
     "_the_slots": 1,
-    "_the_buckets": 1,  # the day, month and year axes, since #NN
+    "_the_buckets": 1,  # the day, month and year axes, since #166
     "_payments_after_observations": 1,
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
