@@ -21,6 +21,7 @@ and readers connect. The trade function pages below specify individual parts of 
 | [trades/evaluate-trades.md](trades/evaluate-trades.md) | `_EvaluateTrades`, prepared trades against one market: one quote per live contract gathered onto the slots, mark, cash, delta and DV01 as one immutable result; a new market makes new results over the same preparation |
 | [trades/report-values.md](trades/report-values.md) | `_ReportValues`, the mark and the cash under the route's labels, the currency and the valuation day, as stored |
 | [trades/report-risk.md](trades/report-risk.md) | `_ReportRisk`, the total delta in lots of the index's reporting specification and the DV01, with their units and the valuation day, as stored |
+| [trades/report-delta.md](trades/report-delta.md) | `_ReportDelta`, the delta by observation day, calendar month or calendar year in lots of the index's reporting specification, one of the three vectors the preparation stored, with the unit and the valuation day |
 | [CreateTrades and retained state](../engineering-tickets/trade-valuation-pipeline/create-trade.md) | Public trade creation wraps private resolution and encoding; one handle retains resolved facts, static arrays, market input references and mappings |
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [time.md](time.md) | the decisions on contract months, their codes, calendar days and business days, recorded ahead of the functions that need them |
