@@ -43,7 +43,7 @@ class Settlement(Enum):
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
     last trading day, or on an IFERC index the month's index on its publication day, the one
-    method an IFERC index takes since #NN; penultimate, the settlement on the business day before
+    method an IFERC index takes since #167; penultimate, the settlement on the business day before
     the last trading day; last3day, the average of the settlements on the last trading day and the
     two business days before it, each a third; and asian, the average of the settles on every
     pricing day the component covers, its contract's calendar month or the booked part of it, each
@@ -187,7 +187,7 @@ def resolved_trades(
     """The one way to make ResolvedTrades: the rules of the first future profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
 
-    The index is a futures or, since #NN, an IFERC index, since a future's contract is a row of a
+    The index is a futures or, since #167, an IFERC index, since a future's contract is a row of a
     futures schedule, its final price the settlement on that row's expiry day, or a row of an
     IFERC schedule, its final price the month's index on that row's publication day, the traded
     basis; a Gas Daily index is refused by name. An IFERC index takes a financial settlement and
@@ -271,7 +271,7 @@ def resolved_trades(
 
 def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
     """The schedule of an index a future is booked on, typed as the kind rule found it: a
-    futures schedule, whose rows' expiry days settle the contracts, or since #NN an IFERC
+    futures schedule, whose rows' expiry days settle the contracts, or since #167 an IFERC
     schedule, whose rows' publication days print each month's index, the traded basis; a Gas
     Daily index is refused, in the resolution of a batch and in the kernel alike. The steps
     that read a day off the schedule dispatch on which it is."""
@@ -342,7 +342,7 @@ def _the_method(
     kind: Kind,
 ) -> None:
     """Each occurrence's method with the batch's settlement and the index's kind. On an IFERC
-    index, since #NN, the settlement is financial, an IFERC basis future being cash settled on
+    index, since #167, the settlement is financial, an IFERC basis future being cash settled on
     its month's published index, and every row's method is lastday, the one observation of that
     index, the first row of another method refused by its method and its row. On a futures
     index: a penultimate future is cash settled

@@ -110,7 +110,7 @@ def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
     """Each slot's row of the calendar, by the kind of schedule the terms hold. On a futures
     schedule the day's offset from the calendar's first day, one subtraction, a slot before it
     refused by name: the first contract only bounds the calendar and nothing prices its days. On
-    an IFERC schedule, since #NN, the row whose publication day is the slot's, one searchsorted
+    an IFERC schedule, since #167, the row whose publication day is the slot's, one searchsorted
     over the calendar's days, every slot's day being a publication day by the encoding's rule and
     the first month a month like any other, nothing bounding it."""
     match encoded.terms.schedule:
@@ -141,7 +141,7 @@ def prepared_trades(
     requires of its fixings; another index of the same name is another index. On a futures index
     each slot's day is a day of the calendar, which runs from the day after the schedule's first
     expiry to its last: the first contract only bounds the calendar, so a slot on or before its
-    expiry is refused by name, nothing ever pricing it. On an IFERC index, since #NN, each slot's
+    expiry is refused by name, nothing ever pricing it. On an IFERC index, since #167, each slot's
     day is a month's publication day and its row that month's, found by one search, the first
     month a month like any other. A slot has fixed when the calendar marks its day fixed, which
     is the day after it at the earliest, an observation staying live on its own day as the

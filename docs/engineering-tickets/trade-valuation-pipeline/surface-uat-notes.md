@@ -16,7 +16,7 @@ Record observations and decisions here before turning them into implementation t
 | 7. Delta by observation time | Retain day, month and year lot-delta vectors across methods and payment groups; select the bucket in `_ReportDelta`. | Implemented in prototype PR #166; reviewed at `df2bec9`; [design ticket](daily-risk-vector.md); quarters excluded |
 | 8. Reserve consumption | Aggregate booked brokerage, clearing and marketing reserves during evaluation; retain the batch totals in results for a pure reader. Marketing is zero where unsupported. | Agreed direction 9 October; implementation pending; marketing input where supported and detailed amount rules still need definition |
 | 9. Date offsets from text | `util_ShiftDate(date, offset, [holiday_calendar])` with signed `bd`, `cd` and `em` offsets. | Agreed direction 9 October; implementation ticket pending |
-| 10. IFERC trade support | Support cleared financial basis futures on a supplied IFERC basis index; use its monthly publication fixing and count payment lag from last trading. | Requested 9 October; [engineering ticket](iferc-basis-futures.md); built in #NN; `lastday` meaning proposed explicitly |
+| 10. IFERC trade support | Support cleared financial basis futures on a supplied IFERC basis index; use its monthly publication fixing and count payment lag from last trading. | Requested 9 October; [engineering ticket](iferc-basis-futures.md); built in #167; `lastday` meaning proposed explicitly |
 
 ## 1. Delta reporting
 
@@ -335,5 +335,5 @@ recommendation, not a new field or a change already implemented. The ticket incl
 full-month bullets/strips and existing quantity bases; partial months, other IFERC
 schedule methods, Gas Daily trades and bilateral rates are outside this slice.
 
-Built in #NN; the ticket's [As built](iferc-basis-futures.md#as-built-nn) section says what
+Built in #167; the ticket's [As built](iferc-basis-futures.md#as-built-167) section says what
 landed and what was not built.

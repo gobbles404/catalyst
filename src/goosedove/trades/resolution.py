@@ -117,7 +117,7 @@ def resolved(
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
-    index is a futures index or, since #NN, an IFERC index, a Gas Daily one refused by name,
+    index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
     every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
@@ -140,7 +140,7 @@ def resolved(
     under last3day, a third each, the three refusing a component that covers a part of its
     month by its contract, its trade and its days, and every pricing day of the days it covers
     under asian, an equal share each, a partial month's share of them, a part with none refused
-    the same way; on an IFERC index, since #NN, the month's index on its publication day under
+    the same way; on an IFERC index, since #167, the month's index on its publication day under
     lastday, the one method it takes, the first row of another refused by its method and row.
     For a financial settlement, each
     occurrence's lag is read once per distinct text and each component pays that many business days
@@ -193,7 +193,7 @@ def resolved(
                 settlement, fields, _last_days(observations, occurrence.size), occurrence
             )
         case IfercSchedule():
-            # Since #NN: the month's last trading day, the exchange's; the index prints later.
+            # Since #167: the month's last trading day, the exchange's; the index prints later.
             payment = _the_payment_terms(
                 settlement, fields, schedule.last_trading_date[contract], occurrence
             )
@@ -555,7 +555,7 @@ def _the_payment_terms(
     its payment calendar, retained, and each component's payment day, the lag counted strictly
     after its anchor, on a futures index its last observation day, the one day under lastday and
     penultimate, the third under last3day and the month's last pricing day under asian, and on
-    an IFERC index since #NN its month's last trading day, the exchange's, the index printing
+    an IFERC index since #167 its month's last trading day, the exchange's, the index printing
     later, on that calendar,
     Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
     on or before it first, so that a day the calendar closes is not itself counted; one busday

@@ -75,7 +75,7 @@ components, a whole month by dates the code's own components; a part of a month 
 `asian` alone, and [util_StartDate](../utilities/start-date.md) and
 [util_EndDate](../utilities/end-date.md) give both days from a label, `BALZ26` with its reference
 date. `schedule_method` is `lastday`, `penultimate`, `last3day` or `asian`, the four
-built on a futures index, any other word refused by name, and on an IFERC index since #NN
+built on a futures index, any other word refused by name, and on an IFERC index since #167
 `lastday` alone, the month's index on its publication day,
 [iferc-basis-futures.md](../../engineering-tickets/trade-valuation-pipeline/iferc-basis-futures.md). `route` is `cleared` or `bilateral`, the bilateral route
 accepted at creation and refused at evaluation until rates exist. `settlement_method` is

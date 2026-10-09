@@ -154,7 +154,7 @@ def observed(
         raise ValueError(f"method has {method.size}, expected {count}, one per component")
     match schedule:
         case IfercSchedule():
-            # Since #NN: one observation per component, the month's index on its publication
+            # Since #167: one observation per component, the month's index on its publication
             # day with the whole weight, lastday alone and the whole month; no pricing calendar
             # is read, an IFERC index having none.
             lastday = method == METHODS.index(ScheduleMethod.LASTDAY)

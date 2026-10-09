@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 10](surface-uat-notes.md#10-iferc-market-accepted-but-trade-creation-refused)
 
-**Status:** Built in #NN on the prototype stack above #166, the page as a ticket, `lastday` kept
-as proposed; the [As built](#as-built-nn) section at the end says what was built and what was
+**Status:** Built in #167 on the prototype stack above #166, the page as a ticket, `lastday` kept
+as proposed; the [As built](#as-built-167) section at the end says what was built and what was
 not. Engineering ticket, 9 October 2026. Product direction agreed during Excel UAT;
 the proposed `lastday` meaning below is an explicit recommendation for this slice.
 Inspected prototype: PR #166, `df2bec9`. Implement against its current successor as one
@@ -226,7 +226,7 @@ in separate PRs under the repository rule. Run the full gate, preserving futures
 last-three-day and Asian acceptance examples. No new reserve behavior, discounting,
 two-index risk decomposition or date-offset utility is included in this ticket.
 
-## As built, #NN
+## As built, #167
 
 Engineering's record of what landed, in the ticket's terms.
 [kernel.md](../../library/trades/kernel.md),

@@ -271,7 +271,7 @@ def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArra
     """Each observation's reference, the contract pricing its day. On a futures index: the day
     open on the index's market, within the schedule, and under the expiry-based methods the
     component's own contract; under asian whichever contract the calendar gives, one gather of
-    the methods onto the observations. On an IFERC index, since #NN: the component's own
+    the methods onto the observations. On an IFERC index, since #167: the component's own
     contract, whose index publishes on that very day, else refused, an IFERC month pricing
     once; no calendar is read, an IFERC index having none."""
     match terms.schedule:
