@@ -1,6 +1,6 @@
 # _ReportDelta
 
-Built in #NN as the ticket [daily-risk-vector.md](../../engineering-tickets/trade-valuation-pipeline/daily-risk-vector.md) of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ReportRisk](report-risk.md) and [_ReportValues](report-values.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md).
+Built in #166 as the ticket [daily-risk-vector.md](../../engineering-tickets/trade-valuation-pipeline/daily-risk-vector.md) of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ReportRisk](report-risk.md) and [_ReportValues](report-values.md); the design is [readers](../../engineering-tickets/trade-valuation-pipeline/06-readers.md).
 
 The batch's delta by observation time, from its results: the lots still to price on each day the batch observes, in the index's reporting specification, summed across its trades, methods and payment groups, or the same lots summed by the calendar month those days fall in, or by the calendar year, in chronological order, with the lot unit and the valuation day beside each row. The three vectors are the preparation's, summed once from each slot's live lots and shared by every result over it; the reader selects one and sums, sorts and converts nothing. A day's lots fall to zero once it has fixed and its row stays; a bucket is a day, a month or a year the batch observes in, never a calendar day without an observation, and a payment day moves nothing.
 

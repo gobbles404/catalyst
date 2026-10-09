@@ -3,8 +3,8 @@
 [Pipeline overview](README.md) · [UAT notes](surface-uat-notes.md#7-observation-dates-appear-out-of-order-in-the-results-readback) ·
 [Lot reporting](lot-delta-reporting.md) · [Calendar driven Asians](calendar-driven-asian-references.md)
 
-**Status:** Built in #NN on the prototype stack above #165, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not.
+**Status:** Built in #166 on the prototype stack above #165, the page as a ticket; the
+[As built](#as-built-166) section at the end says what was built and what was not.
 Engineering ticket, updated 9 October 2026. The owner agreed to saved delta
 vectors for day, month and year, prepared once and selected by a reader parameter.
 Quarters are excluded. The inspected prototype is PR #165 at `f1f1b916`; implement on
@@ -315,7 +315,7 @@ net delta with correct lot units and fixing progression. All three vectors recon
 exist before the reader runs and are reused on every tick; daily references continue
 to reconcile to contract risk while payment ownership remains intact for valuation.
 
-## As built, #NN
+## As built, #166
 
 Engineering's record of what landed, in the ticket's terms.
 [report-delta.md](../../library/trades/report-delta.md),

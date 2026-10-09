@@ -1,6 +1,6 @@
 # 6. Result reports: _ReportValues and _ReportRisk
 
-Since #NN a third report, `_ReportDelta(results, [bucket])`, spills the delta by observation
+Since #166 a third report, `_ReportDelta(results, [bucket])`, spills the delta by observation
 day, calendar month or calendar year from three vectors the preparation stores, as
 [daily-risk-vector.md](daily-risk-vector.md) specifies; it reads what the result shares and
 sums nothing, and the two reports below are unchanged.
