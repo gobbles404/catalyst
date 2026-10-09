@@ -24,6 +24,7 @@ from goosedove.index_definitions.contract_specifications import contract_specifi
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -1678,7 +1679,10 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
         None,
         UNITS,
     )
-    assert refused(daily) == "index is a Gas Daily index, expected a futures index for a future"
+    assert (
+        refused(daily)
+        == "index is a Gas Daily index, expected a futures or an IFERC index for a future"
+    )
     labelled = an_index(contracts=(("X26", "2026-10-28"), ("c1", "2026-11-25")))
     assert refused(labelled) == (
         "index schedule row 2 is 'c1', expected a contract code, a month letter and a two-digit "
@@ -2475,3 +2479,192 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
     assert later.encoded.slot_group.size == 22 and later.encoded.group_contract.size == 1
     np.testing.assert_array_equal(later.encoded.days, enc.days)
     np.testing.assert_array_equal(later.encoded.months, enc.months)
+
+
+# --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
+# The ticket's Waha-like index as the kernel tests have it: X26, Z26 and F27 last trading on the
+# last business day before their months and published on the first business day of them, a 2,500
+# MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the payment calendar closing
+# New Year's Day; the template cleared, financial, lastday, LOT a month at +3bd; WAH001, 1 LOT of
+# Z26 at -0.50 booked 30 November.
+
+WAHA = index(
+    "WAHA",
+    iferc_schedule(
+        ("X26", "Z26", "F27"),
+        dates("2026-10-30", "2026-11-30", "2026-12-31"),
+        dates("2026-11-02", "2026-12-01", "2027-01-04"),
+    ),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("LOT", "MMBTU"),
+        np.array([2_500.0, 1.0]),
+        ("MMBTU", "MMBTU"),
+        np.zeros(2),
+        np.zeros(2),
+        UNITS,
+    ),
+    None,
+    "LOT",
+    UNITS,
+)
+WAHA_PAYS = holiday_calendar(dates("2027-01-01"))
+WAHA_TEMPLATE: dict[str, object] = {
+    "quantity_unit": "LOT",
+    "quantity_per": "month",
+    "schedule_method": "lastday",
+    "route": "cleared",
+    "settlement_method": "financial",
+    "clearing_house": "ICE Clear Europe",
+    "payment_time_lag": "+3bd",
+    "payment_holiday_calendar": WAHA_PAYS,
+}
+WAHA_TICKET: dict[str, list[object]] = {
+    "trade_id": ["WAH001"],
+    "trade_date": ["2026-11-30"],
+    "contract_code": ["Z26"],
+    "quantity": [1],
+    "fixed_price": [-0.50],
+}
+
+
+def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_trading() -> None:
+    # The terms hold the IFERC schedule; Z26 is row 1 covering the whole of December; the one
+    # observation is 1 December, the publication day, and the payment 3 December, three business
+    # days after the 30 November last trading day; the encoding a 2,500 MMBtu exposure with a
+    # fixed leg of 1,250, one slot on 1 December referencing Z26; the counts one of each and the
+    # schedule's three codes read.
+    batch, counter = created(WAHA, WAHA_TICKET, WAHA_TEMPLATE)
+    terms = batch.resolved
+    assert terms.index is WAHA and terms.schedule is WAHA.schedule
+    assert terms.settlement is Settlement.FINANCIAL
+    np.testing.assert_array_equal(terms.schedule_method, [METHODS.index(ScheduleMethod.LASTDAY)])
+    np.testing.assert_array_equal(terms.contract, [1])
+    np.testing.assert_array_equal(terms.start_date, dates("2026-12-01"))
+    np.testing.assert_array_equal(terms.end_date, dates("2026-12-31"))
+    np.testing.assert_array_equal(terms.covered_days, [31])
+    np.testing.assert_array_equal(terms.quantity, [1])
+    np.testing.assert_array_equal(terms.fixed_price, [-0.5])
+    assert terms.payment is not None
+    np.testing.assert_array_equal(terms.payment.lag_days, [3])
+    assert terms.payment.calendar == (WAHA_PAYS,)
+    np.testing.assert_array_equal(terms.payment.date, dates("2026-12-03"))
+    enc = batch.encoded
+    np.testing.assert_array_equal(enc.observations.date, dates("2026-12-01"))
+    np.testing.assert_array_equal(enc.observations.weight, [1.0])
+    np.testing.assert_array_equal(enc.quote_quantity, [2_500.0])
+    np.testing.assert_array_equal(enc.offset, [1_250.0])
+    np.testing.assert_array_equal(enc.slot_date, dates("2026-12-01"))
+    np.testing.assert_array_equal(enc.slot_reference, [1])
+    np.testing.assert_array_equal(enc.group_contract, [1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-03"))
+    assert counter.freeze().as_dict() == {
+        "encoded_components": 1,
+        "encoded_groups": 1,
+        "encoded_observations": 1,
+        "encoded_slots": 1,
+        "resolved_components": 1,
+        "resolved_occurrences": 1,
+        "schedule_codes_read": 3,
+    }
+
+
+def test_iferc_payment_counts_from_last_trading_on_the_payment_calendar_not_publication() -> None:
+    # A Z26-F27 strip: one component a month on one occurrence, Z26 paying 3 December and F27
+    # 6 January, 31 December plus three business days with New Year's Day closed, each observed
+    # on its own publication day. X26, the schedule's first month, booked 15 October pays
+    # 4 November. A calendar closing 2 December moves Z26's payment to the 4th and its observation
+    # not at all. Two rows at +3bd and +4bd are two groups of one contract. +1bd lands on the
+    # publication day and is refused by the existing rule.
+    strip, _ = created(WAHA, {**WAHA_TICKET, "contract_code": ["Z26-F27"]}, WAHA_TEMPLATE)
+    np.testing.assert_array_equal(strip.resolved.occurrence, [0, 0])
+    np.testing.assert_array_equal(strip.resolved.contract, [1, 2])
+    assert strip.resolved.payment is not None
+    np.testing.assert_array_equal(strip.resolved.payment.date, dates("2026-12-03", "2027-01-06"))
+    np.testing.assert_array_equal(strip.encoded.slot_date, dates("2026-12-01", "2027-01-04"))
+    x26, _ = created(
+        WAHA, {**WAHA_TICKET, "trade_date": ["2026-10-15"], "contract_code": ["X26"]}, WAHA_TEMPLATE
+    )
+    assert x26.resolved.payment is not None
+    np.testing.assert_array_equal(x26.resolved.payment.date, dates("2026-11-04"))
+    np.testing.assert_array_equal(x26.encoded.slot_date, dates("2026-11-02"))
+    closed, _ = created(
+        WAHA,
+        WAHA_TICKET,
+        {
+            **WAHA_TEMPLATE,
+            "payment_holiday_calendar": holiday_calendar(dates("2026-12-02", "2027-01-01")),
+        },
+    )
+    assert closed.resolved.payment is not None
+    np.testing.assert_array_equal(closed.resolved.payment.date, dates("2026-12-04"))
+    np.testing.assert_array_equal(closed.encoded.slot_date, dates("2026-12-01"))
+    pair, _ = created(
+        WAHA,
+        {
+            "trade_id": ["L", "S"],
+            "trade_date": ["2026-11-30", "2026-11-30"],
+            "contract_code": ["Z26", "Z26"],
+            "quantity": [1, -1],
+            "fixed_price": [-0.50, -0.50],
+            "payment_time_lag": ["+3bd", "+4bd"],
+        },
+        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_time_lag"},
+    )
+    np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-03", "2026-12-04"))
+    np.testing.assert_array_equal(pair.encoded.group_contract, [1, 1])
+    assert pair.encoded.slot_group.size == 2
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+1bd"}) == (
+        "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
+        "final price exists"
+    )
+
+
+def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_or_says_why() -> (
+    None
+):
+    physical = {
+        key: value
+        for key, value in WAHA_TEMPLATE.items()
+        if key not in ("payment_time_lag", "payment_holiday_calendar")
+    }
+    assert refused(WAHA, WAHA_TICKET, {**physical, "settlement_method": "physical"}) == (
+        "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
+        "future is cash settled on its month's published index"
+    )
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "schedule_method": "asian"}) == (
+        "schedule_method of trade 'WAH001' at row 1 is 'asian', expected 'lastday' on an IFERC "
+        "index; an IFERC month has one index, published once"
+    )
+    two: dict[str, list[object]] = {
+        "trade_id": ["WAH001", "WAH002"],
+        "trade_date": ["2026-11-30", "2026-11-30"],
+        "contract_code": ["Z26", "F27"],
+        "quantity": [1, 1],
+        "fixed_price": [-0.5, -0.5],
+        "schedule_method": ["lastday", "penultimate"],
+    }
+    by_row = {key: value for key, value in WAHA_TEMPLATE.items() if key != "schedule_method"}
+    assert refused(WAHA, two, by_row) == (
+        "schedule_method of trade 'WAH002' at row 2 is 'penultimate', expected 'lastday' on an "
+        "IFERC index; an IFERC month has one index, published once"
+    )
+    part: dict[str, list[object]] = {
+        **{key: value for key, value in WAHA_TICKET.items() if key != "contract_code"},
+        "start_date": ["2026-12-01"],
+        "end_date": ["2026-12-15"],
+    }
+    assert refused(WAHA, part, WAHA_TEMPLATE) == (
+        "Z26 of trade 'WAH001' at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
+        "month, expected the whole month under lastday; an IFERC month's index is one price for "
+        "the whole month"
+    )
+    assert refused(WAHA, {**WAHA_TICKET, "contract_code": ["G27"]}, WAHA_TEMPLATE) == (
+        "contract_code row 1 is 'G27', expected months the index's schedule has a contract for; "
+        "it has none for 2027-02"
+    )
+    bare = index("bare", WAHA.schedule, WAHA.conventions, WAHA.specifications, None, None, UNITS)
+    assert refused(bare, WAHA_TICKET, WAHA_TEMPLATE) == (
+        "index 'bare' has no reporting_lot, expected one of its specifications named when the "
+        "index was made; a batch's delta is reported in lots of it"
+    )
