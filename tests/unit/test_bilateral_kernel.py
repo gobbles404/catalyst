@@ -1,0 +1,444 @@
+"""The bilateral path of the one evaluator, bilateral-calculation-kernel.md: a discount curve, each
+unpaid payment group's amount discounted on the curve's factor for its payment day, DV01 the
+analytic sensitivity of the mark to a rise of one basis point, and the lots each live slot holds
+weighted by its group's factor before any sum; the cleared path as it was, sharing its arrays. The
+figures are the ticket's, priced by hand here, and the production code is never asked for an
+expected answer.
+
+Tolerances, by measure: amounts near 100, lots near 10 and their sums to within 1e-12 absolute and
+1e-12 relative, 1e-14 relative to the legs they come from and far below what a handful of products
+of doubles can drift; DV01s near 1e-2 to the same bounds, the absolute one mattering since a batch
+that cancels to nothing has a mark of 0 exactly here, the legs being equal and opposite in binary.
+docs/library/trades/kernel.md is the page."""
+
+from typing import Any
+
+import numpy as np
+import pytest
+from numpy.typing import NDArray
+from test_trades import (
+    an_index,
+    bounds_of,
+    dates,
+    history_on,
+    ids,
+    numbers,
+    observed_of,
+    picks,
+    quoted,
+    rows,
+    spec,
+)
+
+from goosedove.globals.discount_curve import DiscountCurve, discount_curve
+from goosedove.globals.unit_conversions import UNITS
+from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import FieldValues
+from goosedove.trades.encoding import encoded
+from goosedove.trades.evaluation import TradeResults, trade_results
+from goosedove.trades.preparation import PreparedTrades, prepared_trades
+from goosedove.trades.resolution import trades
+from goosedove.trades.template import trade_template
+from goosedove.trades.terms import (
+    PaymentTerms,
+    QuantityPer,
+    ResolvedTrades,
+    Route,
+    ScheduleMethod,
+    Settlement,
+    resolved_trades,
+)
+
+CLOSE: dict[str, Any] = {"rel": 1e-12, "abs": 1e-12}  # pytest.approx
+TIGHT: dict[str, Any] = {"rtol": 1e-12, "atol": 1e-12}  # np.testing.assert_allclose
+
+# A one-unit reporting lot, UNIT, one barrel, dollars a barrel settled in dollars: a quantity of 10
+# is an exposure of 10, the coefficient is one, and 10 at 70 against 80 pays 100. The boundary Z26
+# expires 2026-12-31; the traded F27 on 2027-01-04, the valuation day, so its observation is live on
+# its own day; and F29 on 2029-01-05 keeps a quote in every market. The pricing calendar closes on
+# one day that matters to nothing, and the payment calendar on one past every payment.
+UNIT = an_index(
+    "UNIT",
+    (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05")),
+    ("2027-12-27",),
+    ("USD", "BBL"),
+    ("VOLUME", "BBL"),
+    ("UNIT", 1.0, "BBL"),
+)
+PAY_DAYS = holiday_calendar(dates("2030-01-01"))
+AS_OF = "2027-01-04"
+A_YEAR, TWO_YEARS = "2028-01-04", "2029-01-03"  # 365 and 730 days after the valuation day
+
+
+def given(array: NDArray[np.float64] | None) -> NDArray[np.float64]:
+    """A bilateral field, which a bilateral result always holds."""
+    assert array is not None
+    return array
+
+
+def curve_of(*anchors: tuple[str, float]) -> DiscountCurve:
+    return discount_curve(dates(*[d for d, _ in anchors]), numbers(*[f for _, f in anchors]))
+
+
+FLAT = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
+
+
+def terms_of(
+    quantities: tuple[float, ...] = (10.0, -10.0),
+    pays: tuple[str, ...] = (A_YEAR, TWO_YEARS),
+    lags: tuple[int, ...] = (261, 522),
+    route: Route = Route.BILATERAL,
+    settlement: Settlement = Settlement.FINANCIAL,
+    contracts: tuple[int, ...] | None = None,
+) -> ResolvedTrades:
+    """One lastday trade per quantity, each its own payment group, at 70 on F27 unless another
+    schedule row is given; bilateral and financial unless told otherwise."""
+    n = len(quantities)
+    contract = rows(*(contracts or (1,) * n))
+    payment = (
+        None
+        if settlement is Settlement.PHYSICAL
+        else PaymentTerms(np.array(lags[:n], dtype=np.int64), (PAY_DAYS,) * n, dates(*pays[:n]))
+    )
+    return resolved_trades(
+        FIXED_FLOAT, UNIT, spec(n), route, settlement,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*range(1001, 1001 + n)),
+        None, None,
+        dates(*[AS_OF] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
+        *bounds_of(UNIT, contract), numbers(*[70.0] * n), payment,
+        counterparty=None if route is Route.CLEARED else ("ACME Trading",) * n,
+    )  # fmt: skip
+
+
+def prepared_on(
+    terms: ResolvedTrades, as_of: str = AS_OF, finals: dict[str, float] | None = None
+) -> PreparedTrades:
+    return prepared_trades(
+        encoded(terms, observed_of(terms), UNITS, WorkCounter()),
+        history_on(UNIT, as_of, finals or {}),
+        WorkCounter(),
+    )
+
+
+def valued(
+    prep: PreparedTrades,
+    quotes: tuple[float, ...],
+    curve: DiscountCurve | None,
+    counter: WorkCounter | None = None,
+) -> TradeResults:
+    return trade_results(prep, quoted(prep.history, *quotes), counter or WorkCounter(), curve)
+
+
+def test_the_unit_lot_makes_the_hand_figures_the_libraries() -> None:
+    lot = UNIT.reporting_lot
+    assert lot is not None and lot.coefficient == 1.0
+
+
+# --- opposite trades paying a year apart ----------------------------------------------------------
+
+
+def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
+    # +10 and -10 of F27 at 70, quoted 80: payments of +100 a year out and -100 two years out, net
+    # nothing, and still 5 of NPV, 0.5 of discounted lots and 0.0085 of DV01 at 0.95 and 0.90.
+    prep = prepared_on(terms_of())
+    counter = WorkCounter()
+    result = valued(prep, (80.0, 50.0), FLAT, counter)
+    assert result.route is Route.BILATERAL and result.curve is FLAT and result.cash == 0.0
+    assert result.mark == pytest.approx(5.0, **CLOSE)
+    assert result.dv01 == pytest.approx(0.0085, **CLOSE)
+    np.testing.assert_allclose(given(result.payment_amount), [100.0, -100.0], **TIGHT)
+    np.testing.assert_allclose(given(result.npv_by_group), [95.0, -90.0], **TIGHT)
+    np.testing.assert_allclose(given(result.dv01_by_group), [-0.0095, 0.018], **TIGHT)
+    np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
+    # The nominal risk is the preparation's, shared and nought; the discounted lots are 9.5 less 9.
+    assert result.lot_delta is prep.lot_delta and result.lot_delta_total == 0.0
+    assert result.price_sensitivity is prep.price_sensitivity
+    np.testing.assert_allclose(result.discounted_lot_delta, [0.5], **TIGHT)
+    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    np.testing.assert_allclose(result.discounted_price_sensitivity, [0.5], **TIGHT)
+    np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF))
+    np.testing.assert_allclose(result.discounted_daily_lots, [0.5], **TIGHT)
+    np.testing.assert_allclose(result.discounted_monthly_lots, [0.5], **TIGHT)
+    np.testing.assert_allclose(result.discounted_yearly_lots, [0.5], **TIGHT)
+    assert counter.freeze().as_dict() == {
+        "groups_valued": 2,
+        "kernel": 1,
+        "live_prices_read": 1,
+        "payment_factors_read": 2,
+        "risk_reductions": 4,
+        "slots_discounted": 2,
+    }
+    # The same preparation under a tick to 81: 110 and -110, 5.5 of NPV, 0.00935 of DV01, the lots
+    # as they were; and under another curve, 0.96 and 0.92 at 80: 4 of NPV, 0.4 of lots, 0.0088.
+    ticked = valued(prep, (81.0, 50.0), FLAT)
+    assert ticked.mark == pytest.approx(5.5, **CLOSE)
+    assert ticked.dv01 == pytest.approx(0.00935, **CLOSE)
+    assert ticked.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    assert ticked.lot_delta_total == 0.0
+    other = valued(prep, (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92)))
+    assert other.mark == pytest.approx(4.0, **CLOSE)
+    assert other.discounted_lot_delta_total == pytest.approx(0.4, **CLOSE)
+    assert other.dv01 == pytest.approx(0.0088, **CLOSE)
+    assert other.lot_delta_total == 0.0
+    for array in (result.payment_amount, result.npv_by_group, result.discounted_daily_lots):
+        assert array is not None and not array.flags.writeable
+
+
+def test_a_mark_of_nothing_still_carries_lots_and_dv01() -> None:
+    # One +10 at the money, 70 against 70: no NPV and no DV01, 10 nominal lots and 9.5 discounted;
+    # a quote move of one makes 9.5 of NPV and -0.00095 of DV01. And +100 and -100 both at 0.90,
+    # one and two years out: a mark of nothing with 0.009 of DV01, each group's own time to payment.
+    prep = prepared_on(terms_of((10.0,), (A_YEAR,), (261,)))
+    flat = valued(prep, (70.0, 50.0), FLAT)
+    assert flat.mark == 0.0 and flat.dv01 == 0.0
+    assert flat.lot_delta_total == 10.0
+    assert flat.discounted_lot_delta_total == pytest.approx(9.5, **CLOSE)
+    moved = valued(prep, (71.0, 50.0), FLAT)
+    assert moved.mark == pytest.approx(9.5, **CLOSE)
+    assert moved.dv01 == pytest.approx(-0.00095, **CLOSE)
+    both = valued(
+        prepared_on(terms_of()),
+        (80.0, 50.0),
+        curve_of((AS_OF, 1.0), ("2027-01-05", 0.90), (TWO_YEARS, 0.90)),
+    )
+    assert both.mark == pytest.approx(0.0, **CLOSE)
+    assert both.dv01 == pytest.approx(0.009, **CLOSE)
+
+
+def test_batch_equals_its_singletons_and_order_and_duplicates_count() -> None:
+    prep = prepared_on(terms_of())
+    batch = valued(prep, (80.0, 50.0), FLAT)
+    a = valued(prepared_on(terms_of((10.0,), (A_YEAR,), (261,))), (80.0, 50.0), FLAT)
+    b = valued(prepared_on(terms_of((-10.0,), (TWO_YEARS,), (522,))), (80.0, 50.0), FLAT)
+    assert a.mark + b.mark == pytest.approx(batch.mark, **CLOSE)
+    assert a.dv01 + b.dv01 == pytest.approx(batch.dv01, **CLOSE)
+    assert a.discounted_lot_delta_total + b.discounted_lot_delta_total == pytest.approx(
+        batch.discounted_lot_delta_total, **CLOSE
+    )
+    reversed_rows = valued(
+        prepared_on(terms_of((-10.0, 10.0), (TWO_YEARS, A_YEAR), (522, 261))), (80.0, 50.0), FLAT
+    )
+    assert reversed_rows.mark == pytest.approx(batch.mark, **CLOSE)
+    assert reversed_rows.dv01 == pytest.approx(batch.dv01, **CLOSE)
+    twice = valued(
+        prepared_on(terms_of((10.0, 10.0), (A_YEAR, A_YEAR), (261, 261))), (80.0, 50.0), FLAT
+    )
+    np.testing.assert_allclose(
+        given(twice.npv_by_group), [190.0], **TIGHT
+    )  # one group, both trades
+    assert twice.dv01 == pytest.approx(-0.019, **CLOSE)
+    assert twice.discounted_lot_delta_total == pytest.approx(19.0, **CLOSE)
+
+
+# --- fixed is not paid ----------------------------------------------------------------------------
+
+
+def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> None:
+    terms = terms_of((10.0,), (A_YEAR,), (261,))
+    # The observation day, 80 quoted, a curve of ones: 100 of NPV a year out, -0.01 of DV01.
+    on_the_day = valued(prepared_on(terms), (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
+    assert on_the_day.mark == pytest.approx(100.0, **CLOSE)
+    assert on_the_day.dv01 == pytest.approx(-0.01, **CLOSE)
+    assert on_the_day.lot_delta_total == 10.0
+    assert on_the_day.discounted_lot_delta_total == pytest.approx(10.0, **CLOSE)
+    # The next day, fixed at 82: 120 of NPV, 364 days out, no lots, and -0.0119671232876712 of DV01.
+    fixed = prepared_on(terms, "2027-01-05", {"F27": 82.0})
+    unpaid = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
+    assert unpaid.mark == pytest.approx(120.0, **CLOSE)
+    assert unpaid.cash == 0.0
+    assert unpaid.dv01 == pytest.approx(-0.0001 * 364 / 365 * 120.0, **CLOSE)
+    assert unpaid.lot_delta_total == 0.0 and unpaid.discounted_lot_delta_total == 0.0
+    np.testing.assert_array_equal(given(unpaid.payment_factor), [1.0])
+    # At 0.99 the same payment is worth 118.8.
+    at_99 = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 0.99)))
+    assert at_99.mark == pytest.approx(118.8, **CLOSE)
+    # The payment day: cash 120, nothing left to value, a curve of that one day enough and no
+    # factor read; and the day after, the payment before the curve begins, the same.
+    for as_of in (A_YEAR, "2028-01-05"):
+        paid = prepared_on(terms, as_of, {"F27": 82.0})
+        counter = WorkCounter()
+        settled = valued(paid, (50.0,), curve_of((as_of, 1.0)), counter)
+        assert settled.mark == 0.0 and settled.cash == pytest.approx(120.0, **CLOSE)
+        assert settled.dv01 == 0.0 and settled.discounted_lot_delta_total == 0.0
+        np.testing.assert_array_equal(
+            given(settled.payment_factor), [1.0]
+        )  # the policy, read for nothing
+        np.testing.assert_array_equal(given(settled.npv_by_group), [0.0])
+        assert counter.freeze().as_dict() == {
+            "groups_valued": 0,
+            "kernel": 1,
+            "live_prices_read": 0,
+            "payment_factors_read": 0,
+            "risk_reductions": 4,
+            "slots_discounted": 0,
+        }
+
+
+# --- the rules ------------------------------------------------------------------------------------
+
+
+def test_the_rules_refuse_a_curve_with_a_cleared_batch_and_want_one_with_a_bilateral() -> None:
+    cleared = prepared_on(terms_of(route=Route.CLEARED))
+    with pytest.raises(ValueError) as refused:
+        valued(cleared, (80.0, 50.0), FLAT)
+    assert str(refused.value) == (
+        "discount_curve is supplied, expected none unless route = bilateral; a cleared batch is "
+        "undiscounted"
+    )
+    bilateral = prepared_on(terms_of())
+    with pytest.raises(ValueError) as refused:
+        valued(bilateral, (80.0, 50.0), None)
+    assert str(refused.value) == (
+        "discount_curve is missing, expected a discount curve with a bilateral batch, whose "
+        "payments it discounts"
+    )
+    physical = prepared_on(terms_of(settlement=Settlement.PHYSICAL))
+    with pytest.raises(ValueError) as refused:
+        valued(physical, (80.0, 50.0), FLAT)
+    assert str(refused.value) == (
+        "settlement_method is 'physical', expected 'financial' with a bilateral batch; a physical "
+        "delivery has no payment to discount"
+    )
+    with pytest.raises(ValueError) as refused:
+        valued(bilateral, (80.0, 50.0), curve_of(("2027-01-05", 1.0), (TWO_YEARS, 0.9)))
+    assert str(refused.value) == (
+        "discount_curve starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is "
+        "never rebased"
+    )
+    with pytest.raises(ValueError) as refused:
+        valued(bilateral, (80.0, 50.0), curve_of((AS_OF, 1.0), ("2028-12-31", 0.9)))
+    assert str(refused.value) == (
+        "the payment of F27 on 2029-01-03 is past the discount curve, which runs from 2027-01-04 "
+        "to 2028-12-31; expected every unpaid payment day covered"
+    )
+    # A curve ending on the last payment day covers it; a fixed, unpaid group needs its day too.
+    assert valued(bilateral, (80.0, 50.0), FLAT).curve is FLAT
+    fixed = prepared_on(terms_of((10.0,), (A_YEAR,), (261,)), "2027-01-05", {"F27": 82.0})
+    with pytest.raises(
+        ValueError, match=r"^the payment of F27 on 2028-01-04 is past the discount curve"
+    ):
+        valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), ("2028-01-03", 1.0)))
+
+
+# --- the axes -------------------------------------------------------------------------------------
+
+
+def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums() -> None:
+    # Three groups: +10 and -10 of F27 observed on the valuation day, paying a year and two years
+    # out, and +5 of F29 observed on its expiry, 2029-01-05, paying one business day after, on
+    # Monday 2029-01-08; the curve runs from the valuation day to that day, 1 to 0.90 over 735
+    # days, so every factor is interpolated and no two of the three agree. Two slots of one day and
+    # one contract pay on different days, so the weighting comes before the day's sum.
+    curve = curve_of((AS_OF, 1.0), ("2029-01-08", 0.90))
+
+    def factor(days: int) -> float:
+        return 1.0 - 0.1 * days / 735
+
+    terms = terms_of(
+        (10.0, -10.0, 5.0), (A_YEAR, TWO_YEARS, "2029-01-08"), (261, 522, 1), contracts=(1, 1, 2)
+    )
+    prep = prepared_on(terms)
+    counter = WorkCounter()
+    result = valued(prep, (80.0, 50.0), curve, counter)
+    d365, d730, d735 = factor(365), factor(730), factor(735)
+    np.testing.assert_allclose(given(result.payment_factor), [d365, d730, d735], **TIGHT)
+    np.testing.assert_allclose(given(result.payment_amount), [100.0, -100.0, -100.0], **TIGHT)
+    np.testing.assert_allclose(
+        given(result.npv_by_group), [100 * d365, -100 * d730, -100 * d735], **TIGHT
+    )
+    np.testing.assert_allclose(
+        given(result.dv01_by_group),
+        [-0.0001 * 1 * 100 * d365, -0.0001 * 2 * -100 * d730, -0.0001 * 735 / 365 * -100 * d735],
+        **TIGHT,
+    )
+    assert result.mark == pytest.approx(100 * d365 - 100 * d730 - 100 * d735, **CLOSE)
+    # By reference, F27 then F29; by day, the two observation days; by month and year likewise.
+    np.testing.assert_array_equal(prep.encoded.references, [1, 2])
+    np.testing.assert_allclose(
+        result.discounted_lot_delta, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+    )
+    np.testing.assert_allclose(result.lot_delta, [0.0, 5.0])
+    np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF, "2029-01-05"))
+    np.testing.assert_allclose(
+        result.discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+    )
+    np.testing.assert_array_equal(prep.encoded.months, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_allclose(
+        result.discounted_monthly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+    )
+    np.testing.assert_array_equal(prep.encoded.years, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_allclose(
+        result.discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
+    )
+    assert result.discounted_lot_delta_total == pytest.approx(
+        10 * d365 - 10 * d730 + 5 * d735, **CLOSE
+    )
+    assert counter.freeze().as_dict() == {
+        "groups_valued": 3,
+        "kernel": 1,
+        "live_prices_read": 2,
+        "payment_factors_read": 3,
+        "risk_reductions": 4,
+        "slots_discounted": 3,
+    }
+
+
+# --- the cleared path, as it was ------------------------------------------------------------------
+
+
+def test_a_cleared_batch_shares_its_nominal_arrays_and_keeps_no_group_vector() -> None:
+    prep = prepared_on(terms_of(route=Route.CLEARED))
+    counter = WorkCounter()
+    result = valued(prep, (80.0, 50.0), None, counter)
+    assert result.curve is None and result.dv01 == 0.0
+    assert result.mark == pytest.approx(0.0, **CLOSE)  # +100 and -100, undiscounted, net
+    assert result.discounted_lot_delta is prep.lot_delta
+    assert result.discounted_price_sensitivity is prep.price_sensitivity
+    assert result.discounted_daily_lots is prep.daily_lots
+    assert result.discounted_monthly_lots is prep.monthly_lots
+    assert result.discounted_yearly_lots is prep.yearly_lots
+    assert result.discounted_lot_delta_total == prep.lot_delta_total
+    assert result.payment_amount is None and result.npv_by_group is None
+    assert result.dv01_by_group is None and result.payment_factor is None
+    assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
+
+
+# --- the same figures through creation ------------------------------------------------------------
+
+
+def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
+    # The ticket's rows made as a sheet makes them, the lags +261bd and +522bd counted on the
+    # payment calendar from the expiry, 2027-01-04, to 2028-01-04 and 2029-01-03.
+    fields = {
+        "quantity_unit": "UNIT",
+        "quantity_per": "month",
+        "schedule_method": "lastday",
+        "route": "bilateral",
+        "settlement_method": "financial",
+        "counterparty": "ACME Trading",
+        "payment_holiday_calendar": PAY_DAYS,
+    }
+    template = trade_template(
+        FieldValues(FIXED_FLOAT, 1, tuple(fields), {k: (v,) for k, v in fields.items()})
+    )
+    columns: dict[str, Any] = {
+        "trade_id": numbers(1001.0, 1002.0),
+        "trade_date": dates(AS_OF, AS_OF),
+        "contract_code": ("F27", "F27"),
+        "quantity": numbers(10.0, -10.0),
+        "fixed_price": numbers(70.0, 70.0),
+        "payment_time_lag": ("+261bd", "+522bd"),
+    }
+    ticket = FieldValues(FIXED_FLOAT, 2, tuple(columns), columns)
+    batch = trades(UNIT, ticket, template, UNITS, WorkCounter())
+    assert batch.encoded.payment_date is not None
+    np.testing.assert_array_equal(batch.encoded.payment_date, dates(A_YEAR, TWO_YEARS))
+    assert batch.resolved.counterparty == ("ACME Trading", "ACME Trading")
+    prep = prepared_trades(batch.encoded, history_on(UNIT, AS_OF, {}), WorkCounter())
+    result = valued(prep, (80.0, 50.0), FLAT)
+    assert result.mark == pytest.approx(5.0, **CLOSE)
+    assert result.dv01 == pytest.approx(0.0085, **CLOSE)
+    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    assert result.lot_delta_total == 0.0

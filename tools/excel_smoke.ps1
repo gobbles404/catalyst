@@ -1038,7 +1038,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(OR52),1,6)"    = "route"
     "=INDEX(util_ReadHandle(OR52),3,6)"    = "bilateral"
     "=INDEX(util_ReadHandle(OR51),3,6)"    = "ACME Trading"
-    "=_EvaluateTrades(OR53,OR21)" = "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet"
+    "=_EvaluateTrades(OR53,OR21)" = "#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     "=INDEX(util_ReadHandle(OR58),3,8)"    = "ACME Trading"
     "=INDEX(util_ReadHandle(OR58),4,8)"    = "Beta Energy"
     "=_CreateTrades(OR5,OR55:OX55,OR56:OX57,OR9)" = "#ERROR _CreateTrades: ValueError: counterparty is 'ACME Trading', expected none unless route = bilateral"
