@@ -1355,7 +1355,7 @@ def test_an_index_that_cannot_be_made_says_why(args: list[object], text: str) ->
     given = [stand_ins.get(id(arg), arg) for arg in args]
     given.insert(
         1, "Henry Hub natural gas - NYMEX"
-    )  # the display name, since #NN, never at fault here
+    )  # the display name, since #169, never at fault here
     assert bridge.call("_CreateIndex", given) == text
 
 

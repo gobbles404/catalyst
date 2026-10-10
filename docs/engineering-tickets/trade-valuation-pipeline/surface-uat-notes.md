@@ -38,7 +38,7 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 | 1 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. The earlier ticket needs alignment on that connection and the rule for a reference before the period. |
 | 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Follow the helper work for one coherent date-entry UAT pass; this is a UX sequence, not a hard code dependency. |
 | 3 / item 9 | [Date-offset utility](#9-date-offsets-from-text): signed `bd`, `cd`, `em`, optional holiday calendar | Direction is specified; focused ticket still needed. Independent of the preceding work and can proceed alongside it. It is not a prerequisite for existing trade payment lags. |
-| 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #NN. Required text immediately after `name`; stored on the index and exposed in readback only. |
+| 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #169. Required text immediately after `name`; stored on the index and exposed in readback only. |
 | 5 / item 8 | [Reserve totals](#8-clearing-brokerage-and-marketing-reserves): store brokerage, clearing and marketing totals on evaluated results, with a pure reader | Define marketing input/default and amount/sign/basis rules first. Preserve gross booked activity before exposure netting. Can ship before bilateral rates; it is not a rates dependency. |
 | 6 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. Plan the arc now; coding need not wait for the unrelated utility or name changes if this becomes the priority. |
 
@@ -216,8 +216,8 @@ implemented and reviewed in PR #165 without changing the creator signatures.
 
 ## 6. Human-readable index names
 
-Built in #NN; the [readable index names ticket](readable-index-names.md)'s
-[As built](readable-index-names.md#as-built-nn) section says what landed. Retain the index's existing `name` used by the current market and
+Built in #169; the [readable index names ticket](readable-index-names.md)'s
+[As built](readable-index-names.md#as-built-169) section says what landed. Retain the index's existing `name` used by the current market and
 price-vector matching. Add required `display_name` text immediately after `name` in
 `_CreateIndex`, store it on the index and expose it immediately beside `name` through
 `util_ReadHandle`.

@@ -530,7 +530,7 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
 
 
 def test_the_display_name_is_kept_as_typed_and_may_repeat_the_name() -> None:
-    # A description beside the name, since #NN: text as given, any case, spaces and all, the name
+    # A description beside the name, since #169: text as given, any case, spaces and all, the name
     # itself allowed, read by nothing here; the name and the kind stand as they were.
     assert an_index().display_name == "Henry Hub NYMEX index"
     for text in ("West Texas Intermediate crude oil - NYMEX", " spaced ", "Henry Hub NYMEX", "x"):

@@ -47,7 +47,7 @@ class ReportingLot:
 
 @dataclass(frozen=True, slots=True)
 class Index:
-    """The name as the desk typed it, a label and nothing more, and since #NN the display name, a
+    """The name as the desk typed it, a label and nothing more, and since #169 the display name, a
     description a reader who does not know the desk's short names would understand, kept as
     typed and read for nothing but the readback; the kind, read off the schedule;
     the four objects themselves, kept by reference and unchanged: the schedule, the holiday
@@ -98,7 +98,7 @@ def index(
     looked up once, and the two numbers are finite, since a lot size that outruns the largest
     number would divide every delta into nothing; left out, the index has none, and a batch of
     trades on it is refused when it is made, never a market. The name is a label, kept as typed,
-    neither unique nor looked up, and the display name, since #NN, a description beside it, kept
+    neither unique nor looked up, and the display name, since #169, a description beside it, kept
     as typed too, nothing reading it but the readback, the two free to say the same thing; the
     handle and the price vector's match take the name alone. Whether the four objects are one
     index's is otherwise the desk's

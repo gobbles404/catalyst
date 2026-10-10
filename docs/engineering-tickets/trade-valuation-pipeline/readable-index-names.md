@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 6](surface-uat-notes.md#6-human-readable-index-names)
 
-**Status:** Built in #NN on the prototype stack above #168, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Ready for
+**Status:** Built in #169 on the prototype stack above #168, the page as a ticket; the
+[As built](#as-built-169) section at the end says what was built and what was not. Ready for
 engineering, 9 October 2026. Inspected prototype: PR #168 at `d1633d7`. Delivered as one
 focused PR on the prototype successor.
 
@@ -79,7 +79,7 @@ Acceptance is deliberately small:
 Do not add a name registry, search/selector UI, new metadata handle or downstream report
 fields. This PR supplies, stores and exposes one descriptive field.
 
-## As built, #NN
+## As built, #169
 
 Engineering's record of what landed, in the ticket's terms.
 [index.md](../../library/index-definitions/index.md) is the page.
