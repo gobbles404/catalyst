@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Bilateral plan](bilateral-discounting-and-dv01.md) ·
 [UAT notes](surface-uat-notes.md)
 
-**Status:** Built in #NN, 10 October 2026, stacked on PR #173 at `92d49b3`, awaiting review.
+**Status:** Built in #174, 10 October 2026, stacked on PR #173 at `92d49b3`, awaiting review.
 This is the first, rename-only PR in the bilateral arc; [As built](#as-built) at the foot records
 what changed. This ticket does not authorize merging the prototype stack.
 
@@ -98,9 +98,9 @@ instrument support or change to physical-settlement restrictions.
 
 ## As built
 
-PR #NN on `claude/fixed-float-rename`, stacked on #173. The library pages are
+PR #174 on `claude/fixed-float-rename`, stacked on #173. The library pages are
 [list-instruments.md](../../library/instruments/list-instruments.md) and
-[show-instrument.md](../../library/instruments/show-instrument.md); the seam's record is the #NN row of
+[show-instrument.md](../../library/instruments/show-instrument.md); the seam's record is the #174 row of
 [history.md](../../seam/history.md).
 
 - The definition is `FIXED_FLOAT`, name `fixed_float`, description `A fixed-for-floating position on a

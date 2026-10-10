@@ -212,7 +212,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "x:holiday_calendar:9" }, "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
             yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'" };
-            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'" };  // the name until #NN
+            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'" };  // the name until #174
             yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { 1.0 }, "#ERROR _ShowInstrument: instrument is number 1.0, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { ExcelMissing.Value }, "#ERROR _ShowInstrument: instrument is missing, expected text" };

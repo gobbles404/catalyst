@@ -145,7 +145,7 @@ def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_ther
     with pytest.raises(
         ValueError, match=r"^instrument is 'future', expected one of: 'fixed_float'$"
     ):
-        instrument("future")  # the name until #NN, refused as any other word
+        instrument("future")  # the name until #174, refused as any other word
     two = (FIXED_FLOAT, Instrument("swap", "d", (a_field(),)))
     with pytest.raises(
         ValueError, match=r"^instrument is 'x', expected one of: 'fixed_float', 'swap'$"
@@ -247,7 +247,7 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
     )
-    assert ENTRY["_ShowInstrument"]("future") == (  # the name until #NN
+    assert ENTRY["_ShowInstrument"]("future") == (  # the name until #174
         "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'"
     )
     assert (

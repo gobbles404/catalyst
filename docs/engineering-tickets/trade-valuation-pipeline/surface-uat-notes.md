@@ -8,7 +8,7 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These eleven items are implemented on the prototype stack through **PR #NN**, the last two
+These eleven items are implemented on the prototype stack through **PR #174**, the last two
 awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -26,7 +26,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 8 / item 9 | [Date-offset utility](date-offset-utility.md) | [#171](https://github.com/gobbles404/goosedove/pull/171), `0803f6f`; both review findings closed | `util_ShiftDate(date, offset, [holiday_calendar])` returns one date. Try signed `bd`, `cd` and `em`, weekend anchors, a supplied holiday calendar and zero offsets. |
 | 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
 | 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
-| 11 / bilateral first slice | [Rename future to fixed_float](rename-instrument-fixed-float.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | `_ListInstruments` lists `fixed_float`; `_ShowInstrument` and `_CreateTradeTemplate` take it and refuse `future` as an unknown name. Every existing example books, values and reports the same numbers under the new name. |
+| 11 / bilateral first slice | [Rename future to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), awaiting review | `_ListInstruments` lists `fixed_float`; `_ShowInstrument` and `_CreateTradeTemplate` take it and refuse `future` as an unknown name. Every existing example books, values and reports the same numbers under the new name. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -405,7 +405,7 @@ The owner subsequently agreed that counterparty is required for bilateral and ab
 for cleared; this records the agreed field, not an implemented change.
 
 On 10 October the owner agreed to rename the broad `future` instrument to `fixed_float`, with the
-existing cleared and bilateral route choices, built in #NN as the [rename-only first slice](rename-instrument-fixed-float.md),
+existing cleared and bilateral route choices, built in #174 as the [rename-only first slice](rename-instrument-fixed-float.md),
 not another instrument or pricing path. The
 [consolidated 18-field inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
 preserves the 16 existing fields and adds counterparty and marketing reserve (item 8). Those

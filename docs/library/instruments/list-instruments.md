@@ -1,6 +1,6 @@
 # _ListInstruments
 
-Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md). Its one instrument was named `future` until #NN, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md), the first slice of the bilateral arc, renamed it `fixed_float`; the name and its description changed and nothing else.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md). Its one instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md), the first slice of the bilateral arc, renamed it `fixed_float`; the name and its description changed and nothing else.
 
 Lists the library-defined instrument schemas that can be inspected with
 [_ShowInstrument](show-instrument.md). This is the first read-only surface for the
@@ -89,7 +89,7 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | an empty catalog spills the header alone | example |
 | three reads publish nothing: the store's live handles as they were | example |
 | seven calls across seven functions and the mixed way out's numpy, no trade, market or history among them; a peak of 994 bytes, within twice the slack | budget |
-| the header, `fixed_float` and the two counts in a real Excel, and `future`, the name until #NN, refused as any other word | Excel smoke |
+| the header, `fixed_float` and the two counts in a real Excel, and `future`, the name until #174, refused as any other word | Excel smoke |
 
 ## Not here
 

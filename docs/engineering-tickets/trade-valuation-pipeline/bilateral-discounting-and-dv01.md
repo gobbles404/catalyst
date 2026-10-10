@@ -51,7 +51,7 @@ rename actual futures products, index kinds or futures schedules merely because 
 names contain "future". `route = cleared | bilateral` already exists; bilateral work
 enables its valuation rather than adding a third route. Preserve the current settlement
 rules and pipeline responsibilities through the rename. This document records the
-decision; the prototype exposes `fixed_float` since #NN.
+decision; the prototype exposes `fixed_float` since #174.
 
 ## Trade representation field inventory
 
@@ -468,7 +468,7 @@ Include a batch with one group paid and another unpaid, and a correction of a kn
 Treat this as a small feature arc above the reviewed prototype, not an instruction to merge
 the stack. The first PR is agreed as rename-only; remaining PR boundaries can be refined:
 
-1. **Instrument rename only:** [rename `future` to `fixed_float`](rename-instrument-fixed-float.md), built in #NN,
+1. **Instrument rename only:** [rename `future` to `fixed_float`](rename-instrument-fixed-float.md), built in #174,
    migrating discovery, templates, help, tests and kept workbook callers. Preserve the
    entire current schema and numerical behavior; no new fields or bilateral valuation.
 2. **Representation additions:** the agreed counterparty and marketing-reserve fields,
