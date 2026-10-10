@@ -1,8 +1,8 @@
 # util_EndDate
 
-Built in #129; the balance of a period, a `BAL` label, in #160, from a reference date, and since #NN from a valuation-date handle, the period held to end on or after its day; the ticket is [date-helper-inputs.md](../../engineering-tickets/trade-valuation-pipeline/date-helper-inputs.md).
+Built in #129; the balance of a period, a `BAL` label, in #160, from a reference date, and since #173 from a valuation-date handle, the period held to end on or after its day; the ticket is [date-helper-inputs.md](../../engineering-tickets/trade-valuation-pipeline/date-helper-inputs.md).
 
-Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #160, the last day of the balance of any of these too, `BALZ26` with its valuation-date handle since #NN, the same last day, the period checked here as well to end on or after the valuation day, though the end it would give is the label's own. Text and a handle in and one date out, no object made, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep, and the valuation-day rule of a balance. The code is `src/goosedove/index_definitions/periods.py`, `end_date`, and `src/goosedove/excel/utilities.py`, the worksheet function.
+Gives the last calendar day of a contract or strip from its label, inclusive: 31 January 2026 for `F26`, 31 March 2027 for `1Q27`, 31 March 2030 for `W29`, and the last day of the right label of `F26-Z28`; since #160, the last day of the balance of any of these too, `BALZ26` with its valuation-date handle since #173, the same last day, the period checked here as well to end on or after the valuation day, though the end it would give is the label's own. Text and a handle in and one date out, no object made, a derivation and no `util_Read*` function, as [conventions.md](../conventions.md) divides them. It is the twin of [util_StartDate](start-date.md), through the same reading of the same grammar, which that page holds in full: the forms, the case rule, the two-digit year, what a range covers and the order its ends must keep, and the valuation-day rule of a balance. The code is `src/goosedove/index_definitions/periods.py`, `end_date`, and `src/goosedove/excel/utilities.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -22,7 +22,7 @@ def util_EndDate(period: str, valuation_date: Handle[ValuationDate] | None = Non
 | 8 | BALX26 | `=util_EndDate(A8,$B$1)` shows `46356`, 30-Nov-2026, a month still to come |
 | 9 | balf26 | `=util_EndDate(A9,$B$1)` shows `#ERROR util_EndDate: ValueError: valuation_date is 2026-10-12, after 'balf26' ended on 2026-01-31, expected a valuation day on or before the period's last day` |
 
-Two arguments, the label required and, since #160, the second, which may be left out with nothing in its place and is required by the library for a `BAL` label, since #NN the valuation-date handle, a raw date refused by the seam, both as [util_StartDate](start-date.md) says and the seam checks, as [inputs.md](../../seam/inputs.md) says; the result is a date, out as its serial, as [outputs.md](../../seam/outputs.md) says, which the cell formats. Nothing is published and no object is made.
+Two arguments, the label required and, since #160, the second, which may be left out with nothing in its place and is required by the library for a `BAL` label, since #173 the valuation-date handle, a raw date refused by the seam, both as [util_StartDate](start-date.md) says and the seam checks, as [inputs.md](../../seam/inputs.md) says; the result is a date, out as its serial, as [outputs.md](../../seam/outputs.md) says, which the cell formats. Nothing is published and no object is made.
 
 ## Excel help
 
@@ -43,7 +43,7 @@ The four rules of [util_StartDate](start-date.md), run over the whole expression
 | each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
 | a range's right end starts and ends no earlier than its left | `period is 'CAL28-F28', expected range endpoints in chronological order` |
 | a `BAL` label has its valuation-date handle | `valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period` |
-| the label's period ends on or after the valuation day, since #NN | `valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day` |
+| the label's period ends on or after the valuation day, since #173 | `valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day` |
 
 The last day is the day before the month after the period begins, one conversion of a month to a day and one day subtracted, so a February's own length, a winter's March in the year after and `W99`'s in the next century come from numpy's month unit with nothing counted by hand.
 
@@ -57,7 +57,7 @@ The tests are the start function's, each case asking for both days: `tests/unit/
 | every malformed label and every reversed range the start function refuses, refused here with the same words | example |
 | for any month, the last day is the day before the next month's first; for any range, the right label's last day | property |
 | the last days through the seam as serials, and both refusals in the library's words; the seam's own for a number, a blank and empty text | example, through the seam |
-| since #NN the balance of a period ending on the label's last day from any valuation day on or before it, the ticket's table, slice B's labels, the leap day, a Saturday and a year-end range among them, a future period's end the label's own; the handle left out or the period ended refused naming the label, the day and the end, the prefix twice or over a malformed or reversed label refused naming the whole expression; the same through the seam, with a blank, a raw date, a text, a fraction of a day and a handle of another kind in the seam's words | example |
+| since #173 the balance of a period ending on the label's last day from any valuation day on or before it, the ticket's table, slice B's labels, the leap day, a Saturday and a year-end range among them, a future period's end the label's own; the handle left out or the period ended refused naming the label, the day and the end, the prefix twice or over a malformed or reversed label refused naming the whole expression; the same through the seam, with a blank, a raw date, a text, a fraction of a day and a handle of another kind in the seam's words | example |
 | the last day of the schedule's own `m26`, of a quarter, a year, a winter and two ranges in a real workbook, a reversed range refused; the balances over valuation-date handles, a period that has ended refused | Excel smoke |
 
 ## Not here

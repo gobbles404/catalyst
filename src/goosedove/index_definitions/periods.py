@@ -4,7 +4,7 @@ of two labels joined by a hyphen, F26-Z28, from the first day of the left to the
 right. Each is read for two months, numpy's month unit, its first month and the month after its
 last, from which its first and its last calendar day follow by one conversion each. The balance
 of any of them, BALZ26, runs from the valuation day the desk supplies, or from the label's first
-day when that is later, to the label's last day, since #NN; a period that ended before the
+day when that is later, to the label's last day, since #173; a period that ended before the
 valuation day is refused. Text and a day in and one date out, no object and no handle here: the
 worksheet functions read the day off a valuation-date handle and pass it in. The letters are read
 in either case, by the owner's decision for these utilities.
@@ -63,7 +63,7 @@ def balance_of(period: str) -> str | None:
 
 def start_date(period: str, as_of: np.datetime64 | None = None) -> np.datetime64:
     """The first calendar day of the period: the first month's first day, or for the balance of
-    a period the later of the valuation day and that first day, since #NN, the day the deal
+    a period the later of the valuation day and that first day, since #173, the day the deal
     covers from, a period that has ended refused; for an ordinary label a day given is read for
     nothing, so one formula serves a column of both."""
     label = balance_of(period)
@@ -96,7 +96,7 @@ def end_date(period: str, as_of: np.datetime64 | None = None) -> np.datetime64:
 def _balance_from(
     as_of: np.datetime64 | None, first: np.datetime64, last: np.datetime64, period: str
 ) -> np.datetime64:
-    """The first day the balance of a period covers, since #NN: the valuation day given, since
+    """The first day the balance of a period covers, since #173: the valuation day given, since
     the balance of a period starts on no day the label names, and the later of it and the
     label's first day, so a future period is the whole period and a current one runs from the
     day itself; a period that ended before the valuation day is refused naming the label, the

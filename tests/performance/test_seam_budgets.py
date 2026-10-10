@@ -380,7 +380,7 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     }
 
 
-# The balance of a period, since #NN from a valuation-date handle: the handle's text checked and
+# The balance of a period, since #173 from a valuation-date handle: the handle's text checked and
 # resolved once, the label read under its prefix, and the day held to the period's end and raised
 # to its first day, which needs the last day as well as the first, one conversion more than the
 # ordinary reading; nothing grows with the period, and nothing is published.

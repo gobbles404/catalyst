@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [UAT item 3](surface-uat-notes.md#3-dates-and-period-labels-through-the-same-helpers)
 
-**Status:** Built in #NN, 10 October 2026, one prototype PR stacked on PR #172 at
+**Status:** Built in #173, 10 October 2026, one prototype PR stacked on PR #172 at
 `7f14a83`, awaiting review. This ticket supersedes this page's earlier raw-reference-date
 and date-passthrough proposal. [As built](#as-built) at the foot records what the build settled.
 
@@ -170,9 +170,9 @@ this PR.
 
 ## As built
 
-PR #NN on `claude/bal-date-helpers`, stacked on #172. The library pages are
+PR #173 on `claude/bal-date-helpers`, stacked on #172. The library pages are
 [start-date.md](../../library/utilities/start-date.md) and [end-date.md](../../library/utilities/end-date.md);
-the seam's record is the #NN row of [history.md](../../seam/history.md).
+the seam's record is the #173 row of [history.md](../../seam/history.md).
 
 - The rule as specified: `start = max(as_of, first)`, `end = last`, both helpers refusing
   `as_of > last`; `day_fraction_elapsed` is never read, so 0, 0.5 and 1 on one day give the same dates.

@@ -854,7 +854,7 @@ def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_s
             )
 
 
-# The balance of a period, since #NN from a valuation-date handle beside the label: the ticket's
+# The balance of a period, since #173 from a valuation-date handle beside the label: the ticket's
 # table as serials, the first day the later of the handle's day and the label's first, the last
 # day the label's, the fraction of the day read for nothing; an ordinary label with a handle
 # reads as before, with either handle. Left out with a BAL label, and a period that has ended,

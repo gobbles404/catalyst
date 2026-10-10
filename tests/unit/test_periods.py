@@ -256,7 +256,7 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
 
 # --- the balance of a period --------------------------------------------------
 # trade-periods-and-bal.md slice B gave the balance a reference date held inside the period;
-# date-helper-inputs.md, since #NN, gives it the valuation day: the balance runs from the later
+# date-helper-inputs.md, since #173, gives it the valuation day: the balance runs from the later
 # of that day and the label's first day to the label's last day, a future period being the whole
 # period, a current one running from the day itself, and a period that ended before the day
 # refused by both readers, naming the label, the day and the end. An ordinary label reads as

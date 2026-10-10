@@ -8,7 +8,7 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These ten items are implemented on the prototype stack through **PR #NN**, the last of them
+These ten items are implemented on the prototype stack through **PR #173**, the last of them
 awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -25,7 +25,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 7 / item 8 | [Reserve totals](reserve-totals.md) | [#170](https://github.com/gobbles404/goosedove/pull/170), `716a236`; reviewed clean | `_ReportReserves(results)` reports gross brokerage and clearing costs, zero marketing and currency. The ticket example gives 50 / 20 / 0 / USD, unchanged by a tick, fixing or payment. |
 | 8 / item 9 | [Date-offset utility](date-offset-utility.md) | [#171](https://github.com/gobbles404/goosedove/pull/171), `0803f6f`; both review findings closed | `util_ShiftDate(date, offset, [holiday_calendar])` returns one date. Try signed `bd`, `cd` and `em`, weekend anchors, a supplied holiday calendar and zero offsets. |
 | 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
-| 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
+| 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -90,7 +90,7 @@ coercion, including zero and signed IDs.
 
 ## 3. Dates and period labels through the same helpers
 
-Implemented in PR #NN on 10 October 2026, awaiting review, with the full gate passing. The
+Implemented in PR #173 on 10 October 2026, awaiting review, with the full gate passing. The
 owner settled the valuation context and booking workflow on 10 October. The
 [BAL date-helper ticket](date-helper-inputs.md) supersedes the earlier raw-reference-date and
 date-passthrough proposal; its As built section records the pinned messages and the workbook rows.

@@ -1757,7 +1757,7 @@ def period_state(
 def booked(ethane: dict[str, Any]) -> dict[str, Any]:
     """The page's booking two ways: the dates from the helpers on BALZ26 with 15 December as the
     valuation day, and the same dates typed; and the calday twin, 2,000 a day over the 17 days."""
-    # Since #NN the helpers take the valuation-date handle, 15 December here, in place of a date.
+    # Since #173 the helpers take the valuation-date handle, 15 December here, in place of a date.
     mid_december = ENTRY["_CreateValuationDate"](serial("2026-12-15"), 0.5)
     start = cast(float, ENTRY["util_StartDate"]("BALZ26", mid_december))
     end = cast(float, ENTRY["util_EndDate"]("BALZ26", mid_december))

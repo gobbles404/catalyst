@@ -177,7 +177,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_EndDate", new object[] { "CAL28-F28", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
             yield return new object[] { "util_StartDate", new object[] { 46023.0, ExcelMissing.Value }, "#ERROR util_StartDate: period is number 46023.0, expected text" };
             yield return new object[] { "util_EndDate", new object[] { "", ExcelMissing.Value }, "#ERROR util_EndDate: period is empty text, expected text" };
-            // The balance of a period, date-helper-inputs.md: the second argument is a valuation-date handle since #NN, so a raw date, a blank, a text and a fraction of a day fail in the seam's words whatever the label, a BAL label without one in the library's, and a malformed or reversed label under the prefix as any label does; the balances themselves are a fact below, their handles made at run time.
+            // The balance of a period, date-helper-inputs.md: the second argument is a valuation-date handle since #173, so a raw date, a blank, a text and a fraction of a day fail in the seam's words whatever the label, a BAL label without one in the library's, and a malformed or reversed label under the prefix as any label does; the balances themselves are a fact below, their handles made at run time.
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period" };
             yield return new object[] { "util_EndDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period" };
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", 46371.0 }, "#ERROR util_StartDate: valuation_date is number 46371.0, expected valuation date handle" };
@@ -755,7 +755,7 @@ namespace Goosedove.Host.Tests
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
             var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("GAL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
-            var midDecember = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);  // the helpers take the handle since #NN
+            var midDecember = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);  // the helpers take the handle since #173
             var start = (double)Seam.Call("util_StartDate", "BALZ26", midDecember);
             var end = (double)Seam.Call("util_EndDate", "BALZ26", midDecember);
             var first = (double)Seam.Call("util_StartDate", "Z26", midDecember);
