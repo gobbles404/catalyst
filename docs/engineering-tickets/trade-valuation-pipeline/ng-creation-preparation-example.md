@@ -86,11 +86,11 @@ The row headings are `trade_id`, `trade_date`, `contract_code`, `quantity`, and 
 
 | Occurrence | trade_id | trade_date | contract_code | quantity | fixed_price |
 |---:|---|---|---|---:|---:|
-| 0 | NG-001 | 2026-09-24 | Z26 | 10 | 3.100 |
-| 1 | NG-002 | 2026-09-24 | Z26 | -4 | 3.150 |
-| 2 | NG-003 | 2026-09-25 | F27 | 7 | 3.400 |
-| 3 | NG-004 | 2026-09-25 | F27 | -12 | 3.350 |
-| 4 | NG-001 | 2026-09-24 | Z26 | 10 | 3.100 |
+| 0 | 1001 | 2026-09-24 | Z26 | 10 | 3.100 |
+| 1 | 1002 | 2026-09-24 | Z26 | -4 | 3.150 |
+| 2 | 1003 | 2026-09-25 | F27 | 7 | 3.400 |
+| 3 | 1004 | 2026-09-25 | F27 | -12 | 3.350 |
+| 4 | 1001 | 2026-09-24 | Z26 | 10 | 3.100 |
 
 Occurrence is internal row identity, not an additional worksheet input. Rows 0 and 4 both
 count even though every supplied value is identical. `trade_id` is not a uniqueness key.
