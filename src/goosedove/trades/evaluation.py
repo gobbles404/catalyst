@@ -7,7 +7,7 @@ index's reporting lot with its total, shared with the preparation that settled t
 tick changes them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch
 as a whole,
 immutable, retained with everything that explains it, the dated live contributions among it;
-the batch's booked reserves, the encoding's, carried by reference since #170. Since #NN a bilateral
+the batch's booked reserves, the encoding's, carried by reference since #170. Since #176 a bilateral
 batch takes a discount curve: its live contributions summed onto the payment groups, each unpaid
 group's amount discounted on the curve's factor for its payment day, the mark their sum, DV01 the
 analytic sensitivity of that mark to a rise of one basis point, and the lots each live slot holds
@@ -29,7 +29,7 @@ from goosedove.trades.reserves import Reserves
 from goosedove.trades.terms import Route, Settlement
 
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
-# The bilateral path's counts, since #NN: factors read off the curve, one per distinct unpaid
+# The bilateral path's counts, since #176: factors read off the curve, one per distinct unpaid
 # payment day; unpaid groups discounted, each with its time fraction and its DV01; live slots
 # weighted by their group's factor; and the reductions of the discounted lots, onto the
 # references, the days, the months and the years.
@@ -63,7 +63,7 @@ class TradeResults:
     record by reference, which no tick changes, _ReportReserves spills and the results
     readback shows once.
 
-    Since #NN, the bilateral fields. curve is the discount curve the batch was valued on, None for
+    Since #176, the bilateral fields. curve is the discount curve the batch was valued on, None for
     a cleared batch. discounted_lot_delta[r], discounted_lot_delta_total,
     discounted_price_sensitivity[r] and the discounted daily, monthly and yearly lots are the
     nominal vectors weighted by each live slot's payment factor before the sums, the lots the desk
@@ -121,7 +121,7 @@ def trade_results(
 
     The market is over the history the batch was prepared against, the one object: a market over
     another history, a later valuation date or a corrected fixing, is refused, and the batch is
-    prepared again outside, never silently here. Then the route, since #NN. A cleared batch is
+    prepared again outside, never silently here. Then the route, since #176. A cleared batch is
     undiscounted and takes no curve: one supplied is refused by name, since its payments are
     margined as they come and discounting them would be a wrong number. A bilateral batch meets
     _the_curve's rules: financial, since a physical delivery has no payment to discount; a curve
@@ -206,7 +206,7 @@ def trade_results(
 
 
 def _the_curve(prepared: PreparedTrades, curve: DiscountCurve | None) -> DiscountCurve:
-    """A bilateral batch's rules, since #NN, in this order, the first failure being the message:
+    """A bilateral batch's rules, since #176, in this order, the first failure being the message:
     financial, since a physical delivery has no payment to discount; a curve supplied; the curve
     starting on the valuation date, never rebased; and the curve covering every unpaid payment
     day, the first uncovered group named by its contract, its day and the curve's range. A paid
@@ -248,7 +248,7 @@ def _discounted(
     dated_live_contribution: NDArray[np.float64],
     counter: WorkCounter,
 ) -> TradeResults:
-    """The bilateral snapshot, since #NN, over the rules _the_curve checked. The live contributions
+    """The bilateral snapshot, since #176, over the rules _the_curve checked. The live contributions
     are summed onto the payment groups, one bincount, and each group's amount is its entry-price
     offset, its set amount and its live amount together; a paid group's amount is cash already
     and is read for nothing. The curve's factor is read once per distinct unpaid payment day, by

@@ -8,7 +8,7 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These thirteen changes are implemented on the prototype stack through **PR #NN**, the last two
+These thirteen changes are implemented on the prototype stack through **PR #176**, the last two
 awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -28,7 +28,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), `92d49b3`; reviewed clean, full gate passed | Supply the valuation-date handle as the second helper input. Try mixed-case BAL, future/current months and an expired month. Both helpers reject expired BAL; paste dates as values before booking. The kept example gives 400 USD / 0.2 lots for helper and frozen dates, and 240 / 0.12 when deliberately rebooked from the later day. |
 | 11 / bilateral first slice | [Instrument rename to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), `29fe38f`; reviewed clean, full gate passed | Select `fixed_float` in catalog/template cells. Old `future` selectors fail normally. Check existing bookings retain the same fields, values and risks; actual futures index/schedule names stay unchanged. |
 | 12 / items 8 and 11 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | [#175](https://github.com/gobbles404/goosedove/pull/175), awaiting review | Add `marketing_reserve` to a ticket or a template: `_ReportReserves` shows the amounts summed once per row, a strip once, a zero-quantity row in full, and value and risk do not move. Book a bilateral template with `counterparty` in place of `clearing_house`: the batch is made and read back per row, and evaluation still refuses. |
-| 13 / bilateral calculation | [Bilateral calculation kernel](bilateral-calculation-kernel.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Nothing new to try on the sheet yet: the evaluator values a bilateral batch on a discount curve privately, pinned by hand-priced tests; `_EvaluateTrades` still refuses a bilateral batch, now asking for the curve the next slice adds. |
+| 13 / bilateral calculation | [Bilateral calculation kernel](bilateral-calculation-kernel.md) | [#176](https://github.com/gobbles404/goosedove/pull/176), awaiting review | Nothing new to try on the sheet yet: the evaluator values a bilateral batch on a discount curve privately, pinned by hand-priced tests; `_EvaluateTrades` still refuses a bilateral batch, now asking for the curve the next slice adds. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its

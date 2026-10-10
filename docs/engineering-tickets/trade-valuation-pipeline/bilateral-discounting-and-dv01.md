@@ -16,7 +16,7 @@ rates, ACT/365F, not a finite bump, and the readers expose both lot deltas as di
 `nominal_delta` and `delta`. The curve-date policy is agreed too: the curve is anchored at `as_of`,
 its start date the valuation day and a mismatch refused. No bilateral valuation is implemented by
 this ticket. Counterparty and marketing reserve are built in #175, and the calculation kernel in
-#NN, privately, [bilateral-calculation-kernel.md](bilateral-calculation-kernel.md); the public curve
+#176, privately, [bilateral-calculation-kernel.md](bilateral-calculation-kernel.md); the public curve
 argument and the readers follow.
 
 **Subsequent UAT steer:** The owner expects reported delta in **lots**. The monetary

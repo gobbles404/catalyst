@@ -4,7 +4,7 @@
 [Preceding booking-fields ticket](booking-fields-and-marketing-reserve.md) ·
 [UAT notes](surface-uat-notes.md)
 
-**Status:** Built in #NN, 10 October 2026, stacked on PR #175 at `529bc27`, awaiting review, the
+**Status:** Built in #176, 10 October 2026, stacked on PR #175 at `529bc27`, awaiting review, the
 owner having aligned on 10 October: a bilateral path inside the existing evaluation function, no
 new public function or stage. [As built](#as-built) at the foot records what the build settled.
 This is a calculation ticket, not permission to merge the prototype stack.
@@ -256,10 +256,10 @@ the sheet. Rates, risk and curve-date meanings above carry forward the existing 
 
 ## As built
 
-PR #NN on `claude/bilateral-kernel`, stacked on #175. The page is
+PR #176 on `claude/bilateral-kernel`, stacked on #175. The page is
 [kernel.md](../../library/trades/kernel.md#the-bilateral-path), with
 [evaluate-trades.md](../../library/trades/evaluate-trades.md) for what the worksheet function does
-and does not do yet; the seam's record is the #NN row of [history.md](../../seam/history.md).
+and does not do yet; the seam's record is the #176 row of [history.md](../../seam/history.md).
 
 - The owner's three clarifications, kept: the cleared tick's ledgers did not move and a cleared result
   shares the preparation's nominal arrays under the discounted names, its group vectors `None`; the

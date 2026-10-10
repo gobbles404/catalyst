@@ -891,7 +891,7 @@ def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market()
 
 
 def test_a_physical_bilateral_batch_is_refused_by_its_settlement() -> None:
-    # Since #NN a bilateral batch is valued on a curve, tests/unit/test_bilateral_kernel.py; the
+    # Since #176 a bilateral batch is valued on a curve, tests/unit/test_bilateral_kernel.py; the
     # physical rows of the page under the bilateral route have no payment to discount.
     enc = encoded(
         terms_of(route=Route.BILATERAL),
