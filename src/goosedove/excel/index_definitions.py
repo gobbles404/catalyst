@@ -159,6 +159,11 @@ def _CreateIndex(
     name: Annotated[
         str, "The index's name as the desk calls it, such as Henry Hub NYMEX, kept as typed."
     ],
+    display_name: Annotated[
+        str,
+        "A description a reader who does not know the desk's short names would understand, "
+        "such as Henry Hub natural gas - NYMEX, kept as typed and read for nothing else.",
+    ],
     schedule: Annotated[
         Handle[object],
         "The index's schedule handle, futures, IFERC or Gas Daily: the cell showing its creator's "
@@ -187,11 +192,12 @@ def _CreateIndex(
         "and prices no trades.",
     ] = None,
 ) -> Handle[Index]:
-    """Creates the index behind one reference price from its name, schedule, conventions,
-    specifications, a futures index's holiday calendar and the lot its delta is reported in, and
-    shows its handle, the text other formulas take as the index."""
+    """Creates the index behind one reference price from its name, a description, schedule,
+    conventions, specifications, a futures index's holiday calendar and the lot its delta is
+    reported in, and shows its handle, the text other formulas take as the index."""
     return index(
         name,
+        display_name,
         schedule,
         index_conventions,
         contract_specifications,

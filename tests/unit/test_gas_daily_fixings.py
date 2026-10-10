@@ -39,7 +39,7 @@ def an_index(schedule: object, name: str = "Henry Hub Gas Daily") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    return index(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
 
 # The page's sample as the desk keeps it, the newest flow day in the first row: Henry Hub Gas
@@ -50,6 +50,7 @@ PRICES = prices(2.900, 2.875, 2.875, 2.875, 2.875, 2.930)
 INDEX = an_index(gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")))
 FUTURES_INDEX = index(
     "WTI NYMEX",
+    "West Texas Intermediate crude oil - NYMEX",
     futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None),
     CONVENTIONS,
     SPECIFICATIONS,

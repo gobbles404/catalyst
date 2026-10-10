@@ -985,13 +985,14 @@ INDEX_GAS_DAILY_FIRST = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
 INDEX_GAS_DAILY_LAST = Cells.from_rows([[46295.0], [46326.0], [46356.0]])
 INDEX_HEADERS = [
     "name",
+    "display_name",
     "kind",
     "contracts",
     "specifications",
     "has_holiday_calendar",
     "reporting_lot",
 ]
-INDEX_TYPES = ["str", "str", "int64", "int64", "bool", "str"]
+INDEX_TYPES = ["str", "str", "str", "int64", "int64", "bool", "str"]
 
 
 def the_parts() -> tuple[str, str, str, str]:
@@ -1013,14 +1014,23 @@ def an_index(*args: object) -> str:
 
 def test_a_futures_index_is_created_from_text_and_four_handles_and_read_back_as_one_row() -> None:
     schedule, holidays, conventions, specifications = the_parts()
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     kinds, slots, joined = read(made)
     assert rows((kinds, slots, joined)) == [
         INDEX_HEADERS,
         INDEX_TYPES,
-        ["Henry Hub NYMEX", "futures", 3.0, 2.0, 1.0, "unset"],
+        ["Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", "futures", 3.0, 2.0, 1.0, "unset"],
     ]
     assert kinds[2].tolist() == [
+        TEXT_CODE,
         TEXT_CODE,
         TEXT_CODE,
         NUMBER_CODE,
@@ -1028,28 +1038,67 @@ def test_a_futures_index_is_created_from_text_and_four_handles_and_read_back_as_
         BOOLEAN_CODE,
         TEXT_CODE,
     ]
-    spaced = an_index(" Henry Hub NYMEX ", schedule, conventions, specifications, holidays, MISSING)
+    spaced = an_index(
+        " Henry Hub NYMEX ",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert rows(read(spaced))[2][0] == " Henry Hub NYMEX "
 
 
 def test_an_iferc_and_a_gas_daily_index_are_created_without_a_holiday_calendar() -> None:
     _, _, conventions, specifications = the_parts()
     iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
-    monthly = an_index("Henry Hub IFERC", iferc, conventions, specifications, MISSING, MISSING)
-    assert rows(read(monthly))[2] == ["Henry Hub IFERC", "IFERC", 3.0, 2.0, 0.0, "unset"]
+    monthly = an_index(
+        "Henry Hub IFERC",
+        "Henry Hub natural gas - Inside FERC monthly index",
+        iferc,
+        conventions,
+        specifications,
+        MISSING,
+        MISSING,
+    )
+    assert rows(read(monthly))[2] == [
+        "Henry Hub IFERC",
+        "Henry Hub natural gas - Inside FERC monthly index",
+        "IFERC",
+        3.0,
+        2.0,
+        0.0,
+        "unset",
+    ]
     gas_daily = a_gas_daily_schedule(
         INDEX_GAS_DAILY_CODES, INDEX_GAS_DAILY_FIRST, INDEX_GAS_DAILY_LAST
     )
     daily = an_index(
-        "Henry Hub Gas Daily", gas_daily, conventions, specifications, MISSING, MISSING
+        "Henry Hub Gas Daily",
+        "Henry Hub natural gas - Platts Gas Daily",
+        gas_daily,
+        conventions,
+        specifications,
+        MISSING,
+        MISSING,
     )
     kinds, slots, joined = read(daily)
     assert rows((kinds, slots, joined)) == [
         INDEX_HEADERS,
         INDEX_TYPES,
-        ["Henry Hub Gas Daily", "Gas Daily", 3.0, 2.0, 0.0, "unset"],
+        [
+            "Henry Hub Gas Daily",
+            "Henry Hub natural gas - Platts Gas Daily",
+            "Gas Daily",
+            3.0,
+            2.0,
+            0.0,
+            "unset",
+        ],
     ]
     assert kinds[2].tolist() == [
+        TEXT_CODE,
         TEXT_CODE,
         TEXT_CODE,
         NUMBER_CODE,
@@ -1062,7 +1111,16 @@ def test_an_iferc_and_a_gas_daily_index_are_created_without_a_holiday_calendar()
 def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None:
     schedule, holidays, conventions, specifications = the_parts()
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, MISSING, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            MISSING,
+            MISSING,
+        ],
     ) == (
         "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, "
         "expected holiday calendar handle with a futures schedule"
@@ -1072,14 +1130,31 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
     )
     assert bridge.call(
         "_CreateIndex",
-        ["Henry Hub Gas Daily", gas_daily, conventions, specifications, holidays, MISSING],
+        [
+            "Henry Hub Gas Daily",
+            "Henry Hub natural gas - Platts Gas Daily",
+            gas_daily,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     ) == (
         "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
         "expected none with a Gas Daily schedule"
     )
     iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub IFERC", iferc, conventions, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub IFERC",
+            "Henry Hub natural gas - Inside FERC monthly index",
+            iferc,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     ) == (
         "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
         "expected none with an IFERC schedule"
@@ -1091,14 +1166,39 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
     ):
         assert bridge.call(
             "_CreateIndex",
-            ["Henry Hub NYMEX", wrong, conventions, specifications, holidays, MISSING],
+            [
+                "Henry Hub NYMEX",
+                "Henry Hub natural gas - NYMEX",
+                wrong,
+                conventions,
+                specifications,
+                holidays,
+                MISSING,
+            ],
         ) == (
             f"#ERROR _CreateIndex: ValueError: schedule is {what}, "
             "expected a futures, IFERC or Gas Daily schedule"
         )
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", made, conventions, specifications, MISSING, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            made,
+            conventions,
+            specifications,
+            MISSING,
+            MISSING,
+        ],
     ) == (
         "#ERROR _CreateIndex: ValueError: schedule is an index, "
         "expected a futures, IFERC or Gas Daily schedule"
@@ -1253,26 +1353,64 @@ def test_an_index_that_cannot_be_made_says_why(args: list[object], text: str) ->
         id(THE_SPECIFICATIONS): specifications,
     }
     given = [stand_ins.get(id(arg), arg) for arg in args]
+    given.insert(
+        1, "Henry Hub natural gas - NYMEX"
+    )  # the display name, since #NN, never at fault here
     assert bridge.call("_CreateIndex", given) == text
 
 
 def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_name() -> None:
     schedule, holidays, conventions, specifications = the_parts()
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, holidays, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            holidays,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     ) == (
         f"#ERROR _CreateIndex: index_conventions is holiday calendar handle {holidays!r}, "
         "expected index conventions handle"
     )
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, conventions, holidays, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            conventions,
+            holidays,
+            MISSING,
+        ],
     ) == (
         f"#ERROR _CreateIndex: contract_specifications is index conventions handle "
         f"{conventions!r}, expected contract specifications handle"
     )
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, made, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            made,
+            MISSING,
+        ],
     ) == (
         f"#ERROR _CreateIndex: holiday_calendar is index handle {made!r}, "
         "expected holiday calendar handle"
@@ -1285,7 +1423,18 @@ def test_a_handle_of_another_kind_in_a_typed_slot_of_the_index_is_refused_by_nam
 def test_lot_units_of_another_measure_are_refused_by_the_index_in_the_librarys_words() -> None:
     schedule, holidays, _, gas = the_parts()
     volume = the_conventions(*UNITS)
-    assert bridge.call("_CreateIndex", ["WTI NYMEX", schedule, volume, gas, holidays, MISSING]) == (
+    assert bridge.call(
+        "_CreateIndex",
+        [
+            "WTI NYMEX",
+            "West Texas Intermediate crude oil - NYMEX",
+            schedule,
+            volume,
+            gas,
+            holidays,
+            MISSING,
+        ],
+    ) == (
         "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', "
         "expected a VOLUME unit, GAL, BBL, L or M3"
     )
@@ -1293,26 +1442,76 @@ def test_lot_units_of_another_measure_are_refused_by_the_index_in_the_librarys_w
         SPECIFICATION_HEADERS,
         Cells.from_rows([["lots", 1000.0, "BBL", 3.0, 2.0], ["gal", 1.0, "GAL", 0.0, 0.0]]),
     )
-    made = an_index("WTI NYMEX", schedule, volume, barrels_and_gallons, holidays, MISSING)
-    assert rows(read(made))[2] == ["WTI NYMEX", "futures", 3.0, 2.0, 1.0, "unset"]
+    made = an_index(
+        "WTI NYMEX",
+        "West Texas Intermediate crude oil - NYMEX",
+        schedule,
+        volume,
+        barrels_and_gallons,
+        holidays,
+        MISSING,
+    )
+    assert rows(read(made))[2] == [
+        "WTI NYMEX",
+        "West Texas Intermediate crude oil - NYMEX",
+        "futures",
+        3.0,
+        2.0,
+        1.0,
+        "unset",
+    ]
 
 
 def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() -> None:
     schedule, holidays, conventions, specifications = the_parts()
     before = number(
-        an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING), INDEX
+        an_index(
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ),
+        INDEX,
     )
     refused = bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, MISSING, MISSING]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            MISSING,
+            MISSING,
+        ],
     )
     assert cast(str, refused).startswith(
         "#ERROR _CreateIndex: ValueError: holiday_calendar is missing"
     )
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert number(made, INDEX) == before + 1
     read(made)
     read(made)
-    again = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    again = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert number(again, INDEX) == before + 2
 
 
@@ -1340,10 +1539,12 @@ def test_a_failed_index_publishes_no_object_and_reading_one_publishes_nothing() 
 )
 def test_an_index_handle_carries_its_name_as_typed(name: str) -> None:
     schedule, holidays, conventions, specifications = the_parts()
-    made = an_index(name, schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(name, f"{name} index", schedule, conventions, specifications, holidays, MISSING)
     assert made.startswith(f"{PID}:index:{name}:")
     assert made[len(f"{PID}:index:{name}:") :].isdigit()
-    again = an_index(name, schedule, conventions, specifications, holidays, MISSING)
+    again = an_index(
+        name, f"{name} index", schedule, conventions, specifications, holidays, MISSING
+    )
     assert again.startswith(f"{PID}:index:{name}:")
     assert number(again, INDEX) == number(made, INDEX) + 1
 
@@ -1359,14 +1560,32 @@ def test_an_index_handle_carries_its_name_as_typed(name: str) -> None:
 def test_a_name_too_long_for_a_cell_fails_before_the_index_is_stored(name: str, units: int) -> None:
     schedule, holidays, conventions, specifications = the_parts()
     before = number(
-        an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING), INDEX
+        an_index(
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ),
+        INDEX,
     )
     count = before + 1  # the count the refused text would have carried
     total = len(f"{PID}:index:") + units + len(":") + len(str(count))
     assert bridge.call(
-        "_CreateIndex", [name, schedule, conventions, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [name, f"{name} index", schedule, conventions, specifications, holidays, MISSING],
     ) == (f"#ERROR _CreateIndex: returned handle of {total} characters, expected at most 32767")
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING)
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
     assert number(made, INDEX) == count
 
 
@@ -1379,16 +1598,45 @@ def test_a_dead_index_handle_cannot_be_read() -> None:
 
 def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> None:
     schedule, holidays, conventions, specifications = the_parts()
-    made = an_index("Henry Hub NYMEX", schedule, conventions, specifications, holidays, "ICE NG")
+    made = an_index(
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        "ICE NG",
+    )
     kinds, slots, joined = read(made)
     assert rows((kinds, slots, joined)) == [
         [*INDEX_HEADERS, "lot_size", "lot_unit", "lot_quote_quantity", "lot_coefficient"],
         [*INDEX_TYPES, "float64", "str", "float64", "float64"],
-        ["Henry Hub NYMEX", "futures", 3.0, 2.0, 1.0, "ICE NG", 2500.0, "MMBTU", 2500.0, 2500.0],
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            "futures",
+            3.0,
+            2.0,
+            1.0,
+            "ICE NG",
+            2500.0,
+            "MMBTU",
+            2500.0,
+            2500.0,
+        ],
     ]
-    assert kinds[2].tolist()[5:] == [TEXT_CODE, NUMBER_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE]
+    assert kinds[2].tolist()[6:] == [TEXT_CODE, NUMBER_CODE, TEXT_CODE, NUMBER_CODE, NUMBER_CODE]
     assert bridge.call(
-        "_CreateIndex", ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, "LOT"]
+        "_CreateIndex",
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            "LOT",
+        ],
     ) == (
         "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the "
         "specifications: 'NYMEX NG', 'ICE NG'"
@@ -1396,14 +1644,79 @@ def test_the_reporting_lot_is_named_resolved_and_read_back_or_left_unset() -> No
     assert (
         bridge.call(
             "_CreateIndex",
-            ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, None],
+            [
+                "Henry Hub NYMEX",
+                "Henry Hub natural gas - NYMEX",
+                schedule,
+                conventions,
+                specifications,
+                holidays,
+                None,
+            ],
         )
         == "#ERROR _CreateIndex: reporting_lot is blank, expected text"
     )
     assert (
         bridge.call(
             "_CreateIndex",
-            ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, 1.0],
+            [
+                "Henry Hub NYMEX",
+                "Henry Hub natural gas - NYMEX",
+                schedule,
+                conventions,
+                specifications,
+                holidays,
+                1.0,
+            ],
         )
         == "#ERROR _CreateIndex: reporting_lot is number 1.0, expected text"
+    )
+
+
+# --- the display name, readable-index-names.md ---------------------------------------------------
+
+
+def test_the_display_name_reads_back_beside_the_name_and_is_text_as_typed() -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    made = an_index(
+        "WTI",
+        "West Texas Intermediate crude oil - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
+    )
+    assert ":index:WTI:" in made  # the handle keeps the name
+    kinds, slots, joined = read(made)
+    assert rows((kinds, slots, joined))[0][:3] == ["name", "display_name", "kind"]
+    assert rows((kinds, slots, joined))[1][:3] == ["str", "str", "str"]
+    assert rows((kinds, slots, joined))[2][:3] == [
+        "WTI",
+        "West Texas Intermediate crude oil - NYMEX",
+        "futures",
+    ]
+    assert kinds[2].tolist()[:3] == [TEXT_CODE, TEXT_CODE, TEXT_CODE]
+    same = an_index("WTI", "WTI", schedule, conventions, specifications, holidays, MISSING)
+    assert rows(read(same))[2][:2] == ["WTI", "WTI"]
+    spaced = an_index(
+        "WTI", " West Texas Intermediate ", schedule, conventions, specifications, holidays, MISSING
+    )
+    assert rows(read(spaced))[2][1] == " West Texas Intermediate "
+
+
+@pytest.mark.parametrize(
+    ("value", "words"),
+    [(MISSING, "missing"), (None, "blank"), (1.0, "number 1.0"), ("", "empty text")],
+    ids=["left out", "a blank", "a number", "empty text"],
+)
+def test_a_display_name_that_is_not_text_is_refused_in_the_seams_words(
+    value: object, words: str
+) -> None:
+    schedule, holidays, conventions, specifications = the_parts()
+    assert (
+        bridge.call(
+            "_CreateIndex", ["WTI", value, schedule, conventions, specifications, holidays, MISSING]
+        )
+        == f"#ERROR _CreateIndex: display_name is {words}, expected text"
     )

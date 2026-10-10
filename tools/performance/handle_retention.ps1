@@ -137,7 +137,7 @@ try {
     Put "M2" "=_CreateHolidayCalendar(F2)"
     Put "M3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
     Put "M4" "=_CreateContractSpecifications(H1:L1,H2:L2)"
-    Put "M5" "=_CreateIndex(F1,M1,M3,M4,M2)"
+    Put "M5" "=_CreateIndex(F1,""West Texas Intermediate crude oil - NYMEX"",M1,M3,M4,M2)"
     Put "M6" "=_CreateValuationDate(F3,0.5)"
     Put "M7" "=_CreateCalendar(M6,M5)"
     Put "M8" "=_CreateFuturesFixings(F4:F5,G4:G5,M5)"

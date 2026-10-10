@@ -92,6 +92,7 @@ PAYS: NDArray[np.datetime64] = np.array(
 PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
 GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -370,6 +371,7 @@ MONTH_ENDS = np.busday_offset(
 ASIAN_PAYS = np.busday_offset(MONTH_ENDS, 2, holidays=HOLIDAYS)
 ASIAN_GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -782,6 +784,7 @@ MIXED_SIZES = [(8, 2), (2_000, 24)]
 MIXED_IDS = ["eight trades", "two thousand trades"]
 MIXED_GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -956,6 +959,7 @@ ROLLING_EXPIRIES = np.busday_offset(
 )
 ROLLING_GAS = index(
     "rolling",
+    "Sample gas index with rolling contracts",
     futures_schedule(ROLLING_CODES, ROLLING_EXPIRIES, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -1059,6 +1063,7 @@ IFERC_PUBLICATION = np.busday_offset(
 IFERC_PAYS = np.busday_offset(IFERC_LAST_TRADING, 3, roll="backward", holidays=HOLIDAYS)
 BASIS = index(
     "basis",
+    "Sample basis index",
     iferc_schedule(CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(

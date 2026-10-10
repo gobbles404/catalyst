@@ -367,6 +367,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
     of gas and one lot, since nothing measured here reads either."""
     return ENTRY["_CreateIndex"](
         "sample",
+        "Sample futures index",
         schedule,
         ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         ENTRY["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
@@ -401,13 +402,25 @@ def test_an_index_keeps_one_small_record_and_its_reader_stays_small() -> None:
     assert (
         least_peak(
             lambda: ENTRY["_CreateIndex"](
-                "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
+                "Henry Hub NYMEX",
+                "Henry Hub natural gas - NYMEX",
+                schedule,
+                conventions,
+                specifications,
+                holidays,
+                MISSING,
             )
         )
         <= 2 * SLACK
     )
     made = ENTRY["_CreateIndex"](
-        "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specifications,
+        holidays,
+        MISSING,
     )
     assert least_peak(lambda: ENTRY["util_ReadHandle"](made)) <= 2 * SLACK
 
@@ -1066,7 +1079,9 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         ),
         Cells.from_rows([["lot", 10000.0, "MMBTU", 0.0, 0.0]]),
     )
-    ix = ENTRY["_CreateIndex"]("gas", schedule, conventions, specifications, holidays, "lot")
+    ix = ENTRY["_CreateIndex"](
+        "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
+    )
     names = Cells.from_rows(
         [
             [

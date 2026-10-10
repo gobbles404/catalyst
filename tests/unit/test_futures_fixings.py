@@ -65,7 +65,14 @@ SPECIFICATIONS = contract_specifications(
 def an_index(holidays: NDArray[np.datetime64]) -> Index:
     """A futures index whose holiday calendar lists those days."""
     return index(
-        "sample", SCHEDULE, CONVENTIONS, SPECIFICATIONS, holiday_calendar(holidays), None, UNITS
+        "sample",
+        "Sample futures index",
+        SCHEDULE,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        holiday_calendar(holidays),
+        None,
+        UNITS,
     )
 
 
@@ -142,6 +149,7 @@ def test_a_holiday_listed_twice_or_on_a_weekend_changes_nothing() -> None:
 def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() -> None:
     gas_daily = index(
         "Henry Hub Gas Daily",
+        "Henry Hub natural gas - Platts Gas Daily",
         gas_daily_schedule(("U26",), dates("2026-09-01"), dates("2026-09-30")),
         CONVENTIONS,
         SPECIFICATIONS,
@@ -154,6 +162,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
     assert str(failure.value) == "index is a Gas Daily index, expected a futures index"
     iferc = index(
         "Henry Hub IFERC",
+        "Henry Hub natural gas - Inside FERC monthly index",
         iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")),
         CONVENTIONS,
         SPECIFICATIONS,

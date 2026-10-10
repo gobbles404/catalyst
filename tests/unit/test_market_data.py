@@ -96,7 +96,8 @@ def an_index_of(name: str, schedule: object, holidays: object) -> str:
         ],
     )
     text = bridge.call(
-        "_CreateIndex", [name, schedule, conventions, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [name, f"{name} index", schedule, conventions, specifications, holidays, MISSING],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
@@ -404,7 +405,15 @@ def test_an_index_of_another_kind_is_refused_in_the_librarys_words() -> None:
     )
     gas_daily = bridge.call(
         "_CreateIndex",
-        ["Henry Hub Gas Daily", schedule, conventions, specifications, MISSING, MISSING],
+        [
+            "Henry Hub Gas Daily",
+            "Henry Hub natural gas - Platts Gas Daily",
+            schedule,
+            conventions,
+            specifications,
+            MISSING,
+            MISSING,
+        ],
     )
     assert bridge.call("_CreateFuturesFixings", [DATES, SETTLES, gas_daily]) == (
         "#ERROR _CreateFuturesFixings: ValueError: index is a Gas Daily index, "

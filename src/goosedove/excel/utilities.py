@@ -275,23 +275,26 @@ def index_conventions_table(obj: IndexConventions) -> MixedArray:
 
 @shown.register
 def index_table(obj: Index) -> MixedArray:
-    # What the index holds, one row: its name, its kind, how many contracts its schedule has,
+    # What the index holds, one row: its name and, since #NN, the display name beside it, its
+    # kind, how many contracts its schedule has,
     # how many the specifications name, whether a holiday calendar was given, and the reporting
     # lot, its name with its size, its unit and the two conversions the index resolved, or the
     # word unset and nothing after it for an index made without one. The parts spill through
     # their own handles; nothing of them is read here but two lengths.
     headers = [
         "name",
+        "display_name",
         "kind",
         "contracts",
         "specifications",
         "has_holiday_calendar",
         "reporting_lot",
     ]
-    types = ["str", "str", "int64", "int64", "bool", "str"]
+    types = ["str", "str", "str", "int64", "int64", "bool", "str"]
     lot = obj.reporting_lot
     columns: list[NDArray[Any] | tuple[str, ...]] = [
         (obj.name,),
+        (obj.display_name,),
         (obj.kind.value,),
         np.array([len(obj.schedule.codes)], dtype=np.int64),
         np.array([len(obj.specifications.names)], dtype=np.int64),

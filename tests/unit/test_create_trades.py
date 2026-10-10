@@ -65,6 +65,7 @@ def an_index(
     names = tuple(name for name, _, _ in lots)
     return index(
         name,
+        f"{name} index",
         schedule,
         index_conventions("USD", measure[1], "USD", measure[0], measure[1], UNITS),
         contract_specifications(
@@ -1672,6 +1673,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
 def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None:
     daily = index(
         "daily",
+        "Sample Gas Daily index",
         gas_daily_schedule(("c0",), dates("2026-01-01"), dates("2026-01-31")),
         NG.conventions,
         NG.specifications,
@@ -1813,7 +1815,13 @@ def sheet() -> dict[str, Any]:
         row("NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0),
     )
     ng = ENTRY["_CreateIndex"](
-        "Henry Hub NYMEX", schedule, conventions, specs, holidays, "NYMEX NG"
+        "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
+        schedule,
+        conventions,
+        specs,
+        holidays,
+        "NYMEX NG",
     )
     template = ENTRY["_CreateTradeTemplate"](
         "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
@@ -2490,6 +2498,7 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
 
 WAHA = index(
     "WAHA",
+    "Waha basis - ICE",
     iferc_schedule(
         ("X26", "Z26", "F27"),
         dates("2026-10-30", "2026-11-30", "2026-12-31"),
@@ -2663,7 +2672,16 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
         "contract_code row 1 is 'G27', expected months the index's schedule has a contract for; "
         "it has none for 2027-02"
     )
-    bare = index("bare", WAHA.schedule, WAHA.conventions, WAHA.specifications, None, None, UNITS)
+    bare = index(
+        "bare",
+        "An index made without a reporting lot",
+        WAHA.schedule,
+        WAHA.conventions,
+        WAHA.specifications,
+        None,
+        None,
+        UNITS,
+    )
     assert refused(bare, WAHA_TICKET, WAHA_TEMPLATE) == (
         "index 'bare' has no reporting_lot, expected one of its specifications named when the "
         "index was made; a batch's delta is reported in lots of it"

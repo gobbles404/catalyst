@@ -36,7 +36,7 @@ def an_index(schedule: object, name: str = "Waha IFERC") -> Index:
     """The index of that schedule with one set of conventions and specifications throughout,
     since nothing here reads either, and no holiday calendar, as an IFERC or a Gas Daily index
     has none."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    return index(name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
 
 
 # The page's sample: Waha IFERC, the first four months of 2026, the codes as the desk keeps
@@ -53,6 +53,7 @@ SCHEDULE = iferc_schedule(
 INDEX = an_index(SCHEDULE)
 FUTURES_INDEX = index(
     "WTI NYMEX",
+    "West Texas Intermediate crude oil - NYMEX",
     futures_schedule(("m26", "n26"), dates("2026-05-19", "2026-06-22"), None),
     CONVENTIONS,
     SPECIFICATIONS,

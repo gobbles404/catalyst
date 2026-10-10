@@ -149,6 +149,7 @@ def an_index(
     spec_name, lot_size, lot_unit = lot
     return index(
         name,
+        f"{name} index",
         schedule,
         index_conventions(quote[0], quote[1], "USD", measure[0], measure[1], UNITS),
         contract_specifications(
@@ -297,6 +298,7 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
 
 GAS_DAILY = index(
     "daily",
+    "Sample Gas Daily index",
     gas_daily_schedule(("c0",), dates("2026-01-01"), dates("2026-01-31")),
     NG.conventions,
     NG.specifications,
@@ -590,6 +592,7 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
 # -1,000,000 cents per dollar per MMBTU, and the unit names both currencies.
 CENT_SETTLED = index(
     "cents settled",
+    "Gas settled in cents",
     futures_schedule(
         ("X26", "Z26", "F27", "G27"),
         dates("2026-10-28", "2026-11-25", "2026-12-29", "2027-01-27"),
@@ -633,6 +636,7 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
 def test_fees_per_lot_are_reserves_and_move_no_value() -> None:
     with_fees = index(
         "Henry Hub NYMEX",
+        "Henry Hub natural gas - NYMEX",
         NG.schedule,
         NG.conventions,
         contract_specifications(
@@ -3361,6 +3365,7 @@ def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
 # from are the fixture's own arithmetic, never the kernel's.
 MIXED = index(
     "MIXED",
+    "Synthetic volume index for the mixed-fields example",
     futures_schedule(
         ("X26", "Z26", "F27", "G27"),
         dates("2026-11-30", "2026-12-31", "2027-01-29", "2027-02-26"),
@@ -3686,6 +3691,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
         )
     cents = index(
         "cents lots",
+        "Gas quoted in cents with lot specifications",
         CENTS.schedule,
         CENTS.conventions,
         contract_specifications(
@@ -3874,6 +3880,7 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
 # any book count their lots past the largest number while every monetary number stays finite.
 TINY_LOT = index(
     "tiny lot",
+    "Gas with a one BTU lot",
     CENTS.schedule,
     CENTS.conventions,
     contract_specifications(
@@ -3984,6 +3991,7 @@ def wti_like(name: str, contracts: tuple[tuple[str, str], ...]) -> Index:
     """An index of those contracts with the WTI-like conventions, the barrel and the lot."""
     return index(
         name,
+        f"{name} index",
         futures_schedule(
             tuple(code for code, _ in contracts), dates(*(expiry for _, expiry in contracts)), None
         ),
@@ -4653,6 +4661,7 @@ WAHA_SCHEDULE = iferc_schedule(
 )
 WAHA = index(
     "WAHA",
+    "Waha basis - ICE",
     WAHA_SCHEDULE,
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -4977,7 +4986,16 @@ def test_the_first_iferc_month_is_a_month_to_trade_and_the_existing_refusals_hol
     assert str(missing.value) == (
         "fixings has no index for X26, expected an index for every fixed month in calendar"
     )
-    twin = index("WAHA", WAHA_SCHEDULE, WAHA.conventions, WAHA.specifications, None, "LOT", UNITS)
+    twin = index(
+        "WAHA",
+        "Waha basis - ICE",
+        WAHA_SCHEDULE,
+        WAHA.conventions,
+        WAHA.specifications,
+        None,
+        "LOT",
+        UNITS,
+    )
     enc = encoded(x26, observed_of(x26), UNITS, WorkCounter())
     with pytest.raises(ValueError) as other:
         prepared_trades(enc, waha_history("2026-11-03", X26_INDEX, twin), WorkCounter())
