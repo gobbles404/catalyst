@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [UAT item 9](surface-uat-notes.md#9-date-offsets-from-text)
 
-**Status:** Built in #NN, one focused PR stacked on the reviewed prototype PR #170 at
+**Status:** Built in #171, one focused PR stacked on the reviewed prototype PR #170 at
 `716a236`, the page as it was agreed on 10 October 2026 with the section at the end saying
 what landed. It is independent of the unresolved BAL valuation-context and mixed
 period-entry decisions.
@@ -141,7 +141,7 @@ with explicit start/end dates; it does not change how a trade obtains its booked
 
 ## As built
 
-Built in #NN. The page is [shift-date.md](../../library/utilities/shift-date.md). The library
+Built in #171. The page is [shift-date.md](../../library/utilities/shift-date.md). The library
 helper is `shift_date(date, offset, holidays)` in `src/goosedove/index_definitions/date_offsets.py`,
 beside the period grammar: one full match of a sign, ASCII digits and two letters, the suffix
 looked up among `bd`, `cd` and `em` in either case, the digits counted before the count is read,
