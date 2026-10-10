@@ -8,7 +8,7 @@ Record observations and decisions here before turning them into implementation t
 | Item | Owner direction | Status |
 |---|---|---|
 | 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Implemented in prototype PR #164; fixes reviewed at `414b6e0`; [design ticket](lot-delta-reporting.md) |
-| 2. `trade_id` | Accept whole-number IDs of at most 15 digits directly from Excel; retain integers and read back numeric cells. | Owner clarified integer IDs, 9 October; [engineering ticket](numeric-trade-ids.md); built in #NN |
+| 2. `trade_id` | Accept whole-number IDs of at most 15 digits directly from Excel; retain integers and read back numeric cells. | Owner clarified integer IDs, 9 October; [engineering ticket](numeric-trade-ids.md); built in #168 |
 | 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
 | 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
 | 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Implemented in prototype PR #165; reviewed at `f1f1b91`; [design ticket](calendar-driven-asian-references.md) |
@@ -55,7 +55,7 @@ integer retained identity and numeric readback, using existing seam support. It 
 optional omission, template/ticket disjointness, original-row attribution and duplicate
 occurrences. IDs remain attribution rather than an economic grouping or deduplication key.
 The ticket specifies finite whole values within the 15-digit range, without text coercion;
-built in #NN, the ticket's [As built](numeric-trade-ids.md#as-built-nn) section saying what
+built in #168, the ticket's [As built](numeric-trade-ids.md#as-built-168) section saying what
 landed.
 
 ## 3. Dates and period labels through the same helpers

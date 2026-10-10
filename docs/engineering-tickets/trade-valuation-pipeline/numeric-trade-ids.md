@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 2](surface-uat-notes.md#2-trade-identifiers)
 
-**Status:** Built in #NN on the prototype stack above #167, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Engineering
+**Status:** Built in #168 on the prototype stack above #167, the page as a ticket; the
+[As built](#as-built-168) section at the end says what was built and what was not. Engineering
 ticket, 9 October 2026. The owner confirmed that source-system
 trade IDs are whole integers of at most 15 digits, without meaningful leading zeros.
 Inspected prototype: PR #167 at `9117a39`. One focused PR on the current prototype
@@ -128,7 +128,7 @@ Keep one batch path for one or many trades, including duplicate IDs and zero-qua
 No counterparty field, trade lookup service, uniqueness registry, external-system connector,
 new handle identity or per-trade valuation is part of this ticket.
 
-## As built, #NN
+## As built, #168
 
 Engineering's record of what landed, in the ticket's terms.
 [create-trades.md](../../library/trades/create-trades.md),

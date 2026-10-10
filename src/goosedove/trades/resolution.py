@@ -118,7 +118,7 @@ def resolved(
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
-    trade IDs, since #NN, are whole numbers of at most 15 digits, the template's one read when
+    trade IDs, since #168, are whole numbers of at most 15 digits, the template's one read when
     the template was made and the ticket's column read here, the first bad row named. The
     index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
@@ -277,7 +277,7 @@ class _Fields:
         return self.texts(name) if self.has(name) else None
 
     def ids(self, name: str) -> NDArray[np.int64] | None:
-        """The trade IDs per occurrence, whole numbers of at most 15 digits since #NN, or None when
+        """The trade IDs per occurrence, whole numbers of at most 15 digits since #168, or None when
         neither supplied them: the template's one, read for the rule when the template was made
         and repeated here, or the ticket's column read for it now, the first bad row named by the
         field and the row."""

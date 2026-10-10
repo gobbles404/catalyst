@@ -360,7 +360,7 @@ def trades_table(obj: Trades) -> MixedArray:
     # resolved terms under the definition's own field names in the definition's order, the row's
     # own method, unit and basis and the batch's route and settlement on every row, since a
     # reader of one row should see the whole deal and the template need not have supplied them,
-    # then what the encoding made of the terms. trade_id, a number since #NN,
+    # then what the encoding made of the terms. trade_id, a number since #168,
     # clearing_house and broker where the batch has them; quantity_unit the specification's name
     # as the index spells it; the payment lag and the day it gives for a financial settlement;
     # then what the resolution derived, start_date and end_date, the days the component covers,
@@ -392,7 +392,7 @@ def trades_table(obj: Trades) -> MixedArray:
         if given is not None:
             text(name, tuple(np.array(given, dtype=object)[rows]))
 
-    if terms.trade_ids is not None:  # the source system's whole numbers, since #NN
+    if terms.trade_ids is not None:  # the source system's whole numbers, since #168
         numbers("trade_id", "int64", terms.trade_ids[rows])
     numbers("trade_date", "datetime64[D]", terms.trade_dates[rows])
     text("contract_code", tuple(codes))

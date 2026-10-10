@@ -112,7 +112,7 @@ class ResolvedTrades:
     and quantity_per[i] the basis its quantity is stated per, each the position of the member
     among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
     trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source system's
-    whole number of at most 15 digits held as an int64 since #NN, clearing_house[i] its clearing
+    whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
     organization and broker[i] its broker, the IDs an array and the two labels tuples, each None
     as a whole when the field was not given, each kept as given and read for nothing but a
     message's words. Per
@@ -159,7 +159,7 @@ class ResolvedTrades:
 
 def named_trade(trade_ids: NDArray[np.int64] | None, row: int) -> str:
     """A trade named in a message, by its ID when the ticket gave one, the whole number without
-    quotes since #NN, and by its row as the sheet counts rows either way, `trade 1001 at row 1`,
+    quotes since #168, and by its row as the sheet counts rows either way, `trade 1001 at row 1`,
     `trade at row 3`: the words every refusal of a row's own fact uses, in the kernel and in the
     observations alike."""
     if trade_ids is None:
@@ -199,7 +199,7 @@ def resolved_trades(
     lot, since the batch's delta is a count of that lot and a batch without one could not report
     its risk. The occurrences are the ticket's
     rows: one date each, and one trade ID, a whole number of at most 15 digits the caller read
-    by whole_trade_ids since #NN, clearing house and broker each where those are given;
+    by whole_trade_ids since #168, clearing house and broker each where those are given;
     one specification, method and basis each, the specification a row of the index's
     specifications, since the lot size and the lot unit are read there, its quantities counting
     it, whatever the desk's word for it, an exchange lot or a bare unit the index defines with a
@@ -518,7 +518,7 @@ TRADE_ID_LIMIT = 10**TRADE_ID_DIGITS - 1
 
 def whole_trade_ids(values: NDArray[np.float64], where: Callable[[int], str]) -> NDArray[np.int64]:
     """Each trade ID a whole number of at most 15 digits, the source system's deal numbers as the
-    sheet carries them exactly, since #NN: finite, whole and within -999,999,999,999,999 to
+    sheet carries them exactly, since #168: finite, whole and within -999,999,999,999,999 to
     999,999,999,999,999, zero and signed values included, since an identifier is not a quantity;
     the first that is not is refused in the caller's words for its position, the row in a
     ticket and the field in a template, a whole value shown without a fraction. Then the values

@@ -167,7 +167,7 @@ def price_of(where: str, number: float) -> float:
 
 def trade_id_of(where: str, number: float) -> int:
     """A trade ID by the kernel's rule, a whole number of at most 15 digits, named by its field,
-    since #NN: the one integer a template holds, read once here and repeated for every row."""
+    since #168: the one integer a template holds, read once here and repeated for every row."""
     return int(whole_trade_ids(np.array([number]), lambda _: where)[0])
 
 
@@ -184,7 +184,7 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 
 # The readers by field name: the text fields whose text means something beyond being text, and
-# the three numbers the kernel has a rule for, the trade ID since #NN; the two labels and the
+# the three numbers the kernel has a rule for, the trade ID since #168; the two labels and the
 # dates are read by nobody.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {

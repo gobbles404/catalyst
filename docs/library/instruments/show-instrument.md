@@ -84,7 +84,7 @@ accepted at creation and refused at evaluation until rates exist. `settlement_me
 component's anchor on that calendar: on a futures index its last observation day, and on an
 IFERC index since #167 the month's last trading date, the index printing later. `clearing_house` is required with a cleared route
 and `broker` is a label; neither is read for anything. `fixed_price` is the agreed price in the
-index's quote units, `trade_id` the source system's deal number since #NN, a whole number of at
+index's quote units, `trade_id` the source system's deal number since #168, a whole number of at
 most 15 digits read back as a number, duplicates kept as separate trades,
 [numeric-trade-ids.md](../../engineering-tickets/trade-valuation-pipeline/numeric-trade-ids.md),
 `trade_date` the day the deal was struck.
