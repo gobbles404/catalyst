@@ -378,7 +378,7 @@ namespace Goosedove.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills seven rows by nineteen columns since #NN, the labels down the first column, the
+        // the shown fixed_float spills seven rows by nineteen columns since #175, the labels down the first column, the
         // fields across the first row and the required row booleans, every other cell text.
         [Fact]
         public void the_instrument_catalog_is_listed_and_the_future_shown()
@@ -1952,7 +1952,7 @@ namespace Goosedove.Host.Tests
             var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, holidays, "LOT");
             Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 1e+308 a lot", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
-            // Since #NN, booking-fields-and-marketing-reserve.md: a marketing column books 15, 20, 25 and 5
+            // Since #175, booking-fields-and-marketing-reserve.md: a marketing column books 15, 20, 25 and 5
             // once per row, 65, the strip Z26-F27 showing its one amount on both components, over 60 and
             // 24; a template's 7 books 28 on the four plain rows, the mark and the lot as without; a
             // bilateral template names its counterparty, kept per row, its batch made and prepared and

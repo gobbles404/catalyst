@@ -1601,7 +1601,7 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             {**NG_TEMPLATE, "settlement_method": "financial", "payment_time_lag": "+1bd"},
             "payment_holiday_calendar is missing, expected it when settlement_method = financial",
         ),
-        (  # since #NN: a bilateral batch names its counterparty
+        (  # since #175: a bilateral batch names its counterparty
             NG_TICKET,
             {
                 **{k: v for k, v in NG_TEMPLATE.items() if k != "clearing_house"},
@@ -2170,7 +2170,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
 
 def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[str, Any]) -> None:
     # The route and the settlement from the ticket's columns, the template holding neither, and
-    # since #NN the counterparty the bilateral route requires: the spill is the one place all
+    # since #175 the counterparty the bilateral route requires: the spill is the one place all
     # three are read back, the counterparty between the clearing house's place and the broker's.
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float",

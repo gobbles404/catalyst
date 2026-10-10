@@ -5274,7 +5274,7 @@ def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -
 # The ticket's four rows on the fee index, LOT each: 2 and -2 of Z26, 1 of the strip Z26-F27, two
 # components, and 0 of Z26, booking 15, 20, 25 and 5 of marketing: 65 USD, the strip's amount once
 # and the zero row's whole, over 60 of brokerage and 24 of clearing on the five components; since
-# #NN. The amounts are per occurrence and the sum runs over them, never the components.
+# #175. The amounts are per occurrence and the sum runs over them, never the components.
 
 
 def marketed_terms(

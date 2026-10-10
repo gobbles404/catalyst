@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Bilateral plan](bilateral-discounting-and-dv01.md) ·
 [UAT notes](surface-uat-notes.md) · [Existing reserve totals](reserve-totals.md)
 
-**Status:** Built in #NN, 10 October 2026, stacked on PR #174 at `29fe38f`, awaiting review.
+**Status:** Built in #175, 10 October 2026, stacked on PR #174 at `29fe38f`, awaiting review.
 [As built](#as-built) at the foot records what the build settled. This ticket does not
 authorize landing the prototype stack.
 
@@ -170,11 +170,11 @@ reserve release schedule, counterparty risk or cross-results aggregation is incl
 
 ## As built
 
-PR #NN on `claude/booking-fields`, stacked on #174. The library pages are
+PR #175 on `claude/booking-fields`, stacked on #174. The library pages are
 [show-instrument.md](../../library/instruments/show-instrument.md),
 [create-trades.md](../../library/trades/create-trades.md),
 [trade-template.md](../../library/trades/trade-template.md) and
-[report-reserves.md](../../library/trades/report-reserves.md); the seam's record is the #NN row of
+[report-reserves.md](../../library/trades/report-reserves.md); the seam's record is the #175 row of
 [history.md](../../seam/history.md).
 
 - The fields as specified: `counterparty` after `clearing_house`, text, `route = bilateral` its condition,

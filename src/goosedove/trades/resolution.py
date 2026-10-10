@@ -72,7 +72,7 @@ PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 # `route = cleared`; a field is present exactly when its condition holds.
 CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
     "clearing_house": ("route", Route.CLEARED),
-    "counterparty": ("route", Route.BILATERAL),  # since #NN
+    "counterparty": ("route", Route.BILATERAL),  # since #175
     "payment_time_lag": ("settlement_method", Settlement.FINANCIAL),
     "payment_holiday_calendar": ("settlement_method", Settlement.FINANCIAL),
 }
@@ -131,11 +131,11 @@ def resolved(
     with its row where the ticket supplied it, since the page promises a ticket's field its row,
     the unit, the method, the route, the settlement and the basis in that order. Each conditional
     field is present exactly when its
-    condition holds, a clearing house with a cleared route, since #NN a counterparty with a
+    condition holds, a clearing house with a cleared route, since #175 a counterparty with a
     bilateral one, and the two payment fields with a financial settlement, and absent otherwise,
     since a label for a clearing house a bilateral trade has not, a counterparty a cleared trade
     faces through its clearing house, or a payment a physical contract never makes, would say
-    something false. Since #NN a marketing reserve may stand in either, a finite amount of zero
+    something false. Since #175 a marketing reserve may stand in either, a finite amount of zero
     or more per row, the template's one value booked once by every row or the ticket's column,
     the first bad row named, and none at all when neither supplies the field. The
     trade IDs, since #168, are whole numbers of at most 15 digits, the template's one read when
@@ -352,7 +352,7 @@ class _Fields:
         return whole_trade_ids(self.ticket.numbers(name), lambda k: self.where(name, k))
 
     def amounts(self, name: str) -> NDArray[np.float64] | None:
-        """The marketing reserves per occurrence, finite amounts of zero or more since #NN, or None
+        """The marketing reserves per occurrence, finite amounts of zero or more since #175, or None
         when neither supplied them: the template's one, read for the rule when the template was
         made and repeated here, or the ticket's column read for it now, the first bad row named
         by the field and the row."""

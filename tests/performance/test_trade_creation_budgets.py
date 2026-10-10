@@ -221,13 +221,13 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "choice": 4,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
         "_Fields.has": 18,  # the required fields, the code the first period field found, and
-        # since #NN the counterparty's condition and the marketing reserve looked for
+        # since #175 the counterparty's condition and the marketing reserve looked for
         "_Fields.rows": 10,
         "_Fields.texts": 5,  # the three row fields' columns read once each, the codes apart
         "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #172
         "_Fields.period_dates": 2,  # the two dates, none supplied by this ticket
         "_Fields.labels": 3,  # clearing_house, counterparty and broker; the IDs are read by ids
-        "_Fields.amounts": 1,  # the marketing reserve, None when neither supplies it, since #NN
+        "_Fields.amounts": 1,  # the marketing reserve, None when neither supplies it, since #175
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
@@ -1009,7 +1009,7 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
 
 # --- the marketing reserve, booking-fields-and-marketing-reserve.md ------------------------------
 # A ticket with a marketing column sums its amounts once per row, reported as reserved_occurrences
-# beside the components' brokerage and clearing; nothing else in the counter moves, since #NN.
+# beside the components' brokerage and clearing; nothing else in the counter moves, since #175.
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -1032,7 +1032,7 @@ def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
         "encoded_observations": rows,
         "encoded_slots": contracts,
         "reserved_components": rows,
-        "reserved_occurrences": rows,  # the rows' amounts summed once each, since #NN
+        "reserved_occurrences": rows,  # the rows' amounts summed once each, since #175
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,

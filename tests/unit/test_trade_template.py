@@ -187,7 +187,7 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
-        (  # since #NN: a marketing reserve is a finite amount of zero or more
+        (  # since #175: a marketing reserve is a finite amount of zero or more
             {"marketing_reserve": -5.0},
             "marketing_reserve is -5.0, expected a finite amount of zero or more",
         ),

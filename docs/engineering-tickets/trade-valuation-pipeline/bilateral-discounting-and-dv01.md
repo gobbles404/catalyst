@@ -471,7 +471,7 @@ the stack. The first PR is agreed as rename-only; remaining PR boundaries can be
 1. **Instrument rename only:** [rename `future` to `fixed_float`](rename-instrument-fixed-float.md), built in #174,
    migrating discovery, templates, help, tests and kept workbook callers. Preserve the
    entire current schema and numerical behavior; no new fields or bilateral valuation.
-2. **Representation additions:** the agreed counterparty and marketing-reserve fields, built in #NN,
+2. **Representation additions:** the agreed counterparty and marketing-reserve fields, built in #175,
    preserving static encoding and the stated reserve treatment.
 3. **Bilateral evaluation and risks:** settle the outstanding conventions and reader contract,
    add the optional curve argument and private rate-input arithmetic, complete valuation and

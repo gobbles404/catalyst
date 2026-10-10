@@ -3866,7 +3866,7 @@ def test_a_row_booking_half_a_period_or_none_fails_on_the_sheet_in_the_librarys_
 # 0 of Z26 at 25 cents, booking 15, 20, 25 and 5 of marketing: 65 USD once per row, the strip's two
 # components carrying its one amount, over 60 of brokerage and 24 of clearing; the same rows without
 # the column value the same and book nought. A bilateral template names its counterparty, kept per
-# row, and its batch is made and prepared and refused at evaluation as before; since #NN.
+# row, and its batch is made and prepared and refused at evaluation as before; since #175.
 MARKETING_HEADERS = (*ETE_HEADERS, "marketing_reserve")
 MARKETING_ROWS: list[list[object]] = [
     [1001.0, serial("2026-11-20"), "Z26", 2.0, "LOT", 25.0, "lastday", 15.0],

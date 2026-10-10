@@ -19,7 +19,7 @@ records the agreed fields, new counterparty and nonnegative marketing reserve, a
 agreed direct curve input at evaluation. Futures index/schedule names remain.
 The [rename-only ticket](rename-instrument-fixed-float.md) is complete on the reviewed
 prototype, and [counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) is built in
-#NN, awaiting review; then the private bilateral kernel and its evaluation/reporting integration. Older
+#175, awaiting review; then the private bilateral kernel and its evaluation/reporting integration. Older
 design passages below retain their historical wording; this update and the bilateral
 plan define the current delivery arc.
 
@@ -28,7 +28,7 @@ plan define the current delivery arc.
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
 | [Trade surface UAT notes](surface-uat-notes.md) | Implemented features and release-testing checklist, suggested order for pending engineering work, and the detailed owner decisions behind each item |
 | [Human readable index names](readable-index-names.md) | Required `display_name` at index creation, retained as descriptive text and exposed through index readback |
-| [Brokerage and clearing reserve totals](reserve-totals.md) | Implemented static cost totals read through `_ReportReserves`; marketing the optional manual amount since #NN |
+| [Brokerage and clearing reserve totals](reserve-totals.md) | Implemented static cost totals read through `_ReportReserves`; marketing the optional manual amount since #175 |
 | [Shift a date by a text offset](date-offset-utility.md) | Implemented in PR #171: explicit date plus signed `bd`, `cd` or `em`, optional holiday calendar, returning one date without valuation context |
 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | Implemented in PR #172: choose dates or code per row; complete dates take precedence, with blank and empty-text absence scoped to the three period fields |
 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | Implemented and reviewed in PR #173: explicit handle supplies BAL `as_of`; future periods start at their first day, expired periods fail, and users freeze booking dates by pasting values |
@@ -38,7 +38,7 @@ plan define the current delivery arc.
 | [Calendar driven Asian pricing references](calendar-driven-asian-references.md) | Generic daily reference resolution from the index schedule/calendar, separating averaging month and payment ownership from the futures supplying prices |
 | [Lot-delta reporting](lot-delta-reporting.md) | Engineering ticket for delta in an explicitly designated index-specific lot, preserving monetary valuation coefficients |
 | [Rename future to fixed_float](rename-instrument-fixed-float.md) | Implemented and reviewed in PR #174: catalog/caller cutover only, with unchanged fields, numerical results and work budgets |
-| [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | Implemented in PR #NN, awaiting review: bilateral counterparty attribution and optional static marketing cost on either route, summed once per original trade row and read through the existing reserve report |
+| [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | Implemented in PR #175, awaiting review: bilateral counterparty attribution and optional static marketing cost on either route, summed once per original trade row and read through the existing reserve report |
 | [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Agreed: optional curve at evaluation, as-of anchor, payment-date DFs, analytic signed DV01; both risk readers spill nominal_delta and delta with unchanged signatures. Measure added work; no new public rate preparation step |
 | [Golden harness plan](../ethane-golden-validation-harness.md) | Active plan for independent financial expectations and separately reviewed production snapshots |
 | [Contract survey](../../futures-trade-field-review.md) | Product facts and examples for checking coverage, not a second trade schema |

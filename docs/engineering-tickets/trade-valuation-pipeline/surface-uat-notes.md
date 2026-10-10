@@ -8,7 +8,7 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These twelve changes are implemented on the prototype stack through **PR #NN**, the last awaiting
+These twelve changes are implemented on the prototype stack through **PR #175**, the last awaiting
 review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -27,7 +27,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
 | 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), `92d49b3`; reviewed clean, full gate passed | Supply the valuation-date handle as the second helper input. Try mixed-case BAL, future/current months and an expired month. Both helpers reject expired BAL; paste dates as values before booking. The kept example gives 400 USD / 0.2 lots for helper and frozen dates, and 240 / 0.12 when deliberately rebooked from the later day. |
 | 11 / bilateral first slice | [Instrument rename to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), `29fe38f`; reviewed clean, full gate passed | Select `fixed_float` in catalog/template cells. Old `future` selectors fail normally. Check existing bookings retain the same fields, values and risks; actual futures index/schedule names stay unchanged. |
-| 12 / items 8 and 11 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Add `marketing_reserve` to a ticket or a template: `_ReportReserves` shows the amounts summed once per row, a strip once, a zero-quantity row in full, and value and risk do not move. Book a bilateral template with `counterparty` in place of `clearing_house`: the batch is made and read back per row, and evaluation still refuses. |
+| 12 / items 8 and 11 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | [#175](https://github.com/gobbles404/goosedove/pull/175), awaiting review | Add `marketing_reserve` to a ticket or a template: `_ReportReserves` shows the amounts summed once per row, a strip once, a zero-quantity row in full, and value and risk do not move. Book a bilateral template with `counterparty` in place of `clearing_house`: the batch is made and read back per row, and evaluation still refuses. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -331,7 +331,7 @@ refused. Agreed basis is a settlement-currency amount per trade row, counted onc
 for a strip, omitted as zero. Preserve the static creation-time total and existing result
 reader. The owner agreed the field is optional on either route. Present blank cells
 retain the existing refusal; use zero in a supplied column.
-Implemented in PR #NN, awaiting review: `marketing_reserve` on the `fixed_float`, booked once per
+Implemented in PR #175, awaiting review: `marketing_reserve` on the `fixed_float`, booked once per
 original row, the strip, duplicate and zero-quantity examples pinned, as
 [counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) specifies.
 
@@ -420,14 +420,14 @@ Owner reminder, 9 October: add `counterparty` to the instrument definition as pa
 the bilateral work, available through the normal template/ticket entry and retained
 on the resolved trade. Specified in
 [counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) and implemented in
-PR #NN, awaiting review: counterparty is required for bilateral and absent for cleared, a label
+PR #175, awaiting review: counterparty is required for bilateral and absent for cleared, a label
 kept per row and read back.
 
 PR #174, reviewed at `29fe38f` on 10 October, renamed the broad `future` instrument to
 `fixed_float`, with the existing cleared and bilateral route choices. The
 [consolidated 18-field inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
 preserves the 16 existing fields and adds counterparty and marketing reserve (item 8).
-Those representation choices are built in #NN. The subsequent agreed
+Those representation choices are built in #175. The subsequent agreed
 valuation path passes the current curve directly to evaluation, keeping it outside static
 trades so rate updates reuse trades and commodity fixing preparation. There is no new
 public preparation step in this arc.

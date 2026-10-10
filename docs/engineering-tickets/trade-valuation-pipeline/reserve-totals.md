@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [UAT item 8](surface-uat-notes.md#8-clearing-brokerage-and-marketing-reserves)
 
-**Since #NN:** `marketing_reserve` is a field of the `fixed_float`, booked once per ticket row, [booking-fields-and-marketing-reserve.md](booking-fields-and-marketing-reserve.md); the zero marketing below is this slice as built.
+**Since #175:** `marketing_reserve` is a field of the `fixed_float`, booked once per ticket row, [booking-fields-and-marketing-reserve.md](booking-fields-and-marketing-reserve.md); the zero marketing below is this slice as built.
 
 **Status:** Built in #170 on the prototype stack above #169, the page as a ticket; the
 [As built](#as-built-170) section at the end says what was built and what was not. Ready

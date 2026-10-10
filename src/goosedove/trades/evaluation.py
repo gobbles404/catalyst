@@ -44,7 +44,7 @@ class TradeResults:
     three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
     model is undiscounted, so a rate move changes nothing, a result of the model and not a
     placeholder. as_of is the history's valuation day. reserves, since #170, is the batch's
-    booked brokerage, clearing and since #NN marketing and their currency, the encoding's
+    booked brokerage, clearing and since #175 marketing and their currency, the encoding's
     record by reference, which no tick changes, _ReportReserves spills and the results
     readback shows once."""
 

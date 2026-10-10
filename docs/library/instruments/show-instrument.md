@@ -1,6 +1,6 @@
 # _ShowInstrument
 
-Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator. The instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md) renamed it `fixed_float`, its fields and rules unchanged. Two fields joined in #NN, `counterparty` and `marketing_reserve`, [booking-fields-and-marketing-reserve.md](../../engineering-tickets/trade-valuation-pipeline/booking-fields-and-marketing-reserve.md), the first booking slice of the bilateral arc.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator. The instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md) renamed it `fixed_float`, its fields and rules unchanged. Two fields joined in #175, `counterparty` and `marketing_reserve`, [booking-fields-and-marketing-reserve.md](../../engineering-tickets/trade-valuation-pipeline/booking-fields-and-marketing-reserve.md), the first booking slice of the bilateral arc.
 
 Shows one library-defined instrument schema with fields across columns and metadata down
 rows, including descriptions, requirements and defined options. This is the read-only counterpart of
@@ -57,7 +57,7 @@ argument of `_CreateTrades`, once for the batch, and every other fact arrives as
 or a ticket column, each from one source, a field supplied by both refused even to the same value.
 
 `quantity` is a signed whole count of `quantity_unit`, zero included since #146, a row kept
-ready for a deal, no exposure and no quantity-based reserve but, since #NN, any marketing reserve it
+ready for a deal, no exposure and no quantity-based reserve but, since #175, any marketing reserve it
 entered, and `quantity_unit` names one of the
 index's contract specifications exactly as the index spells it, the desk's word for a quantity of
 the index: `NYMEX NG` for the 10,000 MMBtu lot, `ICE PHH` for the 2,500 MMBtu lot, `MMBTU` where
@@ -88,7 +88,7 @@ accepted at creation and refused at evaluation until rates exist. `settlement_me
 `payment_time_lag` and `payment_holiday_calendar`, the lag counted strictly after each
 component's anchor on that calendar: on a futures index its last observation day, and on an
 IFERC index since #167 the month's last trading date, the index printing later. `clearing_house` is required with a cleared route
-and refused with a bilateral one, `counterparty` since #NN the reverse, required with a bilateral
+and refused with a bilateral one, `counterparty` since #175 the reverse, required with a bilateral
 route and refused with a cleared one, a label kept per row, and `broker` is a label; none is read
 for anything but the readback. `fixed_price` is the agreed price in the
 index's quote units, `trade_id` the source system's deal number since #168, a whole number of at
@@ -96,7 +96,7 @@ most 15 digits read back as a number, duplicates kept as separate trades,
 [numeric-trade-ids.md](../../engineering-tickets/trade-valuation-pipeline/numeric-trade-ids.md),
 `trade_date` the day the deal was struck.
 
-`marketing_reserve`, since #NN, is an optional amount in the index's settlement currency, a marketing
+`marketing_reserve`, since #175, is an optional amount in the index's settlement currency, a marketing
 cost booked once per ticket row whatever its months, quantity, days or sign: the template's one value
 booked once by every row or the ticket's column, finite and zero or more, a negative amount, NaN and
 the infinities refused naming the field and the first such row, a blank cell refused as any number's;
@@ -183,9 +183,9 @@ this generic schema reader for now.
 | future_month | Use contract_code with explicitly supported syntax |
 | quantity, quantity_unit, fixed_price | Use fixed_price for the agreed price; quantity basis is explicit and applies per monthly component |
 | broker | Retain optional attribution as in the user's ticket; no pricing effect inferred |
-| counterparty, marketer | `counterparty` built in #NN: required with a bilateral route, refused with a cleared one, a label kept per row and read for nothing else; marketer is no field |
+| counterparty, marketer | `counterparty` built in #175: required with a bilateral route, refused with a cleared one, a label kept per row and read for nothing else; marketer is no field |
 | clearing_house | Distinguish the clearing house from a clearing firm/account; agree whether selected specifications supply or constrain it |
-| marketing_reserve | Built in #NN: an amount in the settlement currency per ticket row, zero or more, counted once whatever the strip, quantity or days, reporting-only through `_ReportReserves`; omitted, zero |
+| marketing_reserve | Built in #175: an amount in the settlement currency per ticket row, zero or more, counted once whatever the strip, quantity or days, reporting-only through `_ReportReserves`; omitted, zero |
 | trade_date, contract_specification | Add the missing executed date and unambiguous specification selection; since #145 the selection is `quantity_unit`'s, a name among the index's specifications, and there is no separate field |
 | schedule_method, quantity_per | Retain these field names; library-defined methods, all four built, and the month and calday quantity bases, both built since #159; exact and cfd outside v1 |
 | settlement_method | Retain physical/financial identification; physical-delivery handling is outside v1 and does not set payment dates |
@@ -208,17 +208,17 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| the fixed_float's eighteen fields in order, `counterparty` and `marketing_reserve` since #NN, which are required, the conditions, the period fields' three among them since #161 and their words since #172, the three alone letting a cell go unsupplied, the types and the codes | example |
+| the fixed_float's eighteen fields in order, `counterparty` and `marketing_reserve` since #175, which are required, the conditions, the period fields' three among them since #161 and their words since #172, the three alone letting a cell go unsupplied, the types and the codes | example |
 | a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
 | the name matched exactly, `Future`, ` fixed_float` and `future`, the name until #174, refused naming `fixed_float`, an empty catalog saying so, two instruments both named | example |
-| seven rows and nineteen columns since #NN, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
+| seven rows and nineteen columns since #175, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
 | the page's table equals the spill, cell for cell | example against the page |
 | through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 133 for the fixed_float since #NN, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, and two columns more since #NN, 115 cells of text, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
-| the labels, the fields, two booleans, a condition and a type in a real Excel, the two new fields' names, condition and rule since #NN; another case and a blank refused | Excel smoke |
+| twelve functions, the classification once per cell, 133 for the fixed_float since #175, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, and two columns more since #175, 115 cells of text, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
+| the labels, the fields, two booleans, a condition and a type in a real Excel, the two new fields' names, condition and rule since #175; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which
 the mixed way out carries and the seam's table builder, columns of one kind, could not build:

@@ -378,9 +378,9 @@ def trades_table(obj: Trades) -> MixedArray:
     # own method, unit and basis and the batch's route and settlement on every row, since a
     # reader of one row should see the whole deal and the template need not have supplied them,
     # then what the encoding made of the terms. trade_id, a number since #168,
-    # clearing_house, since #NN counterparty, and broker where the batch has them; quantity_unit
+    # clearing_house, since #175 counterparty, and broker where the batch has them; quantity_unit
     # the specification's name as the index spells it; the payment lag and the day it gives for a
-    # financial settlement; since #NN marketing_reserve where the batch has it, the amount the
+    # financial settlement; since #175 marketing_reserve where the batch has it, the amount the
     # row booked shown on each of its components, the one amount and no allocation among them,
     # so a reader never sums the column down a strip;
     # then what the resolution derived, since #172 entered_contract_code, the code text the row

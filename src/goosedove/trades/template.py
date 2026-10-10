@@ -188,7 +188,7 @@ def trade_id_of(where: str, number: float) -> int:
 
 def marketing_reserve_of(where: str, number: float) -> float:
     """A marketing reserve by the reserves' rule, finite and zero or more, named by its field,
-    since #NN: the one amount a template holds, read once here and booked once by every row of
+    since #175: the one amount a template holds, read once here and booked once by every row of
     a batch made under it."""
     marketing_reserves(np.array([number]), lambda _: where)
     return number
@@ -208,7 +208,7 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 # The readers by field name: the text fields whose text means something beyond being text, and
 # the four numbers the library has a rule for, the trade ID since #168 and the marketing
-# reserve since #NN; the three labels and the dates are read by nobody, and since #172 neither
+# reserve since #175; the three labels and the dates are read by nobody, and since #172 neither
 # is a contract code, which the resolution reads for the rows that book by it, a row with both
 # dates keeping it as entered text.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(

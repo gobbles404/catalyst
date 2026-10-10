@@ -82,7 +82,7 @@ class Encoded:
     else: no calendar day without an observation, and a payment day moves nothing.
 
     Then reserves, since #170, the batch's booked brokerage and clearing, each component's
-    count of its specification times the specification's rate per lot, summed, since #NN the
+    count of its specification times the specification's rate per lot, summed, since #175 the
     marketing reserve the rows booked, summed once per row, and their currency, the Reserves
     record, static for the batch and entering no number
     here; _ReportReserves spills the totals and the results readback shows them once."""
@@ -183,7 +183,7 @@ def encoded(
     its two days are named, since a payment before the last settle exists would have nothing to
     pay. The fees of the specification are read once, since #170, for the reserves, each
     component's count times its specification's two rates per lot and the batch's two sums,
-    and since #NN the rows' marketing reserves summed once each, kept beside the encoding and
+    and since #175 the rows' marketing reserves summed once each, kept beside the encoding and
     never a contribution to value,
     docs/library/trades/report-reserves.md.
 

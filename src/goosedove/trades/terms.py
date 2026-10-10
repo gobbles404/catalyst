@@ -114,10 +114,10 @@ class ResolvedTrades:
     among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
     trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source system's
     whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
-    organization, counterparty[i] since #NN the counterparty it faces and broker[i] its broker,
+    organization, counterparty[i] since #175 the counterparty it faces and broker[i] its broker,
     the IDs an array and the three labels tuples, each None as a whole when the field was not
     given, each kept as given and read for nothing but a message's words; marketing_reserve[i]
-    since #NN the marketing cost the row booked once, a finite amount of zero or more in the
+    since #175 the marketing cost the row booked once, a finite amount of zero or more in the
     settlement currency, None as a whole when neither the template nor the ticket supplied it,
     read by the reserves alone. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
@@ -572,7 +572,7 @@ def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> N
 def marketing_reserves(
     amounts: NDArray[np.float64], where: Callable[[int], str]
 ) -> NDArray[np.float64]:
-    """Each marketing reserve a finite amount of zero or more, since #NN, the first that is not
+    """Each marketing reserve a finite amount of zero or more, since #175, the first that is not
     refused in the caller's words, a negative amount, NaN and the infinities alike; the amounts
     handed back for the record, the one rule a template's value and a ticket's column share."""
     bad = ~(np.isfinite(amounts) & (amounts >= 0.0))

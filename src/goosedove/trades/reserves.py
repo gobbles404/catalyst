@@ -1,6 +1,6 @@
 """The batch's booked reserves: the brokerage and the clearing each component incurs, its count of
 its specification times that specification's rate per lot, summed for the batch once, when the
-batch is made, since #NN the marketing reserve each row booked, summed once per row, zero when
+batch is made, since #175 the marketing reserve each row booked, summed once per row, zero when
 no row booked one, and the currency they are in. Static booked amounts in the settlement
 currency: a fixing, a payment, a tick or a roll of the valuation
 date changes none of them, and they enter no mark, cash, delta or DV01.
@@ -14,7 +14,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.terms import ResolvedTrades
 
 RESERVED_COMPONENTS = "reserved_components"  # components whose brokerage and clearing were booked
-RESERVED_OCCURRENCES = "reserved_occurrences"  # rows whose marketing reserve was summed, since #NN
+RESERVED_OCCURRENCES = "reserved_occurrences"  # rows whose marketing reserve was summed, since #175
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class Reserves:
     specifications hold them, costs per count of the row: a row named BBL with a lot size of one
     charges per barrel and a row named LOT of a thousand barrels per thousand, no lot size,
     coefficient or quote unit scaling either, and a buy and a sell that net to nothing both
-    reserve. marketing, since #NN, is the sum over the ticket's rows of the marketing_reserve
+    reserve. marketing, since #175, is the sum over the ticket's rows of the marketing_reserve
     each entered, the template's one value for every row or the ticket's column, counted once
     per row whatever its months, quantity, days or sign, a duplicate row twice and a row of
     zero quantity its full amount; 0.0 when neither supplied the field. currency is the index's
@@ -52,7 +52,7 @@ def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
     total is finite, else refused for the batch, since amounts each finite can sum past the
     largest number, and nothing is published that a reader would then fail on; the
     multiplications and the sums run with numpy's flags down, the rules being the judge. The
-    amounts are not kept: the totals are what the batch books. The marketing reserve, since #NN,
+    amounts are not kept: the totals are what the batch books. The marketing reserve, since #175,
     is the rows' amounts summed once, each finite and zero or more by the rule that read them,
     over the occurrences and never the components, so a strip books its amount once; the sum is
     held finite the same way, refused for the batch when finite amounts sum past the largest
