@@ -30,6 +30,7 @@ from goosedove.index_definitions.contract_codes import (
     next_contract,
 )
 from goosedove.index_definitions.contract_specifications import ContractSpecifications
+from goosedove.index_definitions.date_offsets import shift_date
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
@@ -665,3 +666,22 @@ def util_EndDate(
     """Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for
     W29 and the last day of the right label of F26-Z28; of its balance, the same last day."""
     return Date(end_date(period, reference_date))
+
+
+@excel_function
+def util_ShiftDate(
+    date: Annotated[Date, "The day to shift, such as A2 or DATE(2026,10,9)."],
+    offset: Annotated[
+        str,
+        "The shift as text: a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or "
+        "+0em, typed or in a cell such as B2.",
+    ],
+    holiday_calendar: Annotated[
+        Handle[HolidayCalendar] | None,
+        "The holiday-calendar handle whose holidays business days skip, such as C2; left out for "
+        "Monday to Friday with no holidays.",
+    ] = None,
+) -> Date:
+    """Shifts a date by business days, calendar days or month ends, +1bd the next business day,
+    -1bd the one before, +7cd a week on, +0em the month's last day, and shows the date."""
+    return Date(shift_date(date, offset, holiday_calendar))

@@ -3,12 +3,12 @@
 [Pipeline overview](README.md) · [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md)
 
 Running list started 8 October 2026 while testing the trade prototype in Excel.
-Status and suggested handoff order updated **10 October 2026**. Item numbers are stable
+Status and suggested handoff order updated **10 October 2026**, item 9 built the same day. Item numbers are stable
 references to the detailed notes below; the pending-work order is a recommendation.
 
 ## Implemented and reviewed: release testing
 
-These seven items are implemented on the prototype stack through **PR #170 at `716a236`**.
+These eight items are implemented on the prototype stack through **PR #NN**, stacked on #170 at `716a236`.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
 these additions. This is an implementation checklist, not confirmation of release contents.
@@ -21,6 +21,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 4 / item 10 | [IFERC basis futures](iferc-basis-futures.md) | [#167](https://github.com/gobbles404/goosedove/pull/167), `9117a39`; payment-help finding closed | Book a Waha/HSC-style basis future with `lastday` and `+3bd`. Verify payment from last trading, fixing from publication, and the live -> fixed-unpaid -> cash progression. The synthetic 1-lot Waha example marks $500 at -0.30 against -0.50, then $750 at a -0.20 fixing, then $750 cash on payment. |
 | 5 / item 2 | [Numeric trade IDs](numeric-trade-ids.md) | [#168](https://github.com/gobbles404/goosedove/pull/168), `d1633d7`; reviewed clean | Enter numeric IDs, including a 15-digit value and a repeated ID. Read back numeric values; duplicates keep both trade occurrences. Fractional values and text IDs fail. |
 | 6 / item 6 | [Readable index names](readable-index-names.md) | [#169](https://github.com/gobbles404/goosedove/pull/169), `3c10318`; workbook-selector corrections verified in the #170 review | Supply required `display_name` after `name` in `_CreateIndex`. Inspect the description beside the existing name; price-vector matching and handle labels still use `name`. |
+| 8 / item 9 | [Shift a date by a text offset](date-offset-utility.md) | #NN | `=util_ShiftDate(DATE(2026,10,9),"+1bd")` shows 12-Oct-2026 once formatted; with a holiday calendar closed on the 12th, `"+1bd"` shows the 13th; try `"-1bd"` from a Sunday, `"+7cd"`, `"+0em"`, `"+1em"` from 31-Jan-2028, `"1bd"` without its sign and a blank where the calendar should be. |
 | 7 / item 8 | [Reserve totals](reserve-totals.md) | [#170](https://github.com/gobbles404/goosedove/pull/170), `716a236`; reviewed clean | `_ReportReserves(results)` reports gross brokerage and clearing costs, zero marketing and currency. The ticket example gives 50 / 20 / 0 / USD, unchanged by a tick, fixing or payment. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
@@ -37,15 +38,15 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / item 9 | [Date-offset utility](date-offset-utility.md): signed `bd`, `cd`, `em`, optional holiday calendar | Ready for engineering; selected next small handoff. Explicit date in, one date out, no implicit valuation context. Existing trade payment-lag rules remain unchanged. |
+| 1 / item 9 | [Date-offset utility](date-offset-utility.md): signed `bd`, `cd`, `em`, optional holiday calendar | Built in #NN, moved to release testing above. Explicit date in, one date out, no implicit valuation context. Existing trade payment-lag rules remain unchanged. |
 | 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Independent of the offset utility and BAL-context decision; it can support dates already supplied explicitly. |
 | 3 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. Align that connection and the rule for a reference before the period. |
 | 4 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. This arc is independent of the date utilities. |
 
-Readable index names and reserve totals have moved to release testing above. The remaining
-order favors the smallest specified change first, not code dependencies. Bilateral's
-remaining economic choices still need alignment; marketing reserves follow bilateral.
-These four UAT items remain unimplemented. Detailed decisions and examples follow.
+Readable index names, reserve totals and the date-offset utility have moved to release testing
+above. The remaining order favors the smallest specified change first, not code dependencies.
+Bilateral's remaining economic choices still need alignment; marketing reserves follow bilateral.
+Three UAT items remain unimplemented. Detailed decisions and examples follow.
 
 ## 1. Delta reporting
 
@@ -312,6 +313,8 @@ Do not infer missing rates. The ticket pins strips, calendar-day quantities, equ
 entry units, finite amounts and unchanged reserves across ticks and payment dates.
 
 ## 9. Date offsets from text
+
+Built in #NN; the ticket page's [As built](date-offset-utility.md#as-built) says what landed.
 
 Not implemented. The [date-offset utility ticket](date-offset-utility.md) is ready for
 engineering and selected as the next small handoff after PR #170.

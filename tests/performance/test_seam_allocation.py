@@ -535,6 +535,29 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
     assert bridge.live_handles() == live
 
 
+# A shifted date makes one day, by one numpy offset or two conversions, then pays the seam's way
+# out for a date: within twice the slack for one business day and for two million, for the sheet's
+# calendar of days end to end and for ninety thousand month ends alike, since nothing is made per
+# day shifted; nothing is published.
+@pytest.mark.parametrize(
+    ("date", "offset"),
+    [
+        (46304.0, "+1bd"),
+        (46304.0, "+2000000bd"),
+        (61.0, "+2958404cd"),
+        (46304.0, "-7cd"),
+        (46304.0, "+0em"),
+        (46304.0, "+90000em"),
+    ],
+)
+def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
+    date: float, offset: str
+) -> None:
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["util_ShiftDate"](date, offset, MISSING)) <= 2 * SLACK
+    assert bridge.live_handles() == live
+
+
 # A period's first or last day makes two months and one day, then pays the seam's way out for a
 # date: measured 1,264 bytes on 2026-10-02 for one month and for the whole century alike, which
 # twice the slack covers; the balance of one, since #160, adds its reference date's check and the

@@ -2,9 +2,10 @@
 
 [Pipeline overview](README.md) · [UAT item 9](surface-uat-notes.md#9-date-offsets-from-text)
 
-**Status:** Ready for engineering, 10 October 2026. One focused PR after the reviewed
-prototype PR #170 at `716a236`. This is the next small UAT slice; it is independent
-of the unresolved BAL valuation-context and mixed period-entry decisions.
+**Status:** Built in #NN, one focused PR stacked on the reviewed prototype PR #170 at
+`716a236`, the page as it was agreed on 10 October 2026 with the section at the end saying
+what landed. It is independent of the unresolved BAL valuation-context and mixed
+period-entry decisions.
 
 ## Outcome and worksheet contract
 
@@ -137,3 +138,33 @@ No BAL parsing changes, implicit `as_of`, date-or-text union, mixed ticket-perio
 custom weekends, intraday offsets, compound instructions, monthly date clamping or
 month-end business-day adjustment are included. The helper can be composed in Excel
 with explicit start/end dates; it does not change how a trade obtains its booked dates.
+
+## As built
+
+Built in #NN. The page is [shift-date.md](../../library/utilities/shift-date.md). The library
+helper is `shift_date(date, offset, holidays)` in `src/goosedove/index_definitions/date_offsets.py`,
+beside the period grammar: one full match of a sign, ASCII digits and two letters, the suffix
+looked up among `bd`, `cd` and `em` in either case, the digits counted before the count is read,
+more than seven significant digits refused by their digits, since the sheet's calendar is seven
+digits of days, business days or month ends end to end; then one `np.busday_offset` with
+`roll="backward"` for a positive count and `"forward"` for a negative one and no roll for zero,
+one `np.timedelta64` of days, or the month moved by the count and one and taken as a day less one;
+the day made held to the sheet's two days, which moved from `trades/template.py` to
+`index_definitions/sheet_days.py`, the template and the resolution reading them there with no
+ledger moved. A calendar left out is an empty holiday array to numpy, which takes no absence of
+one. The wrapper `util_ShiftDate` in `excel/utilities.py` declares the seam's `Date`, a required
+text and `Handle[HolidayCalendar] | None`, the first utility with a handle it may leave out;
+nothing new at the seam, nothing published, the help within its limit.
+
+Pinned: the sixteen worked answers, in the library, through the seam, on the smoke's sheet with
+the synthetic calendar in PA2, in the host's rows and its fact on a calendar of its own, and in
+the kept workbook's rows 1884 to 1905; a nonleap February, offsets across the holiday and back,
+mixed-case suffixes, the signed zeros of each suffix on a closed day, leading zeros; the sheet's
+first and last days reached from each other and a day past either, by a day, a business day or
+a month, refused naming the date and the offset; eight and five thousand digits refused by their
+digits and seven read; nineteen texts that are no offset, an Arabic-Indic digit among them; the
+round trip of business days from an open day as a property, the month end's month and the
+calendar days' arithmetic likewise; the calendar refused blank, dead or of another kind whatever
+the offset; the same calls and the same numpy for one day and for two million, within twice the
+slack, nothing published. The payment lag's grammar, the trade creators' ledgers and the kept
+goldens are unchanged.

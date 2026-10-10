@@ -317,6 +317,69 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
     }
 
 
+# A date shifted by an offset: the date checked as a number and as a date and the offset as text,
+# the calendar handle resolved once where one is given, the library's one reading, its one numpy
+# offset for business days, dispatched in C and unseen, or its two conversions for a month end, and
+# the seam's way out for a date. The same calls and the same numpy for one day and for two million,
+# for a week and for the sheet's calendar end to end, for one month end and for ninety thousand:
+# nothing here is one iteration or one allocated day per day shifted.
+@pytest.mark.parametrize(
+    ("date", "offset", "with_calendar", "library", "astype"),
+    [
+        (46304.0, "+1bd", False, {"_business_days_on": 1}, {}),
+        (46304.0, "+2000000bd", False, {"_business_days_on": 1}, {}),
+        (46304.0, "-1bd", True, {"_business_days_on": 1}, {}),
+        (46304.0, "+7cd", False, {}, {}),
+        (61.0, "+2958404cd", False, {}, {}),
+        (46304.0, "+0em", True, {}, {"generic.astype": 2}),
+        (46304.0, "+90000em", False, {}, {"generic.astype": 2}),
+    ],
+    ids=[
+        "one business day",
+        "two million business days",
+        "a business day back, a calendar given",
+        "a week",
+        "the calendar end to end",
+        "the month's end, a calendar given",
+        "ninety thousand month ends",
+    ],
+)
+def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    date: float,
+    offset: str,
+    with_calendar: bool,
+    library: dict[str, int],
+    astype: dict[str, int],
+) -> None:
+    calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46307.0]]))
+    third = calendar if with_calendar else bridge.MISSING
+    PATH["util_ShiftDate"](date, offset, third)
+    assert call_profile(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,  # the date, the offset and the calendar, given or left out
+        "_number": 1,
+        "_date": 1,
+        "_text": 2 if with_calendar else 1,  # the offset, and the handle's text
+        **({"_resolve": 1} if with_calendar else {}),
+        "util_ShiftDate": 1,
+        "shift_date": 1,
+        **library,
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
+        **astype,  # the month to its first day, twice, for a month end
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
 # The balance of a period: the reference checked as a number and as a date, the label read under
 # its prefix, and the reference held inside the period, which needs the last day as well as the
 # first, one conversion more than the ordinary reading; nothing grows with the period.

@@ -200,6 +200,29 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelEmpty.Value }, "#ERROR util_StartDate: reference_date is blank, expected date" };
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", "15-Dec-2026" }, "#ERROR util_StartDate: reference_date is text '15-Dec-2026', expected date" };
             yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46371.5 }, "#ERROR util_EndDate: reference_date is number 46371.5, expected date" };
+            // A date shifted by a text offset, the calendar left out: the ticket's table, Friday 9 October 2026 at 46304, the Saturday at 46305 and the Sunday at 46306; the month ends through a leap February; the library's words for no offset, a result past the sheet's calendar and a count of too many digits; the seam's for the date, the offset and a blank where the calendar should be, a blank being no omission.
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+1bd", ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46306.0, "-1bd", ExcelMissing.Value }, 46304.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd", ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", ExcelMissing.Value }, 46311.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-7cd", ExcelMissing.Value }, 46297.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+0em", ExcelMissing.Value }, 46326.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1em", ExcelMissing.Value }, 46356.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1em", ExcelMissing.Value }, 46295.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em", ExcelMissing.Value }, 46812.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46371.0, "+1em", ExcelMissing.Value }, 46418.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+001cD", ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+0em", ExcelMissing.Value }, 2958465.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em" };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+99999999cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { ExcelMissing.Value, "+1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: date is missing, expected date" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.5, "+1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: date is number 46304.5, expected date" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, ExcelEmpty.Value, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is blank, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, 1.0, ExcelMissing.Value }, "#ERROR util_ShiftDate: offset is number 1.0, expected text" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelEmpty.Value }, "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "x:holiday_calendar:9" }, "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
             yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'" };
             yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
@@ -914,6 +937,23 @@ namespace Goosedove.Host.Tests
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
+        // A date shifted on a calendar of the host's making: Monday 12 October 2026 closed, so Friday
+        // the 9th steps to Tuesday the 13th and the closed Monday back to the Friday; a zero count
+        // leaves the Saturday as it is, a week of calendar days reads no holiday, and a valuation
+        // date where the calendar should be is refused in the seam's words.
+        [Fact]
+        public void a_date_is_shifted_on_a_holiday_calendar_the_host_made()
+        {
+            var calendar = (string)Seam.Call("_CreateHolidayCalendar", 46307.0);
+            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1BD", calendar));
+            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46307.0, "-1bd", calendar));
+            Assert.Equal(46305.0, Seam.Call("util_ShiftDate", 46305.0, "+0bd", calendar));
+            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+7cd", calendar));
+            Assert.Equal(46326.0, Seam.Call("util_ShiftDate", 46304.0, "+0em", calendar));
+            var valuation = (string)Seam.Call("_CreateValuationDate", 46304.0, 0.5);
+            Assert.Equal("#ERROR util_ShiftDate: holiday_calendar is valuation date handle '" + valuation + "', expected holiday calendar handle", Seam.Call("util_ShiftDate", 46304.0, "+1bd", valuation));
+        }
+
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
         public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()

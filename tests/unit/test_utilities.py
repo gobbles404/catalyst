@@ -890,6 +890,104 @@ def test_the_balance_of_a_period_takes_its_reference_date_through_the_seam() -> 
                 )
 
 
+# --- a date shifted by a text offset ------------------------------------------------------------
+
+
+# The ticket's table through the seam: a serial and an instruction in, a serial out; the synthetic
+# calendar, Monday 12 October 2026 closed, where a row names it, and the seam's MISSING where the
+# calendar is left out. Nothing is published for a result.
+def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
+    live = bridge.live_handles()
+    synthetic = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-10-12")]])])
+    for date, offset, calendar, expected in (
+        ("2026-10-09", "+1bd", MISSING, "2026-10-12"),
+        ("2026-10-09", "+1BD", synthetic, "2026-10-13"),
+        ("2026-10-10", "+1bd", MISSING, "2026-10-12"),
+        ("2026-10-11", "-1bd", MISSING, "2026-10-09"),
+        ("2026-10-12", "+1bd", synthetic, "2026-10-13"),
+        ("2026-10-12", "-1bd", synthetic, "2026-10-09"),
+        ("2026-10-10", "+0bd", synthetic, "2026-10-10"),
+        ("2026-10-09", "+7cd", synthetic, "2026-10-16"),
+        ("2026-10-09", "-7cd", MISSING, "2026-10-02"),
+        ("2026-10-10", "-0cd", MISSING, "2026-10-10"),
+        ("2026-10-09", "+0em", synthetic, "2026-10-31"),
+        ("2026-10-09", "+1em", MISSING, "2026-11-30"),
+        ("2026-10-09", "-1em", MISSING, "2026-09-30"),
+        ("2028-01-31", "+1em", MISSING, "2028-02-29"),
+        ("2026-12-15", "+1em", MISSING, "2027-01-31"),
+        ("2026-10-09", "+001cD", MISSING, "2026-10-10"),
+        ("9999-12-31", "+0em", MISSING, "9999-12-31"),
+    ):
+        assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
+    shifted = bridge.call("util_ShiftDate", [serial("2026-10-09"), "+1bd", MISSING])
+    assert isinstance(shifted, float)
+    assert bridge.live_handles()[0] == live[0] + 1  # the calendar, and nothing of the shifts
+
+
+# The library's words through the seam: an instruction that is no offset, a result past the
+# sheet's calendar, and a count of too many digits, named by its digits and not echoed.
+def test_a_shift_the_library_refuses_is_refused_in_its_words_through_the_seam() -> None:
+    for offset in ("1bd", "+1.5bd", "+1wd", "+1bd+2cd", " +1bd"):
+        assert bridge.call("util_ShiftDate", [serial("2026-10-09"), offset, MISSING]) == (
+            f"#ERROR util_ShiftDate: ValueError: offset is {offset!r}, expected a sign, a whole "
+            "count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em"
+        )
+    assert bridge.call("util_ShiftDate", [serial("9999-12-31"), "+1cd", MISSING]) == (
+        "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, "
+        "outside the sheet's calendar, 1900-03-01 to 9999-12-31"
+    )
+    assert bridge.call("util_ShiftDate", [serial("1900-03-01"), "-1bd", MISSING]) == (
+        "#ERROR util_ShiftDate: ValueError: date 1900-03-01 shifted by '-1bd' is 1900-02-28, "
+        "outside the sheet's calendar, 1900-03-01 to 9999-12-31"
+    )
+    assert bridge.call(
+        "util_ShiftDate", [serial("2026-10-09"), "+" + "9" * 5000 + "cd", MISSING]
+    ) == (
+        "#ERROR util_ShiftDate: ValueError: offset has a count of 5000 digits, expected at most 7; "
+        "the sheet's calendar runs 1900-03-01 to 9999-12-31"
+    )
+
+
+# The seam's words: the date one date, the offset one text, the calendar left out or a holiday
+# calendar handle, a blank being no omission; checked whatever the offset, a zero or a calendar-day
+# one that reads no holiday included.
+def test_the_shifts_arguments_are_checked_by_the_seam_whatever_the_offset() -> None:
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        (46304.5, "is number 46304.5"),
+        ("x", "is text 'x'"),
+        (Cells.from_rows([[46304.0], [46305.0]]), "is 2x1 array"),
+    ):
+        assert bridge.call("util_ShiftDate", [wrong, "+1bd", MISSING]) == (
+            f"#ERROR util_ShiftDate: date {what}, expected date"
+        )
+    for wrong, what in (
+        (MISSING, "is missing"),
+        (None, "is blank"),
+        ("", "is empty text"),
+        (1.0, "is number 1.0"),
+    ):
+        assert bridge.call("util_ShiftDate", [serial("2026-10-09"), wrong, MISSING]) == (
+            f"#ERROR util_ShiftDate: offset {what}, expected text"
+        )
+    valuation = bridge.call("_CreateValuationDate", [serial("2026-10-09"), 0.5])
+    for offset in ("+1bd", "+0bd", "+7cd", "+0em"):
+        assert bridge.call("util_ShiftDate", [serial("2026-10-09"), offset, None]) == (
+            "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle"
+        )
+        assert bridge.call(
+            "util_ShiftDate", [serial("2026-10-09"), offset, "x:holiday_calendar:9"]
+        ) == (
+            "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no "
+            "live object, expected holiday calendar handle"
+        )
+        assert bridge.call("util_ShiftDate", [serial("2026-10-09"), offset, valuation]) == (
+            f"#ERROR util_ShiftDate: holiday_calendar is valuation date handle {valuation!r}, "
+            "expected holiday calendar handle"
+        )
+
+
 # --- what does not resolve fails in the seam's words, and spills nothing -------
 
 

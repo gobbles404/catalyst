@@ -158,6 +158,28 @@ def test_the_two_period_functions_explain_themselves() -> None:
     assert arguments == [("period", line), ("[reference_date]", reference)]
 
 
+def test_the_date_shift_explains_itself() -> None:
+    description, arguments, hidden = SPECS["util_ShiftDate"]
+    assert not hidden
+    assert description == (
+        "Shifts a date by business days, calendar days or month ends, +1bd the next business day, "
+        "-1bd the one before, +7cd a week on, +0em the month's last day, and shows the date."
+    )
+    assert arguments == [
+        ("date", "The day to shift, such as A2 or DATE(2026,10,9)."),
+        (
+            "offset",
+            "The shift as text: a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd "
+            "or +0em, typed or in a cell such as B2.",
+        ),
+        (
+            "[holiday_calendar]",
+            "The holiday-calendar handle whose holidays business days skip, such as C2; left out "
+            "for Monday to Friday with no holidays.",
+        ),
+    ]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden

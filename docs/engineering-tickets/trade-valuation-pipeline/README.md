@@ -16,7 +16,7 @@ Surface any proposed change to an agreed boundary or economic meaning for design
 |---|---|
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
 | [Trade surface UAT notes](surface-uat-notes.md) | Running observations and owner decisions from Excel UAT, including delta in lots, trade identifiers, date-helper inputs, ticket period precedence, readable index names and results readback ordering |
-| [Shift a date by a text offset](date-offset-utility.md) | `util_ShiftDate(date, offset, [holiday_calendar])`: an explicit date plus a signed `bd`, `cd` or `em` count, an optional holiday calendar, one date out and no valuation context; UAT item 9, the page as a ticket |
+| [Shift a date by a text offset](date-offset-utility.md) | `util_ShiftDate(date, offset, [holiday_calendar])`: an explicit date plus a signed `bd`, `cd` or `em` count, an optional holiday calendar, one date out and no valuation context; UAT item 9, built in #NN |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on its evaluated results and read through `_ReportReserves`, marketing zero until after bilateral; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |
