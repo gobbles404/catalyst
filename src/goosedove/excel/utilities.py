@@ -378,8 +378,11 @@ def trades_table(obj: Trades) -> MixedArray:
     # own method, unit and basis and the batch's route and settlement on every row, since a
     # reader of one row should see the whole deal and the template need not have supplied them,
     # then what the encoding made of the terms. trade_id, a number since #168,
-    # clearing_house and broker where the batch has them; quantity_unit the specification's name
-    # as the index spells it; the payment lag and the day it gives for a financial settlement;
+    # clearing_house, since #NN counterparty, and broker where the batch has them; quantity_unit
+    # the specification's name as the index spells it; the payment lag and the day it gives for a
+    # financial settlement; since #NN marketing_reserve where the batch has it, the amount the
+    # row booked shown on each of its components, the one amount and no allocation among them,
+    # so a reader never sums the column down a strip;
     # then what the resolution derived, since #172 entered_contract_code, the code text the row
     # entered as typed, kept apart from the contract its components resolved to under
     # contract_code, and the words `(not supplied)` where the row entered none and booked by
@@ -420,6 +423,7 @@ def trades_table(obj: Trades) -> MixedArray:
     text("route", (terms.route.value,) * n)
     text("settlement_method", (terms.settlement.value,) * n)
     labels("clearing_house", terms.clearing_house)
+    labels("counterparty", terms.counterparty)
     labels("broker", terms.broker)
     numbers("quantity", "float64", terms.quantity)
     text(
@@ -432,6 +436,8 @@ def trades_table(obj: Trades) -> MixedArray:
         lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
         text("payment_time_lag", tuple(lags[rows]))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
+    if terms.marketing_reserve is not None:  # the row's one amount on each of its components
+        numbers("marketing_reserve", "float64", terms.marketing_reserve[rows])
     entered = np.full(obj.code_entered.size, NOT_SUPPLIED, dtype=object)
     entered[obj.code_entered] = np.array(obj.entered_codes, dtype=object)
     text("entered_contract_code", tuple(entered[rows]))

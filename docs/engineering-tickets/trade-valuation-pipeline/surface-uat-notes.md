@@ -8,8 +8,8 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These eleven items are implemented on the prototype stack through **PR #174**, the last two
-awaiting review.
+These twelve changes are implemented on the prototype stack through **PR #NN**, the last awaiting
+review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
 these additions. This is an implementation checklist, not confirmation of release contents.
@@ -25,16 +25,17 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 7 / item 8 | [Reserve totals](reserve-totals.md) | [#170](https://github.com/gobbles404/goosedove/pull/170), `716a236`; reviewed clean | `_ReportReserves(results)` reports gross brokerage and clearing costs, zero marketing and currency. The ticket example gives 50 / 20 / 0 / USD, unchanged by a tick, fixing or payment. |
 | 8 / item 9 | [Date-offset utility](date-offset-utility.md) | [#171](https://github.com/gobbles404/goosedove/pull/171), `0803f6f`; both review findings closed | `util_ShiftDate(date, offset, [holiday_calendar])` returns one date. Try signed `bd`, `cd` and `em`, weekend anchors, a supplied holiday calendar and zero offsets. |
 | 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
-| 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
-| 11 / bilateral first slice | [Rename future to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), awaiting review | `_ListInstruments` lists `fixed_float`; `_ShowInstrument` and `_CreateTradeTemplate` take it and refuse `future` as an unknown name. Every existing example books, values and reports the same numbers under the new name. |
+| 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), `92d49b3`; reviewed clean, full gate passed | Supply the valuation-date handle as the second helper input. Try mixed-case BAL, future/current months and an expired month. Both helpers reject expired BAL; paste dates as values before booking. The kept example gives 400 USD / 0.2 lots for helper and frozen dates, and 240 / 0.12 when deliberately rebooked from the later day. |
+| 11 / bilateral first slice | [Instrument rename to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), `29fe38f`; reviewed clean, full gate passed | Select `fixed_float` in catalog/template cells. Old `future` selectors fail normally. Check existing bookings retain the same fields, values and risks; actual futures index/schedule names stay unchanged. |
+| 12 / items 8 and 11 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Add `marketing_reserve` to a ticket or a template: `_ReportReserves` shows the amounts summed once per row, a strip once, a zero-quantity row in full, and value and risk do not move. Book a bilateral template with `counterparty` in place of `clearing_house`: the batch is made and read back per row, and evaluation still refuses. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
 aggregation; IFERC exercises the distinct monthly fixing and payment dates. Existing
-case-insensitive BAL helpers are already available, using an explicit raw reference date.
-The valuation-date-handle input and future-period rule specified below are not implemented
-yet. Date passthrough is deferred. Mixed period entry is implemented in PR #172 and can
-consume explicitly supplied helper dates.
+case-insensitive BAL helpers now take an explicit valuation-date handle under PR #173,
+with future periods returning their full dates and expired periods refused. Raw-date
+second arguments must migrate to handles. Date passthrough remains deferred. Mixed
+period entry in PR #172 consumes the helper dates, pasted as values to freeze a booking.
 
 Run these through the normal create -> prepare -> evaluate -> report chain. Include one
 live-price tick reusing preparation and one history/as-of refresh replacing it; confirm
@@ -44,12 +45,15 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / items 11 and 8, and the remaining bilateral plan | [Bilateral representation, discounting and DV01](bilateral-discounting-and-dv01.md) | After the rename: counterparty required for bilateral/absent for cleared; nonnegative manual marketing reserve optional on either route; optional curve argument to evaluation, no extra public preparation step; retain nominal and discounted lot risks plus DV01 and measure added work. Curve-date policy, DV01 convention and reader layout remain open. |
+| 1 / bilateral calculation | [Private bilateral kernel](bilateral-discounting-and-dv01.md#delivery) | Payment-date factors anchored at as_of, unpaid NPV, nominal/discounted lot vectors and analytic signed DV01. Independent hand examples and measured work before public integration. |
+| 2 / bilateral integration | [Evaluation and risk reporting](bilateral-discounting-and-dv01.md#delivery) | Optional curve at evaluation, saved complete results and both nominal_delta/delta columns in scalar and time-bucket readers; DV01 in the scalar risk report. Excel/lifetime acceptance, then UAT. No extra preparation function or reader basis parameter. |
 
-Readable index names, reserve totals, date offsets, mixed period entry, the BAL date helpers and the instrument's rename have moved to release testing above. The remaining
-order favors the smallest specified change first, not code dependencies. Bilateral's
-remaining economic choices still need alignment; marketing reserves follow bilateral.
-This UAT item remains unimplemented. Detailed decisions and examples follow.
+Readable index names, reserve totals, date offsets, mixed period entry and BAL helper
+inputs have moved to release testing above. Bilateral is the remaining main arc; its
+curve-date, analytic DV01 and dual-column risk reporting are now agreed for implementation.
+The owner has brought optional
+manual marketing reserves into its representation work; existing brokerage and clearing
+totals remain implemented. Detailed decisions and examples follow.
 
 ## 1. Delta reporting
 
@@ -70,9 +74,11 @@ independent of which row a trade uses. Remaining Asian lot delta follows the liv
 observation weights. See [Report trade delta in index-defined lots](lot-delta-reporting.md)
 for the recommended selection mechanism, calculation and acceptance cases.
 
-The relationship to discounted monetary sensitivity remains a bilateral design choice.
-The pending bilateral ticket's report contract must incorporate that distinction before
-it is finalized.
+On 10 October the owner agreed to retain nominal lot delta, discounted lot delta and DV01
+as separate measures; the desk generally hedges to discounted delta. The bilateral reader
+contract now spills `nominal_delta` and `delta` together in scalar and day/month/year views,
+with unchanged signatures and no basis selector. Cleared columns are equal; bilateral
+`delta` is discounted. DV01 uses the agreed analytic sensitivity, not finite bumped P&L.
 
 ## 2. Trade identifiers
 
@@ -91,10 +97,10 @@ coercion, including zero and signed IDs.
 
 ## 3. Dates and period labels through the same helpers
 
-Implemented in PR #173 on 10 October 2026, awaiting review, with the full gate passing. The
-owner settled the valuation context and booking workflow on 10 October. The
-[BAL date-helper ticket](date-helper-inputs.md) supersedes the earlier raw-reference-date and
-date-passthrough proposal; its As built section records the pinned messages and the workbook rows.
+Implemented in PR #173 and reviewed clean at `92d49b3`, with the full gate passing on
+10 October. The [BAL date-helper ticket](date-helper-inputs.md) supersedes the earlier
+raw-reference-date and date-passthrough proposal. Independent boundary/handle probes
+and the kept workbook's migrated calls and frozen-date examples matched the agreement.
 
 Keep the function names and argument order; change the optional second input to the
 existing valuation-date handle:
@@ -313,9 +319,21 @@ These are static booked reserves. Fixings, payment dates, valuation-date rolls a
 ticks do not release or reduce them. This replaces the earlier proposal to expose the
 reserve summary directly from a trade handle; the user wants it on evaluated results.
 
-Keep all three categories in the output. Marketing is zero in this slice, without a
-placeholder in the template. Its inputs and calculation are explicitly deferred until
-after bilateral valuation, as a separate ticket.
+Keep all three categories in the output. Marketing is zero in the delivered #170 slice,
+without a placeholder in the template. **Owner steer, 10 October:** add an optional,
+manually entered marketing reserve while defining the bilateral booking fields. It is
+a one-time booked amount, with no release schedule or valuation/DV01 effect. This replaces
+the earlier plan to leave its definition until after bilateral valuation.
+
+The field is `marketing_reserve`, matching the existing report column. The owner confirmed
+positive-cost reporting like brokerage and clearing: finite amounts >= 0, negative values
+refused. Agreed basis is a settlement-currency amount per trade row, counted once even
+for a strip, omitted as zero. Preserve the static creation-time total and existing result
+reader. The owner agreed the field is optional on either route. Present blank cells
+retain the existing refusal; use zero in a supplied column.
+Implemented in PR #NN, awaiting review: `marketing_reserve` on the `fixed_float`, booked once per
+original row, the strip, duplicate and zero-quantity examples pinned, as
+[counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) specifies.
 
 Use positive cost amounts: absolute resolved component quantities multiplied by each
 entry specification's brokerage and clearing rates, then summed. The entry specification's
@@ -400,14 +418,16 @@ Gas Daily trades and bilateral valuation remain outside this slice.
 
 Owner reminder, 9 October: add `counterparty` to the instrument definition as part of
 the bilateral work, available through the normal template/ticket entry and retained
-on the resolved trade. Carry this into the [bilateral implementation ticket](bilateral-discounting-and-dv01.md).
-The owner subsequently agreed that counterparty is required for bilateral and absent
-for cleared; this records the agreed field, not an implemented change.
+on the resolved trade. Specified in
+[counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) and implemented in
+PR #NN, awaiting review: counterparty is required for bilateral and absent for cleared, a label
+kept per row and read back.
 
-On 10 October the owner agreed to rename the broad `future` instrument to `fixed_float`, with the
-existing cleared and bilateral route choices, built in #174 as the [rename-only first slice](rename-instrument-fixed-float.md),
-not another instrument or pricing path. The
+PR #174, reviewed at `29fe38f` on 10 October, renamed the broad `future` instrument to
+`fixed_float`, with the existing cleared and bilateral route choices. The
 [consolidated 18-field inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
-preserves the 16 existing fields and adds counterparty and marketing reserve (item 8). Those
-representation choices are now agreed. The current discount curve stays outside static trades and
-enters evaluation as an optional argument beside the market, with no extra public preparation step.
+preserves the 16 existing fields and adds counterparty and marketing reserve (item 8).
+Those representation choices are built in #NN. The subsequent agreed
+valuation path passes the current curve directly to evaluation, keeping it outside static
+trades so rate updates reuse trades and commodity fixing preparation. There is no new
+public preparation step in this arc.

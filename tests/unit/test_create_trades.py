@@ -1601,6 +1601,24 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             {**NG_TEMPLATE, "settlement_method": "financial", "payment_time_lag": "+1bd"},
             "payment_holiday_calendar is missing, expected it when settlement_method = financial",
         ),
+        (  # since #NN: a bilateral batch names its counterparty
+            NG_TICKET,
+            {
+                **{k: v for k, v in NG_TEMPLATE.items() if k != "clearing_house"},
+                "route": "bilateral",
+            },
+            "counterparty is missing, expected it when route = bilateral",
+        ),
+        (  # and a cleared one faces its clearing house, no counterparty
+            NG_TICKET,
+            {**NG_TEMPLATE, "counterparty": "ACME Trading"},
+            "counterparty is 'ACME Trading', expected none unless route = bilateral",
+        ),
+        (  # a marketing reserve is a finite amount of zero or more, the first bad row named
+            {**NG_TICKET, "marketing_reserve": [15.0, -5.0, 25.0, 5.0, 0.0]},
+            NG_TEMPLATE,
+            "marketing_reserve row 2 is -5.0, expected a finite amount of zero or more",
+        ),
         (
             {**NG_TICKET, "contract_code": ["Z26", "Z2026", "F27", "F27", "Z26"]},
             NG_TEMPLATE,
@@ -2151,8 +2169,9 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
 
 
 def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[str, Any]) -> None:
-    # The route and the settlement from the ticket's columns, the template holding neither: the
-    # spill is the one place both are read back.
+    # The route and the settlement from the ticket's columns, the template holding neither, and
+    # since #NN the counterparty the bilateral route requires: the spill is the one place all
+    # three are read back, the counterparty between the clearing house's place and the broker's.
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
         row("quantity_unit", "quantity_per", "schedule_method"),
@@ -2160,10 +2179,18 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     )
     handle = ENTRY["_CreateTrades"](
         sheet["index"],
-        row("trade_date", "contract_code", "quantity", "fixed_price", "route", "settlement_method"),
+        row(
+            "trade_date",
+            "contract_code",
+            "quantity",
+            "fixed_price",
+            "route",
+            "settlement_method",
+            "counterparty",
+        ),
         cells(
-            [46289.0, "Z26", 1.0, 3.0, "bilateral", "physical"],
-            [46289.0, "F27", 2.0, 3.0, "bilateral", "physical"],
+            [46289.0, "Z26", 1.0, 3.0, "bilateral", "physical", "ACME Trading"],
+            [46289.0, "F27", 2.0, 3.0, "bilateral", "physical", "Beta Energy"],
         ),
         template,
     )
@@ -2172,7 +2199,9 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     assert "trade_id" not in table[0] and "clearing_house" not in table[0]
     assert [line[4] for line in table[2:]] == ["bilateral", "bilateral"]
     assert [line[5] for line in table[2:]] == ["physical", "physical"]
-    assert [line[7] for line in table[2:]] == ["NYMEX NG", "NYMEX NG"]  # the unit, the template's
+    assert table[0][6] == "counterparty"
+    assert [line[6] for line in table[2:]] == ["ACME Trading", "Beta Energy"]  # each row its own
+    assert [line[8] for line in table[2:]] == ["NYMEX NG", "NYMEX NG"]  # the unit, the template's
 
 
 def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any]) -> None:

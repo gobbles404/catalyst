@@ -1022,7 +1022,7 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # --- the instrument catalog -------------------------------------------------------------------
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown fixed_float, seven rows by
-# seventeen columns since #161, 119 cells of which 103 are text, is laid out one cell at a time
+# nineteen columns since #NN, 133 cells of which 115 are text, is laid out one cell at a time
 # and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell, and 15,041
 # on 2026-10-10, about 126 a cell, when #172 lengthened the three period fields' texts to say what
 # a blank cell and a code beside dates mean. The peak follows the length of the texts, the rule
@@ -1034,7 +1034,7 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
-    cells = 7 * 17
+    cells = 7 * 19
     assert least_peak(lambda: ENTRY["_ShowInstrument"]("fixed_float")) <= 130 * cells + SLACK
     assert bridge.live_handles() == live
 

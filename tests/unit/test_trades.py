@@ -47,6 +47,7 @@ from goosedove.trades.terms import (
     Route,
     ScheduleMethod,
     Settlement,
+    marketing_reserves,
     named_trade,
     one_choice,
     resolved_trades,
@@ -5267,3 +5268,119 @@ def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -
         "the batch has inf of brokerage reserve in all, expected a finite amount of USD; the "
         "components' reserves, each finite, sum past the largest number"
     )
+
+
+# --- the marketing reserve, booking-fields-and-marketing-reserve.md ------------------------------
+# The ticket's four rows on the fee index, LOT each: 2 and -2 of Z26, 1 of the strip Z26-F27, two
+# components, and 0 of Z26, booking 15, 20, 25 and 5 of marketing: 65 USD, the strip's amount once
+# and the zero row's whole, over 60 of brokerage and 24 of clearing on the five components; since
+# #NN. The amounts are per occurrence and the sum runs over them, never the components.
+
+
+def marketed_terms(
+    ix: Index,
+    amounts: tuple[float, ...] | None,
+    occurrence: tuple[int, ...] = (0, 1, 2, 2, 3),
+    contract: tuple[int, ...] = (1, 1, 1, 2, 1),
+    quantities: tuple[float, ...] = (2.0, -2.0, 1.0, 1.0, 0.0),
+    trade_ids: tuple[int, ...] = (1001, 1002, 1003, 1004),
+) -> ResolvedTrades:
+    n = len(trade_ids)
+    return resolved_trades(
+        FIXED_FLOAT, ix, spec(n), Route.CLEARED, Settlement.PHYSICAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None, None,
+        dates(*["2026-09-24"] * n), rows(*occurrence), rows(*contract), numbers(*quantities),
+        *bounds_of(ix, rows(*contract)), numbers(*([70.0] * len(contract))), None,
+        marketing_reserve=None if amounts is None else numbers(*amounts),
+    )  # fmt: skip
+
+
+def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row() -> None:
+    ix = a_fee_index()
+    counter = WorkCounter()
+    terms = marketed_terms(ix, (15.0, 20.0, 25.0, 5.0))
+    np.testing.assert_array_equal(terms.marketing_reserve, [15.0, 20.0, 25.0, 5.0])
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    booked = enc.reserves
+    assert (booked.brokerage, booked.clearing, booked.marketing) == (60.0, 24.0, 65.0)
+    assert booked.currency == "USD"
+    assert counter.freeze()["reserved_occurrences"] == 4  # the rows, not the five components
+    assert counter.freeze()["reserved_components"] == 5
+    # The duplicate row counts again, a template's one amount books once per row, and no field at
+    # all books nought and sums nothing.
+    twice = marketed_terms(
+        ix,
+        (15.0, 20.0, 25.0, 5.0, 15.0),
+        occurrence=(0, 1, 2, 2, 3, 4),
+        contract=(1, 1, 1, 2, 1, 1),
+        quantities=(2.0, -2.0, 1.0, 1.0, 0.0, 2.0),
+        trade_ids=(1001, 1002, 1003, 1004, 1001),
+    )
+    assert encoded(twice, observed_of(twice), UNITS, WorkCounter()).reserves.marketing == 80.0
+    seven = marketed_terms(ix, (7.0, 7.0, 7.0, 7.0))
+    assert encoded(seven, observed_of(seven), UNITS, WorkCounter()).reserves.marketing == 28.0
+    plain = marketed_terms(ix, None)
+    quiet = WorkCounter()
+    nought = encoded(plain, observed_of(plain), UNITS, quiet).reserves
+    assert plain.marketing_reserve is None and nought.marketing == 0.0
+    assert (nought.brokerage, nought.clearing) == (60.0, 24.0)
+    assert "reserved_occurrences" not in quiet.freeze().as_dict()
+    # Value and risk are the same with the amounts and without: the reserves enter no number.
+    history = history_on(ix, "2026-10-20", {})
+    with_amounts = trade_results(
+        prepared_trades(enc, history, WorkCounter()),
+        quoted(history, 70.5, 71.0),
+        WorkCounter(),
+    )
+    without = trade_results(
+        prepared_trades(
+            encoded(plain, observed_of(plain), UNITS, WorkCounter()), history, WorkCounter()
+        ),
+        quoted(history, 70.5, 71.0),
+        WorkCounter(),
+    )
+    assert with_amounts.mark == without.mark and with_amounts.cash == without.cash
+    assert with_amounts.lot_delta_total == without.lot_delta_total
+    assert with_amounts.reserves is booked and with_amounts.reserves.marketing == 65.0
+
+
+def test_a_marketing_reserve_is_a_finite_amount_of_zero_or_more_the_first_bad_row_named() -> None:
+    def where(k: int) -> str:
+        return f"marketing_reserve row {k + 1}"
+
+    good = marketing_reserves(numbers(0.0, 0.5, 1e300), where)
+    np.testing.assert_array_equal(good, [0.0, 0.5, 1e300])
+    for bad, text in ((-5.0, "-5.0"), (np.inf, "inf"), (-np.inf, "-inf"), (np.nan, "nan")):
+        with pytest.raises(ValueError) as refused:
+            marketing_reserves(numbers(1.0, bad, -3.0), where)
+        assert str(refused.value) == (
+            f"marketing_reserve row 2 is {text}, expected a finite amount of zero or more"
+        )
+
+
+def test_finite_marketing_amounts_summing_past_the_largest_number_are_refused_for_the_batch() -> (
+    None
+):
+    ix = a_fee_index()
+    terms = marketed_terms(ix, (1e308, 1e308, 0.0, 0.0))
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "the batch has inf of marketing reserve in all, expected a finite amount of USD; the rows' "
+        "amounts, each finite, sum past the largest number"
+    )
+    # The terms take one amount per occurrence and one counterparty per occurrence, no more.
+    with pytest.raises(
+        ValueError, match=r"^marketing_reserve has 3 amounts, expected 4, one per occurrence$"
+    ):
+        marketed_terms(ix, (1.0, 2.0, 3.0))
+    with pytest.raises(
+        ValueError, match=r"^counterparty has 2 texts, expected 4, one per occurrence$"
+    ):
+        resolved_trades(
+            FIXED_FLOAT, ix, spec(4), Route.BILATERAL, Settlement.PHYSICAL,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1001, 1002, 1003, 1004),
+            None, None, dates(*["2026-09-24"] * 4), rows(0, 1, 2, 3), rows(1, 1, 1, 1),
+            numbers(2.0, -2.0, 1.0, 0.0), *bounds_of(ix, rows(1, 1, 1, 1)), numbers(*([70.0] * 4)),
+            None, counterparty=("ACME Trading", "Beta Energy"),
+        )  # fmt: skip

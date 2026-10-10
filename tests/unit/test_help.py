@@ -671,8 +671,8 @@ def test_the_two_reports_explain_themselves() -> None:
     assert not hidden and arguments == [results]
     assert description == (
         "Reports the batch's reserves from its results, as creation stored them: brokerage and "
-        "clearing, each trade's monthly quantity without its sign times its specification's "
-        "rates per lot, summed, marketing at zero until built, and their currency."
+        "clearing, each trade's quantity without its sign times its specification's rates per "
+        "lot, summed; marketing, the rows' amounts summed once each; and their currency."
     )
 
 

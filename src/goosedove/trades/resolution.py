@@ -51,6 +51,7 @@ from goosedove.trades.terms import (
     ResolvedTrades,
     Route,
     Settlement,
+    marketing_reserves,
     named_trade,
     reporting_lot_of,
     resolved_trades,
@@ -71,6 +72,7 @@ PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 # `route = cleared`; a field is present exactly when its condition holds.
 CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
     "clearing_house": ("route", Route.CLEARED),
+    "counterparty": ("route", Route.BILATERAL),  # since #NN
     "payment_time_lag": ("settlement_method", Settlement.FINANCIAL),
     "payment_holiday_calendar": ("settlement_method", Settlement.FINANCIAL),
 }
@@ -129,9 +131,13 @@ def resolved(
     with its row where the ticket supplied it, since the page promises a ticket's field its row,
     the unit, the method, the route, the settlement and the basis in that order. Each conditional
     field is present exactly when its
-    condition holds, a clearing house with a cleared route and the two payment fields with a
-    financial settlement, and absent otherwise, since a label for a clearing house a bilateral
-    trade has not, or a payment a physical contract never makes, would say something false. The
+    condition holds, a clearing house with a cleared route, since #NN a counterparty with a
+    bilateral one, and the two payment fields with a financial settlement, and absent otherwise,
+    since a label for a clearing house a bilateral trade has not, a counterparty a cleared trade
+    faces through its clearing house, or a payment a physical contract never makes, would say
+    something false. Since #NN a marketing reserve may stand in either, a finite amount of zero
+    or more per row, the template's one value booked once by every row or the ticket's column,
+    the first bad row named, and none at all when neither supplies the field. The
     trade IDs, since #168, are whole numbers of at most 15 digits, the template's one read when
     the template was made and the ticket's column read here, the first bad row named. The
     index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
@@ -251,6 +257,8 @@ def resolved(
         end,
         fields.numbers("fixed_price")[occurrence],
         payment,
+        counterparty=fields.labels("counterparty"),
+        marketing_reserve=fields.amounts("marketing_reserve"),
     )
     return terms, observations, periods.entered
 
@@ -342,6 +350,17 @@ class _Fields:
         if name in self.template.defaults:
             return np.full(self.rows, cast(int, self.template.defaults[name]), dtype=np.int64)
         return whole_trade_ids(self.ticket.numbers(name), lambda k: self.where(name, k))
+
+    def amounts(self, name: str) -> NDArray[np.float64] | None:
+        """The marketing reserves per occurrence, finite amounts of zero or more since #NN, or None
+        when neither supplied them: the template's one, read for the rule when the template was
+        made and repeated here, or the ticket's column read for it now, the first bad row named
+        by the field and the row."""
+        if not self.has(name):
+            return None
+        if name in self.template.defaults:
+            return np.full(self.rows, cast(float, self.template.defaults[name]))
+        return marketing_reserves(self.ticket.numbers(name), lambda k: self.where(name, k))
 
     def numbers(self, name: str) -> NDArray[np.float64]:
         if name in self.template.defaults:
