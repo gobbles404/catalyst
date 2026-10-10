@@ -4,7 +4,7 @@ from exactly one of the two, the required fields present and the conditional one
 their condition holds, one route and one settlement for the batch and a quantity unit, a method
 and a basis per row, in that order, each distinct text of the three read once, the quantity unit
 naming one of the index's specifications, every code of the index's
-schedule read for its month once, each row's period chosen row by row since #NN, its two dates
+schedule read for its month once, each row's period chosen row by row since #172, its two dates
 when both are supplied and its contract code otherwise, the code resolved by month to the
 schedule's rows or the dates split at month ends, every component
 with the days it covers, its method's observations made once over those days, and for a
@@ -61,7 +61,7 @@ from goosedove.trades.terms import (
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
 RESOLVED_COMPONENTS = "resolved_components"  # contract months resolved to schedule rows
 SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule read for their month
-# Distinct codes of the rows that book by code, read for their months, since #NN: a row that
+# Distinct codes of the rows that book by code, read for their months, since #172: a row that
 # books by its dates has its code, if any, read for nothing and counted here for nothing.
 TICKET_CODES_READ = "ticket_codes_read"
 PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
@@ -80,7 +80,7 @@ CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
 class Trades:
     """A batch of trades as _CreateTrades publishes it: the resolved terms and their encoding, the
     encoding holding the terms by reference as well, so each fact is kept once and the two
-    sections are read together or apart; and since #NN what each row entered for its
+    sections are read together or apart; and since #172 what each row entered for its
     contract_code, as the seam carries a field some rows leave unsupplied: code_entered, per
     occurrence whether the row entered one, from the ticket's cell or the template's value, and
     entered_codes, the texts of the rows that did, in row order, as typed, both owned and the
@@ -138,7 +138,7 @@ def resolved(
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
     every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
-    refused by row. Each row's period is its own since #NN, chosen from the three period fields
+    refused by row. Each row's period is its own since #172, chosen from the three period fields
     as the row holds them, the template's value or the ticket's cell: a blank or an empty cell
     supplies nothing, so a row holds a field exactly when a value stands in it. Both dates
     supplied, the row books the days between them, whatever code stands beside them, the code
@@ -182,7 +182,7 @@ def resolved(
     by the basis, the entered quantity times its covered days under calday.
 
     Work: one occurrence per ticket row, one component per contract month, one schedule code
-    per row of the schedule and since #NN one ticket code per distinct code of the rows that book
+    per row of the schedule and since #172 one ticket code per distinct code of the rows that book
     by code, none for a row that books by its dates, reported to the counter.
     """
     fields = _fields(template, ticket)
@@ -272,7 +272,7 @@ class _Fields:
 
     def has(self, name: str) -> bool:
         """Whether either names the field: the template owns every field its row named, a period
-        field whose cell held nothing included, since #NN, and the ticket every column."""
+        field whose cell held nothing included, since #172, and the ticket every column."""
         return name in self.template.names or self.ticket.has(name)
 
     def where(self, name: str, row: int) -> str:
@@ -283,7 +283,7 @@ class _Fields:
         return f"{name} row {row + 1}"
 
     def period_texts(self, name: str) -> tuple[NDArray[np.bool_], tuple[str, ...]]:
-        """A period field's texts and which rows supplied them, since #NN: the template's one
+        """A period field's texts and which rows supplied them, since #172: the template's one
         value on every row, or on none when its cell held nothing; the ticket's column over the
         rows whose cells held a value, in row order; or nothing from either."""
         if name in self.template.names:
@@ -398,7 +398,7 @@ def _the_required(fields: _Fields) -> None:
     """Every field the definition always requires, present in one of the two, in the definition's
     order; at the contract code's place some period field, a code or a date, named by either,
     since the code was the required field before the dates could stand in for it: which rows
-    hold which, and whether each holds a whole period, is the periods' own rule since #NN."""
+    hold which, and whether each holds a whole period, is the periods' own rule since #172."""
     for field in fields.template.instrument.fields:
         if field.name == "contract_code":
             if not any(fields.has(name) for name in PERIOD_FIELDS):
@@ -517,7 +517,7 @@ class _Periods:
 
 def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
     """Each occurrence's period chosen row by row and resolved to its components, one per
-    calendar month it covers, in one pass over the components, since #NN. A row with both dates
+    calendar month it covers, in one pass over the components, since #172. A row with both dates
     books the days between them, a code beside them kept as entered text and never read; a row
     with neither books its code; a row with one date and not the other, or with no code and no
     pair, is refused, the first such row from the top, once every row's three fields are known

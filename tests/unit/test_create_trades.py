@@ -131,7 +131,7 @@ def typed(definition: Instrument, name: str, values: list[object]) -> object:
 
 
 def a_ticket(columns: Mapping[str, list[object]], definition: Instrument = FUTURE) -> FieldValues:
-    """A ticket as the seam hands it over: each column typed by its field and, since #NN, a None
+    """A ticket as the seam hands it over: each column typed by its field and, since #172, a None
     among a column's values a cell the row left unsupplied, the column then holding the other
     rows' values with a mask saying which rows supplied one."""
     rows = len(next(iter(columns.values())))
@@ -222,9 +222,9 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         "resolved_components": 5,
         "resolved_occurrences": 5,
         "schedule_codes_read": 3,
-        "ticket_codes_read": 2,  # Z26 and F27, each distinct text once, since #NN
+        "ticket_codes_read": 2,  # Z26 and F27, each distinct text once, since #172
     }
-    # Since #NN the batch keeps what each row entered for its code, apart from the contracts.
+    # Since #172 the batch keeps what each row entered for its code, apart from the contracts.
     np.testing.assert_array_equal(batch.code_entered, [True] * 5)
     assert batch.entered_codes == ("Z26", "Z26", "F27", "F27", "Z26")
     assert not batch.code_entered.flags.writeable
@@ -1133,7 +1133,7 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
     )
 
 
-# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #NN ------------
+# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #172 ------------
 # Each row chooses its period: both dates supplied book the days between them, whatever code
 # stands beside them, the code kept as entered text and read for nothing; neither supplied, the
 # row books its code; one date without the other, or no code and no pair, is refused by the first
@@ -2139,7 +2139,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
     ]
     assert table[2] == first
     assert table[3][3] == "Z26"  # the schedule's spelling, where the ticket typed z26
-    assert table[3][12] == "z26"  # and the entered text as typed, since #NN
+    assert table[3][12] == "z26"  # and the entered text as typed, since #172
     assert table[6] == [5.0, *first[1:]]  # the repeated row, a trade of its own
     assert len(table) == 7
 
@@ -2306,7 +2306,7 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
     # The NG rows booked by dates, a whole December each: the spill shows the days under
     # start_date and end_date beside the code the resolution bound, `(not supplied)` under
     # entered_contract_code since the row entered none, and a part of a month under lastday is
-    # refused in the kernel's words; since #NN a code beside the dates is kept as entered text
+    # refused in the kernel's words; since #172 a code beside the dates is kept as entered text
     # while the dates book the period, whatever the code says.
     headers = row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
     table = spilled(

@@ -105,7 +105,7 @@ beside the function but chosen on the call, by the instrument another argument s
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| `FieldRow[S]`, after a `TextRow`, `S` the type of the one parameter that selects the instrument, `str` for its name or a class whose handle holds one | a body of one row whose headers are any of the instrument's fields, exactly spelled, in any order | `=_CreateTradeTemplate("future", A1:F1, A2:F2)` | a `FieldValues`: the instrument, the fields present in the sheet's order, each column typed by its field, a handle column as the objects the handles stood for, and since #NN, for a field whose definition lets a cell go unsupplied, `contract_code`, `start_date` and `end_date`, which rows supplied a value, a mask beside the values of those rows alone | a header unknown or given twice, a header count that is not the body's width, a body of more than one row, a cell that fails its field's type, named, a blank or an empty text among them for every field but the three, since #NN after the headers and in the field's own words, `trade_rows cell (2, 4) is blank, expected number`; a handle cell naming no live object or an object of another kind, named |
+| `FieldRow[S]`, after a `TextRow`, `S` the type of the one parameter that selects the instrument, `str` for its name or a class whose handle holds one | a body of one row whose headers are any of the instrument's fields, exactly spelled, in any order | `=_CreateTradeTemplate("future", A1:F1, A2:F2)` | a `FieldValues`: the instrument, the fields present in the sheet's order, each column typed by its field, a handle column as the objects the handles stood for, and since #172, for a field whose definition lets a cell go unsupplied, `contract_code`, `start_date` and `end_date`, which rows supplied a value, a mask beside the values of those rows alone | a header unknown or given twice, a header count that is not the body's width, a body of more than one row, a cell that fails its field's type, named, a blank or an empty text among them for every field but the three, since #172 after the headers and in the field's own words, `trade_rows cell (2, 4) is blank, expected number`; a handle cell naming no live object or an object of another kind, named |
 | `FieldRows[S]`, likewise | a body of one or more rows | `=_CreateTrades(I3, A4:E4, A5:E9, B3)` | the same, with a value per row in each column, and for the three period fields the rows that supplied one | the same, but for the row count |
 
 The schema of a table is declared beside the function:
@@ -253,7 +253,7 @@ present and each typed column by name. `EchoFieldRow` and `CountFieldRows` are t
 
 Decided 2026-10-10, a cell of a field that supplied nothing, by the owner, as the ticket
 [contract-codes-and-dates.md](../engineering-tickets/trade-valuation-pipeline/contract-codes-and-dates.md);
-built in #NN.
+built in #172.
 
 43. A blank cell and an exact empty text, a formula's `""` among them, mean that the row
 supplied no value, in a template's row and a ticket's rows alike, for exactly the fields whose

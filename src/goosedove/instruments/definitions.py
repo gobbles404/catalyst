@@ -28,7 +28,7 @@ class Field:
     what it means; whether it must always be present once the trade is resolved; the condition
     that makes it required when it is not always, or none; its type; its choices, or where they
     come from; its rule, what holds of its value beyond the type; and whether a cell of it may be
-    left unsupplied, a blank or an empty text meaning the row supplies no value, which since #NN
+    left unsupplied, a blank or an empty text meaning the row supplies no value, which since #172
     the three period fields allow and no other does: the seam reads the flag off the field a
     header identified and never guesses it from a cell's position."""
 

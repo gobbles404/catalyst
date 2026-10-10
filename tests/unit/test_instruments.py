@@ -81,7 +81,7 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
     assert by_name["start_date"].required_when == "no contract_code on the row, or with end_date"
     assert by_name["end_date"].required_when == "no contract_code on the row, or with start_date"
     assert by_name["end_date"].type is FieldType.DATE
-    # Since #NN the three period fields alone let a cell go unsupplied, a blank or an empty text
+    # Since #172 the three period fields alone let a cell go unsupplied, a blank or an empty text
     # meaning the row supplies no value; every other field's cell must hold one.
     assert [field.name for field in FUTURE.fields if field.may_be_unsupplied] == [
         "contract_code",

@@ -280,7 +280,7 @@ def test_a_zero_quantity_is_held_as_a_row_kept_ready() -> None:
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
 
 
-# --- the period fields, contract-codes-and-dates.md, since #NN ----------------------------------
+# --- the period fields, contract-codes-and-dates.md, since #172 ----------------------------------
 
 
 def test_a_period_cell_left_empty_is_owned_by_the_template_and_supplied_to_no_row() -> None:

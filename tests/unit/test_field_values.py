@@ -286,7 +286,7 @@ def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
     assert out == "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number"
 
 
-# --- cells left unsupplied in the three period fields, since #NN -------------------------------
+# --- cells left unsupplied in the three period fields, since #172 -------------------------------
 
 
 def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(

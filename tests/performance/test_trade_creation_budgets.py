@@ -168,7 +168,7 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
 
 
@@ -198,7 +198,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "reporting_lot_of": 2,  # the resolution's and then the kernel's: the lot delta counts in
         "schedule_months": 1,
         "month_and_year": 25,
-        "_the_periods": 1,  # each row's period chosen, since #NN, and resolved to its components
+        "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components
         "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
         "_schedule_rows": 1,
         "month_bounds": 1,  # the first and last day of each component's month
@@ -221,7 +221,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.has": 15,  # the required fields, the code the first period field found
         "_Fields.rows": 10,
         "_Fields.texts": 5,  # the three row fields' columns read once each, the codes apart
-        "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #NN
+        "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #172
         "_Fields.period_dates": 2,  # the two dates, none supplied by this ticket
         "_Fields.labels": 2,  # clearing_house and broker; the trade IDs are read by ids
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
@@ -258,7 +258,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
 # the quantity rule is one look, whole or not, since zero is a count, zero-quantities.md; and the
 # payment days are one look against the sheet's last day, 31 December 9999, since a later day
 # could reach no cell; and the distinct codes and the distinct lags are each sorted once by their
-# first rows, so that a refusal names the first bad row and not the first bad spelling. Since #NN
+# first rows, so that a refusal names the first bad row and not the first bad spelling. Since #172
 # each row chooses its period: three looks over the rows, half a pair or no period, an end before
 # its start among the dated rows and whether any component is a dated row's; four counts, each
 # row's place among the rows that supplied a start, an end, a code and both dates; the dated and
@@ -272,13 +272,13 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.all": 1,
         "ndarray.any": 23,  # three the selections in range, two the methods present, one the
         # basis, two each component's end on or after its start and in one month, three the
-        # periods' since #NN
+        # periods' since #172
         "ndarray.argsort": 12,  # two per distinct read, the texts and their first rows, five reads
         "ndarray.astype": 17,  # the month bounds four, the one-month look two, the days one, the
         # three row fields' positions among their distinct texts, the dated rows' months four
         "ndarray.clip": 1,
         "ndarray.cumsum": 11,  # one per distinct read within numpy's unique, five, two more, and
-        # the four ranks of the rows since #NN
+        # the four ranks of the rows since #172
         "ndarray.flatten": 7,  # one per unique, the five reads and the methods present, one more
         "ndarray.max": 1,
         "ndarray.min": 1,
@@ -351,7 +351,7 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
     assert call_profile(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_ledger(contracts),
@@ -395,7 +395,7 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
     assert call_profile(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_ledger(contracts),
@@ -449,7 +449,7 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
     assert call_profile(lambda: resolved(ASIAN_GAS, ticket, template, WorkCounter())) == {
         **resolution_ledger(contracts),
@@ -540,7 +540,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_text_row": 1,
         "_texts": 1,
         "_shape": 1,
-        "_field_rows": 1,  # the body as it arrived, since #NN, for the binding to read
+        "_field_rows": 1,  # the body as it arrived, since #172, for the binding to read
         "_field_cells": 1,
         "by_template": 1,  # the template selects the instrument
         "_bind_fields": 1,
@@ -601,7 +601,7 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "_shape": 2,  # the headers' row and, since the shape comes first, the values'
         "_one_row": 1,
         "_field_row": 1,  # one row, the template's shape before its cells, then the cells as they
-        "_field_cells": 1,  # arrived, since #NN, for the binding
+        "_field_cells": 1,  # arrived, since #172, for the binding
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
@@ -611,7 +611,7 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "_resolve": 1,  # the one handle cell
         "_CreateTradeTemplate": 1,
         "trade_template": 1,
-        "_holds": 8,  # whether the row supplied each field's value, since #NN
+        "_holds": 8,  # whether the row supplied each field's value, since #172
         "_value": 8,  # one per field
         "FieldValues.field": 8,
         "FieldValues.field.<locals>.<genexpr>": 16,
@@ -873,7 +873,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
     np.testing.assert_array_equal(np.bincount(terms.specification), [rows // 2, rows // 2])
     np.testing.assert_array_equal(np.bincount(terms.quantity_per), [rows // 2, rows // 2])
@@ -987,7 +987,7 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
-        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #NN
+        "ticket_codes_read": contracts,  # each distinct code of the rows, read once, since #172
     }
     by_distinct = {
         name: (count if name not in resolution_ledger(1) else resolution_ledger(contracts)[name])

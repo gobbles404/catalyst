@@ -3627,7 +3627,7 @@ def test_the_reserves_report_refuses_a_blank_and_another_handle_in_the_seams_wor
     )
 
 
-# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #NN ------------
+# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #172 ------------
 # The ticket's acceptance example: a synthetic financial asian index quoted in USD per BBL, a BBL
 # specification of one and a LOT of 1,000 BBL, the reporting lot; weekday pricing, no holiday that
 # matters; V26 expiring on Friday 30 October 2026, so that it prices every October pricing day,

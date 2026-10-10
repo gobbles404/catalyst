@@ -2236,7 +2236,7 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
 # The binding of a sheet's columns against the instrument another argument selects, through the
 # two probes. Rows of three fields, two of numbers and one of text: the arguments alone, the
 # name's rule and the body as it arrived, then the instrument looked up by name, then the binding,
-# since #NN the cells placed among the texts once, one count over the cells, then one look per
+# since #172 the cells placed among the texts once, one count over the cells, then one look per
 # column and nothing per row, the number columns views of the arrival and the text column its
 # cells taken at their places, with the code column's unsupplied cells looked for once, none here;
 # the same twenty calls across twenty functions and the same numpy at five rows and at 2,500. One
@@ -2314,7 +2314,7 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
-        "_field_body": 1,  # the cells placed among the texts once, since #NN
+        "_field_body": 1,  # the cells placed among the texts once, since #172
         "_field_texts": 1,  # the unit column, its cell taken at its place
         "_field_handles": 1,  # the handle column, its cell's text at its place too
         "_resolve": 1,  # one handle cell, one lookup

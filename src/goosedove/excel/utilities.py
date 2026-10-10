@@ -330,7 +330,7 @@ def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
     )
 
 
-# The words a readback shows where a row supplied no value, since #NN: display alone, never a
+# The words a readback shows where a row supplied no value, since #172: display alone, never a
 # value the library holds, takes or defaults to; a reader who pastes a spill back types nothing.
 NOT_SUPPLIED = "(not supplied)"
 
@@ -340,7 +340,7 @@ def trade_template_table(obj: TradeTemplate) -> MixedArray:
     # The instrument, then each field the template's row named, in the sheet's order, one row:
     # its default, a number, a day and text as they are, a holiday calendar as the words of its
     # kind, since the spill shows what the template holds and is no round trip of a handle; and
-    # since #NN the words `(not supplied)`, text, under a period field whose cell held nothing,
+    # since #172 the words `(not supplied)`, text, under a period field whose cell held nothing,
     # the header the template owns and the value it supplies to no row.
     headers: list[str] = ["instrument"]
     types: list[str] = ["str"]
@@ -380,7 +380,7 @@ def trades_table(obj: Trades) -> MixedArray:
     # then what the encoding made of the terms. trade_id, a number since #168,
     # clearing_house and broker where the batch has them; quantity_unit the specification's name
     # as the index spells it; the payment lag and the day it gives for a financial settlement;
-    # then what the resolution derived, since #NN entered_contract_code, the code text the row
+    # then what the resolution derived, since #172 entered_contract_code, the code text the row
     # entered as typed, kept apart from the contract its components resolved to under
     # contract_code, and the words `(not supplied)` where the row entered none and booked by
     # its dates, display and no value, then start_date and end_date, the days the component

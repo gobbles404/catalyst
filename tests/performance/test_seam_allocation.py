@@ -1022,11 +1022,11 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by
 # seventeen columns since #161, 119 cells of which 103 are text, is laid out one cell at a time
 # and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell, and 15,041
-# on 2026-10-10, about 126 a cell, when #NN lengthened the three period fields' texts to say what
+# on 2026-10-10, about 126 a cell, when #172 lengthened the three period fields' texts to say what
 # a blank cell and a code beside dates mean. The peak follows the length of the texts, the rule
 # texts above all, which #146 lengthened, #158 and #159 kept short and the two period fields add
 # two columns of; a text cell costs its string and its place in the joined text, so the pin says
-# so, 130 a cell and the slack, where 110 a cell and the slack covered the texts before #NN, and
+# so, 130 a cell and the slack, where 110 a cell and the slack covered the texts before #172, and
 # a hundred a cell and the slack covered fifteen columns, 11,411 bytes measured on 2026-10-07.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
@@ -1039,7 +1039,7 @@ def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() 
 
 # --- a row or rows of an instrument's fields --------------------------------------------------
 # Rows of three fields bound through CountFieldRows: the number columns are views of the arrival,
-# and since #NN the cells are placed among the texts once, one count of eight bytes a cell, 24 a
+# and since #172 the cells are placed among the texts once, one count of eight bytes a cell, 24 a
 # row over three columns, the texts an array of eight a text, and the code column's cells taken at
 # their places, an array and the tuple of eight a row each, beside the looks' masks over the rows:
 # measured 147,006 bytes at 2,500 rows on 2026-10-10, about 59 a row, where 3,837 bytes, one a row,
@@ -1078,7 +1078,7 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # day, which keep nothing per row, and 668,580 the same day with the three selections per row, the
 # unit, the method and the basis, 24 bytes retained a row and their distinct reads' temporaries,
 # about 267 a row, and 694,125 on 2026-10-10 with the rows that entered a code and their texts
-# kept since #NN, a byte and a reference a row, about 278 a row, which 280 a row and twice the
+# kept since #172, a byte and a reference a row, about 278 a row, which 280 a row and twice the
 # slack cover;
 # the ticket's own columns are the seam's views and cost nothing here. The expiries are rolled off
 # the index's two holidays, so

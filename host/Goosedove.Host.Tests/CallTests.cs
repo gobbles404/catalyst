@@ -461,7 +461,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("physical", spill[2, 6]);
             Assert.Equal("quantity_unit", spill[0, 9]);
             Assert.Equal("NYMEX NG", spill[2, 9]);
-            Assert.Equal("Z26", spill[2, 12]);  // the code as the ticket typed it, since #NN
+            Assert.Equal("Z26", spill[2, 12]);  // the code as the ticket typed it, since #172
             Assert.Equal("z26", spill[3, 12]);
             Assert.Equal(46357.0, spill[2, 13]);
             Assert.Equal(46387.0, spill[2, 14]);

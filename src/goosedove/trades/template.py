@@ -5,7 +5,7 @@ index, so one template serves every compatible index. It reads each value it hol
 intrinsic to its field, a code from its list, a lag of positive business days within the sheet's
 calendar, a whole quantity, zero included, a finite price, and leaves the rules that need the
 ticket or the index, which fields are required, whether the two overlap, the schedule, whether a
-contract code is the period of any row, to the resolution of a batch: since #NN a template's
+contract code is the period of any row, to the resolution of a batch: since #172 a template's
 contract_code is text the seam typed and nothing more until a row without dates uses it, and a
 period field's cell may hold nothing, the header then owning the field for every batch while no
 row takes a value from it. Those readers live here, since resolution reads the ticket's values
@@ -44,7 +44,7 @@ class TradeTemplate:
     the defaults by field name, in the same order: each the one value the row held, a number as
     a float, a date as a numpy day, text and a code as text, a holiday calendar as the object its
     handle stood for; owned, each being a scalar or an object the library already holds, and
-    read for nothing until a batch is resolved. Since #NN a name may stand with no default: a
+    read for nothing until a batch is resolved. Since #172 a name may stand with no default: a
     period field, contract_code, start_date or end_date, whose cell held nothing, which the
     template then supplies to no row, as its page says."""
 
@@ -82,7 +82,7 @@ def by_template(selector: TradeTemplate) -> Instrument:
 def _value(values: FieldValues, name: str) -> object:
     """The one value of a field in a one-row record, as the scalar its type names, read for the
     field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
-    date, a holiday calendar and since #NN a contract code mean what they are, the code read for
+    date, a holiday calendar and since #172 a contract code mean what they are, the code read for
     its months by the resolution, for the rows that book by it, and by nothing here."""
     field_type = values.field(name).type
     match field_type:
@@ -199,7 +199,7 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 # The readers by field name: the text fields whose text means something beyond being text, and
 # the three numbers the kernel has a rule for, the trade ID since #168; the two labels and the
-# dates are read by nobody, and since #NN neither is a contract code, which the resolution reads
+# dates are read by nobody, and since #172 neither is a contract code, which the resolution reads
 # for the rows that book by it, a row with both dates keeping it as entered text.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {

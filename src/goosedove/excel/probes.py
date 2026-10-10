@@ -165,7 +165,7 @@ def CountFieldRows(instrument: str, fields: TextRow, rows: FieldRows[str]) -> fl
 def _echoed(values: FieldValues) -> MixedArray:
     """The bound columns laid out under their field names, each as its type came through the
     seam, a date as its serial, a handle column as the words of each object's kind and, since
-    #NN, a cell of a field that supplied no value as the words `(not supplied)`: laid out cell by
+    #172, a cell of a field that supplied no value as the words `(not supplied)`: laid out cell by
     cell, since a column some rows left unsupplied holds a value on some rows and the words on
     the rest, which the table builder's columns of one kind could not hold."""
     columns: list[list[object]] = []

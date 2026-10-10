@@ -28,7 +28,7 @@ class FieldValues:
     order, each once, every one a field of the instrument; columns, by field name, each the
     seam's typed column, numbers as a float64 array, dates as a datetime64[D] array, text and
     codes as a tuple of text, and a handle field as a tuple of the objects the handles stood for,
-    one per row; and supplied, since #NN, by the name of each present field whose definition
+    one per row; and supplied, since #172, by the name of each present field whose definition
     lets a cell go unsupplied, a read-only mask over the rows, True where the row holds a value,
     the field's column then holding the values of those rows alone, in row order, so that a
     row's absence is a fact beside the values and never a sentinel among them. A field absent

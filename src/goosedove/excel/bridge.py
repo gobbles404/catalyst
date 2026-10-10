@@ -618,7 +618,7 @@ def _one_row(value: object) -> None:
 def _field_cells(value: object) -> Cells:
     """A body of field values as it arrived, nothing of its cells checked here: a range's kinds,
     numbers and texts, or one cell laid out as the range the host would have sent, a blank and an
-    empty text among what may arrive, since #NN. Whether a cell may hold nothing is its field's to
+    empty text among what may arrive, since #172. Whether a cell may hold nothing is its field's to
     say, and the field is known only once the headers are bound, so the binding refuses what each
     field refuses, column by column; a missing argument is refused here as every required
     argument is."""
@@ -872,7 +872,7 @@ class FieldsSchema:
 
 @dataclass(frozen=True, slots=True)
 class _FieldBody:
-    """One body of field values under binding, since #NN: its cells as they arrived, the
+    """One body of field values under binding, since #172: its cells as they arrived, the
     argument's name for messages, each cell's place among the body's texts, valid where the cell
     is text, which cells hold an empty text, and the texts as an array to take a column's from;
     the three made once over the whole body, so that a text column's cells are found at their own
@@ -920,7 +920,7 @@ def _field_bad(
     )
 
 
-# One rule per field type, since #NN over the rows a field's cells are checked on: every row for
+# One rule per field type, since #172 over the rows a field's cells are checked on: every row for
 # a field whose cells must hold a value, so that a blank or an empty text fails as its field's type
 # refuses it, a blank where a number is wanted named `blank, expected number`; the rows that
 # supplied a value for a field whose cells may go unsupplied, the rest being nothing to check. Each
@@ -1017,7 +1017,7 @@ def _bind_fields(
     column, left to right, the first bad cell named. A header matches a field name as typed,
     case and all, decision 2 of the review: `Quantity` is unknown where `quantity` is a field,
     and the message lists the instrument's fields; no field is required here, since a template
-    supplies a subset and the ticket the rest, which the creator checks. Since #NN the cells are
+    supplies a subset and the ticket the rest, which the creator checks. Since #172 the cells are
     checked after the headers and not before, because a blank or an empty text is a cell that
     supplied nothing where the header names a field whose definition allows that, the three
     period fields, and a cell that fails its field's type anywhere else: the permission comes

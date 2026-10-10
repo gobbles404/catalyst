@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [UAT item 4](surface-uat-notes.md#4-contract-codes-and-dates-on-one-ticket)
 
-**Status:** Built in #NN, one focused PR stacked on the reviewed prototype PR #171 at
+**Status:** Built in #172, one focused PR stacked on the reviewed prototype PR #171 at
 `0803f6f`, the page as agreed on 10 October 2026 with the section at the end saying what
 landed; this ticket does not decide how the stack lands on main.
 
@@ -194,7 +194,7 @@ new public signature or general relaxation of blank-cell handling belongs in thi
 
 ## As built
 
-Built in #NN. The pages are [create-trades.md](../../library/trades/create-trades.md),
+Built in #172. The pages are [create-trades.md](../../library/trades/create-trades.md),
 [trade-template.md](../../library/trades/trade-template.md), the Show page's three period
 cells, [read-handle.md](../../library/utilities/read-handle.md) and
 [inputs.md](../../seam/inputs.md) decision 43.
