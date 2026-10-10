@@ -20,7 +20,7 @@ Waha IFERC, the first four months of 2026, the newest month in the first row as 
 |---|---|---|---|---|---|---|
 | 1 | contract_code | price | contract_code | last_trading_date | publication_date | |
 | 2 | J26 | 1.60 | F26 | 31-Dec-2025 | 5-Jan-2026 | `=_CreateIfercSchedule(C2:C5, D2:D5, E2:E5)` shows `30512:iferc_schedule:51` |
-| 3 | H26 | 1.95 | G26 | 30-Jan-2026 | 2-Feb-2026 | `=_CreateIndex("Waha IFERC", F2, B10, B11)` shows `30512:index:Waha IFERC:52`, B10 and B11 holding the conventions and the specifications |
+| 3 | H26 | 1.95 | G26 | 30-Jan-2026 | 2-Feb-2026 | `=_CreateIndex("Waha IFERC", "Waha basis - Inside FERC monthly index", F2, B10, B11)` shows `30512:index:Waha IFERC:52`, B10 and B11 holding the conventions and the specifications |
 | 4 | G26 | 2.10 | H26 | 27-Feb-2026 | 2-Mar-2026 | |
 | 5 | F26 | 1.85 | J26 | 31-Mar-2026 | 1-Apr-2026 | |
 | 6 | `=_CreateIfercFixings(A2:A5, B2:B5, F3)` | shows `30512:iferc_fixings:Waha IFERC:53` | | | | |

@@ -20,7 +20,7 @@ def _CreateCalendar(
 | 3 | | | n26 | 22-Jun-2026 |
 | 4 | | | q26 | 21-Jul-2026 |
 | 5 | `=_CreateValuationDate(B1, 0.5)` | shows `30512:valuation_date:1` | `=_CreateFuturesSchedule(C2:C4, D2:D4)` | shows `30512:futures_schedule:4` |
-| 6 | `=_CreateHolidayCalendar(B2)` | shows `30512:holiday_calendar:7` | `=_CreateIndex("WTI NYMEX", D5, B15, B16, A6)` | shows `30512:index:WTI NYMEX:10`, B15 and B16 holding the conventions and the specifications |
+| 6 | `=_CreateHolidayCalendar(B2)` | shows `30512:holiday_calendar:7` | `=_CreateIndex("WTI NYMEX", "West Texas Intermediate crude oil - NYMEX", D5, B15, B16, A6)` | shows `30512:index:WTI NYMEX:10`, B15 and B16 holding the conventions and the specifications |
 | 7 | `=_CreateCalendar(A5, D6)` | shows `30512:calendar:WTI NYMEX:12`, the futures calendar | | |
 | 8 | `=_CreateCalendar(A5, B20)` | shows `30512:calendar:Henry Hub Gas Daily:13`, B20 holding a Gas Daily index | | |
 | 9 | `=_CreateCalendar(A5, B30)` | shows `30512:calendar:Henry Hub IFERC:14`, B30 holding an IFERC index | | |

@@ -3,21 +3,53 @@
 [Pipeline overview](README.md) · [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md)
 
 Running list started 8 October 2026 while testing the trade prototype in Excel.
-Record observations and decisions here before turning them into implementation tickets.
+Status and suggested handoff order updated **9 October 2026**. Item numbers are stable
+references to the detailed notes below; the pending-work order is a recommendation.
 
-| Item | Owner direction | Status |
+## Implemented and reviewed: release testing
+
+These five items are implemented on the prototype stack through **PR #168 at `d1633d7`**.
+Implementation and review do not imply a merge to main. For the planned **10 October release**,
+confirm the packaged build includes this revision or a reviewed successor before testing
+these additions. This is an implementation checklist, not confirmation of release contents.
+
+| Test order / UAT item | Implemented change | Reviewed PR | What to try in Excel |
+|---|---|---|---|
+| 1 / item 1 | [Delta in index-defined lots](lot-delta-reporting.md) | [#164](https://github.com/gobbles404/goosedove/pull/164), `414b6e0` | ETE `1 LOT`, `1000 BBL` and `42000 GAL` each report 1 live lot; all three together report 3. Check the index's reporting-lot selection and a partially fixed Asian. |
+| 2 / item 5 | [Calendar-driven Asian pricing references](calendar-driven-asian-references.md) | [#165](https://github.com/gobbles404/goosedove/pull/165), `f1f1b91` | Book a December crude Asian that spans the F27/G27 roll. Inspect both pricing references, then advance history across the roll and check remaining live risk. |
+| 3 / item 7 | [Delta by day, month and year](daily-risk-vector.md) | [#166](https://github.com/gobbles404/goosedove/pull/166), `df2bec9` | Use `_ReportDelta` with `day`, `month` and `year`. Mix Asian and pen trades with different payment dates: risk sums by observation date, each bucket view totals to `_ReportRisk`, and fixed dates retain zero rows. |
+| 4 / item 10 | [IFERC basis futures](iferc-basis-futures.md) | [#167](https://github.com/gobbles404/goosedove/pull/167), `9117a39`; payment-help finding closed | Book a Waha/HSC-style basis future with `lastday` and `+3bd`. Verify payment from last trading, fixing from publication, and the live -> fixed-unpaid -> cash progression. The synthetic 1-lot Waha example marks $500 at -0.30 against -0.50, then $750 at a -0.20 fixing, then $750 cash on payment. |
+| 5 / item 2 | [Numeric trade IDs](numeric-trade-ids.md) | [#168](https://github.com/gobbles404/goosedove/pull/168), `d1633d7`; reviewed clean | Enter numeric IDs, including a 15-digit value and a repeated ID. Read back numeric values; duplicates keep both trade occurrences. Fractional values and text IDs fail. |
+
+Test lot normalization before the newer risk views so unit mistakes do not obscure the
+results. The Asian roll then exercises reference mapping; the daily report checks its
+aggregation; IFERC exercises the distinct monthly fixing and payment dates. Existing
+case-insensitive BAL helpers are already available, using an explicit fixed booking reference.
+They do not yet include the date-passthrough or mixed period-entry requests below.
+
+Run these through the normal create -> prepare -> evaluate -> report chain. Include one
+live-price tick reusing preparation and one history/as-of refresh replacing it; confirm
+the sheet updates and the saved risk views remain consistent with the scalar reports.
+
+## Not implemented: suggested engineering order
+
+| Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Implemented in prototype PR #164; fixes reviewed at `414b6e0`; [design ticket](lot-delta-reporting.md) |
-| 2. `trade_id` | Accept whole-number IDs of at most 15 digits directly from Excel; retain integers and read back numeric cells. | Owner clarified integer IDs, 9 October; [engineering ticket](numeric-trade-ids.md); built in #168 |
-| 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
-| 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
-| 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Implemented in prototype PR #165; reviewed at `f1f1b91`; [design ticket](calendar-driven-asian-references.md) |
-| 6. Readable index names | Keep the existing short `name` and add a human-readable `display_name` on the index. | Agreed direction; implementation ticket pending |
-| 7. Delta by observation time | Retain day, month and year lot-delta vectors across methods and payment groups; select the bucket in `_ReportDelta`. | Implemented in prototype PR #166; reviewed at `df2bec9`; [design ticket](daily-risk-vector.md); quarters excluded |
-| 8. Reserve consumption | Aggregate booked brokerage, clearing and marketing reserves during evaluation; retain the batch totals in results for a pure reader. Marketing is zero where unsupported. | Agreed direction 9 October; implementation pending; marketing input where supported and detailed amount rules still need definition |
-| 9. Date offsets from text | `util_ShiftDate(date, offset, [holiday_calendar])` with signed `bd`, `cd` and `em` offsets. | Agreed direction 9 October; implementation ticket pending |
-| 10. IFERC trade support | Support cleared financial basis futures on a supplied IFERC basis index; use its monthly publication fixing and count payment lag from last trading. | Requested 9 October; [engineering ticket](iferc-basis-futures.md); built in #167; `lastday` meaning proposed explicitly |
-| 11. Bilateral counterparty | Add a `counterparty` field to the instrument definition when implementing bilateral trades. | Owner reminder, 9 October; included in the [bilateral ticket](bilateral-discounting-and-dv01.md); implementation pending |
+| 1 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. The earlier ticket needs alignment on that connection and the rule for a reference before the period. |
+| 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Follow the helper work for one coherent date-entry UAT pass; this is a UX sequence, not a hard code dependency. |
+| 3 / item 9 | [Date-offset utility](#9-date-offsets-from-text): signed `bd`, `cd`, `em`, optional holiday calendar | Direction is specified; focused ticket still needed. Independent of the preceding work and can proceed alongside it. It is not a prerequisite for existing trade payment lags. |
+| 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #NN. Required text immediately after `name`; stored on the index and exposed in readback only. |
+| 5 / item 8 | [Reserve totals](#8-clearing-brokerage-and-marketing-reserves): store brokerage, clearing and marketing totals on evaluated results, with a pure reader | Define marketing input/default and amount/sign/basis rules first. Preserve gross booked activity before exposure netting. Can ship before bilateral rates; it is not a rates dependency. |
+| 6 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. Plan the arc now; coding need not wait for the unrelated utility or name changes if this becomes the priority. |
+
+The owner selected readable index names as the immediate handoff while the date-helper
+interface is reconsidered. The numbered order above retains the earlier sequencing
+context; it is not a dependency order. Reserve and bilateral discussions can start now, but their
+remaining economic choices should be settled before those implementations start.
+
+The six pending UAT items remain pending until implemented and reviewed. The broader
+bilateral valuation plan is included in the last row to give item 11 its proper context;
+it is not an additional completed UAT feature. Detailed decisions and examples follow.
 
 ## 1. Delta reporting
 
@@ -46,19 +78,23 @@ it is finalized.
 
 The owner clarified on 9 October that the source system uses numeric IDs, superseding
 the earlier alphanumeric proposal, and confirmed whole numbers of at most 15 digits
-without meaningful leading zeros. Through reviewed prototype #167 at `9117a39`, the
-instrument still requires text for `trade_id` and refuses numeric Excel cells.
+without meaningful leading zeros. PR #168 at `d1633d7` implements numeric entry and
+readback and has been reviewed clean; the earlier text-only limitation is resolved.
 
 The owner also confirmed the field can be a whole integer. The
 [numeric trade IDs ticket](numeric-trade-ids.md) changes this field to numeric entry,
 integer retained identity and numeric readback, using existing seam support. It preserves
 optional omission, template/ticket disjointness, original-row attribution and duplicate
 occurrences. IDs remain attribution rather than an economic grouping or deduplication key.
-The ticket specifies finite whole values within the 15-digit range, without text coercion;
-built in #168, the ticket's [As built](numeric-trade-ids.md#as-built-168) section saying what
-landed.
+The implementation accepts finite whole values within the 15-digit range, without text
+coercion, including zero and signed IDs.
 
 ## 3. Dates and period labels through the same helpers
+
+Not implemented; revisit before handoff. The [date-helper inputs draft](date-helper-inputs.md)
+and the details below record the earlier explicit-reference proposal. The owner now wants
+one-argument BAL with a start of the later of `as_of` and the period's first day. How that
+helper selects an existing valuation date remains open; work has moved to readable names.
 
 Keep the existing worksheet call shapes:
 
@@ -180,21 +216,22 @@ implemented and reviewed in PR #165 without changing the creator signatures.
 
 ## 6. Human-readable index names
 
-Retain the index's existing `name` as the short label used by the current market and
-price-vector matching. Add a separate `display_name` supplied when creating the index,
-stored on the index and exposed alongside `name` through `util_ReadHandle`.
+Built in #NN; the [readable index names ticket](readable-index-names.md)'s
+[As built](readable-index-names.md#as-built-nn) section says what landed. Retain the index's existing `name` used by the current market and
+price-vector matching. Add required `display_name` text immediately after `name` in
+`_CreateIndex`, store it on the index and expose it immediately beside `name` through
+`util_ReadHandle`.
 
 | `name` | Illustrative `display_name` |
 |---|---|
 | `WTI` | West Texas Intermediate crude oil - NYMEX |
 | `NG` | Henry Hub natural gas - NYMEX |
 
-Readers or selectors can present both together so a user unfamiliar with another desk's
-shorthand can identify the market. This is descriptive metadata; pricing and binding
-continue to use the existing identifiers and object references. Do not infer conventions
-or product behavior from the display text, or rename the existing `name` field as part of
-this addition. Exact argument placement and whether the new value is required remain for
-the implementation ticket; no creator signature has changed in this note.
+This is descriptive text, supplied at creation and available for inspection. No new
+selector or report consumes it. Pricing and binding continue to use the existing names
+and object references; conventions and product behavior are not inferred from the text.
+Use the existing required-text validation and normal index recreation when inputs change.
+Migrate kept constructor calls, help and examples together with the field.
 
 ## 7. Observation dates appear out of order in the results readback
 
@@ -312,18 +349,22 @@ time, a month-end business-day adjustment, or a dependency on today's date.
 
 ## 10. IFERC market accepted but trade creation refused
 
-UAT reported: `index is an IFERC index, expected a futures index for a future`.
-In prototype `df2bec9`, `trades.terms.futures_schedule_of` deliberately refuses any
-index whose kind is not `FUTURES`. Trade resolution and the kernel use this boundary.
+Implemented in prototype PR #167 and reviewed through the payment-help fix at `9117a39`,
+with no outstanding review findings and the full gate passing. The PR remains open.
+The original UAT refusal and its resolution are recorded below.
 
-The library already supports an IFERC index, schedule, fixings, calendar and market.
-The trade path has not been extended to consume them. Its current observations and
-fixing lookup assume a daily futures calendar; an IFERC calendar instead has one row
+UAT reported: `index is an IFERC index, expected a futures index for a future`.
+In prototype `df2bec9`, `trades.terms.futures_schedule_of` deliberately refused any
+index whose kind was not `FUTURES`. Trade resolution and the kernel used this boundary.
+
+The library already supported an IFERC index, schedule, fixings, calendar and market.
+The trade path had not been extended to consume them. Its observations and
+fixing lookup assumed a daily futures calendar; an IFERC calendar instead has one row
 per contract month, dated by the index's publication date. The IFERC schedule retains
 last trading and publication dates separately.
 
-Changing the template's schedule method cannot remove this boundary. Removing the kind
-check alone does not connect monthly observations and fixing lookup to the trade kernel.
+Changing the template's schedule method could not remove this boundary. Removing the kind
+check alone would not connect monthly observations and fixing lookup to the trade kernel.
 
 Owner direction, 9 October: use the existing `future` instrument for ICE Waha/HSC basis
 futures on a single IFERC index. The index supplies the traded basis in both its live
@@ -333,12 +374,12 @@ the last trading date: template `payment_time_lag = +3bd` counts from that date 
 supplied payment holiday calendar. Publication date separately determines fixing state.
 
 The [IFERC basis futures ticket](iferc-basis-futures.md) contains the exchange evidence,
-mapping, payment/cash and lot-delta examples, and implementation acceptance. It proposes
-retaining required `lastday` for one monthly publication fixing on an IFERC index, while
-preserving expiry-day `lastday` on a futures index. That method wording is an explicit
-recommendation, not a new field or a change already implemented. The ticket includes
-full-month bullets/strips and existing quantity bases; partial months, other IFERC
-schedule methods, Gas Daily trades and bilateral rates are outside this slice.
+mapping, payment/cash and lot-delta examples, and acceptance. PR #167 implements required
+`lastday` for one monthly publication fixing on an IFERC index, while preserving expiry-day
+`lastday` on a futures index. It supports full-month bullets/strips and existing quantity
+bases, with the usual separate preparation and evaluation. The help now states each
+index kind's correct payment anchor. Partial months, other IFERC schedule methods,
+Gas Daily trades and bilateral valuation remain outside this slice.
 
 ## 11. Counterparty on bilateral trades
 
