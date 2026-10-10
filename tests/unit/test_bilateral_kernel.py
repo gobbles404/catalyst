@@ -297,13 +297,25 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
             given(settled.payment_factor), [1.0]
         )  # the policy, read for nothing
         np.testing.assert_array_equal(given(settled.npv_by_group), [0.0])
+        # The one slot, fixed, is weighted like any other, its lots nothing; the discounted
+        # vectors are floats of nothing, a sum over every slot and never numpy's integer zeros
+        # for a sum over none.
+        for array in (
+            settled.discounted_lot_delta,
+            settled.discounted_price_sensitivity,
+            settled.discounted_daily_lots,
+            settled.discounted_monthly_lots,
+            settled.discounted_yearly_lots,
+        ):
+            assert array.dtype == np.float64
+            np.testing.assert_array_equal(array, [0.0])
         assert counter.freeze().as_dict() == {
             "groups_valued": 0,
             "kernel": 1,
             "live_prices_read": 0,
             "payment_factors_read": 0,
             "risk_reductions": 4,
-            "slots_discounted": 0,
+            "slots_discounted": 1,
         }
 
 

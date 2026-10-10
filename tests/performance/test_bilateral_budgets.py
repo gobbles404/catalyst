@@ -1,15 +1,17 @@
 """What a bilateral batch costs, bilateral-calculation-kernel.md. The preparation maps the unpaid
 payment days once, for a bilateral batch alone: the counter's days mapped, the one helper beside the
 cleared preparation's functions, the unique's numpy over the cleared ledger, the mapping's bytes
-retained and its peak by unpaid group. The tick: the counter's unpaid groups, live slots, factors
-read and reductions; the same functions and numpy calls at five trades and at two thousand, no day
-sorted or counted; and the peak following the groups, the live slots and the time buckets, nothing
-per trade. The cleared preparation's and tick's ledgers are test_trade_budgets.py's and did not
-move. The fixtures are that module's gas indexes and history, valued on 10 March 2027, the batches
-bilateral and financial with a counterparty, the curve anchored on the valuation day and running to
-the end of 2028, past every payment: the lastday batches one slot a contract, the asian ones a month
-of pricing days each, two thousand trades over twenty-four contracts observing 519 days with 429 of
-them live, the long schedule whose day buckets the peak carries."""
+retained and its peak by unpaid group. The tick: the counter's unpaid groups, slots weighted,
+factors read and reductions; the same functions and numpy calls at five trades and at two thousand,
+no day sorted or counted; and the peak following the groups, the slots, the live slots and the time
+buckets, nothing per trade. The cleared preparation's and tick's ledgers are test_trade_budgets.py's
+and did not move. The fixtures are that module's gas indexes and history, the batches bilateral and
+financial with a counterparty, the curve anchored on the valuation day and running to the end of
+2028, past every payment: lastday batches of one slot a contract and asian ones of a month of
+pricing days each, valued on 10 March 2027, two thousand asian trades over twenty-four contracts
+observing 519 days with 429 of them live; and the same asian trades over twenty-three contracts
+valued on 10 October 2028, every one of their 497 days fixed and every group paid, the long strip
+whose sums are over no live slot at all."""
 
 import numpy as np
 import pytest
@@ -56,16 +58,25 @@ from goosedove.trades.terms import (
     resolved_trades,
 )
 
-CURVE = discount_curve(np.array([AS_OF, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9]))
+LATE = (
+    "2028-10-10"  # every contract through September 2028 fixed and paid; October's is the market's
+)
 
 
-def asian_live(contracts: int) -> int:
+def curve_on(as_of: str) -> DiscountCurve:
+    """A curve anchored on the valuation day, 1 there and 0.9 at the end of 2028."""
+    return discount_curve(
+        np.array([as_of, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9])
+    )
+
+
+def asian_live(contracts: int, as_of: str) -> int:
     """How many of an asian batch's slots are live on the valuation day, from the fixture's own
     dates: for each contract's month, the business days from the later of its first day and the
     valuation day, live on its own day, to its end, none for a month that ended before it."""
     months = MONTHS[1 : contracts + 1].astype("datetime64[D]")
     ends = (MONTHS[1 : contracts + 1] + np.timedelta64(1, "M")).astype("datetime64[D]")
-    starts = np.maximum(months, np.datetime64(AS_OF))
+    starts = np.maximum(months, np.datetime64(as_of))
     return int(np.busday_count(starts, ends, holidays=HOLIDAYS).clip(min=0).sum())
 
 
@@ -74,22 +85,26 @@ def slots_of(method: ScheduleMethod, contracts: int) -> int:
     return int(MONTH_DAYS[1 : contracts + 1].sum()) if method is ScheduleMethod.ASIAN else contracts
 
 
-# The method, components over contracts, then the live slots and the unpaid groups the valuation
-# day leaves, from the fixture's own dates: the five trades over November and December 2026 have all
-# fixed and paid by 10 March 2027 under either method; two thousand lastday trades over twenty-four
-# contracts leave twenty live slots and twenty unpaid groups, and two thousand asian ones 429 live
-# days over the same twenty groups, one payment day a contract.
+# The method, components over contracts and the valuation day, then the live slots and the unpaid
+# groups that day leaves, from the fixture's own dates: the five trades over November and December
+# 2026 have all fixed and paid by 10 March 2027 under either method; two thousand lastday trades
+# over twenty-four contracts leave twenty live slots and twenty unpaid groups, and two thousand
+# asian ones 429 live days over the same twenty groups, one payment day a contract; two thousand
+# asian trades over twenty-three contracts valued on 10 October 2028 leave nothing live and nothing
+# unpaid, 497 days fixed and 23 groups paid.
 CASES = [
-    (ScheduleMethod.LASTDAY, 5, 2, 0, 0),
-    (ScheduleMethod.LASTDAY, 2_000, 24, 20, 20),
-    (ScheduleMethod.ASIAN, 5, 2, 0, 0),
-    (ScheduleMethod.ASIAN, 2_000, 24, asian_live(24), 20),
+    (ScheduleMethod.LASTDAY, 5, 2, AS_OF, 0, 0),
+    (ScheduleMethod.LASTDAY, 2_000, 24, AS_OF, 20, 20),
+    (ScheduleMethod.ASIAN, 5, 2, AS_OF, 0, 0),
+    (ScheduleMethod.ASIAN, 2_000, 24, AS_OF, asian_live(24, AS_OF), 20),
+    (ScheduleMethod.ASIAN, 2_000, 23, LATE, 0, 0),
 ]
 IDS = [
     "five lastday trades, all paid",
     "two thousand lastday trades, twenty live",
     "five asian trades, all paid",
     "two thousand asian trades, 429 live days",
+    "two thousand asian trades over 497 days, all paid",
 ]
 
 
@@ -115,13 +130,15 @@ def bilateral_terms(components: int, contracts: int, method: ScheduleMethod) -> 
     )  # fmt: skip
 
 
-def a_bilateral_batch(components: int, contracts: int, method: ScheduleMethod) -> PreparedTrades:
+def a_bilateral_batch(
+    components: int, contracts: int, method: ScheduleMethod, as_of: str
+) -> PreparedTrades:
     terms = bilateral_terms(components, contracts, method)
     enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
-    return prepared_trades(enc, a_history(ix=terms.index), WorkCounter())
+    return prepared_trades(enc, a_history(as_of=as_of, ix=terms.index), WorkCounter())
 
 
-def tick(prep: PreparedTrades, market: Market, curve: DiscountCurve = CURVE) -> TradeResults:
+def tick(prep: PreparedTrades, market: Market, curve: DiscountCurve) -> TradeResults:
     return trade_results(prep, market, WorkCounter(), curve)
 
 
@@ -151,19 +168,22 @@ MAPPING_NUMPY = {
 }
 
 
-@pytest.mark.parametrize(("method", "components", "contracts", "live", "unpaid"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
 def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     call_profile: CallProfile,
     numpy_calls: CallProfile,
     method: ScheduleMethod,
     components: int,
     contracts: int,
+    as_of: str,
     live: int,
     unpaid: int,
 ) -> None:
     terms = bilateral_terms(components, contracts, method)
     enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
-    history = a_history(ix=terms.index)
+    history = a_history(as_of=as_of, ix=terms.index)
     counter = WorkCounter()
     prep = prepared_trades(enc, history, counter)
     slots = slots_of(method, contracts)
@@ -184,7 +204,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     np.testing.assert_array_equal(pays.days, np.sort(payment_date[unsettled]))
     np.testing.assert_array_equal(pays.days[pays.day_of_group], payment_date[unsettled])
     np.testing.assert_array_equal(
-        pays.tau, (payment_date[unsettled] - np.datetime64(AS_OF)).astype(np.int64) / 365.0
+        pays.tau, (payment_date[unsettled] - np.datetime64(as_of)).astype(np.int64) / 365.0
     )
     arrays = (pays.days, pays.groups, pays.day_of_group, pays.tau)
     assert all(not array.flags.writeable for array in arrays)
@@ -218,36 +238,42 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
 # --- the tick -----------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("method", "components", "contracts", "live", "unpaid"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
 def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
-    method: ScheduleMethod, components: int, contracts: int, live: int, unpaid: int
+    method: ScheduleMethod, components: int, contracts: int, as_of: str, live: int, unpaid: int
 ) -> None:
-    prep = a_bilateral_batch(components, contracts, method)
+    prep = a_bilateral_batch(components, contracts, method, as_of)
     counter = WorkCounter()
-    trade_results(prep, a_market(prep.history), counter, CURVE)
+    trade_results(prep, a_market(prep.history), counter, curve_on(as_of))
     assert counter.freeze().as_dict() == {
         "groups_valued": unpaid,
         "kernel": 1,
-        "live_prices_read": 20 if live else 0,  # one quote a live contract, whatever its days
+        "live_prices_read": prep.live_references.size,  # one quote a live contract
         "payment_factors_read": unpaid,  # one payment day a contract: a factor an unpaid group
         "risk_reductions": 4,  # the lots onto the references, the days, the months, the years
-        "slots_discounted": live,
+        "slots_discounted": slots_of(method, contracts),  # every slot, a fixed one by nothing
     }
 
 
-@pytest.mark.parametrize(("method", "components", "contracts", "live", "unpaid"), CASES, ids=IDS)
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
 def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     call_profile: CallProfile,
     numpy_calls: CallProfile,
     method: ScheduleMethod,
     components: int,
     contracts: int,
+    as_of: str,
     live: int,
     unpaid: int,
 ) -> None:
-    prep = a_bilateral_batch(components, contracts, method)
+    prep = a_bilateral_batch(components, contracts, method, as_of)
     quoted = a_market(prep.history)  # made before the ledger looks, as the market is on a sheet
-    assert call_profile(lambda: tick(prep, quoted)) == {
+    curve = curve_on(as_of)
+    assert call_profile(lambda: tick(prep, quoted, curve)) == {
         "trade_results": 1,
         "_the_curve": 1,  # the four rules, before any quote is read
         "DiscountCurve.start_date": 2,  # the rule's look and the factors' positions
@@ -263,8 +289,8 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     # amount, the NPVs, the DV01s and the discounted lots; the looks that hold the coverage, the
     # amounts, the discounted lots by reference, the sensitivity and the three views finite, with
     # the market's own; the bincounts' reductions among the rest; and the new arrays frozen, ten
-    # of them.
-    assert numpy_calls(lambda: tick(prep, quoted)) == {
+    # of them. The same with no slot live: the sums are over every slot and never over none.
+    assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
         "ndarray.any": 8,
         "ndarray.astype": 1,
         "ndarray.setflags": 10,
@@ -276,26 +302,32 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     }
 
 
-# The peak follows the payment groups, the live slots and the time buckets, the temporaries of the
-# discounted path, a dozen arrays over the groups, three over the live slots and the three views
-# over the days, the months and the years, within four slacks: measured 2,977 bytes for two groups
-# and no live slot, 5,061 for twenty-four groups and twenty live slots, 3,305 for two asian groups
-# over 43 days and 22,024 for twenty-four over 519 days with 429 live, on 2026-10-10, against 1,210,
-# 1,418, 1,210 and 10,960 for the cleared tick of the same batches. The retained arrays are exactly
-# the new vectors' bytes.
-@pytest.mark.parametrize(("method", "components", "contracts", "live", "unpaid"), CASES, ids=IDS)
-def test_a_bilateral_tick_allocates_by_group_live_slot_and_bucket_and_retains_its_vectors(
-    method: ScheduleMethod, components: int, contracts: int, live: int, unpaid: int
+# The peak follows the payment groups, the slots, the live slots and the time buckets: a dozen
+# arrays over the groups; the factor gathered onto every slot and the slot's lots, 16 bytes a slot;
+# the cleared tick's quote and contribution on a live slot and the bilateral path's live groups, 32
+# a live slot; and the three views over the days, the months and the years; within four slacks.
+# Measured 2,992 bytes for two groups and no live slot, 5,093 for twenty-four groups and twenty
+# live slots, 3,648 for two asian groups over 43 days, 22,808 for twenty-four over 519 days with 429
+# live and 15,203 for the fully paid strip of 497 days, on 2026-10-10, against 1,210, 1,418, 1,210,
+# 10,960 and 1,210 for the cleared tick of the same batches. The retained arrays are exactly the new
+# vectors' bytes, floats every one, the fully paid strip's as well.
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
+def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vectors(
+    method: ScheduleMethod, components: int, contracts: int, as_of: str, live: int, unpaid: int
 ) -> None:
-    prep = a_bilateral_batch(components, contracts, method)
+    prep = a_bilateral_batch(components, contracts, method, as_of)
     encoding = prep.encoded
     groups = encoding.group_contract.size
+    slots = encoding.slot_group.size
     buckets = encoding.days.size + encoding.months.size + encoding.years.size
     quoted = a_market(prep.history)
-    assert least_peak(lambda: tick(prep, quoted)) <= (
-        128 * groups + 48 * live + 8 * buckets + 4 * SLACK
+    curve = curve_on(as_of)
+    assert least_peak(lambda: tick(prep, quoted, curve)) <= (
+        128 * groups + 16 * slots + 32 * live + 8 * buckets + 4 * SLACK
     )
-    result = tick(prep, quoted)
+    result = tick(prep, quoted, curve)
     new: tuple[NDArray[np.float64] | None, ...] = (
         result.discounted_lot_delta,
         result.discounted_price_sensitivity,
@@ -309,5 +341,6 @@ def test_a_bilateral_tick_allocates_by_group_live_slot_and_bucket_and_retains_it
     )
     retained = sum(0 if array is None else array.nbytes for array in new)
     assert retained == 8 * (2 * encoding.references.size + buckets + 4 * groups)
+    assert all(array is None or array.dtype == np.float64 for array in new)
     # The nominal vectors are the preparation's, by reference, not copies.
     assert result.lot_delta is prep.lot_delta and result.price_sensitivity is prep.price_sensitivity

@@ -258,9 +258,11 @@ def _discounted(
     unpaid group's NPV is its amount times its factor, the mark their sum, and its DV01 is -0.0001
     times its time fraction times its NPV, the analytic sensitivity to a rise of one basis point in
     the continuously compounded zero rates, the batch's DV01 their sum, negative for an amount
-    receivable. The discounted lots are each live slot's lots times its group's factor, before any
-    sum, since two slots of one day and one contract may pay on different days; summed onto the
-    references, the days, the months and the years as the preparation sums the nominal lots, and
+    receivable. The discounted lots are each slot's lots times its group's factor, a fixed slot's
+    lots being zero, before any sum, since two slots of one day and one contract may pay on
+    different days; summed over every slot onto the references, the days, the months and the
+    years exactly as the preparation sums the nominal lots, one path whether a slot is live or
+    not and whether any is, since a sum over no slot is numpy's integer zeros and not a sum; and
     the discounted sensitivity the lots times the reporting lot's coefficient, the one conversion
     the index resolved. The arithmetic runs with numpy's flags down and the rules judge: every
     group's amount, the two totals, the discounted lots by reference and by bucket, the discounted
@@ -268,7 +270,7 @@ def _discounted(
     by its group, the batch, its contract or its bucket.
 
     Work: one factor per distinct unpaid payment day, one group per unpaid group, one slot per
-    live slot and four reductions, reported to the counter; nothing per component or observation,
+    slot and four reductions, reported to the counter; nothing per component or observation,
     nothing of the nominal risk done again, and no day sorted.
     """
     encoded = prepared.encoded
@@ -300,15 +302,13 @@ def _discounted(
         dv01_by_group[pays.groups] = -0.0001 * pays.tau * npv[pays.groups]
         mark = float(npv.sum())
         dv01 = float(dv01_by_group.sum())
-        live_lots = prepared.dated_live_lots[prepared.live_slot] * payment_factor[live_group]
+        discounted_lots = prepared.dated_live_lots * payment_factor[encoded.slot_group]
         discounted_lot_delta = np.bincount(
-            encoded.reference_of_slot[prepared.live_slot],
-            weights=live_lots,
-            minlength=encoded.references.size,
+            encoded.reference_of_slot, weights=discounted_lots, minlength=encoded.references.size
         )
         discounted_price_sensitivity = discounted_lot_delta * lot.coefficient
         daily = np.bincount(
-            encoded.day_of_slot[prepared.live_slot], weights=live_lots, minlength=encoded.days.size
+            encoded.day_of_slot, weights=discounted_lots, minlength=encoded.days.size
         )
         monthly = np.bincount(encoded.month_of_day, weights=daily, minlength=encoded.months.size)
         yearly = np.bincount(encoded.year_of_month, weights=monthly, minlength=encoded.years.size)
@@ -366,7 +366,7 @@ def _discounted(
         )
     counter.hit(PAYMENT_FACTORS_READ, int(pays.days.size))
     counter.hit(GROUPS_VALUED, int(pays.groups.size))
-    counter.hit(SLOTS_DISCOUNTED, int(prepared.live_slot.size))
+    counter.hit(SLOTS_DISCOUNTED, int(encoded.slot_group.size))
     counter.hit(RISK_REDUCTIONS, 4)
     for array in (
         amount,

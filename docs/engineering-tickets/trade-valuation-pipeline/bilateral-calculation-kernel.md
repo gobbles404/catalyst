@@ -263,7 +263,7 @@ and does not do yet; the seam's record is the #176 row of [history.md](../../sea
 
 - The owner's three clarifications, kept: the cleared tick's ledgers did not move and a cleared result
   shares the preparation's nominal arrays under the discounted names, its group vectors `None`; the
-  counter reports factors read once per distinct unpaid payment day, groups valued, live slots
+  counter reports factors read once per distinct unpaid payment day, groups valued, slots
   weighted and reductions, with the peak and the retained bytes pinned beside; the tests hold the hand
   figures to `rtol=1e-12, atol=1e-12`, the absolute part justified by the cancelling batches whose
   mark is 0 exactly, and the tolerance stated per measure in the test module's docstring.
@@ -279,8 +279,8 @@ and does not do yet; the seam's record is the #176 row of [history.md](../../sea
   expected every unpaid payment day covered`.
 - The arithmetic as specified: `npv[g] = amount[g] * D[g]`, `dv01[g] = -0.0001 * tau[g] * npv[g]`, the
   factor read by position on the daily curve once per distinct unpaid day, paid groups at the policy
-  factor of one with nothing read; discounted lots per live slot before the sums by reference, day,
-  month and year; the discounted sensitivity the lots times the reporting lot's coefficient.
+  factor of one with nothing read; discounted lots per slot, a fixed slot's zero, before the sums
+  by reference, day, month and year; the discounted sensitivity the lots times the reporting lot's coefficient.
 - `TradeResults` gains `curve`, `discounted_lot_delta`, `discounted_lot_delta_total`,
   `discounted_price_sensitivity`, the three discounted time views, `payment_amount`, `npv_by_group`,
   `dv01_by_group` and `payment_factor`; the readback and the reports are untouched.
@@ -304,14 +304,20 @@ and does not do yet; the seam's record is the #176 row of [history.md](../../sea
   unpaid payment days, the unsettled groups, each group's place among the days and its time
   fraction; the tick gathers the curve's factors through it and sorts nothing, which the budgets
   pin, with the long asian schedule's day buckets now in the peak's formula.
-- Counts: the bilateral tick 8 functions and 8 numpy entries at five trades and at two thousand, under lastday and under asian,
-  no sort among them, against the cleared tick's 4 and 4, which did not move; the preparation of a bilateral batch one helper
-  and the unique's numpy over the cleared preparation's ledger, which did not move either, one day mapped per distinct unpaid
-  payment day; the counter one factor per distinct unpaid payment day, one unpaid group, one live slot and 4 reductions; the
-  peak 2,977 bytes for two groups and 5,061 for twenty-four with twenty live slots, 3,305 and 22,024 for the asian batches over
-  43 and 519 days with 429 live, within 128 a group, 48 a live slot, 8 a time bucket and four slacks, against 1,210, 1,418,
-  1,210 and 10,960 cleared; the retained arrays exactly the new vectors' bytes, and the mapping eight bytes a day and
-  twenty-four an unpaid group. The Python tests 2,528 to 2,556, the smoke 976 formulas to 976, the host's 314
+- The review's P3 at 7e3bbe2: a fully paid strip of 497 days peaked past the bound, numpy's sum over
+  no live slot being integer zeros that the next sum converted. The discounted lots are now summed
+  over every slot, a fixed slot's being zero, exactly as the preparation sums the nominal lots,
+  one path and floats always, two gathers fewer on a tick; the fully paid strip is the budgets'
+  fifth case and the peak's formula carries the slots.
+- Counts: the bilateral tick 8 functions and 8 numpy entries at five trades and at two thousand, under lastday and under asian
+  and with no slot live, no sort among them, against the cleared tick's 4 and 4, which did not move; the preparation of a
+  bilateral batch one helper and the unique's numpy over the cleared preparation's ledger, which did not move either, one
+  day mapped per distinct unpaid payment day; the counter one factor per distinct unpaid payment day, one unpaid group, one
+  slot and 4 reductions; the peak 2,992 bytes for two groups and 5,093 for twenty-four with twenty live slots, 3,648 and
+  22,808 for the asian batches over 43 and 519 days with 429 live and 15,203 for a fully paid strip of 497 days, within 128 a
+  group, 16 a slot, 32 a live slot, 8 a time bucket and four slacks, against 1,210, 1,418, 1,210, 10,960 and 1,210 cleared;
+  the retained arrays exactly the new vectors' bytes, floats every one, and the mapping eight bytes a day and twenty-four an
+  unpaid group. The Python tests 2,528 to 2,560, the smoke 976 formulas to 976, the host's 314
   to 314, the lifetime's 128 unchanged; the workbook's one refusal text recalculated.
 - Not done, as the ticket keeps separate: no curve argument on `_EvaluateTrades`, no reader column, no
   workbook example of a bilateral value; the public bilateral refusal reworded only, in the smoke, the
