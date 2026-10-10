@@ -307,7 +307,7 @@ Built as the page says, on the path the other methods take, with these particula
   method; an asian future is cash settled on the average of its month's pricing days`. With all
   four methods of the definition built, the method choice reads `expected lastday, penultimate,
   last3day or asian`, and a word that is none of them, `Asian` among them, is refused by name;
-  the `future` definition's rule says the four are built, in words kept short since the Show spill's allocation pin follows the length of its texts, and `_ShowInstrument` shows it.
+  the `fixed_float` definition's rule says the four are built, in words kept short since the Show spill's allocation pin follows the length of its texts, and `_ShowInstrument` shows it.
 - **The live input.** As the page says above, a monthly live input projects the month's
   remaining unfixed days at a common price, and the history supplies the daily prices averaged;
   the market performs no conversion from a quote of the whole month's average, and the delta is

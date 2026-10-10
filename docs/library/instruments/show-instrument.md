@@ -1,6 +1,6 @@
 # _ShowInstrument
 
-Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator. The instrument was named `future` until #NN, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md) renamed it `fixed_float`, its fields and rules unchanged.
 
 Shows one library-defined instrument schema with fields across columns and metadata down
 rows, including descriptions, requirements and defined options. This is the read-only counterpart of
@@ -11,14 +11,14 @@ rows, including descriptions, requirements and defined options. This is the read
 
 ```python
 def _ShowInstrument(
-    instrument: Annotated[str, "One instrument name from _ListInstruments, such as future."],
+    instrument: Annotated[str, "One instrument name from _ListInstruments, such as fixed_float."],
 ) -> MixedArray: ...
 ```
 
 Excel formula:
 
 ```excel
-=_ShowInstrument("future")
+=_ShowInstrument("fixed_float")
 ```
 
 `instrument` is the exact catalog identifier as text, or a reference to its cell in the list.
@@ -35,7 +35,7 @@ The `required` row contains Excel booleans after its text label; all other cells
 nonempty text. There are no spacer rows, blank placeholders, object handles or additional
 implementation-type row. This is the default layout; no transpose argument is introduced.
 
-The `future` schema as the sheet sees it, `src/goosedove/instruments/definitions.py` laid out by
+The `fixed_float` schema as the sheet sees it, `src/goosedove/instruments/definitions.py` laid out by
 `src/goosedove/excel/instruments.py`. A template supplies defaults for
 recognized trade fields; the selected traded product/agreement constrains the resolved values.
 The index is not among the fields: `_CreateTrades(index, fields, trade_rows, template)` takes
@@ -48,9 +48,9 @@ it as its first argument, once for the whole batch.
 | required_when | none | none | no start_date and end_date on the row | no contract_code on the row, or with end_date | no contract_code on the row, or with start_date | none | none | none | route = cleared | none | none | none | none | none | settlement_method = financial | settlement_method = financial |
 | type | number | date | text | date | date | code | code | code | text | text | number | text | code | number | text | holiday calendar handle |
 | options | a whole number of at most 15 digits | no fixed list | a contract or strip, F26, 1Q27, CAL27, Z27-X28 | no fixed list | no fixed list | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list | no fixed list | a signed whole count, zero included | the index's specification names | month, calday | no fixed list | +1bd, +2bd and other positive whole business days | a _CreateHolidayCalendar handle |
-| rule | The source system's deal number, whole, -999999999999999 to 999999999999999, never text; duplicates keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Typed in either case and resolved by month against the index's schedule when the row supplies no dates, every schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through November 2028; beside both dates it is kept as entered text and not read; a blank or empty cell is not supplied | With end_date the inclusive days the deal covers, split at month ends, whatever the row's code; one date without the other fails; a blank or empty cell is not supplied; util_StartDate gives it from a label | On or after start_date; the two dates book the row's period together, so one without the other fails; a blank or empty cell is not supplied; a part of a month prices under asian alone | A library rule selected by the trade; all four are built on a futures index, asian averaging the month's pricing days; lastday alone on an IFERC index, its published month | Must be supported for the traded product; bilateral valuation waits on rates | A fact of the trade; a physical future past its expiry is refused, a financial one pays on its payment day | A label kept as typed; nothing is inferred from it | Attribution; no fee or clearing role inferred from the label | A whole count of the selected quantity definition, positive, negative or zero; a zero row is kept, contributes nothing and can be filled in later | Selects the lot size and unit from the index given to _CreateTrades, exactly as named there; the template may supply it, and the index owns what it means | The quantity per contract month, or per calendar day of it, weekends and holidays included | A finite number in the index's quote units; the same for every month of a strip | Counted strictly after the component's anchor on the payment calendar: on a futures index its last observation day, the expiry under lastday; on an IFERC index the month's last_trading_date; +1bd for PHH, +3bd for Waha | Monday to Friday less its holidays; separate from the pricing calendar |
+| rule | The source system's deal number, whole, -999999999999999 to 999999999999999, never text; duplicates keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Typed in either case and resolved by month against the index's schedule when the row supplies no dates, every schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through November 2028; beside both dates it is kept as entered text and not read; a blank or empty cell is not supplied | With end_date the inclusive days the deal covers, split at month ends, whatever the row's code; one date without the other fails; a blank or empty cell is not supplied; util_StartDate gives it from a label | On or after start_date; the two dates book the row's period together, so one without the other fails; a blank or empty cell is not supplied; a part of a month prices under asian alone | A library rule selected by the trade; all four are built on a futures index, asian averaging the month's pricing days; lastday alone on an IFERC index, its published month | Must be supported for the traded product; bilateral valuation waits on rates | A fact of the trade; a physical fixed_float past its expiry is refused, a financial one pays on its payment day | A label kept as typed; nothing is inferred from it | Attribution; no fee or clearing role inferred from the label | A whole count of the selected quantity definition, positive, negative or zero; a zero row is kept, contributes nothing and can be filled in later | Selects the lot size and unit from the index given to _CreateTrades, exactly as named there; the template may supply it, and the index owns what it means | The quantity per contract month, or per calendar day of it, weekends and holidays included | A finite number in the index's quote units; the same for every month of a strip | Counted strictly after the component's anchor on the payment calendar: on a futures index its last observation day, the expiry under lastday; on an IFERC index the month's last_trading_date; +1bd for PHH, +3bd for Waha | Monday to Friday less its holidays; separate from the pricing calendar |
 
-`future` is the one instrument defined: a monthly contract or strip on a futures index, built in
+`fixed_float`, `future` until #NN, is the one instrument defined: a fixed-for-floating position on a monthly contract or strip of a futures or, since #167, an IFERC index, built in
 #139 through #144 as [create-trades.md](../trades/create-trades.md) and
 [trade-template.md](../trades/trade-template.md) describe. The index is no field: it is the first
 argument of `_CreateTrades`, once for the batch, and every other fact arrives as a template default
@@ -98,7 +98,7 @@ most 15 digits read back as a number, duplicates kept as separate trades,
 | Item | Text |
 |---|---|
 | Function | Shows an instrument's fields, requirements, types and rules. |
-| instrument | One instrument name from _ListInstruments, such as future. |
+| instrument | One instrument name from _ListInstruments, such as fixed_float. |
 
 ## The library checks
 
@@ -107,13 +107,13 @@ exact: no trimming, case folding, aliases or guessing. An unknown identifier fai
 the choices in catalog order. For the one-instrument catalog:
 
 ```text
-instrument is 'Future', expected one of: 'future'
+instrument is 'Future', expected one of: 'fixed_float'
 ```
 
 An empty catalog gives:
 
 ```text
-instrument is 'future', expected a listed instrument; none are defined
+instrument is 'fixed_float', expected a listed instrument; none are defined
 ```
 
 The seam's existing blank/missing/type errors apply before lookup. A failure publishes no
@@ -179,14 +179,14 @@ this generic schema reader for now.
 | settlement_method | Retain physical/financial identification; physical-delivery handling is outside v1 and does not set payment dates |
 
 Omitted candidates are not silently supported or discarded at ingestion. The creators
-reject a field absent from the schema, `fields cell (1, 1) is text 'contract_specification', expected a field of future: trade_id, trade_date, contract_code, ...`. Final settlement belongs
+reject a field absent from the schema, `fields cell (1, 1) is text 'contract_specification', expected a field of fixed_float: trade_id, trade_date, contract_code, ...`. Final settlement belongs
 to the actual traded product/agreement; price/quantity units come from the applicable static
 definitions. This generic reader describes the domains without choosing or overriding facts.
 
 The newer legacy template also supplies floating/curve sources, observation and payment
 scheduling, spreads and conversion controls. Their proposed ownership and unresolved meaning
 are recorded in the [field sketch](../../engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md).
-They are not all new inputs to the future schema above.
+They are not all new inputs to the fixed_float schema above.
 
 ## Tests
 
@@ -196,16 +196,16 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| the future's sixteen fields in order, which are required, the conditions, the period fields' three among them since #161 and their words since #172, the three alone letting a cell go unsupplied, the types and the codes | example |
+| the fixed_float's sixteen fields in order, which are required, the conditions, the period fields' three among them since #161 and their words since #172, the three alone letting a cell go unsupplied, the types and the codes | example |
 | a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
-| the name matched exactly, `Future` and ` future` refused naming `future`, an empty catalog saying so, two instruments both named | example |
+| the name matched exactly, `Future`, ` fixed_float` and `future`, the name until #NN, refused naming `fixed_float`, an empty catalog saying so, two instruments both named | example |
 | seven rows and seventeen columns, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
 | the page's table equals the spill, cell for cell | example against the page |
 | through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 119 for the future, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
+| twelve functions, the classification once per cell, 119 for the fixed_float, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which

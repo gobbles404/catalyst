@@ -31,7 +31,7 @@ from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.sheet_days import SHEET_LAST_DAY
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FUTURE, FieldType
+from goosedove.instruments.definitions import FIXED_FLOAT, FieldType
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.observations import Observations, observed
@@ -66,7 +66,7 @@ SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule rea
 TICKET_CODES_READ = "ticket_codes_read"
 PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 
-# The conditions of the future's required_when fields, as library rules: the field, the batch
+# The conditions of the fixed_float's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
 # `route = cleared`; a field is present exactly when its condition holds.
 CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
@@ -118,7 +118,7 @@ def resolved(
     encoding, since the payment days count from them, and what the rows entered for their codes,
     the rows that entered one and their texts.
 
-    The ticket is bound against the template's instrument, the future, the one whose trades are
+    The ticket is bound against the template's instrument, the fixed_float, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
     in one of them. The route and the settlement are one each, the template's value or a column
     every row agrees on; the quantity unit, the method and the basis are each row's own, the
@@ -375,10 +375,11 @@ class _Fields:
 
 
 def _fields(template: TradeTemplate, ticket: FieldValues) -> _Fields:
-    """The template's instrument the future, the ticket bound against it, and the two disjoint."""
-    if template.instrument is not FUTURE:
+    """The template's instrument the fixed_float, the ticket bound against it, and the two
+    disjoint."""
+    if template.instrument is not FIXED_FLOAT:
         raise ValueError(
-            f"template is of instrument {template.instrument.name!r}, expected {FUTURE.name}, "
+            f"template is of instrument {template.instrument.name!r}, expected {FIXED_FLOAT.name}, "
             "the one instrument whose trades are built"
         )
     if ticket.instrument is not template.instrument:

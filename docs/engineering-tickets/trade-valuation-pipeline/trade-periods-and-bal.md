@@ -161,7 +161,7 @@ The utilities remain deterministic, nonvolatile, and publish no handles.
 
 ## Slice C Explicit dates through trade creation
 
-Add `start_date` and `end_date` to the shared `future` instrument definition. After
+Add `start_date` and `end_date` to the shared `fixed_float` instrument definition. After
 combining template and ticket fields, require exactly one complete period form:
 
 | Form | Present | Absent |
@@ -419,7 +419,7 @@ Built as the page says for slice B, on the two date utilities, with these partic
 
 Built as the page says for slice C, on the path every batch takes, with these particulars.
 
-- **The fields.** The `future` gains `start_date` and `end_date` after `contract_code`, dates that
+- **The fields.** The `fixed_float` gains `start_date` and `end_date` after `contract_code`, dates that
   may stand in for the code, so `contract_code` is no longer always required: the three say their
   rule in the Show spill's `required_when` row, `no start_date and end_date` and `no contract_code`,
   and the shown future is seven rows by seventeen columns. The period form was checked at the code's

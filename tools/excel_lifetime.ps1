@@ -539,7 +539,7 @@ $trades = {
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
     Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,13)"
     $id = Id $state
@@ -569,7 +569,7 @@ $trades = {
     Check "a cleared template fails the batch in the seam's words" ($failed -eq "#ERROR _CreateTrades: template is blank, expected trade template handle") $failed
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 1) }
     Check "the template and the batch are released, twelve live" ($c.Live -eq 12 -and $c.Released -eq 5 -and $c.Published -eq 17) $c.Text
-    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
     Check "the template typed back rebuilds the batch" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
     Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
@@ -705,7 +705,7 @@ $valuation = {
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("fixed_float",K1:R1,K2:R2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
     Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
     Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"

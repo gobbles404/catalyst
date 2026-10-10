@@ -20,18 +20,18 @@ The user's example, two fields:
 |---|---|---|
 | 1 | quantity_unit | schedule_method |
 | 2 | NYMEX NG | lastday |
-| 3 | `=_CreateTradeTemplate("future", A1:B1, A2:B2)` | shows `30512:trade_template:40` |
+| 3 | `=_CreateTradeTemplate("fixed_float", A1:B1, A2:B2)` | shows `30512:trade_template:40` |
 
-The NG example's template, every field of the `future` the five ticket rows do not supply, in A1:F2 with the creator in B3: `quantity_unit` NYMEX NG, the specification the quantities count, `quantity_per` month, `schedule_method` lastday, `route` cleared, `settlement_method` physical, `clearing_house` CME Clearing.
+The NG example's template, every field of the `fixed_float` the five ticket rows do not supply, in A1:F2 with the creator in B3: `quantity_unit` NYMEX NG, the specification the quantities count, `quantity_per` month, `schedule_method` lastday, `route` cleared, `settlement_method` physical, `clearing_house` CME Clearing.
 
-Three arguments, all required, none with a default. The instrument is first: one exact name from `_ListInstruments`, `future`, which selects the definition the headers are checked against. The fields are one row of field names as `_ShowInstrument` shows them, spelled exactly, case and all, in any order; the values one aligned row beneath them. One field takes the same path as many, and a template carries at least one. Omit a field entirely when the template should not supply it; a listed field with a blank cell is an input error, not an instruction to inherit something, for every field but the three period fields, `contract_code`, `start_date` and `end_date`, whose cell may be blank or a formula's `""` since #172: the template then owns the header, so a ticket column of that name is still overlap, and supplies the value to no row, [contract-codes-and-dates.md](../../engineering-tickets/trade-valuation-pipeline/contract-codes-and-dates.md). The row crosses as `FieldRow[str]`, the seam's one-row form of decision 42, bound against the instrument named: the seam checks the name's type, the width, each header against the definition, unknown and repeated headers named, and each cell by its field's type, a date as a date, a number as a number, a code as text and `payment_holiday_calendar` as a holiday calendar handle resolved to its object; more than one row of values is refused as `values is 2x1 array, expected one row of field values`, by its shape before any cell is looked at since #151, so a range one row too tall is named for its rows and never for the blank in its extra row. The result is a handle, `30512:trade_template:40`, the kind and the count alone, since a template carries no index's name. Other formulas refer to the cell; a worksheet heading or an Excel name such as `ICE_Futs` or `NYMEX_Futs` says what the template is for, and the library object has no label field. An unchanged recalculation shares the live template; a changed cell under it, a value or the holiday calendar's own creator, makes a new one and every batch over it anew, the old released when Excel disconnects its last creator.
+Three arguments, all required, none with a default. The instrument is first: one exact name from `_ListInstruments`, `fixed_float`, which selects the definition the headers are checked against. The fields are one row of field names as `_ShowInstrument` shows them, spelled exactly, case and all, in any order; the values one aligned row beneath them. One field takes the same path as many, and a template carries at least one. Omit a field entirely when the template should not supply it; a listed field with a blank cell is an input error, not an instruction to inherit something, for every field but the three period fields, `contract_code`, `start_date` and `end_date`, whose cell may be blank or a formula's `""` since #172: the template then owns the header, so a ticket column of that name is still overlap, and supplies the value to no row, [contract-codes-and-dates.md](../../engineering-tickets/trade-valuation-pipeline/contract-codes-and-dates.md). The row crosses as `FieldRow[str]`, the seam's one-row form of decision 42, bound against the instrument named: the seam checks the name's type, the width, each header against the definition, unknown and repeated headers named, and each cell by its field's type, a date as a date, a number as a number, a code as text and `payment_holiday_calendar` as a holiday calendar handle resolved to its object; more than one row of values is refused as `values is 2x1 array, expected one row of field values`, by its shape before any cell is looked at since #151, so a range one row too tall is named for its rows and never for the blank in its extra row. The result is a handle, `30512:trade_template:40`, the kind and the count alone, since a template carries no index's name. Other formulas refer to the cell; a worksheet heading or an Excel name such as `ICE_Futs` or `NYMEX_Futs` says what the template is for, and the library object has no label field. An unchanged recalculation shares the live template; a changed cell under it, a value or the holiday calendar's own creator, makes a new one and every batch over it anew, the old released when Excel disconnects its last creator.
 
 ## Excel help
 
 | Item | Text |
 |---|---|
 | Function | Creates shared defaults for an instrument and shows their handle, the text other formulas take as the trade template. |
-| instrument | One instrument name from _ListInstruments, such as future. |
+| instrument | One instrument name from _ListInstruments, such as fixed_float. |
 | fields | The field-name cells in one row, such as A1:B1, using names shown by _ShowInstrument. |
 | values | The values in one row beneath those fields, such as A2:B2. |
 
@@ -57,7 +57,7 @@ Nothing is required of a template: not `trade_date`, `contract_code` or the two 
 
 ```text
 TradeTemplate
-    instrument   the library's future definition, by reference
+    instrument   the library's fixed_float definition, by reference
     names        the fields the row named, in the sheet's order, each owned for every batch under it
     defaults     by field name, in the same order: quantity_unit NYMEX NG, schedule_method lastday;
                  since #172 a period field may stand in names with no default, its cell having held nothing
@@ -71,7 +71,7 @@ The same template supplies its fields to one or many ticket rows. Template field
 
 ## Reading it back
 
-`util_ReadHandle` on the handle spills one row under two heading rows: `instrument` first, `future`, then each field the row named under its name in the sheet's order, a number and a date as they are, text as typed, a holiday calendar as `a holiday calendar`, the words of its kind, and since #172 `(not supplied)`, text under `str`, where a period field's cell held nothing. The spill shows what the template holds and is no round trip of a handle.
+`util_ReadHandle` on the handle spills one row under two heading rows: `instrument` first, `fixed_float`, then each field the row named under its name in the sheet's order, a number and a date as they are, text as typed, a holiday calendar as `a holiday calendar`, the words of its kind, and since #172 `(not supplied)`, text under `str`, where a period field's cell held nothing. The spill shows what the template holds and is no round trip of a handle.
 
 ## Tests
 

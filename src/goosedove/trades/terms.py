@@ -187,11 +187,11 @@ def resolved_trades(
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
 ) -> ResolvedTrades:
-    """The one way to make ResolvedTrades: the rules of the first future profile, checked once,
+    """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
 
-    The index is a futures or, since #167, an IFERC index, since a future's contract is a row of a
-    futures schedule, its final price the settlement on that row's expiry day, or a row of an
+    The index is a futures or, since #167, an IFERC index, since a fixed_float's contract is a row
+    of a futures schedule, its final price the settlement on that row's expiry day, or a row of an
     IFERC schedule, its final price the month's index on that row's publication day, the traded
     basis; a Gas Daily index is refused by name. An IFERC index takes a financial settlement and
     the lastday method alone, the first row of another method named, since an IFERC month has
@@ -221,7 +221,7 @@ def resolved_trades(
     the entered quantity times its covered days under calday, finite, for the encoding to convert
     and nothing later to scale again. A financial settlement has payment terms, a lag and a
     calendar per occurrence and one payment day per component, and a physical one has none: a
-    physical future
+    physical fixed_float
     pays on no
     day, and giving it terms would invent a payment the contract does not make. The instrument
     is kept as the definition the terms stand under, and read for nothing here.
@@ -274,7 +274,7 @@ def resolved_trades(
 
 
 def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
-    """The schedule of an index a future is booked on, typed as the kind rule found it: a
+    """The schedule of an index a fixed_float is booked on, typed as the kind rule found it: a
     futures schedule, whose rows' expiry days settle the contracts, or since #167 an IFERC
     schedule, whose rows' publication days print each month's index, the traded basis; a Gas
     Daily index is refused, in the resolution of a batch and in the kernel alike. The steps
@@ -287,7 +287,7 @@ def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
         case Kind.GAS_DAILY:
             raise ValueError(
                 f"index is {described(index.kind, 'index')}, expected a futures or an IFERC "
-                "index for a future"
+                "index for a fixed_float"
             )
         case _:
             assert_never(index.kind)

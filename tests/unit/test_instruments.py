@@ -20,7 +20,7 @@ from goosedove.excel.instruments import (
 )
 from goosedove.instruments.definitions import (
     CATALOG,
-    FUTURE,
+    FIXED_FLOAT,
     NONE,
     ROWS,
     Field,
@@ -39,14 +39,14 @@ def spilled(result: object) -> tuple[NDArray[np.uint8], NDArray[np.float64], str
     return cast(tuple[NDArray[np.uint8], NDArray[np.float64], str], result)
 
 
-FIELDS = tuple([field.name for field in FUTURE.fields])
+FIELDS = tuple([field.name for field in FIXED_FLOAT.fields])
 
 
 # --- the definitions ------------------------------------------------------------------------
 
 
-def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None:
-    assert [each.name for each in CATALOG] == ["future"]
+def test_the_catalog_holds_the_fixed_float_with_its_sixteen_fields_in_order() -> None:
+    assert [each.name for each in CATALOG] == ["fixed_float"]
     assert FIELDS == (
         "trade_id",
         "trade_date",
@@ -65,8 +65,8 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
         "payment_time_lag",
         "payment_holiday_calendar",
     )
-    by_name = {field.name: field for field in FUTURE.fields}
-    assert [field.name for field in FUTURE.fields if field.required] == [
+    by_name = {field.name: field for field in FIXED_FLOAT.fields}
+    assert [field.name for field in FIXED_FLOAT.fields if field.required] == [
         "trade_date",
         "schedule_method",
         "route",
@@ -83,7 +83,7 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
     assert by_name["end_date"].type is FieldType.DATE
     # Since #172 the three period fields alone let a cell go unsupplied, a blank or an empty text
     # meaning the row supplies no value; every other field's cell must hold one.
-    assert [field.name for field in FUTURE.fields if field.may_be_unsupplied] == [
+    assert [field.name for field in FIXED_FLOAT.fields if field.may_be_unsupplied] == [
         "contract_code",
         "start_date",
         "end_date",
@@ -91,7 +91,7 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
     assert by_name["payment_time_lag"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
-    assert {field.name for field in FUTURE.fields if field.type is FieldType.CODE} == {
+    assert {field.name for field in FIXED_FLOAT.fields if field.type is FieldType.CODE} == {
         "schedule_method",
         "route",
         "settlement_method",
@@ -99,7 +99,7 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
     }
     assert by_name["quantity_unit"].type is FieldType.TEXT
     assert by_name["quantity_unit"].options == "the index's specification names"
-    assert all(field.required_when == NONE for field in FUTURE.fields if field.required)
+    assert all(field.required_when == NONE for field in FIXED_FLOAT.fields if field.required)
 
 
 def a_field(name: str = "f", required_when: str = NONE, rule: str = "r") -> Field:
@@ -128,18 +128,28 @@ def test_a_definition_that_cannot_be_authored_says_why(
 
 
 def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_there_are() -> None:
-    assert instrument("future") is FUTURE
-    with pytest.raises(ValueError, match=r"^instrument is 'Future', expected one of: 'future'$"):
+    assert instrument("fixed_float") is FIXED_FLOAT
+    with pytest.raises(
+        ValueError, match=r"^instrument is 'Future', expected one of: 'fixed_float'$"
+    ):
         instrument("Future")
-    with pytest.raises(ValueError, match=r"^instrument is ' future', expected one of: 'future'$"):
-        instrument(" future")
+    with pytest.raises(
+        ValueError, match=r"^instrument is ' fixed_float', expected one of: 'fixed_float'$"
+    ):
+        instrument(" fixed_float")
     with pytest.raises(
         ValueError,
-        match=r"^instrument is 'future', expected a listed instrument; none are defined$",
+        match=r"^instrument is 'fixed_float', expected a listed instrument; none are defined$",
     ):
-        instrument("future", ())
-    two = (FUTURE, Instrument("swap", "d", (a_field(),)))
-    with pytest.raises(ValueError, match=r"^instrument is 'x', expected one of: 'future', 'swap'$"):
+        instrument("fixed_float", ())
+    with pytest.raises(
+        ValueError, match=r"^instrument is 'future', expected one of: 'fixed_float'$"
+    ):
+        instrument("future")  # the name until #NN, refused as any other word
+    two = (FIXED_FLOAT, Instrument("swap", "d", (a_field(),)))
+    with pytest.raises(
+        ValueError, match=r"^instrument is 'x', expected one of: 'fixed_float', 'swap'$"
+    ):
         instrument("x", two)
 
 
@@ -152,8 +162,9 @@ def test_the_list_spills_a_header_and_one_row_per_instrument() -> None:
     assert listed.texts == (
         "instrument",
         "description",
-        "future",
-        "A position tied to a specified reference contract, with explicit settlement terms.",
+        "fixed_float",
+        "A fixed-for-floating position on a specified reference contract, with explicit "
+        "observation and settlement terms.",
     )
     assert (listed.kinds == TEXT_CODE).all()
 
@@ -194,7 +205,7 @@ def test_a_one_field_definition_shows_seven_rows_and_two_columns() -> None:
 
 
 def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
-    shown = _ShowInstrument("future")
+    shown = _ShowInstrument("fixed_float")
     assert shown.shape == (7, 17)
     assert tuple([shown.texts[i] for i in (0, 17, 34, 35, 52, 69, 86)]) == ROWS  # column one
     assert shown.texts[:17] == ("field", *FIELDS)
@@ -202,7 +213,7 @@ def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     assert required[0] == TEXT_CODE and (required[1:] == BOOLEAN_CODE).all()
     np.testing.assert_array_equal(
         shown.numeric_slots[2, 1:],
-        [field.required for field in FUTURE.fields],
+        [field.required for field in FIXED_FLOAT.fields],
     )
     other_rows = np.delete(shown.kinds, 2, axis=0)
     assert (other_rows == TEXT_CODE).all()
@@ -216,7 +227,7 @@ def test_the_show_page_shows_the_same_cells_as_the_spill() -> None:
     start = next(i for i, line in enumerate(lines) if line.startswith("| field | trade_id |"))
     table = [[cell.strip() for cell in line.split("|")[1:-1]] for line in lines[start : start + 8]]
     del table[1]  # the markdown separator row
-    shown = schema_cells(FUTURE)
+    shown = schema_cells(FIXED_FLOAT)
     texts = iter(shown.texts)
     for r in range(7):
         for c in range(17):
@@ -230,11 +241,14 @@ def test_the_show_page_shows_the_same_cells_as_the_spill() -> None:
 
 def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
-    assert kinds.shape == (2, 2) and text.split("\0")[2] == "future"
-    kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("future"))
+    assert kinds.shape == (2, 2) and text.split("\0")[2] == "fixed_float"
+    kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
     assert kinds.shape == (7, 17) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert ENTRY["_ShowInstrument"]("Future") == (
-        "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'"
+        "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
+    )
+    assert ENTRY["_ShowInstrument"]("future") == (  # the name until #NN
+        "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'"
     )
     assert (
         ENTRY["_ShowInstrument"](None)
@@ -255,7 +269,7 @@ def test_reading_the_catalog_publishes_nothing() -> None:
     live = len(bridge.live_handles())
     for _ in range(3):
         ENTRY["_ListInstruments"]()
-        ENTRY["_ShowInstrument"]("future")
+        ENTRY["_ShowInstrument"]("fixed_float")
     assert len(bridge.live_handles()) == live
 
 

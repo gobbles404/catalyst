@@ -1,5 +1,7 @@
 # Instrument fields: requirements, templates and contractual authority
 
+**Naming, #NN:** the instrument this page calls `future` is `fixed_float` since [rename-instrument-fixed-float.md](rename-instrument-fixed-float.md); the design below is kept as written.
+
 [Pipeline overview](README.md) · [Instrument definitions](00-instrument-definitions.md) ·
 [_ShowInstrument draft](../../library/instruments/show-instrument.md)
 

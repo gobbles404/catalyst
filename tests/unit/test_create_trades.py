@@ -28,7 +28,7 @@ from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FUTURE, NONE, FieldType, Instrument
+from goosedove.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import CONDITIONS, PERIOD_FIELDS, Trades, resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
@@ -130,7 +130,9 @@ def typed(definition: Instrument, name: str, values: list[object]) -> object:
             return tuple(values)
 
 
-def a_ticket(columns: Mapping[str, list[object]], definition: Instrument = FUTURE) -> FieldValues:
+def a_ticket(
+    columns: Mapping[str, list[object]], definition: Instrument = FIXED_FLOAT
+) -> FieldValues:
     """A ticket as the seam hands it over: each column typed by its field and, since #172, a None
     among a column's values a cell the row left unsupplied, the column then holding the other
     rows' values with a mask saying which rows supplied one."""
@@ -145,7 +147,7 @@ def a_ticket(columns: Mapping[str, list[object]], definition: Instrument = FUTUR
     return FieldValues(definition, rows, tuple(columns), typed_columns, supplied)
 
 
-def a_template(fields: Mapping[str, object], definition: Instrument = FUTURE) -> TradeTemplate:
+def a_template(fields: Mapping[str, object], definition: Instrument = FIXED_FLOAT) -> TradeTemplate:
     return trade_template(a_ticket({name: [value] for name, value in fields.items()}, definition))
 
 
@@ -174,7 +176,7 @@ def refused(
 def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     batch, counter = created()
     terms = batch.resolved
-    assert terms.instrument is FUTURE and terms.index is NG and terms.schedule is NG.schedule
+    assert terms.instrument is FIXED_FLOAT and terms.index is NG and terms.schedule is NG.schedule
     np.testing.assert_array_equal(terms.specification, [0] * 5)
     assert (terms.route, terms.settlement) == (Route.CLEARED, Settlement.PHYSICAL)
     np.testing.assert_array_equal(
@@ -1453,9 +1455,9 @@ def test_a_strip_counts_the_selected_unit_in_every_month() -> None:
 
 
 def test_the_old_field_is_unknown_to_the_definition() -> None:
-    assert "contract_specification" not in {field.name for field in FUTURE.fields}
+    assert "contract_specification" not in {field.name for field in FIXED_FLOAT.fields}
     with pytest.raises(StopIteration):
-        typed(FUTURE, "contract_specification", ["NYMEX NG"])
+        typed(FIXED_FLOAT, "contract_specification", ["NYMEX NG"])
 
 
 # --- a quantity of zero: a row kept ready --------------------------------------------------------
@@ -1823,7 +1825,7 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
     )
     assert (
         refused(daily)
-        == "index is a Gas Daily index, expected a futures or an IFERC index for a future"
+        == "index is a Gas Daily index, expected a futures or an IFERC index for a fixed_float"
     )
     labelled = an_index(contracts=(("X26", "2026-10-28"), ("c1", "2026-11-25")))
     assert refused(labelled) == (
@@ -1843,7 +1845,9 @@ def test_the_conditions_are_the_definitions_own() -> None:
     # The three conditional fields are CONDITIONS'; the period fields' three say their rule in
     # the definition's words and are the periods' to check row by row, not a condition on a fact.
     conditional = {
-        field.name: field.required_when for field in FUTURE.fields if field.required_when != NONE
+        field.name: field.required_when
+        for field in FIXED_FLOAT.fields
+        if field.required_when != NONE
     }
     period = {name: conditional.pop(name) for name in ("contract_code", "start_date", "end_date")}
     assert period == {
@@ -1857,15 +1861,18 @@ def test_the_conditions_are_the_definitions_own() -> None:
 
 
 def test_the_ticket_and_the_template_are_of_one_instrument_the_future() -> None:
-    other = Instrument("swap", "Another instrument.", FUTURE.fields)
+    other = Instrument("swap", "Another instrument.", FIXED_FLOAT.fields)
     with pytest.raises(ValueError) as refusal:
         trades(NG, a_ticket(NG_TICKET, other), a_template(NG_TEMPLATE), UNITS, WorkCounter())
-    assert str(refusal.value) == "ticket is of instrument 'swap', expected the template's, 'future'"
+    assert (
+        str(refusal.value)
+        == "ticket is of instrument 'swap', expected the template's, 'fixed_float'"
+    )
     with pytest.raises(ValueError) as refusal:
         resolved(NG, a_ticket(NG_TICKET), a_template({"route": "cleared"}, other), WorkCounter())
     assert str(refusal.value) == (
-        "template is of instrument 'swap', expected future, the one instrument whose trades are "
-        "built"
+        "template is of instrument 'swap', expected fixed_float, the one instrument whose trades "
+        "are built"
     )
 
 
@@ -1964,7 +1971,7 @@ def sheet() -> dict[str, Any]:
         "NYMEX NG",
     )
     template = ENTRY["_CreateTradeTemplate"](
-        "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
+        "fixed_float", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
     )
     return {
         "index": ng,
@@ -2026,7 +2033,8 @@ def test_the_creators_refusals_come_in_the_decided_order(sheet: dict[str, Any]) 
             template,
         )
     ).startswith(
-        "#ERROR _CreateTrades: fields cell (1, 1) is text 'Trade_id', expected a field of future: "
+        "#ERROR _CreateTrades: fields cell (1, 1) is text 'Trade_id', expected a field of "
+        "fixed_float: "
     )
     assert create(ix, headers, cells([1001.0, 46289.0, "Z26", "ten", 3.1]), template) == (
         "#ERROR _CreateTrades: trade_rows cell (1, 4) is text 'ten', expected number"
@@ -2146,7 +2154,7 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     # The route and the settlement from the ticket's columns, the template holding neither: the
     # spill is the one place both are read back.
     template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row("quantity_unit", "quantity_per", "schedule_method"),
         row("NYMEX NG", "month", "lastday"),
     )
@@ -2169,7 +2177,7 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
 
 def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any]) -> None:
     template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*TOY_TEMPLATE),
         row(
             *[
@@ -2260,7 +2268,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
     # the month's quantity read side by side and the month's total is never taken for the
     # entered daily quantity.
     template = ENTRY["_CreateTradeTemplate"](
-        "future", row(*NG_TEMPLATE), row(*{**NG_TEMPLATE, "quantity_per": "calday"}.values())
+        "fixed_float", row(*NG_TEMPLATE), row(*{**NG_TEMPLATE, "quantity_per": "calday"}.values())
     )
     table = spilled(
         ENTRY["_CreateTrades"](sheet["index"], sheet["headers"], sheet["rows"], template)
@@ -2293,7 +2301,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         -3_720_000.0,
         3_100_000.0,
     ]
-    assert str(ENTRY["_CreateTradeTemplate"]("future", row("quantity_per"), row("day"))) == (
+    assert str(ENTRY["_CreateTradeTemplate"]("fixed_float", row("quantity_per"), row("day"))) == (
         "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'day', expected month or calday"
     )
 

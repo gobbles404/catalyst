@@ -52,9 +52,10 @@ class Instrument:
     fields: tuple[Field, ...]
 
 
-FUTURE = Instrument(
-    "future",
-    "A position tied to a specified reference contract, with explicit settlement terms.",
+FIXED_FLOAT = Instrument(
+    "fixed_float",
+    "A fixed-for-floating position on a specified reference contract, with explicit observation "
+    "and settlement terms.",
     (
         Field(
             "trade_id",
@@ -140,8 +141,8 @@ FUTURE = Instrument(
             NONE,
             FieldType.CODE,
             "physical, financial",
-            "A fact of the trade; a physical future past its expiry is refused, a financial one "
-            "pays on its payment day",
+            "A fact of the trade; a physical fixed_float past its expiry is refused, a financial "
+            "one pays on its payment day",
         ),
         Field(
             "clearing_house",
@@ -247,7 +248,7 @@ def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
     return instruments
 
 
-CATALOG = catalog(FUTURE)
+CATALOG = catalog(FIXED_FLOAT)
 
 
 def instrument(name: str, instruments: tuple[Instrument, ...] = CATALOG) -> Instrument:

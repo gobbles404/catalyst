@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Creation](create-trade.md) ·
 [Preparation](03-market-binding.md) · [Existing average example](worked-example.md)
 
-Design fixture, 3 October 2026, complete as a booking under the `future` definition since the
+Design fixture, 3 October 2026, complete as a booking under the `fixed_float` definition since the
 review's decisions of the same day. This specifies expected economics and intermediate data
 before implementing the general creators. It is not a saved production-library golden.
 All trade inputs, static fixture facts and independent expected answers are specified below;
@@ -19,14 +19,14 @@ invented payment terms to the physically deliverable NG contract.
 
 The initial NG calculation is undiscounted entry-to-current economic P&L for open futures.
 It does not model margin transfers, delivery obligations, a payment date, or post-expiry cash.
-The booking is complete under the `future` definition: its payment terms are none, since the
+The booking is complete under the `fixed_float` definition: its payment terms are none, since the
 contract is physically settled, and the toy product below carries the payment lifecycle.
 
 ## Static facts and where they come from
 
 | Fact | Source | Fixture value |
 |---|---|---|
-| Instrument | Library definition; selected first when creating a template | `future` |
+| Instrument | Library definition; selected first when creating a template | `fixed_float` |
 | Index | The first argument of `_CreateTrades`, once for the batch | Fixture label `Henry Hub NYMEX`; futures schedule kind |
 | Quote conventions | `index.conventions` | Quote currency `USD`, quote quantity `MMBTU`, amount currency `USD`, quantity type `ENERGY`, quantity unit `MMBTU` |
 | Selected specification | Name within `index.specifications` | `NYMEX NG` |
@@ -49,7 +49,7 @@ the template, required and last, carries the instrument.
 
 ## Template facts and trade rows are disjoint
 
-The template is created for `future` and supplies the shared facts in one row:
+The template is created for `fixed_float` and supplies the shared facts in one row:
 
 | quantity_unit | quantity_per | schedule_method | route | settlement_method | clearing_house |
 |---|---|---|---|---|---|
@@ -58,7 +58,7 @@ The template is created for `future` and supplies the shared facts in one row:
 Since #145 `quantity_unit` names the specification, the 10,000 MMBtu NYMEX lot, and there is
 no separate `contract_specification` field; the quantity counts the named lot.
 
-With the ticket's five columns below, every field the `future` definition requires is supplied
+With the ticket's five columns below, every field the `fixed_float` definition requires is supplied
 once: `payment_time_lag` and `payment_holiday_calendar` are required only when
 `settlement_method` is `financial`, and this physical contract supplies neither; `trade_id` and
 `broker` are optional, and the ticket carries the first. `CME Clearing` is a label retained as
@@ -72,7 +72,7 @@ On a sheet, with the template's headers in A1:F1 and its row in A2:F2, the ticke
 in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
 
 ```excel
-=_CreateTradeTemplate("future", A1:F1, A2:F2)
+=_CreateTradeTemplate("fixed_float", A1:F1, A2:F2)
 =_CreateTrades(NGIndex, A4:E4, A5:E9, Template)
 =_PrepareTrades(Trades, History)
 =_EvaluateTrades(Prepared, Market)

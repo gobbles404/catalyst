@@ -2179,7 +2179,7 @@ def test_a_price_vector_is_a_name_and_one_column_in_and_one_copy_out(
 # contiguity checks that copy nothing, the count of the text cells, and two arrays made for the
 # way out. The shown schema is the same way out over seven rows and fifteen columns laid out one
 # cell at a time, the one classification per cell and the generator that feeds it, 105 of each
-# for the future's fourteen fields and the row labels: the one spill the seam builds per cell,
+# for the fixed_float's fourteen fields and the row labels: the one spill the seam builds per cell,
 # and a new field adds seven to each count.
 def test_the_instrument_list_is_one_table_out(
     call_profile: CallProfile, numpy_calls: CallProfile
@@ -2207,8 +2207,8 @@ def test_the_instrument_list_is_one_table_out(
 def test_the_shown_instrument_is_laid_out_once_per_cell(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    PATH["_ShowInstrument"]("future")
-    assert call_profile(lambda: PATH["_ShowInstrument"]("future")) == {
+    PATH["_ShowInstrument"]("fixed_float")
+    assert call_profile(lambda: PATH["_ShowInstrument"]("fixed_float")) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 1,
@@ -2222,7 +2222,7 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }
-    assert numpy_calls(lambda: PATH["_ShowInstrument"]("future")) == {
+    assert numpy_calls(lambda: PATH["_ShowInstrument"]("fixed_float")) == {
         "ndarray.any": 3,
         "numpy.asarray": 1,
         "numpy.ascontiguousarray": 2,
@@ -2248,8 +2248,8 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
 ) -> None:
     headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
     body = Cells.from_rows([[float(i), 3.0 + i / 100, f"c{i}"] for i in range(rows)])
-    assert PATH["CountFieldRows"]("future", headers, body) == float(rows)
-    assert call_profile(lambda: PATH["CountFieldRows"]("future", headers, body)) == {
+    assert PATH["CountFieldRows"]("fixed_float", headers, body) == float(rows)
+    assert call_profile(lambda: PATH["CountFieldRows"]("fixed_float", headers, body)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 3,
@@ -2271,7 +2271,7 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
         "_number_out": 1,
         "_scalar": 1,
     }
-    assert numpy_calls(lambda: PATH["CountFieldRows"]("future", headers, body)) == {
+    assert numpy_calls(lambda: PATH["CountFieldRows"]("fixed_float", headers, body)) == {
         "ndarray.any": 3,  # one look per column
         "ndarray.cumsum": 1,  # the cells placed among the texts
         "ndarray.ravel": 1,
@@ -2290,8 +2290,8 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         [["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]]
     )
     row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
-    PATH["EchoFieldRow"]("future", headers, row)
-    profile = call_profile(lambda: PATH["EchoFieldRow"]("future", headers, row))
+    PATH["EchoFieldRow"]("fixed_float", headers, row)
+    profile = call_profile(lambda: PATH["EchoFieldRow"]("fixed_float", headers, row))
     binding = {
         name: count
         for name, count in profile.items()

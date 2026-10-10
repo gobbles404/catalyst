@@ -49,7 +49,7 @@ __all__ = [
 
 @excel_function
 def _CreateTradeTemplate(
-    instrument: Annotated[str, "One instrument name from _ListInstruments, such as future."],
+    instrument: Annotated[str, "One instrument name from _ListInstruments, such as fixed_float."],
     fields: Annotated[
         TextRow,
         "The field-name cells in one row, such as A1:B1, using names shown by _ShowInstrument.",
