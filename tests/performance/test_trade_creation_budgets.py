@@ -142,7 +142,7 @@ def a_ticket(rows: int, contracts: int) -> FieldValues:
         ("trade_date", "contract_code", "quantity", "fixed_price"),
         {
             "trade_date": np.repeat(np.datetime64("2026-09-24", "D"), rows),
-            "contract_code": tuple(CODES[i] for i in on),
+            "contract_code": tuple(CODES[int(i)] for i in on),
             "quantity": np.where(np.arange(rows) % 3 == 0, -3.0, 2.0),
             "fixed_price": 3.0 + (np.arange(rows) % 7) / 100,
         },
@@ -513,7 +513,7 @@ def a_body(rows: int, contracts: int) -> Cells:
     on = contract_rows(rows, contracts)
     return Cells.from_rows(
         [
-            [46289.0, CODES[on[i]], -3.0 if i % 3 == 0 else 2.0, 3.0 + (i % 7) / 100]
+            [46289.0, CODES[int(on[i])], -3.0 if i % 3 == 0 else 2.0, 3.0 + (i % 7) / 100]
             for i in range(rows)
         ]
     )
@@ -847,7 +847,7 @@ def a_mixed_ticket(rows: int, contracts: int) -> FieldValues:
         ),
         {
             "trade_date": np.repeat(np.datetime64("2026-09-24", "D"), rows),
-            "contract_code": tuple(CODES[i] for i in on),
+            "contract_code": tuple(CODES[int(i)] for i in on),
             "quantity": np.where(np.arange(rows) % 3 == 0, -3.0, 2.0),
             "fixed_price": 3.0 + (np.arange(rows) % 7) / 100,
             "quantity_unit": tuple(("lot", "MMBTU")[i % 2] for i in range(rows)),

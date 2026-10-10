@@ -271,9 +271,7 @@ def test_a_whole_year_strip_resolves_twelve_months_against_a_long_schedule() -> 
     contracts = tuple(
         (
             f"{letters[int(m.astype(int)) % 12]}{str(m)[2:4]}",
-            str(
-                np.busday_offset(m.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, "backward")
-            ),
+            str(np.busday_offset(np.datetime64(m, "D") + np.timedelta64(24, "D"), 0, "backward")),
         )
         for m in months
     )
