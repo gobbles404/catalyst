@@ -118,6 +118,25 @@ def test_a_count_of_more_than_seven_digits_is_refused_before_any_arithmetic() ->
     assert shift_date(day("2026-10-09"), "+00000001234567cd", None) == day("5406-11-26")
 
 
+def test_leading_zeros_are_dropped_before_the_count_is_read() -> None:
+    # Five thousand leading zeros are no digits of the count: the digits after them are read,
+    # none after them is zero, and eight after them are refused by those eight; nothing is ever
+    # converted whole, so no count runs into Python's own limit on the digits it converts.
+    zeros = "0" * 5000
+    assert shift_date(day("2026-10-09"), "+" + zeros + "1cd", None) == day("2026-10-10")
+    assert shift_date(day("2026-10-09"), "-" + zeros + "1bd", SYNTHETIC) == day("2026-10-08")
+    assert shift_date(day("2026-10-09"), "+" + zeros + "1em", None) == day("2026-11-30")
+    assert shift_date(day("2026-10-09"), "+" + zeros + "bd", SYNTHETIC) == day("2026-10-09")
+    assert shift_date(day("2026-10-09"), "-" + zeros + "cd", None) == day("2026-10-09")
+    assert shift_date(day("2026-10-09"), "+" + zeros + "em", None) == day("2026-10-31")
+    with pytest.raises(ValueError) as refused:
+        shift_date(day("2026-10-09"), "+" + zeros + "12345678cd", None)
+    assert str(refused.value) == (
+        f"offset has a count of 8 digits, expected at most {MOST_DIGITS}; the sheet's "
+        "calendar runs 1900-03-01 to 9999-12-31"
+    )
+
+
 # --- what is no offset -------------------------------------------------------------------------
 
 

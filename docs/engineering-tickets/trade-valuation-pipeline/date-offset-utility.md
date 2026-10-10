@@ -162,8 +162,9 @@ the kept workbook's rows 1884 to 1905; a nonleap February, offsets across the ho
 mixed-case suffixes, the signed zeros of each suffix on a closed day, leading zeros; the sheet's
 first and last days reached from each other and a day past either, by a day, a business day or
 a month, refused naming the date and the offset; eight and five thousand digits refused by their
-digits and seven read; nineteen texts that are no offset, an Arabic-Indic digit among them; the
-round trip of business days from an open day as a property, the month end's month and the
+digits, seven read and five thousand leading zeros dropped before the count is read; nineteen
+texts that are no offset, an Arabic-Indic digit among them; the round trip of business days from
+an open day as a property, the month end's month and the
 calendar days' arithmetic likewise; the calendar refused blank, dead or of another kind whatever
 the offset; the same calls and the same numpy for one day and for two million, within twice the
 slack, nothing published. The payment lag's grammar, the trade creators' ledgers and the kept

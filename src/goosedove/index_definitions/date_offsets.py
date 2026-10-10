@@ -61,13 +61,14 @@ def shift_date(date: np.datetime64, offset: str, holidays: HolidayCalendar | Non
         unit = Unit(suffix.lower())
     except ValueError:
         raise ValueError(f"offset is {offset!r}, expected {FORMS}") from None
-    significant = len(digits.lstrip("0"))
-    if significant > MOST_DIGITS:
+    significant = digits.lstrip("0")
+    if len(significant) > MOST_DIGITS:
         raise ValueError(
-            f"offset has a count of {significant} digits, expected at most {MOST_DIGITS}; the "
-            f"sheet's calendar runs {SHEET_FIRST_DAY} to {SHEET_LAST_DAY}"
+            f"offset has a count of {len(significant)} digits, expected at most {MOST_DIGITS}; "
+            f"the sheet's calendar runs {SHEET_FIRST_DAY} to {SHEET_LAST_DAY}"
         )
-    count = int(digits) if sign == "+" else -int(digits)
+    magnitude = int(significant or "0")
+    count = magnitude if sign == "+" else -magnitude
     match unit:
         case Unit.BUSINESS_DAYS:
             shifted = _business_days_on(date, count, holidays)

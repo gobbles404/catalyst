@@ -37,7 +37,7 @@ Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/
 
 ## The grammar
 
-One sign, `+` or `-`, one whole count in ASCII digits, leading zeros allowed, and one of three suffixes in either case, nothing before, between or after: `+1bd`, `-1BD`, `+001cD`, `-0em`. A count of more than seven significant digits is refused by its digits, since the sheet's calendar is 2,958,404 days, 2,113,146 business days and 97,197 month ends end to end and an eighth digit names no day a cell can show; so is anything else, a missing sign, a decimal, a space, a second instruction, a letter that is no suffix or a digit that is no ASCII digit, naming the offset and the form.
+One sign, `+` or `-`, one whole count in ASCII digits, leading zeros allowed and dropped before the count is read, however many, and one of three suffixes in either case, nothing before, between or after: `+1bd`, `-1BD`, `+001cD`, `-0em`. A count of more than seven significant digits is refused by its digits, since the sheet's calendar is 2,958,404 days, 2,113,146 business days and 97,197 month ends end to end and an eighth digit names no day a cell can show; so is anything else, a missing sign, a decimal, a space, a second instruction, a letter that is no suffix or a digit that is no ASCII digit, naming the offset and the form.
 
 | Suffix | Means | From Friday 9-Oct-2026 |
 |---|---|---|
@@ -61,7 +61,7 @@ The sheet's two days are the library's in `src/goosedove/index_definitions/sheet
 
 ## The reading
 
-The offset is read once by one full match of a sign, digits and two letters; the suffix is looked up among the three; the count is read as an integer only after its digits are counted. A business-day shift is one `np.busday_offset` with the sign's roll and the calendar's holidays, or none; a calendar-day shift one `np.timedelta64` added; a month end two conversions, the date to its month, the month moved by the count and one, to its first day, less one day. No loop runs over the days shifted, so a shift of two million business days costs what a shift of one does, as the budgets pin.
+The offset is read once by one full match of a sign, digits and two letters; the suffix is looked up among the three; the leading zeros are dropped and the count is read as an integer from the digits left, only after they are counted. A business-day shift is one `np.busday_offset` with the sign's roll and the calendar's holidays, or none; a calendar-day shift one `np.timedelta64` added; a month end two conversions, the date to its month, the month moved by the count and one, to its first day, less one day. No loop runs over the days shifted, so a shift of two million business days costs what a shift of one does, as the budgets pin.
 
 ## Tests
 
@@ -71,7 +71,7 @@ The library's examples and properties are `tests/unit/test_date_offsets.py`; the
 |---|---|
 | the ticket's sixteen worked answers, the synthetic calendar of one closed Monday where it says, the calendar omitted where it says | example |
 | a nonleap February, three business days across the holiday and back, two weekends, every suffix in mixed case, the signed zeros of each suffix on a Sunday, a count with leading zeros | example |
-| the sheet's last day keeps its month end; its first and last days reached from each other end to end in calendar days; a day past either end, by a day, a business day or a month, and the largest seven-digit counts of each suffix, refused naming the date and the offset; eight digits and five thousand refused by their digits; seven digits read | example |
+| the sheet's last day keeps its month end; its first and last days reached from each other end to end in calendar days; a day past either end, by a day, a business day or a month, and the largest seven-digit counts of each suffix, refused naming the date and the offset; eight digits and five thousand refused by their digits; seven digits read; five thousand leading zeros dropped, the digits after them read, none as zero and eight refused | example |
 | nineteen texts that are no offset, a missing sign, a decimal, a space anywhere, two instructions, a letter that is no suffix, an Arabic-Indic digit, refused naming the offset | example |
 | from any open day of 2026 to 2080, with the calendar and without, `+n` business days lands on an open day n business days on and `-n` returns; any month end is the last day of the month the count names; calendar days add and subtract whatever the calendar | property |
 | the ticket's table through the seam as serials and a float; the library's three refusals in its words; the date, the offset and the calendar refused in the seam's, a blank, a dead text and a valuation date where the calendar should be, whatever the offset; one calendar published and nothing of the shifts | example, through the seam |
