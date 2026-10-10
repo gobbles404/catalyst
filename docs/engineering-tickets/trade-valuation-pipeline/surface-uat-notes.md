@@ -39,7 +39,7 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 | 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Follow the helper work for one coherent date-entry UAT pass; this is a UX sequence, not a hard code dependency. |
 | 3 / item 9 | [Date-offset utility](#9-date-offsets-from-text): signed `bd`, `cd`, `em`, optional holiday calendar | Direction is specified; focused ticket still needed. Independent of the preceding work and can proceed alongside it. It is not a prerequisite for existing trade payment lags. |
 | 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #169. Required text immediately after `name`; stored on the index and exposed in readback only. |
-| 5 / item 8 | [Reserve totals](reserve-totals.md): calculate static brokerage/clearing totals at creation, carry them into evaluated results and expose a pure reader | Built in #NN. Positive costs from absolute component quantities and entry-specification rates, before netting. Marketing returns zero; its inputs and calculation follow bilateral. |
+| 5 / item 8 | [Reserve totals](reserve-totals.md): calculate static brokerage/clearing totals at creation, carry them into evaluated results and expose a pure reader | Built in #170. Positive costs from absolute component quantities and entry-specification rates, before netting. Marketing returns zero; its inputs and calculation follow bilateral. |
 | 6 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. Plan the arc now; coding need not wait for the unrelated utility or name changes if this becomes the priority. |
 
 Readable index names and the bounded reserve-totals ticket are ready for handoff while
@@ -283,8 +283,8 @@ gate passing. This records the reviewed prototype, not a merge to main.
 
 ## 8. Clearing brokerage and marketing reserves
 
-Built in #NN; the [reserve-totals ticket](reserve-totals.md)'s
-[As built](reserve-totals.md#as-built-nn) section says what landed.
+Built in #170; the [reserve-totals ticket](reserve-totals.md)'s
+[As built](reserve-totals.md#as-built-170) section says what landed.
 Reserves do not affect trade valuation, cash or market risk.
 
 In the inspected prototype through PR #168, contract specifications store

@@ -7,7 +7,7 @@ index's reporting lot with its total, shared with the preparation that settled t
 tick changes them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch
 as a whole,
 immutable, retained with everything that explains it, the dated live contributions among it;
-the batch's booked reserves, the encoding's, carried by reference since #NN.
+the batch's booked reserves, the encoding's, carried by reference since #170.
 docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
@@ -43,7 +43,7 @@ class TradeResults:
     BBL)`, and lot_delta_total their sum, the number the risk report shows as the delta; the
     three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
     model is undiscounted, so a rate move changes nothing, a result of the model and not a
-    placeholder. as_of is the history's valuation day. reserves, since #NN, is the batch's
+    placeholder. as_of is the history's valuation day. reserves, since #170, is the batch's
     booked brokerage and clearing with marketing at zero and their currency, the encoding's
     record by reference, which no tick changes, _ReportReserves spills and the results
     readback shows once."""

@@ -2410,7 +2410,7 @@ def ete_index(
     fees: dict[str, tuple[float, float]] | None = None,
 ) -> str:
     """The ETE index through the seam, quoted in that currency unit per that quantity unit and
-    settled in that currency, the reporting lot as given, MISSING for none, and since #NN the
+    settled in that currency, the reporting lot as given, MISSING for none, and since #170 the
     brokerage and clearing rates per lot of the specifications named, the rest free."""
     rates = fees or {}
     schedule = ENTRY["_CreateFuturesSchedule"](
@@ -3441,7 +3441,7 @@ def test_an_id_cell_that_is_not_a_whole_number_fails_in_the_seams_or_the_library
 # The ticket's worked example on the ETE index, cents a gallon settled in dollars: LOT at 10.00 and
 # 4.00 a lot, BBL at 0.01 and 0.004 a barrel, GAL free; four December rows, 2 LOT, -2 LOT, 1,000
 # BBL and 0 LOT at 25 cents: 50 of brokerage and 20 of clearing, marketing nought, in USD, booked
-# when the batch is made and the same through every tick, fixing, correction and payment, since #NN.
+# when the batch is made and the same through every tick, fixing, correction and payment, since #170.
 RESERVE_FEES = {"LOT": (10.0, 4.0), "BBL": (0.01, 0.004)}
 RESERVE_ROWS: list[list[object]] = [
     [101.0, serial("2026-11-20"), "Z26", 2.0, "LOT", 25.0, "lastday"],

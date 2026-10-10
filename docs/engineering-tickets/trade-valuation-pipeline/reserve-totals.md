@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 8](surface-uat-notes.md#8-clearing-brokerage-and-marketing-reserves)
 
-**Status:** Built in #NN on the prototype stack above #169, the page as a ticket; the
-[As built](#as-built-nn) section at the end says what was built and what was not. Ready
+**Status:** Built in #170 on the prototype stack above #169, the page as a ticket; the
+[As built](#as-built-170) section at the end says what was built and what was not. Ready
 for engineering, 9 October 2026. Inspected baseline: prototype PR #168 at `d1633d7`. One
 focused PR on its current successor. Marketing reserve inputs and calculations are deferred
 until after bilateral valuation.
@@ -132,7 +132,7 @@ No nonzero marketing reserve, reserve release schedule, fee payment lifecycle, r
 discounting, rate lookup by broker/clearing-house name, per-trade report or cross-index
 aggregation is included. Marketing follows bilateral as a separate ticket.
 
-## As built, #NN
+## As built, #170
 
 Engineering's record of what landed, in the ticket's terms.
 [report-reserves.md](../../library/trades/report-reserves.md) is the page.

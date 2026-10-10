@@ -9,7 +9,7 @@ input the batch consumes, an observation date within a payment group: the date, 
 pricing that date, derived by the calendar's rule and retained, the group's own under the
 expiry-based methods and whichever the calendar gives under asian, and the summed exposure
 every settle or quote of that date multiplies. And the reserves, the brokerage and the clearing
-each component incurs, summed for the batch, since #NN. Nothing here changes on a tick, a fixing
+each component incurs, summed for the batch, since #170. Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
@@ -81,7 +81,7 @@ class Encoded:
     year_of_month[m]. A bucket is a day, a month or a year the batch observes in and nothing
     else: no calendar day without an observation, and a payment day moves nothing.
 
-    Then reserves, since #NN, the batch's booked brokerage and clearing, each component's
+    Then reserves, since #170, the batch's booked brokerage and clearing, each component's
     count of its specification times the specification's rate per lot, summed, marketing at
     zero and their currency, the Reserves record, static for the batch and entering no number
     here; _ReportReserves spills the totals and the results readback shows them once."""
@@ -180,7 +180,7 @@ def encoded(
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
-    pay. The fees of the specification are read once, since #NN, for the reserves, each
+    pay. The fees of the specification are read once, since #170, for the reserves, each
     component's count times its specification's two rates per lot and the batch's two sums,
     marketing at zero, kept beside the encoding and never a contribution to value,
     docs/library/trades/report-reserves.md.

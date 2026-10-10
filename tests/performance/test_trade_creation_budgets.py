@@ -543,7 +543,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
-        "reserves": 1,  # the booked brokerage and clearing, once over the components, since #NN
+        "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_publish": 1,
     }
     expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 8}

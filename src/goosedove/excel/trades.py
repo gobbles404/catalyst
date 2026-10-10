@@ -3,7 +3,7 @@ created once and taken last by the trades creator; the trades, a batch of one or
 index, resolved from a template and a ticket and encoded; the batch prepared against one market
 history, as often as the history moves; the prepared batch evaluated against one market, as often
 as the quotes move; and the reports of a result, its values, its risk, its delta by time and,
-since #NN, its reserves, each handle to handle. docs/library/trades/ holds a page per
+since #170, its reserves, each handle to handle. docs/library/trades/ holds a page per
 function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are

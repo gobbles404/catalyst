@@ -5120,7 +5120,7 @@ def test_whole_trade_ids_keeps_15_digits_either_side_of_zero_and_names_the_first
 # barrels at 10.00 brokerage and 4.00 clearing a lot, and BBL, one barrel at 0.01 and 0.004, the
 # LOT the reporting lot unless another is named; and the four trades of its worked example, each
 # one Z26 month, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT: 20 + 20 + 10 + 0 of brokerage and
-# 8 + 8 + 4 + 0 of clearing, 50 and 20 USD, marketing nought, since #NN.
+# 8 + 8 + 4 + 0 of clearing, 50 and 20 USD, marketing nought, since #170.
 
 
 def a_fee_index(

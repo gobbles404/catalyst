@@ -482,7 +482,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # contract_lot_delta so that neither is read as the slot's; then the two units those numbers
     # are in, the sensitivity's, currency per quote unit, and the lot's words, the batch's facts
     # on every row so that a row reads whole, as the trades spill carries the route; the mark,
-    # the cash and the totals are the reports' to show. Then, since #NN, the batch's reserves,
+    # the cash and the totals are the reports' to show. Then, since #170, the batch's reserves,
     # once: the three totals and their currency on the first slot row, as _ReportReserves
     # spills them, and a dash on every later row, since they are the batch's booked amounts and
     # no slot's, and a total repeated on every slot would read as each slot's.

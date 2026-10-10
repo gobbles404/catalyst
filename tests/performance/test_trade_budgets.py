@@ -337,7 +337,7 @@ ENCODING_LEDGER = {
     "_the_slots": 1,
     "_the_buckets": 1,  # the day, month and year axes, since #166
     "_payments_after_observations": 1,
-    "reserves": 1,  # the booked brokerage and clearing, once over the components, since #NN
+    "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,

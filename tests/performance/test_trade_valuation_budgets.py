@@ -169,7 +169,7 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
         ("_ReportRisk", 3, True),
-        ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #NN
+        ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
         expected = {
