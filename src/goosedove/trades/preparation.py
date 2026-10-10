@@ -19,9 +19,27 @@ from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.encoding import Encoded
+from goosedove.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot
+PAYMENT_DAYS_MAPPED = "payment_days_mapped"  # distinct unpaid payment days, bilateral, since #176
+
+
+@dataclass(frozen=True, slots=True)
+class UnpaidPayments:
+    """The unpaid payment groups' days, since #176, for the bilateral path to gather factors by:
+    days, the distinct payment days of the groups not yet settled, increasing; groups, those
+    groups' positions among the batch's groups, increasing; day_of_group[i], the position among
+    days of groups[i]'s payment day; and tau[i], the calendar days from the valuation date to
+    that day over 365, ACT/365F. Made once when the batch is prepared, since the groups settled
+    and the valuation date change only then, so that a tick sorts and counts no day; None for a
+    cleared batch, which discounts nothing, and for a physical one, which pays on no day."""
+
+    days: NDArray[np.datetime64]
+    groups: NDArray[np.intp]
+    day_of_group: NDArray[np.intp]
+    tau: NDArray[np.float64]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +75,11 @@ class PreparedTrades:
     days, monthly_lots[m] those summed onto its calendar months and yearly_lots[y] onto its
     calendar years, the three views _ReportDelta selects among, a bucket's lots zero once its
     days have fixed and its row kept; every one of them checked finite before the record is
-    made; the result shares them."""
+    made; the result shares them. And since #176, for a bilateral financial batch, unpaid_payments,
+    the distinct payment days of the groups not yet settled with each such group's place among
+    them and its time fraction, made once here, since the groups settled and the valuation date
+    change only when a batch is prepared again, so that a tick gathers the curve's factors and
+    sorts nothing; None for a cleared batch and for a physical one."""
 
     encoded: Encoded
     history: MarketHistory
@@ -78,6 +100,7 @@ class PreparedTrades:
     daily_lots: NDArray[np.float64]
     monthly_lots: NDArray[np.float64]
     yearly_lots: NDArray[np.float64]
+    unpaid_payments: UnpaidPayments | None
 
 
 class Bucket(Enum):
@@ -131,6 +154,28 @@ def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
             assert_never(encoded.terms.schedule)
 
 
+def _unpaid_payments(
+    encoded: Encoded, unsettled: NDArray[np.bool_], as_of: np.datetime64, counter: WorkCounter
+) -> UnpaidPayments | None:
+    """The mapping a bilateral batch's ticks gather the curve's factors by, since #176, made once
+    here, where the groups settled and the valuation date are decided, and for a bilateral batch
+    alone, a cleared one discounting nothing: None for a physical batch, which pays on no day and
+    which the evaluation refuses a curve; else the groups not yet settled, their distinct payment
+    days with each group's place among them, one unique over those groups' days, and their time
+    fractions, ACT/365F, every array frozen. Work: one day mapped per distinct unpaid payment day,
+    reported to the counter; nothing on a tick."""
+    if encoded.payment_date is None:
+        return None
+    groups = np.flatnonzero(unsettled)
+    pays = encoded.payment_date[groups]
+    days, day_of_group = np.unique(pays, return_inverse=True)
+    tau = (pays - as_of).astype(np.int64) / 365.0
+    for array in (days, groups, day_of_group, tau):
+        array.setflags(write=False)
+    counter.hit(PAYMENT_DAYS_MAPPED, int(days.size))
+    return UnpaidPayments(days, groups, day_of_group, tau)
+
+
 def prepared_trades(
     encoded: Encoded, history: MarketHistory, counter: WorkCounter
 ) -> PreparedTrades:
@@ -161,11 +206,13 @@ def prepared_trades(
     reporting lot's coefficient, the conversion the index resolved once, so that the delta is
     counted in lots of the index's reporting specification whatever words the rows were entered
     in, and no specification is looked up and nothing is converted here or on a tick. Every live
-    lot, every lot delta and their total are finite, else the first that is not is refused by its
-    slot, its contract or the batch, the fourth rule: a lot small enough, a BTU against quantities
-    in the trillions of MMBTU, divides a finite exposure past the largest number once it is counted
-    in lots, or two contracts' finite deltas sum past it, and nothing is published that a reader
-    would then fail on.
+    lot, every lot delta, their total and the cash are finite, else the first that is not is
+    refused by its slot, its contract or the batch, the fourth rule: a lot small enough, a BTU
+    against quantities in the trillions of MMBTU, divides a finite exposure past the largest
+    number once it is counted in lots, two contracts' finite deltas sum past it, or, since #176,
+    the settled groups' offsets and set amounts do, and nothing is published that a reader would
+    then fail on. For a bilateral financial batch the unpaid groups' payment days are mapped here
+    once, _unpaid_payments, for the ticks to gather the curve's factors by.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
     counter; nothing per component, nothing per observation, nothing per day of the calendar.
@@ -217,10 +264,11 @@ def prepared_trades(
         encoded.reference_of_slot, weights=dated_live_exposure, minlength=encoded.references.size
     )
     lot = terms.reporting_lot
-    with np.errstate(over="ignore"):  # a finite exposure may outrun the largest number in lots
+    with np.errstate(over="ignore"):  # finite legs may outrun the largest number; the rules judge
         dated_live_lots = dated_live_exposure / lot.coefficient
         lot_delta = price_sensitivity / lot.coefficient
         lot_delta_total = float(lot_delta.sum())
+        cash = float((encoded.offset_of_group + set_amount)[is_settled].sum())
     words = lot.words
     outrun = ~np.isfinite(dated_live_lots)
     if outrun.any():
@@ -262,9 +310,21 @@ def prepared_trades(
                 f"{label} {starts[b]} has {float(lots[b])!r} of lot delta in all, expected a "
                 f"finite number of {words}; its exposures in lots sum past the largest number"
             )
+    if not np.isfinite(cash):
+        currency = terms.index.conventions.currency_unit
+        raise ValueError(
+            f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
+            "settled groups' offsets and set amounts sum past the largest number"
+        )
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
+    # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
+    unpaid_payments = (
+        _unpaid_payments(encoded, unsettled, as_of, counter)
+        if terms.route is Route.BILATERAL
+        else None
+    )
     arrays = (
         is_fixed,
         dated_live_exposure,
@@ -283,11 +343,12 @@ def prepared_trades(
         *arrays,
         float(encoded.offset_of_group[unsettled].sum()),
         float(set_amount[unsettled].sum()),
-        float((encoded.offset_of_group + set_amount)[is_settled].sum()),
+        cash,
         price_sensitivity,
         lot_delta,
         lot_delta_total,
         daily_lots,
         monthly_lots,
         yearly_lots,
+        unpaid_payments,
     )

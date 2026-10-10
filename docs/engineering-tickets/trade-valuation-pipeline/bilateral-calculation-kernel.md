@@ -290,12 +290,29 @@ and does not do yet; the seam's record is the #176 row of [history.md](../../sea
   118.8, then cash 120, the axes on interpolated factors over two references and a year end, the
   singletons, the order, the duplicate, the cleared sharing, and the two trades made through the
   creators with `+261bd` and `+522bd`.
-- Counts: the bilateral tick 8 functions and 13 numpy calls at five trades and at two thousand, against the cleared tick's 4 and
-  4, which did not move; the counter one factor per distinct unpaid payment day, one unpaid group, one live slot and 4
-  reductions; the peak 3,608 bytes for two groups and 7,600 for twenty-four with twenty live slots, within 128 a group, 48
-  a live slot and four slacks, against 1,210 and 1,418 cleared; the retained arrays exactly the new vectors' bytes. The
-  Python tests 2,528 to 2,543, the smoke 976 formulas to 976, the host's 314 to 314, the lifetime's 128
-  unchanged; the workbook's one refusal text recalculated.
+- The review at 82ccf0e, two P2 findings, fixed on the branch. Every stored vector is checked
+  before a result is made: the amount of every group, paid or not, the mark and the DV01, the
+  discounted lots by reference, the discounted sensitivity by reference, the three views and the
+  lots' total, with the arithmetic run under numpy's overflow flag so the rules and not a warning
+  judge; the cash is checked where it is made, at preparation, for either route. The review's
+  case, half the largest number of barrels in each of two groups on a three-barrel reporting lot,
+  is refused by its contract, `F27 has inf of discounted price sensitivity, expected a finite
+  amount of USD per USD/BBL; its discounted lots times the lot's coefficient outrun the largest
+  number`, where the cleared batch publishes the largest number exactly with a mark of nothing.
+  And the payment-day mapping is the preparation's, `UnpaidPayments` on `PreparedTrades`, made
+  once for a bilateral financial batch by `_unpaid_payments` and `None` otherwise: the distinct
+  unpaid payment days, the unsettled groups, each group's place among the days and its time
+  fraction; the tick gathers the curve's factors through it and sorts nothing, which the budgets
+  pin, with the long asian schedule's day buckets now in the peak's formula.
+- Counts: the bilateral tick 8 functions and 8 numpy entries at five trades and at two thousand, under lastday and under asian,
+  no sort among them, against the cleared tick's 4 and 4, which did not move; the preparation of a bilateral batch one helper
+  and the unique's numpy over the cleared preparation's ledger, which did not move either, one day mapped per distinct unpaid
+  payment day; the counter one factor per distinct unpaid payment day, one unpaid group, one live slot and 4 reductions; the
+  peak 2,977 bytes for two groups and 5,061 for twenty-four with twenty live slots, 3,305 and 22,024 for the asian batches over
+  43 and 519 days with 429 live, within 128 a group, 48 a live slot, 8 a time bucket and four slacks, against 1,210, 1,418,
+  1,210 and 10,960 cleared; the retained arrays exactly the new vectors' bytes, and the mapping eight bytes a day and
+  twenty-four an unpaid group. The Python tests 2,528 to 2,556, the smoke 976 formulas to 976, the host's 314
+  to 314, the lifetime's 128 unchanged; the workbook's one refusal text recalculated.
 - Not done, as the ticket keeps separate: no curve argument on `_EvaluateTrades`, no reader column, no
   workbook example of a bilateral value; the public bilateral refusal reworded only, in the smoke, the
   host and the kept workbook. No golden file changed.

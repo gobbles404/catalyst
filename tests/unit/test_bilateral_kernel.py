@@ -9,7 +9,10 @@ Tolerances, by measure: amounts near 100, lots near 10 and their sums to within 
 1e-12 relative, 1e-14 relative to the legs they come from and far below what a handful of products
 of doubles can drift; DV01s near 1e-2 to the same bounds, the absolute one mattering since a batch
 that cancels to nothing has a mark of 0 exactly here, the legs being equal and opposite in binary.
-docs/library/trades/kernel.md is the page."""
+The review of the kernel added the mapping of the unpaid payment days, made once at preparation,
+and the rules over every stored vector: the discounted sensitivity on a three-barrel lot and the
+amounts past the largest number, by group or as cash. docs/library/trades/kernel.md is the
+page."""
 
 from typing import Any
 
@@ -32,7 +35,11 @@ from test_trades import (
 
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
 from goosedove.globals.unit_conversions import UNITS
+from goosedove.index_definitions.contract_specifications import contract_specifications
+from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.index import Index, index
+from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
@@ -70,6 +77,27 @@ UNIT = an_index(
 PAY_DAYS = holiday_calendar(dates("2030-01-01"))
 AS_OF = "2027-01-04"
 A_YEAR, TWO_YEARS = "2028-01-04", "2029-01-03"  # 365 and 730 days after the valuation day
+# The review's index: the same contracts and calendars, trades entered in barrels, a bare unit of
+# one, and a reporting lot of three barrels, so that a lot is a third of an exposure and the
+# discounted sensitivity is the lots multiplied back by three.
+TRIO = index(
+    "TRIO",
+    "TRIO index",
+    futures_schedule(("Z26", "F27", "F29"), dates("2026-12-31", "2027-01-04", "2029-01-05"), None),
+    index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+    contract_specifications(
+        ("BBL", "TRIO"),
+        numbers(1.0, 3.0),
+        ("BBL", "BBL"),
+        numbers(0.0, 0.0),
+        numbers(0.0, 0.0),
+        UNITS,
+    ),
+    holiday_calendar(dates("2027-12-27")),
+    "TRIO",
+    UNITS,
+)
+LARGEST = float(np.finfo(np.float64).max)
 
 
 def given(array: NDArray[np.float64] | None) -> NDArray[np.float64]:
@@ -92,9 +120,12 @@ def terms_of(
     route: Route = Route.BILATERAL,
     settlement: Settlement = Settlement.FINANCIAL,
     contracts: tuple[int, ...] | None = None,
+    fixed: float = 70.0,
+    ix: Index = UNIT,
 ) -> ResolvedTrades:
-    """One lastday trade per quantity, each its own payment group, at 70 on F27 unless another
-    schedule row is given; bilateral and financial unless told otherwise."""
+    """One lastday trade per quantity, each its own payment group, at 70 on F27 of UNIT unless
+    another schedule row, fixed price or index is given; bilateral and financial unless told
+    otherwise."""
     n = len(quantities)
     contract = rows(*(contracts or (1,) * n))
     payment = (
@@ -103,11 +134,11 @@ def terms_of(
         else PaymentTerms(np.array(lags[:n], dtype=np.int64), (PAY_DAYS,) * n, dates(*pays[:n]))
     )
     return resolved_trades(
-        FIXED_FLOAT, UNIT, spec(n), route, settlement,
+        FIXED_FLOAT, ix, spec(n), route, settlement,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*range(1001, 1001 + n)),
         None, None,
         dates(*[AS_OF] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
-        *bounds_of(UNIT, contract), numbers(*[70.0] * n), payment,
+        *bounds_of(ix, contract), numbers(*[fixed] * n), payment,
         counterparty=None if route is Route.CLEARED else ("ACME Trading",) * n,
     )  # fmt: skip
 
@@ -117,7 +148,7 @@ def prepared_on(
 ) -> PreparedTrades:
     return prepared_trades(
         encoded(terms, observed_of(terms), UNITS, WorkCounter()),
-        history_on(UNIT, as_of, finals or {}),
+        history_on(terms.index, as_of, finals or {}),
         WorkCounter(),
     )
 
@@ -442,3 +473,109 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
     assert result.dv01 == pytest.approx(0.0085, **CLOSE)
     assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
     assert result.lot_delta_total == 0.0
+
+
+# --- the review of #176: the mapping once, every stored vector finite -----------------------------
+
+
+def test_the_preparation_maps_the_unpaid_payment_days_once_for_the_ticks() -> None:
+    # The two groups, a year and two years out: two days, each group's place among them and the
+    # time fractions 1 and 2, frozen, two days mapped. Once the first has paid, one group is left,
+    # a year from the new valuation day. Two contracts paying on one day map one day for the two,
+    # and a tick reads one factor for both. A cleared batch and a physical one map nothing.
+    terms = terms_of()
+    counter = WorkCounter()
+    prep = prepared_trades(
+        encoded(terms, observed_of(terms), UNITS, WorkCounter()),
+        history_on(UNIT, AS_OF, {}),
+        counter,
+    )
+    assert counter.freeze().as_dict() == {
+        "fixings_read": 0,
+        "payment_days_mapped": 2,
+        "prepared_slots": 2,
+    }
+    pays = prep.unpaid_payments
+    assert pays is not None
+    np.testing.assert_array_equal(pays.days, dates(A_YEAR, TWO_YEARS))
+    np.testing.assert_array_equal(pays.groups, [0, 1])
+    np.testing.assert_array_equal(pays.day_of_group, [0, 1])
+    np.testing.assert_array_equal(pays.tau, [1.0, 2.0])
+    for array in (pays.days, pays.groups, pays.day_of_group, pays.tau):
+        assert not array.flags.writeable
+    later = prepared_on(terms, A_YEAR, {"F27": 82.0}).unpaid_payments
+    assert later is not None
+    np.testing.assert_array_equal(later.days, dates(TWO_YEARS))
+    np.testing.assert_array_equal(later.groups, [1])
+    np.testing.assert_array_equal(later.day_of_group, [0])
+    np.testing.assert_array_equal(later.tau, [1.0])
+    one_day = prepared_on(
+        terms_of((10.0, 5.0), ("2029-01-08", "2029-01-08"), (522, 1), contracts=(1, 2))
+    )
+    shared = one_day.unpaid_payments
+    assert shared is not None
+    np.testing.assert_array_equal(shared.days, dates("2029-01-08"))
+    np.testing.assert_array_equal(shared.groups, [0, 1])
+    np.testing.assert_array_equal(shared.day_of_group, [0, 0])
+    np.testing.assert_allclose(shared.tau, [735 / 365, 735 / 365], **TIGHT)
+    counter = WorkCounter()
+    result = valued(one_day, (80.0, 50.0), curve_of((AS_OF, 1.0), ("2029-01-08", 0.90)), counter)
+    np.testing.assert_array_equal(given(result.payment_factor), [0.9, 0.9])
+    counts = counter.freeze().as_dict()
+    assert counts["payment_factors_read"] == 1 and counts["groups_valued"] == 2
+    assert prepared_on(terms_of(route=Route.CLEARED)).unpaid_payments is None
+    assert prepared_on(terms_of(settlement=Settlement.PHYSICAL)).unpaid_payments is None
+
+
+def test_an_amount_past_the_largest_number_is_refused_by_its_group_or_as_cash() -> None:
+    # One barrel bought at -1e308 is an entry offset of 1e308. Quoted 1e308, the live leg is
+    # another 1e308 and the group's amount is past the largest number, refused by its contract
+    # and payment day with no mark or DV01 made; fixed at 1e308 the next day, the set leg is, the
+    # same words; and on its payment day, when the group is cash, the preparation refuses the
+    # batch's cash, bilateral or cleared alike, before any curve is asked for.
+    terms = terms_of((1.0,), (A_YEAR,), (261,), fixed=-1e308)
+    with pytest.raises(ValueError) as refused:
+        valued(prepared_on(terms), (1e308, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
+    assert str(refused.value) == (
+        "the payment of F27 on 2028-01-04 is inf, expected a finite amount of USD; its fixed, set "
+        "and live legs sum past the largest number"
+    )
+    fixed = prepared_on(terms, "2027-01-05", {"F27": 1e308})
+    with pytest.raises(ValueError, match=r"^the payment of F27 on 2028-01-04 is inf, "):
+        valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
+    for route in (Route.BILATERAL, Route.CLEARED):
+        with pytest.raises(ValueError) as refused:
+            prepared_on(
+                terms_of((1.0,), (A_YEAR,), (261,), route=route, fixed=-1e308),
+                A_YEAR,
+                {"F27": 1e308},
+            )
+        assert str(refused.value) == (
+            "the batch has inf of cash in all, expected a finite amount of USD; the settled "
+            "groups' offsets and set amounts sum past the largest number"
+        )
+
+
+def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_contract() -> None:
+    # The review's case: half the largest number of barrels in each of two groups of F27, bought
+    # at nothing and quoted nothing on a curve of ones, the reporting lot three barrels. The
+    # nominal sensitivity is their sum, the largest number exactly, the lot delta a third of it,
+    # and the cleared batch publishes both with a mark of nothing. The discounted lots are a third
+    # of each half, summed, and multiplied back by three they round past the largest number: the
+    # bilateral tick refuses the sensitivity by its contract rather than publish inf beside a mark
+    # and a DV01 of nothing.
+    halves = (LARGEST / 2, LARGEST / 2)
+    cleared = valued(
+        prepared_on(terms_of(halves, route=Route.CLEARED, fixed=0.0, ix=TRIO)), (0.0, 50.0), None
+    )
+    assert cleared.mark == 0.0 and cleared.dv01 == 0.0
+    np.testing.assert_array_equal(cleared.price_sensitivity, [LARGEST])
+    assert cleared.lot_delta_total == LARGEST / 3
+    prep = prepared_on(terms_of(halves, fixed=0.0, ix=TRIO))
+    assert prep.lot_delta_total == LARGEST / 3
+    with pytest.raises(ValueError) as refused:
+        valued(prep, (0.0, 50.0), curve_of((AS_OF, 1.0), (TWO_YEARS, 1.0)))
+    assert str(refused.value) == (
+        "F27 has inf of discounted price sensitivity, expected a finite amount of USD per USD/BBL; "
+        "its discounted lots times the lot's coefficient outrun the largest number"
+    )

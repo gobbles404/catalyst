@@ -24,7 +24,7 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
-from goosedove.trades.preparation import PreparedTrades
+from goosedove.trades.preparation import PreparedTrades, UnpaidPayments
 from goosedove.trades.reserves import Reserves
 from goosedove.trades.terms import Route, Settlement
 
@@ -251,22 +251,25 @@ def _discounted(
     """The bilateral snapshot, since #176, over the rules _the_curve checked. The live contributions
     are summed onto the payment groups, one bincount, and each group's amount is its entry-price
     offset, its set amount and its live amount together; a paid group's amount is cash already
-    and is read for nothing. The curve's factor is read once per distinct unpaid payment day, by
-    position, the curve being daily from its start, and mapped onto the groups; each unpaid
-    group's NPV is its amount times its factor, the mark their sum, and its DV01 is -0.0001 times
-    its day count from the valuation date over 365, ACT/365F, times its NPV, the analytic
-    sensitivity to a rise of one basis point in the continuously compounded zero rates, the batch's
-    DV01 their sum, negative for an amount receivable. The discounted lots are each live slot's
-    lots times its group's factor, before any sum, since two slots of one day and one contract may
-    pay on different days; summed onto the references, the days, the months and the years as the
-    preparation sums the nominal lots, and the discounted sensitivity the lots times the reporting
-    lot's coefficient, the one conversion the index resolved. Each unpaid amount, the two totals,
-    the discounted vectors and their total are finite, else the first that is not is refused by its
-    group, the batch, its contract or its bucket.
+    and is read for nothing. The unpaid groups, their distinct payment days, each one's place among
+    them and its time fraction are the preparation's, made once when the batch was prepared, so
+    the curve's factor is read here once per distinct unpaid payment day, by position, the curve
+    being daily from its start, and placed on the groups with nothing sorted or counted; each
+    unpaid group's NPV is its amount times its factor, the mark their sum, and its DV01 is -0.0001
+    times its time fraction times its NPV, the analytic sensitivity to a rise of one basis point in
+    the continuously compounded zero rates, the batch's DV01 their sum, negative for an amount
+    receivable. The discounted lots are each live slot's lots times its group's factor, before any
+    sum, since two slots of one day and one contract may pay on different days; summed onto the
+    references, the days, the months and the years as the preparation sums the nominal lots, and
+    the discounted sensitivity the lots times the reporting lot's coefficient, the one conversion
+    the index resolved. The arithmetic runs with numpy's flags down and the rules judge: every
+    group's amount, the two totals, the discounted lots by reference and by bucket, the discounted
+    sensitivity by reference and the lots' total are finite, else the first that is not is refused
+    by its group, the batch, its contract or its bucket.
 
     Work: one factor per distinct unpaid payment day, one group per unpaid group, one slot per
     live slot and four reductions, reported to the counter; nothing per component or observation,
-    and nothing of the nominal risk done again.
+    nothing of the nominal risk done again, and no day sorted.
     """
     encoded = prepared.encoded
     terms = encoded.terms
@@ -278,14 +281,39 @@ def _discounted(
     payment_date = cast(
         NDArray[np.datetime64], encoded.payment_date
     )  # financial: _the_curve's rule
-    unpaid = ~prepared.is_settled
+    pays = cast(UnpaidPayments, prepared.unpaid_payments)  # bilateral and financial: the same rule
     live_group = encoded.slot_group[prepared.live_slot]
-    amount = (
-        encoded.offset_of_group
-        + prepared.set_amount
-        + np.bincount(live_group, weights=dated_live_contribution, minlength=groups)
-    )
-    unfinished = unpaid & ~np.isfinite(amount)
+    lot = terms.reporting_lot
+    with np.errstate(over="ignore", invalid="ignore"):  # the rules below are the judge
+        amount = (
+            encoded.offset_of_group
+            + prepared.set_amount
+            + np.bincount(live_group, weights=dated_live_contribution, minlength=groups)
+        )
+        payment_factor = np.ones(groups)  # a paid group's policy factor, read for nothing
+        payment_factor[pays.groups] = curve.factors[(pays.days - curve.start_date).astype(np.intp)][
+            pays.day_of_group
+        ]
+        npv = np.zeros(groups)
+        npv[pays.groups] = amount[pays.groups] * payment_factor[pays.groups]
+        dv01_by_group = np.zeros(groups)
+        dv01_by_group[pays.groups] = -0.0001 * pays.tau * npv[pays.groups]
+        mark = float(npv.sum())
+        dv01 = float(dv01_by_group.sum())
+        live_lots = prepared.dated_live_lots[prepared.live_slot] * payment_factor[live_group]
+        discounted_lot_delta = np.bincount(
+            encoded.reference_of_slot[prepared.live_slot],
+            weights=live_lots,
+            minlength=encoded.references.size,
+        )
+        discounted_price_sensitivity = discounted_lot_delta * lot.coefficient
+        daily = np.bincount(
+            encoded.day_of_slot[prepared.live_slot], weights=live_lots, minlength=encoded.days.size
+        )
+        monthly = np.bincount(encoded.month_of_day, weights=daily, minlength=encoded.months.size)
+        yearly = np.bincount(encoded.year_of_month, weights=monthly, minlength=encoded.years.size)
+        discounted_total = float(discounted_lot_delta.sum())
+    unfinished = ~np.isfinite(amount)
     if unfinished.any():
         g = int(unfinished.argmax())
         raise ValueError(
@@ -293,35 +321,12 @@ def _discounted(
             f"{float(amount[g])!r}, expected a finite amount of {currency}; its fixed, set and "
             "live legs sum past the largest number"
         )
-    days, back = np.unique(payment_date[unpaid], return_inverse=True)
-    payment_factor = np.ones(groups)  # a paid group's policy factor, read for nothing
-    payment_factor[unpaid] = curve.factors[(days - curve.start_date).astype(np.intp)][back]
-    tau = np.zeros(groups)
-    tau[unpaid] = (payment_date[unpaid] - as_of).astype(np.int64) / 365.0  # ACT/365F
-    npv = np.where(unpaid, amount * payment_factor, 0.0)
-    dv01_by_group = -0.0001 * tau * npv
-    mark = float(npv.sum())
-    dv01 = float(dv01_by_group.sum())
     for label, total in (("mark", mark), ("DV01", dv01)):
         if not np.isfinite(total):
             raise ValueError(
                 f"the batch has {total!r} of {label} in all, expected a finite amount of "
                 f"{currency}; the groups' amounts, each finite, sum past the largest number"
             )
-    live_lots = prepared.dated_live_lots[prepared.live_slot] * payment_factor[live_group]
-    discounted_lot_delta = np.bincount(
-        encoded.reference_of_slot[prepared.live_slot],
-        weights=live_lots,
-        minlength=encoded.references.size,
-    )
-    lot = terms.reporting_lot
-    discounted_price_sensitivity = discounted_lot_delta * lot.coefficient
-    daily = np.bincount(
-        encoded.day_of_slot[prepared.live_slot], weights=live_lots, minlength=encoded.days.size
-    )
-    monthly = np.bincount(encoded.month_of_day, weights=daily, minlength=encoded.months.size)
-    yearly = np.bincount(encoded.year_of_month, weights=monthly, minlength=encoded.years.size)
-    discounted_total = float(discounted_lot_delta.sum())
     words = lot.words
     outrun = ~np.isfinite(discounted_lot_delta)
     if outrun.any():
@@ -330,6 +335,15 @@ def _discounted(
             f"{codes[int(encoded.references[r])]} has {float(discounted_lot_delta[r])!r} of "
             f"discounted lot delta, expected a finite number of {words}; its discounted lots sum "
             "past the largest number"
+        )
+    outrun = ~np.isfinite(discounted_price_sensitivity)
+    if outrun.any():
+        r = int(outrun.argmax())
+        raise ValueError(
+            f"{codes[int(encoded.references[r])]} has {float(discounted_price_sensitivity[r])!r} "
+            f"of discounted price sensitivity, expected a finite amount of {currency} per "
+            f"{conventions.quote_currency_unit}/{conventions.quote_quantity_unit}; its discounted "
+            "lots times the lot's coefficient outrun the largest number"
         )
     for label, starts, lots in (
         ("the day", encoded.days, daily),
@@ -350,8 +364,8 @@ def _discounted(
             f"number of {words}; the contracts' discounted deltas, each finite, sum past the "
             "largest number"
         )
-    counter.hit(PAYMENT_FACTORS_READ, int(days.size))
-    counter.hit(GROUPS_VALUED, int(np.count_nonzero(unpaid)))
+    counter.hit(PAYMENT_FACTORS_READ, int(pays.days.size))
+    counter.hit(GROUPS_VALUED, int(pays.groups.size))
     counter.hit(SLOTS_DISCOUNTED, int(prepared.live_slot.size))
     counter.hit(RISK_REDUCTIONS, 4)
     for array in (
