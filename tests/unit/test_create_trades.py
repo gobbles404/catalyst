@@ -1254,7 +1254,11 @@ def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns(
         "fixed_price": [0.25] * 2,
     }
     coded_template = {**ASIAN_TEMPLATE, "contract_code": "Z26"}
-    dated_rows = {**two, "start_date": [None, "2026-12-12"], "end_date": [None, "2026-12-20"]}
+    dated_rows: dict[str, list[object]] = {
+        **two,
+        "start_date": [None, "2026-12-12"],
+        "end_date": [None, "2026-12-20"],
+    }
     batch, counter = created(ETHANE, dated_rows, coded_template)
     assert components_of(batch)[1:4] == (
         ["2026-12-01", "2026-12-12"],
@@ -1264,14 +1268,17 @@ def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns(
     assert batch.entered_codes == ("Z26", "Z26")
     assert counter.freeze()["ticket_codes_read"] == 1
     started_template = {**ASIAN_TEMPLATE, "start_date": "2026-12-12"}
-    ends_column = {**two, "contract_code": ["Z26", None], "end_date": ["2026-12-20", None]}
+    ends_column: dict[str, list[object]] = {
+        **two,
+        "contract_code": ["Z26", None],
+        "end_date": ["2026-12-20", None],
+    }
     assert refused(ETHANE, ends_column, started_template) == (
         "start_date is 2026-12-12 without end_date row 2, expected both dates, the period's first "
         "and last day, or neither and a contract_code"
     )
-    both_ends, _ = created(
-        ETHANE, {**ends_column, "end_date": ["2026-12-20", "2026-12-31"]}, started_template
-    )
+    two_ends: dict[str, list[object]] = {**ends_column, "end_date": ["2026-12-20", "2026-12-31"]}
+    both_ends, _ = created(ETHANE, two_ends, started_template)
     assert components_of(both_ends)[1:4] == (
         ["2026-12-12"] * 2,
         ["2026-12-20", "2026-12-31"],
@@ -1279,7 +1286,7 @@ def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns(
     )
     np.testing.assert_array_equal(both_ends.code_entered, [True, False])
     dated_template = {**ASIAN_TEMPLATE, "start_date": "2026-12-12", "end_date": "2026-12-31"}
-    codes_column = {**two, "contract_code": ["F27", "Z2026"]}
+    codes_column: dict[str, list[object]] = {**two, "contract_code": ["F27", "Z2026"]}
     by_dates, counter = created(ETHANE, codes_column, dated_template)
     assert components_of(by_dates)[:4] == (
         ["Z26"] * 2,
@@ -1292,15 +1299,17 @@ def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns(
     assert refused(ETHANE, dated_rows, blank_template) == (
         "start_date is supplied by the template and by the ticket, expected by one of them"
     )
-    by_code, _ = created(ETHANE, {**two, "contract_code": ["Z26", "Z26"]}, blank_template)
+    coded_rows: dict[str, list[object]] = {**two, "contract_code": ["Z26", "Z26"]}
+    by_code, _ = created(ETHANE, coded_rows, blank_template)
     assert components_of(by_code)[1:3] == (["2026-12-01"] * 2, ["2026-12-31"] * 2)
     # A template code the grammar refuses stands until a row books by it.
     bad_template = {**ASIAN_TEMPLATE, "contract_code": "Z2026"}
-    standing, _ = created(
-        ETHANE,
-        {**two, "start_date": ["2026-12-12"] * 2, "end_date": ["2026-12-31"] * 2},
-        bad_template,
-    )
+    dated_pair: dict[str, list[object]] = {
+        **two,
+        "start_date": ["2026-12-12"] * 2,
+        "end_date": ["2026-12-31"] * 2,
+    }
+    standing, _ = created(ETHANE, dated_pair, bad_template)
     assert standing.entered_codes == ("Z2026", "Z2026")
     assert refused(ETHANE, two, bad_template) == (
         "contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, "
