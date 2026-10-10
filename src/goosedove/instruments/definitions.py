@@ -54,12 +54,13 @@ FUTURE = Instrument(
     (
         Field(
             "trade_id",
-            "External label identifying the deal",
+            "External numeric identifier of the executed deal",
             False,
             NONE,
-            FieldType.TEXT,
-            "no fixed list",
-            "Duplicate labels keep separate occurrences",
+            FieldType.NUMBER,
+            "a whole number of at most 15 digits",
+            "The source system's deal number, whole, -999999999999999 to 999999999999999, "
+            "never text; duplicates keep separate occurrences",
         ),
         Field(
             "trade_date",

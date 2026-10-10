@@ -214,7 +214,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_Fields.has": 18,  # three of them the period form's
         "_Fields.rows": 8,
         "_Fields.texts": 6,  # the three row fields' columns read once each, with the codes
-        "_Fields.labels": 3,
+        "_Fields.labels": 2,  # clearing_house and broker; the trade IDs are read by ids
+        "_Fields.ids": 1,  # the trade IDs, whole numbers since #NN, none in this ticket
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
         "_Fields.objects": 1,

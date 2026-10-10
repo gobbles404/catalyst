@@ -54,6 +54,7 @@ from goosedove.trades.terms import (
     reporting_lot_of,
     resolved_trades,
     trade_schedule_of,
+    whole_trade_ids,
 )
 
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
@@ -117,6 +118,8 @@ def resolved(
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
+    trade IDs, since #NN, are whole numbers of at most 15 digits, the template's one read when
+    the template was made and the ticket's column read here, the first bad row named. The
     index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
     every code of its schedule is read for its month, the rows the
@@ -177,14 +180,14 @@ def resolved(
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract, start, end = _the_periods(fields, months)
-    labels = fields.labels("trade_id")
+    trade_ids = fields.ids("trade_id")
     observations = observed(
         schedule_method[occurrence],
         index,
         contract,
         start,
         end,
-        lambda k: named_trade(labels, int(occurrence[k])),
+        lambda k: named_trade(trade_ids, int(occurrence[k])),
     )
     # The anchors are handed over as a temporary, not held across the kernel's copies below.
     match schedule:
@@ -209,7 +212,7 @@ def resolved(
         settlement,
         schedule_method,
         quantity_per,
-        labels,
+        trade_ids,
         fields.labels("clearing_house"),
         fields.labels("broker"),
         fields.dates("trade_date"),
@@ -272,6 +275,17 @@ class _Fields:
     def labels(self, name: str) -> tuple[str, ...] | None:
         """A label field per occurrence, or None when neither supplied it."""
         return self.texts(name) if self.has(name) else None
+
+    def ids(self, name: str) -> NDArray[np.int64] | None:
+        """The trade IDs per occurrence, whole numbers of at most 15 digits since #NN, or None when
+        neither supplied them: the template's one, read for the rule when the template was made
+        and repeated here, or the ticket's column read for it now, the first bad row named by the
+        field and the row."""
+        if not self.has(name):
+            return None
+        if name in self.template.defaults:
+            return np.full(self.rows, cast(int, self.template.defaults[name]), dtype=np.int64)
+        return whole_trade_ids(self.ticket.numbers(name), lambda k: self.where(name, k))
 
     def numbers(self, name: str) -> NDArray[np.float64]:
         if name in self.template.defaults:

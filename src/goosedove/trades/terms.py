@@ -111,9 +111,11 @@ class ResolvedTrades:
     for a quantity of the index that the row's quantity_unit named; schedule_method[i] its method
     and quantity_per[i] the basis its quantity is stated per, each the position of the member
     among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
-    trade_dates[i] the day the deal was struck, and labels[i] its trade_id, clearing_house[i] its
-    clearing organization and broker[i] its broker, each tuple None as a whole when the field was
-    not given, each a label kept as typed and read for nothing. Per
+    trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source system's
+    whole number of at most 15 digits held as an int64 since #NN, clearing_house[i] its clearing
+    organization and broker[i] its broker, the IDs an array and the two labels tuples, each None
+    as a whole when the field was not given, each kept as given and read for nothing but a
+    message's words. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
     count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
@@ -135,7 +137,7 @@ class ResolvedTrades:
     settlement: Settlement
     schedule_method: NDArray[np.intp]
     quantity_per: NDArray[np.intp]
-    labels: tuple[str, ...] | None
+    trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
     broker: tuple[str, ...] | None
     trade_dates: NDArray[np.datetime64]
@@ -150,18 +152,19 @@ class ResolvedTrades:
     payment: PaymentTerms | None
 
     def named(self, component: int) -> str:
-        """A component's trade named in a message, by its label when the ticket gave one and by
-        its row as the sheet counts rows either way: `trade 'NG-001' at row 1`, `trade at row 3`."""
-        return named_trade(self.labels, int(self.occurrence[component]))
+        """A component's trade named in a message, by its ID when the ticket gave one and by its
+        row as the sheet counts rows either way: `trade 1001 at row 1`, `trade at row 3`."""
+        return named_trade(self.trade_ids, int(self.occurrence[component]))
 
 
-def named_trade(labels: tuple[str, ...] | None, row: int) -> str:
-    """A trade named in a message, by its label when the ticket gave one and by its row as
-    the sheet counts rows either way, `trade 'NG-001' at row 1`, `trade at row 3`: the words
-    every refusal of a row's own fact uses, in the kernel and in the observations alike."""
-    if labels is None:
+def named_trade(trade_ids: NDArray[np.int64] | None, row: int) -> str:
+    """A trade named in a message, by its ID when the ticket gave one, the whole number without
+    quotes since #NN, and by its row as the sheet counts rows either way, `trade 1001 at row 1`,
+    `trade at row 3`: the words every refusal of a row's own fact uses, in the kernel and in the
+    observations alike."""
+    if trade_ids is None:
         return f"trade at row {row + 1}"
-    return f"trade {labels[row]!r} at row {row + 1}"
+    return f"trade {int(trade_ids[row])} at row {row + 1}"
 
 
 def resolved_trades(
@@ -172,7 +175,7 @@ def resolved_trades(
     settlement: Settlement,
     schedule_method: NDArray[np.intp],
     quantity_per: NDArray[np.intp],
-    labels: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
     trade_dates: NDArray[np.datetime64],
@@ -195,7 +198,8 @@ def resolved_trades(
     one index, published once. The index was made with a reporting
     lot, since the batch's delta is a count of that lot and a batch without one could not report
     its risk. The occurrences are the ticket's
-    rows: one date each, and one label, clearing house and broker each where those are given;
+    rows: one date each, and one trade ID, a whole number of at most 15 digits the caller read
+    by whole_trade_ids since #NN, clearing house and broker each where those are given;
     one specification, method and basis each, the specification a row of the index's
     specifications, since the lot size and the lot unit are read there, its quantities counting
     it, whatever the desk's word for it, an exchange lot or a bare unit the index defines with a
@@ -224,9 +228,9 @@ def resolved_trades(
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
-    occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
+    occurrences = _the_occurrences(trade_dates, trade_ids, clearing_house, broker)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
-    _the_method(schedule_method, settlement, labels, index.kind)
+    _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(
         occurrence,
         contract,
@@ -234,7 +238,7 @@ def resolved_trades(
         start_date,
         end_date,
         fixed_price,
-        labels,
+        trade_ids,
         occurrences,
         len(schedule.codes),
     )
@@ -253,7 +257,7 @@ def resolved_trades(
         settlement,
         _frozen_rows(schedule_method),
         _frozen_rows(quantity_per),
-        labels,
+        None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
         broker,
         _frozen_days(trade_dates),
@@ -263,7 +267,7 @@ def resolved_trades(
         starts,
         ends,
         days,
-        _the_component_quantity(quantity_per, quantities, days, labels, occurrence),
+        _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         _frozen_numbers(fixed_price),
         pays,
     )
@@ -338,7 +342,7 @@ def _the_selections(
 def _the_method(
     schedule_method: NDArray[np.intp],
     settlement: Settlement,
-    labels: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
     kind: Kind,
 ) -> None:
     """Each occurrence's method with the batch's settlement and the index's kind. On an IFERC
@@ -361,7 +365,7 @@ def _the_method(
         if other.any():
             i = int(other.argmax())
             raise ValueError(
-                f"schedule_method of {named_trade(labels, i)} is "
+                f"schedule_method of {named_trade(trade_ids, i)} is "
                 f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
                 "index; an IFERC month has one index, published once"
             )
@@ -375,7 +379,7 @@ def _the_method(
                 return
             i = int(other.argmax())
             method = METHODS[int(schedule_method[i])]
-            trade = named_trade(labels, i)
+            trade = named_trade(trade_ids, i)
             match method:
                 case ScheduleMethod.LASTDAY:
                     return
@@ -405,15 +409,20 @@ def _the_method(
 
 def _the_occurrences(
     trade_dates: NDArray[np.datetime64],
-    labels: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
 ) -> int:
-    """One or more, a date each and, for each label tuple given, a text each: their count."""
+    """One or more, a date each and, for the IDs and each label tuple given, one each: their
+    count."""
     occurrences = trade_dates.size
     if occurrences == 0:
         raise ValueError("trade_dates has 0 dates, expected at least 1, one per occurrence")
-    for name, texts in (("labels", labels), ("clearing_house", clearing_house), ("broker", broker)):
+    if trade_ids is not None and trade_ids.size != occurrences:
+        raise ValueError(
+            f"trade_ids has {trade_ids.size} ids, expected {occurrences}, one per occurrence"
+        )
+    for name, texts in (("clearing_house", clearing_house), ("broker", broker)):
         if texts is not None and len(texts) != occurrences:
             raise ValueError(
                 f"{name} has {len(texts)} texts, expected {occurrences}, one per occurrence"
@@ -428,7 +437,7 @@ def _the_components(
     start_date: NDArray[np.datetime64],
     end_date: NDArray[np.datetime64],
     fixed_price: NDArray[np.float64],
-    labels: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
     occurrences: int,
     schedule_rows: int,
 ) -> None:
@@ -461,7 +470,7 @@ def _the_components(
     held = np.bincount(occurrence, minlength=occurrences)
     if (held == 0).any():
         i = int((held == 0).argmax())
-        raise ValueError(f"{named_trade(labels, i)} has no component, expected at least one")
+        raise ValueError(f"{named_trade(trade_ids, i)} has no component, expected at least one")
     outside = (contract < 0) | (contract >= schedule_rows)
     if outside.any():
         k = int(outside.argmax())
@@ -473,19 +482,21 @@ def _the_components(
     if backwards.any():
         k = int(backwards.argmax())
         raise ValueError(
-            f"end_date of {named_trade(labels, int(occurrence[k]))} is {end_date[k]}, expected a "
-            f"day on or after its start_date, {start_date[k]}"
+            f"end_date of {named_trade(trade_ids, int(occurrence[k]))} is {end_date[k]}, "
+            f"expected a day on or after its start_date, {start_date[k]}"
         )
     two_months = start_date.astype("datetime64[M]") != end_date.astype("datetime64[M]")
     if two_months.any():
         k = int(two_months.argmax())
         raise ValueError(
-            f"{named_trade(labels, int(occurrence[k]))} covers {start_date[k]} to {end_date[k]}, "
-            "expected one calendar month per component"
+            f"{named_trade(trade_ids, int(occurrence[k]))} covers {start_date[k]} to "
+            f"{end_date[k]}, expected one calendar month per component"
         )
-    whole_quantities(quantity, lambda k: f"quantity of {named_trade(labels, int(occurrence[k]))}")
+    whole_quantities(
+        quantity, lambda k: f"quantity of {named_trade(trade_ids, int(occurrence[k]))}"
+    )
     finite_prices(
-        fixed_price, lambda k: f"fixed_price of {named_trade(labels, int(occurrence[k]))}"
+        fixed_price, lambda k: f"fixed_price of {named_trade(trade_ids, int(occurrence[k]))}"
     )
 
 
@@ -501,6 +512,31 @@ def whole_quantities(quantity: NDArray[np.float64], where: Callable[[int], str])
         raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a whole number")
 
 
+TRADE_ID_DIGITS = 15  # the source system's and Excel's: a cell carries fifteen digits exactly
+TRADE_ID_LIMIT = 10**TRADE_ID_DIGITS - 1
+
+
+def whole_trade_ids(values: NDArray[np.float64], where: Callable[[int], str]) -> NDArray[np.int64]:
+    """Each trade ID a whole number of at most 15 digits, the source system's deal numbers as the
+    sheet carries them exactly, since #NN: finite, whole and within -999,999,999,999,999 to
+    999,999,999,999,999, zero and signed values included, since an identifier is not a quantity;
+    the first that is not is refused in the caller's words for its position, the row in a
+    ticket and the field in a template, a whole value shown without a fraction. Then the values
+    converted once to int64 and frozen, the one integer form every later reader takes; nothing
+    rounds, truncates or invents an ID."""
+    bad = ~np.isfinite(values) | (values != np.round(values)) | (np.abs(values) > TRADE_ID_LIMIT)
+    if bad.any():
+        k = int(bad.argmax())
+        value = float(values[k])
+        shown = str(int(value)) if np.isfinite(value) and value == round(value) else repr(value)
+        raise ValueError(
+            f"{where(k)} is {shown}, expected a whole number of at most {TRADE_ID_DIGITS} digits"
+        )
+    ids = values.astype(np.int64)
+    ids.setflags(write=False)
+    return ids
+
+
 def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> None:
     """Each price a finite number, the first that is not refused in the caller's words."""
     unfinished = ~np.isfinite(prices)
@@ -513,7 +549,7 @@ def _the_component_quantity(
     quantity_per: NDArray[np.intp],
     quantity: NDArray[np.float64],
     covered_days: NDArray[np.int64],
-    labels: tuple[str, ...] | None,
+    trade_ids: NDArray[np.int64] | None,
     occurrence: NDArray[np.intp],
 ) -> NDArray[np.float64]:
     """Each component's quantity by its occurrence's basis, formed once here for the encoding to
@@ -534,7 +570,7 @@ def _the_component_quantity(
     if overflow.any():
         k = int(overflow.argmax())
         raise ValueError(
-            f"quantity of {named_trade(labels, int(occurrence[k]))} is {float(quantity[k])!r} "
+            f"quantity of {named_trade(trade_ids, int(occurrence[k]))} is {float(quantity[k])!r} "
             f"over {int(covered_days[k])} days, expected a finite quantity"
         )
     expanded.setflags(write=False)  # made here and owned here: no copy to freeze
@@ -588,6 +624,12 @@ def _frozen_rows(column: NDArray[np.intp]) -> NDArray[np.intp]:
     rows = np.array(column, dtype=np.intp)
     rows.setflags(write=False)
     return rows
+
+
+def _frozen_ids(column: NDArray[np.int64]) -> NDArray[np.int64]:
+    ids = np.array(column, dtype=np.int64)
+    ids.setflags(write=False)
+    return ids
 
 
 def _frozen_numbers(column: NDArray[np.float64]) -> NDArray[np.float64]:

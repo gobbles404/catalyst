@@ -50,6 +50,7 @@ from goosedove.trades.terms import (
     named_trade,
     one_choice,
     resolved_trades,
+    whole_trade_ids,
 )
 
 
@@ -63,6 +64,11 @@ def day(text: str) -> np.datetime64:
 
 def rows(*values: int) -> NDArray[np.intp]:
     return np.array(values, dtype=np.intp)
+
+
+def ids(*values: int) -> NDArray[np.int64]:
+    """Trade IDs as the kernel holds them, whole numbers of at most 15 digits."""
+    return np.array(values, dtype=np.int64)
 
 
 def numbers(*values: float) -> NDArray[np.float64]:
@@ -165,7 +171,7 @@ TOY = an_index(
 )
 
 # The five occurrences: NG-001 twice, every value identical, the duplicate counting.
-LABELS = ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
+TRADE_IDS = ids(1001, 1002, 1003, 1004, 1001)
 TRADE_DATES = dates("2026-09-24", "2026-09-24", "2026-09-25", "2026-09-25", "2026-09-24")
 CONTRACT = rows(1, 1, 2, 2, 1)  # Z26, Z26, F27, F27, Z26 as rows of the schedule
 LOTS = numbers(10, -4, 7, -12, 10)
@@ -189,7 +195,7 @@ def terms_of(
     pays: NDArray[np.datetime64] | None = None,
     keep: slice = slice(None),
     route: Route = Route.CLEARED,
-    labels: tuple[str, ...] | None = LABELS,
+    trade_ids: NDArray[np.int64] | None = TRADE_IDS,
 ) -> ResolvedTrades:
     """The page's five rows resolved against an index, or the rows a slice keeps."""
     occurrences = TRADE_DATES[keep].size
@@ -200,7 +206,7 @@ def terms_of(
         route,
         settlement,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, occurrences),
-        None if labels is None else labels[keep],
+        None if trade_ids is None else trade_ids[keep],
         None,
         None,
         TRADE_DATES[keep],
@@ -259,7 +265,7 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), np.full(5, 2)
     terms = resolved_trades(
         FUTURE, TOY, spec(5), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), LABELS, ("CME Clearing",) * 5,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), TRADE_IDS, ("CME Clearing",) * 5,
         None, TRADE_DATES,
         np.arange(5, dtype=np.intp), CONTRACT, lots, *bounds_of(TOY, CONTRACT), FIXED_PRICE,
         PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
@@ -283,8 +289,8 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
         assert not column.flags.writeable
     assert not terms.payment.date.flags.writeable and not terms.payment.lag_days.flags.writeable
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
-    assert terms.named(4) == "trade 'NG-001' at row 5"
-    assert terms_of(labels=None).named(2) == "trade at row 3"
+    assert terms.named(4) == "trade 1001 at row 5"
+    assert terms_of(trade_ids=None).named(2) == "trade at row 3"
     assert terms.instrument is FUTURE and terms.clearing_house == ("CME Clearing",) * 5
     assert terms.broker is None
 
@@ -326,7 +332,7 @@ GAS_DAILY = index(
         (
             {"schedule_method": np.array([0, 2, 1, 0, 0], dtype=np.intp)},
             "settlement_method is 'physical', expected 'financial' with the last3day method of "
-            "trade 'NG-002' at row 2; a last3day future is cash settled on the average of its last "
+            "trade 1002 at row 2; a last3day future is cash settled on the average of its last "
             "three pricing days",
         ),
         (
@@ -334,8 +340,8 @@ GAS_DAILY = index(
             "trade_dates has 0 dates, expected at least 1, one per occurrence",
         ),
         (
-            {"labels": ("a", "b")},
-            "labels has 2 texts, expected 5, one per occurrence",
+            {"trade_ids": ids(1, 2)},
+            "trade_ids has 2 ids, expected 5, one per occurrence",
         ),
         (
             {"clearing_house": ("CME Clearing",)},
@@ -368,7 +374,7 @@ GAS_DAILY = index(
         ),
         (
             {"occurrence": rows(0, 1, 2, 2, 3)},
-            "trade 'NG-001' at row 5 has no component, expected at least one",
+            "trade 1001 at row 5 has no component, expected at least one",
         ),
         (
             {"contract": rows(1, 1, 2, 3, 1)},
@@ -376,19 +382,19 @@ GAS_DAILY = index(
         ),
         (
             {"quantity": numbers(10, -4, 7.5, -12, 10)},
-            "quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number",
+            "quantity of trade 1003 at row 3 is 7.5, expected a whole number",
         ),
         (
             {"quantity": numbers(10, -4, np.nan, -12, 10)},
-            "quantity of trade 'NG-003' at row 3 is nan, expected a whole number",
+            "quantity of trade 1003 at row 3 is nan, expected a whole number",
         ),
         (
             {"quantity": numbers(10, -4, np.inf, -12, 10)},
-            "quantity of trade 'NG-003' at row 3 is inf, expected a whole number",
+            "quantity of trade 1003 at row 3 is inf, expected a whole number",
         ),
         (
             {"fixed_price": numbers(3.1, 3.15, 3.4, np.inf, 3.1)},
-            "fixed_price of trade 'NG-004' at row 4 is inf, expected a finite price",
+            "fixed_price of trade 1004 at row 4 is inf, expected a finite price",
         ),
         (
             {"settlement": Settlement.FINANCIAL},
@@ -425,7 +431,7 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "settlement": Settlement.PHYSICAL,
         "schedule_method": one_choice(METHODS, ScheduleMethod.LASTDAY, 5),
         "quantity_per": one_choice(BASES, QuantityPer.MONTH, 5),
-        "labels": LABELS,
+        "trade_ids": TRADE_IDS,
         "clearing_house": None,
         "broker": None,
         "trade_dates": TRADE_DATES,
@@ -467,7 +473,7 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 0, 1, 1, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
     np.testing.assert_array_equal(enc.reference_of_slot, [0, 1])
-    assert enc.named_slot(0) == "trade 'NG-001' at row 1 on 2026-11-25, a day Z26 prices"
+    assert enc.named_slot(0) == "trade 1001 at row 1 on 2026-11-25, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
         "encoded_groups": 2,
@@ -530,7 +536,7 @@ def one_lot_in_cents(
     counter = WorkCounter()
     terms = resolved_trades(
         FUTURE, CENTS, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("C-1",), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1), *bounds_of(CENTS, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -602,7 +608,7 @@ CENT_SETTLED = index(
 def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None:
     terms = resolved_trades(
         FUTURE, CENT_SETTLED, spec(4), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ("A", "B", "C", "D"), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1, 2, 3, 4), None, None,
         dates(*["2026-09-24"] * 4),
         rows(0, 1, 2, 2, 3), rows(1, 2, 2, 3, 1), numbers(3, -2, -1, -1, 3),
         *bounds_of(CENT_SETTLED, rows(1, 2, 2, 3, 1)), numbers(3.10, 3.40, 3.55, 3.55, 3.10), None,
@@ -671,7 +677,7 @@ def test_a_financial_settlement_groups_each_contract_by_its_payment_day() -> Non
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 2, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
     np.testing.assert_array_equal(enc.reference_of_slot, [0, 0, 1])
-    assert enc.named_slot(1) == "trade 'NG-002' at row 2 on 2026-11-25, a day Z26 prices"
+    assert enc.named_slot(1) == "trade 1002 at row 2 on 2026-11-25, a day Z26 prices"
     assert counter.freeze()["encoded_groups"] == 3
 
 
@@ -713,7 +719,7 @@ def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() 
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
     assert str(refused.value) == (
-        "trade 'NG-001' at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
+        "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
         "a physical future after its expiry is not supported"
     )
 
@@ -762,7 +768,7 @@ def test_a_contract_expiring_on_a_closed_day_is_refused_when_the_batch_is_encode
     with pytest.raises(ValueError) as refused:
         encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'NG-001' at row 1 observes 2026-11-26, a day the index's market is closed; "
+        "trade 1001 at row 1 observes 2026-11-26, a day the index's market is closed; "
         "no settle exists or will"
     )
 
@@ -1023,7 +1029,7 @@ def pen_terms(
         Route.CLEARED,
         settlement,
         *picks(method, QuantityPer.MONTH, 1),
-        ("PHH-1",),
+        ids(1),
         ("ICE Clear Europe",),
         None,
         dates("2027-06-01"),
@@ -1120,7 +1126,7 @@ def test_a_physical_penultimate_future_is_refused_by_the_kernel() -> None:
         pen_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
         "settlement_method is 'physical', expected 'financial' with the penultimate method of "
-        "trade 'PHH-1' at row 1; a penultimate future is cash settled on the business day before "
+        "trade 1 at row 1; a penultimate future is cash settled on the business day before "
         "its contract's expiry"
     )
 
@@ -1133,7 +1139,7 @@ def test_the_pen_encodes_one_slot_on_the_day_before_expiry_referencing_its_contr
     np.testing.assert_array_equal(enc.slot_exposure, [5_000.0])  # two lots of 2,500 MMBTU
     np.testing.assert_array_equal(enc.offset, [-15_000.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-06-28"))
-    assert enc.named_slot(0) == "trade 'PHH-1' at row 1 on 2027-06-25, a day N27 prices"
+    assert enc.named_slot(0) == "trade 1 at row 1 on 2027-06-25, a day N27 prices"
 
 
 # The page's three states and the hand answers: live on the pen day itself, fixed on the Saturday
@@ -1235,15 +1241,15 @@ STRIP_INDEX = an_index(
     lot=("ICE PHH", 2_500.0, "MMBTU"),
 )
 # Each row: its label, the schedule rows of its months, its lots and its price.
-STRIP_ROWS: tuple[tuple[str, tuple[int, ...], float, float], ...] = (
-    ("A", (1, 2), 2.0, 3.00),
-    ("A", (1, 2), 2.0, 3.00),
-    ("C", (2,), -1.0, 3.05),
+STRIP_ROWS: tuple[tuple[int, tuple[int, ...], float, float], ...] = (
+    (1, (1, 2), 2.0, 3.00),
+    (1, (1, 2), 2.0, 3.00),
+    (3, (2,), -1.0, 3.05),
 )
 STRIP_PAYS = {1: "2027-06-28", 2: "2027-07-28"}  # one clearing day after each month's pen day
 
 
-def strip_terms(order: tuple[tuple[str, tuple[int, ...], float, float], ...]) -> ResolvedTrades:
+def strip_terms(order: tuple[tuple[int, tuple[int, ...], float, float], ...]) -> ResolvedTrades:
     """Those rows resolved on the PHH index with U27, a strip one component per month on its one
     occurrence, each component paying one clearing day after its month's pen day."""
     n = len(order)
@@ -1251,7 +1257,7 @@ def strip_terms(order: tuple[tuple[str, tuple[int, ...], float, float], ...]) ->
     return resolved_trades(
         FUTURE, STRIP_INDEX, spec(n), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.PENULTIMATE, QuantityPer.MONTH, n),
-        tuple(label for label, _, _, _ in order), ("ICE Clear Europe",) * n,
+        ids(*(label for label, _, _, _ in order)), ("ICE Clear Europe",) * n,
         None, np.repeat(day("2027-06-01"), n), rows(*(i for i, _, _, _ in components)),
         rows(*(c for _, c, _, _ in components)), numbers(*(q for _, _, q, _ in components)),
         *bounds_of(STRIP_INDEX, rows(*(c for _, c, _, _ in components))),
@@ -1265,7 +1271,7 @@ def strip_terms(order: tuple[tuple[str, tuple[int, ...], float, float], ...]) ->
 
 
 def strip_valued(
-    order: tuple[tuple[str, tuple[int, ...], float, float], ...],
+    order: tuple[tuple[int, tuple[int, ...], float, float], ...],
     as_of: str,
     settles: dict[str, float],
     quotes: tuple[float, ...],
@@ -1342,7 +1348,7 @@ def test_the_pen_strip_encodes_one_slot_per_month_paying_one_clearing_day_after_
     np.testing.assert_array_equal(enc.slot_date, dates("2027-06-25", "2027-07-27"))
     np.testing.assert_array_equal(enc.slot_exposure, [10_000, 7_500])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-06-28", "2027-07-28"))
-    assert terms.named(4) == "trade 'C' at row 3"
+    assert terms.named(4) == "trade 3 at row 3"
 
 
 # --- the dated axis: the daily toy of dated-exposure.md ---------------------------------------
@@ -1574,21 +1580,21 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     # settle for it, so it is refused rather than priced off Z26.
     terms = resolved_trades(
         FUTURE, DAILY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("G-1",), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
         dates("2026-11-20"), rows(0), rows(2), numbers(1),
         *bounds_of(DAILY, rows(2)), numbers(70.0), paying(dates("2027-02-02"), 1),
     )  # fmt: skip
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, (("2026-12-01",),)), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'G-1' at row 1 observes G27 on 2026-12-01, a day Z26 prices; the lastday method "
+        "trade 1 at row 1 observes G27 on 2026-12-01, a day Z26 prices; the lastday method "
         "takes the contract's own days, and a futures history holds no settle of G27 for a day "
         "Z26 prices"
     )
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, (("2027-02-01",),)), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'G-1' at row 1 observes 2027-02-01, after the schedule's last expiry, 2027-01-29; "
+        "trade 1 at row 1 observes 2027-02-01, after the schedule's last expiry, 2027-01-29; "
         "nothing prices it"
     )
 
@@ -1709,7 +1715,7 @@ def test_observations_own_frozen_copies_and_a_seventh_shared_seven_times_is_one(
 def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
     return resolved_trades(
         FUTURE, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("NG-001", "ENTRY-002"), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1001, 1002), None, None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(*quantities), *bounds_of(NG, rows(1, 2)),
         numbers(3.0, 3.3), None,
@@ -1720,7 +1726,7 @@ def zero_toy_terms() -> ResolvedTrades:
     """One row kept ready on the toy: nothing of Z26 at 3.10, financial, paying 30 November."""
     return resolved_trades(
         FUTURE, TOY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("ENTRY-000",), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1000), None, None,
         dates("2026-10-06"), rows(0), rows(1),
         numbers(0.0), *bounds_of(TOY, rows(1)), numbers(3.1), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -1740,14 +1746,11 @@ def valued_entry(
 def test_a_zero_quantity_is_a_whole_count_the_terms_keep() -> None:
     terms = entry_terms()
     np.testing.assert_array_equal(terms.quantity, [2.0, 0.0])
-    assert terms.named(1) == "trade 'ENTRY-002' at row 2"
+    assert terms.named(1) == "trade 1002 at row 2"
     assert entry_terms((2.0, -0.0)).quantity[1] == 0.0  # numeric negative zero is whole too
     with pytest.raises(ValueError) as refused:
         entry_terms((2.0, 0.5))
-    assert (
-        str(refused.value)
-        == "quantity of trade 'ENTRY-002' at row 2 is 0.5, expected a whole number"
-    )
+    assert str(refused.value) == "quantity of trade 1002 at row 2 is 0.5, expected a whole number"
 
 
 def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> None:
@@ -1760,7 +1763,7 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
     np.testing.assert_array_equal(enc.group_contract, [1, 2])  # F27 held, at nothing
     np.testing.assert_array_equal(enc.slot_exposure, [20_000, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
-    assert enc.named_slot(1) == "trade 'ENTRY-002' at row 2 on 2026-12-29, a day F27 prices"
+    assert enc.named_slot(1) == "trade 1002 at row 2 on 2026-12-29, a day F27 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
         "encoded_groups": 2,
@@ -1803,7 +1806,7 @@ def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -
     # per dollar on F27 alone.
     first_nothing = resolved_trades(
         FUTURE, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("ENTRY-002", "NG-001"), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1002, 1001), None, None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(0.0, -1.0), *bounds_of(NG, rows(1, 2)),
         numbers(3.0, 3.3), None,
@@ -1825,17 +1828,17 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
     # a row of F27 at 3.20 kept ready, against 3.10 and 3.40. By hand: 2,000 less 500 is 1,500 of
     # mark, 10,000 of delta on Z26 and nothing on F27, in whichever of the 24 orders the rows come.
     given_rows = (
-        ("A", 1, 2.0, 3.00),
-        ("B", 2, 0.0, 3.30),
-        ("C", 1, -1.0, 3.05),
-        ("D", 2, 0.0, 3.20),
+        (1, 1, 2.0, 3.00),
+        (2, 2, 0.0, 3.30),
+        (3, 1, -1.0, 3.05),
+        (4, 2, 0.0, 3.20),
     )
     history = history_on(NG, "2026-11-24", {})
     for order in itertools.permutations(given_rows):
         labels, contracts, quantities, prices = zip(*order, strict=True)
         terms = resolved_trades(
             FUTURE, NG, spec(4), Route.CLEARED, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), labels, None, None,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(*labels), None, None,
             np.repeat(day("2026-10-06"), 4),
             np.arange(4, dtype=np.intp), rows(*contracts), numbers(*quantities),
             *bounds_of(NG, rows(*contracts)), numbers(*prices), None,
@@ -1853,7 +1856,8 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     whole, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
     spares = resolved_trades(
         FUTURE, NG, spec(7), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 7), (*LABELS, "ENTRY-A", "ENTRY-B"),
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 7),
+        np.concatenate([TRADE_IDS, ids(2001, 2002)]),
         None, None,
         np.concatenate([TRADE_DATES, dates("2026-10-06", "2026-10-06")]),
         np.arange(7, dtype=np.intp), np.concatenate([CONTRACT, rows(1, 2)]),
@@ -1888,7 +1892,7 @@ def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() ->
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
     assert str(refused.value) == (
-        "trade 'NG-001' at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
+        "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
         "a physical future after its expiry is not supported"
     )
     with pytest.raises(ValueError) as refused:
@@ -2046,7 +2050,7 @@ def l3d_terms(
         Route.CLEARED,
         settlement,
         *picks(ScheduleMethod.LAST3DAY, QuantityPer.MONTH, n),
-        tuple("AB"[k] if k < 2 else f"T{k + 1}" for k in range(n)),
+        np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
         dates(*(["2026-11-20"] * n)),
@@ -2129,7 +2133,7 @@ def test_an_observation_crossing_the_preceding_contracts_window_is_refused() -> 
     with pytest.raises(ValueError) as refused:
         encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
+        "trade 1 at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
         "takes the contract's own days, and a futures history holds no settle of Z26 for a day "
         "X26 prices"
     )
@@ -2140,7 +2144,7 @@ def test_a_physical_last3day_future_is_refused_by_the_kernel() -> None:
         l3d_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
         "settlement_method is 'physical', expected 'financial' with the last3day method of "
-        "trade 'A' at row 1; a last3day future is cash settled on the average of its last three "
+        "trade 1 at row 1; a last3day future is cash settled on the average of its last three "
         "pricing days"
     )
 
@@ -2156,7 +2160,7 @@ def test_the_last3day_batch_encodes_three_slots_of_ten_and_one_fixed_leg() -> No
     np.testing.assert_array_equal(enc.offset_of_group, [-2_040.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09"))
     np.testing.assert_array_equal(enc.references, [1])
-    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-02, a day Z26 prices"
+    assert enc.named_slot(0) == "trade 1 at row 1 on 2026-12-02, a day Z26 prices"
     counts = counter.freeze().as_dict()
     assert (
         counts["encoded_components"],
@@ -2351,7 +2355,7 @@ def asian_terms(
         Route.CLEARED,
         settlement,
         *picks(ScheduleMethod.ASIAN, QuantityPer.MONTH, n),
-        tuple("AB"[k] if k < 2 else f"T{k + 1}" for k in range(n)),
+        np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
         dates(*(["2026-11-20"] * n)),
@@ -2436,15 +2440,15 @@ def test_an_asian_month_another_contract_prices_takes_the_days_contracts_when_en
     np.testing.assert_array_equal(enc.references, [2, 3])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05"))
     np.testing.assert_allclose(enc.slot_exposure, [100.0] * 22)
-    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-01, a day F27 prices"
-    assert enc.named_slot(21) == "trade 'A' at row 1 on 2026-12-31, a day G27 prices"
+    assert enc.named_slot(0) == "trade 1 at row 1 on 2026-12-01, a day F27 prices"
+    assert enc.named_slot(21) == "trade 1 at row 1 on 2026-12-31, a day G27 prices"
 
 
 def test_a_physical_asian_future_is_refused_by_the_kernel() -> None:
     with pytest.raises(ValueError) as refused:
         asian_terms(settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
-        "settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' "
+        "settlement_method is 'physical', expected 'financial' with the asian method of trade 1 "
         "at row 1; an asian future is cash settled on the average of its month's pricing days"
     )
 
@@ -2460,7 +2464,7 @@ def test_the_asian_batch_encodes_22_slots_of_100_and_one_fixed_leg() -> None:
     np.testing.assert_allclose(enc.offset_of_group, [-528.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05"))
     np.testing.assert_array_equal(enc.references, [1])
-    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-01, a day Z26 prices"
+    assert enc.named_slot(0) == "trade 1 at row 1 on 2026-12-01, a day Z26 prices"
     counts = counter.freeze().as_dict()
     assert (
         counts["encoded_components"],
@@ -2636,7 +2640,7 @@ def basis_terms(
         Route.CLEARED,
         Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, basis, occurrences),
-        tuple(f"C-{i + 1}" for i in range(occurrences)),
+        np.arange(1, occurrences + 1, dtype=np.int64),
         None,
         None,
         np.repeat(day("2026-10-06"), occurrences),
@@ -2721,19 +2725,19 @@ def test_a_components_days_are_per_component_in_order_in_one_month_and_the_produ
             period=(dates("2026-12-01", "2027-01-15"), dates("2026-12-31", "2027-01-14")),
         )
     assert str(refused.value) == (
-        "end_date of trade 'C-2' at row 2 is 2027-01-14, expected a day on or after its "
+        "end_date of trade 2 at row 2 is 2027-01-14, expected a day on or after its "
         "start_date, 2027-01-15"
     )
     with pytest.raises(ValueError) as refused:
         basis_terms(NG, (1,), (1,), period=(dates("2026-12-01"), dates("2027-01-31")))
     assert str(refused.value) == (
-        "trade 'C-1' at row 1 covers 2026-12-01 to 2027-01-31, expected one calendar month per "
+        "trade 1 at row 1 covers 2026-12-01 to 2027-01-31, expected one calendar month per "
         "component"
     )
     with pytest.raises(ValueError) as refused:
         basis_terms(NG, (1,), (1e308,))
     assert str(refused.value) == (
-        "quantity of trade 'C-1' at row 1 is 1e+308 over 31 days, expected a finite quantity"
+        "quantity of trade 1 at row 1 is 1e+308 over 31 days, expected a finite quantity"
     )
     # The same entered quantity is a whole, finite count under month and stands.
     assert basis_terms(NG, (1,), (1e308,), QuantityPer.MONTH).component_quantity[0] == 1e308
@@ -2750,8 +2754,7 @@ def test_a_quantity_at_the_rounded_bound_is_refused_with_its_infinite_product() 
         with pytest.raises(ValueError) as refused:
             basis_terms(NG, (1,), (quantity,))
         assert str(refused.value) == (
-            f"quantity of trade 'C-1' at row 1 is {quantity!r} over 31 days, expected a finite "
-            "quantity"
+            f"quantity of trade 1 at row 1 is {quantity!r} over 31 days, expected a finite quantity"
         )
     below = float(np.nextafter(at_bound, 0))
     terms = basis_terms(NG, (1,), (below,))
@@ -2806,7 +2809,7 @@ def period_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         *picks(ScheduleMethod.ASIAN, basis, n),
-        tuple(f"P{k + 1}" for k in range(n)),
+        np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
         np.repeat(day("2026-11-20"), n),
@@ -3024,7 +3027,7 @@ def group_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         *picks(ScheduleMethod.LAST3DAY, QuantityPer.MONTH, n),
-        tuple("AB"[k] if k < 2 else f"T{k + 1}" for k in range(n)),
+        np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
         dates(*(["2026-11-30"] * n)),
@@ -3072,7 +3075,7 @@ def test_two_payment_days_on_one_contract_encode_as_two_groups_off_one_reference
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 3, 4, 5])
     np.testing.assert_array_equal(enc.references, [1])  # the axis holds Z26 once
     np.testing.assert_array_equal(enc.reference_of_slot, [0] * 6)
-    assert enc.named_slot(3) == "trade 'B' at row 2 on 2026-12-02, a day Z26 prices"
+    assert enc.named_slot(3) == "trade 2 at row 2 on 2026-12-02, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
         "encoded_groups": 2,
@@ -3388,7 +3391,7 @@ class Mixed(NamedTuple):
     """A row of the mixed example: its label, quantity, unit, basis, method and clearing house, the
     schedule rows it covers, one unless a strip, and a booked part of its one month where given."""
 
-    label: str
+    label: int
     quantity: float
     unit: str
     basis: str
@@ -3399,10 +3402,10 @@ class Mixed(NamedTuple):
 
 
 MIXED_ROWS = (
-    Mixed("A", 1.0, "BBL", "month", "lastday", "Clearer A"),
-    Mixed("B", -2.0, "GAL", "calday", "penultimate", "Clearer B"),
-    Mixed("C", 3.0, "BBL", "month", "last3day", "Clearer A"),
-    Mixed("D", 22.0, "GAL", "month", "asian", "Clearer B"),
+    Mixed(1, 1.0, "BBL", "month", "lastday", "Clearer A"),
+    Mixed(2, -2.0, "GAL", "calday", "penultimate", "Clearer B"),
+    Mixed(3, 3.0, "BBL", "month", "last3day", "Clearer A"),
+    Mixed(4, 22.0, "GAL", "month", "asian", "Clearer B"),
 )
 
 
@@ -3463,7 +3466,7 @@ def mixed_terms(
         settlement,
         np.array([METHODS.index(ScheduleMethod(entry.method)) for entry in entries], dtype=np.intp),
         np.array([BASES.index(QuantityPer(entry.basis)) for entry in entries], dtype=np.intp),
-        tuple(entry.label for entry in entries),
+        ids(*(entry.label for entry in entries)),
         tuple(entry.clearer for entry in entries),
         None,
         np.repeat(day("2026-11-30"), n),
@@ -3540,8 +3543,8 @@ def test_the_mixed_rows_encode_as_the_ticket_says() -> None:
     np.testing.assert_allclose(enc.slot_exposure, [-62.0] + [1.0] * 19 + [43.0, 43.0, 85.0])
     np.testing.assert_array_equal(enc.slot_reference, [1] * 23)
     np.testing.assert_array_equal(enc.references, [1])  # one contract on the axis
-    assert enc.named_slot(0) == "trade 'B' at row 2 on 2026-12-30, a day Z26 prices"
-    assert enc.named_slot(21) == "trade 'C' at row 3 on 2026-12-30, a day Z26 prices"
+    assert enc.named_slot(0) == "trade 2 at row 2 on 2026-12-30, a day Z26 prices"
+    assert enc.named_slot(21) == "trade 3 at row 3 on 2026-12-30, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 4,
         "encoded_groups": 2,
@@ -3631,7 +3634,7 @@ def test_the_mixed_batch_equals_its_singletons_in_every_state_and_order() -> Non
     # a row kept ready at nothing under asian; and a strip of a gallon a day over January and
     # February, 31 and 28 gallons on F27 and G27 at 13 and 14 against 10, 93 + 112 = 205 of mark
     # live in every state and 31 and 28 of delta on two more contracts.
-    strip = Mixed("S", 1.0, "GAL", "calday", "lastday", "Clearer A", contracts=(2, 3))
+    strip = Mixed(19, 1.0, "GAL", "calday", "lastday", "Clearer A", contracts=(2, 3))
     for as_of, quotes, mark, cash, delta, *_ in MIXED_LIFECYCLE:
         batch, _ = mixed_evaluated(as_of, quotes)
         alone = [mixed_evaluated(as_of, quotes, mixed_terms((entry,)))[0] for entry in MIXED_ROWS]
@@ -3647,7 +3650,7 @@ def test_the_mixed_batch_equals_its_singletons_in_every_state_and_order() -> Non
         assert twice.mark == pytest.approx(mark + alone[0].mark)
         assert twice.cash == pytest.approx(cash + alone[0].cash)
         kept, _ = mixed_evaluated(
-            as_of, quotes, mixed_terms((*MIXED_ROWS, Mixed("Z", 0.0, "GAL", "month", "asian")))
+            as_of, quotes, mixed_terms((*MIXED_ROWS, Mixed(26, 0.0, "GAL", "month", "asian")))
         )
         assert (kept.mark, kept.cash) == (pytest.approx(mark), pytest.approx(cash))
         assert kept.prepared.encoded.slot_group.size == 23
@@ -3666,7 +3669,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
     # numbers in every state; a lot of ten thousand beside ten thousand units on a cent-quoted
     # index settling in dollars, one slot of twenty thousand, 2,000 dollars ten cents up, the price
     # in cents for both rows whatever unit counts the quantity.
-    in_gallons = mixed_terms((Mixed("A", 42.0, "GAL", "month", "lastday"), *MIXED_ROWS[1:]))
+    in_gallons = mixed_terms((Mixed(1, 42.0, "GAL", "month", "lastday"), *MIXED_ROWS[1:]))
     enc, twin = (
         encoded(t, observed_of(t), UNITS, WorkCounter()) for t in (mixed_terms(), in_gallons)
     )
@@ -3699,8 +3702,8 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
     )
     pair = mixed_terms(
         (
-            Mixed("L", 1.0, "lot", "month", "lastday"),
-            Mixed("M", 10_000.0, "MMBTU", "month", "lastday"),
+            Mixed(12, 1.0, "lot", "month", "lastday"),
+            Mixed(13, 10_000.0, "MMBTU", "month", "lastday"),
         ),
         price=300.0,
         ix=cents,
@@ -3744,7 +3747,7 @@ def test_the_payment_conventions_combine_with_mixed_methods() -> None:
     result, _ = mixed_evaluated("2026-12-31", MIXED_QUOTES, coalesced)
     assert (result.mark, result.cash) == (pytest.approx(213), 0.0)  # 275 - 62, nothing paid yet
     apart = mixed_terms(
-        (Mixed("A", 1.0, "BBL", "month", "lastday"), *MIXED_ROWS[1:]),
+        (Mixed(1, 1.0, "BBL", "month", "lastday"), *MIXED_ROWS[1:]),
         lags=(1, 1, 1, 1),
         pay_closed=("2027-01-01", "2027-01-04"),
     )
@@ -3759,9 +3762,9 @@ def test_a_partial_asian_row_stands_beside_whole_months_under_other_methods() ->
     # contract, its days and its own method, though A, expiry-based too, stands whole.
     whole_and_part = mixed_terms(
         (
-            Mixed("A", 1.0, "BBL", "month", "lastday"),
+            Mixed(1, 1.0, "BBL", "month", "lastday"),
             Mixed(
-                "D", 15.0, "GAL", "month", "asian", "Clearer B", period=("2026-12-01", "2026-12-15")
+                4, 15.0, "GAL", "month", "asian", "Clearer B", period=("2026-12-01", "2026-12-15")
             ),
         )
     )
@@ -3780,9 +3783,9 @@ def test_a_partial_asian_row_stands_beside_whole_months_under_other_methods() ->
     assert counter.freeze()["encoded_slots"] == 12
     part_under_pen = mixed_terms(
         (
-            Mixed("A", 1.0, "BBL", "month", "lastday"),
+            Mixed(1, 1.0, "BBL", "month", "lastday"),
             Mixed(
-                "B",
+                2,
                 -2.0,
                 "GAL",
                 "calday",
@@ -3795,7 +3798,7 @@ def test_a_partial_asian_row_stands_beside_whole_months_under_other_methods() ->
     with pytest.raises(ValueError) as refused:
         observed_of(part_under_pen)
     assert str(refused.value) == (
-        "Z26 of trade 'B' at row 2 is covered from 2026-12-01 to 2026-12-15, part of its month, "
+        "Z26 of trade 2 at row 2 is covered from 2026-12-01 to 2026-12-15, part of its month, "
         "expected the whole month under penultimate; the expiry-based methods take the contract's "
         "month entire, and a part of it prices under asian"
     )
@@ -3808,12 +3811,12 @@ def test_interleaved_methods_and_a_strip_keep_their_components_and_anchors() -> 
     # pays from its own last day, S's F27 on 1 February, D on the 16th and B on the 31st.
     terms = mixed_terms(
         (
-            Mixed("A", 1.0, "BBL", "month", "lastday"),
-            Mixed("S", 1.0, "GAL", "month", "last3day", "Clearer A", contracts=(1, 2)),
+            Mixed(1, 1.0, "BBL", "month", "lastday"),
+            Mixed(19, 1.0, "GAL", "month", "last3day", "Clearer A", contracts=(1, 2)),
             Mixed(
-                "D", 15.0, "GAL", "month", "asian", "Clearer B", period=("2026-12-01", "2026-12-15")
+                4, 15.0, "GAL", "month", "asian", "Clearer B", period=("2026-12-01", "2026-12-15")
             ),
-            Mixed("B", -2.0, "GAL", "calday", "penultimate", "Clearer B"),
+            Mixed(2, -2.0, "GAL", "calday", "penultimate", "Clearer B"),
         )
     )
     obs = observed_of(terms)
@@ -3850,12 +3853,12 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
         mixed_terms(MIXED_ROWS[:2], settlement=Settlement.PHYSICAL)
     assert str(refused.value) == (
         "settlement_method is 'physical', expected 'financial' with the penultimate method of "
-        "trade 'B' at row 2; a penultimate future is cash settled on the business day before its "
+        "trade 2 at row 2; a penultimate future is cash settled on the business day before its "
         "contract's expiry"
     )
     lastday_rows = (
-        Mixed("A", 1.0, "BBL", "month", "lastday"),
-        Mixed("G", 10.0, "GAL", "calday", "lastday"),
+        Mixed(1, 1.0, "BBL", "month", "lastday"),
+        Mixed(7, 10.0, "GAL", "calday", "lastday"),
     )
     physical = mixed_terms(lastday_rows, settlement=Settlement.PHYSICAL)
     np.testing.assert_array_equal(physical.component_quantity, [1.0, 310.0])
@@ -3897,7 +3900,7 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
     assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
     terms = resolved_trades(
         FUTURE, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("H",), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(8), None, None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1e303), *bounds_of(tiny, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
@@ -3906,7 +3909,7 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(tiny, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
-        "trade 'H' at row 1 on 2026-11-25, a day Z26 prices, has inf live lots, expected a finite "
+        "trade 8 at row 1 on 2026-11-25, a day Z26 prices, has inf live lots, expected a finite "
         "number of lots of BTU (1 BTU); the exposure in lots outruns the largest number"
     )
 
@@ -3921,7 +3924,7 @@ def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract(
     # finite; this is the arithmetic's edge, not a trade anyone books.
     terms = resolved_trades(
         FUTURE, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("A", "B"), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1, 2), None, None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 1),
         numbers(9e303, 9e303), *bounds_of(NG, rows(1, 1)), numbers(0.0, 0.0),
         paying(dates("2026-11-30", "2026-12-01"), 2),
@@ -3943,7 +3946,7 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
     # meets an infinite total. The sum runs with the overflow flag down and the rule judges.
     terms = resolved_trades(
         FUTURE, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("Z", "F"), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(26, 6), None, None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 2),
         numbers(1e302, 1e302), *bounds_of(TINY_LOT, rows(1, 2)), numbers(300.0, 300.0),
         paying(dates("2026-11-30", "2026-12-31"), 2),
@@ -4044,7 +4047,7 @@ def wti_terms(
         Settlement.FINANCIAL,
         method,
         basis,
-        tuple(f"W{k + 1}" for k in range(n)),
+        np.arange(1, n + 1, dtype=np.int64),
         ("Prototype Clearing",) * n,
         None,
         np.repeat(day("2026-11-20"), n),
@@ -4103,8 +4106,8 @@ def test_a_december_asian_on_the_wti_like_index_references_f27_and_then_g27() ->
     np.testing.assert_array_equal(enc.references, [1, 2])
     np.testing.assert_allclose(enc.slot_exposure, [200.0] * 6)
     np.testing.assert_allclose(enc.offset, [-84_000.0])
-    assert enc.named_slot(0) == "trade 'W1' at row 1 on 2026-12-18, a day F27 prices"
-    assert enc.named_slot(2) == "trade 'W1' at row 1 on 2026-12-22, a day G27 prices"
+    assert enc.named_slot(0) == "trade 1 at row 1 on 2026-12-18, a day F27 prices"
+    assert enc.named_slot(2) == "trade 1 at row 1 on 2026-12-22, a day G27 prices"
     counts = counter.freeze().as_dict()
     assert (counts["encoded_groups"], counts["encoded_observations"], counts["encoded_slots"]) == (
         1,
@@ -4295,7 +4298,7 @@ def test_an_asian_outside_the_calendars_coverage_is_refused_at_either_end() -> N
     with pytest.raises(ValueError) as refused:
         encoded(march, observed_of(march), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'W1' at row 1 observes 2027-03-01, after the schedule's last expiry, 2027-02-22; "
+        "trade 1 at row 1 observes 2027-03-01, after the schedule's last expiry, 2027-02-22; "
         "nothing prices it"
     )
     november = wti_terms(periods=(("2026-11-02", "2026-11-19"),), pays=("2026-11-23",))
@@ -4304,7 +4307,7 @@ def test_an_asian_outside_the_calendars_coverage_is_refused_at_either_end() -> N
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, wti_history("2026-12-01"), WorkCounter())
     assert str(refused.value) == (
-        "trade 'W1' at row 1 observes 2026-11-02, before the calendar begins on 2026-11-21; the "
+        "trade 1 at row 1 observes 2026-11-02, before the calendar begins on 2026-11-21; the "
         "schedule's first contract, Z26, bounds the calendar and nothing prices its days"
     )
 
@@ -4726,7 +4729,7 @@ def waha_terms(
         settlement,
         method,
         basis,
-        tuple(f"WAH{k + 1:03d}" for k in range(m)),
+        1000 + np.arange(1, m + 1, dtype=np.int64),
         ("ICE Clear Europe",) * m,
         None,
         np.repeat(day(trade_date), m),
@@ -5015,7 +5018,7 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
     with pytest.raises(ValueError) as asian:
         waha_terms(methods=(ScheduleMethod.ASIAN,))
     assert str(asian.value) == (
-        "schedule_method of trade 'WAH001' at row 1 is 'asian', expected 'lastday' on an IFERC "
+        "schedule_method of trade 1001 at row 1 is 'asian', expected 'lastday' on an IFERC "
         "index; an IFERC month has one index, published once"
     )
     with pytest.raises(ValueError) as second:
@@ -5025,7 +5028,7 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
             methods=(ScheduleMethod.LASTDAY, ScheduleMethod.PENULTIMATE),
         )
     assert str(second.value) == (
-        "schedule_method of trade 'WAH002' at row 2 is 'penultimate', expected 'lastday' on an "
+        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'lastday' on an "
         "IFERC index; an IFERC month has one index, published once"
     )
     # The observations builder says the same of a method on bare arrays, and a part of a month
@@ -5041,7 +5044,7 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
     with pytest.raises(ValueError) as part:
         observed_of(half)
     assert str(part.value) == (
-        "Z26 of trade 'WAH001' at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
+        "Z26 of trade 1001 at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
         "month, expected the whole month under lastday; an IFERC month's index is one price for "
         "the whole month"
     )
@@ -5050,6 +5053,38 @@ def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> 
     with pytest.raises(ValueError) as wrong_day:
         encoded(waha_terms(), off, UNITS, WorkCounter())
     assert str(wrong_day.value) == (
-        "trade 'WAH001' at row 1 observes 2026-12-02, expected 2026-12-01, the day Z26's index "
+        "trade 1001 at row 1 observes 2026-12-02, expected 2026-12-01, the day Z26's index "
         "publishes; an IFERC month prices once, on that day"
     )
+
+
+# --- numeric trade IDs, numeric-trade-ids.md ------------------------------------------------
+
+
+def test_whole_trade_ids_keeps_15_digits_either_side_of_zero_and_names_the_first_bad_one() -> None:
+    # The rule the template and the resolution read through: finite, whole and within the 15
+    # digits, converted once to int64 and frozen; a whole value shown without a fraction, the
+    # others as they are; the kernel then takes the integers and checks their count alone.
+    kept = whole_trade_ids(
+        numbers(999_999_999_999_999, -999_999_999_999_999, 0, 123456.0),
+        lambda k: f"trade_id row {k + 1}",
+    )
+    assert kept.dtype == np.int64 and not kept.flags.writeable
+    assert kept.tolist() == [999_999_999_999_999, -999_999_999_999_999, 0, 123456]
+    for value, shown in (
+        (123456.5, "123456.5"),
+        (1e15, "1000000000000000"),
+        (-1e15, "-1000000000000000"),
+        (float("nan"), "nan"),
+        (float("inf"), "inf"),
+    ):
+        with pytest.raises(ValueError) as refused:
+            whole_trade_ids(numbers(1, value), lambda k: f"trade_id row {k + 1}")
+        assert str(refused.value) == (
+            f"trade_id row 2 is {shown}, expected a whole number of at most 15 digits"
+        )
+    assert named_trade(ids(123456, 7), 1) == "trade 7 at row 2"
+    assert named_trade(None, 1) == "trade at row 2"
+    terms = terms_of(trade_ids=ids(999_999_999_999_999, 2, 3, 4, 5))
+    assert terms.trade_ids is not None and not terms.trade_ids.flags.writeable
+    assert terms.named(0) == "trade 999999999999999 at row 1"
