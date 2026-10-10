@@ -8,8 +8,9 @@ the summed offset and, for a financial settlement, the day it pays. Per slot, th
 input the batch consumes, an observation date within a payment group: the date, the contract
 pricing that date, derived by the calendar's rule and retained, the group's own under the
 expiry-based methods and whichever the calendar gives under asian, and the summed exposure
-every settle or quote of that date multiplies. Nothing here changes on a tick, a fixing or a roll of
-the valuation date. docs/library/trades/kernel.md is the page."""
+every settle or quote of that date multiplies. And the reserves, the brokerage and the clearing
+each component incurs, summed for the batch, since #NN. Nothing here changes on a tick, a fixing
+or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
 from typing import assert_never
@@ -25,6 +26,7 @@ from goosedove.index_definitions.index_conventions import CURRENCY
 from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
+from goosedove.trades.reserves import Reserves, reserves
 from goosedove.trades.terms import METHODS, ResolvedTrades, ScheduleMethod
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
@@ -77,7 +79,12 @@ class Encoded:
     months[m], the first day of each calendar month those days fall in, increasing, and
     month_of_day[d]; years[y], the first day of each calendar year, increasing, and
     year_of_month[m]. A bucket is a day, a month or a year the batch observes in and nothing
-    else: no calendar day without an observation, and a payment day moves nothing."""
+    else: no calendar day without an observation, and a payment day moves nothing.
+
+    Then reserves, since #NN, the batch's booked brokerage and clearing, each component's
+    count of its specification times the specification's rate per lot, summed, marketing at
+    zero and their currency, the Reserves record, static for the batch and entering no number
+    here; _ReportReserves spills the totals and the results readback shows them once."""
 
     terms: ResolvedTrades
     observations: Observations
@@ -102,6 +109,7 @@ class Encoded:
     month_of_day: NDArray[np.intp]
     years: NDArray[np.datetime64]
     year_of_month: NDArray[np.intp]
+    reserves: Reserves
 
     def slot_trade(self, slot: int) -> str:
         """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
@@ -172,12 +180,14 @@ def encoded(
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
-    pay. The fees of the specification are read by nothing here: they are reserves, never a
-    contribution to value.
+    pay. The fees of the specification are read once, since #NN, for the reserves, each
+    component's count times its specification's two rates per lot and the batch's two sums,
+    marketing at zero, kept beside the encoding and never a contribution to value,
+    docs/library/trades/report-reserves.md.
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct
-    specification the batch selects.
+    specification the batch selects; and the reserves once over the components.
     """
     index = terms.index
     conventions = index.conventions
@@ -215,6 +225,7 @@ def encoded(
     counter.hit(ENCODED_GROUPS, int(group_contract.size))
     counter.hit(ENCODED_OBSERVATIONS, int(observations.component.size))
     counter.hit(ENCODED_SLOTS, int(slot_group.size))
+    reserved = reserves(terms, counter)
     arrays = (
         quote_quantity,
         coefficient,
@@ -233,7 +244,7 @@ def encoded(
     )
     for array in arrays:
         array.setflags(write=False)
-    return Encoded(terms, observations, *arrays[:6], payment_date, *arrays[6:])
+    return Encoded(terms, observations, *arrays[:6], payment_date, *arrays[6:], reserved)
 
 
 def _the_groups(

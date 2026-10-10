@@ -48,6 +48,7 @@ from goosedove.market_data.price_vector import PriceVector
 from goosedove.trades.encoding import Encoded
 from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
+from goosedove.trades.reserves import Reserves
 from goosedove.trades.resolution import Trades
 from goosedove.trades.template import TradeTemplate
 from goosedove.trades.terms import BASIS_NAMES, METHOD_NAMES
@@ -481,14 +482,17 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # contract_lot_delta so that neither is read as the slot's; then the two units those numbers
     # are in, the sensitivity's, currency per quote unit, and the lot's words, the batch's facts
     # on every row so that a row reads whole, as the trades spill carries the route; the mark,
-    # the cash and the totals are the two reports' to show.
+    # the cash and the totals are the reports' to show. Then, since #NN, the batch's reserves,
+    # once: the three totals and their currency on the first slot row, as _ReportReserves
+    # spills them, and a dash on every later row, since they are the batch's booked amounts and
+    # no slot's, and a total repeated on every slot would read as each slot's.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
     slots = encoding.slot_group.size
     contribution = np.zeros(slots)
     contribution[prepared.live_slot] = obj.dated_live_contribution
-    return MixedArray.table(
+    table = MixedArray.table(
         [
             (
                 *names,
@@ -513,6 +517,45 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
         (obj.price_sensitivity_unit,) * slots,
         (obj.lot_unit,) * slots,
     )
+    return _with_reserves(table, obj.reserves)
+
+
+def _with_reserves(base: MixedArray, reserves: Reserves) -> MixedArray:
+    """A results table widened by the batch's reserves, shown once: brokerage_reserve,
+    clearing_reserve and marketing_reserve, numbers, and currency, text, on the first body row,
+    as _ReportReserves spills them, and a dash in all four on every later row. A column holding
+    a number on one row and a word on the others is not one the table builder takes, so the
+    four are written by kind, as the market's price column is: their kinds, their slots, and
+    their texts placed among the base's in sheet order, every body row of the base holding the
+    same number of texts, one per text column. The record's four values are placed and nothing
+    is summed or looked up; every result has a first row, a batch observing at least once."""
+    rows, width = base.shape
+    body = rows - 2
+    kinds = np.full((rows, width + 4), TEXT_CODE, dtype=np.uint8)
+    kinds[:, :width] = base.kinds
+    kinds[2, width : width + 3] = NUMBER_CODE
+    slots = np.full((rows, width + 4), np.nan)
+    slots[:, :width] = base.numeric_slots
+    slots[2, width : width + 3] = (reserves.brokerage, reserves.clearing, reserves.marketing)
+    per_row = (len(base.texts) - 2 * width) // body
+    words = np.full((body, per_row + 4), "-", dtype=object)
+    words[:, :per_row] = np.array(base.texts[2 * width :], dtype=object).reshape(body, per_row)
+    words[0, per_row + 3] = reserves.currency
+    placed = np.ones((body, per_row + 4), dtype=np.bool_)
+    placed[0, per_row : per_row + 3] = False  # the three numbers of the first row
+    headings = (
+        *base.texts[:width],
+        "brokerage_reserve",
+        "clearing_reserve",
+        "marketing_reserve",
+        "currency",
+        *base.texts[width : 2 * width],
+        "float64",
+        "float64",
+        "float64",
+        "str",
+    )
+    return MixedArray(kinds, slots, (*headings, *words[placed]))
 
 
 @excel_function

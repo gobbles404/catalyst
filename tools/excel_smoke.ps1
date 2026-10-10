@@ -728,7 +728,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     "=INDEX(_ReportRisk(KA14),3,1)"      = "0"
-    "=COLUMNS(util_ReadHandle(KA14))"    = "12"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "16"
     "=INDEX(util_ReadHandle(KA14),1,10)"  = "contract_lot_delta"
     "=INDEX(util_ReadHandle(KA14),6,10)"  = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
@@ -904,6 +904,46 @@ $formulas = [ordered]@{
     "=_CreateTrades(EB1,EW4:FA4,OJ6:ON6,EW3)" = "#ERROR _CreateTrades: trade_rows cell (1, 1) is text 'NG-001', expected number"
     "=_CreateTrades(EB1,EW4:FA4,OJ3:ON4,EW3)" = "#ERROR _CreateTrades: ValueError: trade_id row 2 is 123456.5, expected a whole number of at most 15 digits"
     '=_CreateTradeTemplate("future",OJ10:OP10,OJ14:OP14)' = "#ERROR _CreateTradeTemplate: ValueError: trade_id is 12.5, expected a whole number of at most 15 digits"
+    # Reserve totals, reserve-totals.md: the worked example in OR1:OW30, four Z26 rows on the
+    # ethane schedule with the ticket's rates, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT, booking 50 of
+    # brokerage and 20 of clearing in USD when the batch is made; _ReportReserves on the 2 December
+    # results in OR23 spills the three totals and the currency, the results readback shows them
+    # once, on the first slot row, and a dash on every later row of the ethane asian's 22 in IY16;
+    # the batch's own readback carries no reserve; a blank and a handle naming nothing refused in the
+    # seam's words; and a rate of 9E+307 a lot, near the largest number a cell takes typed, refused
+    # at creation, two lots of one row past the largest number and one lot each of two rows
+    # summing past it.
+    "=ROWS(_ReportReserves(OR23))"         = "3"
+    "=COLUMNS(_ReportReserves(OR23))"      = "4"
+    "=INDEX(_ReportReserves(OR23),1,1)"    = "brokerage_reserve"
+    "=INDEX(_ReportReserves(OR23),1,2)"    = "clearing_reserve"
+    "=INDEX(_ReportReserves(OR23),1,3)"    = "marketing_reserve"
+    "=INDEX(_ReportReserves(OR23),1,4)"    = "currency"
+    "=INDEX(_ReportReserves(OR23),2,1)"    = "float64"
+    "=INDEX(_ReportReserves(OR23),2,4)"    = "str"
+    "=INDEX(_ReportReserves(OR23),3,1)"    = "50"
+    "=INDEX(_ReportReserves(OR23),3,2)"    = "20"
+    "=INDEX(_ReportReserves(OR23),3,3)"    = "0"
+    "=INDEX(_ReportReserves(OR23),3,4)"    = "USD"
+    "=INDEX(_ReportValues(OR23),3,1)"      = "1260"
+    "=INDEX(_ReportRisk(OR23),3,1)"        = "1"
+    "=ROWS(util_ReadHandle(OR23))"         = "3"
+    "=COLUMNS(util_ReadHandle(OR23))"      = "16"
+    "=INDEX(util_ReadHandle(OR23),1,13)"   = "brokerage_reserve"
+    "=INDEX(util_ReadHandle(OR23),1,16)"   = "currency"
+    "=INDEX(util_ReadHandle(OR23),3,13)"   = "50"
+    "=INDEX(util_ReadHandle(OR23),3,14)"   = "20"
+    "=INDEX(util_ReadHandle(OR23),3,16)"   = "USD"
+    "=COLUMNS(util_ReadHandle(OR16))"      = "21"
+    "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
+    "=INDEX(util_ReadHandle(IY16),3,13)"   = "0"
+    "=INDEX(util_ReadHandle(IY16),3,16)"   = "USD"
+    "=INDEX(util_ReadHandle(IY16),4,13)"   = "-"
+    "=INDEX(util_ReadHandle(IY16),24,16)"  = "-"
+    "=_ReportReserves(C2)"                 = "#ERROR _ReportReserves: results is blank, expected trade results handle"
+    '=_ReportReserves("x:trade_results:9")' = "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, expected trade results handle"
+    "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 9e+307 a lot"
+    "=_CreateTrades(OR27,OR10:OW10,OR29:OW30,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number"
     "=_CreateTrades(EB1,EW4:FA4,OJ2:ON3,OJ12)" = "#ERROR _CreateTrades: ValueError: trade_id is supplied by the template and by the ticket, expected by one of them"
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{5,"Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
@@ -1695,6 +1735,33 @@ $cells = [ordered]@{
     "OJ12" = '=_CreateTradeTemplate("future",OJ10:OP10,OJ11:OP11)'
     "OJ13" = "=_CreateTrades(EB1,EX4:FA4,EX5:FA7,OJ12)"
     "OJ14" = "12.5"; "OK14" = "lots"; "OL14" = "month"; "OM14" = "lastday"; "ON14" = "cleared"; "OO14" = "physical"; "OP14" = "CME Clearing"
+    "OR1" = "LOT"; "OS1" = "1000"; "OT1" = "BBL"; "OU1" = "10"; "OV1" = "4"
+    "OR2" = "BBL"; "OS2" = "1"; "OT2" = "BBL"; "OU2" = "0.01"; "OV2" = "0.004"
+    "OR3" = "GAL"; "OS3" = "1"; "OT3" = "GAL"; "OU3" = "0"; "OV3" = "0"
+    "OR4" = "=_CreateContractSpecifications(EI1:EM1,OR1:OV3)"
+    "OR5" = '=_CreateIndex("RESERVES","Ethane with the reserve ticket rates",IA5,ID1,OR4,IC1,"LOT")'
+    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_time_lag"; "OX7" = "payment_holiday_calendar"
+    "OR8" = "month"; "OS8" = "lastday"; "OT8" = "cleared"; "OU8" = "financial"; "OV8" = "Prototype Clearing"; "OW8" = "+2bd"; "OX8" = "=IC2"
+    "OR9" = '=_CreateTradeTemplate("future",OR7:OX7,OR8:OX8)'
+    "OR10" = "trade_id"; "OS10" = "trade_date"; "OT10" = "contract_code"; "OU10" = "quantity"; "OV10" = "quantity_unit"; "OW10" = "fixed_price"
+    "OR11" = "101"; "OS11" = "20-Nov-2026"; "OT11" = "Z26"; "OU11" = "2"; "OV11" = "LOT"; "OW11" = "0.25"
+    "OR12" = "102"; "OS12" = "20-Nov-2026"; "OT12" = "Z26"; "OU12" = "-2"; "OV12" = "LOT"; "OW12" = "0.25"
+    "OR13" = "103"; "OS13" = "20-Nov-2026"; "OT13" = "Z26"; "OU13" = "1000"; "OV13" = "BBL"; "OW13" = "0.25"
+    "OR14" = "104"; "OS14" = "20-Nov-2026"; "OT14" = "Z26"; "OU14" = "0"; "OV14" = "LOT"; "OW14" = "0.25"
+    "OR16" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR9)"
+    "OR17" = "=_CreateCalendar(IY2,OR5)"
+    "OR18" = "=_CreateFuturesFixings(IY3:IY4,IZ3:IZ4,OR5)"
+    "OR19" = "=_CreateMarketHistory(OR17,OR18)"
+    "OR20" = '=_CreatePriceVector("RESERVES",IY10:IY12)'
+    "OR21" = "=_CreateMarket(OR19,OR20)"
+    "OR22" = "=_PrepareTrades(OR16,OR19)"
+    "OR23" = "=_EvaluateTrades(OR22,OR21)"
+    "OR25" = "LOT"; "OS25" = "1000"; "OT25" = "BBL"; "OU25" = "9E+307"; "OV25" = "0"
+    "OR26" = "=_CreateContractSpecifications(EI1:EM1,OR25:OV25)"
+    "OR27" = '=_CreateIndex("HUGE","A rate a cell holds that two lots outrun",IA5,ID1,OR26,IC1,"LOT")'
+    "OR28" = "101"; "OS28" = "20-Nov-2026"; "OT28" = "Z26"; "OU28" = "2"; "OV28" = "LOT"; "OW28" = "0.25"
+    "OR29" = "101"; "OS29" = "20-Nov-2026"; "OT29" = "Z26"; "OU29" = "1"; "OV29" = "LOT"; "OW29" = "0.25"
+    "OR30" = "102"; "OS30" = "20-Nov-2026"; "OT30" = "Z26"; "OU30" = "1"; "OV30" = "LOT"; "OW30" = "0.25"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

@@ -231,6 +231,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_EvaluateTrades", new object[] { ExcelEmpty.Value, ExcelMissing.Value }, "#ERROR _EvaluateTrades: prepared is blank, expected prepared trades handle" };
             yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
             yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value }, "#ERROR _ReportRisk: results is blank, expected trade results handle" };
+            yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -832,7 +833,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid))[2, 0], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(12, contributions.GetLength(1));
+            Assert.Equal(16, contributions.GetLength(1));
             Assert.Equal("contract_lot_delta", contributions[0, 9]);
             Assert.Equal(46365.0, contributions[5, 3]);
             Assert.Equal(0.0, contributions[5, 9]);
@@ -1847,6 +1848,74 @@ namespace Goosedove.Host.Tests
             Assert.Equal(750.0, (double)paid[2, 1], 6);
             var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("LOT", "month", "lastday", "cleared", "physical", "ICE Clear Europe"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis future is cash settled on its month's published index", Seam.Call("_CreateTrades", index, headers, row, physical));
+        }
+
+        // Reserve totals, reserve-totals.md: the worked example on the ethane schedule, X26, Z26, F27
+        // and G27 expiring 46356, 46387, 46416 and 46444, closed 46381 and 46388, dollars a gallon,
+        // LOT a thousand barrels at 10 and 4 a lot, BBL a barrel at 0.01 and 0.004, GAL free; 101 to
+        // 104 booked 46346, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT of Z26 at 0.25, financial at +2bd on a
+        // calendar closed 46388. On 46358 at 0.28: 1,260 of mark, a lot, and 50 of brokerage, 20 of
+        // clearing and none of marketing in USD, the report's one row and the results readback's
+        // first, the batch's readback without a reserve column; a tick to 0.31 marks 2,520 and
+        // reserves the same. A rate of 1e308 a lot: two lots refused by row, one lot each of two rows
+        // refused for the batch, nothing published.
+        [Fact]
+        public void a_batch_books_its_reserves_once_and_its_results_report_them_unchanged()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46356.0, 46387.0, 46416.0, 46444.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "GAL", "USD", "VOLUME", "GAL");
+            var headings = Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 10.0, 4.0 }, { "BBL", 1.0, "BBL", 0.01, 0.004 }, { "GAL", 1.0, "GAL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, holidays, "LOT");
+            var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
+            var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price");
+            var rows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", -2.0, "LOT", 0.25 }, { 103.0, 46346.0, "Z26", 1000.0, "BBL", 0.25 }, { 104.0, 46346.0, "Z26", 0.0, "LOT", 0.25 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
+            Assert.StartsWith(Pid + ":trades:RESERVES:", trades);
+            var batch = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(21, batch.GetLength(1));
+            Assert.Equal("offset", batch[0, 20]);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46358.0, 0.5), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", Column(46357.0, 46356.0), Column(0.24, 0.28), index));
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            string Valued(params object[] quotes)
+            {
+                return (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "RESERVES", Column(quotes))));
+            }
+            var results = Valued(0.28, 0.30, 0.32);
+            Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            var reserves = (object[,])Seam.Call("_ReportReserves", results);
+            Assert.Equal(3, reserves.GetLength(0));
+            Assert.Equal(4, reserves.GetLength(1));
+            Assert.Equal("brokerage_reserve", reserves[0, 0]);
+            Assert.Equal("currency", reserves[0, 3]);
+            Assert.Equal("float64", reserves[1, 0]);
+            Assert.Equal("str", reserves[1, 3]);
+            Assert.Equal(50.0, (double)reserves[2, 0], 9);
+            Assert.Equal(20.0, (double)reserves[2, 1], 9);
+            Assert.Equal(0.0, (double)reserves[2, 2], 9);
+            Assert.Equal("USD", reserves[2, 3]);
+            var table = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(3, table.GetLength(0));
+            Assert.Equal(16, table.GetLength(1));
+            Assert.Equal("brokerage_reserve", table[0, 12]);
+            Assert.Equal("currency", table[0, 15]);
+            Assert.Equal(50.0, (double)table[2, 12], 9);
+            Assert.Equal(20.0, (double)table[2, 13], 9);
+            Assert.Equal("USD", table[2, 15]);
+            var ticked = Valued(0.31, 0.30, 0.32);
+            Assert.Equal(2520.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
+            var again = (object[,])Seam.Call("_ReportReserves", ticked);
+            Assert.Equal(50.0, (double)again[2, 0], 9);
+            Assert.Equal(20.0, (double)again[2, 1], 9);
+            var dear = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 1e308, 0.0 } });
+            var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, holidays, "LOT");
+            Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 1e+308 a lot", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
         }
 
         [Fact]

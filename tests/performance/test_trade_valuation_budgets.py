@@ -166,9 +166,13 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2), sheet["history"])
     results = PATH["_EvaluateTrades"](prepared, sheet["market"])
     live = bridge.live_handles()
-    for name, numeric in (("_ReportValues", 3), ("_ReportRisk", 3)):
+    for name, numeric, dated in (
+        ("_ReportValues", 3, True),
+        ("_ReportRisk", 3, True),
+        ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #NN
+    ):
         profile = call_profile(lambda name=name: PATH[name](results))
-        assert profile == {
+        expected = {
             "Registered.run": 1,
             "_arguments": 1,
             "_validate": 1,
@@ -176,12 +180,14 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
             "_resolve": 1,
             name: 1,
             "MixedArray.table": 1,
-            "_table_column": numeric,  # the numbers and the day
-            "_serials": 1,  # the day to its serial
-            "_unit": 1,
+            "_table_column": numeric,  # the numbers, and the day where the report has one
             "_mixed_out": 1,
             "_bad_mixed": 1,  # the way out's check of the rectangle, finding nothing wrong
-        }, name
+        }
+        if dated:
+            expected["_serials"] = 1  # the day to its serial
+            expected["_unit"] = 1
+        assert profile == expected, name
     assert bridge.live_handles() == live  # a report publishes nothing
 
 
@@ -200,3 +206,4 @@ def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str
     results = PATH["_EvaluateTrades"](prepared, sheet["market"])
     assert least_peak(lambda: PATH["_ReportValues"](results)) <= 2 * SLACK
     assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 2 * SLACK
+    assert least_peak(lambda: PATH["_ReportReserves"](results)) <= 2 * SLACK
