@@ -4,8 +4,9 @@ from exactly one of the two, the required fields present and the conditional one
 their condition holds, one route and one settlement for the batch and a quantity unit, a method
 and a basis per row, in that order, each distinct text of the three read once, the quantity unit
 naming one of the index's specifications, every code of the index's
-schedule read for its month once, each contract code or strip of the ticket resolved by month to
-the schedule's rows, or each start and end date of the ticket split at month ends, every component
+schedule read for its month once, each row's period chosen row by row since #NN, its two dates
+when both are supplied and its contract code otherwise, the code resolved by month to the
+schedule's rows or the dates split at month ends, every component
 with the days it covers, its method's observations made once over those days, and for a
 financial settlement each component's payment day counted strictly after its last observation day
 on the payment calendar. Then the kernel:
@@ -60,6 +61,10 @@ from goosedove.trades.terms import (
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
 RESOLVED_COMPONENTS = "resolved_components"  # contract months resolved to schedule rows
 SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule read for their month
+# Distinct codes of the rows that book by code, read for their months, since #NN: a row that
+# books by its dates has its code, if any, read for nothing and counted here for nothing.
+TICKET_CODES_READ = "ticket_codes_read"
+PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 
 # The conditions of the future's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
@@ -75,11 +80,19 @@ CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
 class Trades:
     """A batch of trades as _CreateTrades publishes it: the resolved terms and their encoding, the
     encoding holding the terms by reference as well, so each fact is kept once and the two
-    sections are read together or apart. Nothing of a market, a history or a valuation date is
+    sections are read together or apart; and since #NN what each row entered for its
+    contract_code, as the seam carries a field some rows leave unsupplied: code_entered, per
+    occurrence whether the row entered one, from the ticket's cell or the template's value, and
+    entered_codes, the texts of the rows that did, in row order, as typed, both owned and the
+    mask read-only; kept apart from the contracts the components resolved to, so that a reader
+    tells a label a row booked by from one its dates overrode, and read by nothing that prices.
+    Nothing of a market, a history or a valuation date is
     here; preparation and evaluation make their own records over this one."""
 
     resolved: ResolvedTrades
     encoded: Encoded
+    code_entered: NDArray[np.bool_]
+    entered_codes: tuple[str, ...]
 
 
 def trades(
@@ -92,17 +105,18 @@ def trades(
     """The one way to make Trades: resolution, which makes the schedule method's observations on
     the way to the payment days, then encoding over the terms and those observations, the unit
     tables and the counter passed in and never looked up; a failure in any publishes nothing."""
-    terms, observations = resolved(index, ticket, template, counter)
-    return Trades(terms, encoded(terms, observations, units, counter))
+    terms, observations, entered = resolved(index, ticket, template, counter)
+    return Trades(terms, encoded(terms, observations, units, counter), *entered)
 
 
 def resolved(
     index: Index, ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
-) -> tuple[ResolvedTrades, Observations]:
+) -> tuple[ResolvedTrades, Observations, tuple[NDArray[np.bool_], tuple[str, ...]]]:
     """The resolution child: the terms of a batch from a template and a ticket, checked in this
     order, the first failure being the message, and then the kernel's own rules; with them the
     observations the schedule method gave the components, made once here and handed on to the
-    encoding, since the payment days count from them.
+    encoding, since the payment days count from them, and what the rows entered for their codes,
+    the rows that entered one and their texts.
 
     The ticket is bound against the template's instrument, the future, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
@@ -124,20 +138,30 @@ def resolved(
     made with a reporting lot, the specification the batch's delta is counted in lots of, and
     every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
-    refused by row. The batch has one period form, a contract_code or start_date with end_date,
-    from the template or the ticket as any field: both forms, either date alone and neither are
-    refused at the code's place in the definition's order. Each contract code of the ticket is
-    read once per distinct text, in the order the sheet first shows each, so that the first row
-    that breaks the grammar is the one named, through the period grammar, in either case, for
-    the months it spans; each pair of dates, an end before its start refused by row, for the
-    months from the start's to the end's; and each month is resolved to its schedule row, a
-    month the schedule lacks refused by the row and the month. A period makes one component per
-    month, in order, all on the one occurrence, each covering its month's days, weekends and
+    refused by row. Each row's period is its own since #NN, chosen from the three period fields
+    as the row holds them, the template's value or the ticket's cell: a blank or an empty cell
+    supplies nothing, so a row holds a field exactly when a value stands in it. Both dates
+    supplied, the row books the days between them, whatever code stands beside them, the code
+    kept as entered text and read for nothing; neither supplied, the row books its contract
+    code; one date without the other, or no code and no pair, is refused by the first such row
+    from the top, naming the field and the row, unless no period field stands in the template
+    or the ticket at all, which is refused by name before any row is read, at the code's place
+    in the definition's order. Each code of a row that books by it is read once per distinct
+    text, in the order the sheet first shows each among those rows, so that the first row that
+    breaks the grammar is the one named, by its own row, through the period grammar, in either
+    case, for the months it spans; a code beside both dates is never read, so a label the
+    grammar refuses stands there. Each pair of dates, an end before its start refused by row,
+    gives the months from the start's to the end's; and each month is resolved to its schedule
+    row, a month the schedule lacks refused by the row and the month, in the words of the form
+    the row booked by. A period makes one component per month, in order, all on the one
+    occurrence, the components in row order whichever form each row took, each covering its
+    month's days, weekends and
     holidays included: the whole month from a code, and from dates the whole month too but for
     the first and the last, which start and end on the dates given, so 12 November to
     31 December is X26 over 12 to 30 November and Z26 over the whole of December; what a
     quantity per calendar day multiplies, and what the schedule method prices over. No calendar
-    moves the days.
+    moves the days. Which rows entered a code, and the texts they entered, are kept beside the
+    batch and apart from the contracts its components resolved to.
     The schedule method gives each component its observation days, the expiry under lastday, the
     business day before it under penultimate, the expiry and the two business days before it
     under last3day, a third each, the three refusing a component that covers a part of its
@@ -157,8 +181,9 @@ def resolved(
     the first row of them named under a physical one, and each component's quantity formed once
     by the basis, the entered quantity times its covered days under calday.
 
-    Work: one occurrence per ticket row, one component per contract month and one schedule code
-    per row of the schedule, reported to the counter.
+    Work: one occurrence per ticket row, one component per contract month, one schedule code
+    per row of the schedule and since #NN one ticket code per distinct code of the rows that book
+    by code, none for a row that books by its dates, reported to the counter.
     """
     fields = _fields(template, ticket)
     _the_required(fields)
@@ -179,7 +204,10 @@ def resolved(
     reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    occurrence, contract, start, end = _the_periods(fields, months)
+    periods = _the_periods(fields, months)
+    counter.hit(TICKET_CODES_READ, periods.codes_read)
+    occurrence, contract = periods.occurrence, periods.contract
+    start, end = periods.start, periods.end
     trade_ids = fields.ids("trade_id")
     observations = observed(
         schedule_method[occurrence],
@@ -224,7 +252,7 @@ def resolved(
         fields.numbers("fixed_price")[occurrence],
         payment,
     )
-    return terms, observations
+    return terms, observations, periods.entered
 
 
 # --- the fields of the batch, each from the template or the ticket --------------------------
@@ -243,14 +271,42 @@ class _Fields:
         return self.ticket.rows
 
     def has(self, name: str) -> bool:
-        return name in self.template.defaults or self.ticket.has(name)
+        """Whether either names the field: the template owns every field its row named, a period
+        field whose cell held nothing included, since #NN, and the ticket every column."""
+        return name in self.template.names or self.ticket.has(name)
 
     def where(self, name: str, row: int) -> str:
         """A field named in a message: with the row when the ticket supplied it, since each row
         has its own value, and alone when the template did, since every row has the same."""
-        if name in self.template.defaults:
+        if name in self.template.names:
             return name
         return f"{name} row {row + 1}"
+
+    def period_texts(self, name: str) -> tuple[NDArray[np.bool_], tuple[str, ...]]:
+        """A period field's texts and which rows supplied them, since #NN: the template's one
+        value on every row, or on none when its cell held nothing; the ticket's column over the
+        rows whose cells held a value, in row order; or nothing from either."""
+        if name in self.template.names:
+            if name in self.template.defaults:
+                text = cast(str, self.template.defaults[name])
+                return np.ones(self.rows, dtype=bool), (text,) * self.rows
+            return np.zeros(self.rows, dtype=bool), ()
+        if self.ticket.has(name):
+            return self.ticket.supplied_rows(name), self.ticket.texts(name)
+        return np.zeros(self.rows, dtype=bool), ()
+
+    def period_dates(self, name: str) -> tuple[NDArray[np.bool_], NDArray[np.datetime64]]:
+        """A period field's days and which rows supplied them, as period_texts gives texts."""
+        if name in self.template.names:
+            if name in self.template.defaults:
+                day = cast(np.datetime64, self.template.defaults[name])
+                return np.ones(self.rows, dtype=bool), np.full(
+                    self.rows, day, dtype="datetime64[D]"
+                )
+            return np.zeros(self.rows, dtype=bool), np.empty(0, dtype="datetime64[D]")
+        if self.ticket.has(name):
+            return self.ticket.supplied_rows(name), self.ticket.dates(name)
+        return np.zeros(self.rows, dtype=bool), np.empty(0, dtype="datetime64[D]")
 
     def one_text(self, name: str) -> str:
         """A batch field's one text: the template's, or the ticket's column when every row holds
@@ -331,7 +387,7 @@ def _fields(template: TradeTemplate, ticket: FieldValues) -> _Fields:
             f"{template.instrument.name!r}"
         )
     for name in ticket.names:
-        if name in template.defaults:
+        if name in template.names:
             raise ValueError(
                 f"{name} is supplied by the template and by the ticket, expected by one of them"
             )
@@ -340,41 +396,21 @@ def _fields(template: TradeTemplate, ticket: FieldValues) -> _Fields:
 
 def _the_required(fields: _Fields) -> None:
     """Every field the definition always requires, present in one of the two, in the definition's
-    order; at the contract code's place the one period form, a code or the two dates, since the
-    code was the required field before the dates could stand in for it."""
+    order; at the contract code's place some period field, a code or a date, named by either,
+    since the code was the required field before the dates could stand in for it: which rows
+    hold which, and whether each holds a whole period, is the periods' own rule since #NN."""
     for field in fields.template.instrument.fields:
         if field.name == "contract_code":
-            _the_period_form(fields)
+            if not any(fields.has(name) for name in PERIOD_FIELDS):
+                raise ValueError(
+                    "contract_code is missing, expected a value in the template or a column in "
+                    "the ticket, or start_date and end_date in its place"
+                )
         elif field.required and not fields.has(field.name):
             raise ValueError(
                 f"{field.name} is missing, expected a value in the template or a column in the "
                 "ticket"
             )
-
-
-def _the_period_form(fields: _Fields) -> None:
-    """Exactly one period form, a contract_code or start_date with end_date, from the template or
-    the ticket as any field is supplied: both forms, either date alone and neither form are
-    refused naming the field at fault, since a batch with two periods, or half of one, covers
-    nobody knows what. The dates' order is checked where they are read."""
-    code = fields.has("contract_code")
-    start, end = fields.has("start_date"), fields.has("end_date")
-    if code and (start or end):
-        raise ValueError(
-            f"contract_code is supplied with {'start_date' if start else 'end_date'}, expected "
-            "one period form, a contract_code or start_date with end_date"
-        )
-    if start != end:
-        given, other = ("start_date", "end_date") if start else ("end_date", "start_date")
-        raise ValueError(
-            f"{given} is supplied without {other}, expected both dates, the period's first and "
-            "last day, or a contract_code"
-        )
-    if not code and not start:
-        raise ValueError(
-            "contract_code is missing, expected a value in the template or a column in the "
-            "ticket, or start_date and end_date in its place"
-        )
 
 
 def _the_conditions(fields: _Fields, route: Route, settlement: Settlement) -> None:
@@ -434,78 +470,152 @@ def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int
     return months
 
 
-def _each_distinct[T](
-    fields: _Fields, name: str, read: Callable[[str, str], T]
+def _distinct_texts[T](
+    texts: NDArray[Any],
+    rows: NDArray[np.intp] | None,
+    where: Callable[[int], str],
+    read: Callable[[str, str], T],
 ) -> tuple[list[T], NDArray[np.intp]]:
-    """A text field read once per distinct text, the first row holding each named in a refusal,
-    and the position of each occurrence's text among the distinct ones. The texts are read in
-    the order their first rows come, not the order they sort in, so the first row from the top
-    that breaks the grammar is the one named; the values are kept in the sorted order the
-    positions index."""
-    texts = np.array(fields.texts(name))
+    """A field's texts, over every row or over the rows given, read once per distinct text, the
+    first row holding each named in a refusal by its own number, and the position of each text
+    among the distinct ones. The texts are read in the order their first rows come, not the
+    order they sort in, so the first row from the top that breaks the grammar is the one named;
+    the values are kept in the sorted order the positions index."""
     distinct, first_rows, inverse = np.unique(texts, return_index=True, return_inverse=True)
     by_row = np.argsort(first_rows)  # the distinct texts in the order their first rows come
-    read_values = {
-        int(i): read(fields.where(name, int(first_rows[i])), str(distinct[i])) for i in by_row
-    }
+    read_values: dict[int, T] = {}
+    for i in by_row:
+        row = int(first_rows[i]) if rows is None else int(rows[first_rows[i]])
+        read_values[int(i)] = read(where(row), str(distinct[i]))
     return [read_values[i] for i in range(distinct.size)], inverse.astype(np.intp)
 
 
-def _the_periods(
-    fields: _Fields, months: NDArray[np.int64]
-) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.datetime64], NDArray[np.datetime64]]:
-    """Each occurrence's period resolved to its components, one per calendar month it covers, in
-    one pass over the components: the occurrence of each, the schedule row of its contract and
-    the first and the last day it covers, aligned. From a contract code, read once per distinct
-    text, every month of the code, each covered whole; from start_date and end_date, the months
-    from the start's to the end's, each covered whole but the first from the start date and the
-    last to the end date, an end before its start refused by its row. The month bounds are one
-    conversion each over the components, the clipping one maximum and one minimum, and the days
-    are the kernel's to count."""
-    if fields.has("contract_code"):
-        spans, inverse = _each_distinct(fields, "contract_code", months_of)
-        bounds = np.array(spans, dtype=np.int64).reshape(-1, 2)[inverse]
-        first, after = bounds[:, 0], bounds[:, 1]
-        dates = None
-    else:
-        starts, ends = fields.dates("start_date"), fields.dates("end_date")
-        backwards = ends < starts
-        if backwards.any():
-            i = int(backwards.argmax())
-            raise ValueError(
-                f"{fields.where('end_date', i)} is {ends[i]}, expected a day on or after "
-                f"{fields.where('start_date', i)}, {starts[i]}"
-            )
-        first = starts.astype("datetime64[M]").astype(np.int64)
-        after = ends.astype("datetime64[M]").astype(np.int64) + 1
-        dates = (starts, ends)
-    count = after - first
-    occurrence = np.repeat(np.arange(fields.rows, dtype=np.intp), count)
-    offsets = np.cumsum(count) - count
-    month = first[occurrence] + (np.arange(occurrence.size) - offsets[occurrence])
-    contract = _schedule_rows(fields, months, month, occurrence, dates is None)
-    month_first, month_last = month_bounds(month)
-    if dates is None:
-        return occurrence, contract, month_first, month_last
-    starts, ends = dates
-    return (
-        occurrence,
-        contract,
-        np.maximum(month_first, starts[occurrence]),
-        np.minimum(month_last, ends[occurrence]),
+def _each_distinct[T](
+    fields: _Fields, name: str, read: Callable[[str, str], T]
+) -> tuple[list[T], NDArray[np.intp]]:
+    """A text field of every row read once per distinct text, each occurrence's position among
+    the distinct texts beside the values."""
+    return _distinct_texts(
+        np.array(fields.texts(name)), None, lambda i: fields.where(name, i), read
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _Periods:
+    """What the rows' periods resolved to: per component its occurrence, its schedule row and the
+    first and the last day it covers, aligned; which rows entered a code, a read-only mask the
+    batch owns, with the texts they entered in row order; and how many distinct codes were read
+    for their months."""
+
+    occurrence: NDArray[np.intp]
+    contract: NDArray[np.intp]
+    start: NDArray[np.datetime64]
+    end: NDArray[np.datetime64]
+    entered: tuple[NDArray[np.bool_], tuple[str, ...]]
+    codes_read: int
+
+
+def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
+    """Each occurrence's period chosen row by row and resolved to its components, one per
+    calendar month it covers, in one pass over the components, since #NN. A row with both dates
+    books the days between them, a code beside them kept as entered text and never read; a row
+    with neither books its code; a row with one date and not the other, or with no code and no
+    pair, is refused, the first such row from the top, once every row's three fields are known
+    and before any code is read. The dated rows' ends are held on or after their starts, by row.
+    The codes of the rows that book by code are read once per distinct text, in the order their
+    first rows come, so the first row from the top that breaks the grammar is the one named;
+    then each row's first month and the month after its last, from the code's span or the
+    dates' months, the components in row order whichever form each row took, each month looked
+    up in the schedule's months, a month without a contract refused by the row and the month,
+    and each component's days its month's, a dated row's first and last clipped to its dates.
+    The month bounds are one conversion each over the components, the clipping one maximum and
+    one minimum over the dated components, and the days are the kernel's to count."""
+    rows = fields.rows
+    code_on, codes = fields.period_texts("contract_code")
+    start_on, starts = fields.period_dates("start_date")
+    end_on, ends = fields.period_dates("end_date")
+    dated = start_on & end_on
+    faulty = (start_on ^ end_on) | ~(dated | code_on)
+    if faulty.any():
+        i = int(faulty.argmax())
+        if start_on[i] == end_on[i]:
+            raise ValueError(
+                f"row {i + 1} has no period, expected a contract_code or start_date with end_date "
+                "on each row; contract_code, start_date and end_date are not supplied"
+            )
+        given, other, on, values = (
+            ("start_date", "end_date", start_on, starts)
+            if start_on[i]
+            else ("end_date", "start_date", end_on, ends)
+        )
+        raise ValueError(
+            f"{fields.where(given, i)} is {values[int(np.count_nonzero(on[:i]))]} without "
+            f"{fields.where(other, i)}, expected both dates, the period's first and last day, or "
+            "neither and a contract_code"
+        )
+    # Each row's place among the rows that supplied a field, where that field's values are.
+    rank_start = np.cumsum(start_on) - 1
+    rank_end = np.cumsum(end_on) - 1
+    rank_code = np.cumsum(code_on) - 1
+    rank_dated = np.cumsum(dated) - 1
+    dated_rows = np.flatnonzero(dated)
+    dated_starts = starts[rank_start[dated_rows]]
+    dated_ends = ends[rank_end[dated_rows]]
+    backwards = dated_ends < dated_starts
+    if backwards.any():
+        k = int(backwards.argmax())
+        i = int(dated_rows[k])
+        raise ValueError(
+            f"{fields.where('end_date', i)} is {dated_ends[k]}, expected a day on or after "
+            f"{fields.where('start_date', i)}, {dated_starts[k]}"
+        )
+    coded_rows = np.flatnonzero(~dated)  # each supplies a code, the rule above having passed
+    coded_texts = np.array(codes, dtype=object)[rank_code[coded_rows]]
+    spans, inverse = _distinct_texts(
+        coded_texts, coded_rows, lambda i: fields.where("contract_code", i), months_of
+    )
+    bounds = np.array(spans, dtype=np.int64).reshape(-1, 2)[inverse]
+    first = np.empty(rows, dtype=np.int64)
+    after = np.empty(rows, dtype=np.int64)
+    first[coded_rows], after[coded_rows] = bounds[:, 0], bounds[:, 1]
+    first[dated_rows] = dated_starts.astype("datetime64[M]").astype(np.int64)
+    after[dated_rows] = dated_ends.astype("datetime64[M]").astype(np.int64) + 1
+    count = after - first
+    occurrence = np.repeat(np.arange(rows, dtype=np.intp), count)
+    offsets = np.cumsum(count) - count
+    month = first[occurrence] + (np.arange(occurrence.size) - offsets[occurrence])
+
+    def period_of(i: int) -> str:
+        """A row's period as a refusal names it: its two dates, or the code it books by."""
+        if dated[i]:
+            k = int(rank_dated[i])
+            return (
+                f"{fields.where('start_date', i)} is {dated_starts[k]} and "
+                f"{fields.where('end_date', i)} {dated_ends[k]}"
+            )
+        return f"{fields.where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
+
+    contract = _schedule_rows(months, month, occurrence, period_of)
+    start, end = month_bounds(month)
+    on = dated[occurrence]  # the dated rows' components, clipped to their rows' dates
+    if on.any():
+        k = rank_dated[occurrence[on]]
+        start[on] = np.maximum(start[on], dated_starts[k])
+        end[on] = np.minimum(end[on], dated_ends[k])
+    entered = np.array(code_on, dtype=bool)  # the batch's own copy of which rows entered a code
+    entered.setflags(write=False)
+    return _Periods(occurrence, contract, start, end, (entered, codes), len(spans))
+
+
 def _schedule_rows(
-    fields: _Fields,
     months: NDArray[np.int64],
     month: NDArray[np.int64],
     occurrence: NDArray[np.intp],
-    by_code: bool,
+    period_of: Callable[[int], str],
 ) -> NDArray[np.intp]:
     """Each component's month resolved to its schedule row, one lookup over the components; a
     month the schedule lacks is refused by the row that covers it and the month, in the words of
-    the period form the row used."""
+    the period form the row booked by."""
     low, high = int(months.min()), int(months.max())
     row_of = np.full(high - low + 1, -1, dtype=np.intp)
     row_of[months - low] = np.arange(months.size, dtype=np.intp)
@@ -514,16 +624,9 @@ def _schedule_rows(
     missing = contract < 0
     if missing.any():
         k = int(missing.argmax())
-        i = int(occurrence[k])
-        period = (
-            f"{fields.where('contract_code', i)} is {fields.texts('contract_code')[i]!r}"
-            if by_code
-            else f"{fields.where('start_date', i)} is {fields.dates('start_date')[i]} and "
-            f"{fields.where('end_date', i)} {fields.dates('end_date')[i]}"
-        )
         raise ValueError(
-            f"{period}, expected months the index's schedule has a contract for; "
-            f"it has none for {_month(month[k])}"
+            f"{period_of(int(occurrence[k]))}, expected months the index's schedule has a "
+            f"contract for; it has none for {_month(month[k])}"
         )
     return contract.astype(np.intp)
 

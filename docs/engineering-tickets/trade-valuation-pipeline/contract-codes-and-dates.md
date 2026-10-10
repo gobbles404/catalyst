@@ -2,9 +2,9 @@
 
 [Pipeline overview](README.md) · [UAT item 4](surface-uat-notes.md#4-contract-codes-and-dates-on-one-ticket)
 
-**Status:** Ready for engineering, 10 October 2026. Owner-approved entry behavior.
-Inspected prototype: PR #171 at `0803f6f`. One focused PR continuing the prototype;
-this ticket does not decide how the stack lands on main.
+**Status:** Built in #NN, one focused PR stacked on the reviewed prototype PR #171 at
+`0803f6f`, the page as agreed on 10 October 2026 with the section at the end saying what
+landed; this ticket does not decide how the stack lands on main.
 
 **Suggested PR title:** `feat(trades): resolve codes and dates per ticket row`
 
@@ -191,3 +191,44 @@ Update the UAT item to implemented only after review. The original exclusive-for
 in the earlier period and mixed-field tickets is historical and superseded by this ticket.
 No implicit valuation context, BAL parser change, new schedule method, bilateral valuation,
 new public signature or general relaxation of blank-cell handling belongs in this PR.
+
+## As built
+
+Built in #NN. The pages are [create-trades.md](../../library/trades/create-trades.md),
+[trade-template.md](../../library/trades/trade-template.md), the Show page's three period
+cells, [read-handle.md](../../library/utilities/read-handle.md) and
+[inputs.md](../../seam/inputs.md) decision 43.
+
+The seam: `Field` carries `may_be_unsupplied`, true for the three period fields and no other,
+and the field body crosses as it arrived, its cells checked after its headers so that the
+field a header names says whether a blank or an empty text means a row that supplied nothing
+or a cell that fails its type, `trade_rows cell (2, 4) is blank, expected number` where the
+mixed range's words stood; the cells are placed among the body's texts by one count over
+the cells, so an absent code or an empty-text date displaces no text and no handle, and
+`FieldValues.supplied` carries a read-only mask per such field beside the values of the rows
+that supplied one, never a sentinel. The template keeps `names`, the fields its row named and
+owns, apart from `defaults`, so a blank period cell owns its header and supplies no row;
+`contract_code` is text there, the grammar reading it at `_CreateTrades` for the rows that
+book by it.
+
+The resolution: `_the_periods` reads the three fields as each row holds them, the template's
+value on every row or the ticket's cells, and chooses per row, a complete pair winning, a code
+otherwise, half a pair or no period refused by the first such row from the top and named with
+the field and the row; the codes of the rows that book by code are read once per distinct text
+in first-occurrence order, the dated rows' months come from their dates, the components stand
+in row order whichever form each row took, a missing schedule month is named by the row's own
+form, and the dated components are clipped to their rows' dates; `ticket_codes_read` counts the
+distinct codes read, none for a batch of dated rows. The batch keeps `code_entered` and
+`entered_codes` apart from the contracts; the kernel, the encoding, the preparation and the
+evaluation are untouched. The readback adds `entered_contract_code` before `start_date`,
+`(not supplied)` where a row entered none, and the template's spill shows the same words under
+an unsupplied period field; both are display and no value.
+
+Pinned: the ticket's table on one ticket, Z26 for its V26, with a BAL label and a code naming
+another month beside dates; the refusals by row, the earliest faulty row named; template and
+ticket splits of the three fields and the overlap of an owned blank header; the seam's masks,
+neighbouring text and handles, formula-empty cells, the blank elsewhere in its field's words;
+the acceptance example valued end to end, 580 and 0.29 lots, the singletons summing and a
+whole month by dates the code's own; the ledgers at five rows and two thousand; the smoke's
+block, the host's fact and the kept workbook's block with its eleven older reads moved a
+column. The UAT item stays as the owner left it, implemented only after review.

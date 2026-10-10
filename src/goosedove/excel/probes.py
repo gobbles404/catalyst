@@ -10,12 +10,12 @@ them, and they ship in the build everyone loads. They stay as long as the seam d
 """
 
 from collections.abc import Callable
-from typing import Annotated, Any, assert_never
+from typing import Annotated, assert_never
 
 import numpy as np
-from numpy.typing import NDArray
 
 from goosedove.excel.bridge import (
+    EXCEL_EPOCH,
     BooleanColumn,
     DateColumn,
     FieldRow,
@@ -163,22 +163,35 @@ def CountFieldRows(instrument: str, fields: TextRow, rows: FieldRows[str]) -> fl
 
 
 def _echoed(values: FieldValues) -> MixedArray:
-    """The bound columns laid out as a table under their field names, each as its type came
-    through the seam, a handle column as the words of each object's kind."""
-    columns: list[NDArray[Any] | tuple[str, ...]] = []
+    """The bound columns laid out under their field names, each as its type came through the
+    seam, a date as its serial, a handle column as the words of each object's kind and, since
+    #NN, a cell of a field that supplied no value as the words `(not supplied)`: laid out cell by
+    cell, since a column some rows left unsupplied holds a value on some rows and the words on
+    the rest, which the table builder's columns of one kind could not hold."""
+    columns: list[list[object]] = []
     for name in values.names:
-        match values.field(name).type:
-            case FieldType.NUMBER:
-                columns.append(values.numbers(name))
-            case FieldType.DATE:
-                columns.append(values.dates(name))
-            case FieldType.TEXT | FieldType.CODE:
-                columns.append(values.texts(name))
-            case FieldType.HOLIDAY_CALENDAR:
-                columns.append(tuple([named(obj) for obj in values.objects(name)]))
-            case _:
-                assert_never(values.field(name).type)
-    return MixedArray.table([values.names], *columns)
+        held = iter(_typed(values, name))
+        column: list[object] = ["(not supplied)"] * values.rows
+        for r in np.flatnonzero(values.supplied_rows(name)):
+            column[int(r)] = next(held)
+        columns.append(column)
+    body = [[column[r] for column in columns] for r in range(values.rows)]
+    return MixedArray.cells([list(values.names), *body])
+
+
+def _typed(values: FieldValues, name: str) -> list[object]:
+    """A bound column's values as cells: a number, a date's serial, text, or a kind's words."""
+    match values.field(name).type:
+        case FieldType.NUMBER:
+            return values.numbers(name).tolist()
+        case FieldType.DATE:
+            return (values.dates(name) - EXCEL_EPOCH).astype(np.int64).tolist()
+        case FieldType.TEXT | FieldType.CODE:
+            return list(values.texts(name))
+        case FieldType.HOLIDAY_CALENDAR:
+            return [named(obj) for obj in values.objects(name)]
+        case _:
+            assert_never(values.field(name).type)
 
 
 @probe

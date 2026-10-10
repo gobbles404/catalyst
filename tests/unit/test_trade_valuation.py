@@ -3402,13 +3402,11 @@ def test_a_templates_numeric_id_reads_back_as_a_number_and_reaches_every_row(
         (True, "#ERROR _CreateTrades: trade_rows cell (1, 1) is boolean TRUE, expected number"),
         (
             "",
-            "#ERROR _CreateTrades: trade_rows cell (1, 1) is empty text, expected number, nonempty "
-            "text or boolean",
+            "#ERROR _CreateTrades: trade_rows cell (1, 1) is empty text, expected number",
         ),
         (
             None,
-            "#ERROR _CreateTrades: trade_rows cell (1, 1) is blank, expected number, nonempty text "
-            "or boolean",
+            "#ERROR _CreateTrades: trade_rows cell (1, 1) is blank, expected number",
         ),
         (
             123456.5,
@@ -3626,4 +3624,225 @@ def test_the_reserves_report_refuses_a_blank_and_another_handle_in_the_seams_wor
     assert ENTRY["_ReportReserves"]("x:trade_results:9") == (
         "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, "
         "expected trade results handle"
+    )
+
+
+# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #NN ------------
+# The ticket's acceptance example: a synthetic financial asian index quoted in USD per BBL, a BBL
+# specification of one and a LOT of 1,000 BBL, the reporting lot; weekday pricing, no holiday that
+# matters; V26 expiring on Friday 30 October 2026, so that it prices every October pricing day,
+# with U26 before it to open the calendar on 30 September; every observation live at 72 on
+# 1 October and every fixed price 70; +1bd on the same weekday calendar. Row 1, V26 and no dates,
+# 100 BBL a month: 100 BBL over October's 22 pricing days, 200 of mark, 0.10 lots. Row 2, V26
+# beside 12 to 31 October, 100 BBL a month: the same 100 BBL over the window's 15 days, 200 and
+# 0.10. Row 3, no code, 12 to 20 October at 10 BBL a calendar day: 90 BBL over 7 pricing days, 180
+# and 0.09. Together 290 BBL, 580 of mark and 0.29 lots; rows 1 and 2 pay Monday 2 November, row
+# 3 Wednesday the 21st, each row's quantity spread over its own days.
+
+CODE_DATE_HEADERS = (
+    "trade_id",
+    "trade_date",
+    "contract_code",
+    "start_date",
+    "end_date",
+    "quantity",
+    "quantity_per",
+    "fixed_price",
+)
+BBL_HOLIDAYS = ["2030-01-01"]  # the weekday calendars need one holiday to be made; none in 2026
+
+
+def code_date_row(
+    label: int, code: object, start: object, end: object, quantity: float, basis: str
+) -> list[object]:
+    """A row of the acceptance ticket, struck on 15 September at 70; a code or dates left as
+    formula-empty text, or a blank, supply nothing."""
+    return [float(label), serial("2026-09-15"), code, start, end, quantity, basis, 70.0]
+
+
+BBL_ROWS = (
+    code_date_row(1, "V26", "", "", 100.0, "month"),
+    code_date_row(2, "V26", serial("2026-10-12"), serial("2026-10-31"), 100.0, "month"),
+    code_date_row(3, "", serial("2026-10-12"), serial("2026-10-20"), 10.0, "calday"),
+)
+
+
+@pytest.fixture(scope="module")
+def bbl() -> dict[str, Any]:
+    index, calendar = an_index(
+        "BBL_ASIAN",
+        [
+            ("U26", "2026-09-29"),
+            ("V26", "2026-10-30"),
+            ("X26", "2026-11-30"),
+            ("Z26", "2026-12-31"),
+        ],
+        BBL_HOLIDAYS,
+        [("BBL", 1.0), ("LOT", 1_000.0)],
+        measure=("VOLUME", "BBL"),
+        reporting_lot="LOT",
+    )
+    template = ENTRY["_CreateTradeTemplate"](
+        "future",
+        row(*[name for name in PEN_FIELDS if name != "quantity_per"]),
+        row("BBL", "asian", "cleared", "financial", "Prototype Clearing", "+1bd", calendar),
+    )
+    history = a_history(index, "2026-09-30", "2026-10-01", BBL_HOLIDAYS, {})
+    market = a_market(history, "BBL_ASIAN", 72.0, 72.0, 72.0)
+    return {"index": index, "template": template, "history": history, "market": market}
+
+
+def bbl_valued(bbl: dict[str, Any], *lines: list[object]) -> tuple[str, tuple[float, float, float]]:
+    """A batch of those rows on the acceptance index, and its mark, cash and delta on 1 October."""
+    batch = ENTRY["_CreateTrades"](
+        bbl["index"], row(*CODE_DATE_HEADERS), rows(*lines), bbl["template"]
+    )
+    prepared = ENTRY["_PrepareTrades"](batch, bbl["history"])
+    return str(batch), valued(str(ENTRY["_EvaluateTrades"](prepared, bbl["market"])))
+
+
+def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singletons(
+    bbl: dict[str, Any],
+) -> None:
+    batch, value = bbl_valued(bbl, *BBL_ROWS)
+    assert value == (pytest.approx(580), 0.0, pytest.approx(0.29))
+    table = spilled(ENTRY["util_ReadHandle"](batch))
+    columns = table[0]
+
+    def column_of(name: str) -> list[object]:
+        return [line[columns.index(name)] for line in table[2:]]
+
+    assert column_of("row") == [1.0, 2.0, 3.0]
+    assert column_of("contract_code") == ["V26"] * 3  # the resolved contract on every row
+    assert column_of("entered_contract_code") == ["V26", "V26", "(not supplied)"]
+    assert column_of("start_date") == [
+        serial(d) for d in ("2026-10-01", "2026-10-12", "2026-10-12")
+    ]
+    assert column_of("end_date") == [serial(d) for d in ("2026-10-31", "2026-10-31", "2026-10-20")]
+    assert column_of("covered_days") == [31.0, 20.0, 9.0]
+    assert column_of("quantity") == [100.0, 100.0, 10.0]
+    assert column_of("quantity_per") == ["month", "month", "calday"]
+    assert column_of("component_quantity") == [100.0, 100.0, 90.0]
+    assert column_of("quote_quantity") == [100.0, 100.0, 90.0]
+    assert column_of("payment_date") == [serial("2026-11-02")] * 2 + [serial("2026-10-21")]
+    # Two payment groups of V26: 22 slots paying 2 November and 7 paying the 21st.
+    prepared = ENTRY["_PrepareTrades"](batch, bbl["history"])
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))[2:]
+    assert len(slots) == 29
+    assert [line[3] for line in slots].count(serial("2026-11-02")) == 22
+    assert [line[3] for line in slots].count(serial("2026-10-21")) == 7
+    assert [line[4] for line in slots] == [False] * 29  # every observation live
+    results = ENTRY["_EvaluateTrades"](prepared, bbl["market"])
+    by_month = spilled(ENTRY["_ReportDelta"](results, "month"))
+    assert by_month[2] == [
+        serial("2026-10-01"),
+        pytest.approx(0.29),
+        "lots of LOT (1000 BBL)",
+        serial("2026-10-01"),
+    ]
+    # Each row alone values as the page says, and the batch is their sum.
+    for line, mark, lots in (
+        (BBL_ROWS[0], 200, 0.10),
+        (BBL_ROWS[1], 200, 0.10),
+        (BBL_ROWS[2], 180, 0.09),
+    ):
+        _, alone = bbl_valued(bbl, line)
+        assert alone == (pytest.approx(mark), 0.0, pytest.approx(lots))
+    # Rows 2 and 3 as a ticket of dates alone, the codes left out, value the same.
+    headers = (
+        "trade_id",
+        "trade_date",
+        "start_date",
+        "end_date",
+        "quantity",
+        "quantity_per",
+        "fixed_price",
+    )
+    dated_only = ENTRY["_CreateTrades"](
+        bbl["index"],
+        row(*headers),
+        rows(*[[*line[:2], *line[3:]] for line in BBL_ROWS[1:]]),
+        bbl["template"],
+    )
+    _, two = bbl_valued(bbl, *BBL_ROWS[1:])
+    assert (
+        valued(
+            str(
+                ENTRY["_EvaluateTrades"](
+                    ENTRY["_PrepareTrades"](dated_only, bbl["history"]), bbl["market"]
+                )
+            )
+        )
+        == two
+        == (pytest.approx(380), 0.0, pytest.approx(0.19))
+    )
+
+
+def test_a_whole_month_by_dates_is_the_codes_own_and_a_label_beside_dates_moves_nothing(
+    bbl: dict[str, Any],
+) -> None:
+    by_code = bbl_valued(bbl, BBL_ROWS[0])
+    by_dates = bbl_valued(
+        bbl, code_date_row(4, None, serial("2026-10-01"), serial("2026-10-31"), 100.0, "month")
+    )
+    superseded = bbl_valued(
+        bbl, code_date_row(5, "X26", serial("2026-10-01"), serial("2026-10-31"), 100.0, "month")
+    )
+    balmo = bbl_valued(
+        bbl, code_date_row(6, "BALV26", serial("2026-10-01"), serial("2026-10-31"), 100.0, "month")
+    )
+    assert by_code[1] == by_dates[1] == superseded[1] == balmo[1]
+    assert by_code[1] == (pytest.approx(200), 0.0, pytest.approx(0.10))
+    for batch, entered in ((by_dates, "(not supplied)"), (superseded, "X26"), (balmo, "BALV26")):
+        table = spilled(ENTRY["util_ReadHandle"](batch[0]))
+        line = table[2]
+        assert line[table[0].index("contract_code")] == "V26"
+        assert line[table[0].index("entered_contract_code")] == entered
+    for batch in (by_code, by_dates, superseded, balmo):
+        slots = spilled(ENTRY["util_ReadHandle"](ENTRY["_PrepareTrades"](batch[0], bbl["history"])))
+        assert len(slots) == 24 and [line[3] for line in slots[2:]] == [serial("2026-11-02")] * 22
+
+
+def test_a_row_booking_half_a_period_or_none_fails_on_the_sheet_in_the_librarys_words(
+    bbl: dict[str, Any],
+) -> None:
+    create = ENTRY["_CreateTrades"]
+    headers = row(*CODE_DATE_HEADERS)
+    assert create(
+        bbl["index"],
+        headers,
+        rows(code_date_row(5, "V26", serial("2026-10-12"), "", 100.0, "month")),
+        bbl["template"],
+    ) == (
+        "#ERROR _CreateTrades: ValueError: start_date row 1 is 2026-10-12 without end_date row 1, "
+        "expected both dates, the period's first and last day, or neither and a contract_code"
+    )
+    assert create(
+        bbl["index"],
+        headers,
+        rows(BBL_ROWS[0], code_date_row(6, None, "", None, 100.0, "month")),
+        bbl["template"],
+    ) == (
+        "#ERROR _CreateTrades: ValueError: row 2 has no period, expected a contract_code or "
+        "start_date with end_date on each row; contract_code, start_date and end_date are not "
+        "supplied"
+    )
+    # A number where a code or a date should be is the field's type refusing it, as ever.
+    assert (
+        create(
+            bbl["index"],
+            headers,
+            rows(code_date_row(7, 26.0, "", "", 100.0, "month")),
+            bbl["template"],
+        )
+        == "#ERROR _CreateTrades: trade_rows cell (1, 3) is number 26.0, expected text"
+    )
+    assert (
+        create(
+            bbl["index"],
+            headers,
+            rows(code_date_row(8, "", "October", serial("2026-10-20"), 100.0, "month")),
+            bbl["template"],
+        )
+        == "#ERROR _CreateTrades: trade_rows cell (1, 4) is text 'October', expected date"
     )

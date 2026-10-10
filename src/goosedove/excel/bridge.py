@@ -36,7 +36,7 @@ from enum import IntEnum
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from operator import attrgetter
-from types import NoneType, UnionType
+from types import MappingProxyType, NoneType, UnionType
 from typing import (
     Annotated,
     Any,
@@ -358,6 +358,7 @@ ONLY_BOOLEANS: Final = 1 << Kind.BOOLEAN
 NUMBER_CODE: Final = int(Kind.NUMBER)
 TEXT_CODE: Final = int(Kind.TEXT)
 BOOLEAN_CODE: Final = int(Kind.BOOLEAN)
+BLANK_CODE: Final = int(Kind.BLANK)
 
 # The kinds a mixed range may hold, as bits of the host's summary: number, text and boolean.
 # NOT_MIXED is every other bit, which today is blank and missing, so seen & NOT_MIXED is set
@@ -614,13 +615,37 @@ def _one_row(value: object) -> None:
         raise _Rejected
 
 
-def _field_row(value: object) -> MixedArray:
-    """A mixed range of one row: a template's values. The shape first, as every row type checks
-    it, so a range one row too tall is refused by its shape and never by whatever its extra row
-    holds, a blank among the rest; then the cells, as the mixed range refuses them."""
+def _field_cells(value: object) -> Cells:
+    """A body of field values as it arrived, nothing of its cells checked here: a range's kinds,
+    numbers and texts, or one cell laid out as the range the host would have sent, a blank and an
+    empty text among what may arrive, since #NN. Whether a cell may hold nothing is its field's to
+    say, and the field is known only once the headers are bound, so the binding refuses what each
+    field refuses, column by column; a missing argument is refused here as every required
+    argument is."""
+    if isinstance(value, Cells):
+        return value
+    if value is MISSING:
+        raise _Rejected
+    try:
+        kind, number = _classify(value)
+    except TypeError:
+        raise _Rejected from None
+    texts = (cast(str, value),) if kind is Kind.TEXT else ()
+    return Cells(np.array([[int(kind)]], dtype=np.uint8), np.array([[number]]), texts, 1 << kind)
+
+
+def _field_row(value: object) -> Cells:
+    """A body of one row: a template's values. The shape first, as every row type checks it, so a
+    range one row too tall is refused by its shape and never by whatever its extra row holds, a
+    blank among the rest; then the cells as they arrived, for the binding."""
     if _shape(value)[0] != 1:
         raise _Rejected(reason="expected one row of field values")
-    return _mixed(value)
+    return _field_cells(value)
+
+
+def _field_rows(value: object) -> Cells:
+    """A body of one or more rows: a ticket's rows, as they arrived, for the binding."""
+    return _field_cells(value)
 
 
 def _column(value: object) -> NDArray[np.float64]:
@@ -845,53 +870,146 @@ class FieldsSchema:
     selector: int
 
 
-def _handles_of(kind: type[object], expected: str, body: _Body, j: int) -> tuple[object, ...]:
-    """A column of handles resolved to the objects they stand for, one per row, in row order:
-    each cell text, else named as a text column names a cell that is not, then its text through
-    the handle rule, which names the cell as the argument a scalar handle names: a creator's
-    failure relayed, text naming no live object, or a handle of another kind. The first bad cell
-    down the column is the one named, whichever way it is bad.
+@dataclass(frozen=True, slots=True)
+class _FieldBody:
+    """One body of field values under binding, since #NN: its cells as they arrived, the
+    argument's name for messages, each cell's place among the body's texts, valid where the cell
+    is text, which cells hold an empty text, and the texts as an array to take a column's from;
+    the three made once over the whole body, so that a text column's cells are found at their own
+    places however many cells around them hold nothing, and no cell's text is ever displaced by a
+    blank or an empty text in another column."""
 
-    Each cell's text is found at its own place in the body's texts, counted in sheet order over
-    the whole body once: the resolution acts on the texts here, before the columns to the right
-    have been checked, so the text column's slice, which is right only once every column has
-    passed, would hand a text from a number column over as a handle and name a cell that is not
-    there. Per cell, since each is its own lookup.
-    """
-    mixed = body.mixed
-    kinds = mixed.kinds
-    places = np.cumsum(kinds.ravel() == TEXT_CODE).reshape(kinds.shape) - 1
-    not_text = kinds[:, j] != TEXT_CODE
+    cells: Cells
+    argument: str
+    places: NDArray[np.intp]
+    empty: NDArray[np.bool_] | None  # None when no cell holds an empty text, the usual body
+    texts: NDArray[np.object_]
+
+
+def _field_body(cells: Cells, argument: str) -> _FieldBody:
+    """The body's cells placed among its texts once: one count over the cells, in place, so that
+    the only transient the size of the body is the places themselves, eight bytes a cell; the
+    empty texts found only when the host's texts hold one."""
+    kinds = cells.kinds
+    is_text = kinds.ravel() == TEXT_CODE
+    places = np.cumsum(is_text, dtype=np.intp)
+    places -= 1
+    texts = np.array(cells.texts, dtype=object)
+    empty = None
+    if "" in cells.texts:
+        empty = np.zeros(kinds.shape, dtype=bool)
+        empty.flat[np.flatnonzero(is_text)[texts == ""]] = True
+    return _FieldBody(cells, argument, places.reshape(kinds.shape), empty, texts)
+
+
+def _unsupplied(body: _FieldBody, j: int) -> NDArray[np.bool_]:
+    """The cells of column j that hold nothing a field could take: a blank, or an empty text."""
+    blank = body.cells.kinds[:, j] == BLANK_CODE
+    return blank if body.empty is None else blank | body.empty[:, j]
+
+
+def _field_bad(
+    body: _FieldBody, j: int, bad: NDArray[np.bool_], expected: str
+) -> TypeValidationError:
+    """The failure for the first flagged cell of column j, named within the whole body."""
+    r = int(bad.argmax())
+    cells = body.cells
+    value = _cell(cells.kinds, cells.numbers, cells.texts, r * cells.kinds.shape[1] + j)
+    return TypeValidationError(
+        f"{body.argument} cell ({r + 1}, {j + 1}) is {describe(value)}, expected {expected}"
+    )
+
+
+# One rule per field type, since #NN over the rows a field's cells are checked on: every row for
+# a field whose cells must hold a value, so that a blank or an empty text fails as its field's type
+# refuses it, a blank where a number is wanted named `blank, expected number`; the rows that
+# supplied a value for a field whose cells may go unsupplied, the rest being nothing to check. Each
+# takes one look at its column: the kinds settle number and text, the slots settle a date, as the
+# whole-range rules do, and the empties settle an empty text. A column checked on every row is a
+# view of the arrival or one conversion, as a table's is; one checked on some rows is those rows
+# taken once.
+def _field_numbers(body: _FieldBody, j: int, rows: NDArray[np.bool_] | None) -> NDArray[np.float64]:
+    bad = body.cells.kinds[:, j] != NUMBER_CODE
+    if rows is not None:
+        bad &= rows
+    if bad.any():
+        raise _field_bad(body, j, bad, "number")
+    column = body.cells.numbers[:, j]
+    return column if rows is None else column[rows]
+
+
+def _field_dates(
+    body: _FieldBody, j: int, rows: NDArray[np.bool_] | None
+) -> NDArray[np.datetime64]:
+    slots = body.cells.numbers[:, j]
+    bad = _not_dates(slots)
+    if rows is not None:
+        bad &= rows
+    if bad.any():
+        raise _field_bad(body, j, bad, "date")
+    return _as_days(slots if rows is None else slots[rows])
+
+
+def _field_texts(body: _FieldBody, j: int, rows: NDArray[np.bool_] | None) -> tuple[str, ...]:
+    bad = body.cells.kinds[:, j] != TEXT_CODE
+    if body.empty is not None:
+        bad |= body.empty[:, j]
+    if rows is not None:
+        bad &= rows
+    if bad.any():
+        raise _field_bad(body, j, bad, "text")
+    places = body.places[:, j] if rows is None else body.places[rows, j]
+    return tuple(body.texts[places])
+
+
+def _field_handles(
+    kind: type[object],
+    expected: str,
+    body: _FieldBody,
+    j: int,
+    rows: NDArray[np.bool_] | None,
+) -> tuple[object, ...]:
+    """A column of handles resolved to the objects they stand for, one per row checked, in row
+    order: each cell nonempty text, else named as a text column names a cell that is not, then
+    its text through the handle rule, which names the cell as the argument a scalar handle
+    names: a creator's failure relayed, text naming no live object, or a handle of another
+    kind. The first bad cell down the column is the one named, whichever way it is bad; each
+    cell's text is found at its own place, and each is its own lookup."""
+    cells = body.cells
+    not_text = cells.kinds[:, j] != TEXT_CODE
+    if body.empty is not None:
+        not_text |= body.empty[:, j]
+    if rows is not None:
+        not_text &= rows
     held: list[object] = []
-    for r in range(kinds.shape[0]):
+    for r in range(cells.kinds.shape[0]):
+        if rows is not None and not rows[r]:
+            continue
         if not_text[r]:
-            raise _bad_cell(body, j, not_text, expected)
-        text = mixed.texts[int(places[r, j])]
+            raise _field_bad(body, j, not_text, expected)
+        text = cells.texts[int(body.places[r, j])]
         held.append(_resolve(kind, expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
     return tuple(held)
 
 
-# Each field type's words for a cell and its column rule: the four of the tables, text for a code,
-# and a handle column for a field that holds one. _texts_of's slice rests on every column bound to
-# text being listed in the body's text columns, so a handle column, text at the seam, is one.
-_FIELD_COLUMNS: Final[dict[FieldType, tuple[str, Callable[[_Body, int], object]]]] = {
-    FieldType.TEXT: ("text", _texts_of),
-    FieldType.CODE: ("text", _texts_of),
-    FieldType.NUMBER: ("number", _numbers_of),
-    FieldType.DATE: ("date", _dates_of),
+# Each field type's words for a cell and its column rule: text for a code, and a handle column
+# for a field that holds one.
+_FIELD_COLUMNS: Final[
+    dict[FieldType, tuple[str, Callable[[_FieldBody, int, NDArray[np.bool_] | None], object]]]
+] = {
+    FieldType.TEXT: ("text", _field_texts),
+    FieldType.CODE: ("text", _field_texts),
+    FieldType.NUMBER: ("number", _field_numbers),
+    FieldType.DATE: ("date", _field_dates),
     FieldType.HOLIDAY_CALENDAR: (
         "holiday calendar handle",
-        partial(_handles_of, HolidayCalendar, "holiday calendar handle"),
+        partial(_field_handles, HolidayCalendar, "holiday calendar handle"),
     ),
 }
-_TEXT_FIELDS: Final = frozenset(
-    {field_type for field_type, (_, rule) in _FIELD_COLUMNS.items() if rule is _texts_of}
-    | {FieldType.HOLIDAY_CALENDAR}
-)
 
 
 def _bind_fields(
-    schema: FieldsSchema, definition: Instrument, headers: tuple[str, ...], body: MixedArray
+    schema: FieldsSchema, definition: Instrument, headers: tuple[str, ...], body: Cells
 ) -> FieldValues:
     """The headers bound to the instrument's fields, exactly, then each column checked against
     its field's type in sheet order, then the record. The order of failures is the table's: the
@@ -899,8 +1017,13 @@ def _bind_fields(
     column, left to right, the first bad cell named. A header matches a field name as typed,
     case and all, decision 2 of the review: `Quantity` is unknown where `quantity` is a field,
     and the message lists the instrument's fields; no field is required here, since a template
-    supplies a subset and the ticket the rest, which the creator checks."""
-    cols = body.shape[1]
+    supplies a subset and the ticket the rest, which the creator checks. Since #NN the cells are
+    checked after the headers and not before, because a blank or an empty text is a cell that
+    supplied nothing where the header names a field whose definition allows that, the three
+    period fields, and a cell that fails its field's type anywhere else: the permission comes
+    from the field the header identified, never from the cell's position. The rows that supplied
+    such a field cross as a mask beside its values, inputs.md decision 43."""
+    cols = body.kinds.shape[1]
     if len(headers) != cols:
         raise TypeValidationError(
             f"{schema.header_row} has {len(headers)} headers, expected {cols}, "
@@ -921,14 +1044,20 @@ def _bind_fields(
                 f"already given at cell (1, {found[header] + 1})"
             )
         found[header] = j
-    kinds = [by_name[header].type for header in headers]
-    text_columns = tuple([j for j, kind in enumerate(kinds) if kind in _TEXT_FIELDS])
-    under = _Body(body, schema.body, text_columns)
-    columns = {
-        header: _FIELD_COLUMNS[kind][1](under, j)
-        for j, (header, kind) in enumerate(zip(headers, kinds, strict=True))
-    }
-    return FieldValues(definition, body.shape[0], headers, columns)
+    under = _field_body(body, schema.body)
+    columns: dict[str, object] = {}
+    supplied: dict[str, NDArray[np.bool_]] = {}
+    for j, header in enumerate(headers):
+        field = by_name[header]
+        rows = None
+        if field.may_be_unsupplied:
+            rows = ~_unsupplied(under, j)
+            rows.setflags(write=False)
+            supplied[header] = rows
+        columns[header] = _FIELD_COLUMNS[field.type][1](under, j, rows)
+    return FieldValues(
+        definition, body.kinds.shape[0], headers, columns, MappingProxyType(supplied)
+    )
 
 
 # --- the way out: every declared result, in the words of the sheet, and the rule that sends it
@@ -1678,7 +1807,7 @@ def _declared(
             raise TypeError(f"{function}: {spec.name} declares field values, which take no default")
         if one_row:
             return "one row of field values", _field_row
-        return "rows of field values", _mixed
+        return "rows of field values", _field_rows
     if spec.annotation is MixedArray and not hidden:
         # Without headers the columns of a mixed range mean nothing, and a function would have to
         # guess by position. A hidden probe keeps the bare range as the seam's own instrument.
@@ -1878,7 +2007,7 @@ def _arguments(registered: Registered, args: Sequence[object]) -> list[object]:
         values[i] = _refine(schema, headers, body)
     for i, fields_schema in registered.fields:
         definition = selected(values[fields_schema.selector])
-        headers, body = cast(tuple[str, ...], values[i - 1]), cast(MixedArray, values[i])
+        headers, body = cast(tuple[str, ...], values[i - 1]), cast(Cells, values[i])
         values[i] = _bind_fields(fields_schema, definition, headers, body)
     return values
 

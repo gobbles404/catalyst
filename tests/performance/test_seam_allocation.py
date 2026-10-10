@@ -1021,32 +1021,39 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
 # 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by
 # seventeen columns since #161, 119 cells of which 103 are text, is laid out one cell at a time
-# and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell. The peak
-# follows the length of the texts, the rule texts above all, which #146 lengthened, #158 and
-# #159 kept short and the two period fields add two columns of, kept short too; a text cell
-# costs about 110 bytes, its string and its place in the joined text, so the pin says so, 110 a
-# cell and the slack, where a hundred a cell and the slack covered fifteen columns, 11,411 bytes
-# measured on 2026-10-07, and would cover seventeen by 55 bytes, too little for the next text.
+# and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell, and 15,041
+# on 2026-10-10, about 126 a cell, when #NN lengthened the three period fields' texts to say what
+# a blank cell and a code beside dates mean. The peak follows the length of the texts, the rule
+# texts above all, which #146 lengthened, #158 and #159 kept short and the two period fields add
+# two columns of; a text cell costs its string and its place in the joined text, so the pin says
+# so, 130 a cell and the slack, where 110 a cell and the slack covered the texts before #NN, and
+# a hundred a cell and the slack covered fifteen columns, 11,411 bytes measured on 2026-10-07.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
     cells = 7 * 17
-    assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 110 * cells + SLACK
+    assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 130 * cells + SLACK
     assert bridge.live_handles() == live
 
 
 # --- a row or rows of an instrument's fields --------------------------------------------------
-# Rows of three fields bound through CountFieldRows: the number columns are views of the mixed
-# storage and the one text column the host's tuple itself, so the peak is one look's mask over
-# the rows at a time and the record's small objects: measured 3,837 bytes at 2,500 rows on
-# 2026-10-04, one byte a row and the slack twice over. A row of four fields with a handle cell
-# echoed back through EchoFieldRow, the handle resolved and the table built: 2,033 bytes.
+# Rows of three fields bound through CountFieldRows: the number columns are views of the arrival,
+# and since #NN the cells are placed among the texts once, one count of eight bytes a cell, 24 a
+# row over three columns, the texts an array of eight a text, and the code column's cells taken at
+# their places, an array and the tuple of eight a row each, beside the looks' masks over the rows:
+# measured 147,006 bytes at 2,500 rows on 2026-10-10, about 59 a row, where 3,837 bytes, one a row,
+# stood from 2026-10-04 while a text column was the host's tuple itself; 60 a row and the slack
+# twice over. A row of four fields with a handle cell echoed back through EchoFieldRow, the handle
+# resolved and the table built cell by cell: 2,340 bytes.
 def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
     rows = N // 4
     headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
     body = Cells.from_rows([[float(i), 3.0 + i / 100, f"c{i}"] for i in range(rows)])
-    assert least_peak(lambda: ENTRY["CountFieldRows"]("future", headers, body)) <= rows + 2 * SLACK
+    assert (
+        least_peak(lambda: ENTRY["CountFieldRows"]("future", headers, body))
+        <= 60 * rows + 2 * SLACK
+    )
     calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
     one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
     row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
@@ -1070,7 +1077,9 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # on 2026-10-08 with the two dates, 569,243 the same day with the payment groups by contract and
 # day, which keep nothing per row, and 668,580 the same day with the three selections per row, the
 # unit, the method and the basis, 24 bytes retained a row and their distinct reads' temporaries,
-# about 267 a row, which 272 a row and twice the slack cover;
+# about 267 a row, and 694,125 on 2026-10-10 with the rows that entered a code and their texts
+# kept since #NN, a byte and a reference a row, about 278 a row, which 280 a row and twice the
+# slack cover;
 # the ticket's own columns are the seam's views and cost nothing here. The expiries are rolled off
 # the index's two holidays, so
 # that Z26 expires on 24 December and not on the closed 25th, and every call measured is checked,
@@ -1141,4 +1150,4 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert peak <= 272 * rows + 2 * SLACK
+    assert peak <= 280 * rows + 2 * SLACK

@@ -167,7 +167,10 @@ combining template and ticket fields, require exactly one complete period form:
 | Ordinary contract or strip | `contract_code` | `start_date`, `end_date` |
 | Explicit inclusive period | `start_date`, `end_date` | `contract_code` |
 
-Refuse both forms together, either date alone, neither form, or reversed dates. Preserve
+Refuse both forms together, either date alone, neither form, or reversed dates. (Superseded in
+#NN by [contract-codes-and-dates.md](contract-codes-and-dates.md): the three fields stand on one
+ticket and each row chooses, a complete pair winning over a code kept as entered text; half a
+pair, no period and reversed dates are still refused, by the row.) Preserve
 strict field names and the refusal of template/ticket field overlap even when values
 match. Dates can come from worksheet helper cells; the library receives dates, not the
 formulas that produced them. Validate meaning once in creation.
@@ -417,12 +420,13 @@ Built as the page says for slice C, on the path every batch takes, with these pa
 - **The fields.** The `future` gains `start_date` and `end_date` after `contract_code`, dates that
   may stand in for the code, so `contract_code` is no longer always required: the three say their
   rule in the Show spill's `required_when` row, `no start_date and end_date` and `no contract_code`,
-  and the shown future is seven rows by seventeen columns. The period form is checked at the code's
+  and the shown future is seven rows by seventeen columns. The period form was checked at the code's
   place in the definition's order, so a missing period is still named before a missing method:
   `contract_code is supplied with start_date, expected one period form, a contract_code or
   start_date with end_date`, `start_date is supplied without end_date, expected both dates, the
   period's first and last day, or a contract_code`, `contract_code is missing, expected a value in
-  the template or a column in the ticket, or start_date and end_date in its place`.
+  the template or a column in the ticket, or start_date and end_date in its place`; since #NN the
+  first two are history, each row choosing its form, [contract-codes-and-dates.md](contract-codes-and-dates.md).
 - **The resolution.** `_the_periods` in `src/goosedove/trades/resolution.py` resolves either form
   to components in one pass: from a code every month of the code, each covered whole; from dates
   the months from the start's to the end's, each covered whole but the first from the start date

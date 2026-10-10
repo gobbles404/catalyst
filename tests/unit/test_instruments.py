@@ -77,9 +77,17 @@ def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None
         "fixed_price",
     ]
     assert by_name["clearing_house"].required_when == "route = cleared"
-    assert by_name["contract_code"].required_when == "no start_date and end_date"
-    assert by_name["start_date"].required_when == "no contract_code"
+    assert by_name["contract_code"].required_when == "no start_date and end_date on the row"
+    assert by_name["start_date"].required_when == "no contract_code on the row, or with end_date"
+    assert by_name["end_date"].required_when == "no contract_code on the row, or with start_date"
     assert by_name["end_date"].type is FieldType.DATE
+    # Since #NN the three period fields alone let a cell go unsupplied, a blank or an empty text
+    # meaning the row supplies no value; every other field's cell must hold one.
+    assert [field.name for field in FUTURE.fields if field.may_be_unsupplied] == [
+        "contract_code",
+        "start_date",
+        "end_date",
+    ]
     assert by_name["payment_time_lag"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR

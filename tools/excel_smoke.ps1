@@ -451,8 +451,8 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("future"),3,3)'  = "TRUE"
     '=INDEX(_ShowInstrument("future"),1,5)'  = "start_date"
     '=INDEX(_ShowInstrument("future"),3,4)'  = "FALSE"
-    '=INDEX(_ShowInstrument("future"),4,4)'  = "no start_date and end_date"
-    '=INDEX(_ShowInstrument("future"),4,5)'  = "no contract_code"
+    '=INDEX(_ShowInstrument("future"),4,4)'  = "no start_date and end_date on the row"
+    '=INDEX(_ShowInstrument("future"),4,5)'  = "no contract_code on the row, or with end_date"
     '=INDEX(_ShowInstrument("future"),4,10)' = "route = cleared"
     '=INDEX(_ShowInstrument("future"),5,17)' = "holiday calendar handle"
     '=INDEX(_ShowInstrument("future"),6,13)' = "the index's specification names"
@@ -507,10 +507,10 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),3,9)" = "10"
     "=INDEX(util_ReadHandle(EW8),1,10)" = "quantity_unit"
     "=INDEX(util_ReadHandle(EW8),3,10)" = "lots"
-    "=INDEX(util_ReadHandle(EW8),3,17)" = "10000"
-    "=INDEX(util_ReadHandle(EW8),3,19)" = "-700000"
+    "=INDEX(util_ReadHandle(EW8),3,18)" = "10000"
+    "=INDEX(util_ReadHandle(EW8),3,20)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "19"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "20"
     "=INDEX(util_ReadHandle(EW13),1,13)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,3)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,3)"  = "u26"
@@ -518,7 +518,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),3,13)" = "46226"
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
-    "=COLUMNS(util_ReadHandle(EW13))"    = "20"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "21"
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
     '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
@@ -582,9 +582,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG12),4,1)"  = "2"
     "=INDEX(util_ReadHandle(FG12),4,2)"  = "0"
     "=INDEX(util_ReadHandle(FG12),4,9)"  = "0"
-    "=INDEX(util_ReadHandle(FG12),4,16)" = "0"
     "=INDEX(util_ReadHandle(FG12),4,17)" = "0"
-    "=INDEX(util_ReadHandle(FG12),4,19)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,18)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,20)" = "0"
     "=ROWS(util_ReadHandle(FG13))"       = "3"
     "=INDEX(util_ReadHandle(FG13),3,6)"  = "2000"
     "=INDEX(_ReportValues(FG14),3,1)"    = "8500"
@@ -633,7 +633,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP4),3,5)"   = "penultimate"
     "=INDEX(util_ReadHandle(GP4),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(GP4),3,14)"  = "46195"
-    "=COLUMNS(util_ReadHandle(GP4))"     = "21"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "22"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "46192"
     "=INDEX(util_ReadHandle(GP5),3,4)"   = "46195"
@@ -696,22 +696,22 @@ $formulas = [ordered]@{
     # alone in IS14 valued on 2 December against the asian block's history and market as the
     # month batch of 3,410 gallons in IS16 values, 96.1 of mark and 3,255 of delta each; a basis
     # that is neither word refused by name.
-    "=INDEX(util_ReadHandle(IS12),1,15)" = "start_date"
-    "=INDEX(util_ReadHandle(IS12),3,15)" = "46327"
-    "=INDEX(util_ReadHandle(IS12),3,16)" = "46356"
-    "=INDEX(util_ReadHandle(IS12),4,15)" = "46357"
-    "=INDEX(util_ReadHandle(IS12),1,17)" = "covered_days"
-    "=INDEX(util_ReadHandle(IS12),2,17)" = "int64"
-    "=INDEX(util_ReadHandle(IS12),1,18)" = "component_quantity"
+    "=INDEX(util_ReadHandle(IS12),1,16)" = "start_date"
+    "=INDEX(util_ReadHandle(IS12),3,16)" = "46327"
+    "=INDEX(util_ReadHandle(IS12),3,17)" = "46356"
+    "=INDEX(util_ReadHandle(IS12),4,16)" = "46357"
+    "=INDEX(util_ReadHandle(IS12),1,18)" = "covered_days"
+    "=INDEX(util_ReadHandle(IS12),2,18)" = "int64"
+    "=INDEX(util_ReadHandle(IS12),1,19)" = "component_quantity"
     "=INDEX(util_ReadHandle(IS12),3,9)"  = "100"
     "=INDEX(util_ReadHandle(IS12),3,11)" = "calday"
-    "=INDEX(util_ReadHandle(IS12),3,17)" = "30"
-    "=INDEX(util_ReadHandle(IS12),4,17)" = "31"
-    "=INDEX(util_ReadHandle(IS12),3,18)" = "3000"
-    "=INDEX(util_ReadHandle(IS12),4,18)" = "3100"
-    "=INDEX(util_ReadHandle(IS12),5,18)" = "3410"
+    "=INDEX(util_ReadHandle(IS12),3,18)" = "30"
+    "=INDEX(util_ReadHandle(IS12),4,18)" = "31"
+    "=INDEX(util_ReadHandle(IS12),3,19)" = "3000"
+    "=INDEX(util_ReadHandle(IS12),4,19)" = "3100"
     "=INDEX(util_ReadHandle(IS12),5,19)" = "3410"
-    "=COLUMNS(util_ReadHandle(IS12))"    = "21"
+    "=INDEX(util_ReadHandle(IS12),5,20)" = "3410"
+    "=COLUMNS(util_ReadHandle(IS12))"    = "22"
     "=INDEX(_ReportValues(IY18),3,1)"    = "96.1"
     "=INDEX(_ReportRisk(IY18),3,1)"      = "3255"
     "=INDEX(_ReportValues(IY20),3,1)"    = "96.1"
@@ -726,12 +726,12 @@ $formulas = [ordered]@{
     # refused in the library's words.
     "=INDEX(util_ReadHandle(IS21),3,4)"  = "Z26"
     "=INDEX(util_ReadHandle(IS21),3,14)" = "46392"
-    "=INDEX(util_ReadHandle(IS21),3,15)" = "46371"
-    "=INDEX(util_ReadHandle(IS21),3,16)" = "46387"
-    "=INDEX(util_ReadHandle(IS21),3,17)" = "17"
-    "=INDEX(util_ReadHandle(IS21),3,18)" = "2000"
-    "=INDEX(util_ReadHandle(IS21),4,15)" = "46357"
-    "=INDEX(util_ReadHandle(IS21),4,17)" = "31"
+    "=INDEX(util_ReadHandle(IS21),3,16)" = "46371"
+    "=INDEX(util_ReadHandle(IS21),3,17)" = "46387"
+    "=INDEX(util_ReadHandle(IS21),3,18)" = "17"
+    "=INDEX(util_ReadHandle(IS21),3,19)" = "2000"
+    "=INDEX(util_ReadHandle(IS21),4,16)" = "46357"
+    "=INDEX(util_ReadHandle(IS21),4,18)" = "31"
     "=ROWS(util_ReadHandle(IY21))"       = "24"
     "=INDEX(_ReportValues(IY22),3,1)"    = "122"
     "=INDEX(_ReportValues(IY22),3,2)"    = "0"
@@ -781,11 +781,11 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(KU7),4,11)"  = "calday"
     "=INDEX(util_ReadHandle(KU7),3,14)"  = "46391"
     "=INDEX(util_ReadHandle(KU7),4,14)"  = "46387"
-    "=INDEX(util_ReadHandle(KU7),4,18)"  = "-62"
-    "=INDEX(util_ReadHandle(KU7),3,19)"  = "42"
-    "=INDEX(util_ReadHandle(KU7),5,19)"  = "126"
-    "=INDEX(util_ReadHandle(KU7),6,19)"  = "22"
-    "=INDEX(util_ReadHandle(KU7),3,21)"  = "-420"
+    "=INDEX(util_ReadHandle(KU7),4,19)"  = "-62"
+    "=INDEX(util_ReadHandle(KU7),3,20)"  = "42"
+    "=INDEX(util_ReadHandle(KU7),5,20)"  = "126"
+    "=INDEX(util_ReadHandle(KU7),6,20)"  = "22"
+    "=INDEX(util_ReadHandle(KU7),3,22)"  = "-420"
     "=INDEX(_ReportValues(LC34),3,1)"    = "275"
     "=INDEX(_ReportValues(LC34),3,2)"    = "-62"
     "=INDEX(_ReportRisk(LC34),3,1)"      = "85"
@@ -966,7 +966,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(OR23),3,13)"   = "50"
     "=INDEX(util_ReadHandle(OR23),3,14)"   = "20"
     "=INDEX(util_ReadHandle(OR23),3,16)"   = "USD"
-    "=COLUMNS(util_ReadHandle(OR16))"      = "21"
+    "=COLUMNS(util_ReadHandle(OR16))"      = "22"
     "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
     "=INDEX(util_ReadHandle(IY16),3,13)"   = "0"
     "=INDEX(util_ReadHandle(IY16),3,16)"   = "USD"
@@ -980,8 +980,8 @@ $formulas = [ordered]@{
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{5,"Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
     "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 of trade 16 at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
-    '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one period form, a contract_code or start_date with end_date"
-    '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date is supplied without end_date, expected both dates, the period's first and last day, or a contract_code"
+    '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date row 1 is 2026-12-15 without end_date row 1, expected both dates, the period's first and last day, or neither and a contract_code"
+    '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date row 1 is 2026-12-15 without end_date row 1, expected both dates, the period's first and last day, or neither and a contract_code"
     '=_CreateTradeTemplate("future",IK1,IL2)' = "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'asian', expected month or calday"
     "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method of trade 1 at row 1; an asian future is cash settled on the average of its month's pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
@@ -1176,6 +1176,44 @@ $formulas = [ordered]@{
     "=_CreateGasDailyFixings(DM2:DM7)" = "#ERROR _CreateGasDailyFixings: price is missing, expected column of numbers"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7)" = "#ERROR _CreateGasDailyFixings: index is missing, expected index handle"
     "=_CreateGasDailyFixings(DM2:DM7,DN2:DN7,EB2)" = "#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index"
+    # Contract codes and dates on one ticket, contract-codes-and-dates.md: the ticket in PV1:QC4
+    # over the BBL_ASIAN index in PD6 under the asian template in PN3, three rows on one ticket
+    # with all three period columns, V26 with formula-empty dates, V26 beside 12 to 31 October and
+    # no code beside 12 to 20 October at 10 barrels a calendar day; the batch in PV6 read back with
+    # the entered code apart from the resolved contract, `(not supplied)` where the row entered
+    # none, the days and the months' quantities, 31, 20 and 9 days, 100, 100 and 90 barrels, and
+    # the payment days, 2 November and 21 October; prepared on 1 October against QE7, 29 slots in
+    # two groups, and valued against QE13 at 72 with every fixed price 70, 580 of mark and 0.29
+    # lots, the same by month; a template whose period cell is formula-empty in PN7 read back as
+    # `(not supplied)`; a start without its end, a row with no period and a number where a code
+    # should be refused in their words.
+    "=INDEX(util_ReadHandle(PV6),1,15)" = "entered_contract_code"
+    "=INDEX(util_ReadHandle(PV6),1,16)" = "start_date"
+    "=INDEX(util_ReadHandle(PV6),3,4)"  = "V26"
+    "=INDEX(util_ReadHandle(PV6),5,4)"  = "V26"
+    "=INDEX(util_ReadHandle(PV6),3,15)" = "V26"
+    "=INDEX(util_ReadHandle(PV6),4,15)" = "V26"
+    "=INDEX(util_ReadHandle(PV6),5,15)" = "(not supplied)"
+    "=INDEX(util_ReadHandle(PV6),3,16)" = "46296"
+    "=INDEX(util_ReadHandle(PV6),4,16)" = "46307"
+    "=INDEX(util_ReadHandle(PV6),3,17)" = "46326"
+    "=INDEX(util_ReadHandle(PV6),5,17)" = "46315"
+    "=INDEX(util_ReadHandle(PV6),3,18)" = "31"
+    "=INDEX(util_ReadHandle(PV6),4,18)" = "20"
+    "=INDEX(util_ReadHandle(PV6),5,18)" = "9"
+    "=INDEX(util_ReadHandle(PV6),5,19)" = "90"
+    "=INDEX(util_ReadHandle(PV6),3,14)" = "46328"
+    "=INDEX(util_ReadHandle(PV6),5,14)" = "46316"
+    "=COLUMNS(util_ReadHandle(PV6))"    = "22"
+    "=ROWS(util_ReadHandle(QE14))"      = "31"
+    "=INDEX(_ReportValues(QE15),3,1)"   = "580"
+    "=ROUND(INDEX(_ReportRisk(QE15),3,1),6)" = "0.29"
+    '=ROUND(INDEX(_ReportDelta(QE15,"month"),3,2),6)' = "0.29"
+    "=INDEX(util_ReadHandle(PN7),1,2)"  = "contract_code"
+    "=INDEX(util_ReadHandle(PN7),3,2)"  = "(not supplied)"
+    "=_CreateTrades(PD6,PV1:QC1,PV8:QC8,PN3)" = "#ERROR _CreateTrades: ValueError: start_date row 1 is 2026-10-12 without end_date row 1, expected both dates, the period's first and last day, or neither and a contract_code"
+    '=_CreateTrades(PD6,PV1:QC1,{6,46280,"","","",100,"month",70},PN3)' = "#ERROR _CreateTrades: ValueError: row 1 has no period, expected a contract_code or start_date with end_date on each row; contract_code, start_date and end_date are not supplied"
+    '=_CreateTrades(PD6,PV1:QC1,{7,46280,26,"","",100,"month",70},PN3)' = "#ERROR _CreateTrades: trade_rows cell (1, 3) is number 26.0, expected text"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -2029,6 +2067,53 @@ $cells = [ordered]@{
     "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
     "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
     "EE2" = '=_CreateIndex(EC5,"Waha basis - Inside FERC monthly index",EE1,AP1,BY1)'
+    # Contract codes and dates on one ticket, contract-codes-and-dates.md: the synthetic BBL_ASIAN
+    # index of U26, V26, X26 and Z26 expiring 29-Sep-2026, 30-Oct-2026, 30-Nov-2026 and 31-Dec-2026
+    # in PD1:PE4 and its schedule in PD5, so that V26 prices every October pricing day, a calendar
+    # closed on 1-Jan-2030 alone in PF1 over PF3, the barrel conventions in PG1, the specifications
+    # BBL of one barrel and LOT of 1,000 in PH2:PL3 under the headers in EI1:EM1 and in PH1, the
+    # index in PD6; the asian template in PN3 over seven fields in PN1:PT2, paying +1bd on the same
+    # calendar, the basis left to the ticket, and a template whose contract_code cell is a formula's
+    # "" in PN7; the ticket's headers and three rows in PV1:QC4, the empty cells formulas returning
+    # "", and a fourth row with a start and no end in PV8:QC8; the batch in PV6; the valuation day,
+    # 1-Oct-2026 at midday, in QE1 and QE2, the one settle of 30 September in QE3:QF3, the calendar,
+    # the fixings and the history in QE5:QE7, the quotes of 72 in QE9:QE11, the vector and the
+    # market in QE12:QE13, the batch prepared in QE14 and evaluated in QE15.
+    "PD1" = "U26"; "PE1" = "29-Sep-2026"
+    "PD2" = "V26"; "PE2" = "30-Oct-2026"
+    "PD3" = "X26"; "PE3" = "30-Nov-2026"
+    "PD4" = "Z26"; "PE4" = "31-Dec-2026"
+    "PD5" = "=_CreateFuturesSchedule(PD1:PD4,PE1:PE4)"
+    "PF3" = "1-Jan-2030"
+    "PF1" = "=_CreateHolidayCalendar(PF3)"
+    "PG1" = '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
+    "PH2" = "BBL"; "PI2" = "1"; "PJ2" = "BBL"; "PK2" = "0"; "PL2" = "0"
+    "PH3" = "LOT"; "PI3" = "1000"; "PJ3" = "BBL"; "PK3" = "0"; "PL3" = "0"
+    "PH1" = "=_CreateContractSpecifications(EI1:EM1,PH2:PL3)"
+    "PD6" = '=_CreateIndex("BBL_ASIAN","Synthetic barrel index for the codes-and-dates example",PD5,PG1,PH1,PF1,"LOT")'
+    "PN1" = "quantity_unit"; "PO1" = "schedule_method"; "PP1" = "route"; "PQ1" = "settlement_method"; "PR1" = "clearing_house"; "PS1" = "payment_time_lag"; "PT1" = "payment_holiday_calendar"
+    "PN2" = "BBL"; "PO2" = "asian"; "PP2" = "cleared"; "PQ2" = "financial"; "PR2" = "Prototype Clearing"; "PS2" = "+1bd"; "PT2" = "=PF1"
+    "PN3" = '=_CreateTradeTemplate("future",PN1:PT1,PN2:PT2)'
+    "PN5" = "contract_code"; "PO5" = "quantity_unit"
+    "PN6" = '=""'; "PO6" = "BBL"
+    "PN7" = '=_CreateTradeTemplate("future",PN5:PO5,PN6:PO6)'
+    "PV1" = "trade_id"; "PW1" = "trade_date"; "PX1" = "contract_code"; "PY1" = "start_date"; "PZ1" = "end_date"; "QA1" = "quantity"; "QB1" = "quantity_per"; "QC1" = "fixed_price"
+    "PV2" = "1"; "PW2" = "15-Sep-2026"; "PX2" = "V26"; "PY2" = '=""'; "PZ2" = '=""'; "QA2" = "100"; "QB2" = "month"; "QC2" = "70"
+    "PV3" = "2"; "PW3" = "15-Sep-2026"; "PX3" = "V26"; "PY3" = "12-Oct-2026"; "PZ3" = "31-Oct-2026"; "QA3" = "100"; "QB3" = "month"; "QC3" = "70"
+    "PV4" = "3"; "PW4" = "15-Sep-2026"; "PX4" = '=""'; "PY4" = "12-Oct-2026"; "PZ4" = "20-Oct-2026"; "QA4" = "10"; "QB4" = "calday"; "QC4" = "70"
+    "PV6" = "=_CreateTrades(PD6,PV1:QC1,PV2:QC4,PN3)"
+    "PV8" = "5"; "PW8" = "15-Sep-2026"; "PX8" = "V26"; "PY8" = "12-Oct-2026"; "PZ8" = '=""'; "QA8" = "100"; "QB8" = "month"; "QC8" = "70"
+    "QE1" = "1-Oct-2026"
+    "QE2" = "=_CreateValuationDate(QE1,0.5)"
+    "QE3" = "30-Sep-2026"; "QF3" = "70"
+    "QE5" = "=_CreateCalendar(QE2,PD6)"
+    "QE6" = "=_CreateFuturesFixings(QE3,QF3,PD6)"
+    "QE7" = "=_CreateMarketHistory(QE5,QE6)"
+    "QE9" = "72"; "QE10" = "72"; "QE11" = "72"
+    "QE12" = '=_CreatePriceVector("BBL_ASIAN",QE9:QE11)'
+    "QE13" = "=_CreateMarket(QE7,QE12)"
+    "QE14" = "=_PrepareTrades(PV6,QE7)"
+    "QE15" = "=_EvaluateTrades(QE14,QE13)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

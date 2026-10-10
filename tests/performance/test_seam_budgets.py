@@ -2235,11 +2235,13 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
 # --- a row or rows of an instrument's fields --------------------------------------------------
 # The binding of a sheet's columns against the instrument another argument selects, through the
 # two probes. Rows of three fields, two of numbers and one of text: the arguments alone, the
-# name's rule and the mixed range's, then the instrument looked up by name, then the binding,
-# one look per column and nothing per row, the number columns views of the mixed storage and the
-# text column the host's tuple itself; the same eighteen calls across eighteen functions and
-# three looks at five rows and at 2,500. One row with a handle cell adds the handle's one
-# resolution and the date's conversion, then the echo's own table out.
+# name's rule and the body as it arrived, then the instrument looked up by name, then the binding,
+# since #NN the cells placed among the texts once, one count over the cells, then one look per
+# column and nothing per row, the number columns views of the arrival and the text column its
+# cells taken at their places, with the code column's unsupplied cells looked for once, none here;
+# the same twenty calls across twenty functions and the same numpy at five rows and at 2,500. One
+# row with a handle cell adds the handle's one resolution and the date's conversion, then the
+# echo's own table out.
 @pytest.mark.parametrize("rows", [5, 2_500], ids=["five rows", "2,500 rows"])
 def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
     call_profile: CallProfile, numpy_calls: CallProfile, rows: int
@@ -2256,19 +2258,26 @@ def test_rows_of_fields_bind_with_one_look_per_column_and_nothing_per_row(
         "_texts": 1,
         "_one_row": 1,
         "_shape": 1,
-        "_mixed": 1,  # the body, accepted on the host's summary
+        "_field_rows": 1,  # the body as it arrived, for the binding
+        "_field_cells": 1,
         "by_name": 1,  # the instrument looked up by its name
         "instrument": 1,
         "_bind_fields": 1,
-        "_numbers_of": 2,
-        "_texts_of": 1,
-        "MixedArray.shape": 2,
+        "_field_body": 1,  # the cells placed among the texts once
+        "_field_numbers": 2,
+        "_unsupplied": 1,  # the code column's blanks and empty texts, none
+        "_field_texts": 1,
         "CountFieldRows": 1,
         "_number_out": 1,
         "_scalar": 1,
     }
     assert numpy_calls(lambda: PATH["CountFieldRows"]("future", headers, body)) == {
         "ndarray.any": 3,  # one look per column
+        "ndarray.cumsum": 1,  # the cells placed among the texts
+        "ndarray.ravel": 1,
+        "ndarray.reshape": 1,
+        "ndarray.setflags": 1,  # the rows that supplied a code, frozen
+        "numpy.array": 1,  # the texts as an array, to take the code column's from
         "ufunc.reduce": 3,
     }
 
@@ -2289,10 +2298,11 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         if name
         in {
             "_bind_fields",
-            "_texts_of",
-            "_numbers_of",
-            "_dates_of",
-            "_handles_of",
+            "_field_body",
+            "_field_texts",
+            "_field_numbers",
+            "_field_dates",
+            "_field_handles",
             "_resolve",
             "_field_row",
             "by_name",
@@ -2304,9 +2314,10 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
-        "_texts_of": 1,  # the code column; the handle column finds its cells' texts itself
-        "_handles_of": 1,
+        "_field_body": 1,  # the cells placed among the texts once, since #NN
+        "_field_texts": 1,  # the unit column, its cell taken at its place
+        "_field_handles": 1,  # the handle column, its cell's text at its place too
         "_resolve": 1,  # one handle cell, one lookup
-        "_dates_of": 1,
-        "_numbers_of": 1,
+        "_field_dates": 1,
+        "_field_numbers": 1,
     }

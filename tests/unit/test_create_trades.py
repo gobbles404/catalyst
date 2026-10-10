@@ -30,7 +30,7 @@ from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FUTURE, NONE, FieldType, Instrument
 from goosedove.instruments.fields import FieldValues
-from goosedove.trades.resolution import CONDITIONS, Trades, resolved, trades
+from goosedove.trades.resolution import CONDITIONS, PERIOD_FIELDS, Trades, resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
 from goosedove.trades.terms import BASES, METHODS, QuantityPer, Route, ScheduleMethod, Settlement
 
@@ -131,13 +131,18 @@ def typed(definition: Instrument, name: str, values: list[object]) -> object:
 
 
 def a_ticket(columns: Mapping[str, list[object]], definition: Instrument = FUTURE) -> FieldValues:
+    """A ticket as the seam hands it over: each column typed by its field and, since #NN, a None
+    among a column's values a cell the row left unsupplied, the column then holding the other
+    rows' values with a mask saying which rows supplied one."""
     rows = len(next(iter(columns.values())))
-    return FieldValues(
-        definition,
-        rows,
-        tuple(columns),
-        {name: typed(definition, name, values) for name, values in columns.items()},
-    )
+    supplied: dict[str, NDArray[np.bool_]] = {}
+    typed_columns: dict[str, object] = {}
+    for name, values in columns.items():
+        present = [value is not None for value in values]
+        if not all(present):
+            supplied[name] = np.array(present)
+        typed_columns[name] = typed(definition, name, [v for v in values if v is not None])
+    return FieldValues(definition, rows, tuple(columns), typed_columns, supplied)
 
 
 def a_template(fields: Mapping[str, object], definition: Instrument = FUTURE) -> TradeTemplate:
@@ -217,7 +222,12 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         "resolved_components": 5,
         "resolved_occurrences": 5,
         "schedule_codes_read": 3,
+        "ticket_codes_read": 2,  # Z26 and F27, each distinct text once, since #NN
     }
+    # Since #NN the batch keeps what each row entered for its code, apart from the contracts.
+    np.testing.assert_array_equal(batch.code_entered, [True] * 5)
+    assert batch.entered_codes == ("Z26", "Z26", "F27", "F27", "Z26")
+    assert not batch.code_entered.flags.writeable
 
 
 def test_codes_resolve_in_either_case_against_a_schedule_in_either_case() -> None:
@@ -1123,56 +1133,178 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
     )
 
 
-def test_the_period_form_is_one_of_two_and_the_dates_run_forward() -> None:
-    both: dict[str, list[object]] = {**DATED_TICKET, "contract_code": ["Z26"]}
-    assert refused(ETHANE, both, ASIAN_TEMPLATE) == (
-        "contract_code is supplied with start_date, expected one period form, a contract_code or "
-        "start_date with end_date"
+# --- contract codes and dates on one ticket, contract-codes-and-dates.md, since #NN ------------
+# Each row chooses its period: both dates supplied book the days between them, whatever code
+# stands beside them, the code kept as entered text and read for nothing; neither supplied, the
+# row books its code; one date without the other, or no code and no pair, is refused by the first
+# such row. A blank or a formula's "" in the three fields is a cell that supplied nothing.
+
+THREE_FORMS: dict[str, list[object]] = {
+    "trade_id": [1, 2, 3, 4, 5, 6],
+    "trade_date": ["2026-11-20"] * 6,
+    "contract_code": ["Z26", "Z26", "Z26", None, "BALZ26", "F27"],
+    "start_date": [None, "2026-12-12", "2026-12-12", "2026-12-12", "2026-12-12", "2026-12-12"],
+    "end_date": [None, "2026-12-31", "2026-12-20", "2026-12-20", "2026-12-31", "2026-12-31"],
+    "quantity": [100, 100, 10, 10, 100, 100],
+    "fixed_price": [0.25] * 6,
+}
+
+
+def test_each_row_books_by_its_dates_when_both_stand_and_by_its_code_otherwise() -> None:
+    # The ticket's table, Z26 for its V26: row 1 the code alone, the whole month; rows 2 and 3
+    # the code beside both dates, the dates winning; row 4 the dates alone, the same window as
+    # row 3; row 5 a BAL label the grammar refuses, standing beside dates as typed; row 6 a code
+    # naming another month, moving nothing. The components come in row order whichever form.
+    batch, counter = created(ETHANE, THREE_FORMS, ASIAN_TEMPLATE)
+    assert components_of(batch) == (
+        ["Z26"] * 6,
+        ["2026-12-01", "2026-12-12", "2026-12-12", "2026-12-12", "2026-12-12", "2026-12-12"],
+        ["2026-12-31", "2026-12-31", "2026-12-20", "2026-12-20", "2026-12-31", "2026-12-31"],
+        [31, 20, 9, 9, 20, 20],
+        [100.0, 100.0, 10.0, 10.0, 100.0, 100.0],
     )
-    both_end: dict[str, list[object]] = {**ASIAN_TICKET, "end_date": ["2026-12-31"] * 2}
-    assert refused(ETHANE, both_end, ASIAN_TEMPLATE) == (
-        "contract_code is supplied with end_date, expected one period form, a contract_code or "
-        "start_date with end_date"
-    )
-    alone = {name: values for name, values in DATED_TICKET.items() if name != "end_date"}
-    assert refused(ETHANE, alone, ASIAN_TEMPLATE) == (
-        "start_date is supplied without end_date, expected both dates, the period's first and last "
-        "day, or a contract_code"
-    )
-    alone = {name: values for name, values in DATED_TICKET.items() if name != "start_date"}
-    assert refused(ETHANE, alone, ASIAN_TEMPLATE) == (
-        "end_date is supplied without start_date, expected both dates, the period's first and last "
-        "day, or a contract_code"
-    )
-    neither = {
-        name: values
-        for name, values in DATED_TICKET.items()
-        if "date" not in name or name == "trade_date"
+    np.testing.assert_array_equal(batch.resolved.occurrence, [0, 1, 2, 3, 4, 5])
+    np.testing.assert_array_equal(batch.code_entered, [True, True, True, False, True, True])
+    assert batch.entered_codes == ("Z26", "Z26", "Z26", "BALZ26", "F27")
+    assert counter.freeze()["ticket_codes_read"] == 1  # row 1's Z26; the labels beside dates, never
+    # Rows 3 and 4 are one window: the same observation days and the same payment day.
+    obs = batch.encoded.observations
+    np.testing.assert_array_equal(obs.date[obs.component == 2], obs.date[obs.component == 3])
+    assert batch.resolved.payment is not None
+    assert batch.resolved.payment.date[2] == batch.resolved.payment.date[3]
+    # Row 2 alone books as row 2 in the batch does, the code beside it unread either way.
+    alone, _ = created(ETHANE, dated("2026-12-12", "2026-12-31", 100), ASIAN_TEMPLATE)
+    assert components_of(alone) == tuple([column[1]] for column in components_of(batch))
+    # A code the grammar refuses stands beside both dates and is refused alone, by its row.
+    bad_alone: dict[str, list[object]] = {
+        **THREE_FORMS,
+        "contract_code": ["Z2026", *THREE_FORMS["contract_code"][1:]],
     }
-    assert refused(ETHANE, neither, ASIAN_TEMPLATE) == (
-        "contract_code is missing, expected a value in the template or a column in the ticket, or "
-        "start_date and end_date in its place"
+    assert refused(ETHANE, bad_alone, ASIAN_TEMPLATE) == (
+        "contract_code row 1 is 'Z2026', expected a contract or strip with two-digit years, such "
+        "as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
     )
-    # A template may supply the dates, and then a code in the ticket is the other form again.
-    in_template = {**ASIAN_TEMPLATE, "start_date": "2026-12-15", "end_date": "2026-12-31"}
-    ticket = {
-        name: values
-        for name, values in DATED_TICKET.items()
-        if "date" not in name or name == "trade_date"
-    }
-    batch, _ = created(ETHANE, ticket, in_template)
-    assert components_of(batch)[1:4] == (["2026-12-15"], ["2026-12-31"], [17])
-    with_code: dict[str, list[object]] = {**ticket, "contract_code": ["Z26"]}
-    assert refused(ETHANE, with_code, in_template) == (
-        "contract_code is supplied with start_date, expected one period form, a contract_code or "
-        "start_date with end_date"
+
+
+def test_half_a_pair_or_no_period_is_refused_by_the_earliest_such_row() -> None:
+    def form(
+        codes: list[object], starts: list[object], ends: list[object]
+    ) -> dict[str, list[object]]:
+        return {**THREE_FORMS, "contract_code": codes, "start_date": starts, "end_date": ends}
+
+    codes, starts, ends = (
+        THREE_FORMS["contract_code"],
+        THREE_FORMS["start_date"],
+        THREE_FORMS["end_date"],
     )
+    # A start without its end, a valid code standing beside it: one date books nothing.
+    assert refused(ETHANE, form(codes, starts, [*ends[:2], None, *ends[3:]]), ASIAN_TEMPLATE) == (
+        "start_date row 3 is 2026-12-12 without end_date row 3, expected both dates, the period's "
+        "first and last day, or neither and a contract_code"
+    )
+    assert refused(ETHANE, form(codes, [None, None, *starts[2:]], ends), ASIAN_TEMPLATE) == (
+        "end_date row 2 is 2026-12-31 without start_date row 2, expected both dates, the period's "
+        "first and last day, or neither and a contract_code"
+    )
+    # No code and no pair on row 4: nothing books it.
+    nothing = form(codes, [*starts[:3], None, *starts[4:]], [*ends[:3], None, *ends[4:]])
+    assert refused(ETHANE, nothing, ASIAN_TEMPLATE) == (
+        "row 4 has no period, expected a contract_code or start_date with end_date on each row; "
+        "contract_code, start_date and end_date are not supplied"
+    )
+    # Two faults, half a pair on row 2 and nothing on row 4: the earlier row is named.
+    two = {**nothing, "start_date": [None, None, *starts[2:3], None, *starts[4:]]}
+    assert refused(ETHANE, two, ASIAN_TEMPLATE) == (
+        "end_date row 2 is 2026-12-31 without start_date row 2, expected both dates, the period's "
+        "first and last day, or neither and a contract_code"
+    )
+    # Reversed dates, and a month the schedule lacks, each named by the row and its form.
     assert refused(ETHANE, dated("2026-12-31", "2026-12-15"), ASIAN_TEMPLATE) == (
         "end_date row 1 is 2026-12-15, expected a day on or after start_date row 1, 2026-12-31"
     )
     assert refused(ETHANE, dated("2026-11-12", "2027-03-15"), ASIAN_TEMPLATE) == (
         "start_date row 1 is 2026-11-12 and end_date row 1 2027-03-15, expected months the index's "
         "schedule has a contract for; it has none for 2027-03"
+    )
+    mixed_months = form(
+        ["Z26", "CAL27", *codes[2:]], [None, None, *starts[2:]], [None, None, *ends[2:]]
+    )
+    assert refused(ETHANE, mixed_months, ASIAN_TEMPLATE) == (
+        "contract_code row 2 is 'CAL27', expected months the index's schedule has a contract for; "
+        "it has none for 2027-03"
+    )
+    # No period field anywhere, in the template or the ticket: refused by name before any row.
+    neither = {name: values for name, values in THREE_FORMS.items() if name not in PERIOD_FIELDS}
+    assert refused(ETHANE, neither, ASIAN_TEMPLATE) == (
+        "contract_code is missing, expected a value in the template or a column in the ticket, or "
+        "start_date and end_date in its place"
+    )
+
+
+def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns() -> None:
+    # A template code with ticket dates: the dated rows book their dates and the rest the code,
+    # which is read once; a template start with a ticket end column: a pair where the end stands
+    # and half a pair where it does not; template dates with a ticket code column: the dates win
+    # on every row and no code is read; a template whose period cell held nothing owns the header,
+    # so the ticket's column of that name is still overlap, and supplies no row.
+    two: dict[str, list[object]] = {
+        "trade_id": [1, 2],
+        "trade_date": ["2026-11-20"] * 2,
+        "quantity": [100, 10],
+        "fixed_price": [0.25] * 2,
+    }
+    coded_template = {**ASIAN_TEMPLATE, "contract_code": "Z26"}
+    dated_rows = {**two, "start_date": [None, "2026-12-12"], "end_date": [None, "2026-12-20"]}
+    batch, counter = created(ETHANE, dated_rows, coded_template)
+    assert components_of(batch)[1:4] == (
+        ["2026-12-01", "2026-12-12"],
+        ["2026-12-31", "2026-12-20"],
+        [31, 9],
+    )
+    assert batch.entered_codes == ("Z26", "Z26")
+    assert counter.freeze()["ticket_codes_read"] == 1
+    started_template = {**ASIAN_TEMPLATE, "start_date": "2026-12-12"}
+    ends_column = {**two, "contract_code": ["Z26", None], "end_date": ["2026-12-20", None]}
+    assert refused(ETHANE, ends_column, started_template) == (
+        "start_date is 2026-12-12 without end_date row 2, expected both dates, the period's first "
+        "and last day, or neither and a contract_code"
+    )
+    both_ends, _ = created(
+        ETHANE, {**ends_column, "end_date": ["2026-12-20", "2026-12-31"]}, started_template
+    )
+    assert components_of(both_ends)[1:4] == (
+        ["2026-12-12"] * 2,
+        ["2026-12-20", "2026-12-31"],
+        [9, 20],
+    )
+    np.testing.assert_array_equal(both_ends.code_entered, [True, False])
+    dated_template = {**ASIAN_TEMPLATE, "start_date": "2026-12-12", "end_date": "2026-12-31"}
+    codes_column = {**two, "contract_code": ["F27", "Z2026"]}
+    by_dates, counter = created(ETHANE, codes_column, dated_template)
+    assert components_of(by_dates)[:4] == (
+        ["Z26"] * 2,
+        ["2026-12-12"] * 2,
+        ["2026-12-31"] * 2,
+        [20, 20],
+    )
+    assert by_dates.entered_codes == ("F27", "Z2026") and counter.freeze()["ticket_codes_read"] == 0
+    blank_template = {**ASIAN_TEMPLATE, "start_date": None}
+    assert refused(ETHANE, dated_rows, blank_template) == (
+        "start_date is supplied by the template and by the ticket, expected by one of them"
+    )
+    by_code, _ = created(ETHANE, {**two, "contract_code": ["Z26", "Z26"]}, blank_template)
+    assert components_of(by_code)[1:3] == (["2026-12-01"] * 2, ["2026-12-31"] * 2)
+    # A template code the grammar refuses stands until a row books by it.
+    bad_template = {**ASIAN_TEMPLATE, "contract_code": "Z2026"}
+    standing, _ = created(
+        ETHANE,
+        {**two, "start_date": ["2026-12-12"] * 2, "end_date": ["2026-12-31"] * 2},
+        bad_template,
+    )
+    assert standing.entered_codes == ("Z2026", "Z2026")
+    assert refused(ETHANE, two, bad_template) == (
+        "contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, "
+        "1Q27, CAL28, W29, S28 or F26-Z28"
     )
 
 
@@ -1701,16 +1833,16 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
 
 
 def test_the_conditions_are_the_definitions_own() -> None:
-    # The three conditional fields are CONDITIONS'; the period form's three say their rule in
-    # the definition's words and are the period form's to check, not a condition on a fact.
+    # The three conditional fields are CONDITIONS'; the period fields' three say their rule in
+    # the definition's words and are the periods' to check row by row, not a condition on a fact.
     conditional = {
         field.name: field.required_when for field in FUTURE.fields if field.required_when != NONE
     }
     period = {name: conditional.pop(name) for name in ("contract_code", "start_date", "end_date")}
     assert period == {
-        "contract_code": "no start_date and end_date",
-        "start_date": "no contract_code",
-        "end_date": "no contract_code",
+        "contract_code": "no start_date and end_date on the row",
+        "start_date": "no contract_code on the row, or with end_date",
+        "end_date": "no contract_code on the row, or with start_date",
     }
     assert conditional == {
         name: f"{fact} = {value.value}" for name, (fact, value) in CONDITIONS.items()
@@ -1943,6 +2075,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "quantity_unit",
         "quantity_per",
         "fixed_price",
+        "entered_contract_code",
         "start_date",
         "end_date",
         "covered_days",
@@ -1964,6 +2097,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "str",
         "str",
         "float64",
+        "str",
         "datetime64[D]",
         "datetime64[D]",
         "int64",
@@ -1985,6 +2119,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
         "NYMEX NG",
         "month",
         3.1,
+        "Z26",
         46357.0,
         46387.0,
         31.0,
@@ -1995,6 +2130,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
     ]
     assert table[2] == first
     assert table[3][3] == "Z26"  # the schedule's spelling, where the ticket typed z26
+    assert table[3][12] == "z26"  # and the entered text as typed, since #NN
     assert table[6] == [5.0, *first[1:]]  # the repeated row, a trade of its own
     assert len(table) == 7
 
@@ -2057,6 +2193,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "fixed_price",
         "payment_time_lag",
         "payment_date",
+        "entered_contract_code",
         "start_date",
         "end_date",
         "covered_days",
@@ -2066,6 +2203,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "offset",
     ]
     assert [line[0] for line in table[2:]] == [1.0, 1.0]
+    assert [line[14] for line in table[2:]] == ["Z26-F27", "Z26-F27"]  # the strip as typed
     assert [line[2] for line in table[2:]] == ["Z26", "F27"]
     assert [line[7] for line in table[2:]] == ["ION", "ION"]
     assert [line[12] for line in table[2:]] == ["+2bd", "+2bd"]  # the lag beside the day it gave
@@ -2084,7 +2222,8 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     table = spilled(handle)
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
     assert table[3][:4] == [2.0, 1002.0, 46301.0, "F27"]
-    assert table[3][8] == 0.0 and table[3][12:] == [46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0]
+    assert table[3][8] == 0.0
+    assert table[3][12:] == ["F27", 46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
     for cell, words in (
@@ -2124,6 +2263,7 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         "quantity_unit",
         "quantity_per",
         "fixed_price",
+        "entered_contract_code",
         "start_date",
         "end_date",
         "covered_days",
@@ -2132,14 +2272,14 @@ def test_the_spill_keeps_the_entered_quantity_beside_the_days_and_the_months_qua
         "coefficient",
         "offset",
     ]
-    assert table[1][12:16] == ["datetime64[D]", "datetime64[D]", "int64", "float64"]
-    assert [line[12] for line in table[2:]] == [46357.0, 46357.0, 46388.0, 46388.0, 46357.0]
-    assert [line[13] for line in table[2:]] == [46387.0, 46387.0, 46418.0, 46418.0, 46387.0]
+    assert table[1][13:17] == ["datetime64[D]", "datetime64[D]", "int64", "float64"]
+    assert [line[13] for line in table[2:]] == [46357.0, 46357.0, 46388.0, 46388.0, 46357.0]
+    assert [line[14] for line in table[2:]] == [46387.0, 46387.0, 46418.0, 46418.0, 46387.0]
     assert [line[8] for line in table[2:]] == [10.0, -4.0, 7.0, -12.0, 10.0]  # as entered
     assert [line[10] for line in table[2:]] == ["calday"] * 5
-    assert [line[14] for line in table[2:]] == [31.0] * 5  # December and January
-    assert [line[15] for line in table[2:]] == [310.0, -124.0, 217.0, -372.0, 310.0]
-    assert [line[16] for line in table[2:]] == [
+    assert [line[15] for line in table[2:]] == [31.0] * 5  # December and January
+    assert [line[16] for line in table[2:]] == [310.0, -124.0, 217.0, -372.0, 310.0]
+    assert [line[17] for line in table[2:]] == [
         3_100_000.0,
         -1_240_000.0,
         2_170_000.0,
@@ -2155,8 +2295,10 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
     sheet: dict[str, Any],
 ) -> None:
     # The NG rows booked by dates, a whole December each: the spill shows the days under
-    # start_date and end_date beside the code the resolution bound, and a part of a month under
-    # lastday is refused in the kernel's words; a code beside the dates is the other form.
+    # start_date and end_date beside the code the resolution bound, `(not supplied)` under
+    # entered_contract_code since the row entered none, and a part of a month under lastday is
+    # refused in the kernel's words; since #NN a code beside the dates is kept as entered text
+    # while the dates book the period, whatever the code says.
     headers = row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
     table = spilled(
         ENTRY["_CreateTrades"](
@@ -2167,8 +2309,8 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
         )
     )
     assert table[0][3] == "contract_code" and table[2][3] == "Z26"
-    assert table[0][12:14] == ["start_date", "end_date"]
-    assert table[2][12:17] == [46357.0, 46387.0, 31.0, 10.0, 100_000.0]
+    assert table[0][12:15] == ["entered_contract_code", "start_date", "end_date"]
+    assert table[2][12:18] == ["(not supplied)", 46357.0, 46387.0, 31.0, 10.0, 100_000.0]
     assert str(
         ENTRY["_CreateTrades"](
             sheet["index"],
@@ -2182,24 +2324,74 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
         "the expiry-based methods take the contract's month entire, and a part of it prices "
         "under asian"
     )
-    assert str(
+    three = row(
+        "trade_id",
+        "trade_date",
+        "contract_code",
+        "start_date",
+        "end_date",
+        "quantity",
+        "fixed_price",
+    )
+    # A code beside both dates: the dates book December, the code is kept as typed and never
+    # read, so F27, naming another month, and BALZ26, which the grammar refuses, stand alike.
+    for label in ("Z26", "F27", "BALZ26"):
+        table = spilled(
+            ENTRY["_CreateTrades"](
+                sheet["index"],
+                three,
+                cells([1001.0, 46289.0, label, 46357.0, 46387.0, 10.0, 3.1]),
+                sheet["template"],
+            )
+        )
+        assert table[2][3] == "Z26" and table[2][12:15] == [label, 46357.0, 46387.0]
+    # Formula-empty text and a blank in the three columns supply nothing: a code alone books the
+    # month and a pair alone books the days, in one ticket, the empty cells displacing no text.
+    table = spilled(
         ENTRY["_CreateTrades"](
             sheet["index"],
-            row(
-                "trade_id",
-                "trade_date",
-                "contract_code",
-                "start_date",
-                "end_date",
-                "quantity",
-                "fixed_price",
+            three,
+            cells(
+                [1001.0, 46289.0, "Z26", "", "", 10.0, 3.1],
+                [1002.0, 46289.0, None, 46357.0, 46387.0, -4.0, 3.15],
+                [1003.0, 46290.0, "", 46388.0, 46418.0, 7.0, 3.4],
             ),
-            cells([1001.0, 46289.0, "Z26", 46357.0, 46387.0, 10.0, 3.1]),
             sheet["template"],
         )
-    ) == (
-        "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one "
-        "period form, a contract_code or start_date with end_date"
+    )
+    assert [line[3] for line in table[2:]] == ["Z26", "Z26", "F27"]
+    assert [line[12] for line in table[2:]] == ["Z26", "(not supplied)", "(not supplied)"]
+    assert [line[13] for line in table[2:]] == [46357.0, 46357.0, 46388.0]
+    # Half a pair with a valid code beside it, and a row with nothing: refused by their rows.
+    for body, message in (
+        (
+            cells([1001.0, 46289.0, "Z26", 46357.0, "", 10.0, 3.1]),
+            "start_date row 1 is 2026-12-01 without end_date row 1, expected both dates, the "
+            "period's first and last day, or neither and a contract_code",
+        ),
+        (
+            cells(
+                [1001.0, 46289.0, "Z26", "", "", 10.0, 3.1],
+                [1002.0, 46289.0, "", None, "", -4.0, 3.15],
+            ),
+            "row 2 has no period, expected a contract_code or start_date with end_date on each "
+            "row; contract_code, start_date and end_date are not supplied",
+        ),
+    ):
+        assert str(ENTRY["_CreateTrades"](sheet["index"], three, body, sheet["template"])) == (
+            f"#ERROR _CreateTrades: ValueError: {message}"
+        )
+    # A blank anywhere else keeps the seam's words, now the field's own: a blank is no quantity.
+    assert (
+        str(
+            ENTRY["_CreateTrades"](
+                sheet["index"],
+                three,
+                cells([1001.0, 46289.0, "Z26", "", "", None, 3.1]),
+                sheet["template"],
+            )
+        )
+        == "#ERROR _CreateTrades: trade_rows cell (1, 6) is blank, expected number"
     )
 
 
@@ -2269,6 +2461,7 @@ def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_
         "resolved_components": 4,
         "resolved_occurrences": 4,
         "schedule_codes_read": 4,
+        "ticket_codes_read": 1,
     }
 
 
@@ -2578,6 +2771,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
         "resolved_components": 1,
         "resolved_occurrences": 1,
         "schedule_codes_read": 3,
+        "ticket_codes_read": 1,
     }
 
 
