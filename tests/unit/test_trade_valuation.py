@@ -1709,7 +1709,7 @@ def test_a_calday_batch_values_as_the_month_batch_of_its_component_quantity(
 # after the last pricing day: 17 covered days, 12 observations a twelfth each, the fixed leg -500
 # and the payment 5 January; the fixings 0.24 on the 15th, 0.26 on the 31st and 0.28 on every
 # other December pricing day, the live projection 0.28. The dates come from the helpers,
-# util_StartDate and util_EndDate on BALZ26 with the reference date, or are typed, alike.
+# util_StartDate and util_EndDate on BALZ26 with the valuation-date handle, or are typed, alike.
 
 DATE_HEADERS = ("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
 DECEMBER_PRICING = [
@@ -1756,9 +1756,11 @@ def period_state(
 @pytest.fixture(scope="module")
 def booked(ethane: dict[str, Any]) -> dict[str, Any]:
     """The page's booking two ways: the dates from the helpers on BALZ26 with 15 December as the
-    reference, and the same dates typed; and the calday twin, 2,000 a day over the 17 days."""
-    start = cast(float, ENTRY["util_StartDate"]("BALZ26", serial("2026-12-15")))
-    end = cast(float, ENTRY["util_EndDate"]("BALZ26", serial("2026-12-15")))
+    valuation day, and the same dates typed; and the calday twin, 2,000 a day over the 17 days."""
+    # Since #NN the helpers take the valuation-date handle, 15 December here, in place of a date.
+    mid_december = ENTRY["_CreateValuationDate"](serial("2026-12-15"), 0.5)
+    start = cast(float, ENTRY["util_StartDate"]("BALZ26", mid_december))
+    end = cast(float, ENTRY["util_EndDate"]("BALZ26", mid_december))
     assert (start, end) == (serial("2026-12-15"), serial("2026-12-31"))
     headers = row(*DATE_HEADERS)
     helped = ENTRY["_CreateTrades"](

@@ -657,15 +657,16 @@ def util_StartDate(
         "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
         "balance, BALZ26, typed or in a cell such as A2.",
     ],
-    reference_date: Annotated[
-        Date | None,
-        "For a BAL label, the first day the deal covers, such as B2 or DATE(2026,12,15), a day of "
-        "the label's period; left out for any other label.",
+    valuation_date: Annotated[
+        Handle[ValuationDate] | None,
+        "For a BAL label, the valuation-date handle whose day the balance starts on, such as B1 "
+        "showing _CreateValuationDate's result; left out for any other label.",
     ] = None,
 ) -> Date:
     """Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for
-    W29 and the first day of the left label of F26-Z28; of its balance, the reference date."""
-    return Date(start_date(period, reference_date))
+    W29 and the first day of the left label of F26-Z28; of its balance, the later of the
+    valuation day and that first day."""
+    return Date(start_date(period, None if valuation_date is None else valuation_date.as_of))
 
 
 @excel_function
@@ -675,15 +676,16 @@ def util_EndDate(
         "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
         "balance, BALZ26, typed or in a cell such as A2.",
     ],
-    reference_date: Annotated[
-        Date | None,
-        "For a BAL label, the first day the deal covers, such as B2 or DATE(2026,12,15), a day of "
-        "the label's period; left out for any other label.",
+    valuation_date: Annotated[
+        Handle[ValuationDate] | None,
+        "For a BAL label, the valuation-date handle whose day the balance starts on, such as B1 "
+        "showing _CreateValuationDate's result; left out for any other label.",
     ] = None,
 ) -> Date:
     """Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for
-    W29 and the last day of the right label of F26-Z28; of its balance, the same last day."""
-    return Date(end_date(period, reference_date))
+    W29 and the last day of the right label of F26-Z28; of its balance, the same last day, a
+    period ended before the valuation day refused."""
+    return Date(end_date(period, None if valuation_date is None else valuation_date.as_of))
 
 
 @excel_function

@@ -98,6 +98,8 @@ and work budgets in this PR. Do not widen quantity-basis mixing or payment group
 
 ## Slice B BAL parsing with a stable reference date
 
+**Superseded by [date-helper-inputs.md](date-helper-inputs.md), built in #NN.** The second argument is the valuation-date handle, not a date: the balance runs from the later of the handle's day and the label's first day to the label's last day, a future period whole, and a period that ended before the day is refused by both helpers. The reference date below, held inside the period, is how #160 built it and is history.
+
 Extend the existing utilities rather than making the desk enter two hard-coded dates:
 
 ```text

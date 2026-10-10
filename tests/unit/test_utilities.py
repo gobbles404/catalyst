@@ -854,40 +854,71 @@ def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_s
             )
 
 
-# The balance of a period: the reference date as a serial beside the label, the first day it
-# gives and the last day the label's; an ordinary label with a reference reads as before. Left
-# out, the library's words; a blank, a text, a fraction of a day and a range, the seam's, the same
-# whichever label stands beside them.
-def test_the_balance_of_a_period_takes_its_reference_date_through_the_seam() -> None:
-    for period, reference, first, last in (
-        ("balx27", "2027-11-12", "2027-11-12", "2027-11-30"),
-        ("balcal26", "2026-10-07", "2026-10-07", "2026-12-31"),
+# The balance of a period, since #NN from a valuation-date handle beside the label: the ticket's
+# table as serials, the first day the later of the handle's day and the label's first, the last
+# day the label's, the fraction of the day read for nothing; an ordinary label with a handle
+# reads as before, with either handle. Left out with a BAL label, and a period that has ended,
+# the library's words; a blank, a raw date, a text naming no object, a handle of another kind and
+# a range, the seam's, the same whichever label stands beside them, since a supplied handle is
+# checked whatever the label. Nothing is published for a result.
+def test_the_balance_of_a_period_takes_its_valuation_date_handle_through_the_seam() -> None:
+    def at(text: str, fraction: float = 0.5) -> object:
+        return bridge.call("_CreateValuationDate", [serial(text), fraction])
+
+    live = bridge.live_handles()
+    for period, as_of, first, last in (
+        ("balv26", "2026-09-20", "2026-10-01", "2026-10-31"),
+        ("BALV26", "2026-10-12", "2026-10-12", "2026-10-31"),
+        ("BalV26", "2026-10-31", "2026-10-31", "2026-10-31"),
+        ("balf26", "2025-12-20", "2026-01-01", "2026-01-31"),
+        ("balf26", "2026-01-15", "2026-01-15", "2026-01-31"),
+        ("balf26", "2026-01-31", "2026-01-31", "2026-01-31"),
         ("balx26-z26", "2026-11-12", "2026-11-12", "2026-12-31"),
+        ("balcal27", "2026-10-12", "2027-01-01", "2027-12-31"),
         ("BALZ26", "2026-12-15", "2026-12-15", "2026-12-31"),
         ("BALG28", "2028-02-29", "2028-02-29", "2028-02-29"),
         ("Z26", "2026-12-15", "2026-12-01", "2026-12-31"),
+        ("V26", "2027-06-01", "2026-10-01", "2026-10-31"),
     ):
-        assert bridge.call("util_StartDate", [period, serial(reference)]) == serial(first)
-        assert bridge.call("util_EndDate", [period, serial(reference)]) == serial(last)
+        handle = at(as_of)
+        assert bridge.call("util_StartDate", [period, handle]) == serial(first)
+        assert bridge.call("util_EndDate", [period, handle]) == serial(last)
+        assert bridge.call("util_StartDate", [period, at(as_of, 1.0)]) == serial(first)
+    # Two handles, each its own start, no ambient day between them.
+    september, mid = at("2026-09-20"), at("2026-10-12")
+    assert bridge.call("util_StartDate", ["balv26", september]) == serial("2026-10-01")
+    assert bridge.call("util_StartDate", ["balv26", mid]) == serial("2026-10-12")
+    assert bridge.call("util_StartDate", ["V26", september]) == serial("2026-10-01")
+    assert bridge.call("util_StartDate", ["V26", mid]) == serial("2026-10-01")
+    published = bridge.live_handles()[0] - live[0]  # the handles made above, nothing of the days
     for name in ("util_StartDate", "util_EndDate"):
         assert bridge.call(name, ["BALZ26", MISSING]) == (
-            f"#ERROR {name}: ValueError: reference_date is missing, expected a date with "
-            "'BALZ26', the first day the balance of a period covers"
+            f"#ERROR {name}: ValueError: valuation_date is missing, expected a valuation-date "
+            "handle with 'BALZ26', whose day starts the balance of a period"
         )
-        assert bridge.call(name, ["BALZ26", serial("2027-01-05")]) == (
-            f"#ERROR {name}: ValueError: reference_date is 2027-01-05, expected a day of "
-            "'BALZ26', 2026-12-01 to 2026-12-31"
+        assert bridge.call(name, ["balv26", at("2026-11-01")]) == (
+            f"#ERROR {name}: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on "
+            "2026-10-31, expected a valuation day on or before the period's last day"
+        )
+        calendar = bridge.call(
+            "_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]])]
         )
         for wrong, what in (
             (None, "is blank"),
-            ("x", "is text 'x'"),
+            (serial("2026-12-15"), "is number 46371.0"),
             (46371.5, "is number 46371.5"),
+            ("x", "is text 'x' naming no live object"),
+            ("15-Dec-2026", "is text '15-Dec-2026' naming no live object"),
+            (calendar, f"is holiday calendar handle {calendar!r}"),
             (Cells.from_rows([[46371.0], [46372.0]]), "is 2x1 array"),
         ):
             for period in ("BALZ26", "Z26"):
                 assert bridge.call(name, [period, wrong]) == (
-                    f"#ERROR {name}: reference_date {what}, expected date"
+                    f"#ERROR {name}: valuation_date {what}, expected valuation date handle"
                 )
+    assert (
+        bridge.live_handles()[0] == live[0] + published + 4
+    )  # two calendars and two days, nothing else
 
 
 # --- a date shifted by a text offset ------------------------------------------------------------

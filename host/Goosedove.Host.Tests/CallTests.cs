@@ -177,29 +177,16 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_EndDate", new object[] { "CAL28-F28", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
             yield return new object[] { "util_StartDate", new object[] { 46023.0, ExcelMissing.Value }, "#ERROR util_StartDate: period is number 46023.0, expected text" };
             yield return new object[] { "util_EndDate", new object[] { "", ExcelMissing.Value }, "#ERROR util_EndDate: period is empty text, expected text" };
-            // The balance of a period, trade-periods-and-bal.md slice B: one BAL prefix in either case on any label and the reference date, the first day the deal covers, a day of the label's own period, either end included; a strip's balance, a leap day, a Saturday; an ordinary label with a reference reads as before; a reference left out, one before and one after the period and a repeated prefix in the library's words, a blank, a text and a fraction in the seam's.
-            yield return new object[] { "util_StartDate", new object[] { "balx27", 46703.0 }, 46703.0 };
-            yield return new object[] { "util_EndDate", new object[] { "balx27", 46703.0 }, 46721.0 };
-            yield return new object[] { "util_StartDate", new object[] { "balcal26", 46302.0 }, 46302.0 };
-            yield return new object[] { "util_EndDate", new object[] { "balcal26", 46302.0 }, 46387.0 };
-            yield return new object[] { "util_StartDate", new object[] { "balx26-z26", 46338.0 }, 46338.0 };
-            yield return new object[] { "util_EndDate", new object[] { "balx26-z26", 46338.0 }, 46387.0 };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", 46371.0 }, 46371.0 };
-            yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46371.0 }, 46387.0 };
-            yield return new object[] { "util_StartDate", new object[] { "BALG28", 46812.0 }, 46812.0 };
-            yield return new object[] { "util_EndDate", new object[] { "BALG28", 46812.0 }, 46812.0 };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", 46368.0 }, 46368.0 };
-            yield return new object[] { "util_StartDate", new object[] { "Z26", 46371.0 }, 46357.0 };
-            yield return new object[] { "util_EndDate", new object[] { "Z26", 46371.0 }, 46387.0 };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers" };
-            yield return new object[] { "util_EndDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers" };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", 46392.0 }, "#ERROR util_StartDate: ValueError: reference_date is 2027-01-05, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31" };
-            yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46356.0 }, "#ERROR util_EndDate: ValueError: reference_date is 2026-11-30, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31" };
-            yield return new object[] { "util_StartDate", new object[] { "BALBALZ26", 46371.0 }, "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
-            yield return new object[] { "util_EndDate", new object[] { "BALZ28-F26", 46371.0 }, "#ERROR util_EndDate: ValueError: period is 'BALZ28-F26', expected range endpoints in chronological order" };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelEmpty.Value }, "#ERROR util_StartDate: reference_date is blank, expected date" };
-            yield return new object[] { "util_StartDate", new object[] { "BALZ26", "15-Dec-2026" }, "#ERROR util_StartDate: reference_date is text '15-Dec-2026', expected date" };
-            yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46371.5 }, "#ERROR util_EndDate: reference_date is number 46371.5, expected date" };
+            // The balance of a period, date-helper-inputs.md: the second argument is a valuation-date handle since #NN, so a raw date, a blank, a text and a fraction of a day fail in the seam's words whatever the label, a BAL label without one in the library's, and a malformed or reversed label under the prefix as any label does; the balances themselves are a fact below, their handles made at run time.
+            yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period" };
+            yield return new object[] { "util_EndDate", new object[] { "BALZ26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period" };
+            yield return new object[] { "util_StartDate", new object[] { "BALZ26", 46371.0 }, "#ERROR util_StartDate: valuation_date is number 46371.0, expected valuation date handle" };
+            yield return new object[] { "util_StartDate", new object[] { "Z26", 46371.0 }, "#ERROR util_StartDate: valuation_date is number 46371.0, expected valuation date handle" };
+            yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelEmpty.Value }, "#ERROR util_StartDate: valuation_date is blank, expected valuation date handle" };
+            yield return new object[] { "util_StartDate", new object[] { "BALZ26", "15-Dec-2026" }, "#ERROR util_StartDate: valuation_date is text '15-Dec-2026' naming no live object, expected valuation date handle" };
+            yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46371.5 }, "#ERROR util_EndDate: valuation_date is number 46371.5, expected valuation date handle" };
+            yield return new object[] { "util_StartDate", new object[] { "BALBALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_EndDate", new object[] { "BALZ28-F26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'BALZ28-F26', expected range endpoints in chronological order" };
             // A date shifted by a text offset, the calendar left out: the ticket's table, Friday 9 October 2026 at 46304, the Saturday at 46305 and the Sunday at 46306; the month ends through a leap February; the library's words for no offset, a result past the sheet's calendar and a count of too many digits; the seam's for the date, the offset and a blank where the calendar should be, a blank being no omission.
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelMissing.Value }, 46307.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+1bd", ExcelMissing.Value }, 46307.0 };
@@ -768,10 +755,11 @@ namespace Goosedove.Host.Tests
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
             var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("GAL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
-            var start = (double)Seam.Call("util_StartDate", "BALZ26", 46371.0);
-            var end = (double)Seam.Call("util_EndDate", "BALZ26", 46371.0);
-            var first = (double)Seam.Call("util_StartDate", "Z26", 46371.0);
-            var last = (double)Seam.Call("util_EndDate", "Z26", 46371.0);
+            var midDecember = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);  // the helpers take the handle since #NN
+            var start = (double)Seam.Call("util_StartDate", "BALZ26", midDecember);
+            var end = (double)Seam.Call("util_EndDate", "BALZ26", midDecember);
+            var first = (double)Seam.Call("util_StartDate", "Z26", midDecember);
+            var last = (double)Seam.Call("util_EndDate", "Z26", midDecember);
             var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
             var rows = new object[,] { { 16.0, 46346.0, start, end, 2000.0, 0.25 }, { 17.0, 46346.0, first, last, 2200.0, 0.25 } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
@@ -2042,6 +2030,43 @@ namespace Goosedove.Host.Tests
             Assert.Equal("contract_code", shown[0, 1]);
             Assert.Equal("str", shown[1, 1]);
             Assert.Equal("(not supplied)", shown[2, 1]);
+        }
+
+        // The balance of a period from a valuation-date handle, date-helper-inputs.md: the ticket's table,
+        // October 2026 from 20 September, 46285, the whole month, 46296 to 46326, from the 12th, 46307,
+        // that day, on the 31st, 46326, one day, and from 1 November, 46327, refused by both readers;
+        // January 2026 from the December before, 46011, the whole month; a strip from 12 November,
+        // 46338; a calendar year from the October before; December from the 15th, 46371, and the leap
+        // day, 46812, one day; an ordinary label its whole period with either handle; the fraction of
+        // the day read for nothing; a handle of another kind refused by the seam whatever the label.
+        [Fact]
+        public void the_balance_of_a_period_starts_on_the_later_of_the_valuation_day_and_its_first_day()
+        {
+            var september = (string)Seam.Call("_CreateValuationDate", 46285.0, 0.0);
+            var october12 = (string)Seam.Call("_CreateValuationDate", 46307.0, 0.5);
+            var october31 = (string)Seam.Call("_CreateValuationDate", 46326.0, 1.0);
+            var november = (string)Seam.Call("_CreateValuationDate", 46327.0, 0.0);
+            var december = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);
+            Assert.Equal(46296.0, Seam.Call("util_StartDate", "balv26", september));
+            Assert.Equal(46326.0, Seam.Call("util_EndDate", "balv26", september));
+            Assert.Equal(46307.0, Seam.Call("util_StartDate", "BALV26", october12));
+            Assert.Equal(46326.0, Seam.Call("util_EndDate", "BALV26", october12));
+            Assert.Equal(46326.0, Seam.Call("util_StartDate", "BalV26", october31));
+            Assert.Equal(46326.0, Seam.Call("util_EndDate", "BalV26", october31));
+            Assert.Equal(46023.0, Seam.Call("util_StartDate", "balf26", (string)Seam.Call("_CreateValuationDate", 46011.0, 0.0)));
+            Assert.Equal(46388.0, Seam.Call("util_StartDate", "balcal27", october12));
+            Assert.Equal(46752.0, Seam.Call("util_EndDate", "balcal27", october12));
+            Assert.Equal(46338.0, Seam.Call("util_StartDate", "balx26-z26", (string)Seam.Call("_CreateValuationDate", 46338.0, 0.0)));
+            Assert.Equal(46371.0, Seam.Call("util_StartDate", "BALZ26", december));
+            Assert.Equal(46387.0, Seam.Call("util_EndDate", "BALZ26", december));
+            Assert.Equal(46812.0, Seam.Call("util_StartDate", "BALG28", (string)Seam.Call("_CreateValuationDate", 46812.0, 0.0)));
+            Assert.Equal(46357.0, Seam.Call("util_StartDate", "Z26", december));
+            Assert.Equal(46357.0, Seam.Call("util_StartDate", "Z26", september));
+            Assert.Equal(46387.0, Seam.Call("util_EndDate", "Z26", october12));
+            Assert.Equal("#ERROR util_StartDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day", Seam.Call("util_StartDate", "balv26", november));
+            Assert.Equal("#ERROR util_EndDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day", Seam.Call("util_EndDate", "balv26", november));
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46381.0);
+            Assert.Equal("#ERROR util_StartDate: valuation_date is holiday calendar handle '" + holidays + "', expected valuation date handle", Seam.Call("util_StartDate", "Z26", holidays));
         }
 
         [Fact]

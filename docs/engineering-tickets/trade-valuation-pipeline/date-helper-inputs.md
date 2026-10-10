@@ -2,9 +2,9 @@
 
 [Pipeline overview](README.md) · [UAT item 3](surface-uat-notes.md#3-dates-and-period-labels-through-the-same-helpers)
 
-**Status:** Ready for engineering, 10 October 2026. One focused prototype PR after
-PR #172; inspected baseline `7f14a83`. This ticket supersedes this page's earlier
-raw-reference-date and date-passthrough proposal. Implementation has not started.
+**Status:** Built in #NN, 10 October 2026, one prototype PR stacked on PR #172 at
+`7f14a83`, awaiting review. This ticket supersedes this page's earlier raw-reference-date
+and date-passthrough proposal. [As built](#as-built) at the foot records what the build settled.
 
 ## Outcome
 
@@ -167,3 +167,35 @@ also leaves `_CreateTrades` unchanged: no direct active BAL-code booking, automa
 snapshot, new `exact` method or quantity/schedule change. `util_ShiftDate` remains the
 separate offset utility. The handle-based BAL inputs above are the complete scope of
 this PR.
+
+## As built
+
+PR #NN on `claude/bal-date-helpers`, stacked on #172. The library pages are
+[start-date.md](../../library/utilities/start-date.md) and [end-date.md](../../library/utilities/end-date.md);
+the seam's record is the #NN row of [history.md](../../seam/history.md).
+
+- The rule as specified: `start = max(as_of, first)`, `end = last`, both helpers refusing
+  `as_of > last`; `day_fraction_elapsed` is never read, so 0, 0.5 and 1 on one day give the same dates.
+- The messages, pinned in `tests/unit/test_periods.py` and `tests/unit/test_utilities.py`: a `BAL`
+  label without its handle, `valuation_date is missing, expected a valuation-date handle with 'BALZ26',
+  whose day starts the balance of a period`; a period that has ended, `valuation_date is 2026-02-01,
+  after 'balf26' ended on 2026-01-31, expected a valuation day on or before the period's last day`, the
+  same words from both helpers; the seam's own for a blank, a raw date, a fraction of a day, a text
+  naming no live object and a handle of another kind, `valuation_date is number 46371.0, expected
+  valuation date handle` among them, whatever the label beside.
+- Where the code is: `src/goosedove/index_definitions/periods.py`, `start_date(period, as_of=None)` and
+  `end_date(period, as_of=None)` over one `_balance_from`, taking the day and never a handle;
+  `src/goosedove/excel/utilities.py`, the two wrappers, `valuation_date: Handle[ValuationDate] | None =
+  None`, passing `as_of` through. Both stay nonvolatile, publish nothing and keep no cache.
+- Migrated callers: the period, utility, help and valuation tests, the seam budget and allocation
+  tests, the host's theory rows and a new fact, the smoke's utility block, now over twelve handles in
+  `QH1:QH12`, and its dated booking block over a handle in `IU16`, and `workbooks/handles.xlsx`: rows
+  1531 to 1536 and 1541 to 1542 take handles in F over the days in C, and rows 1955 to 1973 hold the
+  worksheet example, two handles, 12 and 20 October 2026, `balv26` from each, `BALX26` a month to
+  come, `balcal27`, `balf26` refused as ended and `balv26` refused without a handle, then one window
+  booked three ways, from the helpers at 12 October, pasted as values and from the helpers at 20
+  October: the first two the same to the number, 400 of mark and 0.2 lots, the third 240 and 0.12.
+- Counts: the balance of a month 16 calls across 14 functions and of a strip 17, where #160's were 16 across 15, the handle's text checked and resolved where the reference date's serial was checked by two functions; one label and a range unchanged at 14 across 13 and 15; the numpy ledger unchanged at 8 calls; the peak within twice the slack as before, nothing published. The Python tests 2,503 to 2,514, the smoke 922 formulas to 936, the host's 325 to 313, the theory's twenty-two balance rows over a reference date become nine refusals and one fact of nineteen asserts, the lifetime's 128 unchanged.
+- Not done, as the ticket keeps separate: `period` stays text; `_CreateTrades` is unchanged, no `BAL`
+  code booking and no snapshot; `util_ShiftDate` untouched; the helpers freeze nothing and write to no
+  cell; no golden file changed.
