@@ -148,7 +148,7 @@ def ng() -> dict[str, Any]:
     history = a_history(index, "2026-10-29", "2026-11-24", holidays, {})
     market = a_market(history, "Henry Hub NYMEX", 3.20, 3.50)
     prepared = ENTRY["_PrepareTrades"](trades, history)
-    results = ENTRY["_EvaluateTrades"](prepared, market)
+    results = ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING)
     return {
         "index": index,
         "template": template,
@@ -179,13 +179,21 @@ def test_the_values_report_spills_the_mark_and_the_cash_under_the_routes_labels(
     ]
 
 
-def test_the_risk_report_spills_the_total_delta_and_the_dv01_with_their_units(
+def test_the_risk_report_spills_both_deltas_and_the_dv01_with_their_units(
     ng: dict[str, Any],
 ) -> None:
+    # A cleared batch: the nominal and the discounted delta the same eleven lots, no DV01.
     assert spilled(ENTRY["_ReportRisk"](ng["results"])) == [
-        ["delta_total", "delta_unit", "dv01", "dv01_unit", "as_of"],
-        ["float64", "str", "float64", "str", "datetime64[D]"],
-        [11.0, "lots of NYMEX NG (10000 MMBTU)", 0.0, "USD per basis point", serial("2026-11-24")],
+        ["nominal_delta", "delta", "delta_unit", "dv01", "dv01_unit", "as_of"],
+        ["float64", "float64", "str", "float64", "str", "datetime64[D]"],
+        [
+            11.0,
+            11.0,
+            "lots of NYMEX NG (10000 MMBTU)",
+            0.0,
+            "USD per basis point",
+            serial("2026-11-24"),
+        ],
     ]
 
 
@@ -215,40 +223,50 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
             "live_lots",
             "live_contribution",
             "contract_sensitivity",
+            "contract_discounted_sensitivity",
             "contract_lot_delta",
+            "contract_delta",
             "sensitivity_unit",
             "lot_unit",
+            "payment_factor",
+            "payment_amount",
+            "group_npv",
+            "group_dv01",
             "brokerage_reserve",
             "clearing_reserve",
             "marketing_reserve",
             "currency",
         ],
         ["str", "str", "datetime64[D]", "bool"]
-        + ["float64"] * 5
+        + ["float64"] * 7
         + ["str", "str"]
-        + ["float64"] * 3
+        + ["float64"] * 7
         + ["str"],
     ]
     assert table[2][:6] == ["Z26", "Z26", serial("2026-11-25"), False, 160_000.0, 16.0]
-    assert table[2][6:9] == [pytest.approx(512_000.0), 160_000.0, 16.0]
-    assert table[2][9:] == [
+    # The contract's risk four ways, the discounted twins the nominal arrays for a cleared
+    # batch; the units on every row; no payment facts for a cleared batch, a dash in each; and
+    # the batch's reserves once, none at these rates.
+    assert table[2][6:11] == [pytest.approx(512_000.0), 160_000.0, 160_000.0, 16.0, 16.0]
+    assert table[2][11:] == [
         "USD per USD/MMBTU",
         "lots of NYMEX NG (10000 MMBTU)",
+        *["-"] * 4,
         0.0,
         0.0,
         0.0,
         "USD",
-    ]  # the units, on every row, and the batch's reserves once, none at these rates
-    assert table[3][9:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 4
+    ]
+    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8
     assert table[3][4:6] == [160_000.0 * -5 / 16, -5.0]
-    assert table[3][6:9] == [pytest.approx(-175_000.0), -50_000.0, -5.0]
+    assert table[3][6:11] == [pytest.approx(-175_000.0), -50_000.0, -50_000.0, -5.0, -5.0]
 
 
 def test_a_tick_makes_new_results_over_the_same_preparation_and_the_old_stand(
     ng: dict[str, Any],
 ) -> None:
     ticked = a_market(ng["history"], "Henry Hub NYMEX", 3.21, 3.50)
-    later = ENTRY["_EvaluateTrades"](ng["prepared"], ticked)
+    later = ENTRY["_EvaluateTrades"](ng["prepared"], ticked, bridge.MISSING)
     assert later != ng["results"]
     assert spilled(ENTRY["_ReportValues"](later))[2][0] == pytest.approx(8_600.0)
     assert spilled(ENTRY["_ReportValues"](ng["results"]))[2][0] == 7_000.0  # unmoved
@@ -258,7 +276,7 @@ def test_a_tick_makes_new_results_over_the_same_preparation_and_the_old_stand(
 def test_one_trade_takes_the_same_path_as_five(ng: dict[str, Any]) -> None:
     one = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(NG_ROWS[3]), ng["template"])
     prepared = ENTRY["_PrepareTrades"](one, ng["history"])
-    results = ENTRY["_EvaluateTrades"](prepared, ng["market"])
+    results = ENTRY["_EvaluateTrades"](prepared, ng["market"], bridge.MISSING)
     values = spilled(ENTRY["_ReportValues"](results))
     assert values[2][:2] == [pytest.approx(-18_000.0), 0.0]
     assert spilled(ENTRY["_ReportRisk"](results))[2][0] == -12.0  # twelve lots sold
@@ -307,7 +325,7 @@ def toy_state(
     history = a_history(toy["index"], "2026-10-29", as_of, TOY_HOLIDAYS, settles)
     market = a_market(history, "TOY_GAS", *quotes)
     prepared = ENTRY["_PrepareTrades"](toy["trades"], history)
-    return str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 def valued(results: str) -> tuple[float, float, float]:
@@ -372,8 +390,12 @@ def test_the_toys_states_value_on_the_sheet_as_the_page_says(
 def test_the_tick_reuses_the_initial_states_preparation(toy: dict[str, Any]) -> None:
     history = a_history(toy["index"], "2026-10-29", "2026-11-24", TOY_HOLIDAYS, {})
     prepared = ENTRY["_PrepareTrades"](toy["trades"], history)
-    initial = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", 3.20, 3.50, 3.60))
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", 3.21, 3.50, 3.60))
+    initial = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "TOY_GAS", 3.20, 3.50, 3.60), bridge.MISSING
+    )
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "TOY_GAS", 3.21, 3.50, 3.60), bridge.MISSING
+    )
     assert valued(str(initial))[0] == pytest.approx(7_000)
     assert valued(str(ticked))[0] == pytest.approx(8_600)
     assert valued(str(initial))[0] == pytest.approx(7_000)  # the old results stand
@@ -388,14 +410,20 @@ def test_a_market_over_a_corrected_history_of_the_same_day_is_refused_until_prep
     first = a_history(toy["index"], "2026-10-29", "2026-11-26", TOY_HOLIDAYS, Z26_FIRST)
     corrected = a_history(toy["index"], "2026-10-29", "2026-11-26", TOY_HOLIDAYS, Z26)
     prepared = ENTRY["_PrepareTrades"](toy["trades"], first)
-    on_first = ENTRY["_EvaluateTrades"](prepared, a_market(first, "TOY_GAS", 3.50, 3.60))
+    on_first = ENTRY["_EvaluateTrades"](
+        prepared, a_market(first, "TOY_GAS", 3.50, 3.60), bridge.MISSING
+    )
     assert valued(str(on_first))[0] == pytest.approx(10_200)
-    assert ENTRY["_EvaluateTrades"](prepared, a_market(corrected, "TOY_GAS", 3.50, 3.60)) == (
+    assert ENTRY["_EvaluateTrades"](
+        prepared, a_market(corrected, "TOY_GAS", 3.50, 3.60), bridge.MISSING
+    ) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'TOY_GAS', "
         "expected the one the trades were prepared against"
     )
     again = ENTRY["_PrepareTrades"](toy["trades"], corrected)
-    on_corrected = ENTRY["_EvaluateTrades"](again, a_market(corrected, "TOY_GAS", 3.50, 3.60))
+    on_corrected = ENTRY["_EvaluateTrades"](
+        again, a_market(corrected, "TOY_GAS", 3.50, 3.60), bridge.MISSING
+    )
     assert valued(str(on_corrected))[0] == pytest.approx(11_800)
 
 
@@ -417,7 +445,7 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         -5.0,
     ]
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[2] == [*z26, True, *([0.0] * 5), *TOY_UNITS, 0.0, 0.0, 0.0, "USD"]
+    assert table[2] == [*z26, True, *([0.0] * 7), *TOY_UNITS, *["-"] * 4, 0.0, 0.0, 0.0, "USD"]
     assert table[3][-4:] == ["-"] * 4
     assert table[3][:7] == [
         "F27",
@@ -428,7 +456,7 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         -50_000.0,
         -5.0,
     ]
-    assert table[3][7:10] == [pytest.approx(-175_000.0), -50_000.0, -5.0]
+    assert table[3][7:12] == [pytest.approx(-175_000.0), -50_000.0, -50_000.0, -5.0, -5.0]
 
 
 def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_exposure(
@@ -439,13 +467,14 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
     assert [line[4:8] for line in slots[2:]] == [[True, True, 0.0, 0.0], [True, True, 0.0, 0.0]]
     assert spilled(ENTRY["util_ReadHandle"](results))[2:] == [
         ["Z26", "Z26", serial("2026-11-25"), serial("2026-11-30"), True]
-        + [0.0] * 5
+        + [0.0] * 7
         + TOY_UNITS
+        + ["-"] * 4
         + [0.0, 0.0, 0.0, "USD"],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
-        + [0.0] * 5
+        + [0.0] * 7
         + TOY_UNITS
-        + ["-"] * 4,
+        + ["-"] * 8,
     ]
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
@@ -577,7 +606,7 @@ def phh_state(
     history = a_history(phh["index"], "2027-05-27", as_of, PHH_HOLIDAYS, settles)
     market = a_market(history, "Henry Hub NYMEX", *quotes)
     prepared = ENTRY["_PrepareTrades"](phh["trades"], history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 PEN_FIXED = {"2027-06-25": 3.20}
@@ -606,7 +635,7 @@ def test_the_phh_pen_values_on_the_sheet_as_the_page_says(
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
     values = spilled(ENTRY["_ReportValues"](results))[2]
     assert values[2:] == ["USD", serial(as_of)]
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of ICE PHH (2500 MMBTU)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of ICE PHH (2500 MMBTU)"
 
 
 def test_the_pens_dates_read_back_from_the_batch_and_the_preparation(phh: dict[str, Any]) -> None:
@@ -632,7 +661,9 @@ def test_the_pens_dates_read_back_from_the_batch_and_the_preparation(phh: dict[s
 
 def test_a_tick_moves_the_live_pen_on_the_same_preparation(phh: dict[str, Any]) -> None:
     history, prepared, results = phh_state(phh, "2027-06-25", {}, (3.10, 3.15))
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "Henry Hub NYMEX", 3.11, 3.15))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "Henry Hub NYMEX", 3.11, 3.15), bridge.MISSING
+    )
     assert valued(str(ticked))[0] == pytest.approx(550)
     assert valued(results)[0] == pytest.approx(500)
 
@@ -683,7 +714,9 @@ def test_the_short_pen_and_the_long_sum_to_nothing_and_each_equals_itself_alone(
     market = a_market(history, "Henry Hub NYMEX", 3.10, 3.15)
 
     def cash_of(batch: object) -> float:
-        results = ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](batch, history), market)
+        results = ENTRY["_EvaluateTrades"](
+            ENTRY["_PrepareTrades"](batch, history), market, bridge.MISSING
+        )
         return valued(str(results))[1]
 
     assert cash_of(short) == pytest.approx(-1_000)
@@ -755,7 +788,9 @@ def strip_state(
 ) -> str:
     history = a_history(strip["index"], "2027-05-27", as_of, PHH_HOLIDAYS, settles)
     market = a_market(history, "Henry Hub NYMEX", *quotes)
-    return str(ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market))
+    return str(
+        ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market, bridge.MISSING)
+    )
 
 
 @pytest.mark.parametrize(
@@ -773,7 +808,7 @@ def test_the_pen_strip_batch_values_on_the_sheet_as_the_hand_says(
     results = strip_state(strip, strip["trades"], as_of, settles, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(sum(delta)))
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert [(line[0], line[9]) for line in table[2:]] == [("N27", delta[0]), ("Q27", delta[1])]
+    assert [(line[0], line[10]) for line in table[2:]] == [("N27", delta[0]), ("Q27", delta[1])]
     turned = strip_batch(strip["index"], strip["template"], STRIP_ROWS[::-1])
     assert valued(strip_state(strip, turned, as_of, settles, quotes)) == (
         pytest.approx(mark),
@@ -875,13 +910,17 @@ def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> No
     assert batch[2][batch[0].index("quote_quantity")] == 3_000.0
     live = a_history(index, "2026-11-23", "2026-12-17", holidays, {})
     results = ENTRY["_EvaluateTrades"](
-        ENTRY["_PrepareTrades"](trades, live), a_market(live, "WTI NYMEX", 61.0, 61.5)
+        ENTRY["_PrepareTrades"](trades, live),
+        a_market(live, "WTI NYMEX", 61.0, 61.5),
+        bridge.MISSING,
     )
     assert valued(str(results)) == (pytest.approx(3_000), 0.0, pytest.approx(3))
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of NYMEX CL (1000 BBL)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of NYMEX CL (1000 BBL)"
     paid = a_history(index, "2026-11-23", "2026-12-21", holidays, {"2026-12-18": 61.5})
     results = ENTRY["_EvaluateTrades"](
-        ENTRY["_PrepareTrades"](trades, paid), a_market(paid, "WTI NYMEX", 61.0, 61.5)
+        ENTRY["_PrepareTrades"](trades, paid),
+        a_market(paid, "WTI NYMEX", 61.0, 61.5),
+        bridge.MISSING,
     )
     assert valued(str(results)) == (0.0, pytest.approx(4_500), 0.0)
 
@@ -904,7 +943,9 @@ def valued_on_24_nov(
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(row_), template)
     history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
     results = ENTRY["_EvaluateTrades"](
-        ENTRY["_PrepareTrades"](trades, history), a_market(history, name, 3.20, 3.50)
+        ENTRY["_PrepareTrades"](trades, history),
+        a_market(history, name, 3.20, 3.50),
+        bridge.MISSING,
     )
     return valued(str(results)), spilled(ENTRY["util_ReadHandle"](trades))
 
@@ -957,10 +998,12 @@ def test_a_cents_index_reads_back_the_quote_quantity_apart_from_the_coefficient(
     assert spill[2][spill[0].index("offset")] == pytest.approx(-30_000.0)
     history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
     results = ENTRY["_EvaluateTrades"](
-        ENTRY["_PrepareTrades"](trades, history), a_market(history, "cents", 310.0, 350.0)
+        ENTRY["_PrepareTrades"](trades, history),
+        a_market(history, "cents", 310.0, 350.0),
+        bridge.MISSING,
     )
     assert valued(str(results)) == (pytest.approx(1_000.0), 0.0, pytest.approx(1.0))
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of NYMEX NG (10000 MMBTU)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of NYMEX NG (10000 MMBTU)"
 
 
 def test_the_old_field_is_refused_at_the_seam_as_unknown(ng: dict[str, Any]) -> None:
@@ -1010,7 +1053,7 @@ def entry_state(ng: dict[str, Any], second: float) -> tuple[str, str, str]:
     )
     prepared = str(ENTRY["_PrepareTrades"](trades, ng["history"]))
     market = a_market(ng["history"], "Henry Hub NYMEX", 3.10, 3.40)
-    return trades, prepared, str(ENTRY["_EvaluateTrades"](prepared, market))
+    return trades, prepared, str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_is_sold(
@@ -1024,13 +1067,13 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     assert batch[3][batch[0].index("offset")] == 0.0
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[2][:5] == ["Z26", "Z26", serial("2026-11-25"), False, 20_000.0]
-    assert table[2][7] == 20_000.0 and table[2][8] == 2.0  # the contract's, and in lots
+    assert table[2][7] == 20_000.0 and table[2][9] == 2.0  # the contract's, and in lots
     units = ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"]
-    assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 5 + units + ["-"] * 4
+    assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 7 + units + ["-"] * 8
     sold_trades, sold_prepared, sold = entry_state(ng, -1.0)
     assert sold_trades != trades and sold_prepared != prepared and sold != results
     assert valued(sold) == (pytest.approx(1_000), 0.0, pytest.approx(1))  # a lot sold
-    assert spilled(ENTRY["util_ReadHandle"](sold))[3][7:9] == [-10_000.0, -1.0]
+    assert spilled(ENTRY["util_ReadHandle"](sold))[3][7:11] == [-10_000.0, -10_000.0, -1.0, -1.0]
     assert valued(results) == (pytest.approx(2_000), 0.0, pytest.approx(2))  # the old stand
 
 
@@ -1043,9 +1086,10 @@ def test_an_all_zero_batch_is_a_batch_like_any_other_reporting_nothing(ng: dict[
     )
     assert re.fullmatch(rf"{os.getpid()}:trades:Henry Hub NYMEX:\d+", str(trades))
     prepared = ENTRY["_PrepareTrades"](trades, ng["history"])
-    results = ENTRY["_EvaluateTrades"](prepared, ng["market"])
+    results = ENTRY["_EvaluateTrades"](prepared, ng["market"], bridge.MISSING)
     assert spilled(ENTRY["_ReportValues"](results))[2] == [0.0, 0.0, "USD", serial("2026-11-24")]
     assert spilled(ENTRY["_ReportRisk"](results))[2] == [
+        0.0,
         0.0,
         "lots of NYMEX NG (10000 MMBTU)",
         0.0,
@@ -1071,7 +1115,9 @@ def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(toy: dict[s
     ):
         history = a_history(toy["index"], "2026-10-29", as_of, TOY_HOLIDAYS, settles)
         prepared = ENTRY["_PrepareTrades"](trades, history)
-        results = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", *quotes))
+        results = ENTRY["_EvaluateTrades"](
+            prepared, a_market(history, "TOY_GAS", *quotes), bridge.MISSING
+        )
         assert valued(str(results)) == (0.0, 0.0, 0.0), as_of
     slots = spilled(ENTRY["util_ReadHandle"](ENTRY["_PrepareTrades"](trades, history)))
     assert slots[2] == [
@@ -1090,7 +1136,9 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
     ng: dict[str, Any],
 ) -> None:
     trades, prepared, _ = entry_state(ng, 0.0)
-    assert ENTRY["_EvaluateTrades"](prepared, a_market(ng["history"], "Henry Hub NYMEX", 3.10)) == (
+    assert ENTRY["_EvaluateTrades"](
+        prepared, a_market(ng["history"], "Henry Hub NYMEX", 3.10), bridge.MISSING
+    ) == (
         "#ERROR _EvaluateTrades: ValueError: requested contract 'F27' is beyond live-price "
         "coverage ending at 'Z26'"
     )
@@ -1116,12 +1164,14 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
     prepared_nothing = ENTRY["_PrepareTrades"](nothing, ng["history"])
     yesterday = a_history(ng["index"], "2026-10-29", "2026-11-23", NG_HOLIDAYS, {})
     assert ENTRY["_EvaluateTrades"](
-        prepared_nothing, a_market(yesterday, "Henry Hub NYMEX", 3.10, 3.40)
+        prepared_nothing, a_market(yesterday, "Henry Hub NYMEX", 3.10, 3.40), bridge.MISSING
     ) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index "
         "'Henry Hub NYMEX', expected the one the trades were prepared against"
     )
-    assert valued(str(ENTRY["_EvaluateTrades"](prepared_nothing, ng["market"]))) == (0.0, 0.0, 0.0)
+    assert valued(
+        str(ENTRY["_EvaluateTrades"](prepared_nothing, ng["market"], bridge.MISSING))
+    ) == (0.0, 0.0, 0.0)
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------
@@ -1141,12 +1191,40 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         f"#ERROR _PrepareTrades: history is market handle {ng['market']!r}, "
         "expected market history handle"
     )
-    assert evaluate(ng["prepared"], bridge.MISSING) == (
+    assert evaluate(ng["prepared"], bridge.MISSING, bridge.MISSING) == (
         "#ERROR _EvaluateTrades: market is missing, expected market handle"
     )
-    assert evaluate(ng["trades"], ng["market"]) == (
+    assert evaluate(ng["trades"], ng["market"], bridge.MISSING) == (
         f"#ERROR _EvaluateTrades: prepared is trades handle {ng['trades']!r}, "
         "expected prepared trades handle"
+    )
+    # The curve, optional and last since #NN: left out is nothing, a blank is not, nor empty
+    # text, a number, a dead handle or another kind; and a cleared batch given one is the
+    # library's refusal, after the seam's.
+    assert evaluate(ng["prepared"], ng["market"], None) == (
+        "#ERROR _EvaluateTrades: discount_curve is blank, expected discount curve handle"
+    )
+    assert evaluate(ng["prepared"], ng["market"], "") == (
+        "#ERROR _EvaluateTrades: discount_curve is empty text, expected discount curve handle"
+    )
+    assert evaluate(ng["prepared"], ng["market"], 1.0) == (
+        "#ERROR _EvaluateTrades: discount_curve is number 1.0, expected discount curve handle"
+    )
+    assert evaluate(ng["prepared"], ng["market"], "x:discount_curve:9") == (
+        "#ERROR _EvaluateTrades: discount_curve is text 'x:discount_curve:9' naming no live "
+        "object, expected discount curve handle"
+    )
+    assert evaluate(ng["prepared"], ng["market"], ng["market"]) == (
+        f"#ERROR _EvaluateTrades: discount_curve is market handle {ng['market']!r}, "
+        "expected discount curve handle"
+    )
+    curve = ENTRY["_CreateDiscountCurve"](
+        row("date", "discount_factor"),
+        rows([serial("2026-11-24"), 1.0], [serial("2027-11-24"), 0.9]),
+    )
+    assert evaluate(ng["prepared"], ng["market"], curve) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve is supplied, expected none unless "
+        "route = bilateral; a cleared batch is undiscounted"
     )
     assert ENTRY["_ReportValues"](ng["prepared"]) == (
         f"#ERROR _ReportValues: results is prepared trades handle {ng['prepared']!r}, "
@@ -1168,7 +1246,9 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', "
         "expected the trades', 'Henry Hub NYMEX'"
     )
-    assert evaluate(ng["prepared"], a_market(other, "Henry Hub NYMEX", 3.2, 3.5)) == (
+    assert evaluate(
+        ng["prepared"], a_market(other, "Henry Hub NYMEX", 3.2, 3.5), bridge.MISSING
+    ) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index "
         "'Henry Hub NYMEX', expected the one the trades were prepared against"
     )
@@ -1186,7 +1266,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         row("NYMEX NG", "month", "lastday", "bilateral", "physical", "ACME Trading"),
     )  # fmt: skip
     trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*NG_ROWS), bilateral)
-    assert evaluate(prepare(trades, ng["history"]), ng["market"]) == (
+    assert evaluate(prepare(trades, ng["history"]), ng["market"], bridge.MISSING) == (
         "#ERROR _EvaluateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
         "with a bilateral batch; a physical delivery has no payment to discount"
     )
@@ -1259,7 +1339,7 @@ def l3d_state(
     history = a_history(l3d["index"], "2026-12-01", as_of, L3D_HOLIDAYS, settles)
     market = a_market(history, "SYN", *quotes)
     prepared = ENTRY["_PrepareTrades"](l3d["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -1292,7 +1372,7 @@ def test_the_last3day_batch_values_on_the_sheet_as_the_page_says(
     _, _, results = l3d_state(l3d, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
     assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of)]
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of UNIT (1 MMBTU)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of UNIT (1 MMBTU)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert [line[0] for line in slots] == ["Z26"] * 3
     assert [line[9] for line in slots] == [pytest.approx(delta)] * 3  # the contract's lots
@@ -1323,7 +1403,9 @@ def test_a_tick_moves_the_live_last3day_slots_and_the_old_results_stand(
     l3d: dict[str, Any],
 ) -> None:
     history, prepared, results = l3d_state(l3d, "2026-12-03", (74.0, 80.0))
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "SYN", 75.0, 80.0))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "SYN", 75.0, 80.0), bridge.MISSING
+    )
     assert valued(str(ticked)) == (pytest.approx(170), 0.0, pytest.approx(20))
     assert valued(results) == (pytest.approx(150), 0.0, pytest.approx(20))
 
@@ -1336,12 +1418,12 @@ def test_a_corrected_last3day_fixing_takes_a_new_history_and_a_new_preparation(
         l3d["index"], "2026-12-01", "2026-12-03", L3D_HOLIDAYS, {**L3D_SETTLES, "2026-12-02": 72.0}
     )
     market = a_market(corrected, "SYN", 74.0, 80.0)
-    assert ENTRY["_EvaluateTrades"](prepared, market) == (
+    assert ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'SYN', "
         "expected the one the trades were prepared against"
     )
     again = ENTRY["_PrepareTrades"](l3d["trades"], corrected)
-    assert valued(str(ENTRY["_EvaluateTrades"](again, market))) == (
+    assert valued(str(ENTRY["_EvaluateTrades"](again, market, bridge.MISSING))) == (
         pytest.approx(160),
         0.0,
         pytest.approx(20),
@@ -1493,7 +1575,7 @@ def ethane_state(
     history = a_history(ethane["index"], "2026-11-30", as_of, ETHANE_HOLIDAYS, settles)
     market = a_market(history, "ETHANE", *quotes)
     prepared = ENTRY["_PrepareTrades"](ethane["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -1530,7 +1612,7 @@ def test_the_asian_batch_values_on_the_sheet_as_the_page_says(
     _, _, results = ethane_state(ethane, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
     assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of)]
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of GAL (1 GAL)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of GAL (1 GAL)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert len(slots) == 22 and [line[0] for line in slots] == ["Z26"] * 22
     assert [line[9] for line in slots] == [pytest.approx(delta)] * 22  # the contract's lots
@@ -1566,7 +1648,9 @@ def test_a_tick_moves_the_live_asian_slots_and_the_old_results_stand(
     ethane: dict[str, Any],
 ) -> None:
     history, prepared, results = ethane_state(ethane, "2026-12-02", LIVE_QUOTES)
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETHANE", 0.29, 0.30, 0.32))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "ETHANE", 0.29, 0.30, 0.32), bridge.MISSING
+    )
     assert valued(str(ticked)) == (pytest.approx(105), 0.0, pytest.approx(2_100))
     assert valued(results) == (pytest.approx(84), 0.0, pytest.approx(2_100))
 
@@ -1583,12 +1667,12 @@ def test_a_corrected_asian_fixing_takes_a_new_history_and_a_new_preparation(
         {**ETHANE_SETTLES, "2026-12-01": 0.25},
     )
     market = a_market(corrected, "ETHANE", *LIVE_QUOTES)
-    assert ENTRY["_EvaluateTrades"](prepared, market) == (
+    assert ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'ETHANE', "
         "expected the one the trades were prepared against"
     )
     again = ENTRY["_PrepareTrades"](ethane["trades"], corrected)
-    assert valued(str(ENTRY["_EvaluateTrades"](again, market))) == (
+    assert valued(str(ENTRY["_EvaluateTrades"](again, market, bridge.MISSING))) == (
         pytest.approx(85),
         0.0,
         pytest.approx(2_100),
@@ -1761,7 +1845,7 @@ def period_state(
     history = a_history(ethane["index"], "2026-11-30", as_of, ETHANE_HOLIDAYS, settles)
     market = a_market(history, "ETHANE", *quotes)
     prepared = ENTRY["_PrepareTrades"](trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.fixture(scope="module")
@@ -1870,7 +1954,9 @@ def test_the_booked_period_reads_back_its_days_and_a_roll_moves_only_the_states(
     assert [line[4] for line in slots] == [True] + [False] * 11
     assert slots[1][6] == pytest.approx(2_000 / 12)
     # A tick reuses the preparation over the same history; the old results stand.
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETHANE", 0.30, 0.30, 0.32))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "ETHANE", 0.30, 0.30, 0.32), bridge.MISSING
+    )
     assert valued(str(ticked)) == (
         pytest.approx(2_000 / 12 * (0.24 + 11 * 0.30) - 500),
         0.0,
@@ -2015,7 +2101,7 @@ def pays_state(
     history = a_history(pays["index"], "2026-12-01", as_of, PAYS_HOLIDAYS, settles)
     market = a_market(history, "PAYS", *quotes)
     prepared = ENTRY["_PrepareTrades"](pays["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -2070,9 +2156,15 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "live_lots",
         "live_contribution",
         "contract_sensitivity",
+        "contract_discounted_sensitivity",
         "contract_lot_delta",
+        "contract_delta",
         "sensitivity_unit",
         "lot_unit",
+        "payment_factor",
+        "payment_amount",
+        "group_npv",
+        "group_dv01",
         "brokerage_reserve",
         "clearing_reserve",
         "marketing_reserve",
@@ -2096,7 +2188,9 @@ def test_the_two_lags_read_back_from_the_batch_and_the_preparation_outlives_a_ti
     ]
     assert [line[columns.index("offset")] for line in batch[2:]] == [-4_200.0, 2_160.0]
     history, prepared, results = pays_state(pays, "2026-12-03", (74.0, 80.0))
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "PAYS", 75.0, 80.0))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "PAYS", 75.0, 80.0), bridge.MISSING
+    )
     assert valued(str(ticked)) == (pytest.approx(170), 0.0, pytest.approx(20))
     assert valued(results) == (pytest.approx(150), 0.0, pytest.approx(20))
     _, again, corrected = pays_state(
@@ -2234,7 +2328,7 @@ def mixed_state(
     history = a_history(mixed["index"], "2026-11-30", as_of, MIXED_HOLIDAYS, settles)
     market = a_market(history, "MIXED", *quotes)
     prepared = ENTRY["_PrepareTrades"](mixed["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(("as_of", "quotes", "mark", "cash", "delta"), MIXED_STATES, ids=MIXED_IDS)
@@ -2248,7 +2342,7 @@ def test_the_mixed_batch_values_on_the_sheet_as_the_ticket_says(
 ) -> None:
     _, prepared, results = mixed_state(mixed, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of GAL (1 GAL)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of GAL (1 GAL)"
     slots = spilled(ENTRY["util_ReadHandle"](prepared))[2:]
     assert len(slots) == 23 and [line[0] for line in slots] == ["Z26"] * 23
     assert [line[3] for line in slots] == [serial("2026-12-31")] + [serial("2027-01-04")] * 22
@@ -2310,7 +2404,9 @@ def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any])
 
 def test_a_tick_moves_the_mixed_batch_and_the_old_results_stand(mixed: dict[str, Any]) -> None:
     history, prepared, results = mixed_state(mixed, "2026-12-30", MIXED_QUOTES)
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "MIXED", 13.0, 13.0, 14.0))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "MIXED", 13.0, 13.0, 14.0), bridge.MISSING
+    )
     assert valued(str(ticked)) == (pytest.approx(260), 0.0, pytest.approx(66))
     assert valued(results) == (pytest.approx(194), 0.0, pytest.approx(66))
     _, again, corrected = mixed_state(
@@ -2485,7 +2581,9 @@ def ete_state(
     trades = str(ENTRY["_CreateTrades"](index, row(*headers), rows(*lines), template))
     history = a_history(index, "2026-11-30", as_of, ETE_HOLIDAYS, settles)
     prepared = str(ENTRY["_PrepareTrades"](trades, history))
-    results = str(ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", *quotes)))
+    results = str(
+        ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", *quotes), bridge.MISSING)
+    )
     return trades, prepared, results
 
 
@@ -2500,7 +2598,8 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
     )
     assert valued(results) == (pytest.approx(1_260), 0.0, pytest.approx(1))
     risk = spilled(ENTRY["_ReportRisk"](results))[2]
-    assert risk[1] == "lots of LOT (1000 BBL)" and risk[3] == "USD per basis point"
+    assert risk[1] == pytest.approx(1) and risk[2] == "lots of LOT (1000 BBL)"
+    assert risk[4] == "USD per basis point"
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert batch[2][batch[0].index("quote_quantity")] == pytest.approx(42_000.0)
     assert batch[2][batch[0].index("coefficient")] == pytest.approx(420.0)
@@ -2513,9 +2612,15 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "live_lots",
         "live_contribution",
         "contract_sensitivity",
+        "contract_discounted_sensitivity",
         "contract_lot_delta",
+        "contract_delta",
         "sensitivity_unit",
         "lot_unit",
+        "payment_factor",
+        "payment_amount",
+        "group_npv",
+        "group_dv01",
         "brokerage_reserve",
         "clearing_reserve",
         "marketing_reserve",
@@ -2526,9 +2631,12 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         pytest.approx(1.0),
         pytest.approx(11_760.0),
         pytest.approx(420.0),
+        pytest.approx(420.0),
+        pytest.approx(1.0),
         pytest.approx(1.0),
         "USD per CENT/GAL",
         "lots of LOT (1000 BBL)",
+        *["-"] * 4,
         0.0,
         0.0,
         0.0,
@@ -2548,9 +2656,12 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         pytest.approx(3.0),
         pytest.approx(35_280.0),
         pytest.approx(1_260.0),
+        pytest.approx(1_260.0),
+        pytest.approx(3.0),
         pytest.approx(3.0),
         "USD per CENT/GAL",
         "lots of LOT (1000 BBL)",
+        *["-"] * 4,
         0.0,
         0.0,
         0.0,
@@ -2592,8 +2703,10 @@ def test_a_partial_asian_period_reports_the_live_half_of_its_lots(ete: dict[str,
         serial(d) for d in ("2026-12-14", "2026-12-15", "2026-12-16", "2026-12-17")
     ]
     assert [line[7] for line in slots] == [0.0, 0.0, pytest.approx(0.75), pytest.approx(0.75)]
-    assert spilled(ENTRY["util_ReadHandle"](results))[2][8:10] == [
+    assert spilled(ENTRY["util_ReadHandle"](results))[2][8:12] == [
         pytest.approx(630.0),
+        pytest.approx(630.0),
+        pytest.approx(1.5),
         pytest.approx(1.5),
     ]
 
@@ -2632,7 +2745,7 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
     _, _, results = ete_state(index, ete_template(), [line], "2026-12-02", {}, (live, live))
     assert valued(results) == (pytest.approx(mark), 0.0, pytest.approx(1))
     assert spilled(ENTRY["_ReportValues"](results))[2][2] == settled
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of LOT (1000 BBL)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of LOT (1000 BBL)"
     shown = spilled(ENTRY["util_ReadHandle"](index))
     assert shown[0][6:] == [
         "reporting_lot",
@@ -2651,9 +2764,10 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
     # The results read back the two units the risk numbers are in, on every row: the same
     # lot delta under the same heading is 420 or 42,000 of sensitivity, and the units say which.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[2][10:] == [
+    assert table[2][12:] == [
         f"{settled} per {quote[0]}/{quote[1]}",
         "lots of LOT (1000 BBL)",
+        *["-"] * 4,
         0.0,
         0.0,
         0.0,
@@ -2682,7 +2796,9 @@ def test_the_reporting_lot_is_the_indexs_choice_and_scales_the_lots_alone() -> N
             line: list[object] = [5.0, serial("2026-09-24"), "Z26", quantity, 3.1]
             trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(line), template)
             results = str(
-                ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market)
+                ENTRY["_EvaluateTrades"](
+                    ENTRY["_PrepareTrades"](trades, history), market, bridge.MISSING
+                )
             )
             assert valued(results) == (
                 pytest.approx(quantity / 10),
@@ -2691,7 +2807,7 @@ def test_the_reporting_lot_is_the_indexs_choice_and_scales_the_lots_alone() -> N
             )
             table = spilled(ENTRY["util_ReadHandle"](results))
             assert table[2][7] == pytest.approx(quantity)  # the sensitivity, whatever the lot
-            unit = spilled(ENTRY["_ReportRisk"](results))[2][1]
+            unit = spilled(ENTRY["_ReportRisk"](results))[2][2]
             assert unit == f"lots of {reporting_lot} ({size} MMBTU)"
 
 
@@ -2721,7 +2837,7 @@ def test_every_method_fully_live_reports_one_lot_and_a_strip_a_lot_a_month(
     )
     assert valued(over_two) == (pytest.approx(1_260 + 1_680), 0.0, pytest.approx(2))
     table = spilled(ENTRY["util_ReadHandle"](over_two))[2:]
-    assert [(line[0], line[9]) for line in table] == [
+    assert [(line[0], line[10]) for line in table] == [
         ("Z26", pytest.approx(1.0)),
         ("F27", pytest.approx(1.0)),
     ]
@@ -2851,7 +2967,7 @@ def wti_state(
     history = a_history(wti["index"], "2026-11-23", as_of, WTI_HOLIDAYS, settles)
     market = a_market(history, "WTI", *quotes)
     prepared = ENTRY["_PrepareTrades"](wti["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -2888,7 +3004,7 @@ def test_the_wti_asian_values_on_the_sheet_as_the_ticket_says(
     # every row, the payment day the 30th, and each contract's lots beside its slots.
     _, _, results = wti_state(wti, as_of, quotes)
     assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(lots))
-    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of LOT (1000 BBL)"
+    assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of LOT (1000 BBL)"
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0][:4] == [
         "pricing_contract",
@@ -2901,7 +3017,7 @@ def test_the_wti_asian_values_on_the_sheet_as_the_ticket_says(
     assert [line[1] for line in slots] == ["Z26"] * 6  # booked as Z26 throughout
     assert [line[2] for line in slots] == [serial(d) for d in WTI_WINDOW]
     assert [line[3] for line in slots] == [serial("2026-12-30")] * 6
-    assert [line[9] for line in slots] == [pytest.approx(by_contract[0])] * 2 + [
+    assert [line[10] for line in slots] == [pytest.approx(by_contract[0])] * 2 + [
         pytest.approx(by_contract[1])
     ] * 4
 
@@ -2983,7 +3099,7 @@ def test_a_code_entry_and_the_dates_of_the_whole_month_agree_on_the_wti_asian(
     assert [line[1] for line in slots[2:]] == ["Z26"] * 22
     assert [line[3] for line in slots[2:]] == [serial("2027-01-05")] * 22
     assert valued(code) == valued(dated) == (pytest.approx(6_500), 0.0, pytest.approx(2.2))
-    assert [line[9] for line in spilled(ENTRY["util_ReadHandle"](code))[2:]] == [
+    assert [line[10] for line in spilled(ENTRY["util_ReadHandle"](code))[2:]] == [
         pytest.approx(1.5)
     ] * 15 + [pytest.approx(0.7)] * 7
 
@@ -2999,8 +3115,8 @@ DECEMBER_PRICING_DAYS = [
     if np.is_busday(d, holidays=np.array(WTI_HOLIDAYS, dtype="datetime64[D]"))
 ]
 SEVENTY_FIVE = {d: 75.0 for d in DECEMBER_PRICING_DAYS}
-DELTA_HEADERS = ["bucket_start", "delta", "delta_unit", "as_of"]
-DELTA_TYPES = ["datetime64[D]", "float64", "str", "datetime64[D]"]
+DELTA_HEADERS = ["bucket_start", "nominal_delta", "delta", "delta_unit", "as_of"]
+DELTA_TYPES = ["datetime64[D]", "float64", "float64", "str", "datetime64[D]"]
 LOT_UNIT = "lots of LOT (1000 BBL)"
 
 
@@ -3033,7 +3149,7 @@ def monthly_state(
     history = a_history(monthly["index"], "2026-11-30", as_of, WTI_HOLIDAYS, SEVENTY_FIVE)
     market = a_market(history, "MONTHLY", 75.0)
     prepared = ENTRY["_PrepareTrades"](monthly["trades"] if trades is None else trades, history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -3066,18 +3182,31 @@ def test_the_delta_reports_by_day_month_and_year_on_the_sheet_as_the_ticket_says
             0.0 if d < as_of else (4.0 if d == "2026-12-30" else 1.0) for d in DECEMBER_PRICING_DAYS
         ]
         assert [line[1] for line in by_day[2:]] == [pytest.approx(x) for x in expected]
-        assert [line[2:] for line in by_day[2:]] == [[LOT_UNIT, serial(as_of)]] * 22
+        assert [line[2] for line in by_day[2:]] == [pytest.approx(x) for x in expected]
+        assert [line[3:] for line in by_day[2:]] == [[LOT_UNIT, serial(as_of)]] * 22
         by_month = spilled(ENTRY["_ReportDelta"](results, "month"))
         assert by_month == [
             DELTA_HEADERS,
             DELTA_TYPES,
-            [serial("2026-12-01"), pytest.approx(live), LOT_UNIT, serial(as_of)],
+            [
+                serial("2026-12-01"),
+                pytest.approx(live),
+                pytest.approx(live),
+                LOT_UNIT,
+                serial(as_of),
+            ],
         ]
         by_year = spilled(ENTRY["_ReportDelta"](results, "year"))
-        assert by_year[2] == [serial("2026-01-01"), pytest.approx(live), LOT_UNIT, serial(as_of)]
-        assert sum(cast(float, line[1]) for line in by_day[2:]) == pytest.approx(
-            spilled(ENTRY["_ReportRisk"](results))[2][0]
-        )
+        assert by_year[2] == [
+            serial("2026-01-01"),
+            pytest.approx(live),
+            pytest.approx(live),
+            LOT_UNIT,
+            serial(as_of),
+        ]
+        risk = spilled(ENTRY["_ReportRisk"](results))[2]
+        assert sum(cast(float, line[1]) for line in by_day[2:]) == pytest.approx(risk[0])
+        assert sum(cast(float, line[2]) for line in by_day[2:]) == pytest.approx(risk[1])
 
 
 def test_the_delta_report_refuses_a_bucket_that_is_none_of_the_three(
@@ -3123,6 +3252,7 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
     assert spilled(ENTRY["_ReportDelta"](results, "month"))[2] == [
         serial("2026-12-01"),
         pytest.approx(1.2),
+        pytest.approx(1.2),
         LOT_UNIT,
         serial("2026-12-18"),
     ]
@@ -3130,7 +3260,9 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
         serial("2026-01-01"),
         pytest.approx(1.2),
     ]
-    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "WTI", 73.0, 76.0))
+    ticked = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "WTI", 73.0, 76.0), bridge.MISSING
+    )
     for bucket in ("day", "month", "year"):
         assert spilled(ENTRY["_ReportDelta"](str(ticked), bucket)) == spilled(
             ENTRY["_ReportDelta"](results, bucket)
@@ -3223,7 +3355,7 @@ def waha_state(
     history = an_iferc_history(waha["index"], as_of, indices)
     market = a_market(history, "WAHA", *quotes)
     prepared = ENTRY["_PrepareTrades"](waha["trades"], history)
-    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
 @pytest.mark.parametrize(
@@ -3283,7 +3415,9 @@ def test_the_waha_basis_future_values_on_the_sheet_as_the_ticket_says(
         float(live),
     ]
     by_day = spilled(ENTRY["_ReportDelta"](results, bridge.MISSING))
-    assert by_day[2:] == [[serial("2026-12-01"), pytest.approx(live), WAHA_LOT, serial(as_of)]]
+    assert by_day[2:] == [
+        [serial("2026-12-01"), pytest.approx(live), pytest.approx(live), WAHA_LOT, serial(as_of)]
+    ]
     assert spilled(ENTRY["_ReportDelta"](results, "month"))[2][:2] == [
         serial("2026-12-01"),
         pytest.approx(live),
@@ -3308,12 +3442,15 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     assert (at["contract_code"], at["schedule_method"]) == ("Z26", "lastday")
     assert (at["payment_time_lag"], at["payment_date"]) == ("+3bd", serial("2026-12-03"))
     history, prepared, results = waha_state(waha, "2026-12-01", WAHA_X26, (-0.30, -0.10))
-    ticked = str(ENTRY["_EvaluateTrades"](prepared, a_market(history, "WAHA", -0.25, -0.10)))
+    ticked = str(
+        ENTRY["_EvaluateTrades"](prepared, a_market(history, "WAHA", -0.25, -0.10), bridge.MISSING)
+    )
     assert ticked != results
     assert valued(ticked) == (pytest.approx(625), 0, pytest.approx(1))
     assert valued(results) == (pytest.approx(500), 0, pytest.approx(1))
     risk = spilled(ENTRY["_ReportRisk"](results))
-    assert risk[0][:2] == ["delta_total", "delta_unit"] and risk[2][:2] == [1, WAHA_LOT]
+    assert risk[0][:3] == ["nominal_delta", "delta", "delta_unit"]
+    assert risk[2][:3] == [1, 1, WAHA_LOT]
 
 
 def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made(
@@ -3530,13 +3667,15 @@ def test_one_batch_keeps_its_reserves_through_ticks_fixings_corrections_and_paym
     live = a_history(index, "2026-11-30", "2026-12-02", ETE_HOLIDAYS, {})
     prepared = str(ENTRY["_PrepareTrades"](trades, live))
     states = [
-        str(ENTRY["_EvaluateTrades"](prepared, a_market(live, "ETE", 28.0, 29.0))),
-        str(ENTRY["_EvaluateTrades"](prepared, a_market(live, "ETE", 31.0, 29.0))),
+        str(ENTRY["_EvaluateTrades"](prepared, a_market(live, "ETE", 28.0, 29.0), bridge.MISSING)),
+        str(ENTRY["_EvaluateTrades"](prepared, a_market(live, "ETE", 31.0, 29.0), bridge.MISSING)),
     ]
     for as_of, settle in (("2027-01-01", 27.0), ("2027-01-01", 26.5), ("2027-01-04", 27.0)):
         history = a_history(index, "2026-11-30", as_of, ETE_HOLIDAYS, {"2026-12-31": settle})
         again = str(ENTRY["_PrepareTrades"](trades, history))
-        states.append(str(ENTRY["_EvaluateTrades"](again, a_market(history, "ETE", 30.0))))
+        states.append(
+            str(ENTRY["_EvaluateTrades"](again, a_market(history, "ETE", 30.0), bridge.MISSING))
+        )
     assert [valued(state)[:2] for state in states] == [
         (pytest.approx(1_260.0), 0.0),
         (pytest.approx(2_520.0), 0.0),  # the tick: six cents on 42,000 gallons
@@ -3711,7 +3850,9 @@ def bbl_valued(bbl: dict[str, Any], *lines: list[object]) -> tuple[str, tuple[fl
         bbl["index"], row(*CODE_DATE_HEADERS), rows(*lines), bbl["template"]
     )
     prepared = ENTRY["_PrepareTrades"](batch, bbl["history"])
-    return str(batch), valued(str(ENTRY["_EvaluateTrades"](prepared, bbl["market"])))
+    return str(batch), valued(
+        str(ENTRY["_EvaluateTrades"](prepared, bbl["market"], bridge.MISSING))
+    )
 
 
 def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singletons(
@@ -3745,10 +3886,11 @@ def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singl
     assert [line[3] for line in slots].count(serial("2026-11-02")) == 22
     assert [line[3] for line in slots].count(serial("2026-10-21")) == 7
     assert [line[4] for line in slots] == [False] * 29  # every observation live
-    results = ENTRY["_EvaluateTrades"](prepared, bbl["market"])
+    results = ENTRY["_EvaluateTrades"](prepared, bbl["market"], bridge.MISSING)
     by_month = spilled(ENTRY["_ReportDelta"](results, "month"))
     assert by_month[2] == [
         serial("2026-10-01"),
+        pytest.approx(0.29),
         pytest.approx(0.29),
         "lots of LOT (1000 BBL)",
         serial("2026-10-01"),
@@ -3782,7 +3924,9 @@ def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singl
         valued(
             str(
                 ENTRY["_EvaluateTrades"](
-                    ENTRY["_PrepareTrades"](dated_only, bbl["history"]), bbl["market"]
+                    ENTRY["_PrepareTrades"](dated_only, bbl["history"]),
+                    bbl["market"],
+                    bridge.MISSING,
                 )
             )
         )
@@ -4007,7 +4151,7 @@ def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_a
     prepared = str(ENTRY["_PrepareTrades"](trades, history))
     assert prepared.split(":")[1] == "prepared_trades"
     assert (
-        ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", 28.0, 29.0))
+        ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", 28.0, 29.0), bridge.MISSING)
         == BILATERAL_REFUSAL
     )
     # Each row its own counterparty from a ticket column, kept as typed.
@@ -4034,3 +4178,416 @@ def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_a
     assert ENTRY["_CreateTrades"](
         index, row(*ETE_HEADERS, "counterparty"), rows(*blank), by_row
     ) == ("#ERROR _CreateTrades: trade_rows cell (1, 8) is blank, expected text")
+
+
+# --- the bilateral path on the sheet, bilateral-excel-integration.md -----------------------------
+
+# The kernel's one-unit index on the sheet: UNIT, a barrel, dollars a barrel settled in dollars; Z26
+# the boundary, F27 expiring on the valuation day, 4 January 2027, so its observation is live on its
+# own day, and F29 keeping a quote in every market; the pricing calendar closed on one day that
+# matters to nothing and the payment calendar on one past every payment. A bilateral financial
+# template with a counterparty and 5 of marketing a row, and a cleared twin of it; the ticket's two
+# rows, +10 and -10 of F27 at 70 paying +261bd and +522bd, a year and two years out, and the first
+# alone, the one receivable.
+UNIT_HOLIDAYS = ["2027-12-27"]
+UNIT_FIELDS = (
+    "quantity_unit",
+    "quantity_per",
+    "schedule_method",
+    "route",
+    "settlement_method",
+    "counterparty",
+    "payment_holiday_calendar",
+    "marketing_reserve",
+)
+UNIT_HEADERS = (*NG_HEADERS, "payment_time_lag")
+UNIT_ROWS: list[list[object]] = [
+    [1001.0, serial("2027-01-04"), "F27", 10.0, 70.0, "+261bd"],
+    [1002.0, serial("2027-01-04"), "F27", -10.0, 70.0, "+522bd"],
+]
+UNIT_AS_OF = "2027-01-04"
+A_YEAR_OUT, TWO_YEARS_OUT = "2028-01-04", "2029-01-03"  # 365 and 730 days after the valuation day
+UNIT_LOT = "lots of UNIT (1 BBL)"
+RESULT_COLUMNS = [
+    "pricing_contract",
+    "booked_contract",
+    "observation_date",
+    "payment_date",
+    "is_fixed",
+    "live_coefficient",
+    "live_lots",
+    "live_contribution",
+    "contract_sensitivity",
+    "contract_discounted_sensitivity",
+    "contract_lot_delta",
+    "contract_delta",
+    "sensitivity_unit",
+    "lot_unit",
+    "payment_factor",
+    "payment_amount",
+    "group_npv",
+    "group_dv01",
+    "brokerage_reserve",
+    "clearing_reserve",
+    "marketing_reserve",
+    "currency",
+]
+
+
+@pytest.fixture(scope="module")
+def unit() -> dict[str, Any]:
+    index, _ = an_index(
+        "UNIT",
+        [("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05")],
+        UNIT_HOLIDAYS,
+        [("UNIT", 1.0)],
+        ("VOLUME", "BBL"),
+    )
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])))
+    template = ENTRY["_CreateTradeTemplate"](
+        "fixed_float",
+        row(*UNIT_FIELDS),
+        row("UNIT", "month", "lastday", "bilateral", "financial", "ACME Trading", payments, 5.0),
+    )
+    cleared = ENTRY["_CreateTradeTemplate"](
+        "fixed_float",
+        row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[6:]),
+        row(
+            "UNIT", "month", "lastday", "cleared", "financial", "Prototype Clearing", payments, 5.0
+        ),
+    )
+    headers = row(*UNIT_HEADERS)
+    return {
+        "index": index,
+        "payments": payments,
+        "template": template,
+        "trades": str(ENTRY["_CreateTrades"](index, headers, rows(*UNIT_ROWS), template)),
+        "one": str(ENTRY["_CreateTrades"](index, headers, rows(UNIT_ROWS[0]), template)),
+        "one_cleared": str(ENTRY["_CreateTrades"](index, headers, rows(UNIT_ROWS[0]), cleared)),
+    }
+
+
+def unit_history(unit: dict[str, Any], as_of: str, finals: dict[str, float] | None = None) -> str:
+    """The index's history valued that day: a synthetic settle of 3.00 on every business day from
+    1 January 2027 to the day before, the finals given standing on their days, the fixings creator
+    taking them newest first."""
+    return a_history(unit["index"], "2027-01-01", as_of, UNIT_HOLIDAYS, finals or {})
+
+
+def unit_curve(*anchors: tuple[str, float]) -> str:
+    return str(
+        ENTRY["_CreateDiscountCurve"](
+            row("date", "discount_factor"), rows(*[[serial(d), f] for d, f in anchors])
+        )
+    )
+
+
+def unit_state(
+    unit: dict[str, Any],
+    trades: str,
+    as_of: str,
+    quotes: tuple[float, ...],
+    curve: object,
+    finals: dict[str, float] | None = None,
+) -> tuple[str, str, str, str]:
+    """One state: the history valued that day, the market quoting from the first unfixed
+    contract, the batch prepared and evaluated on the curve given, or none: the four handles."""
+    history = unit_history(unit, as_of, finals)
+    market = a_market(history, "UNIT", *quotes)
+    prepared = str(ENTRY["_PrepareTrades"](trades, history))
+    return history, market, prepared, str(ENTRY["_EvaluateTrades"](prepared, market, curve))
+
+
+def risk_of(results: str) -> list[object]:
+    return spilled(ENTRY["_ReportRisk"](results))[2]
+
+
+def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, Any]) -> None:
+    # +10 and -10 of F27 at 70, quoted 80, paying a year and two years out at 0.95 and 0.90: 5 of
+    # NPV, 0.5 of discounted lots over a nominal delta of nought, +0.0085 of DV01; the reports
+    # under the bilateral labels, the day, the month and the year each the one row; the readback
+    # one row a slot, the contract's risk four ways on both, the payment facts one group a row.
+    curve = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.95), (TWO_YEARS_OUT, 0.90))
+    history, market, prepared, results = unit_state(
+        unit, unit["trades"], UNIT_AS_OF, (80.0, 50.0), curve
+    )
+    assert re.fullmatch(rf"{os.getpid()}:trade_results:UNIT:\d+", results)
+    assert spilled(ENTRY["_ReportValues"](results)) == [
+        ["bilateral_mark", "bilateral_cash", "currency", "as_of"],
+        ["float64", "float64", "str", "datetime64[D]"],
+        [pytest.approx(5.0), 0.0, "USD", serial(UNIT_AS_OF)],
+    ]
+    assert spilled(ENTRY["_ReportRisk"](results)) == [
+        ["nominal_delta", "delta", "delta_unit", "dv01", "dv01_unit", "as_of"],
+        ["float64", "float64", "str", "float64", "str", "datetime64[D]"],
+        [
+            0.0,
+            pytest.approx(0.5),
+            UNIT_LOT,
+            pytest.approx(0.0085),
+            "USD per basis point",
+            serial(UNIT_AS_OF),
+        ],
+    ]
+    for bucket, start in (("day", UNIT_AS_OF), ("month", "2027-01-01"), ("year", "2027-01-01")):
+        assert spilled(ENTRY["_ReportDelta"](results, bucket)) == [
+            DELTA_HEADERS,
+            DELTA_TYPES,
+            [serial(start), 0.0, pytest.approx(0.5), UNIT_LOT, serial(UNIT_AS_OF)],
+        ]
+    assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, "USD"]
+    table = spilled(ENTRY["util_ReadHandle"](results))
+    assert table[0] == RESULT_COLUMNS
+    assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
+        "float64"
+    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str"]
+    assert [line[:5] for line in table[2:]] == [
+        ["F27", "F27", serial(UNIT_AS_OF), serial(A_YEAR_OUT), False],
+        ["F27", "F27", serial(UNIT_AS_OF), serial(TWO_YEARS_OUT), False],
+    ]
+    contract = [0.0, pytest.approx(0.5), 0.0, pytest.approx(0.5)]  # F27's, on both rows
+    assert table[2][5:12] == [10.0, 10.0, pytest.approx(800.0), *contract]
+    assert table[3][5:12] == [-10.0, -10.0, pytest.approx(-800.0), *contract]
+    assert table[2][12:] == [
+        "USD per USD/BBL",
+        UNIT_LOT,
+        0.95,
+        pytest.approx(100.0),
+        pytest.approx(95.0),
+        pytest.approx(-0.0095),
+        0.0,
+        0.0,
+        10.0,
+        "USD",
+    ]
+    assert table[3][12:] == [
+        "USD per USD/BBL",
+        UNIT_LOT,
+        0.90,
+        pytest.approx(-100.0),
+        pytest.approx(-90.0),
+        pytest.approx(0.018),
+        *["-"] * 4,
+    ]
+    # A tick to 81 over the same preparation and curve: 5.5 and 0.00935, the lots as they were,
+    # the old results standing; a replacement curve at 0.96 and 0.92 over the same preparation
+    # and market: 4, 0.4 and 0.0088. The reserves move for neither.
+    ticked = str(ENTRY["_EvaluateTrades"](prepared, a_market(history, "UNIT", 81.0, 50.0), curve))
+    assert ticked != results
+    assert valued(ticked) == (pytest.approx(5.5), 0.0, 0.0)
+    assert risk_of(ticked)[1:4] == [pytest.approx(0.5), UNIT_LOT, pytest.approx(0.00935)]
+    assert valued(results) == (pytest.approx(5.0), 0.0, 0.0)
+    other = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92))
+    replaced = str(ENTRY["_EvaluateTrades"](prepared, market, other))
+    assert valued(replaced) == (pytest.approx(4.0), 0.0, 0.0)
+    assert risk_of(replaced)[1:4] == [pytest.approx(0.4), UNIT_LOT, pytest.approx(0.0088)]
+    for handle in (ticked, replaced):
+        assert spilled(ENTRY["_ReportReserves"](handle))[2] == [0.0, 0.0, 10.0, "USD"]
+
+
+def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str, Any]) -> None:
+    # +10 at 70 observed on 4 January 2027 and paying a year later, fresh curves of ones anchored
+    # on each valuation day: 100 of mark and -0.01 of DV01 on the observation day, both deltas 10;
+    # 120 the next day, fixed at 82 and unpaid, 364 days out, no lots; 118.8 at a factor of 0.99;
+    # on the payment day cash of 120, a one-day curve enough, the factor the policy's 1 and the
+    # group's NPV and DV01 nothing. The cleared twin needs no curve, reports equal deltas and no
+    # DV01. The marketing reserve of 5 stands in every state and under either route.
+    one = unit["one"]
+    ones = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 1.0))
+    _, _, _, results = unit_state(unit, one, UNIT_AS_OF, (80.0, 50.0), ones)
+    assert valued(results) == (pytest.approx(100.0), 0.0, pytest.approx(10.0))
+    assert risk_of(results)[1:4] == [pytest.approx(10.0), UNIT_LOT, pytest.approx(-0.01)]
+    fixed_at_82 = {"2027-01-04": 82.0}
+    _, market, prepared, fixed = unit_state(
+        unit,
+        one,
+        "2027-01-05",
+        (50.0,),
+        unit_curve(("2027-01-05", 1.0), (A_YEAR_OUT, 1.0)),
+        fixed_at_82,
+    )
+    assert valued(fixed) == (pytest.approx(120.0), 0.0, 0.0)
+    assert risk_of(fixed)[1:4] == [0.0, UNIT_LOT, pytest.approx(-0.0001 * 364 / 365 * 120.0)]
+    at_99 = ENTRY["_EvaluateTrades"](
+        prepared, market, unit_curve(("2027-01-05", 1.0), (A_YEAR_OUT, 0.99))
+    )
+    assert valued(str(at_99)) == (pytest.approx(118.8), 0.0, 0.0)
+    for as_of in (A_YEAR_OUT, "2028-01-05"):
+        _, _, _, paid = unit_state(unit, one, as_of, (50.0,), unit_curve((as_of, 1.0)), fixed_at_82)
+        assert valued(paid) == (0.0, pytest.approx(120.0), 0.0)
+        assert risk_of(paid)[1:4] == [0.0, UNIT_LOT, 0.0]
+        table = spilled(ENTRY["util_ReadHandle"](paid))
+        assert table[2][4:5] == [True]  # fixed
+        assert table[2][14:18] == [1.0, pytest.approx(120.0), 0.0, 0.0]
+        assert spilled(ENTRY["_ReportReserves"](paid))[2] == [0.0, 0.0, 5.0, "USD"]
+    _, _, _, cleared = unit_state(
+        unit, unit["one_cleared"], UNIT_AS_OF, (80.0, 50.0), bridge.MISSING
+    )
+    assert spilled(ENTRY["_ReportValues"](cleared))[0][:2] == ["cleared_mark", "cleared_cash"]
+    assert valued(cleared) == (pytest.approx(100.0), 0.0, pytest.approx(10.0))
+    assert risk_of(cleared)[1:4] == [pytest.approx(10.0), UNIT_LOT, 0.0]
+    assert spilled(ENTRY["_ReportReserves"](cleared))[2] == [0.0, 0.0, 5.0, "USD"]
+
+
+def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, Any]) -> None:
+    # The library's rules in the seam's words, each a failure that publishes no result: a
+    # bilateral batch without a curve, paid or not; a curve starting on another day; one ending
+    # before an unpaid payment; a market over another history; a physical bilateral batch.
+    evaluate = ENTRY["_EvaluateTrades"]
+    history = unit_history(unit, UNIT_AS_OF)
+    market = a_market(history, "UNIT", 80.0, 50.0)
+    prepared = str(ENTRY["_PrepareTrades"](unit["trades"], history))
+    curve = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.95), (TWO_YEARS_OUT, 0.90))
+    late = unit_curve(("2027-01-05", 1.0), (TWO_YEARS_OUT, 0.9))
+    short = unit_curve((UNIT_AS_OF, 1.0), ("2028-12-31", 0.9))
+    other = a_market(unit_history(unit, UNIT_AS_OF, {"2027-01-01": 3.1}), "UNIT", 80.0, 50.0)
+    paid_history = unit_history(unit, A_YEAR_OUT, {"2027-01-04": 82.0})
+    paid_market = a_market(paid_history, "UNIT", 50.0)
+    paid_prepared = str(ENTRY["_PrepareTrades"](unit["one"], paid_history))
+    one_day = unit_curve((A_YEAR_OUT, 1.0))
+    physical = ENTRY["_CreateTradeTemplate"](
+        "fixed_float",
+        row(*UNIT_FIELDS[:6]),
+        row("UNIT", "month", "lastday", "bilateral", "physical", "ACME Trading"),
+    )
+    delivery = str(
+        ENTRY["_PrepareTrades"](
+            ENTRY["_CreateTrades"](
+                unit["index"], row(*NG_HEADERS), rows(UNIT_ROWS[0][:5]), physical
+            ),
+            history,
+        )
+    )
+    live, _ = bridge.live_handles()
+    assert evaluate(prepared, market, bridge.MISSING) == BILATERAL_REFUSAL
+    assert evaluate(paid_prepared, paid_market, bridge.MISSING) == BILATERAL_REFUSAL
+    assert evaluate(prepared, market, late) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve starts on 2027-01-05, expected "
+        "2027-01-04, the valuation date; a curve is never rebased"
+    )
+    assert evaluate(paid_prepared, paid_market, curve) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve starts on 2027-01-04, expected "
+        "2028-01-04, the valuation date; a curve is never rebased"
+    )
+    assert evaluate(prepared, market, short) == (
+        "#ERROR _EvaluateTrades: ValueError: the payment of F27 on 2029-01-03 is past the "
+        "discount curve, which runs from 2027-01-04 to 2028-12-31; expected every unpaid payment "
+        "day covered"
+    )
+    assert evaluate(prepared, other, curve) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'UNIT', "
+        "expected the one the trades were prepared against"
+    )
+    for given in (curve, bridge.MISSING):
+        assert evaluate(delivery, market, given) == (
+            "#ERROR _EvaluateTrades: ValueError: settlement_method is 'physical', expected "
+            "'financial' with a bilateral batch; a physical delivery has no payment to discount"
+        )
+    assert bridge.live_handles()[0] == live  # nothing published by a failed evaluation
+    assert str(evaluate(paid_prepared, paid_market, one_day)).split(":")[1] == "trade_results"
+
+
+def bilateral_template(fields: tuple[str, ...], values: tuple[object, ...]) -> str:
+    return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
+
+
+@pytest.mark.parametrize("which", ["rolling asian over a year end", "two payment days", "mixed"])
+def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
+    which: str, wti: dict[str, Any], pays: dict[str, Any]
+) -> None:
+    # Three batches made bilateral on a curve to the end of 2028 at 0.9: a 1,200-barrel asian over
+    # December and January on the WTI-like index, observing two months in two years and pricing
+    # off F27, G27 and H27 in turn; the two payment days on one observation day, +60 at +1bd and
+    # -30 at +3bd of Z26 on the PAYS index; and two rows of the WTI index in different units and
+    # bases, 1,200 barrels a month of F27 and 2 lots a calendar day of G27. On each, the risk
+    # report's nominal delta and delta each equal the sum of their column by day, by month and by
+    # year and the sum of the contract column read back once per contract; the group NPVs sum to
+    # the mark, the group DV01s to the DV01, each NPV its amount times its factor; and the two
+    # deltas differ, every factor below one.
+    wti_calendar = str(ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in WTI_HOLIDAYS])))
+    if which == "rolling asian over a year end":
+        template = bilateral_template(
+            (*PEN_FIELDS[:5], "counterparty", *PEN_FIELDS[6:]),
+            (
+                "BBL",
+                "month",
+                "asian",
+                "bilateral",
+                "financial",
+                "ACME Trading",
+                "+2bd",
+                wti_calendar,
+            ),
+        )
+        strip: list[object] = [
+            23.0,
+            serial("2026-11-20"),
+            serial("2026-12-01"),
+            serial("2027-01-31"),
+            1_200.0,
+            70.0,
+        ]
+        trades = ENTRY["_CreateTrades"](wti["index"], row(*DATE_HEADERS), rows(strip), template)
+        history = a_history(wti["index"], "2026-11-23", "2026-12-18", WTI_HOLIDAYS, WTI_SETTLES)
+        market = a_market(history, "WTI", 72.0, 75.0, 76.0)
+        as_of = "2026-12-18"
+    elif which == "two payment days":
+        template = bilateral_template(
+            (*PAYS_FIELDS[:5], "counterparty", PAYS_FIELDS[6]),
+            (
+                "UNIT",
+                "month",
+                "last3day",
+                "bilateral",
+                "financial",
+                "ACME Trading",
+                str(ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]))),
+            ),
+        )
+        trades = ENTRY["_CreateTrades"](
+            pays["index"], pays["headers"], rows(PAYS_A, PAYS_B), template
+        )
+        history = a_history(pays["index"], "2026-12-01", "2026-12-02", PAYS_HOLIDAYS, PAYS_SETTLES)
+        market = a_market(history, "PAYS", 74.0, 80.0)
+        as_of = "2026-12-02"
+    else:
+        template = bilateral_template(
+            ("schedule_method", "route", "settlement_method", "counterparty", *PEN_FIELDS[6:]),
+            ("lastday", "bilateral", "financial", "ACME Trading", "+2bd", wti_calendar),
+        )
+        headers = row(*NG_HEADERS[:4], "quantity_unit", "quantity_per", "fixed_price")
+        lines: list[list[object]] = [
+            [1.0, serial("2026-11-20"), "F27", 1_200.0, "BBL", "month", 70.0],
+            [2.0, serial("2026-11-20"), "G27", 2.0, "LOT", "calday", 70.0],
+        ]
+        trades = ENTRY["_CreateTrades"](wti["index"], headers, rows(*lines), template)
+        history = a_history(wti["index"], "2026-11-23", "2026-12-18", WTI_HOLIDAYS, WTI_SETTLES)
+        market = a_market(history, "WTI", 72.0, 75.0, 76.0)
+        as_of = "2026-12-18"
+    curve = unit_curve((as_of, 1.0), ("2028-12-31", 0.9))
+    prepared = ENTRY["_PrepareTrades"](trades, history)
+    assert not str(trades).startswith("#ERROR"), trades
+    results = str(ENTRY["_EvaluateTrades"](prepared, market, curve))
+    assert not results.startswith("#ERROR"), results
+    mark = cast(float, spilled(ENTRY["_ReportValues"](results))[2][0])
+    risk = risk_of(results)
+    nominal, delta, dv01 = cast(float, risk[0]), cast(float, risk[1]), cast(float, risk[3])
+    assert nominal != pytest.approx(delta, abs=1e-9) and nominal != 0.0
+    for bucket in ("day", "month", "year"):
+        view = spilled(ENTRY["_ReportDelta"](results, bucket))[2:]
+        assert sum(cast(float, line[1]) for line in view) == pytest.approx(nominal)
+        assert sum(cast(float, line[2]) for line in view) == pytest.approx(delta)
+    table = spilled(ENTRY["util_ReadHandle"](results))
+    assert table[0] == RESULT_COLUMNS
+    by_contract: dict[object, list[object]] = {}
+    for line in table[2:]:
+        by_contract.setdefault(line[0], line)
+    assert sum(cast(float, line[10]) for line in by_contract.values()) == pytest.approx(nominal)
+    assert sum(cast(float, line[11]) for line in by_contract.values()) == pytest.approx(delta)
+    held = [line for line in table[2:] if line[15] != "-"]
+    assert sum(cast(float, line[16]) for line in held) == pytest.approx(mark)
+    assert sum(cast(float, line[17]) for line in held) == pytest.approx(dv01)
+    for line in held:
+        factor, amount, npv = cast(float, line[14]), cast(float, line[15]), cast(float, line[16])
+        assert 0.0 < factor < 1.0 and npv == pytest.approx(amount * factor)
+    assert all(line[14] != "-" for line in table[2:])  # a factor on every slot

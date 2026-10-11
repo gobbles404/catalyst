@@ -100,14 +100,58 @@ def sheet() -> dict[str, Any]:
     }
 
 
-def a_batch(sheet: dict[str, Any], rows: int, contracts: int) -> str:
+def a_batch(
+    sheet: dict[str, Any], rows: int, contracts: int, template: object | None = None
+) -> str:
     body = Cells.from_rows(
         [
             [46289.0, CODES[1 + i % contracts], 2.0 if i % 3 else -3.0, 3.0 + (i % 7) / 100]
             for i in range(rows)
         ]
     )
-    return str(PATH["_CreateTrades"](sheet["index"], sheet["headers"], body, sheet["template"]))
+    chosen = sheet["template"] if template is None else template
+    return str(PATH["_CreateTrades"](sheet["index"], sheet["headers"], body, chosen))
+
+
+@pytest.fixture(scope="module")
+def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
+    """The sheet's batch made bilateral, since #NN: the same fields with a counterparty for the
+    clearing house and the route bilateral, and a curve anchored on the valuation day running to
+    the end of 2028 at 0.9, past every payment."""
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
+    fields = [
+        "quantity_unit",
+        "quantity_per",
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "counterparty",
+        "payment_time_lag",
+        "payment_holiday_calendar",
+    ]
+    template = PATH["_CreateTradeTemplate"](
+        "fixed_float",
+        Cells.from_rows([fields]),
+        Cells.from_rows(
+            [
+                [
+                    "lot",
+                    "month",
+                    "lastday",
+                    "bilateral",
+                    "financial",
+                    "ACME Trading",
+                    "+2bd",
+                    holidays,
+                ]
+            ]
+        ),
+    )
+    curve = PATH["_CreateDiscountCurve"](
+        Cells.from_rows([["date", "discount_factor"]]),
+        Cells.from_rows([[serial(AS_OF), 1.0], [serial(np.datetime64("2028-12-31", "D")), 0.9]]),
+    )
+    return {"template": template, "curve": curve}
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -142,13 +186,13 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
     prepared = PATH["_PrepareTrades"](a_batch(sheet, rows, contracts), sheet["history"])
 
     def tick() -> object:
-        return PATH["_EvaluateTrades"](prepared, sheet["market"])
+        return PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
 
     assert str(tick()).split(":")[1:3] == ["trade_results", "gas"]
     assert call_profile(tick) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 2,
+        "_validate": 3,  # the two handles and the curve left out, since #NN
         "_text": 2,
         "_resolve": 2,
         "_EvaluateTrades": 1,
@@ -164,11 +208,11 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     call_profile: CallProfile, sheet: dict[str, Any]
 ) -> None:
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2), sheet["history"])
-    results = PATH["_EvaluateTrades"](prepared, sheet["market"])
+    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportRisk", 3, True),
+        ("_ReportRisk", 4, True),  # both deltas, the DV01 and the day, since #NN
         ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
@@ -197,13 +241,102 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
 # the quotes and the contributions by live reference and slot; a report at one row laid out;
 # none by trade, since the batch of five rows and two slots prepares at 3,527 bytes and the one
 # of 2,500 rows at 8,912. Measured 2026-10-04: preparing 8,912 bytes, a tick 1,144, the values
-# report 1,967 and the risk report 1,948.
+# report 1,967 and the risk report 1,948; the risk report 2,079 since #NN, its sixth column.
 def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str, Any]) -> None:
     trades = a_batch(sheet, 2_500, 24)
     assert least_peak(lambda: PATH["_PrepareTrades"](trades, sheet["history"])) <= 10 * SLACK
     prepared = PATH["_PrepareTrades"](trades, sheet["history"])
-    assert least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"])) <= 2 * SLACK
-    results = PATH["_EvaluateTrades"](prepared, sheet["market"])
+    assert (
+        least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING))
+        <= 2 * SLACK
+    )
+    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     assert least_peak(lambda: PATH["_ReportValues"](results)) <= 2 * SLACK
-    assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 2 * SLACK
+    assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 3 * SLACK
     assert least_peak(lambda: PATH["_ReportReserves"](results)) <= 2 * SLACK
+
+
+# --- the bilateral path through the seam, since #NN -----------------------------------------------
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_alone(
+    call_profile: CallProfile,
+    sheet: dict[str, Any],
+    bilateral: dict[str, Any],
+    rows: int,
+    contracts: int,
+) -> None:
+    prepared = PATH["_PrepareTrades"](
+        a_batch(sheet, rows, contracts, bilateral["template"]), sheet["history"]
+    )
+
+    def tick() -> object:
+        return PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+
+    assert str(tick()).split(":")[1:3] == ["trade_results", "gas"]
+    # The curve the third handle resolved; the kernel's bilateral path, the rules and the discounted
+    # snapshot, beside the evaluator; nothing of the preparation, and no sort on a tick.
+    assert call_profile(tick) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 3,
+        "_resolve": 3,
+        "_EvaluateTrades": 1,
+        "trade_results": 1,
+        "_the_curve": 1,
+        "DiscountCurve.start_date": 2,
+        "DiscountCurve.max_date": 1,
+        "Market.live_prices": 1,
+        "_discounted": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 6,
+        "_publish": 1,
+    }
+
+
+def test_the_time_report_resolves_one_handle_and_selects_a_view(
+    call_profile: CallProfile, sheet: dict[str, Any], bilateral: dict[str, Any]
+) -> None:
+    prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2, bilateral["template"]), sheet["history"])
+    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+    live = bridge.live_handles()
+    for bucket in ("day", "month", "year"):
+        profile = call_profile(lambda bucket=bucket: PATH["_ReportDelta"](results, bucket))
+        assert profile == {
+            "Registered.run": 1,
+            "_arguments": 1,
+            "_validate": 2,  # the results and the bucket
+            "_text": 2,
+            "_resolve": 1,
+            "_ReportDelta": 1,
+            "choice": 1,  # the bucket's word, one of three
+            "bucketed": 1,  # the two vectors selected by reference, nothing summed
+            "MixedArray.table": 1,
+            "_table_column": 4,  # the starts, both deltas and the day
+            "_serials": 2,
+            "_unit": 2,
+            "_mixed_out": 1,
+            "_bad_mixed": 1,
+        }, bucket
+    assert bridge.live_handles() == live  # a report publishes nothing
+
+
+# Measured 2026-10-11 at 2,500 trades over 24 slots: a bilateral tick 5,093 bytes against the
+# cleared tick's 1,418, the curve's handle, the groups' amounts, factors, NPVs and DV01s and the
+# discounted lots by reference, day, month and year; the time report 4,709 bytes under either
+# route, 24 rows of five columns and the headings; the risk report 2,079, its sixth column.
+def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
+    sheet: dict[str, Any], bilateral: dict[str, Any]
+) -> None:
+    prepared = PATH["_PrepareTrades"](
+        a_batch(sheet, 2_500, 24, bilateral["template"]), sheet["history"]
+    )
+    assert (
+        least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"]))
+        <= 8 * SLACK
+    )
+    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+    assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 3 * SLACK
+    assert least_peak(lambda: PATH["_ReportDelta"](results, "day")) <= 6 * SLACK

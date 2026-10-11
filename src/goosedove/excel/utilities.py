@@ -7,7 +7,7 @@ docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
 from functools import singledispatch
-from typing import Annotated, Any, assert_never
+from typing import Annotated, Any, assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,7 +49,6 @@ from goosedove.market_data.price_vector import PriceVector
 from goosedove.trades.encoding import Encoded
 from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
-from goosedove.trades.reserves import Reserves
 from goosedove.trades.resolution import Trades
 from goosedove.trades.template import TradeTemplate
 from goosedove.trades.terms import BASIS_NAMES, METHOD_NAMES
@@ -502,21 +501,26 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # One row per slot, the dated contents of the result: the slot named, whether it has fixed,
     # the slot's own live coefficient and the same exposure in lots, its live contribution,
     # coefficient times its contract's quote, all zero where it has fixed, and its contract's
-    # risk, the two retained vectors read by each slot's reference and so the same number on
-    # every slot of one contract, whatever group holds it, named contract_sensitivity and
-    # contract_lot_delta so that neither is read as the slot's; then the two units those numbers
-    # are in, the sensitivity's, currency per quote unit, and the lot's words, the batch's facts
-    # on every row so that a row reads whole, as the trades spill carries the route; the mark,
-    # the cash and the totals are the reports' to show. Then, since #170, the batch's reserves,
-    # once: the three totals and their currency on the first slot row, as _ReportReserves
-    # spills them, and a dash on every later row, since they are the batch's booked amounts and
-    # no slot's, and a total repeated on every slot would read as each slot's.
+    # risk, four retained vectors read by each slot's reference and so the same number on every
+    # slot of one contract, whatever group holds it: the sensitivity and the lot delta, nominal,
+    # and since #NN their discounted twins beside each, a cleared result's twins the nominal arrays
+    # themselves, every one named contract_... so that none is read as the slot's and the
+    # discounted apart from the nominal; then the two units those numbers are in, the batch's
+    # facts on every row so that a row reads whole. The mark, the cash and the totals are the
+    # reports' to show. Then, since #NN, the payment groups' retained facts: payment_factor on
+    # every slot, its group's, and payment_amount, group_npv and group_dv01 once per group, on the
+    # first slot row the group holds and a dash on its other rows, since a group's amount repeated
+    # on each of its slots would read as each slot's and sum twice; a cleared result retains none
+    # of the four and shows a dash on every row. Then, since #170, the batch's reserves, once: the
+    # three totals and their currency on the first slot row, as _ReportReserves spills them, and a
+    # dash on every later row, since they are the batch's booked amounts and no slot's.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
     slots = encoding.slot_group.size
     contribution = np.zeros(slots)
     contribution[prepared.live_slot] = obj.dated_live_contribution
+    reference = encoding.reference_of_slot
     table = MixedArray.table(
         [
             (
@@ -526,58 +530,98 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
                 "live_lots",
                 "live_contribution",
                 "contract_sensitivity",
+                "contract_discounted_sensitivity",
                 "contract_lot_delta",
+                "contract_delta",
                 "sensitivity_unit",
                 "lot_unit",
             ),
-            (*types, "bool", "float64", "float64", "float64", "float64", "float64", "str", "str"),
+            (*types, "bool", *("float64",) * 7, "str", "str"),
         ],
         *columns,
         prepared.is_fixed,
         prepared.dated_live_exposure,
         prepared.dated_live_lots,
         contribution,
-        obj.price_sensitivity[encoding.reference_of_slot],
-        obj.lot_delta[encoding.reference_of_slot],
+        obj.price_sensitivity[reference],
+        obj.discounted_price_sensitivity[reference],
+        obj.lot_delta[reference],
+        obj.discounted_lot_delta[reference],
         (obj.price_sensitivity_unit,) * slots,
         (obj.lot_unit,) * slots,
     )
-    return _with_reserves(table, obj.reserves)
+    group = encoding.slot_group
+    first = np.zeros(slots, dtype=np.bool_)
+    first[np.unique(group, return_index=True)[1]] = True  # each group's first slot row
+    once = np.zeros(slots, dtype=np.bool_)
+    once[0] = True  # the batch's own facts, on the first row
+    if obj.payment_factor is None:
+        # A cleared result: nothing retained for the four, a dash on every row.
+        none, nothing = np.zeros(slots, dtype=np.bool_), np.empty(0)
+        payments = [(name, nothing, none) for name in PAYMENT_COLUMNS]
+    else:
+        every = np.ones(slots, dtype=np.bool_)
+        held = (obj.payment_amount, obj.npv_by_group, obj.dv01_by_group)
+        payments = [
+            (PAYMENT_COLUMNS[0], obj.payment_factor[group], every),
+            *(
+                (name, cast(NDArray[np.float64], vector)[group[first]], first)
+                for name, vector in zip(PAYMENT_COLUMNS[1:], held, strict=True)
+            ),  # the three are retained together with the factors
+        ]
+    reserves = obj.reserves
+    return _with_once(
+        table,
+        [
+            *payments,
+            ("brokerage_reserve", np.array([reserves.brokerage]), once),
+            ("clearing_reserve", np.array([reserves.clearing]), once),
+            ("marketing_reserve", np.array([reserves.marketing]), once),
+        ],
+        ("currency", reserves.currency),
+    )
 
 
-def _with_reserves(base: MixedArray, reserves: Reserves) -> MixedArray:
-    """A results table widened by the batch's reserves, shown once: brokerage_reserve,
-    clearing_reserve and marketing_reserve, numbers, and currency, text, on the first body row,
-    as _ReportReserves spills them, and a dash in all four on every later row. A column holding
-    a number on one row and a word on the others is not one the table builder takes, so the
-    four are written by kind, as the market's price column is: their kinds, their slots, and
-    their texts placed among the base's in sheet order, every body row of the base holding the
-    same number of texts, one per text column. The record's four values are placed and nothing
-    is summed or looked up; every result has a first row, a batch observing at least once."""
+PAYMENT_COLUMNS = ("payment_factor", "payment_amount", "group_npv", "group_dv01")
+
+
+def _with_once(
+    base: MixedArray,
+    numbers: list[tuple[str, NDArray[np.float64], NDArray[np.bool_]]],
+    text: tuple[str, str],
+) -> MixedArray:
+    """A results table widened by columns a plain table cannot hold: a number on some rows and a
+    dash on the rest, the batch's reserves on the first row as _ReportReserves spills them and a
+    payment group's amount on the first row of its slots, since a column holding a number on one
+    row and a word on the others is not one the table builder takes. Each is written by kind, as
+    the market's price column is: its kinds, its slots and its texts placed among the base's in
+    sheet order, every body row of the base holding the same number of texts, one per text
+    column. numbers gives each column's name, the numbers it holds in row order and which rows
+    hold one, typed float64 as a column of numbers is; text gives the one text column's name and
+    the word on the first row, a dash below it. Nothing is summed or looked up; every result has
+    a first row, a batch observing at least once."""
     rows, width = base.shape
     body = rows - 2
-    kinds = np.full((rows, width + 4), TEXT_CODE, dtype=np.uint8)
+    added = len(numbers) + 1
+    kinds = np.full((rows, width + added), TEXT_CODE, dtype=np.uint8)
     kinds[:, :width] = base.kinds
-    kinds[2, width : width + 3] = NUMBER_CODE
-    slots = np.full((rows, width + 4), np.nan)
+    slots = np.full((rows, width + added), np.nan)
     slots[:, :width] = base.numeric_slots
-    slots[2, width : width + 3] = (reserves.brokerage, reserves.clearing, reserves.marketing)
     per_row = (len(base.texts) - 2 * width) // body
-    words = np.full((body, per_row + 4), "-", dtype=object)
+    words = np.full((body, per_row + added), "-", dtype=object)
     words[:, :per_row] = np.array(base.texts[2 * width :], dtype=object).reshape(body, per_row)
-    words[0, per_row + 3] = reserves.currency
-    placed = np.ones((body, per_row + 4), dtype=np.bool_)
-    placed[0, per_row : per_row + 3] = False  # the three numbers of the first row
+    placed = np.ones((body, per_row + added), dtype=np.bool_)
+    for j, (_, held, holds) in enumerate(numbers):
+        kinds[2:, width + j][holds] = NUMBER_CODE
+        slots[2:, width + j][holds] = held
+        placed[:, per_row + j] = ~holds
+    words[0, per_row + added - 1] = text[1]
     headings = (
         *base.texts[:width],
-        "brokerage_reserve",
-        "clearing_reserve",
-        "marketing_reserve",
-        "currency",
+        *(name for name, _, _ in numbers),
+        text[0],
         *base.texts[width : 2 * width],
-        "float64",
-        "float64",
-        "float64",
+        *("float64",) * len(numbers),
         "str",
     )
     return MixedArray(kinds, slots, (*headings, *words[placed]))

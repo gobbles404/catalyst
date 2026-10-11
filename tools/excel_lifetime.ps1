@@ -672,8 +672,11 @@ $trades = {
 # place is a price too many for the one contract that remains, so the market fails, the results
 # fail as its consumer, the report spilled in D23 shows the failure in the creator's words and the
 # reads through INDEX show #REF!, no number standing; the vector trimmed to q26's price rebuilds
-# them, a cash of 5,000, a mark of 0 and a delta of 0. Last, the workbook closed releases every
-# publication. check.ps1 runs this group beside core.
+# them, a cash of 5,000, a mark of 0 and a delta of 0. Then the bilateral path, since #NN: a
+# lot of q26 under a template with a counterparty, evaluated on a curve of its own, through the
+# ticket's dependency table, a quote tick, a factor change, a fixing change, the day advanced
+# with the curve left behind, a curve its creator refuses, and a copy holding the old results.
+# Last, the workbook closed releases every publication. check.ps1 runs this group beside core.
 
 # A settle for every business day from 20 May 2026 to the last day given, newest first from T1
 # and U1 down, 25 May closed: the last day's settle as given, the rest 71.00, 71.01, ... down the
@@ -802,12 +805,150 @@ $valuation = {
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 18 }
     Check "sixteen live again, three more published, the old vector released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 18 -and $c.Published -eq 34 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
+
+    # The bilateral path, bilateral-excel-integration.md: a template with a counterparty in K26:R27
+    # paying +2bd, a lot of two NYMEX lots of q26 at 70 in K6:N6, prepared against the chain's
+    # history and evaluated against its market on a curve of its own, W1:X4, 1 on the valuation day,
+    # 0.99 on q26's payment day, 23 July, and 0.9 at the end of 2027: 5,544 of mark, two lots of
+    # 2.8 over 70 at 0.99, under bilateral_mark, a nominal delta of 2, a delta of 1.98 and a DV01 of
+    # -0.045567, thirty days of 5,544 a basis point, the DV01 read through TEXT so the cell's
+    # width shortens nothing. Then the ticket's table: a quote tick remakes the vector, the market
+    # and both results and reuses the batch, the preparation and the curve; a changed factor
+    # remakes the curve and the results and reuses the market; a changed fixing remakes the
+    # history, the preparations and both results and reuses the curve, its day unmoved; the day
+    # advanced with the curve left behind fails the results visibly in the kernel's words until the
+    # curve moves; a curve its creator refuses fails the results as its consumer and publishes
+    # nothing until repaired; and a copy holding the results while the curve changes keeps them and
+    # their curve alive and readable at the old mark, released when it is cleared.
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_time_lag"; Put $state $sheet "R26" "payment_holiday_calendar"
+    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"
+    Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
+    Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
+    Put $state $sheet "W2" "23-Jun-2026"; Put $state $sheet "X2" "1"
+    Put $state $sheet "W3" "23-Jul-2026"; Put $state $sheet "X3" "0.99"
+    Put $state $sheet "W4" "31-Dec-2027"; Put $state $sheet "X4" "0.9"
+    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:R26,K27:R27)'
+    Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
+    Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
+    Put $state $sheet "D29" "=_CreateDiscountCurve(W1:X1,W2:X4)"
+    Put $state $sheet "D30" "=_EvaluateTrades(D28,D11,D29)"
+    Put $state $sheet "D31" "=INDEX(_ReportValues(D30),3,1)"
+    Put $state $sheet "D32" "=INDEX(_ReportRisk(D30),3,1)"
+    Put $state $sheet "D33" "=INDEX(_ReportRisk(D30),3,2)"
+    Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30),3,4),"0.000000")'
+    Put $state $sheet "D35" "=INDEX(_ReportValues(D30),1,1)"
+    $bilateral = Text $state $sheet "D30"
+    Check "the bilateral results' cell shows its handle, named for the index" ($bilateral.StartsWith("${id}:trade_results:WTI NYMEX:")) $bilateral
+    Check "the values report labels the route, bilateral_mark" ((Text $state $sheet "D35") -eq "bilateral_mark") (Text $state $sheet "D35")
+    Check "the mark is 5,544, two lots of 2.8 over 70 at 0.99" ((Text $state $sheet "D31") -eq "5544") (Text $state $sheet "D31")
+    Check "the nominal delta 2 and the delta 1.98" ((Text $state $sheet "D32") -eq "2" -and (Text $state $sheet "D33") -eq "1.98") ((Text $state $sheet "D32") + " " + (Text $state $sheet "D33"))
+    Check "the DV01 -0.045567, thirty days of 5,544 a basis point" ((Text $state $sheet "D34") -eq "-0.045567") (Text $state $sheet "D34")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "the template, the batch, the preparation, the curve and the results published: twenty-one live" ($c.Live -eq 21 -and $c.Published -eq 39 -and $c.Released -eq 18) $c.Text
+
+    # A quote tick: the vector, the market and both results publish anew, the old four released;
+    # the batch, the preparation and the curve are reused as they are.
+    $trades = Text $state $sheet "D27"
+    $prepared = Text $state $sheet "D28"
+    $curve = Text $state $sheet "D29"
+    Put $state $sheet "A11" "73.8"
+    Check "a quote tick gives the bilateral results a new handle" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D30")
+    Check "and the mark follows the quote, 7,524 at 0.99" ((Text $state $sheet "D31") -eq "7524") (Text $state $sheet "D31")
+    Check "while the batch, the preparation and the curve are reused as they are" ((Text $state $sheet "D27") -eq $trades -and (Text $state $sheet "D28") -eq $prepared -and (Text $state $sheet "D29") -eq $curve) ((Text $state $sheet "D28") + " " + (Text $state $sheet "D29"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 22 }
+    Check "the old vector, market and both results are released; four more published" ($c.Live -eq 21 -and $c.Published -eq 43 -and $c.Released -eq 22) $c.Text
+
+    # Only the curve changes: the curve and the results publish anew, the old two released; the
+    # market and the preparation stand.
+    $market = Text $state $sheet "D11"
+    $bilateral = Text $state $sheet "D30"
+    Put $state $sheet "X3" "0.98"
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D29")
+    Check "and the results a new one, 7,448 at 0.98" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
+    Check "the market and the preparation stand" ((Text $state $sheet "D11") -eq $market -and (Text $state $sheet "D28") -eq $prepared) ((Text $state $sheet "D11") + " " + (Text $state $sheet "D28"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 24 }
+    Check "the old curve and results are released; two more published" ($c.Live -eq 21 -and $c.Published -eq 45 -and $c.Released -eq 24) $c.Text
+
+    # A changed fixing: the fixings, the history, the market, both preparations and both results
+    # publish anew, the old seven released; the curve stands, its day still the valuation day, and
+    # the mark is unmoved, q26 live at its quote.
+    $curve = Text $state $sheet "D29"
+    $history = Text $state $sheet "D9"
+    $prepared = Text $state $sheet "D28"
+    Put $state $sheet "U1" "72.6"
+    Check "a changed fixing gives the history a new handle" ((Text $state $sheet "D9") -ne $history -and (Text $state $sheet "D9").StartsWith("${id}:market_history:WTI NYMEX:")) (Text $state $sheet "D9")
+    Check "the bilateral preparation a new one and the mark unmoved, 7,448" ((Text $state $sheet "D28") -ne $prepared -and (Text $state $sheet "D31") -eq "7448") ((Text $state $sheet "D28") + " " + (Text $state $sheet "D31"))
+    Check "the curve stands, its day still the valuation day" ((Text $state $sheet "D29") -eq $curve) (Text $state $sheet "D29")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 31 }
+    Check "the old fixings, history, market, preparations and results are released; seven more published" ($c.Live -eq 21 -and $c.Published -eq 52 -and $c.Released -eq 31) $c.Text
+
+    # The valuation day advances to the 24th with the 23rd's settle, the two together under manual
+    # calculation: the curve left on the 23rd fails the bilateral results visibly, in the kernel's
+    # words, and the reads show #REF!; the curve moved onto the day rebuilds them.
+    $prepared = Text $state $sheet "D28"
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }
+    $last = Put-Fixings $state $sheet ([datetime]"2026-06-23") "72.7"
+    Put $state $sheet "D8" "=_CreateFuturesFixings(T1:T$last,U1:U$last,D5)"
+    Put $state $sheet "A6" "24-Jun-2026"
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
+    Check "the day moved gives the bilateral preparation a new handle" ((Text $state $sheet "D28") -ne $prepared -and (Text $state $sheet "D28").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D28")
+    Check "and the curve left on the 23rd fails the results visibly" ((Text $state $sheet "D30") -eq "#ERROR _EvaluateTrades: ValueError: discount_curve starts on 2026-06-23, expected 2026-06-24, the valuation date; a curve is never rebased") (Text $state $sheet "D30")
+    Check "the mark read through INDEX shows #REF!, no number" ((Text $state $sheet "D31") -eq "#REF!") (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 20 -and $c.Released -ge 40 }
+    Check "the failed results own nothing: twenty live, eight more published, nine released" ($c.Live -eq 20 -and $c.Published -eq 60 -and $c.Released -eq 40) $c.Text
+    Put $state $sheet "W2" "24-Jun-2026"
+    Check "the curve moved onto the day rebuilds the results" ((Text $state $sheet "D30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D30")
+    Check "at 7,448 still, the payment day's factor 0.98" ((Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 41 }
+    Check "the old curve released; the curve and the results published anew" ($c.Live -eq 21 -and $c.Published -eq 62 -and $c.Released -eq 41) $c.Text
+
+    # A curve its creator refuses, a first factor that is not 1: the results fail as its consumer
+    # and own nothing; repaired, both rebuild.
+    $refusedCurve = "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    Put $state $sheet "X2" "0.98"
+    Check "a curve its creator refuses shows the refusal" ((Text $state $sheet "D29") -eq $refusedCurve) (Text $state $sheet "D29")
+    Check "and fails the results as its consumer" ((Text $state $sheet "D30") -eq "#ERROR _EvaluateTrades: discount_curve is the creator's failure, expected discount curve handle: $refusedCurve") (Text $state $sheet "D30")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 -and $c.Released -ge 43 }
+    Check "the curve and the results own nothing: nineteen live, two released, nothing published" ($c.Live -eq 19 -and $c.Published -eq 62 -and $c.Released -eq 43) $c.Text
+    Put $state $sheet "X2" "1"
+    Check "repaired, the curve and the results rebuild, 7,448" ((Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "twenty-one live again, two more published" ($c.Live -eq 21 -and $c.Published -eq 64 -and $c.Released -eq 43) $c.Text
+
+    # A copy of the curve's table, clear of the status cell in Z1, and a second curve, results and
+    # mark over it: equal calls share
+    # the live publications; the live curve changing, the copy keeps the old curve and results
+    # alive and reads what it read, until it is cleared.
+    Put $state $sheet "AB1" "date"; Put $state $sheet "AC1" "discount_factor"
+    Put $state $sheet "AB2" "24-Jun-2026"; Put $state $sheet "AC2" "1"
+    Put $state $sheet "AB3" "23-Jul-2026"; Put $state $sheet "AC3" "0.98"
+    Put $state $sheet "AB4" "31-Dec-2027"; Put $state $sheet "AC4" "0.9"
+    Put $state $sheet "F29" "=_CreateDiscountCurve(AB1:AC1,AB2:AC4)"
+    Put $state $sheet "F30" "=_EvaluateTrades(D28,D11,F29)"
+    Put $state $sheet "F31" "=INDEX(_ReportValues(F30),3,1)"
+    $curve = Text $state $sheet "D29"
+    $bilateral = Text $state $sheet "D30"
+    Check "an equal curve shares the handle" ((Text $state $sheet "F29") -eq $curve) (Text $state $sheet "F29")
+    Check "and an equal evaluation the results" ((Text $state $sheet "F30") -eq $bilateral) (Text $state $sheet "F30")
+    $c = Counts $state $sheet
+    Check "sharing publishes nothing" ($c.Live -eq 21 -and $c.Published -eq 64) $c.Text
+    Put $state $sheet "X3" "0.97"
+    Check "the live curve and results move, 7,372 at 0.97" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7372") (Text $state $sheet "D31")
+    Check "the held results keep their handle and their curve" ((Text $state $sheet "F30") -eq $bilateral -and (Text $state $sheet "F29") -eq $curve) ((Text $state $sheet "F30") + " " + (Text $state $sheet "F29"))
+    Check "and read the mark they read, 7,448" ((Text $state $sheet "F31") -eq "7448") (Text $state $sheet "F31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
+    Check "twenty-three live, two more published, nothing released while the copy holds the old two" ($c.Live -eq 23 -and $c.Published -eq 66 -and $c.Released -eq 43) $c.Text
+    Clear-Cell $state $sheet "F31"; Clear-Cell $state $sheet "F30"; Clear-Cell $state $sheet "F29"
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 45 }
+    Check "the copy cleared, the old curve and results are released; twenty-one live, no misses" ($c.Live -eq 21 -and $c.Released -eq 45 -and $c.Published -eq 66 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
     # The last workbook closes: every publication goes, none missed, none failed.
     Close-Book $state $book
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 34) $c.Text
+    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 66) $c.Text
     Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 

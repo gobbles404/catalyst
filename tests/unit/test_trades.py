@@ -36,7 +36,7 @@ from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import TradeResults, trade_results
 from goosedove.trades.observations import Observations, observations, observed
-from goosedove.trades.preparation import Bucket, PreparedTrades, bucketed, prepared_trades
+from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import month_bounds, schedule_months
 from goosedove.trades.terms import (
     BASES,
@@ -1552,7 +1552,7 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
 
     result, _ = daily_evaluated("2026-12-02")
     table = shown(result)
-    assert table.texts[:10] == (
+    assert table.texts[:12] == (
         "pricing_contract",
         "booked_contract",
         "observation_date",
@@ -1562,15 +1562,19 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
         "live_lots",
         "live_contribution",
         "contract_sensitivity",
+        "contract_discounted_sensitivity",
         "contract_lot_delta",
+        "contract_delta",
     )
     np.testing.assert_array_equal(table.numeric_slots[2:, 3], [46_392.0] * 3)  # 5 January
     np.testing.assert_array_equal(table.numeric_slots[2:, 4], [1.0, 0.0, 0.0])  # is_fixed
     np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 10.0, 10.0])
     np.testing.assert_allclose(table.numeric_slots[2:, 6], [0.0, 10.0, 10.0])  # a unit lot
     np.testing.assert_allclose(table.numeric_slots[2:, 7], [0.0, 740.0, 740.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 8], [20.0, 20.0, 20.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 9], [20.0, 20.0, 20.0])
+    # The contract's sensitivity and lot delta, and their discounted twins, the same for a
+    # cleared batch, on every slot of the contract.
+    for column in (8, 9, 10, 11):
+        np.testing.assert_allclose(table.numeric_slots[2:, column], [20.0, 20.0, 20.0])
 
 
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
@@ -4404,10 +4408,12 @@ def views(
     prepared: PreparedTrades,
 ) -> tuple[list[str], list[float], list[str], list[float], list[str], list[float]]:
     """The three retained views as lists: the days and their lots, the months and theirs, the
-    years and theirs, each bucket start spelled as a day."""
-    (days, daily), (months, monthly), (years, yearly) = (
-        bucketed(prepared, bucket) for bucket in Bucket
-    )
+    years and theirs, each bucket start spelled as a day, read off the preparation as the
+    result's selector reads them."""
+    encoded = prepared.encoded
+    days, daily = encoded.days, prepared.daily_lots
+    months, monthly = encoded.months, prepared.monthly_lots
+    years, yearly = encoded.years, prepared.yearly_lots
     return (
         [str(d) for d in days],
         [float(x) for x in daily],
