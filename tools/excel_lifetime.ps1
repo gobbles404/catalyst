@@ -29,7 +29,7 @@
 #          extended, the settle fixing and paying the trade; the two-price vector left in
 #          place across the roll refused, the reports showing the failure and no number; the
 #          vector trimmed and the chain rebuilt; the bilateral path on a curve of its own; since
-#          #NN a collection of the two results through a tick, a failing input, its recovery,
+#          #180 a collection of the two results through a tick, a failing input, its recovery,
 #          a factor change, a full recalculation and a held old collection over the handle
 #          texts across a second tick; the last
 #          workbook closed. check.ps1 runs this group beside core.
@@ -679,7 +679,7 @@ $trades = {
 # lot of q26 under a template with a counterparty, evaluated on a curve of its own, through the
 # ticket's dependency table, a quote tick, a factor change, a fixing change, the day advanced
 # with the curve left behind, a curve its creator refuses, and a copy holding the old results.
-# Then the collection, since #NN, aggregate-risk-excel-integration.md: the two results
+# Then the collection, since #180, aggregate-risk-excel-integration.md: the two results
 # collected through AE1:AE2 in AE4 and read through _ReportRisk, their lots and DV01 together;
 # a quote tick remakes both results and the collection; a cell naming nothing fails the
 # collection visibly and releases it, its reads #REF!, until repaired; a reformat publishes

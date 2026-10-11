@@ -499,12 +499,12 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
 
 @shown.register
 def aggregate_results_table(obj: AggregateResults) -> MixedArray:
-    """The collection's membership, since #NN, one row per occurrence in the order given, a repeat a
-    row again: its position counted from one as the sheet counts, its index's name and reporting
-    lot, its route, the collection's number for its curve or a dash for a cleared source, its
-    currency, its own saved nominal delta, delta and DV01, and the day every source shares. The
-    collection's totals and vectors are _ReportRisk's to show; no handle text, since a source's
-    cell may have been released while the collection holds the object."""
+    """The collection's membership, since #180, one row per occurrence in the order given, a
+    repeat a row again: its position counted from one as the sheet counts, its index's name and
+    reporting lot, its route, the collection's number for its curve or a dash for a cleared
+    source, its currency, its own saved nominal delta, delta and DV01, and the day every source
+    shares. The collection's totals and vectors are _ReportRisk's to show; no handle text, since a
+    source's cell may have been released while the collection holds the object."""
     sources = obj.sources
     curve = np.full(len(sources), "-", dtype=object)
     for group in obj.rate_groups:

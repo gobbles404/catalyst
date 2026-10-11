@@ -337,7 +337,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "_resolve": 1,
                     "_ReportRisk": 1,
                     "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
-                    "TradeResults.report": 1,  # the result's own selection, since #NN
+                    "TradeResults.report": 1,  # the result's own selection, since #180
                     "risk_view": 1,
                     **selected,
                     "_risk_table": 1,
@@ -371,7 +371,7 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 7 * SLACK
 
 
-# --- a collection of results through the seam, since #NN ------------------------------------------
+# --- a collection of results through the seam, since #180 -----------------------------------------
 
 
 def two_results(

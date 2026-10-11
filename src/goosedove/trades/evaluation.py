@@ -159,7 +159,7 @@ class TradeResults:
     dv01_by_year: NDArray[np.float64] | None
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
-        """The content of the risk report asked for, since #NN: risk_view's selection of this
+        """The content of the risk report asked for, since #180: risk_view's selection of this
         result's saved vectors and totals by reference, what _ReportRisk formats for a result as for
         a collection, whose record answers the same question over its own saved views. Selects, and
         nothing else."""

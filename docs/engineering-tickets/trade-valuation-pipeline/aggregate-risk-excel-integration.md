@@ -4,9 +4,9 @@
 [Collector kernel](aggregate-risk-kernel.md) · [Single-result reporting](unified-risk-reporting.md) ·
 [Pipeline overview](README.md) · [UAT notes](surface-uat-notes.md#12-aggregate-evaluated-results)
 
-**Status:** Built in #NN on `claude/aggregate-excel`, stacked on PR #179 at `f604293`, the
+**Status:** Built in #180 on `claude/aggregate-excel`, stacked on PR #179 at `f604293`, the
 [collector kernel ticket](aggregate-risk-kernel.md) with its compensated reductions, 11 October
-2026, the page as the ticket; the [As built](#as-built-nn) section at the end says what was
+2026, the page as the ticket; the [As built](#as-built-180) section at the end says what was
 built, the one revision the owner agreed on 11 October, and what was not. PR #178 implements
 the report on one result and PR #179 the private collector; this ticket does not claim either
 has shipped.
@@ -226,7 +226,7 @@ key-rate DV01, quarters/hours, nested collections, portfolio persistence or inde
 registry. Unique index names at creation remain the owner's separate follow-up ticket.
 `_ReportValues` and `_ReportReserves` continue to accept single TradeResults only.
 
-## As built (#NN)
+## As built (#180)
 
 Built on `claude/aggregate-excel` above #179's `f604293`, one pull request, the two seam forms
 inside it as the ticket allowed; [aggregate-results.md](../../library/trades/aggregate-results.md)

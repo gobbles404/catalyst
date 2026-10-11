@@ -243,7 +243,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
             yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle" };
             yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
-            // The collector, since #NN: the vector left out, a scalar that is no text, a true array, and a cell naming nothing, in the seam's words.
+            // The collector, since #180: the vector left out, a scalar that is no text, a true array, and a cell naming nothing, in the seam's words.
             yield return new object[] { "_AggregateResults", new object[] { ExcelMissing.Value }, "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column" };
             yield return new object[] { "_AggregateResults", new object[] { 1.0 }, "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results handles in a cell, a row or a column" };
             yield return new object[] { "_AggregateResults", new object[] { new object[,] { { "a", "b" }, { "c", "d" } } }, "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results handles" };
@@ -579,7 +579,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market, ExcelMissing.Value));
             Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results or aggregate results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
-            // Since #NN, aggregate-risk-excel-integration.md: the results collected twice down a column,
+            // Since #180, aggregate-risk-excel-integration.md: the results collected twice down a column,
             // one collection handle of its own kind, and the same reader over it, every Total doubled on
             // the same axis under the same labels; one result alone collected as itself; the readback's
             // membership rows; and the refusals in the seam's and the library's words, nothing collected

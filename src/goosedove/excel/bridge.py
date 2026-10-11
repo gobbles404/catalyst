@@ -89,7 +89,7 @@ BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, hande
 # checker it is the class itself, so a function body needs no cast; to registration it is the
 # mark that selects publishing on the way out and resolving on the way in.
 type Handle[T] = T
-# A vector of handles, since #NN: a cell, a row or a column of texts, each the handle of a live
+# A vector of handles, since #180: a cell, a row or a column of texts, each the handle of a live
 # object of the one kind inside the brackets, handed over as the objects in sheet order, every
 # cell counted and a repeated text its object again. `result_handles: Handles[TradeResults]`;
 # docs/seam/inputs.md decision 44. A handle of one of two kinds is declared as the union of the
@@ -1529,7 +1529,7 @@ def _resolve_each(
     kind: type[object], expected: str, name: str, value: object
 ) -> tuple[object, ...]:
     """The objects a cell, a row or a column of handles stand for, in sheet order, decision 44,
-    since #NN: the shape first, one cell, one row or one column, a wider and taller range refused
+    since #180: the shape first, one cell, one row or one column, a wider and taller range refused
     whole; then each cell through the handle's rule under its own coordinates, a blank, a number,
     a boolean, an empty text, a creator's failure, text naming nothing and a handle of another
     kind each refused at its cell, in sheet order, left to right along a row and down a column;

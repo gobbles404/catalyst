@@ -132,8 +132,8 @@ Built in the handles pull request. A handle is text in a cell that stands for an
 |---|---|---|---|---|
 | `Handle[Kind]`, a class the library defines inside the brackets | text that is the handle of a live object of that kind | a parameter `curve: Handle[DiscountCurve]` handed B5, a creator's cell | the object itself | a number, boolean, blank, missing or empty text, any array; text naming no live object; a handle of another kind; a creator's `#ERROR` text, relayed by a reference to its cell |
 | `Handle[object]`, any kind | text that is the handle of any live object | `=util_ReadHandle(B5)` with B5 any creator's cell | the object itself, whatever its kind | the same, less a handle of another kind, since there is none |
-| `Handles[Kind]`, since #NN, a cell, a row or a column of handles of one kind, decision 44 | one cell, one row or one column of texts, each the handle of a live object of that kind | a parameter `result_handles: Handles[TradeResults]` handed B2:B5, four creators' cells | a tuple of the objects in sheet order, every cell, a repeat again | a true two-dimensional range, by its shape; a scalar that is no handle text, in the scalar's words; a blank, empty text, number, boolean, creator's failure, text naming nothing or handle of another kind in any cell, named by its cell: `result_handles cell (2, 1) is blank, expected trade results handle` |
-| `Handle[A] \| Handle[B]`, since #NN, one handle of either of two kinds, decision 45 | text that is the handle of a live object of either kind | `results: Handle[TradeResults] \| Handle[AggregateResults]` handed A12 | the object itself, of either kind | the same as `Handle[Kind]`, the words naming both kinds: `expected trade results or aggregate results handle` |
+| `Handles[Kind]`, since #180, a cell, a row or a column of handles of one kind, decision 44 | one cell, one row or one column of texts, each the handle of a live object of that kind | a parameter `result_handles: Handles[TradeResults]` handed B2:B5, four creators' cells | a tuple of the objects in sheet order, every cell, a repeat again | a true two-dimensional range, by its shape; a scalar that is no handle text, in the scalar's words; a blank, empty text, number, boolean, creator's failure, text naming nothing or handle of another kind in any cell, named by its cell: `result_handles cell (2, 1) is blank, expected trade results handle` |
+| `Handle[A] \| Handle[B]`, since #180, one handle of either of two kinds, decision 45 | text that is the handle of a live object of either kind | `results: Handle[TradeResults] \| Handle[AggregateResults]` handed A12 | the object itself, of either kind | the same as `Handle[Kind]`, the words naming both kinds: `expected trade results or aggregate results handle` |
 
 A handle of any kind is a parameter's declaration only: a creator names what it makes, so `Handle[object]` as a result refuses to register, as a bare `Handle` does. A vector of handles names its one kind: `Handles[object]` and a vector of a seam type refuse to register, as does a choice of kinds that names `object` or a type that is no handle; neither form takes a default. A handle takes no default, the store holding nothing at registration, but since #103 it may be left out with nothing in its place, the form below. How the text is made and where the object lives is [bridge.md](bridge.md#a-handle-one-store-and-the-text); the way out is [outputs.md](outputs.md), and the parts of the handle contract still open are [handles.md](handles.md).
 
@@ -281,7 +281,7 @@ from the fields it holds, [create-trades.md](../library/trades/create-trades.md)
 
 Decided 2026-10-11, the collection of evaluated results, by the owner, as the ticket
 [aggregate-risk-excel-integration.md](../engineering-tickets/trade-valuation-pipeline/aggregate-risk-excel-integration.md);
-built in #NN.
+built in #180.
 
 44. A cell, a row or a column of handles of one kind is declared `Handles[Kind]`, a form over
 decision 34's `Handle[Kind]` and not a new type: `result_handles: Handles[TradeResults]`. The seam
@@ -315,6 +315,6 @@ probe.
 
 ## Parked
 
-Handles, built in #53 and their lifecycle in #114: the way in, `Handle[Kind]`, is decisions 34 to 37 above, with 44 and 45 since #NN for a vector of one kind and a handle of one of two, taken by a creator since #79, when the fixings of the day first took a holiday calendar, and by the index, the calendar, the fixings, the history and the market since, where `util_ReadHandle` takes any handle by decision 40; the way out is [outputs.md](outputs.md), the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text), and reuse and release are [handles.md](handles.md#publication-and-release). Columns of one handle per row are open; the spec is [handles.md](handles.md#open).
+Handles, built in #53 and their lifecycle in #114: the way in, `Handle[Kind]`, is decisions 34 to 37 above, with 44 and 45 since #180 for a vector of one kind and a handle of one of two, taken by a creator since #79, when the fixings of the day first took a holiday calendar, and by the index, the calendar, the fixings, the history and the market since, where `util_ReadHandle` takes any handle by decision 40; the way out is [outputs.md](outputs.md), the store and the text are [bridge.md](bridge.md#a-handle-one-store-and-the-text), and reuse and release are [handles.md](handles.md#publication-and-release). Columns of one handle per row are open; the spec is [handles.md](handles.md#open).
 
 The way out, results returning to the sheet, is [outputs.md](outputs.md).

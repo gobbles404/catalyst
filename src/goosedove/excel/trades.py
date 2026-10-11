@@ -2,7 +2,7 @@
 created once and taken last by the trades creator; the trades, a batch of one or many on one
 index, resolved from a template and a ticket and encoded; the batch prepared against one market
 history, as often as the history moves; the prepared batch evaluated against one market, as often
-as the quotes move; since #NN one or many results collected into one record of saved risk,
+as the quotes move; since #180 one or many results collected into one record of saved risk,
 handle to handle; and the reports of a result or a collection, its values, its risk by time
 and, since #170, its reserves, each handle to handle. docs/library/trades/ holds a page per
 function.

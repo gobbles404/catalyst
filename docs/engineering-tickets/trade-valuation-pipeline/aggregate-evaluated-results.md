@@ -12,12 +12,12 @@ risk selection and time bucket, and a saved Total above the dated rows. This rep
 The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #178 on
 PR #177's path, reviewed clean at `788e5a7`; the second, [aggregate-risk-kernel.md](aggregate-risk-kernel.md),
 the private collector, in #179 above it; the third, [aggregate-risk-excel-integration.md](aggregate-risk-excel-integration.md),
-the Excel creator and the reader's acceptance of its handle, in #NN above that; release and
+the Excel creator and the reader's acceptance of its handle, in #180 above that; release and
 UAT remain separate.
 
 The first PR establishes the report on one evaluated batch. The [second ticket](aggregate-risk-kernel.md), built in #179 privately,
 defines the private collector kernel and makes the proposed identity, snapshot and duplicate
-policies explicit for review. The [third ticket](aggregate-risk-excel-integration.md), built in #NN,
+policies explicit for review. The [third ticket](aggregate-risk-excel-integration.md), built in #180,
 exposes collection and extends that same reader to the aggregate handle. These policies are
 not hidden decisions in the first PR.
 
@@ -254,7 +254,7 @@ Deliver in reviewable slices after bilateral integration/UAT:
    worked examples and work budgets. It reuses the first slice's report-view structure;
    no Excel creator or reader input change occurs in this slice.
 3. **Collection surface and shared reader.** The [third ticket](aggregate-risk-excel-integration.md),
-   built in #NN with the seam work inside it: typed handle range, `_AggregateResults`, the
+   built in #180 with the seam work inside it: typed handle range, `_AggregateResults`, the
    bounded two-result-kind reader input, wide multi-group headings, debug membership,
    kept workbook and lifetime coverage.
 

@@ -1,6 +1,6 @@
 # _AggregateResults
 
-Built in #NN as the ticket [aggregate-risk-excel-integration.md](../../engineering-tickets/trade-valuation-pipeline/aggregate-risk-excel-integration.md), the third of the [risk reporting and aggregation series](../../engineering-tickets/trade-valuation-pipeline/aggregate-evaluated-results.md), over the collector built privately in #179 as [aggregate-risk-kernel.md](../../engineering-tickets/trade-valuation-pipeline/aggregate-risk-kernel.md). One or many evaluated batches' saved risk collected into one handle, the lots by index and the DV01 by curve and currency, nothing valued, discounted or converted again, which [_ReportRisk](report-risk.md) reports as it reports one batch's.
+Built in #180 as the ticket [aggregate-risk-excel-integration.md](../../engineering-tickets/trade-valuation-pipeline/aggregate-risk-excel-integration.md), the third of the [risk reporting and aggregation series](../../engineering-tickets/trade-valuation-pipeline/aggregate-evaluated-results.md), over the collector built privately in #179 as [aggregate-risk-kernel.md](../../engineering-tickets/trade-valuation-pipeline/aggregate-risk-kernel.md). One or many evaluated batches' saved risk collected into one handle, the lots by index and the DV01 by curve and currency, nothing valued, discounted or converted again, which [_ReportRisk](report-risk.md) reports as it reports one batch's.
 
 ## Worksheet contract
 
@@ -62,7 +62,7 @@ Every array is frozen; nothing of a source's preparation, market or curve is cop
 
 ## The readback
 
-`util_ReadHandle` on the collection shows its membership, since #NN: one row per occurrence in the order given, a repeat a row again, with each source's own saved totals and the day every source shares. The collection's totals and vectors are `_ReportRisk`'s to show, the owner's revision of 11 October to the ticket, since appending totals beneath the membership rows would mix two kinds of rows; no handle text is shown, a source's cell possibly released while the collection holds the object.
+`util_ReadHandle` on the collection shows its membership, since #180: one row per occurrence in the order given, a repeat a row again, with each source's own saved totals and the day every source shares. The collection's totals and vectors are `_ReportRisk`'s to show, the owner's revision of 11 October to the ticket, since appending totals beneath the membership rows would mix two kinds of rows; no handle text is shown, a source's cell possibly released while the collection holds the object.
 
 | position | index | reporting_lot | route | curve | currency | nominal_delta | delta | dv01 | as_of |
 |---|---|---|---|---|---|---:|---:|---:|---|
