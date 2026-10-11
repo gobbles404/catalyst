@@ -115,7 +115,7 @@ def a_batch(
 
 @pytest.fixture(scope="module")
 def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
-    """The sheet's batch made bilateral, since #NN: the same fields with a counterparty for the
+    """The sheet's batch made bilateral, since #177: the same fields with a counterparty for the
     clearing house and the route bilateral, and a curve anchored on the valuation day running to
     the end of 2028 at 0.9, past every payment."""
     holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
@@ -192,7 +192,7 @@ def test_a_tick_resolves_two_handles_and_runs_the_evaluation_alone(
     assert call_profile(tick) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,  # the two handles and the curve left out, since #NN
+        "_validate": 3,  # the two handles and the curve left out, since #177
         "_text": 2,
         "_resolve": 2,
         "_EvaluateTrades": 1,
@@ -212,7 +212,7 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportRisk", 4, True),  # both deltas, the DV01 and the day, since #NN
+        ("_ReportRisk", 4, True),  # both deltas, the DV01 and the day, since #177
         ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
@@ -241,7 +241,7 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
 # the quotes and the contributions by live reference and slot; a report at one row laid out;
 # none by trade, since the batch of five rows and two slots prepares at 3,527 bytes and the one
 # of 2,500 rows at 8,912. Measured 2026-10-04: preparing 8,912 bytes, a tick 1,144, the values
-# report 1,967 and the risk report 1,948; the risk report 2,079 since #NN, its sixth column.
+# report 1,967 and the risk report 1,948; the risk report 2,079 since #177, its sixth column.
 def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str, Any]) -> None:
     trades = a_batch(sheet, 2_500, 24)
     assert least_peak(lambda: PATH["_PrepareTrades"](trades, sheet["history"])) <= 10 * SLACK
@@ -256,7 +256,7 @@ def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str
     assert least_peak(lambda: PATH["_ReportReserves"](results)) <= 2 * SLACK
 
 
-# --- the bilateral path through the seam, since #NN -----------------------------------------------
+# --- the bilateral path through the seam, since #177 ----------------------------------------------
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)

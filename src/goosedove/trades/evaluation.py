@@ -425,7 +425,7 @@ def bucketed(
     results: TradeResults, bucket: Bucket
 ) -> tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
     """One of the three retained views by reference: its bucket starts, the encoding's axis; the
-    nominal lots in it, the preparation's vector; and since #NN the discounted lots, the result's
+    nominal lots in it, the preparation's vector; and since #177 the discounted lots, the result's
     own, a cleared result's the nominal array itself. Nothing is summed, sorted or converted
     here."""
     prepared = results.prepared

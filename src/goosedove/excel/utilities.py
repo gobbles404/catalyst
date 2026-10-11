@@ -503,11 +503,11 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # coefficient times its contract's quote, all zero where it has fixed, and its contract's
     # risk, four retained vectors read by each slot's reference and so the same number on every
     # slot of one contract, whatever group holds it: the sensitivity and the lot delta, nominal,
-    # and since #NN their discounted twins beside each, a cleared result's twins the nominal arrays
+    # and since #177 their discounted twins beside each, a cleared result's twins the nominal arrays
     # themselves, every one named contract_... so that none is read as the slot's and the
     # discounted apart from the nominal; then the two units those numbers are in, the batch's
     # facts on every row so that a row reads whole. The mark, the cash and the totals are the
-    # reports' to show. Then, since #NN, the payment groups' retained facts: payment_factor on
+    # reports' to show. Then, since #177, the payment groups' retained facts: payment_factor on
     # every slot, its group's, and payment_amount, group_npv and group_dv01 once per group, on the
     # first slot row the group holds and a dash on its other rows, since a group's amount repeated
     # on each of its slots would read as each slot's and sum twice; a cleared result retains none

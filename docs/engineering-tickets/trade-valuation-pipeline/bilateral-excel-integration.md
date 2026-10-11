@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Bilateral agreement](bilateral-discounting-and-dv01.md) ·
 [Calculation kernel](bilateral-calculation-kernel.md) · [UAT notes](surface-uat-notes.md)
 
-**Status:** Built in #NN on `claude/bilateral-excel`, stacked on the reviewed PR #176 at
+**Status:** Built in #177 on `claude/bilateral-excel`, stacked on the reviewed PR #176 at
 `7557d8b`, 11 October 2026; owner UAT follows. The final planned implementation slice of the
 first bilateral arc. PR #176's review fixes, the finite-output guards and the payment-date
 mapping made once at preparation, are in that PR and carried forward untouched here. PR #175
@@ -262,11 +262,11 @@ public rate-preparation function remain outside this first bilateral arc.
 
 ## As built
 
-PR #NN on `claude/bilateral-excel`, stacked on #176. The pages are
+PR #177 on `claude/bilateral-excel`, stacked on #176. The pages are
 [evaluate-trades.md](../../library/trades/evaluate-trades.md), [report-risk.md](../../library/trades/report-risk.md),
 [report-delta.md](../../library/trades/report-delta.md) and [report-values.md](../../library/trades/report-values.md),
 with [kernel.md](../../library/trades/kernel.md#the-bilateral-path) for the arithmetic; the seam's
-record is the #NN row of [history.md](../../seam/history.md).
+record is the #177 row of [history.md](../../seam/history.md).
 
 - The signature: `_EvaluateTrades(prepared, market, [discount_curve])`, the curve declared
   `Handle[DiscountCurve] | None = None`, decision 39's form, resolved once by the seam and handed to

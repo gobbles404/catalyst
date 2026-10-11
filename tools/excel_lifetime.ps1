@@ -672,7 +672,7 @@ $trades = {
 # place is a price too many for the one contract that remains, so the market fails, the results
 # fail as its consumer, the report spilled in D23 shows the failure in the creator's words and the
 # reads through INDEX show #REF!, no number standing; the vector trimmed to q26's price rebuilds
-# them, a cash of 5,000, a mark of 0 and a delta of 0. Then the bilateral path, since #NN: a
+# them, a cash of 5,000, a mark of 0 and a delta of 0. Then the bilateral path, since #177: a
 # lot of q26 under a template with a counterparty, evaluated on a curve of its own, through the
 # ticket's dependency table, a quote tick, a factor change, a fixing change, the day advanced
 # with the curve left behind, a curve its creator refuses, and a copy holding the old results.

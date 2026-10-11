@@ -17,7 +17,7 @@ rates, ACT/365F, not a finite bump, and the readers expose both lot deltas as di
 its start date the valuation day and a mismatch refused. No bilateral valuation is implemented by
 this ticket. Counterparty and marketing reserve are built in #175, the calculation kernel in
 #176, privately, [bilateral-calculation-kernel.md](bilateral-calculation-kernel.md), and the public
-curve argument and the readers' columns in #NN, [bilateral-excel-integration.md](bilateral-excel-integration.md);
+curve argument and the readers' columns in #177, [bilateral-excel-integration.md](bilateral-excel-integration.md);
 owner UAT follows.
 
 **Subsequent UAT steer:** The owner expects reported delta in **lots**. The monetary

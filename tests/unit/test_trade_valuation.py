@@ -1198,7 +1198,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         f"#ERROR _EvaluateTrades: prepared is trades handle {ng['trades']!r}, "
         "expected prepared trades handle"
     )
-    # The curve, optional and last since #NN: left out is nothing, a blank is not, nor empty
+    # The curve, optional and last since #177: left out is nothing, a blank is not, nor empty
     # text, a number, a dead handle or another kind; and a cleared batch given one is the
     # library's refusal, after the seam's.
     assert evaluate(ng["prepared"], ng["market"], None) == (

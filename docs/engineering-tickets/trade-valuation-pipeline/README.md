@@ -23,7 +23,7 @@ with the rename; futures index/schedule names remain.
 and the [calculation kernel](bilateral-calculation-kernel.md) in #176, privately, both reviewed.
 The public curve argument to evaluation and the readers' columns, DV01 the analytic signed
 sensitivity of the discounted mark to a one basis point rise, and both nominal and discounted lot
-deltas reported, are built in #NN, [bilateral valuation and risk in Excel](bilateral-excel-integration.md),
+deltas reported, are built in #177, [bilateral valuation and risk in Excel](bilateral-excel-integration.md),
 as the [bilateral plan](bilateral-discounting-and-dv01.md) records; owner UAT follows.
 
 | Material | How engineering should use it |
@@ -35,8 +35,8 @@ as the [bilateral plan](bilateral-discounting-and-dv01.md) records; owner UAT fo
 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | Explicit handle supplies BAL `as_of`; future periods start at their first day, expired periods fail in both helpers, and users freeze booking dates by pasting values; UAT item 3, built in #173 |
 | [Rename future to fixed_float](rename-instrument-fixed-float.md) | The catalog's one instrument renamed `fixed_float`, the same fields, rules, numbers and work budgets, `future` refused as any other word; the first slice of the bilateral arc, built in #174 |
 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | `counterparty` required with a bilateral route and refused with a cleared one, a label kept per row; `marketing_reserve` an optional nonnegative amount booked once per ticket row, summed into the reserves `_ReportReserves` shows; UAT items 8 and 11, built in #175 |
-| [Bilateral calculation kernel](bilateral-calculation-kernel.md) | Built in #176, privately: payment-group NPV on a curve anchored at `as_of`, nominal and discounted lot vectors and analytic DV01, hand-priced and measured inside the existing evaluator; the public curve argument and the readers are #NN's |
-| [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | Built in #NN: the optional curve on `_EvaluateTrades`, `nominal_delta` and `delta` in both risk reports with DV01 in the scalar one, the results readback's discounted contract risk and payment-group facts, the workbook, smoke, host and lifetime acceptance; owner UAT follows |
+| [Bilateral calculation kernel](bilateral-calculation-kernel.md) | Built in #176, privately: payment-group NPV on a curve anchored at `as_of`, nominal and discounted lot vectors and analytic DV01, hand-priced and measured inside the existing evaluator; the public curve argument and the readers are #177's |
+| [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | Built in #177: the optional curve on `_EvaluateTrades`, `nominal_delta` and `delta` in both risk reports with DV01 in the scalar one, the results readback's discounted contract risk and payment-group facts, the workbook, smoke, host and lifetime acceptance; owner UAT follows |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on the evaluated results and read through `_ReportReserves`; since #175 the marketing reserve is the optional amount a row books, summed the same way; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |
