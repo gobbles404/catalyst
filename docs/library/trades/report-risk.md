@@ -57,4 +57,4 @@ The encoding's observation axes, since #166: the distinct observation days, incr
 
 ## Not here
 
-No collection of results on the sheet yet: the collector is built privately in #NN, [aggregate-results.md](aggregate-results.md), and the reader takes its handle in the series' next ticket; no second index on one report, no grand total across unrelated lots; no quarter or week; no curve identity or currency system, `curve_1` a label; no key-rate DV01, no bump, no scenario; no attribution to a trade or a method; no roll-off forecast; no display name on the labels, the index's name as made.
+No collection of results on the sheet yet: the collector is built privately in #179, [aggregate-results.md](aggregate-results.md), and the reader takes its handle in the series' next ticket; no second index on one report, no grand total across unrelated lots; no quarter or week; no curve identity or currency system, `curve_1` a label; no key-rate DV01, no bump, no scenario; no attribution to a trade or a method; no roll-off forecast; no display name on the labels, the index's name as made.

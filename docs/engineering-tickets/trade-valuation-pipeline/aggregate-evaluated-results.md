@@ -11,10 +11,10 @@ risk selection and time bucket, and a saved Total above the dated rows. This rep
 10 October proposal for separate aggregate readers, a default day bucket and long tables.
 The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #178 on
 PR #177's path, reviewed clean at `788e5a7`; the second, [aggregate-risk-kernel.md](aggregate-risk-kernel.md),
-the private collector, in #NN above it; the Excel creator and the reader's acceptance of its
+the private collector, in #179 above it; the Excel creator and the reader's acceptance of its
 handle are the next ticket's, and release and UAT remain separate.
 
-The first PR establishes the report on one evaluated batch. The [second ticket](aggregate-risk-kernel.md), built in #NN privately,
+The first PR establishes the report on one evaluated batch. The [second ticket](aggregate-risk-kernel.md), built in #179 privately,
 defines the private collector kernel and makes the proposed identity, snapshot and duplicate
 policies explicit for review. A subsequent PR exposes collection and extends that same
 reader to the aggregate handle. These policies are not hidden decisions in the first PR.
@@ -247,7 +247,7 @@ Deliver in reviewable slices after bilateral integration/UAT:
 1. **Unified risk report for one evaluated batch.** The [first ticket](unified-risk-reporting.md)
    defines the required selectors, saved payment-time DV01, Total-first layout, removal
    of `_ReportDelta`, full caller migration and financial/workbook acceptance. No collector.
-2. **Collector kernel.** The [second ticket](aggregate-risk-kernel.md), built in #NN, specifies typed source
+2. **Collector kernel.** The [second ticket](aggregate-risk-kernel.md), built in #179, specifies typed source
    input, compatible risk groups and scalar/vector views, identity/duplicate policies,
    worked examples and work budgets. It reuses the first slice's report-view structure;
    no Excel creator or reader input change occurs in this slice.

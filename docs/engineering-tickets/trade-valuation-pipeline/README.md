@@ -31,7 +31,7 @@ records the agreed direction, `_ReportRisk(results, risk, bucket)`, every argume
 risk or `all`, day, month or year, and the saved Total above the dated rows. The
 [first ticket](unified-risk-reporting.md) is built: the report on one evaluated batch with the
 DV01 by payment time, `_ReportDelta` retired and every kept caller migrated. The
-[second ticket](aggregate-risk-kernel.md) is built in #NN privately: the collector of saved
+[second ticket](aggregate-risk-kernel.md) is built in #179 privately: the collector of saved
 risk across evaluated batches, grouped by index object and by curve and currency, nothing
 priced again. The next ticket exposes the collector and takes its handle in the same reader.
 This supersedes the older reader defaults and layouts in the pages below.
@@ -49,7 +49,7 @@ This supersedes the older reader defaults and layouts in the pages below.
 | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | Built in #177: the optional curve on `_EvaluateTrades`, `nominal_delta` and `delta` in both risk reports with DV01 in the scalar one, the results readback's discounted contract risk and payment-group facts, the workbook, smoke, host and lifetime acceptance; owner UAT follows |
 | [Risk reporting and aggregation](aggregate-evaluated-results.md) | The series: one risk reader for an evaluated batch and, later, a collection of them, a required risk and bucket, wide columns and the saved Total first; the report first, the collector next |
 | [Unified risk reporting with totals first](unified-risk-reporting.md) | Built in #178: `_ReportRisk(results, risk, bucket)`, `nominal_delta`, `delta`, `dv01` or `all` by day, month or year, the DV01 by payment time saved at evaluation on axes the encoding makes once, `_ReportDelta` retired and every caller migrated |
-| [Collector kernel for evaluated risk](aggregate-risk-kernel.md) | Built in #NN, privately: one or many results combined by the exact index object and by the curve object and currency, the saved vectors summed onto the unions of the saved axes, saved totals, every occurrence counted, refusals by position; the Excel creator and the reader's acceptance of its handle follow |
+| [Collector kernel for evaluated risk](aggregate-risk-kernel.md) | Built in #179, privately: one or many results combined by the exact index object and by the curve object and currency, the saved vectors summed onto the unions of the saved axes, saved totals, every occurrence counted, refusals by position; the Excel creator and the reader's acceptance of its handle follow |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selected the reporting bucket until #178 retired it into `_ReportRisk`; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on the evaluated results and read through `_ReportReserves`; since #175 the marketing reserve is the optional amount a row books, summed the same way; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |

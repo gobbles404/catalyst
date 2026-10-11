@@ -4,9 +4,9 @@
 [Previous ticket](unified-risk-reporting.md) · [Pipeline overview](README.md) ·
 [UAT notes](surface-uat-notes.md#12-aggregate-evaluated-results)
 
-**Status:** Built in #NN on `claude/aggregate-risk`, stacked on PR #178 at `88f838c`, the
+**Status:** Built in #179 on `claude/aggregate-risk`, stacked on PR #178 at `88f838c`, the
 [unified risk reporting ticket](unified-risk-reporting.md) with its saved payment-time DV01,
-11 October 2026, the page as the ticket; the [As built](#as-built-nn) section at the end says
+11 October 2026, the page as the ticket; the [As built](#as-built-179) section at the end says
 what was built and what was not, with the owner's three clarifications of 11 October. This
 ticket does not claim the first slice has shipped.
 
@@ -302,7 +302,7 @@ Cross-index hedge equivalence, FX, aggregate values/reserves, nested collections
 valuation formulas, curve-tenor DV01, incremental collection, public function migration
 and new time resolutions remain outside this PR.
 
-## As built (#NN)
+## As built (#179)
 
 Built as agreed on 11 October with the owner's three clarifications: results on the same index
 object combine, and distinct index objects of one name are refused rather than numbered or merged,
