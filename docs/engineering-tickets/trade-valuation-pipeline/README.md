@@ -33,7 +33,10 @@ risk or `all`, day, month or year, and the saved Total above the dated rows. The
 DV01 by payment time, `_ReportDelta` retired and every kept caller migrated. The
 [second ticket](aggregate-risk-kernel.md) is built in #179 privately: the collector of saved
 risk across evaluated batches, grouped by index object and by curve and currency, nothing
-priced again. The next ticket exposes the collector and takes its handle in the same reader.
+priced again. The [third ticket](aggregate-risk-excel-integration.md) is built in #NN:
+`_AggregateResults(result_handles)` over a cell, a row or a column of results handles, and
+`_ReportRisk` taking the collection's handle beside a single result's, the two seam forms
+inside it.
 This supersedes the older reader defaults and layouts in the pages below.
 
 | Material | How engineering should use it |
@@ -50,6 +53,7 @@ This supersedes the older reader defaults and layouts in the pages below.
 | [Risk reporting and aggregation](aggregate-evaluated-results.md) | The series: one risk reader for an evaluated batch and, later, a collection of them, a required risk and bucket, wide columns and the saved Total first; the report first, the collector next |
 | [Unified risk reporting with totals first](unified-risk-reporting.md) | Built in #178: `_ReportRisk(results, risk, bucket)`, `nominal_delta`, `delta`, `dv01` or `all` by day, month or year, the DV01 by payment time saved at evaluation on axes the encoding makes once, `_ReportDelta` retired and every caller migrated |
 | [Collector kernel for evaluated risk](aggregate-risk-kernel.md) | Built in #179, privately: one or many results combined by the exact index object and by the curve object and currency, the saved vectors summed onto the unions of the saved axes, saved totals, every occurrence counted, refusals by position; the Excel creator and the reader's acceptance of its handle follow |
+| [Aggregate evaluated risk in Excel](aggregate-risk-excel-integration.md) | Built in #NN: `_AggregateResults(result_handles)`, a cell, a row or a column of results handles collected in the order given, every one counted, into one handle; `_ReportRisk` taking that handle or a single result's through one declaration of two kinds; the readback's membership rows; the two seam forms, a vector of handles of one kind and a handle of one of two kinds, decisions 44 and 45 |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selected the reporting bucket until #178 retired it into `_ReportRisk`; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on the evaluated results and read through `_ReportReserves`; since #175 the marketing reserve is the optional amount a row books, summed the same way; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |

@@ -42,6 +42,48 @@ SLOTS_DISCOUNTED = "slots_discounted"
 RISK_REDUCTIONS = "risk_reductions"
 
 
+class Bucket(Enum):
+    """What a risk report sums by: the day, the calendar month it falls in or the calendar year,
+    _ReportRisk's three choices, a quarter none of them."""
+
+    DAY = "day"
+    MONTH = "month"
+    YEAR = "year"
+
+
+class Risk(Enum):
+    """What a risk report shows, since #178: the nominal delta, the delta weighted by the route's
+    valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
+    summary none of them."""
+
+    NOMINAL_DELTA = "nominal_delta"
+    DELTA = "delta"
+    DV01 = "dv01"
+    ALL = "all"
+
+
+@dataclass(frozen=True, slots=True)
+class RiskView:
+    """One risk report's content, since #178, selected by reference and placed through saved
+    places: dates, the bucket starts, increasing, observation days under the deltas, payment days
+    under the DV01 and their union under all; labels, one heading per risk column, the index's
+    name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
+    totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
+    vector itself where the axis is its own and a copy placed on the shared axis under all, zero
+    where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
+
+    dates: NDArray[np.datetime64]
+    labels: tuple[str, ...]
+    totals: tuple[float, ...]
+    columns: tuple[NDArray[np.float64], ...]
+
+
+NO_DAYS: NDArray[np.datetime64] = np.empty(0, dtype="datetime64[D]")
+NOTHING: NDArray[np.float64] = np.empty(0)
+NO_DAYS.setflags(write=False)
+NOTHING.setflags(write=False)
+
+
 @dataclass(frozen=True, slots=True)
 class TradeResults:
     """The preparation and the market, by reference, and the snapshot they make, read-only. The
@@ -115,6 +157,13 @@ class TradeResults:
     dv01_by_day: NDArray[np.float64] | None
     dv01_by_month: NDArray[np.float64] | None
     dv01_by_year: NDArray[np.float64] | None
+
+    def report(self, risk: Risk, bucket: Bucket) -> RiskView:
+        """The content of the risk report asked for, since #NN: risk_view's selection of this
+        result's saved vectors and totals by reference, what _ReportRisk formats for a result as for
+        a collection, whose record answers the same question over its own saved views. Selects, and
+        nothing else."""
+        return risk_view(self, risk, bucket)
 
     def codes(self) -> tuple[str, ...]:
         """The axis spelled as the schedule spells its codes, one per contract of the batch."""
@@ -458,48 +507,6 @@ def _discounted(
         dv01_by_month,
         dv01_by_year,
     )
-
-
-class Bucket(Enum):
-    """What a risk report sums by: the day, the calendar month it falls in or the calendar year,
-    _ReportRisk's three choices, a quarter none of them."""
-
-    DAY = "day"
-    MONTH = "month"
-    YEAR = "year"
-
-
-class Risk(Enum):
-    """What a risk report shows, since #178: the nominal delta, the delta weighted by the route's
-    valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
-    summary none of them."""
-
-    NOMINAL_DELTA = "nominal_delta"
-    DELTA = "delta"
-    DV01 = "dv01"
-    ALL = "all"
-
-
-@dataclass(frozen=True, slots=True)
-class RiskView:
-    """One risk report's content, since #178, selected by reference and placed through saved
-    places: dates, the bucket starts, increasing, observation days under the deltas, payment days
-    under the DV01 and their union under all; labels, one heading per risk column, the index's
-    name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
-    totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
-    vector itself where the axis is its own and a copy placed on the shared axis under all, zero
-    where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
-
-    dates: NDArray[np.datetime64]
-    labels: tuple[str, ...]
-    totals: tuple[float, ...]
-    columns: tuple[NDArray[np.float64], ...]
-
-
-NO_DAYS: NDArray[np.datetime64] = np.empty(0, dtype="datetime64[D]")
-NOTHING: NDArray[np.float64] = np.empty(0)
-NO_DAYS.setflags(write=False)
-NOTHING.setflags(write=False)
 
 
 def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:

@@ -46,6 +46,7 @@ from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded
 from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
@@ -493,6 +494,59 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
         obj.is_settled[encoding.slot_group],
         obj.dated_live_exposure,
         obj.dated_live_lots,
+    )
+
+
+@shown.register
+def aggregate_results_table(obj: AggregateResults) -> MixedArray:
+    """The collection's membership, since #NN, one row per occurrence in the order given, a repeat a
+    row again: its position counted from one as the sheet counts, its index's name and reporting
+    lot, its route, the collection's number for its curve or a dash for a cleared source, its
+    currency, its own saved nominal delta, delta and DV01, and the day every source shares. The
+    collection's totals and vectors are _ReportRisk's to show; no handle text, since a source's
+    cell may have been released while the collection holds the object."""
+    sources = obj.sources
+    curve = np.full(len(sources), "-", dtype=object)
+    for group in obj.rate_groups:
+        curve[group.occurrences] = f"curve_{group.number}"
+    terms = [source.prepared.encoded.terms for source in sources]
+    return MixedArray.table(
+        [
+            (
+                "position",
+                "index",
+                "reporting_lot",
+                "route",
+                "curve",
+                "currency",
+                "nominal_delta",
+                "delta",
+                "dv01",
+                "as_of",
+            ),
+            (
+                "int64",
+                "str",
+                "str",
+                "str",
+                "str",
+                "str",
+                "float64",
+                "float64",
+                "float64",
+                "datetime64[D]",
+            ),
+        ],
+        np.arange(1, len(sources) + 1, dtype=np.int64),
+        tuple([t.index.name for t in terms]),
+        tuple([t.reporting_lot.name for t in terms]),
+        tuple([source.route.value for source in sources]),
+        tuple([str(c) for c in curve]),
+        tuple([source.currency for source in sources]),
+        np.array([source.lot_delta_total for source in sources]),
+        np.array([source.discounted_lot_delta_total for source in sources]),
+        np.array([source.dv01 for source in sources]),
+        np.full(len(sources), obj.as_of, dtype="datetime64[D]"),
     )
 
 

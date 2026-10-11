@@ -337,6 +337,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "_resolve": 1,
                     "_ReportRisk": 1,
                     "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
+                    "TradeResults.report": 1,  # the result's own selection, since #NN
                     "risk_view": 1,
                     **selected,
                     "_risk_table": 1,
@@ -368,3 +369,117 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
     assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 7 * SLACK
+
+
+# --- a collection of results through the seam, since #NN ------------------------------------------
+
+
+def two_results(
+    sheet: dict[str, Any], bilateral: dict[str, Any], rows: int, contracts: int
+) -> list[str]:
+    """Two results of one bilateral batch over one market and curve, two handles of one content."""
+    prepared = PATH["_PrepareTrades"](
+        a_batch(sheet, rows, contracts, bilateral["template"]), sheet["history"]
+    )
+    return [
+        str(PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])),
+        str(PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])),
+    ]
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
+    call_profile: CallProfile,
+    sheet: dict[str, Any],
+    bilateral: dict[str, Any],
+    rows: int,
+    contracts: int,
+) -> None:
+    handles = two_results(sheet, bilateral, rows, contracts)
+    cells = Cells.from_rows([[handle] for handle in handles])
+    live = bridge.live_handles()
+    # The vector's shape checked once and each cell read and resolved once, the collector's own
+    # functions and nothing of the kernel, the market or the curve; one publication.
+    assert call_profile(lambda: PATH["_AggregateResults"](cells)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_resolve_each": 1,
+        "_cell": 2,
+        "_text": 2,
+        "_resolve": 2,
+        "_AggregateResults": 1,
+        "aggregate_results": 1,
+        "_grouped_by_index": 1,
+        "_grouped_by_curve": 1,
+        "_index_group": 1,
+        "_rate_group": 1,
+        "_summed": 7,
+        "_compensated": 11,
+        "_outrun": 3,
+        "_report_axes": 3,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 20,
+        "_publish": 1,
+    }
+    assert bridge.live_handles()[0] == live[0] + 1
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places(
+    call_profile: CallProfile,
+    sheet: dict[str, Any],
+    bilateral: dict[str, Any],
+    rows: int,
+    contracts: int,
+) -> None:
+    handles = two_results(sheet, bilateral, rows, contracts)
+    collection = str(PATH["_AggregateResults"](Cells.from_rows([handles])))
+    live = bridge.live_handles()
+    # The collection's handle resolved by the two-kind rule, the two words chosen, the collection's
+    # own selection with a copy per column, and #178's rectangle; nothing summed, nothing published.
+    for risk, selected in (
+        ("nominal_delta", {"_lots": 1, "_placed": 1}),
+        ("delta", {"_discounted_lots": 1, "_placed": 1}),
+        ("dv01", {"_dv01": 1, "_placed": 1}),
+        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "_placed": 3}),
+    ):
+        for bucket in ("day", "month", "year"):
+            profile = call_profile(
+                lambda risk=risk, bucket=bucket: PATH["_ReportRisk"](collection, risk, bucket)
+            )
+            assert profile == {
+                "Registered.run": 1,
+                "_arguments": 1,
+                "_validate": 3,
+                "_text": 3,
+                "_resolve": 1,
+                "_ReportRisk": 1,
+                "choice": 2,
+                "AggregateResults.report": 1,
+                "aggregate_view": 1,
+                "_axes_of": 1,
+                **selected,
+                "_risk_table": 1,
+                "MixedArray.table": 2,
+                "_table_column": 2,
+                "_serials": 2,
+                "_unit": 2,
+                "_mixed_out": 1,
+                "_bad_mixed": 1,
+            }, (risk, bucket)
+    assert bridge.live_handles() == live
+
+
+# Measured 2026-10-11 at two results of 2,500 trades over 24 slots: the collection 16,640 bytes,
+# the stacked day axes of the two sources with their places and the compensated pass over them, the
+# unions and the record; its report of all three by day 6,263 bytes, the same rectangle
+# a result's report lays out, 48 dated rows in four columns.
+def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_rectangle(
+    sheet: dict[str, Any], bilateral: dict[str, Any]
+) -> None:
+    handles = two_results(sheet, bilateral, 2_500, 24)
+    cells = Cells.from_rows([[handle] for handle in handles])
+    assert least_peak(lambda: PATH["_AggregateResults"](cells)) <= 17 * SLACK
+    collection = str(PATH["_AggregateResults"](cells))
+    assert least_peak(lambda: PATH["_ReportRisk"](collection, "all", "day")) <= 7 * SLACK

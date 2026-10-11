@@ -7,7 +7,7 @@ from typing import cast
 import pytest
 
 from goosedove.excel import bridge
-from goosedove.excel.bridge import MISSING, Cells, Handle, Table, TextRow, excel_function
+from goosedove.excel.bridge import MISSING, Cells, Handle, Handles, Table, TextRow, excel_function
 from goosedove.excel.probes import probe
 
 PID = os.getpid()  # leads every handle this Python publishes
@@ -486,3 +486,150 @@ def test_a_creator_of_any_kind_and_a_bare_handle_refuse_to_register() -> None:
         excel_function(MakeAny)
     with pytest.raises(TypeError, match="ReadBare: handle declares Handle, which the seam cannot"):
         excel_function(ReadBare)
+
+
+# --- a vector of handles, decision 44, and a handle of one of two kinds, decision 45 -------
+
+
+class Third:
+    """A third kind, so a handle of neither declared kind can be handed where one of two is
+    expected."""
+
+
+@probe
+def MakeThird() -> Handle[Third]:
+    return Third()
+
+
+@probe
+def CollectCurves(curves: Handles[Curve]) -> str:
+    """Probe: the levels of a cell, a row or a column of curve handles, in sheet order."""
+    return ", ".join(repr(curve.level) for curve in curves)
+
+
+@probe
+def ReadEither(handle: Handle[Curve] | Handle[Other]) -> str:
+    """Probe: the class of a curve or an other, whichever the handle stands for."""
+    return type(handle).__name__
+
+
+def test_a_vector_of_handles_hands_the_objects_in_sheet_order_every_cell_counted() -> None:
+    one = cast(str, bridge.call("MakeCurve", [1.0]))
+    two = cast(str, bridge.call("MakeCurve", [2.0]))
+    assert bridge.call("CollectCurves", [one]) == "1.0"
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one]])]) == "1.0"
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one, two]])]) == "1.0, 2.0"
+    assert bridge.call("CollectCurves", [Cells.from_rows([[two], [one], [two]])]) == "2.0, 1.0, 2.0"
+
+
+def test_a_vector_of_handles_refuses_the_shape_first_and_then_each_cell_at_its_place() -> None:
+    one = cast(str, bridge.call("MakeCurve", [1.0]))
+    other = cast(str, bridge.call("MakeOther", []))
+    failed = cast(str, bridge.call("FailToMake", []))
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one, one], [one, None]])]) == (
+        "#ERROR CollectCurves: curves is 2x2 array, expected one cell, one row or one column of "
+        "curve handles"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one], [None]])]) == (
+        "#ERROR CollectCurves: curves cell (2, 1) is blank, expected curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one, 3.0]])]) == (
+        "#ERROR CollectCurves: curves cell (1, 2) is number 3.0, expected curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one], [True]])]) == (
+        "#ERROR CollectCurves: curves cell (2, 1) is boolean TRUE, expected curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one], [""]])]) == (
+        "#ERROR CollectCurves: curves cell (2, 1) is empty text, expected curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one], ["x"]])]) == (
+        "#ERROR CollectCurves: curves cell (2, 1) is text 'x' naming no live object, expected "
+        "curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[one, other]])]) == (
+        f"#ERROR CollectCurves: curves cell (1, 2) is other handle {other!r}, expected curve handle"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[failed], [one]])]) == (
+        "#ERROR CollectCurves: curves cell (1, 1) is the creator's failure, expected curve handle: "
+        f"{failed}"
+    )
+    assert bridge.call("CollectCurves", [MISSING]) == (
+        "#ERROR CollectCurves: curves is missing, expected curve handles in a cell, a row or a "
+        "column"
+    )
+    assert bridge.call("CollectCurves", [None]) == (
+        "#ERROR CollectCurves: curves is blank, expected curve handles in a cell, a row or a column"
+    )
+    assert bridge.call("CollectCurves", [2.0]) == (
+        "#ERROR CollectCurves: curves is number 2.0, expected curve handles in a cell, a row or a "
+        "column"
+    )
+
+
+def test_a_vector_of_handles_names_one_kind_and_takes_no_default() -> None:
+    def CollectAny(handles: Handles[object]) -> str:
+        return ""
+
+    with pytest.raises(TypeError, match=r"CollectAny: handles declares .*, which the seam cannot"):
+        probe(CollectAny)
+
+    def CollectTables(handles: Handles[Table]) -> str:
+        return ""
+
+    with pytest.raises(
+        TypeError, match=r"CollectTables: handles declares .*, which the seam cannot"
+    ):
+        probe(CollectTables)
+
+    def CollectWithDefault(handles: Handles[Curve] = ()) -> str:
+        return ""
+
+    with pytest.raises(
+        TypeError, match=r"CollectWithDefault: handles declares a handle, which takes"
+    ):
+        probe(CollectWithDefault)
+
+
+def test_a_handle_of_one_of_two_kinds_resolves_either_and_names_both_when_refusing() -> None:
+    curve = cast(str, bridge.call("MakeCurve", [1.0]))
+    other = cast(str, bridge.call("MakeOther", []))
+    third = cast(str, bridge.call("MakeThird", []))
+    assert bridge.call("ReadEither", [curve]) == "Curve"
+    assert bridge.call("ReadEither", [other]) == "Other"
+    assert bridge.call("ReadEither", [third]) == (
+        f"#ERROR ReadEither: handle is third handle {third!r}, expected curve or other handle"
+    )
+    assert bridge.call("ReadEither", ["x"]) == (
+        "#ERROR ReadEither: handle is text 'x' naming no live object, expected curve or other "
+        "handle"
+    )
+    assert bridge.call("ReadEither", [None]) == (
+        "#ERROR ReadEither: handle is blank, expected curve or other handle"
+    )
+    assert bridge.call("ReadEither", [2.0]) == (
+        "#ERROR ReadEither: handle is number 2.0, expected curve or other handle"
+    )
+
+
+def test_a_handle_of_one_of_two_kinds_names_both_kinds_and_takes_no_default() -> None:
+    def ReadAnyOfTwo(handle: Handle[Curve] | Handle[object]) -> str:
+        return ""
+
+    with pytest.raises(TypeError, match=r"ReadAnyOfTwo: handle declares .*, which the seam cannot"):
+        probe(ReadAnyOfTwo)
+
+    def ReadHandleOrText(handle: Handle[Curve] | str) -> str:
+        return ""
+
+    with pytest.raises(
+        TypeError, match=r"ReadHandleOrText: handle declares .*, which the seam cannot"
+    ):
+        probe(ReadHandleOrText)
+
+    def ReadEitherWithDefault(handle: Handle[Curve] | Handle[Other] = A_CURVE) -> str:
+        return ""
+
+    with pytest.raises(
+        TypeError, match=r"ReadEitherWithDefault: handle declares a handle, which takes"
+    ):
+        probe(ReadEitherWithDefault)

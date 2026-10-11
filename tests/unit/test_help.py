@@ -667,8 +667,13 @@ def test_the_two_reports_explain_themselves() -> None:
         "labels, the currency and the valuation day, as evaluation stored them."
     )
     description, arguments, hidden = SPECS["_ReportRisk"]
+    either = (
+        "results",
+        "The results handle, one evaluated batch's or a collection's: the cell showing "
+        "_EvaluateTrades's or _AggregateResults's result, such as A12, or a name for it.",
+    )
     assert not hidden and arguments == [
-        results,
+        either,
         (
             "risk",
             "Which risk: nominal_delta, delta, dv01 or all, exactly so; the deltas in lots of "
@@ -682,9 +687,23 @@ def test_the_two_reports_explain_themselves() -> None:
         ),
     ]
     assert description == (
-        "Reports one risk of the batch from its results, or all three, by day, calendar month "
-        "or calendar year: the saved Total first, then one row per date, the deltas on "
-        "observation days and the DV01 on payment days, as evaluation stored them."
+        "Reports one risk of a batch or a collection from its results, or all three, by day, "
+        "calendar month or calendar year: the saved Total first, then one row per date, the "
+        "deltas on observation days and the DV01 on payment days, as evaluation stored them."
+    )
+    description, arguments, hidden = SPECS["_AggregateResults"]
+    assert not hidden and arguments == [
+        (
+            "result_handles",
+            "The results handles to collect: a cell, a row or a column of cells showing "
+            "_EvaluateTrades's results, such as B2:B5, in the order given, every one counted and a "
+            "repeat counted again.",
+        )
+    ]
+    assert description == (
+        "Collects one or many evaluated batches' saved risk into one collection, the lots by index "
+        "and the DV01 by curve and currency, nothing valued again, and shows its handle, which "
+        "_ReportRisk takes beside a single result's."
     )
     description, arguments, hidden = SPECS["_ReportReserves"]
     assert not hidden and arguments == [results]

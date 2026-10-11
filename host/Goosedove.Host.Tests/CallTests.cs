@@ -241,8 +241,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_PrepareTrades", new object[] { "x:trades:gas:9", "y:market_history:gas:9" }, "#ERROR _PrepareTrades: trades is text 'x:trades:gas:9' naming no live object, expected trades handle" };
             yield return new object[] { "_EvaluateTrades", new object[] { ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _EvaluateTrades: prepared is blank, expected prepared trades handle" };
             yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
-            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results handle" };
+            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle" };
             yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
+            // The collector, since #NN: the vector left out, a scalar that is no text, a true array, and a cell naming nothing, in the seam's words.
+            yield return new object[] { "_AggregateResults", new object[] { ExcelMissing.Value }, "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column" };
+            yield return new object[] { "_AggregateResults", new object[] { 1.0 }, "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results handles in a cell, a row or a column" };
+            yield return new object[] { "_AggregateResults", new object[] { new object[,] { { "a", "b" }, { "c", "d" } } }, "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results handles" };
+            yield return new object[] { "_AggregateResults", new object[] { Column("x:trade_results:gas:9", ExcelEmpty.Value) }, "#ERROR _AggregateResults: result_handles cell (1, 1) is text 'x:trade_results:gas:9' naming no live object, expected trade results handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -573,7 +578,57 @@ namespace Goosedove.Host.Tests
             Assert.Equal(36000.0, (double)((object[,])Seam.Call("_ReportValues", later))[2, 0], 6);
             Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market, ExcelMissing.Value));
-            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
+            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results or aggregate results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
+            // Since #NN, aggregate-risk-excel-integration.md: the results collected twice down a column,
+            // one collection handle of its own kind, and the same reader over it, every Total doubled on
+            // the same axis under the same labels; one result alone collected as itself; the readback's
+            // membership rows; and the refusals in the seam's and the library's words, nothing collected
+            // across a price tick, nothing read by the value readers.
+            var collection = (string)Seam.Call("_AggregateResults", Column(results, results));
+            Assert.StartsWith(Pid + ":aggregate_results:", collection);
+            var doubled = (object[,])Seam.Call("_ReportRisk", collection, "all", "year");
+            Assert.Equal(5, doubled.GetLength(0));
+            Assert.Equal(4, doubled.GetLength(1));
+            Assert.Equal(46168.0, doubled[0, 1]);
+            Assert.Equal("sample nominal_delta [NYMEX NG]", doubled[1, 1]);
+            Assert.Equal("sample delta [NYMEX NG]", doubled[1, 2]);
+            Assert.Equal("cleared USD dv01 [USD per basis point]", doubled[1, 3]);
+            Assert.Equal("Total", doubled[3, 0]);
+            Assert.Equal(2.0, doubled[3, 1]);
+            Assert.Equal(2.0, doubled[3, 2]);
+            Assert.Equal(0.0, doubled[3, 3]);
+            Assert.Equal(46023.0, doubled[4, 0]);
+            Assert.Equal(2.0, doubled[4, 1]);
+            var rate = (object[,])Seam.Call("_ReportRisk", collection, "dv01", "day");
+            Assert.Equal(4, rate.GetLength(0));  // all cleared: a Total of nothing per currency over no dated row
+            Assert.Equal("cleared USD dv01 [USD per basis point]", rate[1, 1]);
+            Assert.Equal(0.0, rate[3, 1]);
+            var alone = (string)Seam.Call("_AggregateResults", results);
+            Assert.StartsWith(Pid + ":aggregate_results:", alone);
+            Assert.Equal(1.0, ((object[,])Seam.Call("_ReportRisk", alone, "nominal_delta", "year"))[3, 1]);
+            var members = (object[,])Seam.Call("util_ReadHandle", collection);
+            Assert.Equal(4, members.GetLength(0));
+            Assert.Equal(10, members.GetLength(1));
+            Assert.Equal("position", members[0, 0]);
+            Assert.Equal("curve", members[0, 4]);
+            Assert.Equal("as_of", members[0, 9]);
+            Assert.Equal("int64", members[1, 0]);
+            Assert.Equal(1.0, members[2, 0]);
+            Assert.Equal(2.0, members[3, 0]);
+            Assert.Equal("sample", members[2, 1]);
+            Assert.Equal("NYMEX NG", members[2, 2]);
+            Assert.Equal("cleared", members[2, 3]);
+            Assert.Equal("-", members[2, 4]);
+            Assert.Equal("USD", members[2, 5]);
+            Assert.Equal(1.0, members[2, 6]);
+            Assert.Equal(1.0, members[3, 7]);
+            Assert.Equal(0.0, members[3, 8]);
+            Assert.Equal(46168.0, members[3, 9]);
+            Assert.Equal("#ERROR _AggregateResults: ValueError: results 2 is on index 'sample' quoted off another price vector than results 1, expected one price vector for one index", Seam.Call("_AggregateResults", Row(results, later)));
+            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is blank, expected trade results handle", Seam.Call("_AggregateResults", Column(results, ExcelEmpty.Value)));
+            Assert.Equal("#ERROR _AggregateResults: result_handles is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_AggregateResults", prepared));
+            Assert.Equal("#ERROR _ReportValues: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportValues", collection));
+            Assert.Equal("#ERROR _ReportReserves: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportReserves", collection));
         }
 
         // The penultimate method on the host's chain: a financial template paying one business day
