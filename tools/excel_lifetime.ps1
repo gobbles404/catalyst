@@ -633,7 +633,7 @@ $trades = {
     # delta 0; the template, the history and the market stand. Typed back to two, the mark is
     # 7 and the delta 0.002 again, two barrels of the thousand-barrel reporting lot. The risk
     # report in D20 reads the delta, publishing nothing.
-    Put $state $sheet "D20" "=INDEX(_ReportRisk(D18),3,1)"
+    Put $state $sheet "D20" '=INDEX(_ReportRisk(D18,"nominal_delta","year"),4,2)'
     Check "the risk report reads the delta, 0.002 lots for two barrels" ((Text $state $sheet "D20") -eq "0.002") (Text $state $sheet "D20")
     $template = Text $state $sheet "D14"
     $trades = Text $state $sheet "D15"
@@ -713,7 +713,7 @@ $valuation = {
     Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
     Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"
     Put $state $sheet "D19" "=INDEX(_ReportValues(D18),3,1)"
-    Put $state $sheet "D20" "=INDEX(_ReportRisk(D18),3,1)"
+    Put $state $sheet "D20" '=INDEX(_ReportRisk(D18,"nominal_delta","year"),4,2)'
     Put $state $sheet "D21" "=INDEX(_ReportValues(D18),3,2)"
     Put $state $sheet "D22" "=INDEX(util_ReadHandle(D17),3,6)"
     Put $state $sheet "D23" "=_ReportValues(D18)"
@@ -833,9 +833,9 @@ $valuation = {
     Put $state $sheet "D29" "=_CreateDiscountCurve(W1:X1,W2:X4)"
     Put $state $sheet "D30" "=_EvaluateTrades(D28,D11,D29)"
     Put $state $sheet "D31" "=INDEX(_ReportValues(D30),3,1)"
-    Put $state $sheet "D32" "=INDEX(_ReportRisk(D30),3,1)"
-    Put $state $sheet "D33" "=INDEX(_ReportRisk(D30),3,2)"
-    Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30),3,4),"0.000000")'
+    Put $state $sheet "D32" '=INDEX(_ReportRisk(D30,"nominal_delta","year"),4,2)'
+    Put $state $sheet "D33" '=INDEX(_ReportRisk(D30,"delta","year"),4,2)'
+    Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30,"dv01","day"),4,2),"0.000000")'
     Put $state $sheet "D35" "=INDEX(_ReportValues(D30),1,1)"
     $bilateral = Text $state $sheet "D30"
     Check "the bilateral results' cell shows its handle, named for the index" ($bilateral.StartsWith("${id}:trade_results:WTI NYMEX:")) $bilateral

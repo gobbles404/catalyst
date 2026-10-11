@@ -3,12 +3,12 @@
 [Pipeline overview](README.md) · [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md)
 
 Running list started 8 October 2026 while testing the trade prototype in Excel.
-Status and suggested handoff order updated **10 October 2026**. Item numbers are stable
+Status and suggested handoff order updated **11 October 2026**. Item numbers are stable
 references to the detailed notes below; the pending-work order is a recommendation.
 
 ## Implemented and reviewed: release testing
 
-These fourteen changes are implemented on the prototype stack through **PR #177**, the last
+These fifteen changes are implemented on the prototype stack through **PR #NN**, the last
 awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -18,7 +18,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 |---|---|---|---|
 | 1 / item 1 | [Delta in index-defined lots](lot-delta-reporting.md) | [#164](https://github.com/gobbles404/goosedove/pull/164), `414b6e0` | ETE `1 LOT`, `1000 BBL` and `42000 GAL` each report 1 live lot; all three together report 3. Check the index's reporting-lot selection and a partially fixed Asian. |
 | 2 / item 5 | [Calendar-driven Asian pricing references](calendar-driven-asian-references.md) | [#165](https://github.com/gobbles404/goosedove/pull/165), `f1f1b91` | Book a December crude Asian that spans the F27/G27 roll. Inspect both pricing references, then advance history across the roll and check remaining live risk. |
-| 3 / item 7 | [Delta by day, month and year](daily-risk-vector.md) | [#166](https://github.com/gobbles404/goosedove/pull/166), `df2bec9` | Use `_ReportDelta` with `day`, `month` and `year`. Mix Asian and pen trades with different payment dates: risk sums by observation date, each bucket view totals to `_ReportRisk`, and fixed dates retain zero rows. |
+| 3 / item 7 | [Delta by day, month and year](daily-risk-vector.md) | [#166](https://github.com/gobbles404/goosedove/pull/166), `df2bec9` | Use `_ReportRisk(results, "nominal_delta", bucket)` with `day`, `month` and `year`, `_ReportDelta` until #NN retired it. Mix Asian and pen trades with different payment dates: risk sums by observation date, each bucket view's rows total to the Total row above them, and fixed dates retain zero rows. |
 | 4 / item 10 | [IFERC basis futures](iferc-basis-futures.md) | [#167](https://github.com/gobbles404/goosedove/pull/167), `9117a39`; payment-help finding closed | Book a Waha/HSC-style basis future with `lastday` and `+3bd`. Verify payment from last trading, fixing from publication, and the live -> fixed-unpaid -> cash progression. The synthetic 1-lot Waha example marks $500 at -0.30 against -0.50, then $750 at a -0.20 fixing, then $750 cash on payment. |
 | 5 / item 2 | [Numeric trade IDs](numeric-trade-ids.md) | [#168](https://github.com/gobbles404/goosedove/pull/168), `d1633d7`; reviewed clean | Enter numeric IDs, including a 15-digit value and a repeated ID. Read back numeric values; duplicates keep both trade occurrences. Fractional values and text IDs fail. |
 | 6 / item 6 | [Readable index names](readable-index-names.md) | [#169](https://github.com/gobbles404/goosedove/pull/169), `3c10318`; workbook-selector corrections verified in the #170 review | Supply required `display_name` after `name` in `_CreateIndex`. Inspect the description beside the existing name; price-vector matching and handle labels still use `name`. |
@@ -29,7 +29,8 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 11 / bilateral first slice | [Instrument rename to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), `29fe38f`; reviewed clean, full gate passed | Select `fixed_float` in catalog/template cells. Old `future` selectors fail normally. Check existing bookings retain the same fields, values and risks; actual futures index/schedule names stay unchanged. |
 | 12 / items 8 and 11 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | [#175](https://github.com/gobbles404/goosedove/pull/175), awaiting review | Add `marketing_reserve` to a ticket or a template: `_ReportReserves` shows the amounts summed once per row, a strip once, a zero-quantity row in full, and value and risk do not move. Book a bilateral template with `counterparty` in place of `clearing_house`: the batch is made and read back per row, and evaluation still refuses. |
 | 13 / bilateral calculation | [Bilateral calculation kernel](bilateral-calculation-kernel.md) | [#176](https://github.com/gobbles404/goosedove/pull/176), reviewed clean, full gate passed | Nothing new to try on the sheet in this one: the evaluator values a bilateral batch on a discount curve privately, pinned by hand-priced tests; the sheet's curve argument is item 14's. |
-| 14 / bilateral integration | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | [#177](https://github.com/gobbles404/goosedove/pull/177), awaiting review | Give `_EvaluateTrades` a `_CreateDiscountCurve` handle as its third argument for a bilateral batch, the curve starting on the valuation day and reaching past every unpaid payment: `_ReportValues` reads `bilateral_mark` and `bilateral_cash`, `_ReportRisk` `nominal_delta`, `delta` and the signed DV01, `_ReportDelta` both deltas by day, month or year, and `util_ReadHandle` the payment factors, amounts, group NPVs and DV01s. Leave the curve out for a cleared batch; a cleared batch given one, a curve on another day or one ending early is refused in the library's words. The kept workbook's block from row 2020 holds the two groups, the tick, the replacement curve and the one receivable's three days. Sheets reading the risk spills by position read the unit, the DV01 and the date a column to the right. |
+| 14 / bilateral integration | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | [#177](https://github.com/gobbles404/goosedove/pull/177), awaiting review | Give `_EvaluateTrades` a `_CreateDiscountCurve` handle as its third argument for a bilateral batch, the curve starting on the valuation day and reaching past every unpaid payment: `_ReportValues` reads `bilateral_mark` and `bilateral_cash`, `_ReportRisk` `nominal_delta`, `delta` and the signed DV01 by day, month or year since #NN, item 15, and `util_ReadHandle` the payment factors, amounts, group NPVs and DV01s. Leave the curve out for a cleared batch; a cleared batch given one, a curve on another day or one ending early is refused in the library's words. The kept workbook's block from row 2020 holds the two groups, the tick, the replacement curve and the one receivable's three days. |
+| 15 / item 12 | [Unified risk reporting with totals first](unified-risk-reporting.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Call `_ReportRisk(results, risk, bucket)` with every argument: `nominal_delta`, `delta`, `dv01` or `all` and `day`, `month` or `year`, exactly so. Read the Total row under the context, heading and type rows, then the dated rows: the deltas on observation days, the DV01 on payment days, `all` on their union with zero where only the other kind has a date. On the bilateral block, `all` by month is the ticket's spill, 0, 0.5 and 0.0085 over January 2027, 2028 and 2029; a cleared batch's `dv01` is the Total of nothing over no row. A left-out or blank selector, a case or a quarter is refused. `_ReportDelta` is gone; the kept workbook's reports stand beside their blocks. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -47,7 +48,8 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / owner UAT | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md), built in #177 | Use the kept workbook's bilateral block and realistic desk batches: verify cleared and bilateral values, both delta bases, DV01, different payment days, partial fixings and independent quote and curve updates before closing the arc. |
+| 1 / owner UAT | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md), built in #177, and [unified risk reporting](unified-risk-reporting.md), built in #NN | Use the kept workbook's bilateral block and realistic desk batches: verify cleared and bilateral values, both delta bases, DV01 by payment day, month and year, different payment days, partial fixings and independent quote and curve updates before closing the arc. |
+| 2 / item 12 | The collector of the [risk reporting and aggregation series](aggregate-evaluated-results.md) | After the one-result report: collect compatible evaluated results, then take the collector's handle in the same reader; identity, snapshot and repeated-input policies are proposals to confirm in those tickets. |
 
 Readable index names, reserve totals, date offsets, mixed period entry and BAL helper
 inputs have moved to release testing above. Bilateral is the remaining main arc; its
@@ -281,7 +283,8 @@ on one day should appear as 4 lots on that day. Sorting the existing rows alone 
 
 Agreed direction, refined 9 October: retain the daily vector and its calendar-month and
 calendar-year aggregates at preparation, carry all three into results, and select the
-saved view with `_ReportDelta(results, [bucket = "day"])`. Allowed buckets are `day`,
+saved view with `_ReportDelta(results, [bucket = "day"])`, since #NN with
+`_ReportRisk(results, risk, bucket)`, item 12, both selectors required. Allowed buckets are `day`,
 `month` and `year`; quarters are excluded. Sum each slot's own live lots, never the
 repeated contract-total columns from the debug spill. The reader selects and formats
 saved values, without numerical aggregation or reading the debug table.
@@ -432,3 +435,29 @@ Those representation choices are built in #175. The subsequent agreed
 valuation path passes the current curve directly to evaluation, keeping it outside static
 trades so rate updates reuse trades and commodity fixing preparation. There is no new
 public preparation step in this arc.
+
+## 12. Aggregate evaluated results
+
+Owner direction, 10 October: collect an array of evaluated-result handles, cardinality
+agnostic, and retain risk vectors through time rather than only scalar totals. Compatible
+cleared and bilateral commodity delta combines by index and observation date; different
+indexes retain separate lot risk. DV01 is included, attributed by payment date and grouped by
+curve and currency. Month and year reports are sums of those dated entries. Quote and curve
+updates flow through evaluation into the collection and its readers via ordinary Excel
+dependencies.
+
+Owner refinement, 11 October: one `_ReportRisk(results, risk, bucket)` for evaluated results
+and, later, their aggregate. All parameters are required. Risk is `nominal_delta`, `delta`,
+`dv01` or `all`; bucket is `day`, `month` or `year`. Spill wide risk columns with the saved
+**Total first**, followed by chronological dated buckets. There is no default, summary view,
+separate aggregate reader or scalar-only bucket in this specification. Keep fixed and paid
+zero buckets. With `all`, rows are the sorted union of observation and payment buckets, with
+each column's date meaning and unit explicit. Unrelated indexes' lots never sum to a grand
+total. Index groups follow first supplied appearance.
+
+The [series specification](aggregate-evaluated-results.md) records this direction and
+supersedes the earlier collector-first plan. The [first ticket](unified-risk-reporting.md) is
+built in #NN: the single-result report and the saved payment-time DV01, `_ReportDelta` retired
+and the kept callers migrated, the heading and context layout as proposed, with the owner's
+answers of 11 October recorded on the page. The collector and the acceptance of its handle in
+the same reader follow in the series' next tickets, not implemented.

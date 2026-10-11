@@ -40,4 +40,4 @@ Nothing: the result is complete when it is published or it is not published, so 
 
 ## Not here
 
-No delta or DV01, [_ReportRisk](report-risk.md). No value per trade, no decomposition into offsets, set and live amounts, no cash over a chosen interval, no NPV by payment group, which the readback shows as `group_npv`: a new view is a new function over a result that holds what it needs, and `util_ReadHandle` on the results handle is the debugging spill of the dated contents meanwhile.
+No delta or DV01, [_ReportRisk](report-risk.md), by time since #NN. No value per trade, no decomposition into offsets, set and live amounts, no cash over a chosen interval, no NPV by payment group, which the readback shows as `group_npv`: a new view is a new function over a result that holds what it needs, and `util_ReadHandle` on the results handle is the debugging spill of the dated contents meanwhile.

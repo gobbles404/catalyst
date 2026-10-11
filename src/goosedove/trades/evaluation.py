@@ -25,6 +25,7 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
+from goosedove.trades.encoding import PaymentAxes
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments
 from goosedove.trades.reserves import Reserves
 from goosedove.trades.terms import Route, Settlement
@@ -32,8 +33,9 @@ from goosedove.trades.terms import Route, Settlement
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
 # The bilateral path's counts, since #176: factors read off the curve, one per distinct unpaid
 # payment day; unpaid groups discounted, each with its time fraction and its DV01; live slots
-# weighted by their group's factor; and the reductions of the discounted lots, onto the
-# references, the days, the months and the years.
+# weighted by their group's factor; and the reductions, of the discounted lots onto the
+# references, the days, the months and the years and, since #NN, of the groups' DV01s onto the
+# payment days, their months and their years.
 PAYMENT_FACTORS_READ = "payment_factors_read"
 GROUPS_VALUED = "groups_valued"
 SLOTS_DISCOUNTED = "slots_discounted"
@@ -75,7 +77,13 @@ class TradeResults:
     365 times its NPV, and payment_factor[g] the curve's factor on the group's payment day, 1.0 for
     a paid group, the policy and no read; the four None for a cleared batch, which values no group.
     mark for a bilateral batch is the NPV of the unpaid groups and dv01 their sensitivity summed,
-    negative for an amount receivable."""
+    negative for an amount receivable.
+
+    Since #NN, dv01_by_day[d], dv01_by_month[m] and dv01_by_year[y]: the groups' DV01s summed
+    onto the payment-time axes the encoding made once, the day a group's amount is paid, the
+    calendar month it falls in and the calendar year, a paid group's nothing on its day, each
+    view checked finite; None for a cleared batch, whose DV01 has no dated axis. _ReportRisk
+    reads them by reference through risk_view."""
 
     prepared: PreparedTrades
     market: Market
@@ -104,6 +112,9 @@ class TradeResults:
     npv_by_group: NDArray[np.float64] | None
     dv01_by_group: NDArray[np.float64] | None
     payment_factor: NDArray[np.float64] | None
+    dv01_by_day: NDArray[np.float64] | None
+    dv01_by_month: NDArray[np.float64] | None
+    dv01_by_year: NDArray[np.float64] | None
 
     def codes(self) -> tuple[str, ...]:
         """The axis spelled as the schedule spells its codes, one per contract of the batch."""
@@ -203,6 +214,9 @@ def trade_results(
         None,
         None,
         None,
+        None,
+        None,
+        None,
     )
 
 
@@ -268,10 +282,13 @@ def _discounted(
     the index resolved. The arithmetic runs with numpy's flags down and the rules judge: every
     group's amount, the two totals, the discounted lots by reference and by bucket, the discounted
     sensitivity by reference and the lots' total are finite, else the first that is not is refused
-    by its group, the batch, its contract or its bucket.
+    by its group, the batch, its contract or its bucket. Since #NN the groups' DV01s are summed
+    too, onto the payment days, their months and their years, the axes the encoding made once, a
+    paid group's nothing on its day, and each of the three views is finite or the first period
+    that is not is refused.
 
     Work: one factor per distinct unpaid payment day, one group per unpaid group, one slot per
-    slot and four reductions, reported to the counter; nothing per component or observation,
+    slot and seven reductions, reported to the counter; nothing per component or observation,
     nothing of the nominal risk done again, and no day sorted.
     """
     encoded = prepared.encoded
@@ -314,6 +331,18 @@ def _discounted(
         monthly = np.bincount(encoded.month_of_day, weights=daily, minlength=encoded.months.size)
         yearly = np.bincount(encoded.year_of_month, weights=monthly, minlength=encoded.years.size)
         discounted_total = float(discounted_lot_delta.sum())
+        # Since #NN, the DV01 by payment day, month and year, the groups' DV01s summed onto the
+        # axes the encoding made once, a paid group's nothing on its day, three bincounts.
+        axes = cast(PaymentAxes, encoded.payment_axes)  # bilateral and financial: made with it
+        dv01_by_day = np.bincount(
+            axes.day_of_group, weights=dv01_by_group, minlength=axes.days.size
+        )
+        dv01_by_month = np.bincount(
+            axes.month_of_day, weights=dv01_by_day, minlength=axes.months.size
+        )
+        dv01_by_year = np.bincount(
+            axes.year_of_month, weights=dv01_by_month, minlength=axes.years.size
+        )
     unfinished = ~np.isfinite(amount)
     if unfinished.any():
         g = int(unfinished.argmax())
@@ -365,10 +394,23 @@ def _discounted(
             f"number of {words}; the contracts' discounted deltas, each finite, sum past the "
             "largest number"
         )
+    for label, starts, amounts in (
+        ("the payment day", axes.days, dv01_by_day),
+        ("the payment month from", axes.months, dv01_by_month),
+        ("the payment year from", axes.years, dv01_by_year),
+    ):  # the three views, not the groups: a bucket's sum can outrun what its parts did not
+        outrun = ~np.isfinite(amounts)
+        if outrun.any():
+            b = int(outrun.argmax())
+            raise ValueError(
+                f"{label} {starts[b]} has {float(amounts[b])!r} of DV01 in all, expected a finite "
+                f"amount of {currency} per basis point; its groups' DV01s sum past the largest "
+                "number"
+            )
     counter.hit(PAYMENT_FACTORS_READ, int(pays.days.size))
     counter.hit(GROUPS_VALUED, int(pays.groups.size))
     counter.hit(SLOTS_DISCOUNTED, int(encoded.slot_group.size))
-    counter.hit(RISK_REDUCTIONS, 4)
+    counter.hit(RISK_REDUCTIONS, 7)
     for array in (
         amount,
         npv,
@@ -379,6 +421,9 @@ def _discounted(
         daily,
         monthly,
         yearly,
+        dv01_by_day,
+        dv01_by_month,
+        dv01_by_year,
     ):
         array.setflags(write=False)
     return TradeResults(
@@ -409,25 +454,117 @@ def _discounted(
         npv,
         dv01_by_group,
         payment_factor,
+        dv01_by_day,
+        dv01_by_month,
+        dv01_by_year,
     )
 
 
 class Bucket(Enum):
-    """What a delta report sums the lots by: the observation day, the calendar month it falls in
-    or the calendar year, _ReportDelta's three choices, a quarter none of them."""
+    """What a risk report sums by: the day, the calendar month it falls in or the calendar year,
+    _ReportRisk's three choices, a quarter none of them."""
 
     DAY = "day"
     MONTH = "month"
     YEAR = "year"
 
 
-def bucketed(
+class Risk(Enum):
+    """What a risk report shows, since #NN: the nominal delta, the delta weighted by the route's
+    valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
+    summary none of them."""
+
+    NOMINAL_DELTA = "nominal_delta"
+    DELTA = "delta"
+    DV01 = "dv01"
+    ALL = "all"
+
+
+@dataclass(frozen=True, slots=True)
+class RiskView:
+    """One risk report's content, since #NN, selected by reference and placed through saved
+    places: dates, the bucket starts, increasing, observation days under the deltas, payment days
+    under the DV01 and their union under all; labels, one heading per risk column, the index's
+    name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
+    totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
+    vector itself where the axis is its own and a copy placed on the shared axis under all, zero
+    where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
+
+    dates: NDArray[np.datetime64]
+    labels: tuple[str, ...]
+    totals: tuple[float, ...]
+    columns: tuple[NDArray[np.float64], ...]
+
+
+NO_DAYS: NDArray[np.datetime64] = np.empty(0, dtype="datetime64[D]")
+NOTHING: NDArray[np.float64] = np.empty(0)
+NO_DAYS.setflags(write=False)
+NOTHING.setflags(write=False)
+
+
+def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
+    """The one way to read a risk report's content, since #NN, _ReportRisk's selection. The
+    nominal delta and the delta are on the observation axis of the bucket, the preparation's
+    vector and the result's, totalled by the saved scalars. The DV01 is on the payment axis of
+    the bucket, the result's vector the evaluation summed onto the axes the encoding made once,
+    totalled by the saved DV01; a cleared result's is a total of nothing over no dated row, its
+    DV01 having no dated axis. All three are on the union axis the encoding made, each vector
+    copied through its saved places and zero where only the other kind has a date; a cleared
+    result's all is on the observation axis with a DV01 column of zeros. The labels name the
+    index and its reporting lot for the deltas, `UNIT delta [UNIT]`, and the curve's group and
+    the currency for the DV01, `curve_1 USD dv01 [USD per basis point]`, `cleared USD dv01 [USD
+    per basis point]` where no curve values.
+
+    Work: a copy per column under all, through the saved places; nothing summed, nothing sorted,
+    nothing discovered, the Total the scalar the evaluation stored.
+    """
+    encoded = results.prepared.encoded
+    terms = encoded.terms
+    currency = results.currency
+    nominal_label = f"{terms.index.name} nominal_delta [{terms.reporting_lot.name}]"
+    delta_label = f"{terms.index.name} delta [{terms.reporting_lot.name}]"
+    group = "curve_1" if results.curve is not None else "cleared"
+    dv01_label = f"{group} {currency} dv01 [{currency} per basis point]"
+    match risk:
+        case Risk.NOMINAL_DELTA:
+            observed, nominal, _ = _observation_view(results, bucket)
+            return RiskView(observed, (nominal_label,), (results.lot_delta_total,), (nominal,))
+        case Risk.DELTA:
+            observed, _, discounted = _observation_view(results, bucket)
+            return RiskView(
+                observed, (delta_label,), (results.discounted_lot_delta_total,), (discounted,)
+            )
+        case Risk.DV01:
+            paid, dv01 = _payment_view(results, bucket)
+            return RiskView(paid, (dv01_label,), (results.dv01,), (dv01,))
+        case Risk.ALL:
+            labels = (nominal_label, delta_label, dv01_label)
+            totals = (results.lot_delta_total, results.discounted_lot_delta_total, results.dv01)
+            observed, nominal, discounted = _observation_view(results, bucket)
+            if encoded.payment_axes is None:
+                # Cleared: the observation axis, the DV01 nothing on every row.
+                columns = (nominal, discounted, np.zeros(observed.size))
+                return RiskView(observed, labels, totals, columns)
+            _, dv01 = _payment_view(results, bucket)
+            union, observed_in, paid_in = _union_view(encoded.payment_axes, bucket)
+            nominal_on, discounted_on, dv01_on = (
+                np.zeros(union.size),
+                np.zeros(union.size),
+                np.zeros(union.size),
+            )
+            nominal_on[observed_in] = nominal
+            discounted_on[observed_in] = discounted
+            dv01_on[paid_in] = dv01
+            return RiskView(union, labels, totals, (nominal_on, discounted_on, dv01_on))
+        case _:
+            assert_never(risk)
+
+
+def _observation_view(
     results: TradeResults, bucket: Bucket
 ) -> tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
-    """One of the three retained views by reference: its bucket starts, the encoding's axis; the
-    nominal lots in it, the preparation's vector; and since #177 the discounted lots, the result's
-    own, a cleared result's the nominal array itself. Nothing is summed, sorted or converted
-    here."""
+    """The observation axis of the bucket with the nominal lots, the preparation's, and the
+    discounted lots, the result's, a cleared result's the nominal array itself, by reference."""
     prepared = results.prepared
     encoded = prepared.encoded
     match bucket:
@@ -437,5 +574,40 @@ def bucketed(
             return encoded.months, prepared.monthly_lots, results.discounted_monthly_lots
         case Bucket.YEAR:
             return encoded.years, prepared.yearly_lots, results.discounted_yearly_lots
+        case _:
+            assert_never(bucket)
+
+
+def _payment_view(
+    results: TradeResults, bucket: Bucket
+) -> tuple[NDArray[np.datetime64], NDArray[np.float64]]:
+    """The payment axis of the bucket with the DV01 the evaluation summed onto it, by reference;
+    a cleared result's no day and nothing, its DV01 having no dated axis."""
+    axes = results.prepared.encoded.payment_axes
+    if axes is None:
+        return NO_DAYS, NOTHING
+    match bucket:  # the three vectors stand with the axes: bilateral and financial, made with them
+        case Bucket.DAY:
+            return axes.days, cast(NDArray[np.float64], results.dv01_by_day)
+        case Bucket.MONTH:
+            return axes.months, cast(NDArray[np.float64], results.dv01_by_month)
+        case Bucket.YEAR:
+            return axes.years, cast(NDArray[np.float64], results.dv01_by_year)
+        case _:
+            assert_never(bucket)
+
+
+def _union_view(
+    axes: PaymentAxes, bucket: Bucket
+) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.intp]]:
+    """The union of the observation and the payment axes of the bucket, the encoding's, with the
+    observation axis's places on it and the payment axis's."""
+    match bucket:
+        case Bucket.DAY:
+            return axes.union_days, axes.observed_in_days, axes.paid_in_days
+        case Bucket.MONTH:
+            return axes.union_months, axes.observed_in_months, axes.paid_in_months
+        case Bucket.YEAR:
+            return axes.union_years, axes.observed_in_years, axes.paid_in_years
         case _:
             assert_never(bucket)

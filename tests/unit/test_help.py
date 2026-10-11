@@ -667,11 +667,24 @@ def test_the_two_reports_explain_themselves() -> None:
         "labels, the currency and the valuation day, as evaluation stored them."
     )
     description, arguments, hidden = SPECS["_ReportRisk"]
-    assert not hidden and arguments == [results]
+    assert not hidden and arguments == [
+        results,
+        (
+            "risk",
+            "Which risk: nominal_delta, delta, dv01 or all, exactly so; the deltas in lots of "
+            "the index's reporting specification by observation day, the DV01 in the currency "
+            "per basis point by payment day.",
+        ),
+        (
+            "bucket",
+            "What to sum by: day, month or year, exactly so; a month or a year is labelled by "
+            "its first day, and the Total is the saved number.",
+        ),
+    ]
     assert description == (
-        "Reports the batch's risk from its results: the nominal and the discounted delta in lots "
-        "of the index's reporting specification, with that unit, the DV01 with its unit, the "
-        "currency per basis point, and the valuation day, as evaluation stored them."
+        "Reports one risk of the batch from its results, or all three, by day, calendar month "
+        "or calendar year: the saved Total first, then one row per date, the deltas on "
+        "observation days and the DV01 on payment days, as evaluation stored them."
     )
     description, arguments, hidden = SPECS["_ReportReserves"]
     assert not hidden and arguments == [results]

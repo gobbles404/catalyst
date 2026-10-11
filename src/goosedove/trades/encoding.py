@@ -27,12 +27,45 @@ from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
-from goosedove.trades.terms import METHODS, ResolvedTrades, ScheduleMethod
+from goosedove.trades.terms import METHODS, ResolvedTrades, Route, ScheduleMethod
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
 ENCODED_OBSERVATIONS = "encoded_observations"  # observations placed on their slots
 ENCODED_SLOTS = "encoded_slots"  # dated slots named and summed over
+ENCODED_PAYMENT_DAYS = (
+    "encoded_payment_days"  # a bilateral batch's distinct payment days, since #NN
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentAxes:
+    """The payment-time axes a DV01 report is summed onto, since #NN, for a bilateral batch and for
+    no other, static for the batch: days, the distinct payment days of every group, increasing,
+    paid or not, and day_of_group[g]; months, the first day of each calendar month those days fall
+    in, increasing, and month_of_day[d]; years, the first day of each calendar year, and
+    year_of_month[m]. Then, for the report of every risk at once, the union of the observation
+    axis and the payment axis at each level, increasing, with each axis's places on it:
+    union_days, observed_in_days and paid_in_days; union_months, observed_in_months and
+    paid_in_months; union_years, observed_in_years and paid_in_years. Made once when the batch
+    is made, so that a report copies saved vectors through saved places and discovers, sorts and
+    sums nothing; None for a cleared batch, whose DV01 has no dated axis, and for a physical one."""
+
+    days: NDArray[np.datetime64]
+    day_of_group: NDArray[np.intp]
+    months: NDArray[np.datetime64]
+    month_of_day: NDArray[np.intp]
+    years: NDArray[np.datetime64]
+    year_of_month: NDArray[np.intp]
+    union_days: NDArray[np.datetime64]
+    observed_in_days: NDArray[np.intp]
+    paid_in_days: NDArray[np.intp]
+    union_months: NDArray[np.datetime64]
+    observed_in_months: NDArray[np.intp]
+    paid_in_months: NDArray[np.intp]
+    union_years: NDArray[np.datetime64]
+    observed_in_years: NDArray[np.intp]
+    paid_in_years: NDArray[np.intp]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +118,11 @@ class Encoded:
     count of its specification times the specification's rate per lot, summed, since #175 the
     marketing reserve the rows booked, summed once per row, and their currency, the Reserves
     record, static for the batch and entering no number
-    here; _ReportReserves spills the totals and the results readback shows them once."""
+    here; _ReportReserves spills the totals and the results readback shows them once.
+
+    Then, since #NN, payment_axes, the payment-time axes a DV01 report is summed onto and their
+    unions with the observation axes, PaymentAxes, made once here for a bilateral batch and None
+    for a cleared or a physical one."""
 
     terms: ResolvedTrades
     observations: Observations
@@ -111,6 +148,7 @@ class Encoded:
     years: NDArray[np.datetime64]
     year_of_month: NDArray[np.intp]
     reserves: Reserves
+    payment_axes: PaymentAxes | None
 
     def slot_trade(self, slot: int) -> str:
         """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
@@ -177,7 +215,12 @@ def encoded(
     the distinct observation days, the calendar months they fall in and the calendar years,
     three uniques, each day's pricing contract its first slot's, so that a delta report by
     day, month or year sums what the preparation leaves live onto them and nothing is sorted or
-    grouped when it is read.
+    grouped when it is read. For a bilateral batch, since #NN, the payment-time axes too: the
+    distinct payment days of every group, their months and their years, three uniques more, and
+    the union of each with the observation axis of its level with each axis's places on it,
+    three unions and six searches, so that a DV01 report by payment day and a report of every
+    risk on one axis copy saved vectors through saved places; a cleared batch, whose DV01 has no
+    dated axis, makes none of this and its ledger stands.
 
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
@@ -189,7 +232,8 @@ def encoded(
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct
-    specification the batch selects; and the reserves once over the components.
+    specification the batch selects; the reserves once over the components; and, for a
+    bilateral batch, one payment day per distinct payment day, the axes made once.
     """
     index = terms.index
     conventions = index.conventions
@@ -220,6 +264,12 @@ def encoded(
     )
     references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
     buckets = _the_buckets(slot_date, slot_reference)
+    # A cleared batch's DV01 has no dated axis; nothing more is made for it and its ledger stands.
+    payment_axes = (
+        _the_payment_axes(payment_date, buckets[0], buckets[3], buckets[5], counter)
+        if terms.route is Route.BILATERAL and payment_date is not None
+        else None
+    )
     if payment_date is not None:
         _payments_after_observations(terms, group_contract, payment_date, slot_group, slot_date)
         payment_date.setflags(write=False)
@@ -246,7 +296,9 @@ def encoded(
     )
     for array in arrays:
         array.setflags(write=False)
-    return Encoded(terms, observations, *arrays[:6], payment_date, *arrays[6:], reserved)
+    return Encoded(
+        terms, observations, *arrays[:6], payment_date, *arrays[6:], reserved, payment_axes
+    )
 
 
 def _the_groups(
@@ -365,6 +417,50 @@ def _the_buckets(
         year_keys.astype("datetime64[D]"),
         year_of_month,
     )
+
+
+def _the_payment_axes(
+    payment_date: NDArray[np.datetime64],
+    days: NDArray[np.datetime64],
+    months: NDArray[np.datetime64],
+    years: NDArray[np.datetime64],
+    counter: WorkCounter,
+) -> PaymentAxes:
+    """The payment-time axes of a bilateral batch, since #NN: the distinct payment days of every
+    group with each group's place, the months those days fall in with each day's, the years with
+    each month's, three uniques; and at each level the union of the observation axis given and
+    the payment axis, one union, with each axis's places on it, two searches, so that a report of
+    every risk copies the saved vectors onto one axis through saved places. Every array frozen;
+    one payment day per distinct payment day reported to the counter."""
+    paid, day_of_group = np.unique(payment_date, return_inverse=True)
+    month_keys, month_of_day = np.unique(paid.astype("datetime64[M]"), return_inverse=True)
+    year_keys, year_of_month = np.unique(month_keys.astype("datetime64[Y]"), return_inverse=True)
+    paid_months = month_keys.astype("datetime64[D]")
+    paid_years = year_keys.astype("datetime64[D]")
+    arrays = (
+        paid,
+        day_of_group,
+        paid_months,
+        month_of_day,
+        paid_years,
+        year_of_month,
+        *_the_union(days, paid),
+        *_the_union(months, paid_months),
+        *_the_union(years, paid_years),
+    )
+    for array in arrays:
+        array.setflags(write=False)
+    counter.hit(ENCODED_PAYMENT_DAYS, int(paid.size))
+    return PaymentAxes(*arrays)
+
+
+def _the_union(
+    observed: NDArray[np.datetime64], paid: NDArray[np.datetime64]
+) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.intp]]:
+    """The union of an observation axis and a payment axis, increasing, with each axis's places
+    on it: one union, two searches."""
+    union = np.union1d(observed, paid)
+    return union, np.searchsorted(union, observed), np.searchsorted(union, paid)
 
 
 def _the_slots(

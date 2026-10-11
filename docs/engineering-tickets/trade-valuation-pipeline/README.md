@@ -26,6 +26,14 @@ sensitivity of the discounted mark to a one basis point rise, and both nominal a
 deltas reported, are built in #177, [bilateral valuation and risk in Excel](bilateral-excel-integration.md),
 as the [bilateral plan](bilateral-discounting-and-dv01.md) records; owner UAT follows.
 
+**Reporting update, 11 October, built in #NN:** the [risk reporting and aggregation series](aggregate-evaluated-results.md)
+records the agreed direction, `_ReportRisk(results, risk, bucket)`, every argument required, one
+risk or `all`, day, month or year, and the saved Total above the dated rows. The
+[first ticket](unified-risk-reporting.md) is built: the report on one evaluated batch with the
+DV01 by payment time, `_ReportDelta` retired and every kept caller migrated. Later tickets add
+a collector and take its handle in the same reader. This supersedes the older reader defaults
+and layouts in the pages below.
+
 | Material | How engineering should use it |
 |---|---|
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
@@ -37,7 +45,9 @@ as the [bilateral plan](bilateral-discounting-and-dv01.md) records; owner UAT fo
 | [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | `counterparty` required with a bilateral route and refused with a cleared one, a label kept per row; `marketing_reserve` an optional nonnegative amount booked once per ticket row, summed into the reserves `_ReportReserves` shows; UAT items 8 and 11, built in #175 |
 | [Bilateral calculation kernel](bilateral-calculation-kernel.md) | Built in #176, privately: payment-group NPV on a curve anchored at `as_of`, nominal and discounted lot vectors and analytic DV01, hand-priced and measured inside the existing evaluator; the public curve argument and the readers are #177's |
 | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md) | Built in #177: the optional curve on `_EvaluateTrades`, `nominal_delta` and `delta` in both risk reports with DV01 in the scalar one, the results readback's discounted contract risk and payment-group facts, the workbook, smoke, host and lifetime acceptance; owner UAT follows |
-| [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
+| [Risk reporting and aggregation](aggregate-evaluated-results.md) | The series: one risk reader for an evaluated batch and, later, a collection of them, a required risk and bucket, wide columns and the saved Total first; the report first, the collector next |
+| [Unified risk reporting with totals first](unified-risk-reporting.md) | Built in #NN: `_ReportRisk(results, risk, bucket)`, `nominal_delta`, `delta`, `dv01` or `all` by day, month or year, the DV01 by payment time saved at evaluation on axes the encoding makes once, `_ReportDelta` retired and every caller migrated |
+| [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selected the reporting bucket until #NN retired it into `_ReportRisk`; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on the evaluated results and read through `_ReportReserves`; since #175 the marketing reserve is the optional amount a row books, summed the same way; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |
 | [Numeric trade IDs](numeric-trade-ids.md) | `trade_id` as the source system's whole number of at most 15 digits, numeric entry and readback, text refused, duplicates kept; built in #168 |

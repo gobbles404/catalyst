@@ -1,9 +1,12 @@
 # 6. Result reports: _ReportValues and _ReportRisk
 
-Since #166 a third report, `_ReportDelta(results, [bucket])`, spills the delta by observation
+Since #166 a third report, `_ReportDelta(results, [bucket])`, spilled the delta by observation
 day, calendar month or calendar year from three vectors the preparation stores, as
-[daily-risk-vector.md](daily-risk-vector.md) specifies; it reads what the result shares and
-sums nothing, and the two reports below are unchanged.
+[daily-risk-vector.md](daily-risk-vector.md) specifies; since #NN it is retired into
+`_ReportRisk(results, risk, bucket)`, [unified-risk-reporting.md](unified-risk-reporting.md),
+one risk or all three by time with the saved Total first, which reads what the result shares
+and sums nothing; `_ReportValues` below is unchanged and the scalar risk report's layout is
+history.
 
 [Pipeline overview](README.md) · [Previous: results](05-results.md)
 
