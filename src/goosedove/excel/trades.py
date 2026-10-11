@@ -196,7 +196,7 @@ def _ReportRisk(
 
 
 def _risk_table(as_of: np.datetime64, view: RiskView) -> MixedArray:
-    """The risk report's rectangle, since #NN: a context row, `as_of`, the valuation day and a
+    """The risk report's rectangle, since #178: a context row, `as_of`, the valuation day and a
     dash in every other cell; a header row, `period` and the risk labels; a type row, `str |
     datetime64[D]` for the period column and `float64` for each risk; the Total row, the word and
     the saved scalars; then one row per date, the bucket start and the saved values. The period

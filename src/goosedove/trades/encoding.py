@@ -34,13 +34,13 @@ ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and chec
 ENCODED_OBSERVATIONS = "encoded_observations"  # observations placed on their slots
 ENCODED_SLOTS = "encoded_slots"  # dated slots named and summed over
 ENCODED_PAYMENT_DAYS = (
-    "encoded_payment_days"  # a bilateral batch's distinct payment days, since #NN
+    "encoded_payment_days"  # a bilateral batch's distinct payment days, since #178
 )
 
 
 @dataclass(frozen=True, slots=True)
 class PaymentAxes:
-    """The payment-time axes a DV01 report is summed onto, since #NN, for a bilateral batch and for
+    """The payment-time axes a DV01 report is summed onto, since #178, for a bilateral batch and for
     no other, static for the batch: days, the distinct payment days of every group, increasing,
     paid or not, and day_of_group[g]; months, the first day of each calendar month those days fall
     in, increasing, and month_of_day[d]; years, the first day of each calendar year, and
@@ -120,7 +120,7 @@ class Encoded:
     record, static for the batch and entering no number
     here; _ReportReserves spills the totals and the results readback shows them once.
 
-    Then, since #NN, payment_axes, the payment-time axes a DV01 report is summed onto and their
+    Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and their
     unions with the observation axes, PaymentAxes, made once here for a bilateral batch and None
     for a cleared or a physical one."""
 
@@ -215,7 +215,7 @@ def encoded(
     the distinct observation days, the calendar months they fall in and the calendar years,
     three uniques, each day's pricing contract its first slot's, so that a delta report by
     day, month or year sums what the preparation leaves live onto them and nothing is sorted or
-    grouped when it is read. For a bilateral batch, since #NN, the payment-time axes too: the
+    grouped when it is read. For a bilateral batch, since #178, the payment-time axes too: the
     distinct payment days of every group, their months and their years, three uniques more, and
     the union of each with the observation axis of its level with each axis's places on it,
     three unions and six searches, so that a DV01 report by payment day and a report of every
@@ -426,7 +426,7 @@ def _the_payment_axes(
     years: NDArray[np.datetime64],
     counter: WorkCounter,
 ) -> PaymentAxes:
-    """The payment-time axes of a bilateral batch, since #NN: the distinct payment days of every
+    """The payment-time axes of a bilateral batch, since #178: the distinct payment days of every
     group with each group's place, the months those days fall in with each day's, the years with
     each month's, three uniques; and at each level the union of the observation axis given and
     the payment axis, one union, with each axis's places on it, two searches, so that a report of

@@ -34,7 +34,7 @@ LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per liv
 # The bilateral path's counts, since #176: factors read off the curve, one per distinct unpaid
 # payment day; unpaid groups discounted, each with its time fraction and its DV01; live slots
 # weighted by their group's factor; and the reductions, of the discounted lots onto the
-# references, the days, the months and the years and, since #NN, of the groups' DV01s onto the
+# references, the days, the months and the years and, since #178, of the groups' DV01s onto the
 # payment days, their months and their years.
 PAYMENT_FACTORS_READ = "payment_factors_read"
 GROUPS_VALUED = "groups_valued"
@@ -79,7 +79,7 @@ class TradeResults:
     mark for a bilateral batch is the NPV of the unpaid groups and dv01 their sensitivity summed,
     negative for an amount receivable.
 
-    Since #NN, dv01_by_day[d], dv01_by_month[m] and dv01_by_year[y]: the groups' DV01s summed
+    Since #178, dv01_by_day[d], dv01_by_month[m] and dv01_by_year[y]: the groups' DV01s summed
     onto the payment-time axes the encoding made once, the day a group's amount is paid, the
     calendar month it falls in and the calendar year, a paid group's nothing on its day, each
     view checked finite; None for a cleared batch, whose DV01 has no dated axis. _ReportRisk
@@ -282,7 +282,7 @@ def _discounted(
     the index resolved. The arithmetic runs with numpy's flags down and the rules judge: every
     group's amount, the two totals, the discounted lots by reference and by bucket, the discounted
     sensitivity by reference and the lots' total are finite, else the first that is not is refused
-    by its group, the batch, its contract or its bucket. Since #NN the groups' DV01s are summed
+    by its group, the batch, its contract or its bucket. Since #178 the groups' DV01s are summed
     too, onto the payment days, their months and their years, the axes the encoding made once, a
     paid group's nothing on its day, and each of the three views is finite or the first period
     that is not is refused.
@@ -331,7 +331,7 @@ def _discounted(
         monthly = np.bincount(encoded.month_of_day, weights=daily, minlength=encoded.months.size)
         yearly = np.bincount(encoded.year_of_month, weights=monthly, minlength=encoded.years.size)
         discounted_total = float(discounted_lot_delta.sum())
-        # Since #NN, the DV01 by payment day, month and year, the groups' DV01s summed onto the
+        # Since #178, the DV01 by payment day, month and year, the groups' DV01s summed onto the
         # axes the encoding made once, a paid group's nothing on its day, three bincounts.
         axes = cast(PaymentAxes, encoded.payment_axes)  # bilateral and financial: made with it
         dv01_by_day = np.bincount(
@@ -470,7 +470,7 @@ class Bucket(Enum):
 
 
 class Risk(Enum):
-    """What a risk report shows, since #NN: the nominal delta, the delta weighted by the route's
+    """What a risk report shows, since #178: the nominal delta, the delta weighted by the route's
     valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
     summary none of them."""
 
@@ -482,7 +482,7 @@ class Risk(Enum):
 
 @dataclass(frozen=True, slots=True)
 class RiskView:
-    """One risk report's content, since #NN, selected by reference and placed through saved
+    """One risk report's content, since #178, selected by reference and placed through saved
     places: dates, the bucket starts, increasing, observation days under the deltas, payment days
     under the DV01 and their union under all; labels, one heading per risk column, the index's
     name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
@@ -503,7 +503,7 @@ NOTHING.setflags(write=False)
 
 
 def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
-    """The one way to read a risk report's content, since #NN, _ReportRisk's selection. The
+    """The one way to read a risk report's content, since #178, _ReportRisk's selection. The
     nominal delta and the delta are on the observation axis of the bucket, the preparation's
     vector and the result's, totalled by the saved scalars. The DV01 is on the payment axis of
     the bucket, the result's vector the evaluation summed onto the axes the encoding made once,

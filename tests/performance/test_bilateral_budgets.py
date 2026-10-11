@@ -310,7 +310,7 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
 # The peak follows the payment groups, the slots, the live slots and the time buckets: a dozen
 # arrays over the groups; the factor gathered onto every slot and the slot's lots, 16 bytes a slot;
 # the cleared tick's quote and contribution on a live slot and the bilateral path's live groups, 32
-# a live slot; the three views over the days, the months and the years; and, since #NN, the three
+# a live slot; the three views over the days, the months and the years; and, since #178, the three
 # DV01 views over the payment days, their months and their years; within four slacks.
 # Measured 3,440 bytes for two groups and no live slot, 5,909 for twenty-four groups and twenty
 # live slots, 4,105 for two asian groups over 43 days, 22,744 for twenty-four over 519 days with 429
@@ -359,7 +359,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     assert result.lot_delta is prep.lot_delta and result.price_sensitivity is prep.price_sensitivity
 
 
-# --- the payment-time axes and the risk views, since #NN -----------------------------------------
+# --- the payment-time axes and the risk views, since #178 -----------------------------------------
 
 
 def axes_of(prep: PreparedTrades) -> PaymentAxes:
