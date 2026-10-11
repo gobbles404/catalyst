@@ -286,3 +286,12 @@ separate ticket. No incremental update or cache: a changed result remakes the co
 cells. No FX, no cross-index lots, no grand total. The lifetime group does not replace the
 valuation day or the history under a collection; the day advance under manual calculation is
 exercised on the results above it.
+
+**Review at `df631db`, two findings, fixed on the branch.** A range of handles was decoded one cell
+at a time, each look counting the texts before it, so n handles cost n squared looks; the cells
+are now decoded in one pass, each text taken in turn, and the seam budget runs at two results and
+at twenty-four, no numpy call of the seam's own. The relay rule recognised a bare argument name
+only, so a report over a failed collection showed two wrappers around the creator's text; it reads
+through a cell's name now, and the chain, a failed evaluation, the collection, the report and the
+readback, is tested through the seam, on the smoke sheet and in the host, each showing the
+creator's text once.

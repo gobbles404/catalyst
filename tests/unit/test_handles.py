@@ -566,6 +566,29 @@ def test_a_vector_of_handles_refuses_the_shape_first_and_then_each_cell_at_its_p
     )
 
 
+# A consumer of a failed vector: the cell's name carries the creator's text whole, and the relay
+# rule reads through the cell's name, so the chain shows one text whichever consumer comes next.
+def test_a_failed_vector_relays_the_creators_failure_once_through_its_cell() -> None:
+    one = cast(str, bridge.call("MakeCurve", [1.0]))
+    failed = cast(str, bridge.call("FailToMake", []))
+    collected = cast(str, bridge.call("CollectCurves", [Cells.from_rows([[one], [failed]])]))
+    assert collected == (
+        "#ERROR CollectCurves: curves cell (2, 1) is the creator's failure, expected curve handle: "
+        f"{failed}"
+    )
+    assert bridge.call("ReadCurve", [collected]) == (
+        f"#ERROR ReadCurve: curve is the creator's failure, expected curve handle: {failed}"
+    )
+    assert bridge.call("ReadEither", [collected]) == (
+        "#ERROR ReadEither: handle is the creator's failure, expected curve or other handle: "
+        f"{failed}"
+    )
+    assert bridge.call("CollectCurves", [Cells.from_rows([[collected, one]])]) == (
+        "#ERROR CollectCurves: curves cell (1, 1) is the creator's failure, expected curve handle: "
+        f"{failed}"
+    )
+
+
 def test_a_vector_of_handles_names_one_kind_and_takes_no_default() -> None:
     def CollectAny(handles: Handles[object]) -> str:
         return ""

@@ -629,6 +629,11 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _AggregateResults: result_handles is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_AggregateResults", prepared));
             Assert.Equal("#ERROR _ReportValues: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportValues", collection));
             Assert.Equal("#ERROR _ReportReserves: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportReserves", collection));
+            // A failed evaluation in a cell fails the collection behind the cell's name, the creator's text
+            // whole, and the reader over the failed collection shows that text once behind its own wrapper.
+            var broken = (string)Seam.Call("_AggregateResults", Column(results, "#ERROR _EvaluateTrades: ValueError: x"));
+            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: x", broken);
+            Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
         }
 
         // The penultimate method on the host's chain: a financial template paying one business day

@@ -292,9 +292,11 @@ refused in the scalar's words when it is no handle text, `result_handles is blan
 results handles in a cell, a row or a column`; then each cell is resolved once, in sheet order, left
 to right along a row and top to bottom down a column, through decision 35's rule, the first bad
 cell named by its coordinates whichever way it is bad, `result_handles cell (2, 1) is blank,
-expected trade results handle`, a creator's failure relayed whole behind the cell's name. Every
-cell counts, a repeated handle twice; the function receives a tuple of the objects in that order
-and never the texts. The kind is one: `Handles[object]` and a vector of a seam type refuse to
+expected trade results handle`, a creator's failure relayed whole behind the cell's name, through
+which decision 35's relay rule reads, so a consumer of the failed vector shows the creator's text
+once. The cells are decoded in one pass, each text taken in turn, n looks for n cells. Every cell
+counts, a repeated handle twice; the function receives a tuple of the objects in that order and
+never the texts. The kind is one: `Handles[object]` and a vector of a seam type refuse to
 register, a vector of any kind handing a function objects it could not take together, and no
 default is taken, the store holding nothing at registration. `CollectCurves` is the probe.
 

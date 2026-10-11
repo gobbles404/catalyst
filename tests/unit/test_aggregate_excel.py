@@ -363,6 +363,49 @@ def test_opposite_positions_keep_their_residual_in_every_order(sheet: dict[str, 
         assert view[3:] == [["Total", 1.0], [serial(AS_OF), 1.0]], order
 
 
+def test_a_failed_source_shows_the_creators_failure_once_through_the_collection(
+    sheet: dict[str, Any],
+) -> None:
+    """The ticket's chain: a failed evaluation in a cell fails the collection behind the cell's
+    name with the creator's text whole, and the report, the readback and a second collection over
+    the failed collection's cell each show that text once behind one wrapper of their own, the
+    relay rule reading through the cell's name; nothing published."""
+    failed = str(
+        ENTRY["_EvaluateTrades"](
+            ENTRY["_PrepareTrades"](
+                ENTRY["_CreateTrades"](
+                    sheet["hng"],
+                    sheet["headers"],
+                    rows([1010.0, serial(AS_OF), "F27", 1.0, 70.0, "+261bd"]),
+                    sheet["bilateral"],
+                ),
+                sheet["hng_history"],
+            ),
+            sheet["hng_market"],
+            bridge.MISSING,
+        )
+    )
+    assert failed.startswith("#ERROR _EvaluateTrades: ValueError: discount_curve is missing")
+    live = bridge.live_handles()
+    collection = str(ENTRY["_AggregateResults"](stacked([sheet["b2"], failed])))
+    assert collection == (
+        "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected "
+        f"trade results handle: {failed}"
+    )
+    assert ENTRY["_ReportRisk"](collection, "all", "day") == (
+        "#ERROR _ReportRisk: results is the creator's failure, expected trade results or "
+        f"aggregate results handle: {failed}"
+    )
+    assert ENTRY["util_ReadHandle"](collection) == (
+        f"#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: {failed}"
+    )
+    assert ENTRY["_AggregateResults"](beside(collection, sheet["b2"])) == (
+        "#ERROR _AggregateResults: result_handles cell (1, 1) is the creator's failure, expected "
+        f"trade results handle: {failed}"
+    )
+    assert bridge.live_handles() == live
+
+
 def test_the_collector_refuses_its_inputs_at_their_cells_and_publishes_nothing(
     sheet: dict[str, Any],
 ) -> None:

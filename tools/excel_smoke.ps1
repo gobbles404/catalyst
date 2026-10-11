@@ -1467,7 +1467,9 @@ $formulas = [ordered]@{
     # source's own saved totals. The refusals: another kind, a blank, a number, a true array, a blank
     # cell, the argument left out, in the seam's words; another valuation day and another price
     # vector in the library's; the value readers refusing the collection, the reader naming its two
-    # kinds, and a risk that is none of the four.
+    # kinds, and a risk that is none of the four. A failed evaluation in a cell fails the collection
+    # behind the cell's name with the creator's text whole, and the report and the readback over the
+    # failed collection show that text once, behind one wrapper of their own.
     '=LEFT(RT8,FIND(":",RT8,FIND(":",RT8)+1))'     = "{pid}:aggregate_results:"
     '=LEFT(RT9,FIND(":",RT9,FIND(":",RT9)+1))'     = "{pid}:aggregate_results:"
     '=ROWS(_ReportRisk(RT8,"all","month"))'      = "7"
@@ -1562,6 +1564,9 @@ $formulas = [ordered]@{
     "=LEFT(_ReportValues(RT8),59)"        = "#ERROR _ReportValues: results is aggregate results handle '"
     "=LEFT(_ReportReserves(RT8),61)"      = "#ERROR _ReportReserves: results is aggregate results handle '"
     '=_ReportRisk(RT8,"gamma","day")'     = "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or all"
+    "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -2610,11 +2615,14 @@ $cells = [ordered]@{
     "RN8" = "=_EvaluateTrades(RN7,RN9,RN12)"
     # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 referred to across
     # RT1:RV1 and down RT3:RT5, collected in RT9 and RT8, QV24 alone in RT10; QV8 beside the next
-    # day's RF8 in RW1:RW2 and beside the tick's QV17 in RX1:RX2, two collections the library refuses.
+    # day's RF8 in RW1:RW2 and beside the tick's QV17 in RX1:RX2, two collections the library refuses;
+    # QV8 beside a failed evaluation in RY1:RY2, collected in RY4, the creator's failure carried whole.
     "RT1" = "=QV8"; "RU1" = "=QV22"; "RV1" = "=QV24"
     "RT3" = "=QV8"; "RT4" = "=QV22"; "RT5" = "=QV24"
     "RW1" = "=QV8"; "RW2" = "=RF8"
     "RX1" = "=QV8"; "RX2" = "=QV17"
+    "RY1" = "=QV8"; "RY2" = "=_EvaluateTrades(QV7,QV9)"
+    "RY4" = "=_AggregateResults(RY1:RY2)"
     "RT8" = "=_AggregateResults(RT3:RT5)"
     "RT9" = "=_AggregateResults(RT1:RV1)"
     "RT10" = "=_AggregateResults(QV24)"

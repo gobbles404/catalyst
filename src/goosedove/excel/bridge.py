@@ -406,24 +406,46 @@ def cells_from_buffers(
     return Cells(kinds.reshape(rows, cols).copy(), numbers.reshape(rows, cols).copy(), texts, seen)
 
 
-def _cell(
-    kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
-) -> object:
-    """The value at flat index i of a range's storage, as it arrived."""
-    kind = Kind(int(kinds.flat[i]))
+def _decoded(kind: Kind, number: float, texts: tuple[str, ...], t: int) -> object:
+    """The value of one cell of a range's storage, as it arrived: its kind, its number, and for a
+    text its place among the range's texts."""
     match kind:
         case Kind.NUMBER:
-            return float(numbers.flat[i])
+            return float(number)
         case Kind.TEXT:
-            return texts[int(np.count_nonzero(kinds.ravel()[:i] == TEXT_CODE))]
+            return texts[t]
         case Kind.BOOLEAN:
-            return bool(numbers.flat[i])
+            return bool(number)
         case Kind.BLANK:
             return None
         case Kind.MISSING:
             return MISSING
         case _:
             assert_never(kind)
+
+
+def _cell(
+    kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
+) -> object:
+    """The value at flat index i of a range's storage, as it arrived: one look for the one cell
+    a message names, its text found by counting the texts before it."""
+    flat = kinds.ravel()
+    kind = Kind(int(flat[i]))
+    t = int(np.count_nonzero(flat[:i] == TEXT_CODE)) if kind is Kind.TEXT else 0
+    return _decoded(kind, float(numbers.flat[i]), texts, t)
+
+
+def _values(cells: Cells) -> tuple[object, ...]:
+    """Every cell of a range in sheet order, as it arrived: one pass, each text taken in turn as
+    its cell comes, so a range of n cells is n looks and never n squared, since #180's review."""
+    values: list[object] = []
+    t = 0
+    for code, number in zip(cells.kinds.flat, cells.numbers.flat, strict=True):
+        kind = Kind(int(code))
+        values.append(_decoded(kind, float(number), cells.texts, t))
+        if kind is Kind.TEXT:
+            t += 1
+    return tuple(values)
 
 
 def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected:
@@ -1493,8 +1515,12 @@ def _publish(
 # A relayed failure: what a consumer's cell shows when the creator it refers to failed. The
 # creator's own text comes last, whole, so a consumer of that consumer finds it here and relays
 # it unchanged, and a chain of any length shows one text. Quoting the previous text instead
-# compounded its escaping, and Excel cut the creator's words after a dozen relays.
-_RELAY: Final = re.compile(r"#ERROR \w+: \w+ is the creator's failure, expected [^:]+: (.+)", re.S)
+# compounded its escaping, and Excel cut the creator's words after a dozen relays. The name may
+# carry a cell, `result_handles cell (2, 1)`, since #180: a consumer of a failed collection finds
+# the creator's text behind the cell's name and shows it once.
+_RELAY: Final = re.compile(
+    r"#ERROR \w+: \w+(?: cell \(\d+, \d+\))? is the creator's failure, expected [^:]+: (.+)", re.S
+)
 
 
 def _resolve(kinds: tuple[type[object], ...], expected: str, name: str, value: object) -> object:
@@ -1534,17 +1560,18 @@ def _resolve_each(
     a boolean, an empty text, a creator's failure, text naming nothing and a handle of another
     kind each refused at its cell, in sheet order, left to right along a row and down a column;
     a missing argument refused as every required argument is. One cell is the one object, and
-    a text repeated is its object again, every cell counted. One lookup per cell, nothing
-    sorted, nothing parsed."""
+    a text repeated is its object again, every cell counted. The cells decoded in one pass and
+    one lookup per cell, nothing sorted, nothing parsed; a creator's failure in a cell is carried
+    whole behind the cell's name, and the relay rule reads through that name, so a consumer of
+    the failed vector shows the creator's text once."""
     if not isinstance(value, Cells):
         return (_resolve((kind,), expected, name, value),)
     rows, cols = value.kinds.shape
     if rows != 1 and cols != 1:
         raise _Rejected(None, value, "", f"expected one cell, one row or one column of {expected}s")
     objects: list[object] = []
-    for i in range(rows * cols):
+    for i, cell in enumerate(_values(value)):
         r, c = divmod(i, cols)
-        cell = _cell(value.kinds, value.numbers, value.texts, i)
         try:
             objects.append(_resolve((kind,), expected, f"{name} cell ({r + 1}, {c + 1})", cell))
         except _Rejected:
