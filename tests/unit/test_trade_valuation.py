@@ -328,6 +328,13 @@ def toy_state(
     return str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market, bridge.MISSING))
 
 
+def by_header(results: str, name: str) -> list[object]:
+    """One column of the results readback, selected by its header, the body rows only."""
+    table = spilled(ENTRY["util_ReadHandle"](results))
+    column = table[0].index(name)
+    return [line[column] for line in table[2:]]
+
+
 def valued(results: str) -> tuple[float, float, float]:
     """The mark, the cash and the total delta a results handle reports."""
     values = spilled(ENTRY["_ReportValues"](results))[2]
@@ -1375,7 +1382,8 @@ def test_the_last3day_batch_values_on_the_sheet_as_the_page_says(
     assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of UNIT (1 MMBTU)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert [line[0] for line in slots] == ["Z26"] * 3
-    assert [line[9] for line in slots] == [pytest.approx(delta)] * 3  # the contract's lots
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 3
+    assert by_header(results, "contract_delta") == [pytest.approx(delta)] * 3  # cleared: the same
     live = [line[5] for line in slots]
     assert sum(1 for exposure in live if exposure != 0) * 10 == delta
 
@@ -1452,7 +1460,7 @@ def test_a_last3day_strip_marks_42_with_a_delta_of_3_on_each_month_and_its_dupli
             ("F27", serial("2027-01-06")),
             ("F27", serial("2027-01-07")),
         ]
-        assert [line[9] for line in slots] == [pytest.approx(delta)] * 6  # the month's lots
+        assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 6
         assert [line[5] for line in slots] == [pytest.approx(delta / 3)] * 6  # a third a day
 
 
@@ -1475,7 +1483,7 @@ def test_the_last3day_batch_equals_its_singletons_summed_in_either_order(
     assert valued(results) == (pytest.approx(150), 0.0, pytest.approx(20))
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert [line[0] for line in slots] == ["Z26"] * 3 + ["F27"] * 3
-    assert [line[9] for line in slots] == [pytest.approx(20)] * 3 + [0.0] * 3
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(20)] * 3 + [0.0] * 3
 
 
 def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_sheet(
@@ -1615,7 +1623,8 @@ def test_the_asian_batch_values_on_the_sheet_as_the_page_says(
     assert spilled(ENTRY["_ReportRisk"](results))[2][2] == "lots of GAL (1 GAL)"
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert len(slots) == 22 and [line[0] for line in slots] == ["Z26"] * 22
-    assert [line[9] for line in slots] == [pytest.approx(delta)] * 22  # the contract's lots
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 22
+    assert by_header(results, "contract_delta") == [pytest.approx(delta)] * 22  # cleared: the same
     assert sum(1 for line in slots if line[5] != 0) * 100 == delta
 
 
@@ -1716,7 +1725,7 @@ def test_an_asian_strip_marks_176_with_2200_on_each_month_and_its_duplicate_twic
         slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
         assert [line[0] for line in slots] == ["Z26"] * 22 + ["F27"] * 20
         assert slots[22][2] == serial("2027-01-04") and slots[-1][2] == serial("2027-01-29")
-        assert [line[9] for line in slots] == [pytest.approx(delta)] * 42  # each month's lots
+        assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 42
         assert [line[5] for line in slots] == [pytest.approx(exposures[0])] * 22 + [
             pytest.approx(exposures[1])
         ] * 20
@@ -1744,7 +1753,7 @@ def test_the_asian_batch_equals_its_singletons_summed_in_either_order(
     assert valued(results) == (pytest.approx(84), 0.0, pytest.approx(2_100))
     slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
     assert [line[0] for line in slots] == ["Z26"] * 22 + ["F27"] * 20
-    assert [line[9] for line in slots] == [pytest.approx(2_100)] * 22 + [0.0] * 20
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(2_100)] * 22 + [0.0] * 20
 
 
 def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
@@ -2173,7 +2182,7 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
     assert [line[3] for line in table[2:]] == [line[3] for line in slots[2:]]
     assert table[2][-4:] == [0.0, 0.0, 0.0, "USD"]
     assert [line[-4:] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
-    assert [line[9] for line in table[2:]] == [pytest.approx(delta)] * 6  # the contract's, once
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 6  # the contract's
 
 
 def test_the_two_lags_read_back_from_the_batch_and_the_preparation_outlives_a_tick(
@@ -2347,8 +2356,7 @@ def test_the_mixed_batch_values_on_the_sheet_as_the_ticket_says(
     assert len(slots) == 23 and [line[0] for line in slots] == ["Z26"] * 23
     assert [line[3] for line in slots] == [serial("2026-12-31")] + [serial("2027-01-04")] * 22
     assert [line[5] for line in slots] == [as_of >= "2026-12-31"] + [as_of >= "2027-01-04"] * 22
-    table = spilled(ENTRY["util_ReadHandle"](results))[2:]
-    assert [line[9] for line in table] == [pytest.approx(delta)] * 23
+    assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 23
 
 
 def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any]) -> None:
