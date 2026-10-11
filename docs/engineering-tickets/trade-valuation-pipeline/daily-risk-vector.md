@@ -4,7 +4,7 @@
 [Lot reporting](lot-delta-reporting.md) · [Calendar driven Asians](calendar-driven-asian-references.md)
 
 **Status:** Built in #166 on the prototype stack above #165, the page as a ticket; the
-reader contract below is superseded since #NN by [unified-risk-reporting.md](unified-risk-reporting.md):
+reader contract below is superseded since #178 by [unified-risk-reporting.md](unified-risk-reporting.md):
 `_ReportRisk(results, risk, bucket)` spills these views as `nominal_delta` and `delta`, the
 saved Total above the dated rows, and `_ReportDelta` is retired; the vectors and their
 ownership stand as this page says. The
@@ -322,7 +322,7 @@ to reconcile to contract risk while payment ownership remains intact for valuati
 ## As built, #166
 
 Engineering's record of what landed, in the ticket's terms.
-[report-risk.md](../../library/trades/report-risk.md), which holds this reader's views since #NN,
+[report-risk.md](../../library/trades/report-risk.md), which holds this reader's views since #178,
 [kernel.md](../../library/trades/kernel.md),
 [prepare-trades.md](../../library/trades/prepare-trades.md) and
 [evaluate-trades.md](../../library/trades/evaluate-trades.md) are the pages.

@@ -5,7 +5,7 @@
 [UAT notes](surface-uat-notes.md#12-aggregate-evaluated-results) ·
 [Bilateral integration](bilateral-excel-integration.md)
 
-**Status:** Built in #NN on `claude/risk-vectors`, stacked on the reviewed PR #177 at `788e5a7`,
+**Status:** Built in #178 on `claude/risk-vectors`, stacked on the reviewed PR #177 at `788e5a7`,
 11 October 2026, the page as the ticket; the [As built](#as-built-nn) section at the end says
 what was built and what was not. The first reporting/aggregation slice, not an extension to
 the bilateral integration PR; the owner's answers of 11 October are recorded there.
@@ -248,7 +248,7 @@ new curve identity/currency system, rate-key mapping, FX/unit conversion, change
 formulas, new discount-preparation function, or optional/default selectors. Collection
 policies and multi-group headings are addressed in the next tickets of the series.
 
-## As built (#NN)
+## As built (#178)
 
 Built as agreed on 11 October, the owner's answers to the review's questions first: the heading
 words are the index's `name` and the reporting specification's `name` in brackets, `UNIT

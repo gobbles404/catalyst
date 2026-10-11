@@ -2,7 +2,7 @@
 
 Since #166 a third report, `_ReportDelta(results, [bucket])`, spilled the delta by observation
 day, calendar month or calendar year from three vectors the preparation stores, as
-[daily-risk-vector.md](daily-risk-vector.md) specifies; since #NN it is retired into
+[daily-risk-vector.md](daily-risk-vector.md) specifies; since #178 it is retired into
 `_ReportRisk(results, risk, bucket)`, [unified-risk-reporting.md](unified-risk-reporting.md),
 one risk or all three by time with the saved Total first, which reads what the result shares
 and sums nothing; `_ReportValues` below is unchanged and the scalar risk report's layout is

@@ -8,7 +8,7 @@
 reader for a single evaluated trade array or a collection of evaluated arrays, an explicit
 risk selection and time bucket, and a saved Total above the dated rows. This replaces the
 10 October proposal for separate aggregate readers, a default day bucket and long tables.
-The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #NN on
+The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #178 on
 PR #177's path, reviewed clean at `788e5a7`; the collection changes below are not implemented
 yet, and release and UAT remain separate.
 
