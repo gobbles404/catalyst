@@ -149,8 +149,9 @@ def test_a_collection_runs_the_same_functions_at_any_size(
     sources = valued_sources(method, components, contracts, as_of, count)
     counter = WorkCounter()
     # The membership and the two groupings, one index group and one rate group summed over seven
-    # axes, three looks for a sum past the largest number and the three buckets' axes; twenty
-    # counts; nothing of the kernel, the market, the curve or the preparation is called.
+    # axes by eleven compensated passes, three looks for a sum past the largest number and the
+    # three buckets' axes; twenty counts; nothing of the kernel, the market, the curve or the
+    # preparation is called.
     assert call_profile(lambda: aggregate_results(sources, counter)) == {
         "aggregate_results": 1,
         "_grouped_by_index": 1,
@@ -158,34 +159,39 @@ def test_a_collection_runs_the_same_functions_at_any_size(
         "_index_group": 1,
         "_rate_group": 1,
         "_summed": 7,
+        "_compensated": 11,
         "_outrun": 3,
         "_report_axes": 3,
         "WorkCounter.hit": 20,
     }
     # Sixteen uniques, the seven unions of saved axes, the six report axes and the three unions of
-    # both, each a flatten, a sort and a hash; nineteen searches for places; the looks for a sum
-    # past the largest number, eleven; the two position arrays; and forty-one arrays frozen. The
-    # same at one source and at twenty-four: the concatenations and the bincounts run over more
-    # entries and are not more calls.
+    # both, each a flatten, a sort and a hash; nineteen searches for places; eleven compensated
+    # passes, each two zeros and the flags set down once; the looks for a sum past the largest
+    # number, eleven; the two position arrays; and forty-one arrays frozen. The same at one source
+    # and at twenty-four: a pass adds each occurrence's entries at once, so more occurrences are
+    # more steps of the same arithmetic and not more of these calls.
     assert numpy_calls(lambda: aggregate_results(sources, WorkCounter())) == {
         "ndarray.any": 11,
         "ndarray.flatten": 16,
         "ndarray.searchsorted": 19,
         "ndarray.setflags": 41,
         "ndarray.sort": 16,
+        "numpy._make_extobj": 11,
         "numpy._unique_hash": 16,
         "numpy.array": 2,
         "numpy.asanyarray": 32,
+        "numpy.zeros": 22,
         "ufunc.reduce": 11,
     }
 
 
 # The peak follows the entries stacked: the largest union made is the observation days', every
-# source's day axis concatenated with its places and the two lot vectors beside it and the sort's
-# copies, five arrays of eight bytes an entry, over the bytes retained and within ten slacks of the
-# records, lists and small arrays. Measured 2026-10-11: 8,240 bytes for one five-trade lastday
-# source, 9,328 for two and 10,200 for twenty-four; 42,056 for one asian source of 2,000 trades
-# over 519 days, 43,144 for two and 315,232 for twenty-four, whose stacked days are 12,456. The
+# source's day axis concatenated with its places and the sort's copies, and the compensated pass's
+# running sum, low part and one occurrence's step beside them, five arrays of eight bytes an entry
+# in all, over the bytes retained and within twelve slacks of the records, lists and small arrays.
+# Measured 2026-10-11 with the compensated reduction: 8,776 bytes for one five-trade lastday
+# source, 9,880 for two and 12,721 for twenty-four; 55,839 for one asian source of 2,000 trades
+# over 519 days, 64,607 for two and 251,943 for twenty-four, whose stacked days are 12,456. The
 # retained bytes are exactly the new arrays', 560 for the one lastday source and 33,224 for the one
 # asian, the sources' own vectors shared by reference and never copied.
 @pytest.mark.parametrize(
@@ -207,7 +213,7 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
     stacked = sum(s.prepared.encoded.days.size for s in sources)
     assert (
         least_peak(lambda: aggregate_results(sources, WorkCounter()))
-        <= 40 * stacked + retained + 10 * SLACK
+        <= 40 * stacked + retained + 12 * SLACK
     )
     g, r = agg.index_groups[0], agg.rate_groups[0]
     d, m, y, refs = g.days.size, g.months.size, g.years.size, g.references.size

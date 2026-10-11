@@ -17,6 +17,7 @@ from test_bilateral_kernel import (
     CLOSE,
     FLAT,
     TIGHT,
+    TRIO,
     TWO_YEARS,
     curve_of,
     given,
@@ -566,3 +567,63 @@ def test_sums_past_the_largest_number_are_refused_by_their_coordinate() -> None:
         "the nominal delta of index 'HNG' in all is inf, expected a finite number of lots; the "
         "results' lots sum past the largest number"
     )
+
+
+def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() -> None:
+    # The review's cases, on HNG at a quote equal to the fixed price so that nothing values past
+    # the largest number: ten thousand trillion lots bought, one lot bought and ten thousand
+    # trillion sold are one lot in all and one lot on the contract, the day, the month and the
+    # year, in whichever order the three come; the vectors say what the Total says. On the
+    # three-barrel lot, a million barrels, a barrel and a million sold are a third of a lot the
+    # same way, within the kernel's tolerance.
+    def hng_at_eighty(lots: float) -> TradeResults:
+        return valued_on(
+            hng((lots,), (A_YEAR,), Route.CLEARED, fixed=80.0), HNG_HISTORY, HNG_MARKET, None
+        )
+
+    bought, one, sold = hng_at_eighty(1e16), hng_at_eighty(1.0), hng_at_eighty(-1e16)
+    assert bought.mark == 0.0 and bought.lot_delta_total == 1e16
+    for order in (
+        (bought, one, sold),
+        (bought, sold, one),
+        (one, bought, sold),
+        (sold, one, bought),
+    ):
+        (group,) = collected(*order).index_groups
+        assert group.lot_delta_total == 1.0 and group.discounted_lot_delta_total == 1.0
+        for vector in (
+            group.lot_delta,
+            group.discounted_lot_delta,
+            group.daily_lots,
+            group.discounted_daily_lots,
+            group.monthly_lots,
+            group.yearly_lots,
+        ):
+            np.testing.assert_array_equal(vector, [1.0])
+    trio_history = history_on(TRIO, AS_OF, {})
+    trio_market = quoted(trio_history, 80.0, 50.0)
+
+    def trio_at_eighty(barrels: float) -> TradeResults:
+        terms = terms_of((barrels,), (A_YEAR,), (261,), route=Route.CLEARED, fixed=80.0, ix=TRIO)
+        return valued_on(terms, trio_history, trio_market, None)
+
+    million, barrel, sold_million = trio_at_eighty(1e6), trio_at_eighty(1.0), trio_at_eighty(-1e6)
+    assert barrel.lot_delta_total == pytest.approx(1 / 3, **CLOSE)
+    for order in ((million, barrel, sold_million), (million, sold_million, barrel)):
+        (group,) = collected(*order).index_groups
+        assert group.lot_delta_total == pytest.approx(1 / 3, **CLOSE)
+        np.testing.assert_allclose(group.lot_delta, [1 / 3], **TIGHT)
+        np.testing.assert_allclose(group.daily_lots, [1 / 3], **TIGHT)
+        np.testing.assert_allclose(group.yearly_lots, [1 / 3], **TIGHT)
+        assert float(group.daily_lots.sum()) == pytest.approx(group.lot_delta_total, **CLOSE)
+
+
+def test_every_view_sums_to_the_total_above_it(sources: dict[str, TradeResults]) -> None:
+    # The saved Totals are the scalars summed and the vectors the saved entries summed; each column
+    # of each selection and bucket adds up to its Total within the kernel's tolerance.
+    agg = collected(*(sources[k] for k in "abcd"))
+    for risk in Risk:
+        for bucket in Bucket:
+            view = aggregate_view(agg, risk, bucket)
+            for total, values in zip(view.totals, view.columns, strict=True):
+                assert float(values.sum()) == pytest.approx(total, **CLOSE), (risk, bucket)

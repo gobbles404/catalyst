@@ -10,7 +10,8 @@ by the index object they are on, the exact object and not its name, a distinct i
 name refused, every occurrence of a group over the same history object and the same price-vector
 object as the group's first; and the bilateral occurrences by the curve object they were valued
 on and the result's currency. Within a group it forms the union of the saved axes and sums the
-saved vectors onto it, one bincount per vector, the totals the saved scalars summed; across
+saved vectors onto it, a compensated sum over the occurrences so that what cancels is kept
+whatever their order, the totals the saved scalars summed the same compensated way; across
 groups it sums nothing, the lots of one index never added to another's, nor the DV01 of one
 curve and currency to another's. Every occurrence counts, a repeated result twice. The report
 axes, the union of the groups' observation axes, the union of their payment axes and the union of
@@ -23,6 +24,7 @@ them from zero. Work is counted by the occurrences collected, the groups, the en
 the reductions and the report coordinates saved.
 """
 
+import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, assert_never, cast
@@ -42,7 +44,7 @@ SOURCES_COLLECTED = "sources_collected"  # occurrences, every one, a repeated re
 INDEX_GROUPS = "index_groups"  # one per distinct index object among the occurrences
 RATE_GROUPS = "rate_groups"  # one per distinct curve object and currency among the bilateral ones
 ENTRIES_ALIGNED = "entries_aligned"  # saved vector entries placed on a union, over every reduction
-AGGREGATE_REDUCTIONS = "aggregate_reductions"  # bincounts of saved vectors onto a union
+AGGREGATE_REDUCTIONS = "aggregate_reductions"  # compensated sums of saved vectors onto a union
 REPORT_COORDINATES = (
     "report_coordinates"  # entries of the report axes saved, over the three buckets
 )
@@ -273,6 +275,7 @@ def _index_group(
         ([m.prepared.yearly_lots for m in members], [m.discounted_yearly_lots for m in members]),
         counter,
     )
+    # Python's sum of floats is compensated and keeps a sum past the largest number as inf.
     total = sum([m.lot_delta_total for m in members])
     discounted_total = sum([m.discounted_lot_delta_total for m in members])
     codes = terms.schedule.codes
@@ -356,7 +359,7 @@ def _rate_group(
         ([cast(NDArray[np.float64], m.dv01_by_year) for m in members],),
         counter,
     )
-    total = sum([m.dv01 for m in members])
+    total = sum([m.dv01 for m in members])  # compensated, an overflow kept as inf
     where, value = _outrun(
         (
             ("on", lambda b: days[b], by_day),
@@ -384,20 +387,45 @@ def _summed(
     counter: WorkCounter,
 ) -> tuple[NDArray[Any], tuple[NDArray[np.float64], ...]]:
     """The union of the occurrences' saved axes, increasing, and each kind of saved vector summed
-    onto it: the axes stacked once and their places on the union found once, then one bincount
-    per kind over every entry of every occurrence, frozen; the entries aligned and the reductions
-    reported to the counter. One occurrence takes the same path as many."""
+    onto it: the axes stacked once and their places on the union found once, then each kind
+    summed over the occurrences with compensation, every entry of an occurrence at once, frozen;
+    the entries aligned and the reductions reported to the counter. One occurrence takes the
+    same path as many."""
     stacked = np.concatenate(axes)
     union = np.unique(stacked)
     place = np.searchsorted(union, stacked)
-    sums = tuple(
-        [np.bincount(place, weights=np.concatenate(kind), minlength=union.size) for kind in vectors]
-    )
+    stops = list(itertools.accumulate([axis.size for axis in axes]))
+    pieces = [place[stop - axis.size : stop] for axis, stop in zip(axes, stops, strict=True)]
+    sums = tuple([_compensated(union.size, pieces, kind) for kind in vectors])
     for array in sums:
         array.setflags(write=False)
     counter.hit(ENTRIES_ALIGNED, int(stacked.size))
     counter.hit(AGGREGATE_REDUCTIONS, len(vectors))
     return union, sums
+
+
+def _compensated(
+    size: int, places: list[NDArray[np.intp]], values: list[NDArray[np.float64]]
+) -> NDArray[np.float64]:
+    """One kind of saved vector summed onto the union, the occurrences added one at a time with
+    Neumaier's compensation, every entry of an occurrence at once: the running sum and the low
+    part each addition dropped, added back at the end, so that a lot bought against ten thousand
+    trillion bought and sold is a lot whatever the order the occurrences came in, as the totals
+    summed the same way say. An occurrence's places are distinct, its own axis having no
+    repeated entry, so each step writes every place once."""
+    held = np.zeros(size)
+    dropped = np.zeros(size)
+    # The flags down and the rules judging, as the kernel sums: a sum past the largest number
+    # is inf here and refused by its coordinate after; the compensation is added back only where
+    # it is finite, as Python's own sum of floats does, so an overflow stays inf and not nan.
+    with np.errstate(over="ignore", invalid="ignore"):
+        for at, entries in zip(places, values, strict=True):
+            before = held[at]
+            after = before + entries
+            low = np.abs(before) >= np.abs(entries)
+            dropped[at] += np.where(low, (before - after) + entries, (entries - after) + before)
+            held[at] = after
+        return np.where(np.isfinite(dropped), held + dropped, held)
 
 
 def _outrun(

@@ -324,7 +324,9 @@ in two currencies two groups under one number. The library page is
   refused; each occurrence in order held to the first's valuation day, then to its index's first
   occurrence's history and price-vector objects, another `Market` wrapper over them accepted and a
   distinct index of a seen name refused; the groups' saved reference, day, month and year vectors
-  summed onto the unions of their saved axes by one bincount per vector, the saved totals summed;
+  summed onto the unions of their saved axes with Neumaier's compensation over the occurrences,
+  every entry of an occurrence at once, the saved totals summed by Python's compensated sum, so
+  that what cancels is kept in the vectors and the Total alike whatever the order;
   each new vector and total finite or the first coordinate that is not refused by its measure,
   group and coordinate, the vectors before the total; the report axes made and their places saved.
   Counted as `sources_collected`, `index_groups`, `rate_groups`, `entries_aligned`,
@@ -357,3 +359,11 @@ in two currencies two groups under one number. The library page is
   cannot be made from finite sources on this calendar, a group's DV01 being bounded by the
   largest amount times two years of a basis point, so that refusal is pinned for the lots alone.
   No golden file exists to change.
+- **Review of #179 at dc9f2d6.** One P2: the vectors were summed by `bincount`, sequentially,
+  while the totals were summed with compensation, so ten thousand trillion lots bought, one
+  bought and ten thousand trillion sold made a Total of one lot over vectors of nothing in one
+  order and of one in another, and a third of a three-barrel lot missed the tolerance. Fixed on
+  the branch: the vectors are summed over the occurrences with Neumaier's compensation, the
+  flags down and the compensation added back where finite, as Python's sum does, and the
+  regression tests pin the cancellation in every order, the three-barrel case and every column
+  of every view summing to its Total.
