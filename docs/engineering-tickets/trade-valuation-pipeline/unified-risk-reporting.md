@@ -1,6 +1,6 @@
 # Unified risk reporting with totals first
 
-[Series specification](aggregate-evaluated-results.md) ·
+[Series specification](aggregate-evaluated-results.md) · [Next ticket](aggregate-risk-kernel.md) ·
 [Pipeline overview](README.md) ·
 [UAT notes](surface-uat-notes.md#12-aggregate-evaluated-results) ·
 [Bilateral integration](bilateral-excel-integration.md)
