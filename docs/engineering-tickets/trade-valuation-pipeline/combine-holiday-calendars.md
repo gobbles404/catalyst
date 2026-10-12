@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 16](surface-uat-notes.md#16-combine-payment-holiday-calendars)
 
-**Status:** Built in #NN on `claude/combine-holiday-calendars`, stacked on PR #182 at `9c00a9f`,
-12 October 2026, the page as the ticket; the [As built](#as-built-nn) section at the end says what
+**Status:** Built in #183 on `claude/combine-holiday-calendars`, stacked on PR #182 at `9c00a9f`,
+12 October 2026, the page as the ticket; the [As built](#as-built-183) section at the end says what
 was built and what was not. One focused PR on the current prototype, reusing its existing
 collection-of-handles input support; it does not claim the stack has shipped.
 
@@ -116,7 +116,7 @@ It also does not implement "count on calendar A, then roll on calendar B."
 Every business day counted uses the same combined calendar. That different
 payment convention would require a separate specification.
 
-## As built (#NN)
+## As built (#183)
 
 Built on `claude/combine-holiday-calendars` above #182's `9c00a9f`, one pull request. The function's page is [combine-holiday-calendars.md](../../library/index-definitions/combine-holiday-calendars.md).
 

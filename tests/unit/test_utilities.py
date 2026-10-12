@@ -970,7 +970,7 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
         ("2026-01-30", "+0em+1cd", MISSING, "2026-02-01"),
     ):
         assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
-    # Since #NN a combination, combine-holiday-calendars.md: the ticket's calendars A, the 14th,
+    # Since #183 a combination, combine-holiday-calendars.md: the ticket's calendars A, the 14th,
     # the 12th and the 14th of October 2026, and B, the 13th and the 14th, combined close the
     # three weekdays after the weekend, so from Friday the 9th +1bd is Thursday the 15th and +2bd
     # Friday the 16th, and from the 15th -1bd is the 9th; a calendar listing the union agrees.

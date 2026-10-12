@@ -1,5 +1,5 @@
 """A holiday calendar: the days one market is closed, listed one by one as the desk keeps them,
-and since #NN the combination of calendars, closed on every day any of them is closed.
+and since #183 the combination of calendars, closed on every day any of them is closed.
 docs/library/index-definitions/holiday-calendar.md and combine-holiday-calendars.md are the
 pages."""
 
@@ -43,7 +43,7 @@ def holiday_calendar(holiday: NDArray[np.datetime64]) -> HolidayCalendar:
 def combine_holiday_calendars(
     calendars: Sequence[HolidayCalendar], counter: WorkCounter
 ) -> HolidayCalendar:
-    """One calendar closed on every day any of the given calendars is closed, since #NN,
+    """One calendar closed on every day any of the given calendars is closed, since #183,
     combine-holiday-calendars.md: their listed days taken together and the distinct days kept
     in chronological order, once each, a day two calendars list or one lists twice kept once
     and a weekend day listed kept as any other, since a reader's business days leave the

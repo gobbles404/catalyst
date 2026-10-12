@@ -34,7 +34,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 16 / item 12 | [Aggregate evaluated risk in Excel](aggregate-risk-excel-integration.md) | [#180](https://github.com/gobbles404/goosedove/pull/180), awaiting review | Point `_AggregateResults` at a cell, a row or a column of `_EvaluateTrades` cells, B2:B5 say, and hand the collection's cell to `_ReportRisk(collection, risk, bucket)` as you would a single result's: one column per index for the deltas, one per curve and currency for the DV01, the saved Totals first. Repeat a cell and watch it count again; collect two results of one index over different quotes and read the refusal; read the membership with `util_ReadHandle`. The kept workbook's block from row 2380 is the ticket's example. |
 | 17 / item 9 | [Compound date offsets](compound-date-offsets.md) | [#181](https://github.com/gobbles404/goosedove/pull/181), awaiting review | Type a chain such as `+3em+25cd-1bd+1bd` into `util_ShiftDate` and into a template's or a ticket's `payment_time_lag`; read the payment day beside the rule as written in `util_ReadHandle`. The order is the rule: `-1bd+1bd` keeps an open day and moves a closed one; a chain ending in `cd` or `em` may land on a closed day, and a rule paying on or before the last observation is refused as before. |
 | 18 / item 15 | [Half-year strip labels](half-year-strips.md) | [#182](https://github.com/gobbles404/goosedove/pull/182), awaiting review | Book `1h27` or `2H27` in `contract_code` on an index whose schedule has the six months and read back six components with the code as typed; compare with `F27-M27` and six monthly rows, the same values and risk; try `H27`, which is March, `0H27`, which is refused, and `util_StartDate("BAL1H27", B1)` with a valuation-date handle inside the half. |
-| 19 / item 16 | [Combine holiday calendars](combine-holiday-calendars.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Create two calendars and combine them with `_CombineHolidayCalendars(B2:B3)`; read the result back and see each day once in order; shift 9 October 2026 by `+1bd` on the combination and on each source; point a template's `payment_holiday_calendar` at the combination and read the trade's payment day back; change a source's day and watch the combination and the payment day follow. |
+| 19 / item 16 | [Combine holiday calendars](combine-holiday-calendars.md) | [#183](https://github.com/gobbles404/goosedove/pull/183), awaiting review | Create two calendars and combine them with `_CombineHolidayCalendars(B2:B3)`; read the result back and see each day once in order; shift 9 October 2026 by `+1bd` on the combination and on each source; point a template's `payment_holiday_calendar` at the combination and read the trade's payment day back; change a source's day and watch the combination and the payment day follow. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -492,7 +492,7 @@ signature, market contract or reporting bucket is needed.
 
 Owner agreement, 12 October: combine multiple calendars for payment rules that
 require every included calendar to be open. The [focused ticket](combine-holiday-calendars.md)
-is built in #NN; UAT is pending.
+is built in #183; UAT is pending.
 
 `_CombineHolidayCalendars(calendar_handles)` accepts a cell, row or column of
 calendar handles and returns an ordinary holiday-calendar handle containing the

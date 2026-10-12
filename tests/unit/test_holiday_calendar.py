@@ -1,5 +1,5 @@
 """The holiday calendar: the column retained as typed and as given, and nothing checked; since
-#NN the combination of calendars, the distinct days of all of them in order."""
+#183 the combination of calendars, the distinct days of all of them in order."""
 
 import numpy as np
 import pytest
