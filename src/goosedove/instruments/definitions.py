@@ -223,8 +223,8 @@ FIXED_FLOAT = Instrument(
             "and bd, cd or em",
             "Applied in order from the component's anchor, business days on the payment calendar: "
             "on a futures index its last observation day, the expiry under lastday; on an IFERC "
-            "index the month's last_trading_date; the final day after the anchor; +1bd for PHH, "
-            "+3bd for Waha",
+            "index the month's last_trading_date; the final payment date must be strictly after "
+            "the last observation date, publication for IFERC; +1bd for PHH, +3bd for Waha",
         ),
         Field(
             "payment_holiday_calendar",
