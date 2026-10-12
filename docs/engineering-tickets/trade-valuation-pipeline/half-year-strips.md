@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 15](surface-uat-notes.md#15-half-year-strip-labels)
 
-**Status:** Built in #NN on `claude/half-year-strips`, stacked on PR #181 at `a61ac19`, 12 October
-2026, the page as the ticket; the [As built](#as-built-nn) section at the end says what was built
+**Status:** Built in #182 on `claude/half-year-strips`, stacked on PR #181 at `a61ac19`, 12 October
+2026, the page as the ticket; the [As built](#as-built-182) section at the end says what was built
 and what was not. One focused PR extending the existing period parser and its consumers on the
 current prototype; it does not claim the stack has shipped.
 
@@ -96,7 +96,7 @@ creation should do the same structural work as its equivalent six-month strip,
 with no new parsing or expansion during preparation, evaluation or reporting.
 No unrelated parser rewrite or new public function belongs in this PR.
 
-## As built (#NN)
+## As built (#182)
 
 Built on `claude/half-year-strips` above #181's `a61ac19`, one pull request.
 

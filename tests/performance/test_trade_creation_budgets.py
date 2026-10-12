@@ -1090,7 +1090,7 @@ def test_a_half_year_does_the_work_of_its_six_month_strip(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     # The half reads its one label where the range reads two; from the months on, the resolution,
-    # the observations and the payment days are the same calls and the same numpy, since #NN:
+    # the observations and the payment days are the same calls and the same numpy, since #182:
     # nothing is parsed or expanded again after creation.
     half, strip, template = one_code("1H27"), one_code("F27-M27"), a_template()
     for ticket in (half, strip):

@@ -1,4 +1,4 @@
-"""Periods as the desk labels them: a contract month, F26; a quarter, 1Q27; since #NN a half-year,
+"""Periods as the desk labels them: a contract month, F26; a quarter, 1Q27; since #182 a half-year,
 1H27, January to June, and 2H27, July to December; a calendar year, CAL28; a winter, W29,
 November to the March after; a summer, S28, April to October; and a range of two labels joined
 by a hyphen, F26-Z28, from the first day of the left to the last day of the right. Each is read
@@ -122,7 +122,7 @@ def _balance_from(
 
 def _label_months(label: str, period: str) -> tuple[np.datetime64, np.datetime64]:
     """One label's first month and the month after its last: a month letter and two digits, a
-    quarter number, Q and two digits, since #NN a half number, 1 or 2, H and two digits, CAL and
+    quarter number, Q and two digits, since #182 a half number, 1 or 2, H and two digits, CAL and
     two digits, W or S and two digits, the letters in either case and the two digits the year
     after 2000. H and two digits alone is March, the contract month, as it always was: a half
     leads with its number as a quarter does. Anything else, a space, a one-digit year, a fifth

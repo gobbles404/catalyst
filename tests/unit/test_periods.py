@@ -1,4 +1,4 @@
-"""Periods read from their labels: a month, a quarter, since #NN a half-year, a calendar year, a
+"""Periods read from their labels: a month, a quarter, since #182 a half-year, a calendar year, a
 winter, a summer and a range of two, their first and last calendar days, the letters in either
 case, and everything else refused naming the whole expression; and the balance of any of them from
 a valuation day, the later of that day and the label's first day to the label's last, a period that
@@ -74,7 +74,7 @@ def span(period: str) -> tuple[str, str]:
         "the second quarter",
         "the third quarter",
         "the fourth quarter",
-        "the first half in lowercase, since #NN",
+        "the first half in lowercase, since #182",
         "the first half in capitals",
         "the second half in lowercase",
         "the second half in capitals",
@@ -228,7 +228,7 @@ def test_anything_but_the_forms_is_refused_naming_the_whole_expression(period: s
         "a winter then the summer that began before it",
         "a summer then the quarter that began before it",
         "a year then the quarter before it",
-        "the second half then the first, since #NN",
+        "the second half then the first, since #182",
         "a first half then the half before it",
     ],
 )
@@ -289,7 +289,7 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
     assert after - first == np.timedelta64(3, "M")
     first, after = period_months(f"CAL{yy}")
     assert str(first) == f"{2000 + year}-01" and after - first == np.timedelta64(12, "M")
-    for half in (1, 2):  # since #NN: six months from January or July
+    for half in (1, 2):  # since #182: six months from January or July
         first, after = period_months(f"{half}H{yy}")
         assert str(first) == f"{2000 + year}-{6 * (half - 1) + 1:02d}"
         assert after - first == np.timedelta64(6, "M")
@@ -371,7 +371,7 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
         "a February without a leap day, from the summer before",
         "a year-end range from its last December day",
         "the last winter, into the next century",
-        "the ticket's half from mid-March, since #NN",
+        "the ticket's half from mid-March, since #182",
         "a future half, the whole of it, in lowercase",
         "a half on its last day, one day, in mixed case",
         "a range of halves from a day inside it",
@@ -457,7 +457,7 @@ ENDED = "expected a valuation day on or before the period's last day"
         "a day after a strip",
         "the day after a winter",
         "the day after a leap February",
-        "the day after a first half, since #NN",
+        "the day after a first half, since #182",
     ],
 )
 def test_a_balance_without_its_day_or_of_a_period_that_has_ended_is_refused(
