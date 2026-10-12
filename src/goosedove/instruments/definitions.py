@@ -83,11 +83,11 @@ FIXED_FLOAT = Instrument(
             False,
             "no start_date and end_date on the row",
             FieldType.TEXT,
-            "a contract or strip, F26, 1Q27, CAL27, Z27-X28",
+            "a contract or strip, F26, 1Q27, 1H27, CAL27, Z27-X28",
             "Typed in either case and resolved by month against the index's schedule when the "
-            "row supplies no dates, every schedule code read; CAL27 is F27 through Z27, Z27-X28 "
-            "December 2027 through November 2028; beside both dates it is kept as entered text "
-            "and not read; a blank or empty cell is not supplied",
+            "row supplies no dates, every schedule code read; CAL27 is F27 through Z27, 1H27 F27 "
+            "through M27, Z27-X28 December 2027 through November 2028; beside both dates it is "
+            "kept as entered text and not read; a blank or empty cell is not supplied",
             may_be_unsupplied=True,
         ),
         Field(

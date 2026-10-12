@@ -1,8 +1,8 @@
-"""Periods read from their labels: a month, a quarter, a calendar year, a winter, a summer and a
-range of two, their first and last calendar days, the letters in either case, and everything else
-refused naming the whole expression; and the balance of any of them from a valuation day, the
-later of that day and the label's first day to the label's last, a period that has ended
-refused."""
+"""Periods read from their labels: a month, a quarter, since #NN a half-year, a calendar year, a
+winter, a summer and a range of two, their first and last calendar days, the letters in either
+case, and everything else refused naming the whole expression; and the balance of any of them from
+a valuation day, the later of that day and the label's first day to the label's last, a period that
+has ended refused."""
 
 import numpy as np
 import pytest
@@ -39,6 +39,15 @@ def span(period: str) -> tuple[str, str]:
         ("2Q27", "2027-04-01", "2027-06-30"),
         ("3Q27", "2027-07-01", "2027-09-30"),
         ("4Q27", "2027-10-01", "2027-12-31"),
+        ("1h27", "2027-01-01", "2027-06-30"),
+        ("1H27", "2027-01-01", "2027-06-30"),
+        ("2h27", "2027-07-01", "2027-12-31"),
+        ("2H27", "2027-07-01", "2027-12-31"),
+        ("H27", "2027-03-01", "2027-03-31"),
+        ("1H28", "2028-01-01", "2028-06-30"),
+        ("1H27-2H27", "2027-01-01", "2027-12-31"),
+        ("2h27-1h28", "2027-07-01", "2028-06-30"),
+        ("1Q27-1H27", "2027-01-01", "2027-06-30"),
         ("cal28", "2028-01-01", "2028-12-31"),
         ("CAL28", "2028-01-01", "2028-12-31"),
         ("Cal28", "2028-01-01", "2028-12-31"),
@@ -65,6 +74,15 @@ def span(period: str) -> tuple[str, str]:
         "the second quarter",
         "the third quarter",
         "the fourth quarter",
+        "the first half in lowercase, since #NN",
+        "the first half in capitals",
+        "the second half in lowercase",
+        "the second half in capitals",
+        "H alone is March, the contract month",
+        "a leap-year first half",
+        "the two halves of a year, all of the year",
+        "a second half to the first half after it",
+        "a quarter to the half it begins",
         "a calendar year in lowercase",
         "a calendar year in capitals",
         "a calendar year in mixed case",
@@ -117,6 +135,15 @@ def test_the_twelve_month_letters_are_the_twelve_months_in_either_case() -> None
         "Q1 27",
         "5Q27",
         "0Q27",
+        "0H27",
+        "3H27",
+        "1H7",
+        "1H2027",
+        " 1H27",
+        "1H27 ",
+        "1H27x",
+        "1HH27",
+        "H127",
         "1Q 27",
         "F26 ",
         " F26",
@@ -144,6 +171,15 @@ def test_the_twelve_month_letters_are_the_twelve_months_in_either_case() -> None
         "a quarter with a space",
         "a fifth quarter",
         "a zeroth quarter",
+        "a zeroth half",
+        "a third half",
+        "a half with a one-digit year",
+        "a half with a four-digit year",
+        "a half with a leading space",
+        "a half with a trailing space",
+        "a half with trailing text",
+        "HH for H",
+        "H with a number after it",
         "a quarter split by a space",
         "a trailing space",
         "a leading space",
@@ -175,7 +211,16 @@ def test_anything_but_the_forms_is_refused_naming_the_whole_expression(period: s
 
 @pytest.mark.parametrize(
     "period",
-    ["Z28-F26", "CAL28-F28", "G26-F26", "W29-S29", "S28-1Q28", "CAL27-4Q26"],
+    [
+        "Z28-F26",
+        "CAL28-F28",
+        "G26-F26",
+        "W29-S29",
+        "S28-1Q28",
+        "CAL27-4Q26",
+        "2H27-1H27",
+        "1H28-2H27",
+    ],
     ids=[
         "the right end before the left",
         "the right end ending before the left does",
@@ -183,6 +228,8 @@ def test_anything_but_the_forms_is_refused_naming_the_whole_expression(period: s
         "a winter then the summer that began before it",
         "a summer then the quarter that began before it",
         "a year then the quarter before it",
+        "the second half then the first, since #NN",
+        "a first half then the half before it",
     ],
 )
 def test_a_range_whose_right_end_starts_or_ends_before_the_left_is_refused(period: str) -> None:
@@ -196,7 +243,8 @@ def test_a_range_whose_right_end_starts_or_ends_before_the_left_is_refused(perio
 
 def test_the_forms_message_names_every_form() -> None:
     assert FORMS == (
-        "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+        "a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or "
+        "F26-Z28"
     )
 
 
@@ -241,6 +289,13 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
     assert after - first == np.timedelta64(3, "M")
     first, after = period_months(f"CAL{yy}")
     assert str(first) == f"{2000 + year}-01" and after - first == np.timedelta64(12, "M")
+    for half in (1, 2):  # since #NN: six months from January or July
+        first, after = period_months(f"{half}H{yy}")
+        assert str(first) == f"{2000 + year}-{6 * (half - 1) + 1:02d}"
+        assert after - first == np.timedelta64(6, "M")
+        assert period_months(f"{half}h{yy}") == (first, after)
+    assert period_months(f"1H{yy}-2H{yy}") == period_months(f"CAL{yy}")
+    assert period_months(f"1Q{yy}-1H{yy}") == period_months(f"1H{yy}")
     first, after = period_months(f"W{yy}")
     assert str(first) == f"{2000 + year}-11" and after - first == np.timedelta64(5, "M")
     first, after = period_months(f"S{yy}")
@@ -288,6 +343,10 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
         ("BALG27", "2026-06-30", "2027-02-01", "2027-02-28"),
         ("BALZ26-F27", "2026-12-31", "2026-12-31", "2027-01-31"),
         ("BALW99", "2100-03-15", "2100-03-15", "2100-03-31"),
+        ("BAL1H27", "2027-03-15", "2027-03-15", "2027-06-30"),
+        ("bal1h27", "2026-10-12", "2027-01-01", "2027-06-30"),
+        ("Bal2H27", "2027-12-31", "2027-12-31", "2027-12-31"),
+        ("BAL2h27-1H28", "2027-10-01", "2027-10-01", "2028-06-30"),
     ],
     ids=[
         "the ticket's October from September, the whole month",
@@ -312,6 +371,10 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
         "a February without a leap day, from the summer before",
         "a year-end range from its last December day",
         "the last winter, into the next century",
+        "the ticket's half from mid-March, since #NN",
+        "a future half, the whole of it, in lowercase",
+        "a half on its last day, one day, in mixed case",
+        "a range of halves from a day inside it",
     ],
 )
 def test_the_balance_of_a_period_runs_from_the_later_of_the_valuation_day_and_its_first_day(
@@ -379,6 +442,11 @@ ENDED = "expected a valuation day on or before the period's last day"
             "2028-03-01",
             f"valuation_date is 2028-03-01, after 'BALG28' ended on 2028-02-29, {ENDED}",
         ),
+        (
+            "BAL1H27",
+            "2027-07-01",
+            f"valuation_date is 2027-07-01, after 'BAL1H27' ended on 2027-06-30, {ENDED}",
+        ),
     ],
     ids=[
         "no day for a month",
@@ -389,6 +457,7 @@ ENDED = "expected a valuation day on or before the period's last day"
         "a day after a strip",
         "the day after a winter",
         "the day after a leap February",
+        "the day after a first half, since #NN",
     ],
 )
 def test_a_balance_without_its_day_or_of_a_period_that_has_ended_is_refused(

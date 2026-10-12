@@ -1185,7 +1185,7 @@ def test_each_row_books_by_its_dates_when_both_stand_and_by_its_code_otherwise()
     }
     assert refused(ETHANE, bad_alone, ASIAN_TEMPLATE) == (
         "contract_code row 1 is 'Z2026', expected a contract or strip with two-digit years, such "
-        "as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+        "as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     )
 
 
@@ -1316,7 +1316,7 @@ def test_a_template_may_hold_a_code_or_a_date_beside_the_tickets_period_columns(
     assert standing.entered_codes == ("Z2026", "Z2026")
     assert refused(ETHANE, two, bad_template) == (
         "contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, "
-        "1Q27, CAL28, W29, S28 or F26-Z28"
+        "1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     )
 
 
@@ -1626,7 +1626,7 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             {**NG_TICKET, "contract_code": ["Z26", "Z2026", "F27", "F27", "Z26"]},
             NG_TEMPLATE,
             "contract_code row 2 is 'Z2026', expected a contract or strip with two-digit years, "
-            "such as F26, 1Q27, CAL28, W29, S28 or F26-Z28",
+            "such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28",
         ),
         (
             {**NG_TICKET, "contract_code": ["Z26", "Z26", "F27", "CAL27", "Z26"]},
@@ -3201,3 +3201,135 @@ def test_an_iferc_chain_counts_from_last_trading_and_may_not_pay_on_publication_
         "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
         "final price exists"
     )
+
+
+# --- half-year strips, half-year-strips.md --------------------------------------------------------
+
+# A financial one-unit index with every month from November 2026 to July 2028, X26 the boundary,
+# each contract expiring on the last weekday on or before the 25th of its month, a payment calendar
+# of weekdays and no holiday; a cleared lastday template a lot a month at +2bd.
+HALF_LETTERS = "FGHJKMNQUVXZ"
+HALF = an_index(
+    "HALF",
+    tuple(
+        (
+            f"{HALF_LETTERS[(month - 1) % 12]}{str(2026 + (month - 1) // 12)[2:]}",
+            str(
+                np.busday_offset(
+                    f"{2026 + (month - 1) // 12}-{(month - 1) % 12 + 1:02d}-25", 0, roll="backward"
+                )
+            ),
+        )
+        for month in range(11, 32)
+    ),
+    holidays=(),
+    lots=(("LOT", 1.0, "MMBTU"),),
+)
+HALF_TEMPLATE: dict[str, object] = {
+    **TOY_TEMPLATE,
+    "quantity_unit": "LOT",
+    "payment_holiday_calendar": holiday_calendar(dates()),
+}
+
+
+def half_rows(*codes: str, quantity: float = 1.0) -> dict[str, list[object]]:
+    return {
+        "trade_id": [3001 + k for k in range(len(codes))],
+        "trade_date": ["2026-12-01"] * len(codes),
+        "contract_code": list(codes),
+        "quantity": [quantity] * len(codes),
+        "fixed_price": [3.0] * len(codes),
+    }
+
+
+def test_a_half_year_is_its_six_months_as_a_strip_of_them_is() -> None:
+    # 1H27 in either case resolves to F27 through M27, one occurrence and six components with the
+    # dates, payment days and exposures of the F27-M27 strip and of six monthly rows; the entered
+    # code is kept as typed; H27 alone stays March, one component.
+    half, counter = created(HALF, half_rows("1h27"), HALF_TEMPLATE)
+    strip, _ = created(HALF, half_rows("F27-M27"), HALF_TEMPLATE)
+    months, _ = created(HALF, half_rows("F27", "G27", "H27", "J27", "K27", "M27"), HALF_TEMPLATE)
+    strip_payment = strip.resolved.payment
+    assert strip_payment is not None
+    for batch in (half, strip, months):
+        terms = batch.resolved
+        assert terms.payment is not None
+        np.testing.assert_array_equal(
+            terms.contract, HALF.schedule.codes.index("F27") + np.arange(6)
+        )
+        np.testing.assert_array_equal(
+            terms.start_date, dates(*(f"2027-{m:02d}-01" for m in range(1, 7)))
+        )
+        np.testing.assert_array_equal(
+            terms.end_date,
+            dates(
+                "2027-01-31", "2027-02-28", "2027-03-31", "2027-04-30", "2027-05-31", "2027-06-30"
+            ),
+        )
+        np.testing.assert_array_equal(terms.payment.date, strip_payment.date)
+        np.testing.assert_array_equal(batch.encoded.quote_quantity, half.encoded.quote_quantity)
+        np.testing.assert_array_equal(batch.encoded.offset, half.encoded.offset)
+        np.testing.assert_array_equal(batch.encoded.slot_date, half.encoded.slot_date)
+        np.testing.assert_array_equal(batch.encoded.payment_date, half.encoded.payment_date)
+    np.testing.assert_array_equal(half.resolved.occurrence, [0] * 6)
+    np.testing.assert_array_equal(months.resolved.occurrence, np.arange(6))
+    assert half.code_entered.tolist() == [True]
+    assert counter.freeze()["resolved_components"] == 6
+    assert counter.freeze()["resolved_occurrences"] == 1
+    march, _ = created(HALF, half_rows("H27"), HALF_TEMPLATE)
+    np.testing.assert_array_equal(march.resolved.start_date, dates("2027-03-01"))
+    np.testing.assert_array_equal(march.resolved.end_date, dates("2027-03-31"))
+    second, _ = created(HALF, half_rows("2H27"), HALF_TEMPLATE)
+    np.testing.assert_array_equal(
+        second.resolved.start_date, dates(*(f"2027-{m:02d}-01" for m in range(7, 13)))
+    )
+    twice, _ = created(HALF, half_rows("1H27", "1h27"), HALF_TEMPLATE)
+    assert twice.resolved.occurrence.size == 12  # a repeat is counted again
+    np.testing.assert_array_equal(twice.resolved.occurrence, [0] * 6 + [1] * 6)
+
+
+def test_a_half_year_per_calendar_day_covers_its_days_and_a_missing_month_is_refused() -> None:
+    # One lot a calendar day: 181 for the first half of 2027, 184 for the second, 182 for the leap
+    # first half of 2028, each component its month's days.
+    for code, total, days in (
+        ("1H27", 181, [31, 28, 31, 30, 31, 30]),
+        ("2H27", 184, [31, 31, 30, 31, 30, 31]),
+        ("1H28", 182, [31, 29, 31, 30, 31, 30]),
+    ):
+        batch, _ = created(HALF, half_rows(code), {**HALF_TEMPLATE, "quantity_per": "calday"})
+        np.testing.assert_array_equal(batch.resolved.covered_days, days)
+        np.testing.assert_array_equal(batch.resolved.component_quantity, days)
+        assert float(batch.resolved.component_quantity.sum()) == total
+    # A half whose months the schedule lacks is refused as a strip is, naming the first missing:
+    # the toy has X26 through G27, so March is the first month of 1H27 it has no contract for.
+    assert refused(HALF, half_rows("2H28"), HALF_TEMPLATE) == (
+        "contract_code row 1 is '2H28', expected months the index's schedule has a contract for; "
+        "it has none for 2028-08"
+    )
+    assert refused(
+        TOY, half_rows("1H27"), {**TOY_TEMPLATE, "payment_holiday_calendar": PAYMENT_CALENDAR}
+    ) == (
+        "contract_code row 1 is '1H27', expected months the index's schedule has a contract for; "
+        "it has none for 2027-03"
+    )
+    assert refused(HALF, half_rows("3H27"), HALF_TEMPLATE) == (
+        "contract_code row 1 is '3H27', expected a contract or strip with two-digit years, such as "
+        "F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+    )
+
+
+def test_an_asian_half_observes_each_month_on_its_own_days_as_the_strip_does() -> None:
+    # The asian method averages each component's month on its own pricing days: a half is six
+    # months of observations, not one averaging period, the same days and weights as F27-M27.
+    template = {**HALF_TEMPLATE, "schedule_method": "asian"}
+    half, _ = created(HALF, half_rows("1h27"), template)
+    strip, _ = created(HALF, half_rows("F27-M27"), template)
+    np.testing.assert_array_equal(half.encoded.observations.date, strip.encoded.observations.date)
+    np.testing.assert_array_equal(
+        half.encoded.observations.weight, strip.encoded.observations.weight
+    )
+    np.testing.assert_array_equal(half.encoded.slot_date, strip.encoded.slot_date)
+    np.testing.assert_array_equal(half.encoded.payment_date, strip.encoded.payment_date)
+    payment_dates = half.encoded.payment_date
+    assert payment_dates is not None
+    assert payment_dates.size == 6  # one payment per month, as the strip's

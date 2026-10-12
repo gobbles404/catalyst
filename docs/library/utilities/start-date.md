@@ -33,17 +33,18 @@ Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/
 | Item | Text |
 |---|---|
 | Function | Gives the first calendar day of a contract or strip, 1-Jan-2026 for F26, 1-Nov-2029 for W29 and the first day of the left label of F26-Z28; of its balance, the later of the valuation day and that first day. |
-| `period` | One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its balance, BALZ26, typed or in a cell such as A2. |
+| `period` | One contract or strip label, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28, or its balance, BALZ26, typed or in a cell such as A2. |
 | `[valuation_date]` | For a BAL label, the valuation-date handle whose day the balance starts on, such as B1 showing _CreateValuationDate's result; left out for any other label. |
 
 ## The grammar
 
-A label is one of five forms, or two of them joined by one hyphen. The letters are read in either case, `f26`, `F26`, `cal28` and `Cal28` alike, by the owner's decision for these functions, recorded in [time.md](../time.md); the year is exactly two digits and means 2000 to 2099, the library's fixed horizon, never a decade inferred or today's date consulted.
+A label is one of six forms, or two of them joined by one hyphen, the half-year since #NN, [half-year-strips.md](../../engineering-tickets/trade-valuation-pipeline/half-year-strips.md). The letters are read in either case, `f26`, `F26`, `cal28` and `Cal28` alike, by the owner's decision for these functions, recorded in [time.md](../time.md); the year is exactly two digits and means 2000 to 2099, the library's fixed horizon, never a decade inferred or today's date consulted.
 
 | Form | Means | Such as | First day | Last day |
 |---|---|---|---|---|
 | a month letter and two digits | one calendar month | `F26` | 1-Jan-2026 | 31-Jan-2026 |
 | a quarter number, `Q` and two digits | a calendar quarter, `1Q` January to March, `2Q` April to June, `3Q` July to September, `4Q` October to December | `1Q27` | 1-Jan-2027 | 31-Mar-2027 |
+| a half number, `1` or `2`, `H` and two digits | a calendar half-year, `1H` January to June, `2H` July to December, since #NN; `H` and two digits alone is March, the contract month, so a half leads with its number as a quarter does | `1H27` | 1-Jan-2027 | 30-Jun-2027 |
 | `CAL` and two digits | a calendar year | `CAL28` | 1-Jan-2028 | 31-Dec-2028 |
 | `W` and two digits | a winter, November of that year to the March after | `W29` | 1-Nov-2029 | 31-Mar-2030 |
 | `S` and two digits | a summer, April to October of that year | `S28` | 1-Apr-2028 | 31-Oct-2028 |
@@ -78,7 +79,7 @@ Four rules, the first failure being the message, and both functions run them ove
 
 | Rule | Message |
 |---|---|
-| each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28`; `period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
+| each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28`; `period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28` |
 | a range's right end starts and ends no earlier than its left | `period is 'Z28-F26', expected range endpoints in chronological order` |
 | a `BAL` label has its valuation-date handle, since #160 a second argument and since #173 the handle | `valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period` |
 | the label's period ends on or after the valuation day, since #173; before it, the period has gone | `valuation_date is 2027-01-05, after 'BALZ26' ended on 2026-12-31, expected a valuation day on or before the period's last day` |
@@ -100,6 +101,7 @@ The library's examples and properties are `tests/unit/test_periods.py`; the seam
 | February 2000 and 2028, leap years, and 2027; `W99`, ending in 2100; `Z99`; the whole horizon as `f00-cAL99` | example |
 | one-digit years, a four-digit year, a space anywhere, a fifth and a zeroth quarter, an empty end, two hyphens, three labels, a month by name, `I`, a letter that is no month, `CA`, `CALS`, `WS`, a letter or a year alone: refused by both functions, naming the whole expression | example |
 | `Z28-F26`, `CAL28-F28`, two months the wrong way round, a winter then the summer that began before it, a summer then the quarter before it, a year then the quarter before it: refused by both functions | example |
+| since #NN, `1h27` and `2H27` in either case, `H27` as March, a leap first half, `1H27-2H27` and `2h27-1h28`, a quarter to its half; `0H27`, `3H27`, a one-digit and a four-digit year, spaces and trailing text, `HH` and `H` before a number refused naming the expression; `2H27-1H27` refused by its order; the balance of a half from a day inside it, from before it, on its last day, and refused after it; halves six months long from January or July for any year | example, property |
 | for any month of the horizon in either case: its first day, its last the day before the next month's first, 28 to 31 days; and the range from it to any month on or after it, the left's start and the right's end | property |
 | for any year: a quarter is three months, a year twelve, a winter five from November, a summer seven from April; `1Q` to `CAL` of a year is the year, a later quarter to it refused | property |
 | the first and last days through the seam as serials, a month, a quarter, a year, a winter, a summer, a range and `W99`; a malformed label and a reversed range refused by both in the library's words; left out, blank, empty text, a number and a range of cells in the seam's | example, through the seam |

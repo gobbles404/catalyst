@@ -171,8 +171,23 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_StartDate", new object[] { "F26-Z28", ExcelMissing.Value }, 46023.0 };
             yield return new object[] { "util_EndDate", new object[] { "F26-Z28", ExcelMissing.Value }, 47118.0 };
             yield return new object[] { "util_EndDate", new object[] { "w28-w29", ExcelMissing.Value }, 47573.0 };
-            yield return new object[] { "util_StartDate", new object[] { "W8-W9", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
-            yield return new object[] { "util_EndDate", new object[] { "W8-W9", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            // Half-year strips, half-year-strips.md: 1H27 January to June and 2H27 July to December in either case, H27 March as it was, the ranges of halves, a leap first half; a zeroth and a third half, a one-digit and a four-digit year refused by the grammar, a reversed range by its order.
+            yield return new object[] { "util_StartDate", new object[] { "1h27", ExcelMissing.Value }, 46388.0 };
+            yield return new object[] { "util_EndDate", new object[] { "1H27", ExcelMissing.Value }, 46568.0 };
+            yield return new object[] { "util_StartDate", new object[] { "2H27", ExcelMissing.Value }, 46569.0 };
+            yield return new object[] { "util_EndDate", new object[] { "2h27", ExcelMissing.Value }, 46752.0 };
+            yield return new object[] { "util_StartDate", new object[] { "H27", ExcelMissing.Value }, 46447.0 };
+            yield return new object[] { "util_EndDate", new object[] { "1H27-2H27", ExcelMissing.Value }, 46752.0 };
+            yield return new object[] { "util_StartDate", new object[] { "2H27-1H28", ExcelMissing.Value }, 46569.0 };
+            yield return new object[] { "util_EndDate", new object[] { "2H27-1H28", ExcelMissing.Value }, 46934.0 };
+            yield return new object[] { "util_EndDate", new object[] { "1H28", ExcelMissing.Value }, 46934.0 };
+            yield return new object[] { "util_StartDate", new object[] { "0H27", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_EndDate", new object[] { "3H27", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is '3H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_StartDate", new object[] { "1H7", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is '1H7', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_EndDate", new object[] { "1H2027", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is '1H2027', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_StartDate", new object[] { "2H27-1H27", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is '2H27-1H27', expected range endpoints in chronological order" };
+            yield return new object[] { "util_StartDate", new object[] { "W8-W9", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_EndDate", new object[] { "W8-W9", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
             yield return new object[] { "util_StartDate", new object[] { "Z28-F26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order" };
             yield return new object[] { "util_EndDate", new object[] { "CAL28-F28", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
             yield return new object[] { "util_StartDate", new object[] { 46023.0, ExcelMissing.Value }, "#ERROR util_StartDate: period is number 46023.0, expected text" };
@@ -185,7 +200,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", ExcelEmpty.Value }, "#ERROR util_StartDate: valuation_date is blank, expected valuation date handle" };
             yield return new object[] { "util_StartDate", new object[] { "BALZ26", "15-Dec-2026" }, "#ERROR util_StartDate: valuation_date is text '15-Dec-2026' naming no live object, expected valuation date handle" };
             yield return new object[] { "util_EndDate", new object[] { "BALZ26", 46371.5 }, "#ERROR util_EndDate: valuation_date is number 46371.5, expected valuation date handle" };
-            yield return new object[] { "util_StartDate", new object[] { "BALBALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28" };
+            yield return new object[] { "util_StartDate", new object[] { "BALBALZ26", ExcelMissing.Value }, "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28" };
             yield return new object[] { "util_EndDate", new object[] { "BALZ28-F26", ExcelMissing.Value }, "#ERROR util_EndDate: ValueError: period is 'BALZ28-F26', expected range endpoints in chronological order" };
             // A date shifted by a text offset, the calendar left out: the ticket's table, Friday 9 October 2026 at 46304, the Saturday at 46305 and the Sunday at 46306; the month ends through a leap February; the library's words for no offset, a result past the sheet's calendar and a count of too many digits; the seam's for the date, the offset and a blank where the calendar should be, a blank being no omission.
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelMissing.Value }, 46307.0 };
@@ -648,6 +663,43 @@ namespace Goosedove.Host.Tests
             var broken = (string)Seam.Call("_AggregateResults", Column(results, "#ERROR _EvaluateTrades: ValueError: x"));
             Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: x", broken);
             Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
+        }
+
+        // A half-year strip, half-year-strips.md: on an index of nine months, X26 the boundary and N27
+        // last, 1h27 resolves to F27 through M27, six components on one occurrence, the entered code
+        // kept as typed, each paying two business days after its expiry as the F27-M27 strip's do; the
+        // balance of a half from a valuation day inside it; a zeroth half refused by the grammar.
+        [Fact]
+        public void a_half_year_strip_resolves_to_its_six_months_as_the_strip_of_them_does()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27", "H27", "J27", "K27", "M27", "N27"), Column(46351.0, 46385.0, 46414.0, 46442.0, 46475.0, 46505.0, 46533.0, 46566.0, 46596.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
+            var half = Index(schedule, holidays, "HALF");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var one = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", half, headers, Row(3001.0, 46357.0, "1h27", 1.0, 3.0), template));
+            var strip = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", half, headers, Row(3002.0, 46357.0, "F27-M27", 1.0, 3.0), template));
+            Assert.Equal(8, one.GetLength(0));
+            Assert.Equal(8, strip.GetLength(0));
+            Assert.Equal("payment_date", one[0, 13]);
+            Assert.Equal("entered_contract_code", one[0, 14]);
+            var months = new[] { "F27", "G27", "H27", "J27", "K27", "M27" };
+            var pays = new[] { 46416.0, 46444.0, 46477.0, 46507.0, 46535.0, 46568.0 };
+            for (var k = 0; k < 6; k++)
+            {
+                Assert.Equal(1.0, one[2 + k, 0]);
+                Assert.Equal(months[k], one[2 + k, 3]);
+                Assert.Equal("1h27", one[2 + k, 14]);
+                Assert.Equal(pays[k], one[2 + k, 13]);
+                Assert.Equal(strip[2 + k, 13], one[2 + k, 13]);
+                Assert.Equal(strip[2 + k, 19], one[2 + k, 19]);  // quote_quantity
+            }
+            var midMarch = (string)Seam.Call("_CreateValuationDate", 46461.0, 0.0);
+            Assert.Equal(46461.0, Seam.Call("util_StartDate", "BAL1H27", midMarch));
+            Assert.Equal(46568.0, Seam.Call("util_EndDate", "bal1h27", midMarch));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: contract_code row 1 is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28", Seam.Call("_CreateTrades", half, headers, Row(3003.0, 46357.0, "0H27", 1.0, 3.0), template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: contract_code row 1 is '2H27', expected months the index's schedule has a contract for; it has none for 2027-08", Seam.Call("_CreateTrades", half, headers, Row(3003.0, 46357.0, "2H27", 1.0, 3.0), template));
         }
 
         // The penultimate method on the host's chain: a financial template paying one business day

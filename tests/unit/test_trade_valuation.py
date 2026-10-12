@@ -4725,3 +4725,82 @@ def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
         factor, amount, npv = cast(float, line[14]), cast(float, line[15]), cast(float, line[16])
         assert 0.0 < factor < 1.0 and npv == pytest.approx(amount * factor)
     assert all(line[14] != "-" for line in table[2:])  # a factor on every slot
+
+
+# --- half-year strips, half-year-strips.md --------------------------------------------------------
+
+
+def test_a_half_year_values_as_its_six_months_do() -> None:
+    """The ticket's hand check: a one-unit index whose months run from November 2026 to July
+    2027, X26 the boundary, valued on 15 December 2026 with every live contract quoted 5 against a
+    fixed price of 3; one lot of 1H27 a month under a cleared lastday template marks 12 and
+    carries 6 lots of nominal delta, as six monthly rows do and as F27-M27 does, with the same
+    payment days, exposures, values and risk; the entered code is read back as typed."""
+    contracts = [
+        ("X26", "2026-11-25"),
+        ("Z26", "2026-12-29"),
+        ("F27", "2027-01-27"),
+        ("G27", "2027-02-24"),
+        ("H27", "2027-03-29"),
+        ("J27", "2027-04-28"),
+        ("K27", "2027-05-26"),
+        ("M27", "2027-06-28"),
+        ("N27", "2027-07-28"),
+    ]
+    index, _ = an_index("HALF", contracts, ["2030-01-01"], [("LOT", 1.0)])
+    fields = {
+        **NG_TEMPLATE,
+        "quantity_unit": "LOT",
+        "settlement_method": "financial",
+        "clearing_house": "TEST_CLEARER",
+        "payment_time_lag": "+2bd",
+        "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2030-01-01")])),
+    }
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
+    history = a_history(index, "2026-11-26", "2026-12-15", [], {})
+    market = a_market(history, "HALF", *([5.0] * 8))  # Z26 through N27, every one 2 above 3
+
+    def booked(*codes: str) -> tuple[str, str]:
+        trades = ENTRY["_CreateTrades"](
+            index,
+            row(*NG_HEADERS),
+            rows(
+                *[
+                    [3001.0 + k, serial("2026-12-01"), code, 1.0, 3.0]
+                    for k, code in enumerate(codes)
+                ]
+            ),
+            template,
+        )
+        results = ENTRY["_EvaluateTrades"](
+            ENTRY["_PrepareTrades"](trades, history), market, bridge.MISSING
+        )
+        return str(trades), str(results)
+
+    half_trades, half = booked("1h27")
+    strip_trades, strip = booked("F27-M27")
+    _, months = booked("F27", "G27", "H27", "J27", "K27", "M27")
+    assert valued(half) == (12.0, 0.0, 6.0)
+    assert valued(strip) == (12.0, 0.0, 6.0)
+    assert valued(months) == (12.0, 0.0, 6.0)
+    for risk in ("nominal_delta", "delta", "dv01", "all"):
+        assert spilled(ENTRY["_ReportRisk"](half, risk, "day")) == spilled(
+            ENTRY["_ReportRisk"](strip, risk, "day")
+        )
+        assert spilled(ENTRY["_ReportRisk"](half, risk, "day")) == spilled(
+            ENTRY["_ReportRisk"](months, risk, "day")
+        )
+    half_table = spilled(ENTRY["util_ReadHandle"](half_trades))
+    strip_table = spilled(ENTRY["util_ReadHandle"](strip_trades))
+    assert len(half_table) == 8  # two heading rows and six components
+    code, entered, pay, exposure = (
+        half_table[0].index(name)
+        for name in ("contract_code", "entered_contract_code", "payment_date", "quote_quantity")
+    )
+    assert [line[code] for line in half_table[2:]] == ["F27", "G27", "H27", "J27", "K27", "M27"]
+    assert {str(line[entered]) for line in half_table[2:]} == {"1h27"}
+    assert [line[pay] for line in half_table[2:]] == [line[pay] for line in strip_table[2:]]
+    assert [line[exposure] for line in half_table[2:]] == [
+        line[exposure] for line in strip_table[2:]
+    ]
+    assert spilled(ENTRY["util_ReadHandle"](half)) == spilled(ENTRY["util_ReadHandle"](strip))

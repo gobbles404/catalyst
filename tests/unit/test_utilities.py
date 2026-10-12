@@ -820,6 +820,11 @@ def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
         ("F26-Z28", "2026-01-01", "2028-12-31"),
         ("w28-w29", "2028-11-01", "2030-03-31"),
         ("W99", "2099-11-01", "2100-03-31"),
+        ("1h27", "2027-01-01", "2027-06-30"),  # since #NN, half-year-strips.md
+        ("2H27", "2027-07-01", "2027-12-31"),
+        ("H27", "2027-03-01", "2027-03-31"),
+        ("1H27-2H27", "2027-01-01", "2027-12-31"),
+        ("2H27-1H28", "2027-07-01", "2028-06-30"),
     ):
         assert bridge.call("util_StartDate", [period, MISSING]) == serial(first)
         assert bridge.call("util_EndDate", [period, MISSING]) == serial(last)
@@ -830,10 +835,11 @@ def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
 # the same from either reader, which both read the whole expression.
 def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_seam() -> None:
     forms = (
-        "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+        "a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or "
+        "F26-Z28"
     )
     for name in ("util_StartDate", "util_EndDate"):
-        for period in ("W8-W9", "Q1 27", "F26-", "F2026"):
+        for period in ("W8-W9", "Q1 27", "F26-", "F2026", "0H27", "3H27", "1H2027"):
             assert bridge.call(name, [period, MISSING]) == (
                 f"#ERROR {name}: ValueError: period is {period!r}, expected {forms}"
             )
@@ -877,6 +883,8 @@ def test_the_balance_of_a_period_takes_its_valuation_date_handle_through_the_sea
         ("balcal27", "2026-10-12", "2027-01-01", "2027-12-31"),
         ("BALZ26", "2026-12-15", "2026-12-15", "2026-12-31"),
         ("BALG28", "2028-02-29", "2028-02-29", "2028-02-29"),
+        ("BAL1H27", "2027-03-15", "2027-03-15", "2027-06-30"),  # since #NN
+        ("bal1h27", "2026-10-12", "2027-01-01", "2027-06-30"),
         ("Z26", "2026-12-15", "2026-12-01", "2026-12-31"),
         ("V26", "2027-06-01", "2026-10-01", "2026-10-31"),
     ):

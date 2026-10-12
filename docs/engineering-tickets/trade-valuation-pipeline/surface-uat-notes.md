@@ -33,6 +33,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 15 / item 12 | [Unified risk reporting with totals first](unified-risk-reporting.md) | [#178](https://github.com/gobbles404/goosedove/pull/178), awaiting review | Call `_ReportRisk(results, risk, bucket)` with every argument: `nominal_delta`, `delta`, `dv01` or `all` and `day`, `month` or `year`, exactly so. Read the Total row under the context, heading and type rows, then the dated rows: the deltas on observation days, the DV01 on payment days, `all` on their union with zero where only the other kind has a date. On the bilateral block, `all` by month is the ticket's spill, 0, 0.5 and 0.0085 over January 2027, 2028 and 2029; a cleared batch's `dv01` is the Total of nothing over no row. A left-out or blank selector, a case or a quarter is refused. `_ReportDelta` is gone; the kept workbook's reports stand beside their blocks. |
 | 16 / item 12 | [Aggregate evaluated risk in Excel](aggregate-risk-excel-integration.md) | [#180](https://github.com/gobbles404/goosedove/pull/180), awaiting review | Point `_AggregateResults` at a cell, a row or a column of `_EvaluateTrades` cells, B2:B5 say, and hand the collection's cell to `_ReportRisk(collection, risk, bucket)` as you would a single result's: one column per index for the deltas, one per curve and currency for the DV01, the saved Totals first. Repeat a cell and watch it count again; collect two results of one index over different quotes and read the refusal; read the membership with `util_ReadHandle`. The kept workbook's block from row 2380 is the ticket's example. |
 | 17 / item 9 | [Compound date offsets](compound-date-offsets.md) | [#181](https://github.com/gobbles404/goosedove/pull/181), awaiting review | Type a chain such as `+3em+25cd-1bd+1bd` into `util_ShiftDate` and into a template's or a ticket's `payment_time_lag`; read the payment day beside the rule as written in `util_ReadHandle`. The order is the rule: `-1bd+1bd` keeps an open day and moves a closed one; a chain ending in `cd` or `em` may land on a closed day, and a rule paying on or before the last observation is refused as before. |
+| 18 / item 15 | [Half-year strip labels](half-year-strips.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Book `1h27` or `2H27` in `contract_code` on an index whose schedule has the six months and read back six components with the code as typed; compare with `F27-M27` and six monthly rows, the same values and risk; try `H27`, which is March, `0H27`, which is refused, and `util_StartDate("BAL1H27", B1)` with a valuation-date handle inside the half. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -473,3 +474,15 @@ page. The [third ticket](aggregate-risk-excel-integration.md) is built in #180: 
 over a cell, a row or a column of results handles, the same `_ReportRisk` taking the collection's
 handle, the readback showing the membership alone by the owner's revision of 11 October, and the
 two seam forms the functions need.
+
+## 15. Half-year strip labels
+
+Owner request, 12 October: allow `1h27` and `2h27` in `contract_code` for quoted
+and traded half-year strips. The [focused ticket](half-year-strips.md) is built in #NN;
+UAT is pending.
+
+`1H27` means January to June 2027 and `2H27` July to December 2027, in either case.
+`H27` remains March. A half resolves into the existing six monthly components, retaining
+the normal quantity bases, observation methods and payment dates. The shared start and end
+helpers, ranges and their existing BAL wrapper inherit the labels. No new instrument,
+signature, market contract or reporting bucket is needed.

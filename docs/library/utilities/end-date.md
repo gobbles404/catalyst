@@ -31,7 +31,7 @@ Quoted from the declaration in `src/goosedove/excel/utilities.py`, which `tests/
 | Item | Text |
 |---|---|
 | Function | Gives the last calendar day of a contract or strip, 31-Jan-2026 for F26, 31-Mar-2030 for W29 and the last day of the right label of F26-Z28; of its balance, the same last day, a period ended before the valuation day refused. |
-| `period` | One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its balance, BALZ26, typed or in a cell such as A2. |
+| `period` | One contract or strip label, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28, or its balance, BALZ26, typed or in a cell such as A2. |
 | `[valuation_date]` | For a BAL label, the valuation-date handle whose day the balance starts on, such as B1 showing _CreateValuationDate's result; left out for any other label. |
 
 ## The library checks
@@ -40,7 +40,7 @@ The four rules of [util_StartDate](start-date.md), run over the whole expression
 
 | Rule | Message |
 |---|---|
-| each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
+| each label is one of the forms, with a two-digit year, under a `BAL` prefix or not | `period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28` |
 | a range's right end starts and ends no earlier than its left | `period is 'CAL28-F28', expected range endpoints in chronological order` |
 | a `BAL` label has its valuation-date handle | `valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period` |
 | the label's period ends on or after the valuation day, since #173 | `valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day` |
@@ -59,6 +59,7 @@ The tests are the start function's, each case asking for both days: `tests/unit/
 | the last days through the seam as serials, and both refusals in the library's words; the seam's own for a number, a blank and empty text | example, through the seam |
 | since #173 the balance of a period ending on the label's last day from any valuation day on or before it, the ticket's table, slice B's labels, the leap day, a Saturday and a year-end range among them, a future period's end the label's own; the handle left out or the period ended refused naming the label, the day and the end, the prefix twice or over a malformed or reversed label refused naming the whole expression; the same through the seam, with a blank, a raw date, a text, a fraction of a day and a handle of another kind in the seam's words | example |
 | the last day of the schedule's own `m26`, of a quarter, a year, a winter and two ranges in a real workbook, a reversed range refused; the balances over valuation-date handles, a period that has ended refused | Excel smoke |
+| since #NN the last day of a half-year, 30-Jun-2027 for `1H27` and `1h27`, 31-Dec-2027 for `2H27`, the leap `1H28`, the ranges `1H27-2H27` and `2h27-1h28`, `H27` still March; `0H27`, `3H27`, `1H7` and `1H2027` refused naming the forms, `2H27-1H27` by its order; the balance of a half from a day inside it, [half-year-strips.md](../../engineering-tickets/trade-valuation-pipeline/half-year-strips.md); the same on the host, the smoke sheet and the kept workbook from row 2612 | example |
 
 ## Not here
 
