@@ -665,6 +665,56 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
         }
 
+        // Combined holiday calendars, combine-holiday-calendars.md: the ticket's calendars A, listing
+        // 14 October 2026 twice around the 12th, and B, the 13th and the 14th, combine into the 12th,
+        // the 13th and the 14th once each in order, in a column as in a row, one calendar alone into its
+        // own distinct days; from Friday the 9th +1bd is the 15th and +2bd the 16th, from the 15th -1bd
+        // the 9th; a trade anchored on the 9th pays the 15th; the seam's refusals at their cells, and a
+        // failed source carried whole.
+        [Fact]
+        public void combined_holiday_calendars_close_every_day_any_source_closes()
+        {
+            var a = (string)Seam.Call("_CreateHolidayCalendar", Column(46309.0, 46307.0, 46309.0));
+            var b = (string)Seam.Call("_CreateHolidayCalendar", Column(46308.0, 46309.0));
+            var combined = (string)Seam.Call("_CombineHolidayCalendars", Column(a, b));
+            Assert.Matches(@"^\d+:holiday_calendar:\d+$", combined);
+            var days = (object[,])Seam.Call("util_ReadHandle", combined);
+            Assert.Equal(5, days.GetLength(0));
+            Assert.Equal("holiday", days[0, 0]);
+            Assert.Equal(46307.0, days[2, 0]);
+            Assert.Equal(46308.0, days[3, 0]);
+            Assert.Equal(46309.0, days[4, 0]);
+            var inRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CombineHolidayCalendars", Row(b, a)));
+            Assert.Equal(days, inRow);
+            var alone = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CombineHolidayCalendars", a));
+            Assert.Equal(4, alone.GetLength(0));
+            Assert.Equal(46307.0, alone[2, 0]);
+            Assert.Equal(46309.0, alone[3, 0]);
+            Assert.Equal(46310.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", combined));
+            Assert.Equal(46311.0, Seam.Call("util_ShiftDate", 46304.0, "+2bd", combined));
+            Assert.Equal(46304.0, Seam.Call("util_ShiftDate", 46310.0, "-1bd", combined));
+            Assert.Equal(46308.0, Seam.Call("util_ShiftDate", 46304.0, "+1bd", a));
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("U26", "V26", "X26"), Column(46261.0, 46293.0, 46304.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
+            var anchored = Index(schedule, holidays, "ANCHORED");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "cleared", "financial", "Prototype Clearing", "+1bd", combined));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var trade = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", anchored, headers, Row(4001.0, 46296.0, "X26", 1.0, 3.0), template));
+            Assert.Equal("payment_date", trade[0, 13]);
+            Assert.Equal(46310.0, trade[2, 13]);
+            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one row or one column of holiday calendar handles", Seam.Call("_CombineHolidayCalendars", new object[,] { { a, b }, { b, a } }));
+            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Column(a, ExcelEmpty.Value)));
+            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles cell (1, 2) is number 46307.0, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Row(a, 46307.0)));
+            Assert.Equal($"#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is futures schedule handle '{schedule}', expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", Column(a, schedule)));
+            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle", Seam.Call("_CombineHolidayCalendars", "x"));
+            Assert.Equal("#ERROR _CombineHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column", Seam.Call("_CombineHolidayCalendars", ExcelMissing.Value));
+            var failed = (string)Seam.Call("_CreateHolidayCalendar", Column(46023.0, ExcelEmpty.Value));
+            var broken = (string)Seam.Call("_CombineHolidayCalendars", Column(a, failed));
+            Assert.Equal($"#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is the creator's failure, expected holiday calendar handle: {failed}", broken);
+            Assert.Equal($"#ERROR util_ShiftDate: holiday_calendar is the creator's failure, expected holiday calendar handle: {failed}", Seam.Call("util_ShiftDate", 46304.0, "+1bd", broken));
+        }
+
         // A half-year strip, half-year-strips.md: on an index of nine months, X26 the boundary and N27
         // last, 1h27 resolves to F27 through M27, six components on one occurrence, the entered code
         // kept as typed, each paying two business days after its expiry as the F27-M27 strip's do; the

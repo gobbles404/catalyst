@@ -23,7 +23,11 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.holiday_calendar import (
+    HolidayCalendar,
+    combine_holiday_calendars,
+    holiday_calendar,
+)
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
@@ -3333,3 +3337,55 @@ def test_an_asian_half_observes_each_month_on_its_own_days_as_the_strip_does() -
     payment_dates = half.encoded.payment_date
     assert payment_dates is not None
     assert payment_dates.size == 6  # one payment per month, as the strip's
+
+
+# --- a combined payment calendar, combine-holiday-calendars.md ------------------------------------
+
+
+# A one-unit index whose X26 stops trading on Friday 9 October 2026, the ticket's anchor, behind a
+# boundary contract; the ticket's synthetic calendars A and B, and their combination.
+ANCHORED = an_index(
+    "ANCHORED",
+    (("U26", "2026-08-27"), ("V26", "2026-09-28"), ("X26", "2026-10-09")),
+    holidays=(),
+    lots=(("LOT", 1.0, "MMBTU"),),
+)
+CALENDAR_A = holiday_calendar(dates("2026-10-14", "2026-10-12", "2026-10-14"))
+CALENDAR_B = holiday_calendar(dates("2026-10-13", "2026-10-14"))
+
+
+def anchored_payment(calendar: HolidayCalendar, lag: str = "+1bd") -> str:
+    batch, _ = created(
+        ANCHORED,
+        {
+            "trade_id": [4001],
+            "trade_date": ["2026-10-01"],
+            "contract_code": ["X26"],
+            "quantity": [1.0],
+            "fixed_price": [3.0],
+        },
+        {
+            **TOY_TEMPLATE,
+            "quantity_unit": "LOT",
+            "payment_time_lag": lag,
+            "payment_holiday_calendar": calendar,
+        },
+    )
+    assert batch.resolved.payment is not None
+    assert batch.resolved.payment.date.size == 1
+    return str(batch.resolved.payment.date[0])
+
+
+def test_a_payment_steps_over_every_combined_calendars_holidays() -> None:
+    # From the Friday anchor, the weekend and the three listed weekdays are closed on the combined
+    # calendar, so +1bd pays Thursday 15 October, as a calendar listing the union pays; on A alone
+    # the Tuesday, on B alone the Monday, and on no holidays at all the Monday.
+    combined = combine_holiday_calendars((CALENDAR_A, CALENDAR_B), WorkCounter())
+    assert anchored_payment(combined) == "2026-10-15"
+    assert anchored_payment(holiday_calendar(dates("2026-10-12", "2026-10-13", "2026-10-14"))) == (
+        "2026-10-15"
+    )
+    assert anchored_payment(combined, "+2bd") == "2026-10-16"
+    assert anchored_payment(CALENDAR_A) == "2026-10-13"
+    assert anchored_payment(CALENDAR_B) == "2026-10-12"
+    assert anchored_payment(holiday_calendar(dates())) == "2026-10-12"

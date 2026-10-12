@@ -1,6 +1,6 @@
 # _CreateHolidayCalendar
 
-Built in #67.
+Built in #67. Since #NN several calendars combine into one closed on every day any of them is closed, [combine-holiday-calendars.md](combine-holiday-calendars.md); this page is the creator alone, which keeps the list as given.
 
 The days one market is closed, listed one by one as the desk keeps them, kept as given and reached by handle. It is a static calendar: the list is the calendar, and no day is generated from a rule. Its readers reach it through the [index](index.md), which holds it beside a futures schedule since #107, requires it there and refuses it beside an IFERC or a Gas Daily one. The [futures fixings](../market-data/futures-fixings.md), its first reader since #79 and through the index since #108, are refused on a listed day, or without a fixing on a business day, through numpy's business-day functions over this list, as [time.md](../time.md) decided; the [calendar](../calendar/calendar.md) of #82 reads it the same way, flagging whether the market is open on each of its days. A reader that counts the business days between two dates is not specified. The code is `src/goosedove/index_definitions/holiday_calendar.py`, the record and its builder, and `src/goosedove/excel/index_definitions.py`, the worksheet function.
 

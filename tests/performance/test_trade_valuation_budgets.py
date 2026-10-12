@@ -508,3 +508,62 @@ def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_recta
     assert least_peak(lambda: PATH["_AggregateResults"](cells)) <= 17 * SLACK
     collection = str(PATH["_AggregateResults"](cells))
     assert least_peak(lambda: PATH["_ReportRisk"](collection, "all", "day")) <= 7 * SLACK
+
+
+# --- a combined payment calendar, combine-holiday-calendars.md ------------------------------------
+
+
+# A template paying on a combination of the sheet's calendar with itself does the plain template's
+# work, call for call, at creation, preparation, evaluation and reporting: the union ran once, when
+# the combination was made, and no step after it reads a calendar again.
+def test_a_combined_payment_calendar_adds_no_work_after_creation(
+    call_profile: CallProfile, sheet: dict[str, Any]
+) -> None:
+    holidays = PATH["_CreateHolidayCalendar"](column([serial(d) for d in HOLIDAYS]))
+    combined = str(PATH["_CombineHolidayCalendars"](Cells.from_rows([[holidays], [holidays]])))
+    fields = Cells.from_rows(
+        [
+            [
+                "quantity_unit",
+                "quantity_per",
+                "schedule_method",
+                "route",
+                "settlement_method",
+                "clearing_house",
+                "payment_time_lag",
+                "payment_holiday_calendar",
+            ]
+        ]
+    )
+    on_combined = PATH["_CreateTradeTemplate"](
+        "fixed_float",
+        fields,
+        Cells.from_rows(
+            [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", combined]]
+        ),
+    )
+    rows, contracts = 50, 6
+
+    def steps(template: object) -> list[dict[str, int]]:
+        batch = a_batch(sheet, rows, contracts, template)
+        prepared = str(PATH["_PrepareTrades"](batch, sheet["history"]))
+        results = str(PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING))
+        return [
+            call_profile(lambda: a_batch(sheet, rows, contracts, template)),
+            call_profile(lambda: PATH["_PrepareTrades"](batch, sheet["history"])),
+            call_profile(
+                lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
+            ),
+            call_profile(lambda: PATH["_ReportRisk"](results, "all", "day")),
+        ]
+
+    plain, on_combination = steps(sheet["template"]), steps(on_combined)
+    assert on_combination == plain
+    assert all("combine_holiday_calendars" not in step for step in on_combination)
+    # The union itself, once, when the combination was made.
+    assert (
+        call_profile(
+            lambda: PATH["_CombineHolidayCalendars"](Cells.from_rows([[holidays], [holidays]]))
+        )["combine_holiday_calendars"]
+        == 1
+    )

@@ -210,6 +210,21 @@ def test_the_futures_schedule_creator_explains_itself() -> None:
 
 
 def test_the_holiday_calendar_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CombineHolidayCalendars"]
+    assert not hidden
+    assert description == (
+        "Combines holiday calendars into one closed on every day any of them is closed, the days "
+        "in order, once each, and shows its handle, an ordinary calendar for "
+        "payment_holiday_calendar, util_ShiftDate or another combination."
+    )
+    assert arguments == [
+        (
+            "calendar_handles",
+            "The calendars to combine: a cell, a row or a column of cells showing "
+            "_CreateHolidayCalendar's or this function's results, such as B2:B3, every one read "
+            "and a repeat read again.",
+        )
+    ]
     description, arguments, hidden = SPECS["_CreateHolidayCalendar"]
     assert not hidden
     assert description == (
