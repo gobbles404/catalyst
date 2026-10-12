@@ -139,7 +139,7 @@ def some_terms(
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
+        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
 
 
@@ -409,7 +409,7 @@ def asian_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
     )
 
 
@@ -691,7 +691,7 @@ def two_day_terms(components: int, contracts: int) -> ResolvedTrades:
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(
-            2 + later,
+            tuple(f"+{n}bd" for n in (2 + later).tolist()),
             (PAYMENT_CALENDAR,) * components,
             PAYS[rows] + later.astype("timedelta64[D]"),
         ),
@@ -841,7 +841,7 @@ def mixed_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, pays),
+        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, pays),
     )
 
 
@@ -995,7 +995,7 @@ def rolling_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
     )
 
 
@@ -1101,7 +1101,7 @@ def iferc_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(np.full(components, 3), (PAYMENT_CALENDAR,) * components, IFERC_PAYS[rows]),
+        PaymentTerms(("+3bd",) * components, (PAYMENT_CALENDAR,) * components, IFERC_PAYS[rows]),
     )
 
 

@@ -214,14 +214,17 @@ FIXED_FLOAT = Instrument(
         ),
         Field(
             "payment_time_lag",
-            "Business-day offset from the payment anchor defined by the supported product",
+            "Date offset from the payment anchor defined by the supported product, one instruction "
+            "or a chain applied left to right",
             False,
             "settlement_method = financial",
             FieldType.TEXT,
-            "+1bd, +2bd and other positive whole business days",
-            "Counted strictly after the component's anchor on the payment calendar: on a futures "
-            "index its last observation day, the expiry under lastday; on an IFERC index the "
-            "month's last_trading_date; +1bd for PHH, +3bd for Waha",
+            "+1bd, +3cd, +0em or a chain such as +3em+25cd-1bd+1bd, each a sign, a whole count "
+            "and bd, cd or em",
+            "Applied in order from the component's anchor, business days on the payment calendar: "
+            "on a futures index its last observation day, the expiry under lastday; on an IFERC "
+            "index the month's last_trading_date; the final day after the anchor; +1bd for PHH, "
+            "+3bd for Waha",
         ),
         Field(
             "payment_holiday_calendar",

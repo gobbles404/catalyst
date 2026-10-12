@@ -1,13 +1,23 @@
 """A date shifted by a text offset: the ticket's worked answers, the signed zeros, the suffixes in
 any case, a count with leading zeros, the sheet's calendar as the bound either side, and
-everything else refused naming the offset; the round trip of business days from an open day."""
+everything else refused naming the offset; the round trip of business days from an open day. Since
+#NN a chain of instructions, compound-date-offsets.md: the requested chain through a holiday, the
+ticket's answers, a chain as its instructions in turn, and a chain malformed late refused whole,
+naming where."""
 
 import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from goosedove.index_definitions.date_offsets import FORMS, MOST_DIGITS, shift_date
+from goosedove.index_definitions.date_offsets import (
+    FORMS,
+    MOST_DIGITS,
+    Instruction,
+    Unit,
+    read_offset,
+    shift_date,
+)
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 
@@ -18,6 +28,8 @@ def day(text: str) -> np.datetime64:
 
 # The ticket's synthetic calendar: Monday 12 October 2026 closed, and nothing else.
 SYNTHETIC = holiday_calendar(np.array(["2026-10-12"], dtype="datetime64[D]"))
+# The compound ticket's calendar H: Friday 25 December 2026 closed, and nothing else.
+H = holiday_calendar(np.array(["2026-12-25"], dtype="datetime64[D]"))
 
 
 # --- the ticket's worked examples -----------------------------------------------------------
@@ -146,9 +158,7 @@ def test_leading_zeros_are_dropped_before_the_count_is_read() -> None:
         "1bd",
         "+1.5bd",
         "+1wd",
-        "+1bd+2cd",
         " +1bd",
-        "+1bd ",
         "+ 1bd",
         "+1 bd",
         "+bd",
@@ -158,9 +168,7 @@ def test_leading_zeros_are_dropped_before_the_count_is_read() -> None:
         "++1bd",
         "+-1bd",
         "+1b",
-        "+1bdd",
         "+\N{ARABIC-INDIC DIGIT ONE}bd",  # no ASCII digit, however it reads
-        "+1BDX",
         "1",
     ],
 )
@@ -168,6 +176,36 @@ def test_anything_else_is_refused_naming_the_offset_and_the_form(offset: str) ->
     with pytest.raises(ValueError) as refused:
         shift_date(day("2026-10-09"), offset, SYNTHETIC)
     assert str(refused.value) == f"offset is {offset!r}, expected {FORMS}"
+
+
+# Past the first instruction the reading names where it stood and the text from there, so a
+# chain malformed late fails whole: a space, a letter, a sign on its own, a second instruction
+# with no unit or a decimal, a digit that is no ASCII digit, a bracket.
+@pytest.mark.parametrize(
+    ("offset", "at", "rest"),
+    [
+        ("+1bd ", 5, " "),
+        ("+1bdd", 5, "d"),
+        ("+1BDX", 5, "X"),
+        ("+1bd+", 5, "+"),
+        ("+1bd-", 5, "-"),
+        ("+1bd+2xd", 5, "+2xd"),
+        ("+1bd+2xd+1bd", 5, "+2xd+1bd"),
+        ("+1bd 2cd", 5, " 2cd"),
+        ("+1bd+1.5cd", 5, "+1.5cd"),
+        ("+1bd+\N{ARABIC-INDIC DIGIT ONE}bd", 5, "+\N{ARABIC-INDIC DIGIT ONE}bd"),
+        ("+3em+25cd-1bd+1bd)", 18, ")"),
+    ],
+)
+def test_a_chain_malformed_late_is_refused_whole_naming_where(
+    offset: str, at: int, rest: str
+) -> None:
+    with pytest.raises(ValueError) as refused:
+        shift_date(day("2026-10-09"), offset, SYNTHETIC)
+    assert str(refused.value) == (
+        f"offset is {offset!r}, expected {FORMS}; from character {at}, {rest!r} begins with no "
+        "instruction"
+    )
 
 
 # --- properties -------------------------------------------------------------------------------
@@ -213,3 +251,108 @@ def test_calendar_days_add_and_subtract_whatever_the_calendar_says(
     offset = f"{'+' if count >= 0 else '-'}{abs(count)}cd"
     assert shift_date(anchor, offset, SYNTHETIC) == anchor + np.timedelta64(count, "D")
     assert shift_date(anchor, offset, None) == anchor + np.timedelta64(count, "D")
+
+
+# --- a chain of instructions, compound-date-offsets.md -------------------------------------------
+
+
+def test_the_requested_chain_steps_through_the_holiday() -> None:
+    # From 12 August 2026 on H: the end of the month three ahead, 30 November; 25 calendar days on,
+    # Christmas Day, which H closes; the business day before, Thursday the 24th; and the one after
+    # it, which skips the closed Friday and the weekend to Monday the 28th. Without H the Friday
+    # is open and stands.
+    start = day("2026-08-12")
+    assert shift_date(start, "+3em", H) == day("2026-11-30")
+    assert shift_date(start, "+3em+25cd", H) == day("2026-12-25")
+    assert shift_date(start, "+3em+25cd-1bd", H) == day("2026-12-24")
+    assert shift_date(start, "+3em+25cd-1bd+1bd", H) == day("2026-12-28")
+    assert shift_date(start, "+3em+25cd-1bd+1bd", None) == day("2026-12-25")
+
+
+@pytest.mark.parametrize(
+    ("date", "offset", "calendar", "expected"),
+    [
+        ("2026-08-12", "+3em+25cd-1bd+1bd", None, "2026-12-25"),
+        ("2026-08-12", "+003EM+025cD-01BD+001bd", H, "2026-12-28"),  # zeros and cases, as one
+        ("2026-10-09", "-1bd+1bd", None, "2026-10-09"),  # an open day comes back to itself
+        ("2026-10-10", "-1bd+1bd", None, "2026-10-12"),  # a closed day moves to the next open
+        ("2026-01-30", "+1cd+0em", None, "2026-01-31"),
+        ("2026-01-30", "+0em+1cd", None, "2026-02-01"),  # the order is the rule
+        ("2028-01-31", "+1em+1cd", None, "2028-03-01"),
+        ("2026-10-10", "+0bd+0cd", None, "2026-10-10"),
+        ("2026-10-09", "+1cd", None, "2026-10-10"),  # a Saturday, and no roll is added
+    ],
+)
+def test_the_compound_tickets_answers(
+    date: str, offset: str, calendar: HolidayCalendar | None, expected: str
+) -> None:
+    assert shift_date(day(date), offset, calendar) == day(expected)
+
+
+def test_an_offset_is_read_whole_into_its_instructions() -> None:
+    assert read_offset("offset", "+003EM+025cD-01BD+001bd") == (
+        Instruction("+003EM", Unit.MONTH_ENDS, 3),
+        Instruction("+025cD", Unit.CALENDAR_DAYS, 25),
+        Instruction("-01BD", Unit.BUSINESS_DAYS, -1),
+        Instruction("+001bd", Unit.BUSINESS_DAYS, 1),
+    )
+    assert read_offset("offset", "-0cd") == (Instruction("-0cd", Unit.CALENDAR_DAYS, 0),)
+
+
+def test_a_count_of_too_many_digits_in_a_chain_names_its_instruction() -> None:
+    for offset, digits, k, text in (
+        ("+1bd+99999999cd", 8, 2, "+99999999cd"),
+        ("+99999999cd+1bd", 8, 1, "+99999999cd"),
+        ("+1bd+" + "9" * 5000 + "em+1cd", 5000, 2, "+" + "9" * 5000 + "em"),
+    ):
+        with pytest.raises(ValueError) as refused:
+            shift_date(day("2026-10-09"), offset, None)
+        assert str(refused.value) == (
+            f"offset has a count of {digits} digits in instruction {k}, {text!r}, expected at most "
+            f"{MOST_DIGITS}; the sheet's calendar runs 1900-03-01 to 9999-12-31"
+        )
+
+
+def test_an_instruction_that_leaves_the_sheet_is_refused_whatever_a_later_one_would_do() -> None:
+    # The first day made outside the sheet's calendar is the refusal, named with its instruction
+    # when the offset has more than one, though the next instruction would come back inside; the
+    # sheet's last day keeps its own month end, the month after being reached and a day taken
+    # before the rule applies.
+    for date, offset, made, k, text in (
+        ("9999-12-31", "+1cd-1cd", "10000-01-01", 1, "+1cd"),
+        ("1900-03-01", "-1cd+1cd", "1900-02-28", 1, "-1cd"),
+        ("2026-10-09", "+1bd+9999999cd", "29405-11-06", 2, "+9999999cd"),
+        ("9999-12-31", "+0em+1em-1em", "10000-01-31", 2, "+1em"),
+    ):
+        with pytest.raises(ValueError) as refused:
+            shift_date(day(date), offset, None)
+        assert str(refused.value) == (
+            f"date {date} shifted by {offset!r} is {made} at instruction {k}, {text!r}, outside "
+            "the sheet's calendar, 1900-03-01 to 9999-12-31"
+        )
+    assert shift_date(SHEET_LAST_DAY, "+0em+0em", None) == SHEET_LAST_DAY
+    assert shift_date(SHEET_LAST_DAY, "-1cd+1cd", None) == SHEET_LAST_DAY
+
+
+@given(
+    st.lists(
+        st.tuples(
+            st.sampled_from("+-"),
+            st.integers(min_value=0, max_value=40),
+            st.sampled_from(["bd", "cd", "em", "BD", "Cd", "eM"]),
+        ),
+        min_size=1,
+        max_size=6,
+    ),
+    st.integers(min_value=0, max_value=20_000),
+    st.booleans(),
+)
+def test_a_chain_is_its_instructions_applied_in_turn(
+    steps: list[tuple[str, int, str]], days_on: int, with_calendar: bool
+) -> None:
+    anchor = day("2026-01-05") + np.timedelta64(days_on, "D")
+    calendar = SYNTHETIC if with_calendar else None
+    one_by_one = anchor
+    for sign, count, unit in steps:
+        one_by_one = shift_date(one_by_one, f"{sign}{count}{unit}", calendar)
+    assert shift_date(anchor, "".join(f"{s}{n}{u}" for s, n, u in steps), calendar) == one_by_one

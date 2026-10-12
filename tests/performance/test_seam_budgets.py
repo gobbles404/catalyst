@@ -319,21 +319,25 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
 
 
 # A date shifted by an offset: the date checked as a number and as a date and the offset as text,
-# the calendar handle resolved once where one is given, the library's one reading, its one numpy
-# offset for business days, dispatched in C and unseen, or its two conversions for a month end, and
-# the seam's way out for a date. The same calls and the same numpy for one day and for two million,
-# for a week and for the sheet's calendar end to end, for one month end and for ninety thousand:
-# nothing here is one iteration or one allocated day per day shifted.
+# the calendar handle resolved once where one is given, the library's one reading of the offset
+# into its instructions and one application of them as arrays, since #NN, one numpy offset per
+# business-day instruction, dispatched in C and unseen, or two conversions per month end, one look
+# per instruction at the sheet's calendar, and the seam's way out for a date. The same calls and
+# the same numpy for one day and for two million, for a week and for the sheet's calendar end to
+# end, for one month end and for ninety thousand: nothing here is one iteration or one allocated
+# day per day shifted; the requested chain is its four instructions' looks and nothing more.
 @pytest.mark.parametrize(
-    ("date", "offset", "with_calendar", "library", "astype"),
+    ("date", "offset", "with_calendar", "library", "astype", "steps"),
     [
-        (46304.0, "+1bd", False, {"_business_days_on": 1}, {}),
-        (46304.0, "+2000000bd", False, {"_business_days_on": 1}, {}),
-        (46304.0, "-1bd", True, {"_business_days_on": 1}, {}),
-        (46304.0, "+7cd", False, {}, {}),
-        (61.0, "+2958404cd", False, {}, {}),
-        (46304.0, "+0em", True, {}, {"generic.astype": 2}),
-        (46304.0, "+90000em", False, {}, {"generic.astype": 2}),
+        (46304.0, "+1bd", False, {"_business_days_on": 1}, {}, 1),
+        (46304.0, "+2000000bd", False, {"_business_days_on": 1}, {}, 1),
+        (46304.0, "-1bd", True, {"_business_days_on": 1}, {}, 1),
+        (46304.0, "+7cd", False, {}, {}, 1),
+        (61.0, "+2958404cd", False, {}, {}, 1),
+        (46304.0, "+0em", True, {}, {"ndarray.astype": 2}, 1),
+        (46304.0, "+90000em", False, {}, {"ndarray.astype": 2}, 1),
+        (46246.0, "+3em+25cd-1bd+1bd", True, {"_business_days_on": 2}, {"ndarray.astype": 2}, 4),
+        (46246.0, "+3em+25cd-1bd+1bd", False, {"_business_days_on": 2}, {"ndarray.astype": 2}, 4),
     ],
     ids=[
         "one business day",
@@ -343,6 +347,8 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
         "the calendar end to end",
         "the month's end, a calendar given",
         "ninety thousand month ends",
+        "the requested chain, a calendar given",
+        "the requested chain, no calendar",
     ],
 )
 def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
@@ -353,6 +359,7 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     with_calendar: bool,
     library: dict[str, int],
     astype: dict[str, int],
+    steps: int,
 ) -> None:
     calendar = PATH["_CreateHolidayCalendar"](Cells.from_rows([[46307.0]]))
     third = calendar if with_calendar else bridge.MISSING
@@ -367,6 +374,8 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
         **({"_resolve": 1} if with_calendar else {}),
         "util_ShiftDate": 1,
         "shift_date": 1,
+        "read_offset": 1,  # the offset into its instructions, once
+        "shift_days": 1,  # the instructions applied to the one day, as an array
         **library,
         "_date_out": 1,
         "_unit": 1,
@@ -374,10 +383,13 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     }
     assert numpy_calls(lambda: PATH["util_ShiftDate"](date, offset, third)) == {
         **astype,  # the month to its first day, twice, for a month end
-        "numpy.array": 1,  # the way out's one-day array
-        "numpy.datetime_data": 1,  # its unit
-        "ndarray.any": 2,  # its two looks
-        "ufunc.reduce": 2,
+        "numpy.array": 2,  # the one-day array in, and the way out's one-day array
+        "numpy.asarray": 1,  # the stray days' NaT fill, read for its type
+        "numpy.empty": 2,  # the two small arrays, the stray instruction and the stray day
+        "numpy.datetime_data": 1,  # the way out's unit
+        "ndarray.any": 2
+        + steps,  # one look per instruction at the sheet's calendar, two the way out's
+        "ufunc.reduce": 2 + steps,
     }
 
 

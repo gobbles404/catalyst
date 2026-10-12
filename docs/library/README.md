@@ -52,7 +52,7 @@ and readers connect. The trade function pages below specify individual parts of 
 | [utilities/fut-to-date.md](utilities/fut-to-date.md) | `util_FutToDate`, the first day of a contract's month as a date, 1-Jan-2026 for F26, text in and one date out |
 | [utilities/start-date.md](utilities/start-date.md) | `util_StartDate`, the first calendar day of a contract or strip label, F26, 1Q27, CAL28, W29, S28 or F26-Z28, as a date, and since #160 of its balance, `BALZ26`, since #173 from the later of a valuation-date handle's day and the label's first; the grammar the two period functions share |
 | [utilities/end-date.md](utilities/end-date.md) | `util_EndDate`, the last calendar day of a contract or strip label, inclusive, as a date, the balance of one ending on the same day, a period that ended before the valuation day refused |
-| [utilities/shift-date.md](utilities/shift-date.md) | `util_ShiftDate`, a date shifted by a text offset, `+1bd` the next business day on Monday to Friday less an optional holiday calendar, `+7cd` a week of calendar days, `+0em` the month's last day; one date in and one date out |
+| [utilities/shift-date.md](utilities/shift-date.md) | `util_ShiftDate`, a date shifted by a text offset, `+1bd` the next business day on Monday to Friday less an optional holiday calendar, `+7cd` a week of calendar days, `+0em` the month's last day, since #NN a chain of them applied left to right, `+3em+25cd-1bd+1bd`, the grammar a trade's payment rule shares; one date in and one date out |
 
 The handle that the creators return, text in a cell that stands for a live object, is the seam's: its spec is [handles.md](../seam/handles.md), with the evidence for its store in [excel-dna-handles.md](../seam/excel-dna-handles.md).
 

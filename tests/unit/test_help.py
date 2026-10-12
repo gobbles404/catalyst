@@ -165,14 +165,16 @@ def test_the_date_shift_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Shifts a date by business days, calendar days or month ends, +1bd the next business day, "
-        "-1bd the one before, +7cd a week on, +0em the month's last day, and shows the date."
+        "-1bd the one before, +7cd a week on, +0em the month's last day, a chain such as "
+        "+3em+25cd-1bd+1bd applied left to right, and shows the date."
     )
     assert arguments == [
         ("date", "The day to shift, such as A2 or DATE(2026,10,9)."),
         (
             "offset",
-            "The shift as text: a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd "
-            "or +0em, typed or in a cell such as B2.",
+            "The shift as text: one or more of a sign, a whole count and bd, cd or em, such as "
+            "+1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd, applied left to right, typed or in a "
+            "cell such as B2.",
         ),
         (
             "[holiday_calendar]",

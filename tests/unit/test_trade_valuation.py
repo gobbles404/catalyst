@@ -517,9 +517,10 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
 def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_librarys_words(
     toy: dict[str, Any],
 ) -> None:
-    # The grammar's bound is the template's to refuse, the day the batch's: a lag of three million
+    # The grammar's bound is the template's to refuse, the day the batch's: a lag of 2,100,000
     # business days reads as a lag, and the batch it would make pays Z26 in the year 10076, which
-    # no cell could show, so nothing is published and nothing unnamed reaches the sheet.
+    # no cell could show, so nothing is published and nothing unnamed reaches the sheet; since #NN
+    # a count of more than seven digits is refused by its digits, the utility's rule.
     fields = {
         **NG_TEMPLATE,
         "quantity_unit": "TOY",
@@ -529,24 +530,40 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
     }
     beyond = {**fields, "payment_time_lag": "+99999999999999999999bd"}
     assert ENTRY["_CreateTradeTemplate"]("fixed_float", row(*beyond), row(*beyond.values())) == (
-        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is "
-        "'+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's "
-        "calendar from 1900-03-01 to 9999-12-31 end to end"
+        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 20 digits, "
+        "expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     )
     far = {**fields, "payment_time_lag": "+2100000bd"}
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*far), row(*far.values()))
     assert ":trade_template:" in str(template)  # a lag the template cannot yet see past
     assert ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template) == (
         "#ERROR _CreateTrades: ValueError: payment_time_lag is '+2100000bd', counted from "
-        "2026-11-25 to 10076-05-06, expected a payment day on or before 9999-12-31, the last a "
-        "sheet can show"
+        "2026-11-25 to 10076-05-06, expected a payment day within the sheet's calendar, "
+        "1900-03-01 to 9999-12-31"
     )
     long_lag = {**fields, "payment_time_lag": "+" + "9" * 4301 + "bd"}
     shown = str(
         ENTRY["_CreateTradeTemplate"]("fixed_float", row(*long_lag), row(*long_lag.values()))
     )
-    assert shown.startswith("#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+9999")
-    assert shown.endswith("the sheet's calendar from 1900-03-01 to 9999-12-31 end to end")
+    assert shown == (
+        "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 4301 digits, "
+        "expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
+    )
+    # Since #NN a chain, compound-date-offsets.md: read back as written beside the day it made,
+    # the month's end, the business day before and the one after, 30 November for Z26 and 31
+    # December for F27, under a payment calendar closing New Year's Day.
+    chain = {**fields, "payment_time_lag": "+0EM-1bd+1BD"}
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*chain), row(*chain.values()))
+    made = ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template)
+    assert ":trades:" in str(made), made
+    table = spilled(ENTRY["util_ReadHandle"](made))
+    code, lag, pay = (
+        table[0].index(name) for name in ("contract_code", "payment_time_lag", "payment_date")
+    )
+    assert pay == lag + 1  # the rule beside the day it made
+    assert {line[lag] for line in table[2:]} == {"+0EM-1bd+1BD"}
+    paid = {"Z26": serial("2026-11-30"), "F27": serial("2026-12-31")}
+    assert [line[pay] for line in table[2:]] == [paid[str(line[code])] for line in table[2:]]
 
 
 def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(

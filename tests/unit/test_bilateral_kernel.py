@@ -132,7 +132,7 @@ def terms_of(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(np.array(lags[:n], dtype=np.int64), (PAY_DAYS,) * n, dates(*pays[:n]))
+        else PaymentTerms(tuple(f"+{lag}bd" for lag in lags[:n]), (PAY_DAYS,) * n, dates(*pays[:n]))
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), route, settlement,
