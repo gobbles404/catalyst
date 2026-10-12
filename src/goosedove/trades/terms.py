@@ -90,7 +90,7 @@ def one_choice[E: Enum](members: tuple[E, ...], choice: E, occurrences: int) -> 
 class PaymentTerms:
     """How a financial settlement pays, kept with the days it gives so that a batch explains its
     own payment days. Per occurrence: lag[i], the payment rule as the ticket or the template wrote
-    it, `+2bd` or since #NN a chain such as `+3em+25cd-1bd+1bd`, its instructions read once at
+    it, `+2bd` or since #181 a chain such as `+3em+25cd-1bd+1bd`, its instructions read once at
     creation and applied then, and calendar[i], the holiday calendar its business days are counted
     on, the object the ticket's handle stood for, held by reference. Per component: date[k], the
     day it pays, its occurrence's rule applied instruction by instruction to its anchor, its

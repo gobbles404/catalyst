@@ -950,7 +950,7 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
         ("9999-12-31", "+0em", MISSING, "9999-12-31"),
     ):
         assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
-    # Since #NN a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on a
+    # Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on a
     # calendar closing Christmas Day, 28 December, and 25 December without it; the order the rule.
     christmas = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]])])
     for date, offset, calendar, expected in (

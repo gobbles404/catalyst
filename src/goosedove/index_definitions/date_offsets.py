@@ -1,6 +1,6 @@
 """A date shifted by a text offset, as the desk writes one: `+1bd`, the next business day; `-1bd`,
 the one before; `+7cd`, a week of calendar days on; `+0em`, the last day of the date's month and
-`+1em` the next month's; and since #NN a chain of them, `+3em+25cd-1bd+1bd`, each instruction
+`+1em` the next month's; and since #181 a chain of them, `+3em+25cd-1bd+1bd`, each instruction
 applied to the result of the one before, left to right. One date and one offset in, one date out,
 no object and no handle; the business days are Monday to Friday less the holidays of a calendar
 the desk may give, and nothing else of the library is read. The same reading and the same
@@ -66,7 +66,7 @@ class Shifted:
 
 
 def read_offset(where: str, offset: str) -> tuple[Instruction, ...]:
-    """The instructions of an offset, every one read before any is applied, since #NN.
+    """The instructions of an offset, every one read before any is applied, since #181.
 
     An offset is one or more instructions, each one sign, one whole count in ASCII digits,
     leading zeros allowed, and `bd`, `cd` or `em` in either case, one after another with nothing
@@ -117,7 +117,7 @@ def shift_days(
     days: NDArray[np.datetime64], steps: tuple[Instruction, ...], holidays: HolidayCalendar | None
 ) -> Shifted:
     """Every day shifted by the instructions in turn, each applied to what the one before made,
-    as arrays, since #NN: the days are a column of anchors or the one date of the utility, and
+    as arrays, since #181: the days are a column of anchors or the one date of the utility, and
     each instruction is one numpy operation over all of them. Business days are counted strictly
     from each day without including it, on the calendar's days, Monday to Friday less the
     holidays given, or less none when no calendar is: a day that is itself closed steps back to

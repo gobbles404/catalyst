@@ -9,7 +9,7 @@ when both are supplied and its contract code otherwise, the code resolved by mon
 schedule's rows or the dates split at month ends, every component
 with the days it covers, its method's observations made once over those days, and for a
 financial settlement each component's payment day, its rule applied to its last observation day
-instruction by instruction on the payment calendar, since #NN. Then the kernel:
+instruction by instruction on the payment calendar, since #181. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -62,9 +62,9 @@ from goosedove.trades.terms import (
 
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
 RESOLVED_COMPONENTS = "resolved_components"  # contract months resolved to schedule rows
-PAYMENT_RULES_READ = "payment_rules_read"  # distinct payment rules read, since #NN
+PAYMENT_RULES_READ = "payment_rules_read"  # distinct payment rules read, since #181
 PAYMENT_SHIFTS = "payment_shifts"  # instructions applied, each over one rule's components
-# on one calendar, since #NN
+# on one calendar, since #181
 SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule read for their month
 # Distinct codes of the rows that book by code, read for their months, since #172: a row that
 # books by its dates has its code, if any, read for nothing and counted here for nothing.
@@ -695,7 +695,7 @@ def _the_payment_terms(
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's payment rule as written and
     its payment calendar, retained, and each component's payment day, the rule applied to its
-    anchor instruction by instruction, since #NN: on a futures index its last observation day, the
+    anchor instruction by instruction, since #181: on a futures index its last observation day, the
     one day under lastday and penultimate, the third under last3day and the month's last pricing
     day under asian, and on an IFERC index since #167 its month's last trading day, the exchange's,
     the index printing later; business days on that calendar, Monday to Friday less its holidays,

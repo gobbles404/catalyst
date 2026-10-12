@@ -1,7 +1,7 @@
 """A date shifted by a text offset: the ticket's worked answers, the signed zeros, the suffixes in
 any case, a count with leading zeros, the sheet's calendar as the bound either side, and
 everything else refused naming the offset; the round trip of business days from an open day. Since
-#NN a chain of instructions, compound-date-offsets.md: the requested chain through a holiday, the
+#181 a chain of instructions, compound-date-offsets.md: the requested chain through a holiday, the
 ticket's answers, a chain as its instructions in turn, and a chain malformed late refused whole,
 naming where."""
 

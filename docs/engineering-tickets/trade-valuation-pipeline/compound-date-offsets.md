@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 9](surface-uat-notes.md#9-date-offsets-from-text) · [Original date utility](date-offset-utility.md)
 
-**Status:** Built in #NN on `claude/compound-offsets`, stacked on PR #180 at `2d0e2f7`, the
-reviewed surface, 12 October 2026, the page as the ticket; the [As built](#as-built-nn)
+**Status:** Built in #181 on `claude/compound-offsets`, stacked on PR #180 at `2d0e2f7`, the
+reviewed surface, 12 October 2026, the page as the ticket; the [As built](#as-built-181)
 section at the end says what was built and what was not. This extends #171's utility and
 the existing trade payment rule together, and does not claim either has shipped.
 
@@ -172,7 +172,7 @@ change payment anchors or same-day fixing policy; introduce named rolling
 conventions, custom weekends or intraday rules; or change BAL helpers, risk reports
 or support for mixed routes. Calendar contents remain explicit caller inputs.
 
-## As built (#NN)
+## As built (#181)
 
 Built on `claude/compound-offsets` above #180's `2d0e2f7`, one pull request; [shift-date.md](../../library/utilities/shift-date.md) is the utility's page and [create-trades.md](../../library/trades/create-trades.md) the payment rule's.
 

@@ -202,7 +202,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+001cD", ExcelMissing.Value }, 46305.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+0em", ExcelMissing.Value }, 2958465.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
-            // Since #NN a chain, compound-date-offsets.md: the requested chain from 12 August 2026 without a calendar, 25 December; the order the rule and no roll at the end; a chain malformed late, one leaving the sheet at its first instruction and too many digits in a later one.
+            // Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 without a calendar, 25 December; the order the rule and no roll at the end; a chain malformed late, one leaving the sheet at its first instruction and too many digits in a later one.
             yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+3em+25cd-1bd+1bd", ExcelMissing.Value }, 46381.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+003EM+025cD-01BD+001bd", ExcelMissing.Value }, 46381.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1bd+1bd", ExcelMissing.Value }, 46304.0 };
@@ -2021,7 +2021,7 @@ namespace Goosedove.Host.Tests
             var batch = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(22, batch.GetLength(1));
             Assert.Equal("offset", batch[0, 21]);
-            // Since #NN, compound-date-offsets.md: a payment rule of several instructions reads as the date
+            // Since #181, compound-date-offsets.md: a payment rule of several instructions reads as the date
             // utility's offset does and is kept as written beside the day it made: Z26's 31 December 2026 to its
             // month's end, the same day, and the business day after, past New Year's Day closed, Monday 4 January.
             var chained = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+0em+1bd", pays));

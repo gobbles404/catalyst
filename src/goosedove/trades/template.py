@@ -136,7 +136,7 @@ def quantity_per_of(where: str, text: str) -> QuantityPer:
 def payment_rule_of(where: str, text: str) -> tuple[Instruction, ...]:
     """The instructions of a payment rule, `+1bd`, `+3cd`, `+0em` or a chain such as
     `+3em+25cd-1bd+1bd`, read whole before any is applied, as the date utility reads an offset and
-    in its words, since #NN: one or more of a sign, a whole count of at most seven significant
+    in its words, since #181: one or more of a sign, a whole count of at most seven significant
     digits and bd, cd or em in either case, nothing between or after. Zero and negative counts are
     steps like any other; the day the rule makes is held to the sheet's calendar where it is made
     and after each component's last observation by the kernel, so a rule that pays on or before

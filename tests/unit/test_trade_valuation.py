@@ -519,7 +519,7 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
 ) -> None:
     # The grammar's bound is the template's to refuse, the day the batch's: a lag of 2,100,000
     # business days reads as a lag, and the batch it would make pays Z26 in the year 10076, which
-    # no cell could show, so nothing is published and nothing unnamed reaches the sheet; since #NN
+    # no cell could show, so nothing is published and nothing unnamed reaches the sheet; since #181
     # a count of more than seven digits is refused by its digits, the utility's rule.
     fields = {
         **NG_TEMPLATE,
@@ -549,7 +549,7 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 4301 digits, "
         "expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     )
-    # Since #NN a chain, compound-date-offsets.md: read back as written beside the day it made,
+    # Since #181 a chain, compound-date-offsets.md: read back as written beside the day it made,
     # the month's end, the business day before and the one after, 30 November for Z26 and 31
     # December for F27, under a payment calendar closing New Year's Day.
     chain = {**fields, "payment_time_lag": "+0EM-1bd+1BD"}

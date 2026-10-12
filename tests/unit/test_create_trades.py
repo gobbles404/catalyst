@@ -400,7 +400,7 @@ def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day
     # Representability and no term of business: a day outside the sheet's calendar could reach no
     # cell, so the rule that would pay there is refused naming the rule, the anchor and the day,
     # with the row when the ticket supplied it and the instruction when the rule has more than
-    # one, since #NN; the longest lag that still pays on the last day is taken: from Z26's 25
+    # one, since #181; the longest lag that still pays on the last day is taken: from Z26's 25
     # November 2026 that is 2,080,082 business days on an open calendar. A count of more than
     # seven significant digits is refused by its digits before any day is counted, so no number
     # overflows the arithmetic unnamed.
@@ -1757,7 +1757,7 @@ def test_a_code_or_a_lag_the_grammar_refuses_is_named_by_its_first_bad_row() -> 
         **NG_TICKET,
         "payment_time_lag": ["+2BD", "+2bd+", "+2xd", "+2bd", "+2bd"],
     }
-    assert refused(TOY, lags, template) == (  # row 1 reads since #NN; row 2 is the first bad
+    assert refused(TOY, lags, template) == (  # row 1 reads since #181; row 2 is the first bad
         "payment_time_lag row 2 is '+2bd+', expected one or more of a sign, a whole count and bd, "
         "cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+' "
         "begins with no "

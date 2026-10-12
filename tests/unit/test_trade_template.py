@@ -160,7 +160,7 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             "settlement_method is 'cash', expected physical or financial",
         ),
         ({"quantity_per": "day"}, "quantity_per is 'day', expected month or calday"),
-        (  # since #NN the utility's grammar, one or more instructions, read whole
+        (  # since #181 the utility's grammar, one or more instructions, read whole
             {"payment_time_lag": "2bd"},
             "payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd "
             "or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd",
@@ -332,7 +332,7 @@ def test_a_contract_code_is_text_here_and_read_for_its_months_when_a_row_books_b
     assert a_template(contract_code="Z27-F27").defaults["contract_code"] == "Z27-F27"
 
 
-# Since #NN the template reads a payment rule as the date utility reads an offset: a zero, leading
+# Since #181 the template reads a payment rule as the date utility reads an offset: a zero, leading
 # zeros, either case and a chain are rules, kept as written; the day each makes is the batch's to
 # check, against the sheet's calendar and after the last observation.
 def test_a_payment_rule_in_any_of_the_grammars_forms_is_a_template() -> None:

@@ -536,7 +536,7 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
 
 
 # A shifted date makes one day, by one numpy offset or two conversions per instruction, beside
-# the one-day array in and the two small arrays that would name a stray instruction, since #NN,
+# the one-day array in and the two small arrays that would name a stray instruction, since #181,
 # then pays the seam's way out for a date: within three slacks for one business day and for two
 # million, for the sheet's calendar of days end to end and for ninety thousand month ends alike,
 # since nothing is made per day shifted, measured 2026-10-12 at 2,264, 2,292, 2,088 and 2,116

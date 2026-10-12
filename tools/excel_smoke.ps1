@@ -450,7 +450,7 @@ $formulas = [ordered]@{
     '=util_ShiftDate(PA3,"+001cD")'          = "46305"
     '=util_ShiftDate(DATE(9999,12,31),"+0em")' = "2958465"
     '=util_ShiftDate(PA3,"1bd")'             = "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
-    # Since #NN a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on H in
+    # Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on H in
     # PB2, Christmas Day closed, 28 December, and 25 December without it, the zeros and cases as one;
     # the order the rule, no roll at the end; a chain malformed late, one leaving the sheet at its
     # first instruction and too many digits in a later one, each refused naming where.
@@ -1443,7 +1443,7 @@ $formulas = [ordered]@{
     '=COLUMNS(_ReportRisk(QV24,"all","day"))'     = "4"
     '=INDEX(_ReportRisk(QV24,"all","day"),5,4)'   = "0"
     "=INDEX(util_ReadHandle(QV24),3,15)"  = "-"
-    # The chain's trade, since #NN: the rule as written beside the day it made, 25 May 2027; a rule
+    # The chain's trade, since #181: the rule as written beside the day it made, 25 May 2027; a rule
     # coming back to the expiry refused by the kernel as any payment on the last observation is.
     "=INDEX(util_ReadHandle(QJ15),1,13)"  = "payment_time_lag"
     "=INDEX(util_ReadHandle(QJ15),3,13)"  = "+3em+25cd-1bd+1bd"
@@ -2469,7 +2469,7 @@ $cells = [ordered]@{
     "PA1" = "12-Oct-2026"
     "PA2" = "=_CreateHolidayCalendar(PA1)"
     "PA3" = "9-Oct-2026"; "PA4" = "10-Oct-2026"; "PA5" = "11-Oct-2026"; "PA6" = "12-Oct-2026"
-    # Since #NN the compound ticket's calendar H, Christmas Day 2026 closed and nothing else, in PB2
+    # Since #181 the compound ticket's calendar H, Christmas Day 2026 closed and nothing else, in PB2
     # over PB1, and its dates: 12 August 2026, 30 January 2026 and 31 January 2028.
     "PB1" = "25-Dec-2026"
     "PB2" = "=_CreateHolidayCalendar(PB1)"
@@ -2575,7 +2575,7 @@ $cells = [ordered]@{
     "QJ12" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR11,QJ10)"
     "QJ13" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR10,QJ10)"
     "QJ14" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR10,QJ11)"
-    # Since #NN a chain in the ticket's own column: F27 cleared, paying the end of the month three
+    # Since #181 a chain in the ticket's own column: F27 cleared, paying the end of the month three
     # ahead of its 4 January 2027 expiry, 25 days on, the business day before and the one after.
     "QM12" = "1003"; "QN12" = "4-Jan-2027"; "QO12" = "F27"; "QP12" = "10"; "QQ12" = "70"; "QR12" = "+3em+25cd-1bd+1bd"
     "QJ15" = "=_CreateTrades(QJ8,QM9:QR9,QM12:QR12,QJ11)"

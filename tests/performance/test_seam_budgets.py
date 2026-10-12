@@ -320,7 +320,7 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
 
 # A date shifted by an offset: the date checked as a number and as a date and the offset as text,
 # the calendar handle resolved once where one is given, the library's one reading of the offset
-# into its instructions and one application of them as arrays, since #NN, one numpy offset per
+# into its instructions and one application of them as arrays, since #181, one numpy offset per
 # business-day instruction, dispatched in C and unseen, or two conversions per month end, one look
 # per instruction at the sheet's calendar, and the seam's way out for a date. The same calls and
 # the same numpy for one day and for two million, for a week and for the sheet's calendar end to
