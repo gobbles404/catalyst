@@ -281,28 +281,35 @@ Z26 = {"2026-11-25": 3.23}
 BOTH = {"2026-11-25": 3.23, "2026-12-29": 3.45}
 
 
+# The page's seven states, with its total P&L column typed from the page beside the mark and
+# the cash, and an eighth day between two of them: Friday 27 November, Z26 fixed and not yet
+# paid, since the payment calendar closes the 26th and two business days from the 25th land on
+# Monday the 30th. A payment counted on an open calendar would fall on the 27th and turn the
+# day's 11,800 of mark into cash.
 @pytest.mark.parametrize(
-    ("as_of", "settles", "quotes", "mark", "cash", "delta"),
+    ("as_of", "settles", "quotes", "mark", "cash", "delta", "total"),
     [
-        ("2026-11-24", {}, (3.20, 3.50, 3.60), 7_000, 0, 110_000),
-        ("2026-11-24", {}, (3.21, 3.50, 3.60), 8_600, 0, 110_000),
-        ("2026-11-26", Z26_FIRST, (3.50, 3.60), 10_200, 0, -50_000),
-        ("2026-11-26", Z26, (3.50, 3.60), 11_800, 0, -50_000),
-        ("2026-11-30", Z26, (3.50, 3.60), -11_000, 22_800, -50_000),
-        ("2026-12-30", BOTH, (3.60,), -8_500, 22_800, 0),
-        ("2026-12-31", BOTH, (3.60,), 0, 14_300, 0),
+        ("2026-11-24", {}, (3.20, 3.50, 3.60), 7_000, 0, 110_000, 7_000),
+        ("2026-11-24", {}, (3.21, 3.50, 3.60), 8_600, 0, 110_000, 8_600),
+        ("2026-11-26", Z26_FIRST, (3.50, 3.60), 10_200, 0, -50_000, 10_200),
+        ("2026-11-26", Z26, (3.50, 3.60), 11_800, 0, -50_000, 11_800),
+        ("2026-11-27", Z26, (3.50, 3.60), 11_800, 0, -50_000, 11_800),
+        ("2026-11-30", Z26, (3.50, 3.60), -11_000, 22_800, -50_000, 11_800),
+        ("2026-12-30", BOTH, (3.60,), -8_500, 22_800, 0, 14_300),
+        ("2026-12-31", BOTH, (3.60,), 0, 14_300, 0, 14_300),
     ],
     ids=[
         "24 Nov, initial",
         "24 Nov, a tick",
         "26 Nov, Z26 fixed at 3.22",
         "26 Nov, corrected to 3.23",
+        "27 Nov, Z26 fixed and unpaid, the 26th closed",
         "30 Nov, Z26 paid",
         "30 Dec, both fixed, F27 unpaid",
         "31 Dec, both paid",
     ],
 )
-def test_the_toys_seven_states_value_on_the_sheet_as_the_page_says(
+def test_the_toys_states_value_on_the_sheet_as_the_page_says(
     toy: dict[str, Any],
     as_of: str,
     settles: dict[str, float],
@@ -310,12 +317,13 @@ def test_the_toys_seven_states_value_on_the_sheet_as_the_page_says(
     mark: float,
     cash: float,
     delta: float,
+    total: float,
 ) -> None:
     _, results = toy_state(toy, as_of, settles, quotes)
     got = valued(results)
     assert got[0] == pytest.approx(mark) and got[1] == pytest.approx(cash)
     assert got[2] == pytest.approx(delta)
-    assert got[0] + got[1] == pytest.approx(mark + cash)  # the page's total P&L column
+    assert got[0] + got[1] == pytest.approx(total)  # the page's total P&L column, as typed
     assert spilled(ENTRY["_ReportValues"](results))[2][3] == serial(as_of)
 
 
@@ -327,6 +335,26 @@ def test_the_tick_reuses_the_initial_states_preparation(toy: dict[str, Any]) -> 
     assert valued(str(initial))[0] == pytest.approx(7_000)
     assert valued(str(ticked))[0] == pytest.approx(8_600)
     assert valued(str(initial))[0] == pytest.approx(7_000)  # the old results stand
+
+
+def test_a_market_over_a_corrected_history_of_the_same_day_is_refused_until_prepared_again(
+    toy: dict[str, Any],
+) -> None:
+    # The same index and the same valuation day, Z26's final corrected from 3.22 to 3.23: the
+    # market over the corrected history is another history's, refused by object and never by
+    # name or day, and preparing again against it gives the page's 11,800.
+    first = a_history(toy["index"], "2026-10-29", "2026-11-26", TOY_HOLIDAYS, Z26_FIRST)
+    corrected = a_history(toy["index"], "2026-10-29", "2026-11-26", TOY_HOLIDAYS, Z26)
+    prepared = ENTRY["_PrepareTrades"](toy["trades"], first)
+    on_first = ENTRY["_EvaluateTrades"](prepared, a_market(first, "TOY_GAS", 3.50, 3.60))
+    assert valued(str(on_first))[0] == pytest.approx(10_200)
+    assert ENTRY["_EvaluateTrades"](prepared, a_market(corrected, "TOY_GAS", 3.50, 3.60)) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'TOY_GAS', "
+        "expected the one the trades were prepared against"
+    )
+    again = ENTRY["_PrepareTrades"](toy["trades"], corrected)
+    on_corrected = ENTRY["_EvaluateTrades"](again, a_market(corrected, "TOY_GAS", 3.50, 3.60))
+    assert valued(str(on_corrected))[0] == pytest.approx(11_800)
 
 
 def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
@@ -342,7 +370,7 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
     assert table[3][4] == pytest.approx(-175_000.0) and table[3][5] == -50_000.0
 
 
-def test_a_fully_fixed_batch_inside_a_live_market_reads_no_quote_and_reports_its_cash(
+def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_exposure(
     toy: dict[str, Any],
 ) -> None:
     prepared, results = toy_state(toy, "2026-12-31", BOTH, (3.60,))

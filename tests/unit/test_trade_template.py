@@ -184,6 +184,7 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
         ),
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
+        ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
     ],
 )

@@ -339,8 +339,13 @@ def test_payment_days_are_counted_strictly_after_the_expiry() -> None:
 
 
 def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
-    closes_two_days = holiday_calendar(dates("2026-11-26", "2026-11-27"))
-    open_calendar = holiday_calendar(dates())
+    # Each row's calendar closes a day that would move the other row's payment and not its
+    # own: the first closes 26 November, the day after Z26 expires, the second 31 December,
+    # two business days after F27 does. Row a, Z26 at +1bd on the first, pays 27 November;
+    # row b, F27 at +3bd on the second, pays 4 January. Either calendar applied to both rows
+    # would move one of them, row a to the 26th or row b to New Year's Day.
+    after_z26 = holiday_calendar(dates("2026-11-26"))
+    before_new_year = holiday_calendar(dates("2026-12-31"))
     template = {
         name: value
         for name, value in TOY_TEMPLATE.items()
@@ -355,15 +360,15 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
             "quantity": [1, 1],
             "fixed_price": [3.0, 3.0],
             "payment_time_lag": ["+1bd", "+3bd"],
-            "payment_holiday_calendar": [closes_two_days, open_calendar],
+            "payment_holiday_calendar": [after_z26, before_new_year],
         },
         template,
     )
     payment = batch.resolved.payment
     assert payment is not None
-    np.testing.assert_array_equal(payment.date, dates("2026-11-30", "2027-01-01"))
+    np.testing.assert_array_equal(payment.date, dates("2026-11-27", "2027-01-04"))
     np.testing.assert_array_equal(payment.lag_days, [1, 3])
-    assert payment.calendar == (closes_two_days, open_calendar)
+    assert payment.calendar == (after_z26, before_new_year)
 
 
 # --- the penultimate method: the pen day observed, the payment counted from it ---------------
@@ -504,18 +509,25 @@ TWO_LOTS = an_index(
 )
 
 
-def one_row(unit: str, quantity: float = 2.0, code: str = "Z26") -> dict[str, list[object]]:
-    return {
+def one_row(
+    quantity: float = 2.0, code: str = "Z26", unit: str | None = None
+) -> dict[str, list[object]]:
+    """One ticket row; given a unit, the ticket carries the quantity_unit column itself."""
+    ticket: dict[str, list[object]] = {
         "trade_id": ["q"],
         "trade_date": ["2026-09-24"],
         "contract_code": [code],
         "quantity": [quantity],
         "fixed_price": [3.0],
     }
+    return {**ticket, "quantity_unit": [unit]} if unit is not None else ticket
+
+
+WITHOUT_UNIT = {name: value for name, value in NG_TEMPLATE.items() if name != "quantity_unit"}
 
 
 def quote_quantity(ix: Index, unit: str, quantity: float = 2.0, code: str = "Z26") -> float:
-    batch, _ = created(ix, one_row(unit, quantity, code), {**NG_TEMPLATE, "quantity_unit": unit})
+    batch, _ = created(ix, one_row(quantity, code), {**NG_TEMPLATE, "quantity_unit": unit})
     assert batch.resolved.specification == ix.specifications.names.index(unit)
     return float(batch.encoded.quote_quantity.sum())
 
@@ -532,10 +544,10 @@ def test_the_quantity_unit_names_a_specification_row_and_the_quantity_counts_it(
 def test_a_template_holds_the_name_and_the_index_asked_at_creation_owns_it() -> None:
     template = a_template({**NG_TEMPLATE, "quantity_unit": "ICE PHH"})
     assert template.defaults["quantity_unit"] == "ICE PHH"
-    with_both = trades(TWO_LOTS, a_ticket(one_row("ICE PHH")), template, UNITS, WorkCounter())
+    with_both = trades(TWO_LOTS, a_ticket(one_row()), template, UNITS, WorkCounter())
     assert with_both.resolved.specification == 1
     with pytest.raises(ValueError) as refused:
-        trades(NG, a_ticket(one_row("ICE PHH")), template, UNITS, WorkCounter())
+        trades(NG, a_ticket(one_row()), template, UNITS, WorkCounter())
     assert str(refused.value) == (
         "quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'"
     )
@@ -555,14 +567,28 @@ def test_a_template_holds_the_name_and_the_index_asked_at_creation_owns_it() -> 
     ],
 )
 def test_a_name_the_index_does_not_spell_is_refused_whatever_the_tables_know(unit: str) -> None:
-    assert refused(TWO_LOTS, one_row(unit), {**NG_TEMPLATE, "quantity_unit": unit}) == (
+    assert refused(TWO_LOTS, one_row(), {**NG_TEMPLATE, "quantity_unit": unit}) == (
         f"quantity_unit is {unit!r}, expected one of the index's specifications: "
         "'NYMEX NG', 'ICE PHH', 'MMBTU'"
     )
 
 
+@pytest.mark.parametrize(
+    "unit",
+    ["ice phh", "ICE PHH ", " ICE PHH", "ICE  PHH", "LOT", "MWH"],
+    ids=["case", "trailing space", "leading space", "two spaces", "LOT", "a unit the tables know"],
+)
+def test_a_name_typed_in_the_ticket_is_held_to_the_same_spelling(unit: str) -> None:
+    # The ticket's column is matched as exactly as the template's value, and named with its
+    # row: no case folded, no space trimmed, no unit the tables know taken for a specification.
+    assert refused(TWO_LOTS, one_row(unit=unit), WITHOUT_UNIT) == (
+        f"quantity_unit row 1 is {unit!r}, expected one of the index's specifications: "
+        "'NYMEX NG', 'ICE PHH', 'MMBTU'"
+    )
+
+
 def test_lot_is_a_name_like_any_other_accepted_only_where_the_index_defines_it() -> None:
-    assert refused(NG, one_row("LOT"), {**NG_TEMPLATE, "quantity_unit": "LOT"}) == (
+    assert refused(NG, one_row(), {**NG_TEMPLATE, "quantity_unit": "LOT"}) == (
         "quantity_unit is 'LOT', expected one of the index's specifications: 'NYMEX NG'"
     )
     with_lot = an_index(lots=(("NYMEX NG", 10_000.0, "MMBTU"), ("LOT", 10_000.0, "MMBTU")))
@@ -598,13 +624,13 @@ def test_two_specifications_of_two_units_are_read_each_by_its_own_row() -> None:
 
 def test_a_strip_counts_the_selected_unit_in_every_month() -> None:
     batch, _ = created(
-        TWO_LOTS, one_row("MMBTU", 5_000.0, "Z26-F27"), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
+        TWO_LOTS, one_row(5_000.0, "Z26-F27"), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
     )
     np.testing.assert_array_equal(batch.encoded.quote_quantity, [5_000.0, 5_000.0])
     np.testing.assert_array_equal(batch.resolved.quantity, [5_000.0, 5_000.0])
-    for quantity in (0.5, float("nan")):
+    for quantity in (0.5, float("nan"), float("inf")):
         assert refused(
-            TWO_LOTS, one_row("MMBTU", quantity), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
+            TWO_LOTS, one_row(quantity), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
         ).startswith("quantity of trade 'q' at row 1 is ")
 
 
@@ -669,9 +695,7 @@ def test_a_zero_row_bypasses_no_other_rule() -> None:
 def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
     assert quote_quantity(TWO_LOTS, "ICE PHH", 0.0) == 0.0  # the second row's specification
     assert quote_quantity(TWO_LOTS, "MMBTU", 0.0) == 0.0  # the size-one unit
-    strip, _ = created(
-        TWO_LOTS, one_row("MMBTU", 0.0, "Z26-F27"), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
-    )
+    strip, _ = created(TWO_LOTS, one_row(0.0, "Z26-F27"), {**NG_TEMPLATE, "quantity_unit": "MMBTU"})
     np.testing.assert_array_equal(strip.resolved.contract, [1, 2])  # both months kept
     np.testing.assert_array_equal(strip.encoded.quote_quantity, [0.0, 0.0])
     np.testing.assert_array_equal(strip.encoded.offset_of_group, [0.0, 0.0])
@@ -784,6 +808,11 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             {**NG_TICKET, "quantity": [10, -4, 7.5, -12, 10]},
             NG_TEMPLATE,
             "quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number",
+        ),
+        (
+            NG_TICKET,
+            WITHOUT_UNIT,
+            "quantity_unit is missing, expected a value in the template or a column in the ticket",
         ),
     ],
 )
