@@ -24,6 +24,7 @@ from goosedove.index_definitions.holiday_calendar import holiday_calendar
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.instruments.definitions import FUTURE
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -32,6 +33,7 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import Results, results
 from goosedove.trades.preparation import prepared
 from goosedove.trades.terms import (
+    PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
@@ -106,9 +108,17 @@ TRADE_DATES = dates("2026-09-24", "2026-09-24", "2026-09-25", "2026-09-25", "202
 CONTRACT = rows(1, 1, 2, 2, 1)  # Z26, Z26, F27, F27, Z26 as rows of the schedule
 LOTS = numbers(10, -4, 7, -12, 10)
 FIXED_PRICE = numbers(3.100, 3.150, 3.400, 3.350, 3.100)
-# The toy pays two business days after each contract's last trading day: 30 November for Z26 and
-# 31 December for F27, computed once on the page and supplied here as resolved dates.
+# The toy pays two business days after each contract's last trading day on its payment calendar,
+# closed on 26 November, 25 December and New Year's Day: 30 November for Z26 and 31 December for
+# F27, computed once on the page and supplied here as resolved dates beside the lag and the
+# calendar that gave them.
 TOY_PAYS = dates("2026-11-30", "2026-11-30", "2026-12-31", "2026-12-31", "2026-11-30")
+PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01"))
+
+
+def paying(pays: NDArray[np.datetime64], occurrences: int, lag: int = 2) -> PaymentTerms:
+    """The toy's terms over those days: the lag and the calendar for every occurrence."""
+    return PaymentTerms(np.full(occurrences, lag), (PAYMENT_CALENDAR,) * occurrences, pays)
 
 
 def terms_of(
@@ -122,6 +132,7 @@ def terms_of(
     """The page's five rows resolved against an index, or the rows a slice keeps."""
     occurrences = TRADE_DATES[keep].size
     return resolved_trades(
+        FUTURE,
         ix,
         0,
         route,
@@ -130,12 +141,14 @@ def terms_of(
         "LOT",
         QuantityPer.MONTH,
         None if labels is None else labels[keep],
+        None,
+        None,
         TRADE_DATES[keep],
         np.arange(occurrences, dtype=np.intp),
         CONTRACT[keep],
         LOTS[keep],
         FIXED_PRICE[keep],
-        None if pays is None else pays[keep],
+        None if pays is None else paying(pays[keep], occurrences),
     )
 
 
@@ -177,21 +190,25 @@ def evaluated(
 
 
 def test_the_terms_own_frozen_copies_of_their_columns() -> None:
-    lots, pays = LOTS.copy(), TOY_PAYS.copy()
+    lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), np.full(5, 2)
     terms = resolved_trades(
-        TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
-        QuantityPer.MONTH, LABELS, TRADE_DATES, np.arange(5, dtype=np.intp), CONTRACT, lots,
-        FIXED_PRICE, pays,
+        FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        QuantityPer.MONTH, LABELS, ("CME Clearing",) * 5, None, TRADE_DATES,
+        np.arange(5, dtype=np.intp), CONTRACT, lots, FIXED_PRICE,
+        PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
     )  # fmt: skip
-    lots[0], pays[0] = 99.0, day("2030-01-01")  # the arrays that were passed, changed after
+    lots[0], pays[0], lags[0] = 99.0, day("2030-01-01"), 9  # the arrays passed, changed after
     assert terms.lots[0] == 10.0 and terms.schedule is TOY.schedule
-    assert terms.payment_date is not None and terms.payment_date[0] == day("2026-11-30")
+    assert terms.payment is not None and terms.payment.date[0] == day("2026-11-30")
+    assert terms.payment.lag_days[0] == 2 and terms.payment.calendar[0] is PAYMENT_CALENDAR
     for column in (terms.trade_dates, terms.occurrence, terms.contract, terms.lots):
         assert not column.flags.writeable
-    assert terms.payment_date is not None and not terms.payment_date.flags.writeable
+    assert not terms.payment.date.flags.writeable and not terms.payment.lag_days.flags.writeable
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
     assert terms.named(4) == "trade 'NG-001' at row 5"
     assert terms_of(labels=None).named(2) == "trade at row 3"
+    assert terms.instrument is FUTURE and terms.clearing_house == ("CME Clearing",) * 5
+    assert terms.broker is None
 
 
 GAS_DAILY = index(
@@ -228,6 +245,14 @@ GAS_DAILY = index(
             "labels has 2 texts, expected 5, one per occurrence",
         ),
         (
+            {"clearing_house": ("CME Clearing",)},
+            "clearing_house has 1 texts, expected 5, one per occurrence",
+        ),
+        (
+            {"broker": ("ION",) * 4},
+            "broker has 4 texts, expected 5, one per occurrence",
+        ),
+        (
             {"occurrence": rows(), "contract": rows(), "lots": numbers(), "fixed_price": numbers()},
             "occurrence has 0 rows, expected at least 1, one per component",
         ),
@@ -245,7 +270,7 @@ GAS_DAILY = index(
         ),
         (
             {"occurrence": rows(0, 1, 2, 2, 3)},
-            "trade at row 5 has no component, expected at least one",
+            "trade 'NG-001' at row 5 has no component, expected at least one",
         ),
         (
             {"contract": rows(1, 1, 2, 3, 1)},
@@ -253,37 +278,49 @@ GAS_DAILY = index(
         ),
         (
             {"lots": numbers(10, -4, 7.5, -12, 10)},
-            "lots row 3 is 7.5, expected a whole number of lots",
+            "lots of trade 'NG-003' at row 3 is 7.5, expected a whole number of lots",
         ),
         (
             {"lots": numbers(10, -4, np.nan, -12, 10)},
-            "lots row 3 is nan, expected a whole number of lots",
+            "lots of trade 'NG-003' at row 3 is nan, expected a whole number of lots",
         ),
         (
             {"lots": numbers(10, 0, 7, -12, 10)},
-            "lots row 2 is 0.0, expected a nonzero quantity",
+            "lots of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity",
         ),
         (
             {"fixed_price": numbers(3.1, 3.15, 3.4, np.inf, 3.1)},
-            "fixed_price row 4 is inf, expected a finite price",
+            "fixed_price of trade 'NG-004' at row 4 is inf, expected a finite price",
         ),
         (
             {"settlement": Settlement.FINANCIAL},
-            "payment_date is missing, expected one date per component with a financial settlement",
+            "payment is missing, expected a lag and a calendar per occurrence and one date per "
+            "component with a financial settlement",
         ),
         (
-            {"settlement": Settlement.FINANCIAL, "payment_date": dates("2026-11-30")},
-            "payment_date has 1 dates, expected 5, one per component",
+            {"settlement": Settlement.FINANCIAL, "payment": paying(dates("2026-11-30"), 5)},
+            "payment date has 1 dates, expected 5, one per component",
         ),
         (
-            {"payment_date": TOY_PAYS},
-            "payment_date has 5 dates, expected none with a physical settlement, "
-            "which pays on no day",
+            {"settlement": Settlement.FINANCIAL, "payment": paying(TOY_PAYS, 4)},
+            "payment lag_days has 4, expected 5, one per occurrence",
+        ),
+        (
+            {
+                "settlement": Settlement.FINANCIAL,
+                "payment": PaymentTerms(np.full(5, 2), (PAYMENT_CALENDAR,) * 3, TOY_PAYS),
+            },
+            "payment calendar has 3, expected 5, one per occurrence",
+        ),
+        (
+            {"payment": paying(TOY_PAYS, 5)},
+            "payment has 5 dates, expected none with a physical settlement, which pays on no day",
         ),
     ],
 )
 def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: str) -> None:
     given_terms: dict[str, Any] = {
+        "instrument": FUTURE,
         "ix": NG,
         "specification": 0,
         "route": Route.CLEARED,
@@ -292,12 +329,14 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "quantity_unit": "LOT",
         "quantity_per": QuantityPer.MONTH,
         "labels": LABELS,
+        "clearing_house": None,
+        "broker": None,
         "trade_dates": TRADE_DATES,
         "occurrence": rows(0, 1, 2, 3, 4),
         "contract": CONTRACT,
         "lots": LOTS,
         "fixed_price": FIXED_PRICE,
-        "payment_date": None,
+        "payment": None,
     }
     given_terms.update(change)
     with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
@@ -369,9 +408,9 @@ def one_lot_in_cents(
 ) -> tuple[Results, WorkCounter]:
     counter = WorkCounter()
     terms = resolved_trades(
-        CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
-        QuantityPer.MONTH, ("C-1",), dates("2026-09-24"), rows(0), rows(1), numbers(1),
-        numbers(300.0), dates("2026-11-30"),
+        FUTURE, CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
+        QuantityPer.MONTH, ("C-1",), None, None, dates("2026-09-24"), rows(0), rows(1),
+        numbers(1), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
     history = history_on(CENTS, as_of, finals)
     prep = prepared(encoded(terms, UNITS, counter), history, counter)
@@ -425,7 +464,8 @@ def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
     [
         (
             dates("2026-11-30", "2026-12-01", "2026-12-31", "2026-12-31", "2026-11-30"),
-            "payment_date row 2 is 2026-12-01, expected 2026-11-30, the one day Z26 pays",
+            "payment_date of trade 'NG-002' at row 2 is 2026-12-01, expected 2026-11-30, "
+            "the one day Z26 pays",
         ),
         (
             dates("2026-11-30", "2026-11-30", "2026-12-29", "2026-12-29", "2026-11-30"),
@@ -483,9 +523,9 @@ def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
 
 def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices_it() -> None:
     boundary = resolved_trades(
-        NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
-        QuantityPer.MONTH, None, dates("2026-09-24"), rows(0), rows(0), numbers(1), numbers(3.0),
-        None,
+        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
+        QuantityPer.MONTH, None, None, None, dates("2026-09-24"), rows(0), rows(0), numbers(1),
+        numbers(3.0), None,
     )  # fmt: skip
     enc = encoded(boundary, UNITS, WorkCounter())
     with pytest.raises(ValueError) as refused:
@@ -712,8 +752,8 @@ def test_any_batch_equals_its_singletons_summed(
     def valued(selected: list[tuple[int, int, float]]) -> Results:
         n = len(selected)
         terms = resolved_trades(
-            NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
-            QuantityPer.MONTH, None, np.repeat(day("2026-09-24"), n),
+            FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
+            QuantityPer.MONTH, None, None, None, np.repeat(day("2026-09-24"), n),
             np.arange(n, dtype=np.intp), rows(*(c for c, _, _ in selected)),
             numbers(*(q for _, q, _ in selected)), numbers(*(p for _, _, p in selected)), None,
         )  # fmt: skip

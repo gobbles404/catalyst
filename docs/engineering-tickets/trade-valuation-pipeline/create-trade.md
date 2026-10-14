@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Resolution](01-trade-representation.md) ·
 [Encoding](02-static-encoding.md) · [Next: market binding](03-market-binding.md)
 
-Agreed responsibility boundary, 3 October 2026. This is a design contract, not an implementation.
+Agreed responsibility boundary, 3 October 2026, built in #139 as ticket I4: [create-trades.md](../../library/trades/create-trades.md) is the function's page, `src/goosedove/trades/resolution.py` the two children and the batch. This page is the design contract.
 
 ## The public wrapper and its two children
 
@@ -92,8 +92,8 @@ component to its schedule row is made once here and retained; preparation and ti
 redo it, and schedule creation is unchanged, keeping its codes as labels. Encoding
 keeps a monthly component mapping back to the original occurrence, applies quantity_per
 and schedule_method to each month, and retains its resolved payment date. The period helpers
-do not supply payment rules or authorize one annual average. These are design requirements;
-the general trade creator is not yet implemented.
+do not supply payment rules or authorize one annual average. These are the requirements
+[create-trades.md](../../library/trades/create-trades.md) meets.
 
 Payment terms come from the trade row or template: payment_time_lag, a string such as
 "+1bd", and payment_holiday_calendar. Resolution parses the lag once and establishes the

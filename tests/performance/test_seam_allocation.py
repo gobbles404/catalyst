@@ -1002,3 +1002,66 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["EchoFieldRow"]("future", one, row)) <= 4 * SLACK
     assert bridge.live_handles() == live
+
+
+# --- the trade creators -------------------------------------------------------------------------
+# A template of the toy's nine fields, one with a handle cell, keeps nine scalars and the objects
+# the library already holds: measured 2,412 bytes on 2026-10-04, which four times the slack
+# covers. A batch of 2,500 single-month rows keeps twelve columns of eight bytes a row, the terms'
+# five and the encoding's four by component, and the payment terms' lag, calendar and day by
+# occurrence and component, and on the way makes the months, the rows, the anchors and the payment
+# days of the components and the masks over them: measured 324,317 bytes at 2,500 rows, about 130
+# a row, which 134 a row and twice the slack cover; the ticket's own columns are the seam's views
+# and cost nothing here.
+def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() -> None:
+    letters = "FGHJKMNQUVXZ"
+    months = np.arange("2026-10", "2028-11", dtype="datetime64[M]")
+    codes = [f"{letters[int(m.astype(int)) % 12]}{str(m)[2:4]}" for m in months]
+    expiries = np.busday_offset(
+        months.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, roll="backward"
+    )
+    first = np.datetime64("1899-12-30", "D")
+    schedule = ENTRY["_CreateFuturesSchedule"](
+        Cells.from_rows([[code] for code in codes]),
+        Cells.from_rows([[float((day - first).astype(np.int64))] for day in expiries]),
+        MISSING,
+    )
+    holidays = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46381.0], [46388.0]]))
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    specifications = ENTRY["_CreateContractSpecifications"](
+        Cells.from_rows(
+            [["name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"]]
+        ),
+        Cells.from_rows([["lot", 10000.0, "MMBTU", 0.0, 0.0]]),
+    )
+    ix = ENTRY["_CreateIndex"]("gas", schedule, conventions, specifications, holidays)
+    names = Cells.from_rows(
+        [
+            [
+                "contract_specification",
+                "quantity_unit",
+                "quantity_per",
+                "schedule_method",
+                "route",
+                "settlement_method",
+                "clearing_house",
+                "payment_time_lag",
+                "payment_holiday_calendar",
+            ]
+        ]
+    )
+    values = Cells.from_rows(
+        [["lot", "LOT", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
+    )
+    assert least_peak(lambda: ENTRY["_CreateTradeTemplate"]("future", names, values)) <= 4 * SLACK
+    template = ENTRY["_CreateTradeTemplate"]("future", names, values)
+    rows = N // 4
+    headers = Cells.from_rows([["trade_date", "contract_code", "quantity", "fixed_price"]])
+    body = Cells.from_rows(
+        [
+            [46289.0, codes[1 + i % 24], 2.0 if i % 3 else -3.0, 3.0 + (i % 7) / 100]
+            for i in range(rows)
+        ]
+    )
+    peak = least_peak(lambda: ENTRY["_CreateTrades"](ix, headers, body, template))
+    assert peak <= 134 * rows + 2 * SLACK

@@ -1,61 +1,32 @@
 # _CreateTradeTemplate
 
-Agreed contract. The seam's part is built in #138, `FieldRow[str]` and the `FieldValues` it hands over, [inputs.md](../../seam/inputs.md) decision 42; the creator itself comes in ticket I4. Not implemented.
+Built in #139 as ticket I4 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), with [_CreateTrades](create-trades.md); the seam's part, `FieldRow[str]` and the `FieldValues` it hands over, in #138 as [inputs.md](../../seam/inputs.md) decision 42.
 
-Creates shared trade fields under a library-owned instrument definition, reducing repeated
-ticket entry. The template is allowed to be incomplete. It has no market-state dependency.
+Shared trade fields under a library-owned instrument definition, created once and taken by every batch whose ticket supplies the rest, so a ticket of many rows types each shared fact once. The template may be incomplete, has no market-state dependency, and retains no index: the index is the first argument of `_CreateTrades`, so one template serves a CL index and an NG index alike. The code is `src/goosedove/trades/template.py`, the record, its builder and the readers of each field's value, and `src/goosedove/excel/trades.py`, the worksheet function.
 
 ## Worksheet contract
 
-Proposed worksheet shape, not a currently registerable Python declaration:
-
-```text
-_CreateTradeTemplate(instrument, fields, values) -> Handle[TradeTemplate]
+```python
+def _CreateTradeTemplate(
+    instrument: str,
+    fields: TextRow,
+    values: FieldRow[str],
+) -> Handle[TradeTemplate]: ...
 ```
 
-| Argument | Proposed meaning |
-|---|---|
-| instrument | One exact instrument identifier from _ListInstruments, such as future |
-| fields | One horizontal row of recognized field names, in any order |
-| values | Exactly one aligned row of values for those fields |
+The user's example, two fields:
 
-instrument is the first, required argument. The template retains the selected definition;
-`_CreateTrades(index, fields, trade_rows, template)` takes the template last, required, and
-uses that definition when completing it with ticket fields. The template retains no index:
-the index is the first argument of that call, so one template serves any compatible index.
+| | A | B |
+|---|---|---|
+| 1 | quantity_unit | schedule_method |
+| 2 | LOT | lastday |
+| 3 | `=_CreateTradeTemplate("future", A1:B1, A2:B2)` | shows `30512:trade_template:40` |
 
-One field uses the same path as many. Omit a field entirely when the template should not
-supply it; a listed field with a blank value is an input error, not an instruction to inherit
-something. A template carries at least one field. The template is required on `_CreateTrades`,
-so there is no direct instrument selection and no path without one: a batch that shares
-nothing still names one shared fact in its template.
+The NG example's template, every field of the `future` the five ticket rows do not supply, in A1:G2 with the creator in B3: `contract_specification` NYMEX NG, `quantity_unit` LOT, `quantity_per` month, `schedule_method` lastday, `route` cleared, `settlement_method` physical, `clearing_house` CME Clearing.
 
-The user's example, shown conceptually:
-
-| quantity_unit | schedule_method |
-|---|---|
-| LOT | lastday |
-
-The index is not a template field. `_CreateTrades` takes it as its first argument, a workbook
-name such as `CLIndex` pointing at the cell holding `_CreateIndex`'s handle, and the same
-template serves a CL index and an NG index alike. Existing Index names are display labels and
-need not be unique; nothing is looked up by name.
-
-With headers in A1:B1 and their values in A2:B2:
-
-```excel
-=_CreateTradeTemplate("future", A1:B1, A2:B2)
-```
-
-The result cell contains the template handle. Other formulas refer to that cell. Use a
-worksheet heading or Excel name such as `ICE_Futs` or `NYMEX_Futs` to identify its purpose.
-There is no label argument or label field in the template object. The exact handle text
-follows the seam's existing publication contract. An Excel name refers to the creator cell;
-it does not establish product identity or settlement treatment.
+Three arguments, all required, none with a default. The instrument is first: one exact name from `_ListInstruments`, `future`, which selects the definition the headers are checked against. The fields are one row of field names as `_ShowInstrument` shows them, spelled exactly, case and all, in any order; the values one aligned row beneath them. One field takes the same path as many, and a template carries at least one. Omit a field entirely when the template should not supply it; a listed field with a blank cell is an input error, not an instruction to inherit something. The row crosses as `FieldRow[str]`, the seam's one-row form of decision 42, bound against the instrument named: the seam checks the name's type, the width, each header against the definition, unknown and repeated headers named, and each cell by its field's type, a date as a date, a number as a number, a code as text and `payment_holiday_calendar` as a holiday calendar handle resolved to its object; more than one row of values is refused as `values is 2x1 array, expected one row of field values`. The result is a handle, `30512:trade_template:40`, the kind and the count alone, since a template carries no index's name. Other formulas refer to the cell; a worksheet heading or an Excel name such as `ICE_Futs` or `NYMEX_Futs` says what the template is for, and the library object has no label field. An unchanged recalculation shares the live template; a changed cell under it, a value or the holiday calendar's own creator, makes a new one and every batch over it anew, the old released when Excel disconnects its last creator.
 
 ## Excel help
-
-Proposed lines for the eventual declaration:
 
 | Item | Text |
 |---|---|
@@ -66,146 +37,52 @@ Proposed lines for the eventual declaration:
 
 ## The library checks
 
-The selected instrument must be a recognized definition. Every supplied field must exactly
-match a field identifier in that definition, occur once and have a valid supplied value.
-Matching is case-sensitive, without trimming, aliases or fuzzy matching. The identifiers
-shown in _ShowInstrument's field row are the accepted names; descriptions are not headers.
-Unknown fields fail even if their values are blank or they are intended only as notes.
-No extra columns are silently ignored or retained as arbitrary metadata. Field order may vary.
+Each supplied value is read once for the rule intrinsic to its field, in the sheet's order, the first failure being the cell's text after `#ERROR _CreateTradeTemplate: ValueError:`; the same readers read a ticket's values when a batch is resolved, so a value fails here as it would there.
 
-This exact matching is part of the proposed trade-input binding; today's general Table
-binder ignores case. The [binding page](../../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
-records that difference explicitly. The seam owns shape, type and typed-reference resolution.
-Static semantic constraints belong to the library. It does not parse Excel handles or
-coerce numbers/dates from strings.
+| Field | Rule | Refused as |
+|---|---|---|
+| `schedule_method` | `lastday`, the one method built; `asian`, `penultimate` and `last3day` fail by name until they are | `schedule_method is 'asian', expected lastday, the one method built` |
+| `route` | `cleared` or `bilateral`, exactly | `route is 'Cleared', expected cleared or bilateral` |
+| `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
+| `quantity_unit` | `LOT`, the one unit built, the kernel's own rule | `quantity_unit is 'lot', expected LOT, the one quantity unit built` |
+| `quantity_per` | `month`, the one basis built | `quantity_per is 'day', expected month, the one basis built` |
+| `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd` |
+| `contract_code` | a contract or strip the period grammar reads, in either case | `contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
+| `quantity` | a whole nonzero number of lots, the kernel's own rule | `quantity is 1.5, expected a whole number of lots`; `quantity is 0.0, expected a nonzero quantity` |
+| `fixed_price` | a finite number, the kernel's own rule | `fixed_price is inf, expected a finite price` |
 
-A template need not supply all required trade fields. Do not apply complete-trade required
-or required_when checks to this partial record. Intrinsic supplied-value rules still apply;
-relationships needing ticket values are checked against the final resolved trade. Avoid
-an elaborate second validator that tries to anticipate every future ticket.
-
-The accepted payment_time_lag field is a string such as "+1bd". Like every other field,
-it is supplied by either the template or the trade row, never both. The same applies to
-payment_holiday_calendar. The supported product establishes the payment anchor;
-CreateTrades generates each component's payment_date. Broader bilateral rules are deferred.
-
-The first seam review must pin error ownership and exact messages for unknown/duplicate
-fields, width mismatch, more than one values row, unsupported types and wrong/dead reference
-handles. This page records their required behavior without inventing a new declaration type
-or duplicating current seam messages.
+Nothing is required of a template: not `trade_date`, `contract_code`, `quantity` or `fixed_price`, which a ticket supplies, and not the payment fields of a financial settlement. The conditions, which fields are required and which present, whether the template and the ticket overlap, whether a specification is the index's, whether a code is a contract of the schedule, need the ticket and the index, and `_CreateTrades` checks them against the completed batch, so there is no second validator here anticipating every ticket. The seam owns shape, type and the reference's resolution; the library reads meaning and never parses a handle or coerces a number from text.
 
 ## What it retains
 
-Logical payload, not a commitment to a dictionary implementation:
-
 ```text
 TradeTemplate
-    instrument_definition: the library's future definition
-    defaults:
-        quantity_unit: LOT
-        schedule_method: lastday
+    instrument   the library's future definition, by reference
+    defaults     by field name, in the sheet's order: quantity_unit LOT, schedule_method lastday
 ```
 
-Retain the definition/reference objects and own the supplied default values in an immutable
-record. No duplicate instrument schema is authored by the workbook. No per-field template
-permission list is needed: the final trade follows the normal instrument and contractual
-rules, regardless of a value's source. No trade encoding, history binding or evaluation is
-performed here.
+Each default is the one value the row held, owned: a number as a float, a date as a day, text and a code as text, and a holiday calendar as the object its handle stood for, the same object the calendar's own cell publishes, held by reference so that a batch resolved under the template counts its payment days on it. No duplicate instrument schema is authored by the workbook, no per-field permission list exists, and no trade encoding, history binding or evaluation is performed. The template is the one kind whose handle selects an instrument for the seam, through `goosedove.instruments.fields.selected`, so `_CreateTrades` binds its ticket against the template's definition.
 
-The same template can supply defaults to one or many ticket rows. In the following toy
-example only the fields relevant to this merge are shown; actual construction still needs
-the agreed executed date, specification selection and settlement/clearing facts required by
-the future definition. Prices are illustrative agreed trade prices, not market observations.
+## Template plus ticket
 
-Ticket excerpt:
+The same template supplies its fields to one or many ticket rows. Template fields and ticket columns must be disjoint: a template supplying `quantity_unit` and a ticket with a `quantity_unit` column fail before anything combines, `quantity_unit is supplied by the template and by the ticket, expected by one of them`, equal values or not. Remove the column or remove the field; there is no override, equality exception or fallback. To vary a field between rows, leave it out of the template and supply it in the ticket, where the batch fields, `route` among them, must still agree across rows. Duplicate field names within either input fail at the seam. Duplicate trade rows remain distinct trades; rejecting duplicate field sources deduplicates nothing. [create-trades.md](create-trades.md) holds the order of these checks and the messages.
 
-| contract_code | quantity | fixed_price |
-|---|---:|---:|
-| Z26 | 5 | 70.00 |
-| F27 | -2 | 71.25 |
+## Reading it back
 
-Resolved excerpt, the index, CL, being the argument of the call and applying to both rows:
-
-| quantity_unit | schedule_method | contract_code | quantity | fixed_price |
-|---|---|---|---:|---:|
-| LOT | lastday | Z26 | 5 | 70.00 |
-| LOT | lastday | F27 | -2 | 71.25 |
-
-Template fields and ticket columns must be disjoint. Before combining their values,
-CreateTrades rejects every overlapping field, even when its two values are identical.
-For example, a template supplying quantity_unit=LOT and a ticket containing a quantity_unit
-column fails with a field-specific error. Remove that column from the ticket or remove the
-field from the template. No override, equality exception or fallback is supported.
-
-Duplicate field names within either input also fail under the exact matching rule.
-The completed record must then satisfy its selected definition, including conditional
-requirements. An explicit blank remains an error. Duplicate trade rows remain distinct
-economic occurrences; rejecting duplicate field sources does not deduplicate trades.
-
-The CreateTrades call supplies one template, required, for its array of ticket rows.
-Template-supplied fields are shared; ticket-only fields can vary. Resolution still checks
-compatibility of the completed collection. One index per batch is a fact of the call, since the
-index is its argument; a uniform route is the recommended first commodity batch scope. This
-does not add per-field permission flags or make template identity a valuation-group key. See the
-[batch-boundary sketch](../../engineering-tickets/trade-valuation-pipeline/batch-boundaries-and-discounting.md).
-
-Editing a template input produces a new immutable template through normal worksheet
-dependencies; dependent trade construction can then rebuild. Market-price, fixing and
-valuation-date changes alone do not recreate it. Worksheet headings and names remain an
-Excel concern and do not become additional facts inside the library object.
-
-## Seam work before implementation
-
-`fields` already fits `TextRow`. The combined partial record does not fit the current table path:
-
-- Table schemas are fixed at registration and require all declared columns.
-- A listed function cannot declare a bare MixedArray input to perform its own parsing.
-- Table columns currently support numbers, dates, text and booleans, not typed handles.
-
-The [Excel trade-input binding page](../../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
-specifies a narrow schema-selected partial-record binding at the seam, driven by the approved
-instrument definition: align fields and values, refine supplied cells once, and resolve any
-declared static-reference fields to their objects. The library should receive a typed partial
-record. Do not require all values to be text or insert a new global name registry to bypass
-this requirement. Dependency/lifetime handling must cover the references retained by the
-template, including when a referenced holiday calendar's creator changes or is released.
-
-See [inputs](../../seam/inputs.md), particularly the table and handle contracts and decision
-38, and [handles](../../seam/handles.md). The proposed transport extension still needs
-engineering review and implementation; the current seam cannot register this signature as-is.
+`util_ReadHandle` on the handle spills one row under two heading rows: `instrument` first, `future`, then each default under its field name in the sheet's order, a number and a date as they are, text as typed and a holiday calendar as `a holiday calendar`, the words of its kind. The spill shows what the template holds and is no round trip of a handle.
 
 ## Tests
 
-Implementation acceptance cases, not tests added by this documentation draft:
-
-| Case | Kind |
+| Case | Where |
 |---|---|
-| LOT and lastday create the expected partial template | Example |
-| One field and several fields follow the same constructor path | Example |
-| Reordering field/value pairs preserves meaning; duplicate fields, width/row-count mismatches and wrong-type values fail | Property and example |
-| Unknown, case-changed, whitespace-padded or aliased headers fail; no extra fields survive construction | Example through the seam |
-| Missing trade-only requirements are permitted; invalid supplied values are rejected | Example |
-| An Excel name references the creator cell and its current handle without a library label field | Excel smoke |
-| A typed holiday calendar reference survives through the template and into resolved trades | Example through the seam and Excel lifetime check |
-| Disjoint template/ticket fields complete one or many trades; overlapping fields fail for equal and unequal values | Example in the trade-construction slice |
-| Duplicate field names fail; identical trade occurrences each contribute once | Example in the trade-construction slice |
-| No market reads, trade encoding or evaluation occur during template creation | Work budget |
-
-Inspection should expose the instrument and stored defaults using the
-existing inspection surface when the object kind is implemented. If references are displayed
-as human-readable names, the spill is not automatically a round-trip input table.
+| LOT and lastday make the page's template; one field and the NG template's seven take one path; each value the scalar its type names and a calendar the object itself | `tests/unit/test_trade_template.py` |
+| A template selects its instrument for a ticket; a field the ticket must supply is not required | the same |
+| Sixteen values against their fields' rules refused naming the field, a fraction and a zero of a lot and an infinite price among them; a template's numbers passing the kernel's rules; the builder takes one row | the same |
+| The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 26 in all |
+| One read per value and one publication, 2,412 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
+| A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |
+| The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289 |
 
 ## Not here
 
-Trade construction, complete-trade validation, static numerical encoding, market binding,
-valuation, template inheritance or a permission system. Finalizing the trade constructor's
-argument list follows this template contract; this sketch does not add another public function.
-
-The [CreateTrades wrapper](../../engineering-tickets/trade-valuation-pipeline/create-trade.md)
-consumes templates and tickets through two private children: resolution followed by static
-encoding. Its returned handle retains both outputs; template creation performs neither job.
-
-The [trade-representation sketch](../../engineering-tickets/trade-valuation-pipeline/01-trade-representation.md)
-adds the user's ICE/NYMEX example: different product defaults, a separate ticket sheet and
-static resolution of the assembled facts. Clearing defaults alone do not identify delivery
-obligations; all templates follow the same disjoint-field rule.
+Trade construction, complete-trade validation, static encoding, market binding and valuation: [create-trades.md](create-trades.md) and the [kernel](kernel.md). Template inheritance, a permission system, a label argument or label field, a template that carries an index. A value read for meaning beyond its own field: a specification name, a code's month, a lag's day wait for the index and the ticket.
