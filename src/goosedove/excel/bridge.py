@@ -55,7 +55,10 @@ from numpy.typing import NDArray
 
 import goosedove
 from goosedove.calendar.calendar import Calendar
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
+from goosedove.instruments.definitions import FieldType, Instrument
+from goosedove.instruments.fields import FieldValues, selected
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
@@ -83,6 +86,14 @@ BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, hande
 # checker it is the class itself, so a function body needs no cast; to registration it is the
 # mark that selects publishing on the way out and resolving on the way in.
 type Handle[T] = T
+# A template's one row, or a ticket's rows, of an instrument's fields: a mixed range that a row of
+# text before it heads, bound at the call against the instrument another argument selects, the
+# one parameter whose type is S: `FieldRow[str]` takes the instrument named by the function's text
+# parameter, `FieldRows[TradeTemplate]` the instrument its template handle holds. Any subset of the
+# instrument's fields, in any order, the headers matched exactly, case and all; the function
+# receives a FieldValues, each column typed by its field. docs/seam/inputs.md decision 42.
+type FieldRow[S] = FieldValues
+type FieldRows[S] = FieldValues
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -600,6 +611,14 @@ def _one_row(value: object) -> None:
         raise _Rejected
 
 
+def _field_row(value: object) -> MixedArray:
+    """A mixed range of one row: a template's values."""
+    mixed = _mixed(value)
+    if mixed.shape[0] != 1:
+        raise _Rejected(reason="expected one row of field values")
+    return mixed
+
+
 def _column(value: object) -> NDArray[np.float64]:
     _one_column(value)
     return _numbers(value)[:, 0]
@@ -806,6 +825,107 @@ def _refine(schema: Schema, headers: tuple[str, ...], body: MixedArray) -> Table
     text_columns = tuple([j for j, column in enumerate(bound) if column.refine is _texts_of])
     under = _Body(body, schema.table, text_columns)
     return schema.record(**{column.name: column.refine(under, j) for j, column in enumerate(bound)})
+
+
+# --- a row or rows of an instrument's fields: the schema another argument selects ---------------
+
+
+@dataclass(frozen=True, slots=True)
+class FieldsSchema:
+    """A FieldRow or FieldRows parameter as registration resolved it: the names of the header-row
+    and body parameters for messages, the position of the parameter whose value selects the
+    instrument, and whether the body is one row, a template's, or one or more, a ticket's."""
+
+    header_row: str
+    body: str
+    selector: int
+    one_row: bool
+
+
+def _handles_of(kind: type[object], expected: str, body: _Body, j: int) -> tuple[object, ...]:
+    """A column of handles resolved to the objects they stand for, one per row, in row order:
+    each cell text, else named as a text column names a cell that is not, then its text through
+    the handle rule, which names the cell as the argument a scalar handle names: a creator's
+    failure relayed, text naming no live object, or a handle of another kind. The first bad cell
+    down the column is the one named, whichever way it is bad.
+
+    Each cell's text is found at its own place in the body's texts, counted in sheet order over
+    the whole body once: the resolution acts on the texts here, before the columns to the right
+    have been checked, so the text column's slice, which is right only once every column has
+    passed, would hand a text from a number column over as a handle and name a cell that is not
+    there. Per cell, since each is its own lookup.
+    """
+    mixed = body.mixed
+    kinds = mixed.kinds
+    places = np.cumsum(kinds.ravel() == TEXT_CODE).reshape(kinds.shape) - 1
+    not_text = kinds[:, j] != TEXT_CODE
+    held: list[object] = []
+    for r in range(kinds.shape[0]):
+        if not_text[r]:
+            raise _bad_cell(body, j, not_text, expected)
+        text = mixed.texts[int(places[r, j])]
+        held.append(_resolve(kind, expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
+    return tuple(held)
+
+
+# Each field type's words for a cell and its column rule: the four of the tables, text for a code,
+# and a handle column for a field that holds one. _texts_of's slice rests on every column bound to
+# text being listed in the body's text columns, so a handle column, text at the seam, is one.
+_FIELD_COLUMNS: Final[dict[FieldType, tuple[str, Callable[[_Body, int], object]]]] = {
+    FieldType.TEXT: ("text", _texts_of),
+    FieldType.CODE: ("text", _texts_of),
+    FieldType.NUMBER: ("number", _numbers_of),
+    FieldType.DATE: ("date", _dates_of),
+    FieldType.HOLIDAY_CALENDAR: (
+        "holiday calendar handle",
+        partial(_handles_of, HolidayCalendar, "holiday calendar handle"),
+    ),
+}
+_TEXT_FIELDS: Final = frozenset(
+    {field_type for field_type, (_, rule) in _FIELD_COLUMNS.items() if rule is _texts_of}
+    | {FieldType.HOLIDAY_CALENDAR}
+)
+
+
+def _bind_fields(
+    schema: FieldsSchema, definition: Instrument, headers: tuple[str, ...], body: MixedArray
+) -> FieldValues:
+    """The headers bound to the instrument's fields, exactly, then each column checked against
+    its field's type in sheet order, then the record. The order of failures is the table's: the
+    count first, then each header in order, unknown or already given, then the cells column by
+    column, left to right, the first bad cell named. A header matches a field name as typed,
+    case and all, decision 2 of the review: `Quantity` is unknown where `quantity` is a field,
+    and the message lists the instrument's fields; no field is required here, since a template
+    supplies a subset and the ticket the rest, which the creator checks."""
+    cols = body.shape[1]
+    if len(headers) != cols:
+        raise TypeValidationError(
+            f"{schema.header_row} has {len(headers)} headers, expected {cols}, "
+            f"one per column of {schema.body}"
+        )
+    by_name = {field.name: field for field in definition.fields}
+    found: dict[str, int] = {}
+    for j, header in enumerate(headers):
+        if header not in by_name:
+            names = ", ".join(by_name)
+            raise TypeValidationError(
+                f"{schema.header_row} cell (1, {j + 1}) is {describe(header)}, "
+                f"expected a field of {definition.name}: {names}"
+            )
+        if header in found:
+            raise TypeValidationError(
+                f"{schema.header_row} cell (1, {j + 1}) is {describe(header)}, "
+                f"already given at cell (1, {found[header] + 1})"
+            )
+        found[header] = j
+    kinds = [by_name[header].type for header in headers]
+    text_columns = tuple([j for j, kind in enumerate(kinds) if kind in _TEXT_FIELDS])
+    under = _Body(body, schema.body, text_columns)
+    columns = {
+        header: _FIELD_COLUMNS[kind][1](under, j)
+        for j, (header, kind) in enumerate(zip(headers, kinds, strict=True))
+    }
+    return FieldValues(definition, body.shape[0], headers, columns)
 
 
 # --- the way out: every declared result, in the words of the sheet, and the rule that sends it
@@ -1268,6 +1388,7 @@ class Registered:
     hidden: bool  # absent from Excel's function wizard, still callable by name
     convert: Callable[[object], object]  # the declared result's rule, from _RESULTS
     tables: tuple[tuple[int, Schema], ...]  # each table parameter's position and its schema
+    fields: tuple[tuple[int, FieldsSchema], ...]  # each field-values parameter's, likewise
     publishes: bool  # the declared result is a handle, so the host observes the call
 
     def run(self, *args: object) -> object:
@@ -1498,10 +1619,61 @@ def _schema(function: str, specs: Sequence[inspect.Parameter], i: int) -> Schema
     )
 
 
+def _fields_form(annotation: object) -> bool | None:
+    """Whether an annotation is FieldRow[S], True, or FieldRows[S], False; None for any other."""
+    origin = get_origin(annotation)
+    if origin is FieldRow:
+        return True
+    if origin is FieldRows:
+        return False
+    return None
+
+
+def _fields_schema(function: str, specs: Sequence[inspect.Parameter], i: int) -> FieldsSchema:
+    """A FieldRow or FieldRows parameter's schema, resolved once: the row of text before it that
+    holds its headers, as a table has, and the one parameter whose type is the selector inside
+    the brackets, text for an instrument named, or a handle of the kind that holds one; a
+    function with none or two such parameters cannot say which selects, and is refused."""
+    spec = specs[i]
+    if i == 0 or specs[i - 1].annotation is not TextRow:
+        raise TypeError(
+            f"{function}: {spec.name} declares field values with no row of text before it "
+            "to hold their headers"
+        )
+    selector = get_args(spec.annotation)[0]
+    if selector is str:
+        candidates = [k for k, other in enumerate(specs) if other.annotation is str]
+    elif isinstance(selector, type):
+        candidates = [
+            k
+            for k, other in enumerate(specs)
+            if _is_handle(other.annotation) and _handle_kind(other.annotation) is selector
+        ]
+    else:
+        raise TypeError(f"{function}: {spec.name} selects by {selector!r}, which is not a type")
+    if len(candidates) != 1:
+        words = "text" if selector is str else f"{_words(selector)} handle"
+        raise TypeError(
+            f"{function}: {spec.name} selects its instrument by the {words} parameter, "
+            f"of which the function has {len(candidates)}, expected exactly 1"
+        )
+    one_row = _fields_form(spec.annotation)
+    return FieldsSchema(specs[i - 1].name, spec.name, candidates[0], bool(one_row))
+
+
 def _declared(
     function: str, spec: inspect.Parameter, hidden: bool
 ) -> tuple[str, Callable[[object], object]] | None:
     """The words and the accept rule an annotation selects, or None when the seam has none."""
+    one_row = _fields_form(spec.annotation)
+    if one_row is not None:
+        # Two arguments that mean something only together, as a table is, bound on the call
+        # against a definition a third argument selects: no default could be checked here.
+        if spec.default is not inspect.Parameter.empty:
+            raise TypeError(f"{function}: {spec.name} declares field values, which take no default")
+        if one_row:
+            return "one row of field values", _field_row
+        return "rows of field values", _mixed
     if spec.annotation is MixedArray and not hidden:
         # Without headers the columns of a mixed range mean nothing, and a function would have to
         # guess by position. A hidden probe keeps the bare range as the seam's own instrument.
@@ -1627,6 +1799,11 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     tables = tuple(
         (i, _schema(name, specs, i)) for i, spec in enumerate(specs) if _is_schema(spec.annotation)
     )
+    field_values = tuple(
+        (i, _fields_schema(name, specs, i))
+        for i, spec in enumerate(specs)
+        if _fields_form(spec.annotation) is not None
+    )
     convert = _result(name, signature.return_annotation)
     # What Excel is told comes last, once the declaration itself has passed.
     parameters = tuple(
@@ -1635,7 +1812,9 @@ def register[F: Callable[..., object]](fn: F, *, hidden: bool) -> F:
     )
     description = _description(name, fn, hidden)
     publishes = _is_handle(signature.return_annotation)
-    _FUNCTIONS[name] = Registered(fn, description, parameters, hidden, convert, tables, publishes)
+    _FUNCTIONS[name] = Registered(
+        fn, description, parameters, hidden, convert, tables, field_values, publishes
+    )
     return fn
 
 
@@ -1680,7 +1859,10 @@ def _validate(parameter: Parameter, value: object) -> object:
 
 
 def _arguments(registered: Registered, args: Sequence[object]) -> list[object]:
-    """Every argument checked alone, left to right; then each table bound to its header row."""
+    """Every argument checked alone, left to right; then each table bound to its header row;
+    then each row or rows of field values bound to the instrument their selector names, the
+    selector read once the arguments have passed, as the review's decision 11 orders it: the
+    arguments in signature order, the instrument, the width, the headers, the cells."""
     if len(args) != len(registered.parameters):
         raise TypeValidationError(
             f"expected {len(registered.parameters)} arguments, got {len(args)}"
@@ -1689,6 +1871,10 @@ def _arguments(registered: Registered, args: Sequence[object]) -> list[object]:
     for i, schema in registered.tables:
         headers, body = cast(tuple[str, ...], values[i - 1]), cast(MixedArray, values[i])
         values[i] = _refine(schema, headers, body)
+    for i, fields_schema in registered.fields:
+        definition = selected(values[fields_schema.selector])
+        headers, body = cast(tuple[str, ...], values[i - 1]), cast(MixedArray, values[i])
+        values[i] = _bind_fields(fields_schema, definition, headers, body)
     return values
 
 

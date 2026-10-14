@@ -52,20 +52,24 @@ do not change a field value's own documented grammar, such as contract-code case
 | Scalar typed references | `Handle[Kind]` resolves a live stored object of the declared kind. An optional scalar handle can be omitted with `None` as its declaration default. A blank cell still fails. |
 | Publication and lifetime | [Lifetime.cs](../../../host/Goosedove.Host/Lifetime.cs) uses Excel-DNA observation for handle-returning creators. Equal live calls share a publication; changed inputs create a new immutable object; final disconnection releases the store's reference. |
 
-The current `Table` does **not** implement the proposed template inputs. Its schema is
-chosen at registration, requires every declared column, and supports number, date, text
-and boolean columns. It has no instrument-selected partial-column schema or typed handle
-column. Generic `CreateTrades` and its partial-input binding are not yet implemented.
+The `Table` declared beside a function keeps its schema fixed at registration, every column
+required, with number, date, text and boolean columns. The instrument-selected form beside it,
+`FieldRow[S]` and `FieldRows[S]`, chooses its schema on the call and takes a subset of the
+fields and a handle column; `_CreateTradeTemplate` and `_CreateTrades` declare it in ticket I4.
 
 The general binder's case-insensitive matching differs from the exact trade-field contract
 above, and that is decided: the new path matches exactly, decision 29 stays for the
 registered tables, and inputs.md records the two rules in the decision that records this
 extension. This document does not change existing table functions.
 
-## Bounded seam extension, agreed
+## Bounded seam extension, built
 
 One extension for library-defined, typed partial tables, agreed in the review of 3 October
-2026 as its decisions 9 to 12. Keep the raw mixed-cell
+2026 as its decisions 9 to 12 and built in #138 as ticket I3: `FieldRow[S]` and `FieldRows[S]` in
+`src/goosedove/excel/bridge.py`, bound by `_bind_fields`, the `FieldValues` record and the
+`selected` rule in `src/goosedove/instruments/fields.py`, and [inputs.md](../../seam/inputs.md)
+decision 42 recording it; the probes `EchoFieldRow` and `CountFieldRows` prove it without a
+trade function. Keep the raw mixed-cell
 transport private to the seam. Do not pass a `MixedArray` to the trade library and ask it to
 interpret Excel cell kinds, serial dates, handle strings or positions.
 

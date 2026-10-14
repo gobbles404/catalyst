@@ -10,13 +10,16 @@ them, and they ship in the build everyone loads. They stay as long as the seam d
 """
 
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any, assert_never
 
 import numpy as np
+from numpy.typing import NDArray
 
 from goosedove.excel.bridge import (
     BooleanColumn,
     DateColumn,
+    FieldRow,
+    FieldRows,
     MixedArray,
     NumberArray,
     NumberColumn,
@@ -26,6 +29,9 @@ from goosedove.excel.bridge import (
     TextRow,
     register,
 )
+from goosedove.index_definitions.kind import named
+from goosedove.instruments.definitions import FieldType
+from goosedove.instruments.fields import FieldValues
 
 
 def probe[F: Callable[..., object]](fn: F) -> F:
@@ -140,6 +146,39 @@ def Grid(rows: int, cols: int) -> NumberArray:
     if rows < 1 or cols < 1:
         raise ValueError(f"a grid needs at least one row and one column, not {rows} by {cols}")
     return NumberArray(np.arange(1.0, rows * cols + 1).reshape(rows, cols))
+
+
+@probe
+def EchoFieldRow(instrument: str, fields: TextRow, values: FieldRow[str]) -> MixedArray:
+    """Probe: one row of an instrument's fields bound against the instrument named, spilled back
+    as a table, the field names over the typed cells, a handle cell as the words of its kind."""
+    return _echoed(values)
+
+
+@probe
+def CountFieldRows(instrument: str, fields: TextRow, rows: FieldRows[str]) -> float:
+    """Probe: rows of an instrument's fields bound against the instrument named; how many rows
+    arrived, and nothing else done with them."""
+    return float(rows.rows)
+
+
+def _echoed(values: FieldValues) -> MixedArray:
+    """The bound columns laid out as a table under their field names, each as its type came
+    through the seam, a handle column as the words of each object's kind."""
+    columns: list[NDArray[Any] | tuple[str, ...]] = []
+    for name in values.names:
+        match values.field(name).type:
+            case FieldType.NUMBER:
+                columns.append(values.numbers(name))
+            case FieldType.DATE:
+                columns.append(values.dates(name))
+            case FieldType.TEXT | FieldType.CODE:
+                columns.append(values.texts(name))
+            case FieldType.HOLIDAY_CALENDAR:
+                columns.append(tuple([named(obj) for obj in values.objects(name)]))
+            case _:
+                assert_never(values.field(name).type)
+    return MixedArray.table([values.names], *columns)
 
 
 @probe
