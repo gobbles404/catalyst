@@ -106,7 +106,7 @@ Current code can be reviewed now. End-to-end trade-pricing claims require either
 ## Starting material
 
 - [Current pipeline](engineering-tickets/trade-valuation-pipeline/README.md), [NG worked example](engineering-tickets/trade-valuation-pipeline/ng-creation-preparation-example.md) and [Excel binding proposal](engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md).
-- [Project rules](../CLAUDE.md) and [principles](../PRINCIPLES.md).
+- [Project rules](../AGENTS.md) and [principles](../PRINCIPLES.md).
 - [Measurement method](seam/measuring.md) and [historical baseline](seam/baseline.md).
 - `tests/performance`, `tools/performance` and Excel lifetime/smoke scripts in the repository.
 - [Discount-curve implementation](../src/goosedove/globals/discount_curve.py) and [documented contract](library/globals/discount-curve.md).

@@ -2,7 +2,7 @@
 
 How the seam is measured, and how to read a number. Two questions drive it: does the bridge carry values correctly, and how does its cost grow. Correctness is the tests' job and is not repeated here. This file is about cost: what is counted, what is timed, where the reports land, and what each number includes and leaves out.
 
-The rule from CLAUDE.md holds throughout: work is measured by counts, and counts are tests; time is measured by tools, and no timing gates a merge.
+The rule from AGENTS.md holds throughout: work is measured by counts, and counts are tests; time is measured by tools, and no timing gates a merge.
 
 ## The probes
 
