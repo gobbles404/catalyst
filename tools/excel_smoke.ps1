@@ -428,7 +428,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(EW13))"       = "4"
     "=COLUMNS(util_ReadHandle(EW13))"    = "17"
     '=_CreateTradeTemplate("Future",EW1:FC1,EW2:FC2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
-    '=_CreateTradeTemplate("future",EZ1,EY2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, the one method built"
+    '=_CreateTradeTemplate("future",EZ1,EY2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday or penultimate, the two methods built"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number of lots"
     '=_CreateTradeTemplate("future",EW1:FC1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: fields has 7 headers, expected 6, one per column of values"
     "=_CreateTrades(EB1,EW1:FC1,EW2:FC2,EW3)"    = "#ERROR _CreateTrades: ValueError: contract_specification is supplied by the template and by the ticket, expected by one of them"
@@ -495,6 +495,25 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FM15),4,5)" = "245000"
     "=INDEX(util_ReadHandle(FM15),3,6)" = "0"
     "=INDEX(util_ReadHandle(FM15),4,6)" = "70000"
+    # The penultimate method on the smoke's index: the template in GP3 is the ICE WTI T analogue,
+    # financial, paying one business day after the pen day on the holiday calendar in AM1, and
+    # GP4 the I5 ticket's two lots of n26 at 70 under it. n26 expires Monday 22-Jun-2026, so the
+    # pen observes Friday the 19th, 46192, and pays on the 22nd, 46195; prepared against the
+    # chain's history in GP5, valued 26-May-2026, the pen is live, and GP6 marks it 8,500 as the
+    # lastday batch marks, both live at 74.25. The physical pen in GP9 is refused by the kernel.
+    "=INDEX(util_ReadHandle(GP4),1,15)"  = "payment_date"
+    "=INDEX(util_ReadHandle(GP4),3,6)"   = "penultimate"
+    "=INDEX(util_ReadHandle(GP4),3,14)"  = "+1bd"
+    "=INDEX(util_ReadHandle(GP4),3,15)"  = "46195"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "18"
+    "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
+    "=INDEX(util_ReadHandle(GP5),3,2)"   = "46192"
+    "=INDEX(util_ReadHandle(GP5),3,3)"   = "FALSE"
+    "=INDEX(util_ReadHandle(GP5),3,5)"   = "2000"
+    "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
+    "=INDEX(_ReportValues(GP6),3,2)"     = "0"
+    "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
+    "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
     # The market history: a creator over the calendar in CT7 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -869,6 +888,18 @@ $cells = [ordered]@{
     "FM13" = "=_CreateTrades(FM5,GJ1:GN1,GJ2:GN3,FM12)"
     "FM14" = "=_PrepareTrades(FM13,FM9)"
     "FM15" = "=_EvaluateTrades(FM14,FM11)"
+    # The penultimate method: the ICE WTI T analogue on the smoke's index, nine fields in GP to
+    # GX, the payment calendar held through GX2, in GP3; the I5 ticket's two lots of n26 at 70
+    # under it in GP4, prepared against the chain's history in GP5 and evaluated in GP6; a
+    # physical penultimate template in GP9, which no batch can be made under.
+    "GP1" = "contract_specification"; "GQ1" = "quantity_unit"; "GR1" = "quantity_per"; "GS1" = "schedule_method"; "GT1" = "route"; "GU1" = "settlement_method"; "GV1" = "clearing_house"; "GW1" = "payment_time_lag"; "GX1" = "payment_holiday_calendar"
+    "GP2" = "lots"; "GQ2" = "LOT"; "GR2" = "month"; "GS2" = "penultimate"; "GT2" = "cleared"; "GU2" = "financial"; "GV2" = "ICE Clear Europe"; "GW2" = "+1bd"; "GX2" = "=AM1"
+    "GP3" = '=_CreateTradeTemplate("future",GP1:GX1,GP2:GX2)'
+    "GP4" = "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP3)"
+    "GP5" = "=_PrepareTrades(GP4,CT7)"
+    "GP6" = "=_EvaluateTrades(GP5,CW1)"
+    "GP8" = "lots"; "GQ8" = "LOT"; "GR8" = "month"; "GS8" = "penultimate"; "GT8" = "cleared"; "GU8" = "physical"; "GV8" = "CME Clearing"
+    "GP9" = '=_CreateTradeTemplate("future",GP1:GV1,GP8:GV8)'
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

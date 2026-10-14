@@ -196,7 +196,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "LOT" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("LOT", "LOT") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("LOT", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday, the one method built" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit", "schedule_method"), Row("LOT", "asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'asian', expected lastday or penultimate, the two methods built" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("payment_time_lag"), "+0bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number of lots" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
@@ -477,6 +477,46 @@ namespace Goosedove.Host.Tests
             Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market));
             Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_ReportRisk", prepared));
+        }
+
+        // The penultimate method on the host's chain: a financial template paying one business day
+        // after the pen day on the chain's holiday calendar, the same two trades under it. n26
+        // expires Monday 22 June 2026, so its pen day is Friday the 19th, 46192, and it pays on
+        // the 22nd, 46195; q26 expires Tuesday 21 July, observes Monday the 20th and pays on the
+        // 21st, 46224. Both live on 26 May, the batch marks the lastday batch's 34,000; a physical
+        // penultimate template makes no batch, and an unbuilt method is refused by name.
+        [Fact]
+        public void a_penultimate_batch_observes_the_day_before_expiry_and_pays_after_it()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("m26", "n26", "q26"), Column(46161.0, 46195.0, 46224.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46167.0);
+            var index = Index(schedule, holidays);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46168.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
+            var fields = Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("NYMEX NG", "LOT", "month", "penultimate", "cleared", "financial", "ICE Clear Europe", "+1bd", holidays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var rows = new object[,] { { "V1", 46153.0, "n26", 2.0, 70.0 }, { "V2", 46153.0, "q26", -1.0, 72.0 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
+            var spill = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal(18, spill.GetLength(1));
+            Assert.Equal("penultimate", spill[2, 5]);
+            Assert.Equal("payment_date", spill[0, 14]);
+            Assert.Equal(46195.0, spill[2, 14]);
+            Assert.Equal(46224.0, spill[3, 14]);
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal("observation_date", slots[0, 1]);
+            Assert.Equal(46192.0, slots[2, 1]);
+            Assert.Equal(46223.0, slots[3, 1]);
+            Assert.Equal(false, slots[2, 2]);
+            var values = (object[,])Seam.Call("_ReportValues", (string)Seam.Call("_EvaluateTrades", prepared, market));
+            Assert.Equal(34000.0, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("contract_specification", "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("NYMEX NG", "LOT", "month", "penultimate", "cleared", "physical", "CME Clearing"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry", Seam.Call("_CreateTrades", index, headers, rows, physical));
         }
 
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.

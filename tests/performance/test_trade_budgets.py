@@ -31,7 +31,7 @@ from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
-from goosedove.trades.observations import observations, observed
+from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.terms import (
     PaymentTerms,
@@ -50,6 +50,11 @@ IDS = ["five trades", "two thousand trades"]
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
     return np.array(texts, dtype="datetime64[D]")
+
+
+def observed_of(terms: ResolvedTrades) -> Observations:
+    """The observations the terms' schedule method gives them, as resolution makes them."""
+    return observed(terms.schedule_method, terms.index, terms.contract)
 
 
 # A financial index of 25 monthly contracts from October 2026, each expiring on the last
@@ -87,10 +92,12 @@ def a_batch(components: int, contracts: int) -> Encoded:
     """That many single-month trades spread over the first contracts after the boundary, lots
     and prices varying, encoded on a counter of its own."""
     terms = some_terms(components, contracts)
-    return encoded(terms, observed(terms), UNITS, WorkCounter())
+    return encoded(terms, observed_of(terms), UNITS, WorkCounter())
 
 
-def some_terms(components: int, contracts: int) -> ResolvedTrades:
+def some_terms(
+    components: int, contracts: int, method: ScheduleMethod = ScheduleMethod.LASTDAY
+) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
         FUTURE,
@@ -98,7 +105,7 @@ def some_terms(components: int, contracts: int) -> ResolvedTrades:
         0,
         Route.CLEARED,
         Settlement.FINANCIAL,
-        ScheduleMethod.LASTDAY,
+        method,
         "LOT",
         QuantityPer.MONTH,
         None,
@@ -170,7 +177,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
 ) -> None:
     counter = WorkCounter()
     terms = a_batch(components, contracts).terms
-    encoded(terms, observed(terms), UNITS, counter)
+    encoded(terms, observed_of(terms), UNITS, counter)
     assert counter.freeze().as_dict() == {
         "encoded_components": components,
         "encoded_observations": components,  # lastday: one per component
@@ -253,12 +260,25 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     call_profile: CallProfile, components: int, contracts: int
 ) -> None:
     terms = a_batch(components, contracts).terms
-    obs = observed(terms)
+    obs = observed_of(terms)
     assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
-    assert call_profile(lambda: observed(terms)) == {
+    assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
+        "futures_schedule_of": 1,
         "observations": 1,
     }
+    # The penultimate method reads the holiday calendar and looks once at the expiries; the
+    # encoding over its observations runs the same functions as over lastday's.
+    pen = some_terms(components, contracts, ScheduleMethod.PENULTIMATE)
+    assert call_profile(lambda: observed_of(pen)) == {
+        "observed": 1,
+        "futures_schedule_of": 1,
+        "with_holiday_calendar": 1,
+        "open_days": 1,
+        "observations": 1,
+    }
+    pen_obs = observed_of(pen)
+    assert call_profile(lambda: encoded(pen, pen_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
 
 
 # The encoding's functions, each once: the two calendar rules read once over every observation,
