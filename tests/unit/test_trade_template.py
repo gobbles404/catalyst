@@ -17,7 +17,13 @@ from goosedove.excel.bridge import Cells, Handle, register
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.instruments.definitions import FUTURE
 from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.template import TradeTemplate, trade_template
+from goosedove.trades.template import (
+    MOST_BUSINESS_DAYS,
+    SHEET_FIRST_DAY,
+    SHEET_LAST_DAY,
+    TradeTemplate,
+    trade_template,
+)
 
 ENTRY = {
     name: bridge.entry(name)
@@ -137,6 +143,11 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
     assert dict(template.defaults) == {"settlement_method": "financial", "route": "bilateral"}
 
 
+# A lag of 4,301 digits fits a cell and would fail Python's own conversion, which refuses more
+# than 4,300 digits with words of its own; the bound names it before any digit is converted.
+LONG_LAG = "+" + "9" * 4301 + "bd"
+
+
 @pytest.mark.parametrize(
     ("fields", "message"),
     [
@@ -186,6 +197,16 @@ def test_a_field_the_ticket_must_supply_is_not_required_of_a_template() -> None:
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
+        (
+            {"payment_time_lag": LONG_LAG},
+            f"payment_time_lag is {LONG_LAG!r}, expected at most 2,113,146 business days, "
+            "the sheet's calendar from 1900-03-01 to 9999-12-31 end to end",
+        ),
+        (
+            {"payment_time_lag": "+99999999999999999999bd"},
+            "payment_time_lag is '+99999999999999999999bd', expected at most 2,113,1"
+            "46 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end",
+        ),
     ],
 )
 def test_a_value_against_its_fields_own_rule_is_refused_naming_the_field(
@@ -193,6 +214,14 @@ def test_a_value_against_its_fields_own_rule_is_refused_naming_the_field(
 ) -> None:
     result = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
     assert result == f"#ERROR _CreateTradeTemplate: ValueError: {message}"
+
+
+# The library imports nothing of the seam, so the two days the lag is held to are pinned to the
+# seam's own serials, 61 and 2958465, and the count between them to the number the page quotes.
+def test_the_sheets_calendar_the_lag_is_held_to_is_the_seams() -> None:
+    assert bridge.EXCEL_EPOCH + np.timedelta64(bridge.FIRST_SERIAL, "D") == SHEET_FIRST_DAY
+    assert bridge.EXCEL_EPOCH + np.timedelta64(bridge.LAST_SERIAL, "D") == SHEET_LAST_DAY
+    assert MOST_BUSINESS_DAYS == 2_113_146
 
 
 def test_the_builder_takes_one_row_of_field_values() -> None:

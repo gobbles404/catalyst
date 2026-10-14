@@ -30,6 +30,7 @@ from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.observations import Observations, observed
 from goosedove.trades.template import (
+    SHEET_LAST_DAY,
     TradeTemplate,
     business_days_of,
     months_of,
@@ -397,7 +398,11 @@ def _the_payment_terms(
     after its anchor, its one observation day under the two methods built, on that calendar,
     Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
     on or before it first, so that a day the calendar closes is not itself counted; one busday
-    offset over the components on each distinct calendar. None for a physical settlement."""
+    offset over the components on each distinct calendar. Each day made is on or before the
+    sheet's last day, 31 December 9999, since a later one could reach no cell: the first
+    component paying past it is refused naming its lag, with the row when the ticket gave it,
+    the anchor it was counted from and the day it reached, representability and no term of
+    business. None for a physical settlement."""
     match settlement:
         case Settlement.PHYSICAL:
             return None
@@ -415,6 +420,16 @@ def _the_payment_terms(
                 on = inverse[occurrence] == g
                 pays[on] = np.busday_offset(
                     anchors[on], lag[on], roll="backward", holidays=calendars[int(row)].holiday
+                )
+            late = pays > SHEET_LAST_DAY
+            if late.any():
+                k = int(late.argmax())  # the first component paying past the sheet's last day
+                row = int(occurrence[k])
+                raise ValueError(
+                    f"{fields.where('payment_time_lag', row)} is "
+                    f"{fields.texts('payment_time_lag')[row]!r}, counted from {anchors[k]} to "
+                    f"{pays[k]}, expected a payment day on or before {SHEET_LAST_DAY}, the last a "
+                    "sheet can show"
                 )
             return PaymentTerms(lag_days, calendars, pays)
         case _:
