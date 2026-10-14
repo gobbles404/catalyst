@@ -217,7 +217,8 @@ def _the_method(schedule_method: ScheduleMethod, settlement: Settlement) -> None
         case ScheduleMethod.PENULTIMATE:
             if settlement is Settlement.PHYSICAL:
                 raise ValueError(
-                    "settlement is 'physical', expected 'financial' with the penultimate method; "
+                    "settlement_method is 'physical', expected 'financial' with the penultimate "
+                    "method; "
                     "a penultimate future is cash settled on the business day before its "
                     "contract's expiry"
                 )

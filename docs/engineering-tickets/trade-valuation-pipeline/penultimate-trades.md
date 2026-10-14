@@ -227,7 +227,7 @@ before the payment terms, and counts each occurrence's lag from each component's
 day on its payment calendar, the day rolled back first where that calendar closes it, so the
 payment resolver no longer reads the schedule's expiries; the encoding takes the same
 observations and nothing is kept twice. The kernel refuses a physical settlement with the
-method, `settlement is 'physical', expected 'financial' with the penultimate method; a
+method, `settlement_method is 'physical', expected 'financial' with the penultimate method; a
 penultimate future is cash settled on the business day before its contract's expiry`, so a
 Python caller is held to the rule as the sheet is. Preparation, evaluation, the reports and the
 readers are untouched: the pen's slot is its pen day, its reference the contract pricing that

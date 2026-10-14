@@ -804,8 +804,8 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "penultimate"},
-            "settlement is 'physical', expected 'financial' with the penultimate method; a "
-            "penultimate future is cash settled on the business day before its contract's expiry",
+            "settlement_method is 'physical', expected 'financial' with the penultimate method; a"
+            " penultimate future is cash settled on the business day before its contract's expiry",
         ),
         (
             NG_TICKET,
@@ -913,8 +913,79 @@ def test_two_lags_for_one_contract_are_refused_by_the_trade_and_the_contract() -
         template,
     )
     assert message == (
-        "payment_date of trade 'NG-002' at row 2 is 2026-12-01, expected 2026-11-30, "
-        "the one day Z26 pays"
+        "Z26 pays on 2026-11-30 for trade 'NG-001' at row 1 and on 2026-12-01 for trade 'NG-002"
+        "' at row 2, expected one payment day per contract"
+    )
+    # The page's case: four rows of J27 at +2bd and one at +3bd. Both days are named with their
+    # rows and neither is held to be the right one; the desk decides which terms to change.
+    four = refused(
+        an_index(
+            "J27",
+            (("X26", "2026-10-28"), ("J27", "2027-03-29")),
+            lots=(("TOY", 10_000.0, "MMBTU"),),
+        ),
+        {
+            "trade_id": ["R1", "R2", "R3", "R4"],
+            "trade_date": ["2026-09-24"] * 4,
+            "contract_code": ["J27"] * 4,
+            "quantity": [1, 1, 1, 1],
+            "fixed_price": [3.0] * 4,
+            "payment_time_lag": ["+2bd", "+2bd", "+2bd", "+3bd"],
+        },
+        template,
+    )
+    assert four == (
+        "J27 pays on 2027-03-31 for trade 'R1' at row 1 and on 2027-04-01 for trade 'R4' at row 4, "
+        "expected one payment day per contract"
+    )
+
+
+def test_a_code_or_a_lag_the_grammar_refuses_is_named_by_its_first_bad_row() -> None:
+    # Whatever order the texts sort in: 'F2027' sorts before 'Z2026' and 'AAA' before 'ZZ26',
+    # yet the row from the top is the one named, as the page says of every ticket field.
+    two_bad: dict[str, list[object]] = {
+        **NG_TICKET,
+        "contract_code": ["Z2026", "F2027", "F27", "F27", "Z26"],
+    }
+    assert refused(NG, two_bad).startswith("contract_code row 1 is 'Z2026', expected a contract")
+    later_bad: dict[str, list[object]] = {
+        **NG_TICKET,
+        "contract_code": ["Z26", "ZZ26", "AAA", "F27", "Z26"],
+    }
+    assert refused(NG, later_bad).startswith("contract_code row 2 is 'ZZ26', expected a contract")
+    template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_time_lag"}
+    lags: dict[str, list[object]] = {
+        **NG_TICKET,
+        "payment_time_lag": ["+2BD", "+0bd", "+2bd", "+2bd", "+2bd"],
+    }
+    assert refused(TOY, lags, template) == (
+        "payment_time_lag row 1 is '+2BD', expected a positive whole number of business days, "
+        "such as +1bd"
+    )
+
+
+def test_a_batch_field_the_ticket_supplies_is_named_with_its_row() -> None:
+    # The page's promise, kept for every batch field as it was for quantity_unit: the ticket's
+    # agreed value is named with the row that supplied it, the template's alone.
+    without = {k: v for k, v in NG_TEMPLATE.items() if k not in ("route", "schedule_method")}
+    cleared: dict[str, list[object]] = {
+        **NG_TICKET,
+        "route": ["Cleared"] * 5,
+        "schedule_method": ["lastday"] * 5,
+    }
+    assert refused(NG, cleared, without) == (
+        "route row 1 is 'Cleared', expected cleared or bilateral"
+    )
+    asian: dict[str, list[object]] = {
+        **NG_TICKET,
+        "route": ["cleared"] * 5,
+        "schedule_method": ["asian"] * 5,
+    }
+    assert refused(NG, asian, without) == (
+        "schedule_method row 1 is 'asian', expected lastday or penultimate, the two methods built"
+    )
+    assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "route": "Cleared"}) == (
+        "route is 'Cleared', expected cleared or bilateral"
     )
 
 

@@ -107,15 +107,18 @@ def resolved(
     built. No field is supplied by both, even to the same value. Every required field is present
     in one of them. The batch fields are one each, the template's value or a column every row
     agrees on, and each is read for its meaning: the quantity unit by name among the index's
-    specifications, exactly as the index names them, the row named where the ticket supplied it,
-    the method, the route, the settlement and the basis from their lists. Each conditional field
+    specifications, exactly as the index names them, the method, the route, the settlement and
+    the basis from their lists, each named with its row where the ticket supplied it, since the
+    page promises a ticket's field its row. Each conditional field
     is present exactly when its condition holds, a clearing house with a cleared route and the
     two payment fields with a financial settlement, and absent otherwise, since a label for a
     clearing house a bilateral trade has not, or a payment a physical contract never makes, would
     say something false. The index is a futures index, and every code of its schedule is read for
     its month, the rows the ticket does not use included, a label that is no contract code and
     two rows for one month refused by row. Each contract code of the ticket is read once per
-    distinct text, through the period grammar, in either case, for the months it spans, and each
+    distinct text, in the order the sheet first shows each, so that the first row that breaks the
+    grammar is the one named, through the period grammar, in either case, for the months it
+    spans, and each
     month is resolved to its schedule row, a month the schedule lacks refused by the trade's row
     and the month; a strip makes one component per month, in order, all on the one occurrence.
     The schedule method gives each component its observation day, the expiry under lastday and
@@ -135,10 +138,14 @@ def resolved(
     specification = _the_specification(
         index, fields.where("quantity_unit", 0), fields.one_text("quantity_unit")
     )
-    schedule_method = schedule_method_of("schedule_method", fields.one_text("schedule_method"))
-    route = route_of("route", fields.one_text("route"))
-    settlement = settlement_of("settlement_method", fields.one_text("settlement_method"))
-    quantity_per = quantity_per_of("quantity_per", fields.one_text("quantity_per"))
+    schedule_method = schedule_method_of(
+        fields.where("schedule_method", 0), fields.one_text("schedule_method")
+    )
+    route = route_of(fields.where("route", 0), fields.one_text("route"))
+    settlement = settlement_of(
+        fields.where("settlement_method", 0), fields.one_text("settlement_method")
+    )
+    quantity_per = quantity_per_of(fields.where("quantity_per", 0), fields.one_text("quantity_per"))
     _the_conditions(fields, route, settlement)
     schedule = futures_schedule_of(index)
     months = _the_schedule_months(schedule)
@@ -339,14 +346,17 @@ def _each_distinct[T](
     fields: _Fields, name: str, read: Callable[[str, str], T]
 ) -> tuple[list[T], NDArray[np.intp]]:
     """A text field read once per distinct text, the first row holding each named in a refusal,
-    and the position of each occurrence's text among the distinct ones."""
+    and the position of each occurrence's text among the distinct ones. The texts are read in
+    the order their first rows come, not the order they sort in, so the first row from the top
+    that breaks the grammar is the one named; the values are kept in the sorted order the
+    positions index."""
     texts = np.array(fields.texts(name))
     distinct, first_rows, inverse = np.unique(texts, return_index=True, return_inverse=True)
-    read_values = [
-        read(fields.where(name, int(row)), str(text))
-        for text, row in zip(distinct, first_rows, strict=True)
-    ]
-    return read_values, inverse.astype(np.intp)
+    by_row = np.argsort(first_rows)  # the distinct texts in the order their first rows come
+    read_values = {
+        int(i): read(fields.where(name, int(first_rows[i])), str(distinct[i])) for i in by_row
+    }
+    return [read_values[i] for i in range(distinct.size)], inverse.astype(np.intp)
 
 
 def _the_contracts(

@@ -535,7 +535,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
-    "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
+    "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
     # The market history: a creator over the calendar in CT7 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
