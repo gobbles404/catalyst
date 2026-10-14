@@ -2,7 +2,7 @@
 
 [Pipeline overview](README.md) · [Preparation](03-market-binding.md) · [Results](05-results.md)
 
-**Status:** Research and lifecycle whiteboard, updated 3 October 2026. The first model now
+**Status:** Research and lifecycle whiteboard, updated 4 October 2026. The first model now
 explicitly excludes margining and actual-payment reconciliation. It proposes assumed payment
 on the encoded date; the earlier actual-payment discussion below is background, not a build
 prerequisite. See [proposed result fields by route](result-fields-by-route.md).
@@ -24,9 +24,10 @@ on the next clearing business day after that trading cutoff.
 payment_holiday_calendar as static trade-row or template inputs. The supported product
 definition establishes the anchor and counting convention. CreateTrades parses the lag
 once and resolves and stores payment_date per monthly component. This is the accepted
-starting design, built in #139 as [create-trades.md](../../library/trades/create-trades.md)
-describes under payment days. Broader bilateral conventions remain deferred, with their
-limited coverage explicitly accepted for this first step.
+starting design, built for `lastday` in #139 as
+[create-trades.md](../../library/trades/create-trades.md) describes under payment days.
+[R1](penultimate-trades.md) specifies the penultimate extension. Broader bilateral conventions
+remain deferred, with their limited coverage explicitly accepted for this first step.
 
 The anchor need not be user-entered when supported product terms establish it, but it
 cannot be assumed universally from a reference index. For example, a hypothetical bilateral
@@ -70,17 +71,16 @@ HolidayCalendar object transported by its Excel handle. No separate public ancho
 numeric lag field or payment-rule constructor is needed for this starting scope.
 Listed-product terms must still validate together; a supplied lag/calendar cannot redefine
 the traded product.
-No new schedule field is added for that anchor. Before extending the schedule, work through
-whether the dates derive from what exists: the contract month, business-day rules and the
-relevant calendars. Advancing the NYMEX penultimate pricing date one NYMEX business day
-recovers NYMEX expiry; ICE payment is anchored to ICE's own last trading day, so the relation
-between the two is to be established from the
-[ICE contract specification](https://www.ice.com/products/6590264) rather than assumed, and
-the dates and the calendars are not assumed to coincide. A documented adjusted-lag convention
-is acceptable where it produces the correct dates; it is not a universal rule. The payment
-date is resolved once at creation and retained in the encoding; ticket R1 of the
-[README](README.md) works this through for PHH. schedule_method alone does not establish
-the payment anchor.
+The agreed [R1 implementation](penultimate-trades.md) derives the pen expiry from the
+underlying NYMEX expiry and pricing calendar, then applies `payment_time_lag` from the pen
+expiry on the payment calendar. For its supported pen products, the pen expiry is both the
+observation date and payment anchor. `lastday` keeps its existing expiry anchor. Both resolved
+dates are retained at creation; the underlying schedule is unchanged. This supersedes the
+earlier adjusted-lag proposal. Exchange date examples and separate-calendar tests validate the
+rule; changing the entered lag to compensate for the wrong anchor is not the implementation.
+This limited method-to-anchor relationship does not establish a general rule for future
+Asian or bilateral products. R1 includes PHH and ICE WTI and distinguishes the WTI payment
+deadline from an observed cash transfer.
 Existing ContractSpecifications keeps its lot/unit/fee responsibility. The instrument's
 schedule_method still selects pricing observations, independently of payment_time_lag.
 
