@@ -1093,6 +1093,131 @@ def test_a_fixed_pen_inside_a_live_market_reads_no_quote_whatever_the_underlying
     assert results[0][0].market.first_contract == 1  # N27, still quoted, read by no slot
 
 
+# --- the penultimate method: a strip, a duplicate and a signed lot through one path -----------
+# R1's acceptance list: A, two lots of the N27-Q27 strip at 3.00, A again, and C, one lot of Q27
+# sold at 3.05, on the PHH index with U27 after Q27 so that every state has a market. By hand: a
+# strip lot is 2,500 MMBTU on each of its months, so A holds 5,000 on N27 and 5,000 on Q27, the
+# two As 10,000 and 10,000, and C takes Q27 to 7,500. Live, N27 at 3.10 and Q27 at 3.40: 10,000
+# of N27 ten cents up is 1,000, 10,000 of Q27 forty cents up is 4,000, and C's 2,500 sold at 3.05
+# against 3.40 is -875, 4,125 in all, a delta of 10,000 and 7,500. N27 fixed at 3.20 on its pen
+# day, Friday 25 June, is 2,000, unpaid on the Saturday and cash on Monday the 28th, one clearing
+# day after; Q27 fixed at 3.45 on its pen day, Tuesday 27 July, is 4,500 less C's 1,000, cash on
+# the 28th, 5,500 in all and nothing live.
+
+STRIP_INDEX = an_index(
+    "Henry Hub NYMEX",
+    (("M27", "2027-05-26"), ("N27", "2027-06-28"), ("Q27", "2027-07-28"), ("U27", "2027-08-27")),
+    ("2027-05-31", "2027-07-05"),
+    lot=("ICE PHH", 2_500.0, "MMBTU"),
+)
+# Each row: its label, the schedule rows of its months, its lots and its price.
+STRIP_ROWS: tuple[tuple[str, tuple[int, ...], float, float], ...] = (
+    ("A", (1, 2), 2.0, 3.00),
+    ("A", (1, 2), 2.0, 3.00),
+    ("C", (2,), -1.0, 3.05),
+)
+STRIP_PAYS = {1: "2027-06-28", 2: "2027-07-28"}  # one clearing day after each month's pen day
+
+
+def strip_terms(order: tuple[tuple[str, tuple[int, ...], float, float], ...]) -> ResolvedTrades:
+    """Those rows resolved on the PHH index with U27, a strip one component per month on its one
+    occurrence, each component paying one clearing day after its month's pen day."""
+    n = len(order)
+    components = [(i, c, q, p) for i, (_, months, q, p) in enumerate(order) for c in months]
+    return resolved_trades(
+        FUTURE, STRIP_INDEX, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.PENULTIMATE,
+        QuantityPer.MONTH, tuple(label for label, _, _, _ in order), ("ICE Clear Europe",) * n,
+        None, np.repeat(day("2027-06-01"), n), rows(*(i for i, _, _, _ in components)),
+        rows(*(c for _, c, _, _ in components)), numbers(*(q for _, _, q, _ in components)),
+        numbers(*(p for _, _, _, p in components)),
+        PaymentTerms(
+            np.full(n, 1),
+            (CLEARING_CALENDAR,) * n,
+            dates(*(STRIP_PAYS[c] for _, c, _, _ in components)),
+        ),
+    )  # fmt: skip
+
+
+def strip_valued(
+    order: tuple[tuple[str, tuple[int, ...], float, float], ...],
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = strip_terms(order)
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_by_day(STRIP_INDEX, as_of, settles)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+# The six states by hand: as-of, the settles on their pen days, the quotes of the contracts the
+# market still quotes, then mark, cash, delta on N27 and Q27, and the quotes and fixings read.
+STRIP_LIFECYCLE: list[
+    tuple[str, dict[str, float], tuple[float, ...], int, int, tuple[int, int], int, int]
+] = [
+    ("2027-06-24", {}, (3.10, 3.40), 4_125, 0, (10_000, 7_500), 2, 0),
+    ("2027-06-25", {}, (3.10, 3.40), 4_125, 0, (10_000, 7_500), 2, 0),
+    ("2027-06-26", {"2027-06-25": 3.20}, (3.10, 3.40), 5_125, 0, (0, 7_500), 1, 1),
+    ("2027-06-28", {"2027-06-25": 3.20}, (3.10, 3.40), 3_125, 2_000, (0, 7_500), 1, 1),
+    ("2027-07-27", {"2027-06-25": 3.20}, (3.40,), 3_125, 2_000, (0, 7_500), 1, 1),
+    ("2027-07-28", {"2027-06-25": 3.20, "2027-07-27": 3.45}, (3.50,), 0, 5_500, (0, 0), 0, 2),
+]
+STRIP_IDS = [
+    "24 Jun, both live",
+    "25 Jun, N27 live on its pen day",
+    "26 Jun, N27 fixed, unpaid",
+    "28 Jun, N27 paid",
+    "27 Jul, Q27 live on its pen day",
+    "28 Jul, both paid",
+]
+
+
+@pytest.mark.parametrize(
+    ("as_of", "settles", "quotes", "mark", "cash", "delta", "live_reads", "fixings_read"),
+    STRIP_LIFECYCLE,
+    ids=STRIP_IDS,
+)
+def test_the_pen_strip_batch_marks_fixes_and_pays_as_the_hand_says(
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: tuple[float, float],
+    live_reads: int,
+    fixings_read: int,
+) -> None:
+    result, counter = strip_valued(STRIP_ROWS, as_of, settles, quotes)
+    assert result.mark == pytest.approx(mark) and result.cash == pytest.approx(cash)
+    np.testing.assert_array_equal(result.delta, delta)
+    assert result.delta_total == pytest.approx(sum(delta)) and result.codes() == ("N27", "Q27")
+    counts = counter.freeze()
+    assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
+        live_reads,
+        fixings_read,
+        1,
+    )
+    # The rows the other way round make the same batch, and the three rows each alone sum to it.
+    turned, _ = strip_valued(STRIP_ROWS[::-1], as_of, settles, quotes)
+    assert turned.mark == pytest.approx(mark) and turned.cash == pytest.approx(cash)
+    np.testing.assert_array_equal(turned.delta, delta)
+    singles = [strip_valued((line,), as_of, settles, quotes)[0] for line in STRIP_ROWS]
+    assert sum(s.mark for s in singles) == pytest.approx(mark)
+    assert sum(s.cash for s in singles) == pytest.approx(cash)
+
+
+def test_the_pen_strip_encodes_one_slot_per_month_paying_one_clearing_day_after_each() -> None:
+    terms = strip_terms(STRIP_ROWS)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.quote_quantity, [5_000, 5_000, 5_000, 5_000, -2_500])
+    np.testing.assert_array_equal(enc.slot_date, dates("2027-06-25", "2027-07-27"))
+    np.testing.assert_array_equal(enc.slot_exposure, [10_000, 7_500])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-06-28", "2027-07-28"))
+    assert terms.named(4) == "trade 'C' at row 3"
+
+
 # --- the dated axis: the daily toy of dated-exposure.md ---------------------------------------
 # One index quoted in USD per MMBTU with a lot of one MMBTU; X26 expiring 30 November 2026 bounds
 # the calendar, Z26 expires 31 December and G27 29 January; two components on Z26, A of 60 at 70

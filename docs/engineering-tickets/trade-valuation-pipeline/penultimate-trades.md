@@ -196,6 +196,9 @@ Acceptance requires:
   and a WTI amount/risk example that checks its 1,000-barrel lot size.
 - A single trade, many signed trades, duplicate occurrences and a monthly strip through one
   path; a batch equals its singletons and is invariant to ticket order within tolerances.
+  Pinned by hand since #152, at the kernel and on the sheet: two lots of N27-Q27, the row
+  again and one lot of Q27 sold, with U27 after Q27, through six states from both live to
+  both paid.
 - Missing pen fixings fail visibly. A supplied history with the later expiry fixing cannot
   stand in for a missing pen fixing. Preserve index/history identity and live-coverage checks.
 - A fully fixed pen batch reads no live quote even though its underlying remains tradable;

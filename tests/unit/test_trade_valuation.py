@@ -609,6 +609,123 @@ def test_the_short_pen_and_the_long_sum_to_nothing_and_each_equals_itself_alone(
     assert cash_of(phh["trades"]) + cash_of(short) == pytest.approx(cash_of(both))
 
 
+# R1's strip batch on the sheet, the kernel's hand answers reached through the entries: A, two lots
+# of the N27-Q27 strip at 3.00, A again, and C, one lot of q27 sold at 3.05, on the PHH index with
+# U27 after Q27 so that every state has a market.
+STRIP_ROWS: list[list[object]] = [
+    ["A", serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
+    ["A", serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
+    ["C", serial("2027-06-01"), "q27", -1.0, 3.05],
+]
+STRIP_LIFECYCLE: list[
+    tuple[str, dict[str, float], tuple[float, ...], int, int, tuple[int, int]]
+] = [
+    ("2027-06-24", {}, (3.10, 3.40), 4_125, 0, (10_000, 7_500)),
+    ("2027-06-25", {}, (3.10, 3.40), 4_125, 0, (10_000, 7_500)),
+    ("2027-06-26", PEN_FIXED, (3.10, 3.40), 5_125, 0, (0, 7_500)),
+    ("2027-06-28", PEN_FIXED, (3.10, 3.40), 3_125, 2_000, (0, 7_500)),
+    ("2027-07-27", PEN_FIXED, (3.40,), 3_125, 2_000, (0, 7_500)),
+    ("2027-07-28", {**PEN_FIXED, "2027-07-27": 3.45}, (3.50,), 0, 5_500, (0, 0)),
+]
+STRIP_IDS = [
+    "24 Jun, both live",
+    "25 Jun, N27 live on its pen day",
+    "26 Jun, N27 fixed, unpaid",
+    "28 Jun, N27 paid",
+    "27 Jul, Q27 live on its pen day",
+    "28 Jul, both paid",
+]
+
+
+@pytest.fixture(scope="module")
+def strip() -> dict[str, Any]:
+    index, _ = an_index(
+        "Henry Hub NYMEX",
+        [
+            ("M27", "2027-05-26"),
+            ("N27", "2027-06-28"),
+            ("Q27", "2027-07-28"),
+            ("U27", "2027-08-27"),
+        ],
+        PHH_HOLIDAYS,
+        [("NYMEX NG", 10_000.0), ("ICE PHH", 2_500.0)],
+    )
+    clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
+    template = pen_template("ICE PHH", str(clearing))
+    return {
+        "index": index,
+        "template": template,
+        "trades": strip_batch(index, template, STRIP_ROWS),
+    }
+
+
+def strip_batch(index: str, template: str, lines: list[list[object]]) -> str:
+    return str(ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(*lines), template))
+
+
+def strip_state(
+    strip: dict[str, Any],
+    trades: str,
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+) -> str:
+    history = a_history(strip["index"], "2027-05-27", as_of, PHH_HOLIDAYS, settles)
+    market = a_market(history, "Henry Hub NYMEX", *quotes)
+    return str(ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market))
+
+
+@pytest.mark.parametrize(
+    ("as_of", "settles", "quotes", "mark", "cash", "delta"), STRIP_LIFECYCLE, ids=STRIP_IDS
+)
+def test_the_pen_strip_batch_values_on_the_sheet_as_the_hand_says(
+    strip: dict[str, Any],
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: tuple[float, float],
+) -> None:
+    results = strip_state(strip, strip["trades"], as_of, settles, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(sum(delta)))
+    table = spilled(ENTRY["util_ReadHandle"](results))
+    assert [(line[0], line[-1]) for line in table[2:]] == [("N27", delta[0]), ("Q27", delta[1])]
+    turned = strip_batch(strip["index"], strip["template"], STRIP_ROWS[::-1])
+    assert valued(strip_state(strip, turned, as_of, settles, quotes)) == (
+        pytest.approx(mark),
+        pytest.approx(cash),
+        pytest.approx(sum(delta)),
+    )
+    singles = [
+        valued(
+            strip_state(
+                strip,
+                strip_batch(strip["index"], strip["template"], [line]),
+                as_of,
+                settles,
+                quotes,
+            )
+        )
+        for line in STRIP_ROWS
+    ]
+    assert sum(single[0] for single in singles) == pytest.approx(mark)
+    assert sum(single[1] for single in singles) == pytest.approx(cash)
+
+
+def test_the_pen_strips_days_and_amounts_read_back_from_the_batch(strip: dict[str, Any]) -> None:
+    batch = spilled(ENTRY["util_ReadHandle"](strip["trades"]))
+    head = batch[0]
+    assert [line[head.index("row")] for line in batch[2:]] == [1.0, 1.0, 2.0, 2.0, 3.0]
+    assert [line[head.index("quote_quantity")] for line in batch[2:]] == [
+        5_000.0, 5_000.0, 5_000.0, 5_000.0, -2_500.0
+    ]  # fmt: skip
+    assert [line[head.index("payment_date")] for line in batch[2:]] == [
+        serial("2027-06-28"), serial("2027-07-28"), serial("2027-06-28"), serial("2027-07-28"),
+        serial("2027-07-28"),
+    ]  # fmt: skip
+
+
 def test_a_series_without_the_pen_days_settle_is_refused_before_any_trade_is_prepared(
     phh: dict[str, Any],
 ) -> None:
