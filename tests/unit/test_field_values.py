@@ -128,6 +128,18 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "values is 2x1 array, expected one row of field values",
         ),
         (
+            "future",
+            row("quantity"),
+            rows([1.0], [None]),
+            "values is 2x1 array, expected one row of field values",
+        ),
+        (
+            "future",
+            row("quantity", "fixed_price"),
+            rows([1.0, 3.1], [None, None]),
+            "values is 2x2 array, expected one row of field values",
+        ),
+        (
             "Future",
             row("Quantity"),
             row("ten"),

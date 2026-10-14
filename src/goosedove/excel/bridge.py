@@ -615,11 +615,12 @@ def _one_row(value: object) -> None:
 
 
 def _field_row(value: object) -> MixedArray:
-    """A mixed range of one row: a template's values."""
-    mixed = _mixed(value)
-    if mixed.shape[0] != 1:
+    """A mixed range of one row: a template's values. The shape first, as every row type checks
+    it, so a range one row too tall is refused by its shape and never by whatever its extra row
+    holds, a blank among the rest; then the cells, as the mixed range refuses them."""
+    if _shape(value)[0] != 1:
         raise _Rejected(reason="expected one row of field values")
-    return mixed
+    return _mixed(value)
 
 
 def _column(value: object) -> NDArray[np.float64]:

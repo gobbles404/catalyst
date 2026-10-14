@@ -253,6 +253,11 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     assert create("future", row("quantity_unit"), Cells.from_rows([["lots"], ["lots"]])) == (
         "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     )
+    # Shape before cells: a range one row too tall, its extra row blank, is named for its rows
+    # and not for the blank, the seam's rule for every row type.
+    assert create("future", row("quantity_unit"), Cells.from_rows([["lots"], [None]])) == (
+        "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
+    )
     assert create("future", row("quantity_unit"), row(1.0)) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text"
     )

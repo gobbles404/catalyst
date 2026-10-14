@@ -380,11 +380,11 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "_text": 2,  # the name, and the handle cell's text
         "_text_row": 1,
         "_texts": 1,
-        "_shape": 1,
+        "_shape": 2,  # the headers' row and, since the shape comes first, the values'
         "_one_row": 1,
-        "_field_row": 1,  # one row, the template's shape, through the mixed rule
+        "_field_row": 1,  # one row, the template's shape before its cells, then the mixed rule
         "_mixed": 1,
-        "MixedArray.shape": 3,
+        "MixedArray.shape": 2,
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
