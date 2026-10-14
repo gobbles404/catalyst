@@ -1007,12 +1007,13 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # --- the trade creators -------------------------------------------------------------------------
 # A template of the toy's nine fields, one with a handle cell, keeps nine scalars and the objects
 # the library already holds: measured 2,412 bytes on 2026-10-04, which four times the slack
-# covers. A batch of 2,500 single-month rows keeps twelve columns of eight bytes a row, the terms'
-# five and the encoding's four by component, and the payment terms' lag, calendar and day by
-# occurrence and component, and on the way makes the months, the rows, the anchors and the payment
-# days of the components and the masks over them: measured 324,317 bytes at 2,500 rows, about 130
-# a row, which 134 a row and twice the slack cover; the ticket's own columns are the seam's views
-# and cost nothing here.
+# covers. A batch of 2,500 single-month rows keeps sixteen columns of eight bytes a row, the terms'
+# five and the encoding's three by component, the payment terms' lag, calendar and day by
+# occurrence and component, and the observations' component, day, weight and slot by observation,
+# one per component under lastday, and on the way makes the months, the rows, the anchors and the
+# payment days of the components, the references and the sort that finds the slots, and the
+# masks over them: measured 509,786 bytes at 2,500 rows, about 204 a row, which 208 a row and
+# twice the slack cover; the ticket's own columns are the seam's views and cost nothing here.
 def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() -> None:
     letters = "FGHJKMNQUVXZ"
     months = np.arange("2026-10", "2028-11", dtype="datetime64[M]")
@@ -1064,4 +1065,4 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         ]
     )
     peak = least_peak(lambda: ENTRY["_CreateTrades"](ix, headers, body, template))
-    assert peak <= 134 * rows + 2 * SLACK
+    assert peak <= 208 * rows + 2 * SLACK

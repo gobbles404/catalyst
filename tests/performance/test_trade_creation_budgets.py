@@ -107,10 +107,11 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
 ) -> None:
     counter = WorkCounter()
     batch = trades(GAS, a_ticket(rows, contracts), a_template(), UNITS, counter)
-    assert batch.encoded.inputs.size == contracts
+    assert batch.encoded.groups.size == contracts
     assert counter.freeze().as_dict() == {
         "encoded_components": rows,
-        "encoded_inputs": contracts,
+        "encoded_observations": rows,
+        "encoded_slots": contracts,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -292,13 +293,20 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_one_row": 1,
         "_CreateTrades": 1,
         "trades": 1,
+        "observed": 1,  # the lastday rule, one observation per component
+        "observations": 1,
         "encoded": 1,
+        "_the_references": 1,
+        "with_holiday_calendar": 1,
+        "open_days": 1,
+        "contract_on": 1,
+        "_the_slots": 1,
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
-        "_one_payment_day_per_input": 1,
+        "_one_payment_day_per_group": 1,
         "_publish": 1,
     }
-    expected = {**resolution_ledger(contracts), **seam, "WorkCounter.hit": 5}
+    expected = {**resolution_ledger(contracts), **seam, "WorkCounter.hit": 6}
     assert call_profile(call) == expected
 
 

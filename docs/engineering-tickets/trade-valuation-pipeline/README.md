@@ -95,6 +95,7 @@ complete path, rather than introduce more pipeline stages.
 | [Batch boundaries and discounting](batch-boundaries-and-discounting.md) | How do the one template, the one index, payment groups and current rate inputs fit before final compression? |
 | [Fixing and payment state](fixing-and-payment-state.md) | What does an ICE Henry Hub calendar strip establish, and how does a known price differ from paid cash? |
 | [Proposed result fields by route](result-fields-by-route.md) | How do encoded payment dates move bilateral amounts into modeled cash, and which values/risks does each route return? |
+| [Dated exposure and market alignment](dated-exposure.md) | How does the kernel's axis become the observation date, with the contract pricing that date as its reference, so that an observation fixing on its own day is set while the rest stay live? |
 
 These documents specify input/output meaning, dependencies, a toy payload and acceptance
 conditions. The plural CreateTrades/PrepareTrades/EvaluateTrades boundaries are agreed design
@@ -384,7 +385,8 @@ what its pages say and changes the pages where it learns something.
 | I2 | `_ListInstruments` and `_ShowInstrument` with the `future` definition | the field set in code and on a sheet; the cell-wise table builder | D1; built in #137, [list-instruments.md](../../library/instruments/list-instruments.md) and [show-instrument.md](../../library/instruments/show-instrument.md) |
 | I3 | the seam extension: instrument-selected tables and reference cells | the transport, proved with probes and recorded in inputs.md | I2; built in #138, [inputs.md](../../seam/inputs.md) decision 42 |
 | I4 | `_CreateTradeTemplate` and `_CreateTrades` | resolution and encoding on the sheet: disjoint fields, codes to schedule rows with every code read, lots to quantity, compatibility with the index, payment dates for financial products | I1, I3; built in #139, [trade-template.md](../../library/trades/trade-template.md) and [create-trades.md](../../library/trades/create-trades.md) |
-| I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4 |
+| I4a | dated exposure and market alignment | the kernel's axis becomes the observation date within its payment group, the reference the contract pricing that date, derived and retained; the dated live exposures, the gather of unique live quotes onto them and the dated contributions; the NG numbers kept, a daily toy and offsetting dates by hand | I4; built in #140, [dated-exposure.md](dated-exposure.md) and [kernel.md](../../library/trades/kernel.md) |
+| I5 | `_PrepareTrades`, `_EvaluateTrades`, `_ReportValues`, `_ReportRisk` | the Excel path and its work counts: a tick reuses the preparation, a history change makes a new one, the reports spill stored aggregates | I4a |
 | R1 | PHH payment dates derived from the schedule and the calendars | the relation between ICE's last trading day and the NYMEX penultimate pricing date, worked dates, whether an adjusted lag gives them | I1 |
 | I6 | the toy cash lifecycle | the financial test product, payment dates, the cash bucket, the seven states on a sheet | I5, R1 |
 
