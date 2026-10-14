@@ -215,11 +215,16 @@ def test_one_trade_takes_the_same_path_as_five(ng: dict[str, Any]) -> None:
     assert spilled(ENTRY["_ReportRisk"](results))[2][0] == -120_000.0
 
 
-# --- the toy lifecycle on the sheet: Z26 fixed and paid ------------------------------------------
+# --- the toy lifecycle on the sheet: the seven states of the example page ---------------------
+
+TOY_HOLIDAYS = ["2026-11-26", "2026-12-25", "2027-01-01"]
 
 
-def test_the_toys_paid_contract_is_cash_and_the_rest_marks(ng: dict[str, Any]) -> None:
-    holidays = ["2026-11-26", "2026-12-25", "2027-01-01"]
+@pytest.fixture(scope="module")
+def toy() -> dict[str, Any]:
+    """The toy of the example page on the sheet: TOY_GAS with G27 after F27, the payment calendar
+    closed on 26 November, 25 December and New Year's Day, the financial template paying two
+    business days after each expiry, and the five NG rows as a batch."""
     index, calendar = an_index(
         "TOY_GAS",
         [
@@ -228,7 +233,7 @@ def test_the_toys_paid_contract_is_cash_and_the_rest_marks(ng: dict[str, Any]) -
             ("F27", "2026-12-29"),
             ("G27", "2027-01-27"),
         ],
-        holidays,
+        TOY_HOLIDAYS,
         ("TOY", 10_000.0),
     )
     fields = {
@@ -241,24 +246,126 @@ def test_the_toys_paid_contract_is_cash_and_the_rest_marks(ng: dict[str, Any]) -
     }
     template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(*NG_ROWS), template)
-    # Valued on 30 November, Z26's payment day: Z26 fixed at 3.23 on the 25th and paid, F27 live
-    # at 3.50, G27 quoted and held by nobody.
-    history = a_history(index, "2026-10-29", "2026-11-30", holidays, {"2026-11-25": 3.23})
-    market = a_market(history, "TOY_GAS", 3.50, 3.60)
-    results = ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market)
-    values = spilled(ENTRY["_ReportValues"](results))
-    assert values[2] == [
-        pytest.approx(-11_000.0),
-        pytest.approx(22_800.0),
-        "USD",
-        serial("2026-11-30"),
-    ]
-    risk = spilled(ENTRY["_ReportRisk"](results))
-    assert risk[2][0] == -50_000.0
+    return {"index": index, "template": template, "trades": trades}
+
+
+def toy_state(
+    toy: dict[str, Any], as_of: str, settles: dict[str, float], quotes: tuple[float, ...]
+) -> tuple[str, str]:
+    """One state of the lifecycle: the history valued on that day with those settles standing on
+    their days, the market quoting from the prompt on, the batch prepared and evaluated; the
+    prepared and the results handles."""
+    history = a_history(toy["index"], "2026-10-29", as_of, TOY_HOLIDAYS, settles)
+    market = a_market(history, "TOY_GAS", *quotes)
+    prepared = ENTRY["_PrepareTrades"](toy["trades"], history)
+    return str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+def valued(results: str) -> tuple[float, float, float]:
+    """The mark, the cash and the total delta a results handle reports."""
+    values = spilled(ENTRY["_ReportValues"](results))[2]
+    risk = spilled(ENTRY["_ReportRisk"](results))[2]
+    return cast(float, values[0]), cast(float, values[1]), cast(float, risk[0])
+
+
+Z26_FIRST = {"2026-11-25": 3.22}
+Z26 = {"2026-11-25": 3.23}
+BOTH = {"2026-11-25": 3.23, "2026-12-29": 3.45}
+
+
+@pytest.mark.parametrize(
+    ("as_of", "settles", "quotes", "mark", "cash", "delta"),
+    [
+        ("2026-11-24", {}, (3.20, 3.50, 3.60), 7_000, 0, 110_000),
+        ("2026-11-24", {}, (3.21, 3.50, 3.60), 8_600, 0, 110_000),
+        ("2026-11-26", Z26_FIRST, (3.50, 3.60), 10_200, 0, -50_000),
+        ("2026-11-26", Z26, (3.50, 3.60), 11_800, 0, -50_000),
+        ("2026-11-30", Z26, (3.50, 3.60), -11_000, 22_800, -50_000),
+        ("2026-12-30", BOTH, (3.60,), -8_500, 22_800, 0),
+        ("2026-12-31", BOTH, (3.60,), 0, 14_300, 0),
+    ],
+    ids=[
+        "24 Nov, initial",
+        "24 Nov, a tick",
+        "26 Nov, Z26 fixed at 3.22",
+        "26 Nov, corrected to 3.23",
+        "30 Nov, Z26 paid",
+        "30 Dec, both fixed, F27 unpaid",
+        "31 Dec, both paid",
+    ],
+)
+def test_the_toys_seven_states_value_on_the_sheet_as_the_page_says(
+    toy: dict[str, Any],
+    as_of: str,
+    settles: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, results = toy_state(toy, as_of, settles, quotes)
+    got = valued(results)
+    assert got[0] == pytest.approx(mark) and got[1] == pytest.approx(cash)
+    assert got[2] == pytest.approx(delta)
+    assert got[0] + got[1] == pytest.approx(mark + cash)  # the page's total P&L column
+    assert spilled(ENTRY["_ReportValues"](results))[2][3] == serial(as_of)
+
+
+def test_the_tick_reuses_the_initial_states_preparation(toy: dict[str, Any]) -> None:
+    history = a_history(toy["index"], "2026-10-29", "2026-11-24", TOY_HOLIDAYS, {})
+    prepared = ENTRY["_PrepareTrades"](toy["trades"], history)
+    initial = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", 3.20, 3.50, 3.60))
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", 3.21, 3.50, 3.60))
+    assert valued(str(initial))[0] == pytest.approx(7_000)
+    assert valued(str(ticked))[0] == pytest.approx(8_600)
+    assert valued(str(initial))[0] == pytest.approx(7_000)  # the old results stand
+
+
+def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
+    toy: dict[str, Any],
+) -> None:
+    prepared, results = toy_state(toy, "2026-11-30", Z26, (3.50, 3.60))
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))
+    assert slots[2] == ["Z26", serial("2026-11-25"), True, True, 0.0]
+    assert slots[3] == ["F27", serial("2026-12-29"), False, False, -50_000.0]
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[2] == ["Z26", serial("2026-11-25"), True, 0.0, 0.0, 0.0]
     assert table[3][:4] == ["F27", serial("2026-12-29"), False, -50_000.0]
     assert table[3][4] == pytest.approx(-175_000.0) and table[3][5] == -50_000.0
+
+
+def test_a_fully_fixed_batch_inside_a_live_market_reads_no_quote_and_reports_its_cash(
+    toy: dict[str, Any],
+) -> None:
+    prepared, results = toy_state(toy, "2026-12-31", BOTH, (3.60,))
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))
+    assert [line[2:5] for line in slots[2:]] == [[True, True, 0.0], [True, True, 0.0]]
+    assert spilled(ENTRY["util_ReadHandle"](results))[2:] == [
+        ["Z26", serial("2026-11-25"), True, 0.0, 0.0, 0.0],
+        ["F27", serial("2026-12-29"), True, 0.0, 0.0, 0.0],
+    ]
+    assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
+
+
+def test_a_missing_final_price_fails_the_history_before_any_trade_is_prepared(
+    toy: dict[str, Any],
+) -> None:
+    # The settle on Z26's expiry day is a fixing like any other: a series that skips it is a
+    # series like any other to the fixings creator, and the history valued after that day refuses
+    # it, so no forecast ever stands in for a final price.
+    days = np.arange(np.datetime64("2026-10-29", "D"), np.datetime64("2026-11-26", "D"))
+    days = days[np.is_busday(days, holidays=np.array(TOY_HOLIDAYS, dtype="datetime64[D]"))]
+    without = days[days != np.datetime64("2026-11-25", "D")]
+    fixings = ENTRY["_CreateFuturesFixings"](
+        column([serial(str(d)) for d in without[::-1]]), column([3.0] * without.size), toy["index"]
+    )
+    calendar = ENTRY["_CreateCalendar"](
+        ENTRY["_CreateValuationDate"](serial("2026-11-26"), 0.5), toy["index"]
+    )
+    assert ENTRY["_CreateMarketHistory"](calendar, fixings) == (
+        "#ERROR _CreateMarketHistory: ValueError: fixings has no fixing for 2026-11-25, "
+        "expected a fixing for every fixed day in calendar"
+    )
 
 
 # --- what is refused, in the seam's order and then the library's ------------------------------

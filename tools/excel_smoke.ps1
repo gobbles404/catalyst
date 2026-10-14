@@ -475,6 +475,26 @@ $formulas = [ordered]@{
     '=_PrepareTrades("x:trades:9",CT7)' = "#ERROR _PrepareTrades: trades is text 'x:trades:9' naming no live object, expected trades handle"
     "=_EvaluateTrades(FG6)" = "#ERROR _EvaluateTrades: market is missing, expected market handle"
     "=_ReportValues(C2)"    = "#ERROR _ReportValues: results is blank, expected trade results handle"
+    # The toy lifecycle's paid state: TOY_GAS in FM5, financial, paying two business days after
+    # each expiry on the calendar in FM4, valued on 30-Nov-2026 in FM9 with Z26's final settle of
+    # 3.23 on 25 November among its fixings, F27 quoted at 3.50 and G27 at 3.60 in FM11; two trades,
+    # ten lots of Z26 at 3.10 and seven of F27 at 3.40, prepared in FM14 and evaluated in FM15. Z26
+    # has fixed and paid, so its 13,000 is cash and nothing of it is live; F27 marks 7,000 with a
+    # delta of 70,000; the readers show Z26 fixed and settled with no exposure and F27 live with
+    # its contribution.
+    "=INDEX(_ReportValues(FM15),3,1)" = "7000"
+    "=INDEX(_ReportValues(FM15),3,2)" = "13000"
+    "=INDEX(_ReportValues(FM15),3,4)" = "46356"
+    "=INDEX(_ReportRisk(FM15),3,1)"   = "70000"
+    "=INDEX(util_ReadHandle(FM14),3,1)" = "Z26"
+    "=INDEX(util_ReadHandle(FM14),3,3)" = "TRUE"
+    "=INDEX(util_ReadHandle(FM14),3,4)" = "TRUE"
+    "=INDEX(util_ReadHandle(FM14),3,5)" = "0"
+    "=INDEX(util_ReadHandle(FM14),4,3)" = "FALSE"
+    "=INDEX(util_ReadHandle(FM14),4,5)" = "70000"
+    "=INDEX(util_ReadHandle(FM15),4,5)" = "245000"
+    "=INDEX(util_ReadHandle(FM15),3,6)" = "0"
+    "=INDEX(util_ReadHandle(FM15),4,6)" = "70000"
     # The market history: a creator over the calendar in CT7 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
@@ -791,6 +811,64 @@ $cells = [ordered]@{
     "FG6" = "=_PrepareTrades(FG5,CT7)"
     "FG7" = "=_EvaluateTrades(FG6,CW1)"
     "FG8" = "=_CreateTrades(ED1,FG1:FK1,FG3:FK3,EW3)"
+    # The toy lifecycle's paid state, the example page's fifth: the index TOY_GAS over a schedule
+    # of X26, Z26, F27 and G27, energy conventions in MMBTU, one specification of 10,000 MMBTU a
+    # lot and a holiday calendar closed on 26 November, 25 December and New Year's Day, in FM1 to
+    # FM5; the valuation day 30-Nov-2026 and its calendar in FM6 and FM7; the fixings of every
+    # business day from 29 October to 27 November, newest first, 3.00 but for Z26's final 3.23 on
+    # the 25th, in FW and FX, their history in FM9; F27 and G27 quoted at 3.50 and 3.60, the market
+    # in FM11; the financial template over nine fields in FZ to GH with the payment calendar held
+    # through GH2, in FM12; the two trades in GJ to GN, their batch in FM13, prepared in FM14 and
+    # evaluated in FM15.
+    "FN2" = "TOY"; "FO2" = "10000"; "FP2" = "MMBTU"; "FQ2" = "0"; "FR2" = "0"
+    "FS1" = "X26"; "FT1" = "28-Oct-2026"
+    "FS2" = "Z26"; "FT2" = "25-Nov-2026"
+    "FS3" = "F27"; "FT3" = "29-Dec-2026"
+    "FS4" = "G27"; "FT4" = "27-Jan-2027"
+    "FU1" = "26-Nov-2026"; "FU2" = "25-Dec-2026"; "FU3" = "1-Jan-2027"
+    "FV1" = "30-Nov-2026"
+    "FW1" = "27-Nov-2026"; "FX1" = "3"
+    "FW2" = "25-Nov-2026"; "FX2" = "3.23"
+    "FW3" = "24-Nov-2026"; "FX3" = "3"
+    "FW4" = "23-Nov-2026"; "FX4" = "3"
+    "FW5" = "20-Nov-2026"; "FX5" = "3"
+    "FW6" = "19-Nov-2026"; "FX6" = "3"
+    "FW7" = "18-Nov-2026"; "FX7" = "3"
+    "FW8" = "17-Nov-2026"; "FX8" = "3"
+    "FW9" = "16-Nov-2026"; "FX9" = "3"
+    "FW10" = "13-Nov-2026"; "FX10" = "3"
+    "FW11" = "12-Nov-2026"; "FX11" = "3"
+    "FW12" = "11-Nov-2026"; "FX12" = "3"
+    "FW13" = "10-Nov-2026"; "FX13" = "3"
+    "FW14" = "9-Nov-2026"; "FX14" = "3"
+    "FW15" = "6-Nov-2026"; "FX15" = "3"
+    "FW16" = "5-Nov-2026"; "FX16" = "3"
+    "FW17" = "4-Nov-2026"; "FX17" = "3"
+    "FW18" = "3-Nov-2026"; "FX18" = "3"
+    "FW19" = "2-Nov-2026"; "FX19" = "3"
+    "FW20" = "30-Oct-2026"; "FX20" = "3"
+    "FW21" = "29-Oct-2026"; "FX21" = "3"
+    "FY1" = "3.5"; "FY2" = "3.6"
+    "FZ1" = "contract_specification"; "GA1" = "quantity_unit"; "GB1" = "quantity_per"; "GC1" = "schedule_method"; "GD1" = "route"; "GE1" = "settlement_method"; "GF1" = "clearing_house"; "GG1" = "payment_time_lag"; "GH1" = "payment_holiday_calendar"
+    "FZ2" = "TOY"; "GA2" = "LOT"; "GB2" = "month"; "GC2" = "lastday"; "GD2" = "cleared"; "GE2" = "financial"; "GF2" = "TEST_CLEARER"; "GG2" = "+2bd"; "GH2" = "=FM4"
+    "GJ1" = "trade_id"; "GK1" = "trade_date"; "GL1" = "contract_code"; "GM1" = "quantity"; "GN1" = "fixed_price"
+    "GJ2" = "NG-001"; "GK2" = "24-Sep-2026"; "GL2" = "Z26"; "GM2" = "10"; "GN2" = "3.1"
+    "GJ3" = "NG-003"; "GK3" = "25-Sep-2026"; "GL3" = "F27"; "GM3" = "7"; "GN3" = "3.4"
+    "FM1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "FM2" = "=_CreateContractSpecifications(EI1:EM1,FN2:FR2)"
+    "FM3" = "=_CreateFuturesSchedule(FS1:FS4,FT1:FT4)"
+    "FM4" = "=_CreateHolidayCalendar(FU1:FU3)"
+    "FM5" = '=_CreateIndex("TOY_GAS",FM3,FM1,FM2,FM4)'
+    "FM6" = "=_CreateValuationDate(FV1,0.5)"
+    "FM7" = "=_CreateCalendar(FM6,FM5)"
+    "FM8" = "=_CreateFuturesFixings(FW1:FW21,FX1:FX21,FM5)"
+    "FM9" = "=_CreateMarketHistory(FM7,FM8)"
+    "FM10" = '=_CreatePriceVector("TOY_GAS",FY1:FY2)'
+    "FM11" = "=_CreateMarket(FM9,FM10)"
+    "FM12" = '=_CreateTradeTemplate("future",FZ1:GH1,FZ2:GH2)'
+    "FM13" = "=_CreateTrades(FM5,GJ1:GN1,GJ2:GN3,FM12)"
+    "FM14" = "=_PrepareTrades(FM13,FM9)"
+    "FM15" = "=_EvaluateTrades(FM14,FM11)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

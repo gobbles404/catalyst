@@ -38,7 +38,7 @@ The kernel's rules, in [kernel.md](kernel.md)'s words after `#ERROR _EvaluateTra
 | The route is cleared; bilateral valuation needs discount factors and a DV01 convention | `route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet` |
 | Every live contract is quoted, the market's own rule | `requested contract 'F27' is beyond live-price coverage ending at 'Z26'` |
 
-For the NG example on 24 November 2026 at 3.20 and 3.50: a mark of 7,000 USD, no cash, delta 160,000 and -50,000 USD per USD/MMBTU, total 110,000; at 3.21 the mark is 8,600 and the delta unchanged. For the toy on 30 November, Z26 fixed at 3.23 and paid, F27 at 3.50: a mark of -11,000 and cash of 22,800.
+For the NG example on 24 November 2026 at 3.20 and 3.50: a mark of 7,000 USD, no cash, delta 160,000 and -50,000 USD per USD/MMBTU, total 110,000; at 3.21 the mark is 8,600 and the delta unchanged. For the toy on 30 November, Z26 fixed at 3.23 and paid, F27 at 3.50: a mark of -11,000 and cash of 22,800; its seven states are the example page's table, and [kernel.md](kernel.md) has them with the quotes and fixings read.
 
 ## What it retains
 
@@ -52,9 +52,9 @@ The two reports spill the scalars, [report-values.md](report-values.md) and [rep
 
 | Where | What |
 |---|---|
-| `tests/unit/test_trade_valuation.py` | the NG example's results, their handle, the reports and the reader; a tick making new results over the same preparation while the old stand at 7,000; one trade through the same path; the toy's fixed and paid contract; the seam's refusals in order and the library's, another history's market, a bilateral route |
+| `tests/unit/test_trade_valuation.py` | the NG example's results, their handle, the reports and the reader; a tick making new results over the same preparation while the old stand at 7,000; one trade through the same path; the toy's seven states, its fixed and paid contract read back and its fully fixed batch reading no quote; the seam's refusals in order and the library's, another history's market, a bilateral route |
 | `tests/performance/test_trade_valuation_budgets.py` | a tick resolves two handles and runs `trade_results` and `Market.live_prices` once each, nothing of the preparation or the encoding, the same at five trades and at two thousand; 1,144 bytes at 2,500 trades |
-| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups trades`, `workbooks/handles.xlsx` | the chain on a sheet, from the host, through a price tick with the preparation reused, and at the foot of the handles sheet, B1303 |
+| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups trades`, `workbooks/handles.xlsx` | the chain on a sheet, from the host, through a price tick with the preparation reused, and at the foot of the handles sheet, B1303 and the toy's seven states in J1342 to J1348 |
 
 ## Not here
 
