@@ -10,8 +10,8 @@ instrument identifier as text and spills one column per instrument field. The fi
 contains the seven row labels `field`, `description`, `required`, `required_when`, `type`,
 `options` and `rule`; each field's metadata occupies the corresponding column to its right.
 This keeps field names across columns, matching trade-row entry. Both read the same library-owned definitions
-used by construction. They return tables and create no handles. Their responsibility is
-agreed; implementation and seam verification remain pending.
+used by construction. They return tables and create no handles. Built in #137, over the
+definitions in `src/goosedove/instruments/definitions.py`.
 
 The [field sketch](instrument-field-sketch.md) incorporates the second legacy template:
 conditional requirements, template defaults, option domains and the distinction between

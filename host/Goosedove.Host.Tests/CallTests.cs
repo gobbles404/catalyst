@@ -177,6 +177,11 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_EndDate", new object[] { "CAL28-F28" }, "#ERROR util_EndDate: ValueError: period is 'CAL28-F28', expected range endpoints in chronological order" };
             yield return new object[] { "util_StartDate", new object[] { 46023.0 }, "#ERROR util_StartDate: period is number 46023.0, expected text" };
             yield return new object[] { "util_EndDate", new object[] { "" }, "#ERROR util_EndDate: period is empty text, expected text" };
+            // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
+            yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'" };
+            yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
+            yield return new object[] { "_ShowInstrument", new object[] { 1.0 }, "#ERROR _ShowInstrument: instrument is number 1.0, expected text" };
+            yield return new object[] { "_ShowInstrument", new object[] { ExcelMissing.Value }, "#ERROR _ShowInstrument: instrument is missing, expected text" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -292,6 +297,32 @@ namespace Goosedove.Host.Tests
         }
 
         // A holiday calendar: a column of dates makes one, a single cell makes one of one day, and
+        // The instrument catalog: the list spills a header and a row per instrument, two text columns;
+        // the shown future spills seven rows by sixteen columns, the labels down the first column, the
+        // fields across the first row and the required row booleans, every other cell text.
+        [Fact]
+        public void the_instrument_catalog_is_listed_and_the_future_shown()
+        {
+            var listed = (object[,])Seam.Call("_ListInstruments");
+            Assert.Equal(2, listed.GetLength(0));
+            Assert.Equal(2, listed.GetLength(1));
+            Assert.Equal("instrument", listed[0, 0]);
+            Assert.Equal("description", listed[0, 1]);
+            Assert.Equal("future", listed[1, 0]);
+            var shown = (object[,])Seam.Call("_ShowInstrument", "future");
+            Assert.Equal(7, shown.GetLength(0));
+            Assert.Equal(16, shown.GetLength(1));
+            Assert.Equal("field", shown[0, 0]);
+            Assert.Equal("trade_id", shown[0, 1]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 15]);
+            Assert.Equal("required", shown[2, 0]);
+            Assert.Equal(false, shown[2, 1]);
+            Assert.Equal(true, shown[2, 2]);
+            Assert.Equal("route = cleared", shown[3, 8]);
+            Assert.Equal("holiday calendar handle", shown[4, 15]);
+            Assert.Equal("month, day", shown[5, 12]);
+        }
+
         // util_ReadHandle spills it back, the header, the type, then a row per holiday.
         [Fact]
         public void a_holiday_calendar_is_created_from_a_column_and_read_back_through_its_handle()

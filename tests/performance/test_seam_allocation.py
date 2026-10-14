@@ -969,3 +969,17 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
     valuation, index = calendar_sources(13)
     kept = retained_numpy_bytes(lambda: ENTRY["_CreateCalendar"](valuation, index))
     assert kept == (days * (DAY_BYTES + ROW_BYTES + 2 * FLAG_BYTES), 0)
+
+
+# --- the instrument catalog -------------------------------------------------------------------
+# The list, two text columns of one row, is the way out's arrays and the joined texts: measured
+# 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by sixteen
+# columns, 112 cells of which 97 are text, is laid out one cell at a time and joined for the way
+# out: measured 11,204 bytes, about 100 bytes a cell, which a hundred a cell and the slack cover.
+# Neither publishes.
+def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
+    cells = 7 * 16
+    assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 100 * cells + SLACK
+    assert bridge.live_handles() == live

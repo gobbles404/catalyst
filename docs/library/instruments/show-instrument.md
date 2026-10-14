@@ -1,6 +1,6 @@
 # _ShowInstrument
 
-Agreed starting reader contract. Not implemented; the future schema and seam declaration remain subject to engineering verification.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is generated from the definitions and a test keeps the two equal, cell for cell.
 
 Shows one library-defined instrument schema with fields across columns and metadata down
 rows, including descriptions, requirements and defined options. This is the read-only counterpart of
@@ -35,7 +35,8 @@ The `required` row contains Excel booleans after its text label; all other cells
 nonempty text. There are no spacer rows, blank placeholders, object handles or additional
 implementation-type row. This is the default layout; no transpose argument is introduced.
 
-The `future` schema agreed for the first implementation. A template supplies defaults for
+The `future` schema as the sheet sees it, `src/goosedove/instruments/definitions.py` laid out by
+`src/goosedove/excel/instruments.py`. A template supplies defaults for
 recognized trade fields; the selected traded product/agreement constrains the resolved values.
 The index is not among the fields: `_CreateTrades(index, fields, trade_rows, template)` takes
 it as its first argument, once for the whole batch.
@@ -46,8 +47,8 @@ it as its first argument, once for the whole batch.
 | required | FALSE | TRUE | TRUE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE |
 | required_when | none | none | none | none | none | none | none | route = cleared | none | none | none | none | none | settlement_method = financial | settlement_method = financial |
 | type | text | date | text | text | code | code | code | text | text | number | code | code | number | text | holiday calendar handle |
-| options | no fixed list | no fixed list | selected index's specifications | existing contract-period grammar, subject to index schedule coverage | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list; a label, nothing inferred from it | no fixed list in this sketch | by supported profile | by supported profile | month, day | no fixed list | +1bd, +2bd and other positive whole-business-day offsets consistent with supported trade terms | compatible static payment calendar |
-| rule | Duplicate labels retain separate occurrences | Explicit executed date; never inferred from as-of or today's date | Data is obtained through the index argument of _CreateTrades; template can supply the selection; no separate specification handle | Typed in either case, Z26 or z26, CAL27 or cal27, and resolved by month against the index's schedule, every schedule code read; proposed strip expansion: CAL27 is F27 through Z27; Z27-X28 is December 2027 through November 2028, inclusive | Library-defined rule selected by the trade; template may default it; exact and cfd excluded from v1; lastday is supported first, the others fail by name until built | Must be supported for the selected traded product/agreement | Retained product/trade fact; physical-delivery handling is outside v1; does not choose pricing observations or payment dates | Distinct from clearing firm/account; constrained by the actual route | Attribution; no fees or clearing role inferred from the label | First NG profile: whole nonzero lots; no universal lot-integrality rule for bilateral extensions | First NG profile: LOT; later units require supported conversions | Proposed: each contract month or each calendar day in the quantity period; independent of observation weights | Finite number in the defined quote units; applies to every monthly constituent of a flat-priced strip | Trade row or template supplies it; PHH uses +1bd and ETE uses +2bd; initially count eligible days strictly after the actual traded contract's last trading day | Reuse HolidayCalendar; Monday-Friday excluding listed holidays; independent of pricing calendar |
+| options | no fixed list | no fixed list | the index's specification names | a contract or strip, F26, 1Q27, CAL27, Z27-X28 | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list | no fixed list | whole nonzero lots | LOT | month, day | no fixed list | +1bd, +2bd and other positive whole business days | a _CreateHolidayCalendar handle |
+| rule | Duplicate labels keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Selects the lot size and unit from the index given to _CreateTrades; the template may supply it | Typed in either case and resolved by month against the index's schedule, every schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through November 2028 | A library rule selected by the trade; lastday is built, the others fail by name until they are | Must be supported for the traded product; bilateral valuation waits on rates | A fact of the trade; a physical future past its expiry is refused, a financial one pays on its payment day | A label kept as typed; nothing is inferred from it | Attribution; no fee or clearing role inferred from the label | Signed; whole nonzero lots for the first future profile | LOT is the one unit built; the specification gives the quantity per lot | The quantity for each contract month, or for each calendar day of it; month is built first | A finite number in the index's quote units; the same for every month of a strip | Counted strictly after the traded contract's last trading day on the payment calendar; +1bd for PHH, +2bd for ETE | Monday to Friday less its holidays; separate from the pricing calendar |
 
 `future` here is a proposed desk family organized around a specified reference contract. A
 bilateral lookalike can share this schema while retaining its own contractual treatment.
@@ -219,23 +220,30 @@ They are not all new inputs to the future schema above.
 
 ## Tests
 
-These are implementation acceptance cases, not new tests added by this documentation change.
+`tests/unit/test_instruments.py` holds the examples, `tests/unit/test_help.py` pins the help,
+`tests/performance/test_seam_budgets.py` and `test_seam_allocation.py` the cost, `tools/excel_smoke.ps1`
+the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| Future produces seven metadata rows, with row labels in column one and fields in declared order across the remaining columns | Example |
-| Required cells arrive as Excel booleans, not strings or numbers | Example through the seam |
-| Conditional and option descriptions match library-owned rules; absent conditions display none | Example |
-| Every listed identifier maps to exactly one inspectable schema | Property across the shipped catalog |
-| Unknown/case-changed identifier, and empty catalog, produce the specified errors | Example |
-| One-field definition produces seven rows and two columns; no special reader path | Example |
-| Repeated calls neither create handles nor access trade/market state | Example and work budget |
-| Real Excel preserves field headers across columns, metadata labels down column one and Boolean requirements in the required row | Excel smoke |
+| the future's fifteen fields in order, which are required, the conditions, the types and the codes | example |
+| a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
+| the name matched exactly, `Future` and ` future` refused naming `future`, an empty catalog saying so, two instruments both named | example |
+| seven rows and sixteen columns, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
+| the page's table equals the spill, cell for cell | example against the page |
+| through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
+| every listed name is shown; a one-field definition shows seven rows and two columns | example |
+| three reads publish nothing | example |
+| the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
+| twelve functions, the classification once per cell, 112 for the future, and the mixed way out's numpy; a peak of 11,204 bytes, about 100 a cell, within a hundred a cell and the slack; nothing published | budget |
+| the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
-This shape has a text label column and field columns containing text plus a Boolean
-required cell. It fits the existing `MixedArray` result contract. Verify the declaration
-and formatter through the normal seam review before
-declaring it ready; formatting a schema does not require adding a new result-handle type.
+The shape has a text label column and field columns holding text with one boolean each, which
+the mixed way out carries and the seam's table builder, columns of one kind, could not build:
+`MixedArray.cells` lays a small grid out one cell at a time, the way in's classification of a
+cell used once per cell, for grids of a few hundred cells and never for data; a whole number
+beyond what a cell holds exactly is refused before it becomes a float, as the number and table
+results refuse one.
 
 ## Not here
 
