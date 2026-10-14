@@ -7,7 +7,7 @@ its second child. The wrapper returns one handle retaining both resolved terms a
 
 The first constructor whiteboard is [_CreateTradeTemplate](../../library/trades/trade-template.md):
 instrument, field names and one aligned values row. Excel names identify the template cells;
-the library object has no label field. Its CL/LOT
+the library object has no label field. Its two-field
 example shows shared defaults flowing into ticket rows. It creates a partial template, which
 `_CreateTrades(index, fields, trade_rows, template)` takes last, required.
 
@@ -106,8 +106,9 @@ If the template already supplies the intended clearing selection, the ticket mus
 
 This remains an excerpt. The index is the argument of the call; the template or ticket must
 also establish the specification selection, units, executed date and remaining required
-contractual facts. Here the template can supply the specification name, LOT and compatible
-clearing/settlement facts; the ticket supplies month, signed lots, broker and agreed price.
+contractual facts. Here the template can supply the quantity unit, the specification's name,
+and compatible clearing/settlement facts; the ticket supplies month, signed quantity, broker
+and agreed price.
 
 If the template supplies clearing_house, the ticket must omit that column. Repeating the
 same clearing choice fails just as a different choice does. To vary a field between rows,

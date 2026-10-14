@@ -51,9 +51,12 @@ the template, required and last, carries the instrument.
 
 The template is created for `future` and supplies the shared facts in one row:
 
-| contract_specification | quantity_unit | quantity_per | schedule_method | route | settlement_method | clearing_house |
-|---|---|---|---|---|---|---|
-| NYMEX NG | LOT | month | lastday | cleared | physical | CME Clearing |
+| quantity_unit | quantity_per | schedule_method | route | settlement_method | clearing_house |
+|---|---|---|---|---|---|
+| NYMEX NG | month | lastday | cleared | physical | CME Clearing |
+
+Since #145 `quantity_unit` names the specification, the 10,000 MMBtu NYMEX lot, and there is
+no separate `contract_specification` field; the quantity counts the named lot.
 
 With the ticket's five columns below, every field the `future` definition requires is supplied
 once: `payment_time_lag` and `payment_holiday_calendar` are required only when
@@ -65,11 +68,11 @@ trading day as the final price, and the other methods fail by name until built. 
 not a template field: it is the argument of the call, so this template serves another NG index
 whose specifications name `NYMEX NG` and fails, by name, against one whose do not.
 
-On a sheet, with the template's headers in A1:G1 and its row in A2:G2, the ticket's headers
+On a sheet, with the template's headers in A1:F1 and its row in A2:F2, the ticket's headers
 in A4:E4 and its five rows in A5:E9, and names for the creators' cells:
 
 ```excel
-=_CreateTradeTemplate("future", A1:G1, A2:G2)
+=_CreateTradeTemplate("future", A1:F1, A2:F2)
 =_CreateTrades(NGIndex, A4:E4, A5:E9, Template)
 =_PrepareTrades(Trades, History)
 =_EvaluateTrades(Prepared, Market)
@@ -94,7 +97,7 @@ count even though every supplied value is identical. `trade_id` is not a uniquen
 The ticket fields use the proposed instrument definition's `quantity` and `fixed_price`.
 
 Any intersection between the template's supplied field names and row headers fails, even
-when the values agree. For example, adding `quantity_unit = LOT` to these rows fails because
+when the values agree. For example, adding `quantity_unit = NYMEX NG` to these rows fails because
 the template already supplies it. Duplicate headers within either input fail before a
 dictionary or merge can discard one. Explicit blank cells fail; omission means absence of
 the field, not a blank override. Field duplication and repeated trade occurrences are different

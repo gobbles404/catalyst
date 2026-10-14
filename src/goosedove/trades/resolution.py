@@ -1,8 +1,9 @@
 """The two children of _CreateTrades and the batch they make. Resolution completes a template's
 shared values and a ticket's rows into the resolved terms of one batch on one index: every field
 from exactly one of the two, the required fields present and the conditional ones present when
-their condition holds, one route, settlement, method, unit and basis for the batch, the
-specification named among the index's, every code of the index's schedule read for its month
+their condition holds, one route, settlement, method, quantity unit and basis for the batch, the
+quantity unit naming one of the index's specifications, every code of the index's schedule read
+for its month
 once, each contract code or strip of the ticket resolved by month to the schedule's rows, the
 schedule method's observations made once, and for a financial settlement each component's payment
 day counted strictly after its observation day on the payment calendar. Then the kernel:
@@ -52,7 +53,6 @@ SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule rea
 
 # The fields a batch has one of: the template's value or a ticket column every row agrees on.
 BATCH_FIELDS: Final = (
-    "contract_specification",
     "schedule_method",
     "route",
     "settlement_method",
@@ -105,7 +105,8 @@ def resolved(
     The ticket is bound against the template's instrument, the future, the one whose trades are
     built. No field is supplied by both, even to the same value. Every required field is present
     in one of them. The batch fields are one each, the template's value or a column every row
-    agrees on, and each is read for its meaning: the specification by name among the index's,
+    agrees on, and each is read for its meaning: the quantity unit by name among the index's
+    specifications, exactly as the index names them, the row named where the ticket supplied it,
     the method, the route, the settlement and the basis from their lists. Each conditional field
     is present exactly when its condition holds, a clearing house with a cleared route and the
     two payment fields with a financial settlement, and absent otherwise, since a label for a
@@ -122,19 +123,20 @@ def resolved(
     after its observation day, counted on its occurrence's payment calendar with Monday to Friday
     eligible, the observation day itself rolled back first so that a day the payment calendar
     closes is not counted; the rule of the two methods built, a later method stating its own.
-    Then the kernel's rules, through resolved_trades: the quantity unit LOT, whole nonzero lots
-    and finite prices, each named by its trade, and a financial settlement with penultimate.
+    Then the kernel's rules, through resolved_trades: whole nonzero quantities and finite prices,
+    each named by its trade, and a financial settlement with penultimate.
 
     Work: one occurrence per ticket row, one component per contract month and one schedule code
     per row of the schedule, reported to the counter.
     """
     fields = _fields(template, ticket)
     _the_required(fields)
-    specification = _the_specification(index, fields.one_text("contract_specification"))
+    specification = _the_specification(
+        index, fields.where("quantity_unit", 0), fields.one_text("quantity_unit")
+    )
     schedule_method = schedule_method_of("schedule_method", fields.one_text("schedule_method"))
     route = route_of("route", fields.one_text("route"))
     settlement = settlement_of("settlement_method", fields.one_text("settlement_method"))
-    quantity_unit = fields.one_text("quantity_unit")  # LOT, as the kernel checks
     quantity_per = quantity_per_of("quantity_per", fields.one_text("quantity_per"))
     _the_conditions(fields, route, settlement)
     schedule = futures_schedule_of(index)
@@ -152,7 +154,6 @@ def resolved(
         route,
         settlement,
         schedule_method,
-        quantity_unit,
         quantity_per,
         fields.labels("trade_id"),
         fields.labels("clearing_house"),
@@ -289,14 +290,16 @@ def _the_conditions(fields: _Fields, route: Route, settlement: Settlement) -> No
             raise ValueError(f"{name} is {fields.shown(name)}, expected none unless {condition}")
 
 
-def _the_specification(index: Index, name: str) -> int:
-    """The row of the index's specifications the name selects."""
+def _the_specification(index: Index, where: str, name: str) -> int:
+    """The row of the index's specifications the quantity unit names, exactly: no trimming, no
+    case folding, no alias and no first row taken for want of a match, the index's names being
+    the choices, so a unit the tables know but the index does not define is refused like any
+    other text."""
     names = index.specifications.names
     if name not in names:
         choices = ", ".join(repr(each) for each in names)
         raise ValueError(
-            f"contract_specification is {name!r}, "
-            f"expected one of the index's specifications: {choices}"
+            f"{where} is {name!r}, expected one of the index's specifications: {choices}"
         )
     return names.index(name)
 

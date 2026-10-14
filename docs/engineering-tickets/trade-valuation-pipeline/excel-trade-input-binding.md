@@ -132,7 +132,7 @@ For example, the template's selected columns could be:
 
 | quantity_unit | quantity_per | payment_time_lag | payment_holiday_calendar |
 |---|---|---|---|
-| LOT | month | +1bd | reference to the calendar creator's cell |
+| ICE PHH | month | +1bd | reference to the calendar creator's cell |
 
 And the ticket columns could be:
 
@@ -144,7 +144,7 @@ And the ticket columns could be:
 This shows a partial input boundary for a financial product, not a complete future
 specification; the physical NG template supplies no payment fields. Other required fields
 must be supplied from their single agreed source. Adding `quantity_unit` to the ticket is an
-overlap error, including when every row says `LOT`.
+overlap error, including when every row says `ICE PHH`.
 
 The calendar cell contains a formula reference to the creator or an Excel name referring
 to that cell. The new reference-column validator resolves its handle once and passes the

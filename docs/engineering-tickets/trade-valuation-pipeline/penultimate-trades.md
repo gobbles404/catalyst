@@ -59,19 +59,19 @@ Use the existing `future` definition and exact field names:
 
 | Template field | PHH example | WTI example |
 |---|---|---|
-| `contract_specification` | A supplied specification named `ICE PHH`, with 2,500 MMBtu per lot | A supplied specification named `ICE WTI T`, with 1,000 BBL per lot |
+| `quantity_unit` | `ICE PHH`, a specification of the NG index with 2,500 MMBtu per lot | `ICE WTI T`, a specification of the CL index with 1,000 BBL per lot |
 | `schedule_method` | `penultimate` | `penultimate` |
 | `route` | `cleared` | `cleared` |
 | `settlement_method` | `financial` | `financial` |
-| `quantity_unit` | `LOT` | `LOT` |
 | `quantity_per` | `month` | `month` |
 | `clearing_house` | `ICE Clear Europe` | `ICE Clear Europe` |
 | `payment_time_lag` | `+1bd` | `+1bd`, modeled at the rule deadline |
 | `payment_holiday_calendar` | Clearing-organization calendar handle | Calendar handle for the rule's Trading Days |
 
-Specification names above are example data, not magic strings that dispatch code. Select the
-actual traded product's lot size from the index's supplied specifications. PHH must not inherit
-the 10,000 MMBtu size of its NYMEX reference. Clearing-house text remains a retained label.
+Specification names above are example data, not magic strings that dispatch code. Since #145
+the `quantity_unit` field names the specification and the former `contract_specification`
+field is gone. Select the actual traded product's lot size from the index's supplied
+specifications. PHH must not inherit the 10,000 MMBtu size of its NYMEX reference. Clearing-house text remains a retained label.
 The index argument supplies the underlying NG or CL schedule and history. The live projection
 uses that underlying market's quote, consistent with the dated-reference model; a separate
 ICE quote curve or exchange-basis model is outside R1.

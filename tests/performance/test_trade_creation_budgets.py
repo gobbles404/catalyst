@@ -54,8 +54,7 @@ GAS = index(
 )
 PAYMENT_CALENDAR = holiday_calendar(HOLIDAYS)
 TEMPLATE_FIELDS: dict[str, object] = {
-    "contract_specification": "lot",
-    "quantity_unit": "LOT",
+    "quantity_unit": "lot",
     "quantity_per": "month",
     "schedule_method": "lastday",
     "route": "cleared",
@@ -139,7 +138,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "months_of": distinct,
         "period_months": distinct,
         "_label_months": distinct,
-        "_Fields.where": distinct + 1,
+        "_Fields.where": distinct + 2,  # and once for the quantity unit's name
         "business_days_of": 1,  # one distinct lag
         "_the_payment_terms": 1,
         "schedule_method_of": 1,
@@ -147,9 +146,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "settlement_of": 1,
         "quantity_per_of": 1,
         "choice": 4,
-        "lot_unit": 1,  # the kernel's
-        "_Fields.one_text": 6,
-        "_Fields.has": 16,
+        "_Fields.one_text": 5,
+        "_Fields.has": 15,
         "_Fields.rows": 5,
         "_Fields.texts": 3,
         "_Fields.labels": 3,
@@ -165,7 +163,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_method": 1,
         "_the_occurrences": 1,
         "_the_components": 1,
-        "whole_lots": 1,
+        "whole_quantities": 1,
         "finite_prices": 1,
         "_the_payment": 1,
         "_frozen_days": 2,
@@ -385,22 +383,21 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "by_name": 1,
         "instrument": 1,
         "_bind_fields": 1,
-        "_texts_of": 8,  # eight text and code columns
+        "_texts_of": 7,  # seven text and code columns
         "_handles_of": 1,
         "_resolve": 1,  # the one handle cell
         "_CreateTradeTemplate": 1,
         "trade_template": 1,
-        "_value": 9,  # one per field
-        "FieldValues.field": 9,
-        "FieldValues.field.<locals>.<genexpr>": 18,
-        "FieldValues.texts": 8,
+        "_value": 8,  # one per field
+        "FieldValues.field": 8,
+        "FieldValues.field.<locals>.<genexpr>": 16,
+        "FieldValues.texts": 7,
         "FieldValues.objects": 1,
         "route_of": 1,
         "settlement_of": 1,
         "schedule_method_of": 1,
         "quantity_per_of": 1,
         "choice": 4,
-        "lot_unit": 1,
         "business_days_of": 1,
         "_publish": 1,
     }

@@ -1,12 +1,12 @@
 """The resolved terms of a batch of trades: which deals were struck, under which definitions, as
 the resolution child of _CreateTrades establishes them from a template and a ticket, and as
 tests supply them in Python. One instrument and one index for the batch, one specification of
-the index, one route, one settlement and one schedule method; then the occurrences, the ticket's
-rows, each with its date, its label, its clearing house and its broker where given; then the
-components, one per contract month an occurrence holds, each with its occurrence, its contract,
-its signed lots and its fixed price; and for a financial settlement the payment terms, the lag
-and the calendar each occurrence pays by and the day each component pays.
-docs/library/trades/kernel.md is the page."""
+the index, the quantity unit its quantities count, one route, one settlement and one schedule
+method; then the occurrences, the ticket's rows, each with its date, its label, its clearing
+house and its broker where given; then the components, one per contract month an occurrence
+holds, each with its occurrence, its contract, its signed quantity and its fixed price; and for
+a financial settlement the payment terms, the lag and the calendar each occurrence pays by and
+the day each component pays. docs/library/trades/kernel.md is the page."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,17 +21,6 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
-
-LOT = "LOT"  # the one quantity unit of the first future profile: lots of the specification
-
-
-def lot_unit(where: str, text: str) -> str:
-    """LOT, the one quantity unit built, as a template or a ticket states it: anything else, a
-    unit of quantity included, is refused naming where it was given, since the conversion that
-    would read a quantity in MMBTU or barrels is not built."""
-    if text != LOT:
-        raise ValueError(f"{where} is {text!r}, expected {LOT}, the one quantity unit built")
-    return text
 
 
 class Route(Enum):
@@ -84,17 +73,18 @@ class PaymentTerms:
 class ResolvedTrades:
     """The instrument, the definition the terms were resolved under; the index, by reference, its
     futures schedule, the same object the index holds, typed as the kind rule found it, and the
-    row of its specifications the batch trades as; the route, the settlement and the schedule
-    method, one each for the batch; the quantity unit and basis the lots are stated in. Then two
-    sets of columns aligned by position, all read-only. Per occurrence, the ticket's rows in
-    order: trade_dates[i] the day the deal was struck, and labels[i] its trade_id,
+    row of its specifications the batch's quantities count, the one selection, the desk's word
+    for a quantity of the index that the sheet's quantity_unit named; the route, the settlement
+    and the schedule method, one each for the batch; the basis the quantities are stated per.
+    Then two sets of columns aligned by position, all read-only. Per occurrence, the ticket's
+    rows in order: trade_dates[i] the day the deal was struck, and labels[i] its trade_id,
     clearing_house[i] its clearing organization and broker[i] its broker, each tuple None as a
     whole when the field was not given, each a label kept as typed and read for nothing. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
-    it belongs to, contract[k] the row of the schedule its month is, lots[k] the signed whole
-    number of lots and fixed_price[k] the price agreed, in the index's quote units. Then payment,
-    the terms a financial settlement pays by and the days they give, and None for a physical
-    one, which pays on no day."""
+    it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
+    count of the specification and fixed_price[k] the price agreed, in the index's quote units.
+    Then payment, the terms a financial settlement pays by and the days they give, and None for
+    a physical one, which pays on no day."""
 
     instrument: Instrument
     index: Index
@@ -103,7 +93,6 @@ class ResolvedTrades:
     route: Route
     settlement: Settlement
     schedule_method: ScheduleMethod
-    quantity_unit: str
     quantity_per: QuantityPer
     labels: tuple[str, ...] | None
     clearing_house: tuple[str, ...] | None
@@ -111,7 +100,7 @@ class ResolvedTrades:
     trade_dates: NDArray[np.datetime64]
     occurrence: NDArray[np.intp]
     contract: NDArray[np.intp]
-    lots: NDArray[np.float64]
+    quantity: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
     payment: PaymentTerms | None
 
@@ -134,7 +123,6 @@ def resolved_trades(
     route: Route,
     settlement: Settlement,
     schedule_method: ScheduleMethod,
-    quantity_unit: str,
     quantity_per: QuantityPer,
     labels: tuple[str, ...] | None,
     clearing_house: tuple[str, ...] | None,
@@ -142,7 +130,7 @@ def resolved_trades(
     trade_dates: NDArray[np.datetime64],
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
-    lots: NDArray[np.float64],
+    quantity: NDArray[np.float64],
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
 ) -> ResolvedTrades:
@@ -151,27 +139,27 @@ def resolved_trades(
 
     The index is a futures index, since a future's contract is a row of a futures schedule and
     its final price the settlement on that row's expiry day. The specification is a row of the
-    index's specifications, since the lot size is read there. The quantity unit is LOT, the one
-    unit built; a quantity in MMBTU or barrels waits for the conversion rule that would read it.
-    A penultimate future settles financially: it is cash settled against the settle on the
-    business day before its contract's expiry, and a physical settlement would say a delivery
-    the contract does not make. The occurrences are the ticket's rows: one date each, and one
-    label, clearing house and
-    broker each where those are given. The components are aligned, one or more, each belonging
-    to an occurrence, every occurrence holding at least one, since a trade with no contract
-    month has no economics; each contract is a row of the schedule; each lot count is a whole,
-    nonzero number, the first profile's convention, a signed count of lots; each fixed price is
-    a finite number, the lots and the price named by the trade they belong to, as the sheet
-    counts its rows. A financial settlement has payment terms, a lag and a calendar per
-    occurrence and one payment day per component, and a physical one has none: a physical future
-    pays on no day, and giving it terms would invent a payment the contract does not make. The
-    instrument is kept as the definition the terms stand under, and read for nothing here.
+    index's specifications, since the lot size and the lot unit are read there: it is the one
+    selection, and the quantities count it, whatever the desk's word for it, an exchange lot or
+    a bare unit the index defines with a size of one. A penultimate future settles financially:
+    it is cash settled against the settle on the business day before its contract's expiry, and
+    a physical settlement would say a delivery the contract does not make. The occurrences are
+    the ticket's rows: one date each, and one label, clearing house and broker each where those
+    are given. The components are aligned, one or more, each belonging to an occurrence, every
+    occurrence holding at least one, since a trade with no contract month has no economics; each
+    contract is a row of the schedule; each quantity is a whole, nonzero number, the first
+    profile's convention, a signed count of the specification; each fixed price is a finite
+    number, the quantity and the price named by the trade they belong to, as the sheet counts
+    its rows. A financial settlement has payment terms, a lag and a calendar per occurrence and
+    one payment day per component, and a physical one has none: a physical future pays on no
+    day, and giving it terms would invent a payment the contract does not make. The instrument
+    is kept as the definition the terms stand under, and read for nothing here.
     """
-    schedule = _the_batch(index, specification, quantity_unit)
+    schedule = _the_batch(index, specification)
     _the_method(schedule_method, settlement)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_components(
-        occurrence, contract, lots, fixed_price, labels, occurrences, len(schedule.codes)
+        occurrence, contract, quantity, fixed_price, labels, occurrences, len(schedule.codes)
     )
     pays = _the_payment(settlement, payment, occurrences, occurrence.size)
     return ResolvedTrades(
@@ -182,7 +170,6 @@ def resolved_trades(
         route,
         settlement,
         schedule_method,
-        quantity_unit,
         quantity_per,
         labels,
         clearing_house,
@@ -190,7 +177,7 @@ def resolved_trades(
         _frozen_days(trade_dates),
         _frozen_rows(occurrence),
         _frozen_rows(contract),
-        _frozen_numbers(lots),
+        _frozen_numbers(quantity),
         _frozen_numbers(fixed_price),
         pays,
     )
@@ -207,8 +194,8 @@ def futures_schedule_of(index: Index) -> FuturesSchedule:
     return cast(FuturesSchedule, index.schedule)  # what the kind just said
 
 
-def _the_batch(index: Index, specification: int, quantity_unit: str) -> FuturesSchedule:
-    """A futures index, a row of its specifications, and lots: the index's schedule, typed."""
+def _the_batch(index: Index, specification: int) -> FuturesSchedule:
+    """A futures index and a row of its specifications: the index's schedule, typed."""
     schedule = futures_schedule_of(index)
     rows = len(index.specifications.names)
     if not 0 <= specification < rows:
@@ -216,7 +203,6 @@ def _the_batch(index: Index, specification: int, quantity_unit: str) -> FuturesS
             f"specification is {specification}, "
             f"expected a row of the index's specifications, 0 to {rows - 1}"
         )
-    lot_unit("quantity_unit", quantity_unit)
     return schedule
 
 
@@ -259,20 +245,24 @@ def _the_occurrences(
 def _the_components(
     occurrence: NDArray[np.intp],
     contract: NDArray[np.intp],
-    lots: NDArray[np.float64],
+    quantity: NDArray[np.float64],
     fixed_price: NDArray[np.float64],
     labels: tuple[str, ...] | None,
     occurrences: int,
     schedule_rows: int,
 ) -> None:
     """Aligned, one or more, each of an occurrence and every occurrence holding one; each
-    contract a row of the schedule, each lot count whole and nonzero, each price finite, a lot
-    count or a price refused naming the trade it belongs to, since a strip's component is no
+    contract a row of the schedule, each quantity whole and nonzero, each price finite, a
+    quantity or a price refused naming the trade it belongs to, since a strip's component is no
     row of the sheet."""
     components = occurrence.size
     if components == 0:
         raise ValueError("occurrence has 0 rows, expected at least 1, one per component")
-    for name, column in (("contract", contract), ("lots", lots), ("fixed_price", fixed_price)):
+    for name, column in (
+        ("contract", contract),
+        ("quantity", quantity),
+        ("fixed_price", fixed_price),
+    ):
         if column.size != components:
             raise ValueError(
                 f"{name} has {column.size} rows, expected {components}, one per component"
@@ -295,21 +285,21 @@ def _the_components(
             f"contract row {k + 1} is {contract[k]}, "
             f"expected a row of the schedule, 0 to {schedule_rows - 1}"
         )
-    whole_lots(lots, lambda k: f"lots of {_named(labels, int(occurrence[k]))}")
+    whole_quantities(quantity, lambda k: f"quantity of {_named(labels, int(occurrence[k]))}")
     finite_prices(fixed_price, lambda k: f"fixed_price of {_named(labels, int(occurrence[k]))}")
 
 
-def whole_lots(lots: NDArray[np.float64], where: Callable[[int], str]) -> None:
-    """Each lot count a whole, nonzero number, the first profile's convention, a signed count of
-    lots: the first that is not is refused, named by the caller's words for its position, the
-    trade it belongs to in a batch and the field in a template."""
-    fractional = ~np.isfinite(lots) | (lots != np.round(lots))
+def whole_quantities(quantity: NDArray[np.float64], where: Callable[[int], str]) -> None:
+    """Each quantity a whole, nonzero number, the first profile's convention, a signed count of
+    the specification selected: the first that is not is refused, named by the caller's words
+    for its position, the trade it belongs to in a batch and the field in a template."""
+    fractional = ~np.isfinite(quantity) | (quantity != np.round(quantity))
     if fractional.any():
         k = int(fractional.argmax())
-        raise ValueError(f"{where(k)} is {float(lots[k])!r}, expected a whole number of lots")
-    if (lots == 0).any():
-        k = int((lots == 0).argmax())
-        raise ValueError(f"{where(k)} is {float(lots[k])!r}, expected a nonzero quantity")
+        raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a whole number")
+    if (quantity == 0).any():
+        k = int((quantity == 0).argmax())
+        raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a nonzero quantity")
 
 
 def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> None:

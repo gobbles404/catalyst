@@ -168,6 +168,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "C2" "25-May-2026"
     Put $State $Sheet "E1" "name"; Put $State $Sheet "F1" "lot_size"; Put $State $Sheet "G1" "brokerage_rate_per_lot"; Put $State $Sheet "H1" "clearing_rate_per_lot"; Put $State $Sheet "I1" "lot_unit"
     Put $State $Sheet "E2" "NYMEX"; Put $State $Sheet "F2" "1000"; Put $State $Sheet "G2" "0"; Put $State $Sheet "H2" "0"; Put $State $Sheet "I2" "BBL"
+    Put $State $Sheet "E3" "barrel"; Put $State $Sheet "F3" "42"; Put $State $Sheet "G3" "0"; Put $State $Sheet "H3" "0"; Put $State $Sheet "I3" "GAL"
     Put $State $Sheet "A6" "26-May-2026"
     Put $State $Sheet "A7" "22-May-2026"; Put $State $Sheet "B7" "71.25"
     Put $State $Sheet "A8" "21-May-2026"; Put $State $Sheet "B8" "71.1"
@@ -176,7 +177,7 @@ function Build-Chain($State, $Sheet, [string]$Name = "WTI NYMEX", [double]$First
     Put $State $Sheet "D1" "=_CreateFuturesSchedule(A2:A4,B2:B4)"
     Put $State $Sheet "D2" "=_CreateHolidayCalendar(C2)"
     Put $State $Sheet "D3" '=_CreateIndexConventions("USD","BBL","USD","VOLUME","BBL")'
-    Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I2)"
+    Put $State $Sheet "D4" "=_CreateContractSpecifications(E1:I1,E2:I3)"
     Put $State $Sheet "D5" "=_CreateIndex(A1,D1,D3,D4,D2)"
     Put $State $Sheet "D6" "=_CreateValuationDate(A6,0.5)"
     Put $State $Sheet "D7" "=_CreateCalendar(D6,D5)"
@@ -510,7 +511,9 @@ $processes = {
 # after. The day in C13 moves onto that Tuesday, so the calendar publishes anew and with it the
 # template that holds it and the batch, whose payment day moves to the Wednesday; then the
 # template's cell is cleared, the batch fails as its consumer, both are released, and the
-# template typed back rebuilds the batch.
+# template typed back rebuilds the batch. At the end the template's quantity unit changes from
+# the NYMEX lot to the index's barrel of 42 gallons, and the template, the batch, the
+# preparation and the results publish anew, the mark following the lot size.
 
 $trades = {
     param($state)
@@ -518,14 +521,14 @@ $trades = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "contract_specification"; Put $state $sheet "L1" "quantity_unit"; Put $state $sheet "M1" "quantity_per"; Put $state $sheet "N1" "schedule_method"; Put $state $sheet "O1" "route"; Put $state $sheet "P1" "settlement_method"; Put $state $sheet "Q1" "clearing_house"; Put $state $sheet "R1" "payment_time_lag"; Put $state $sheet "S1" "payment_holiday_calendar"
-    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "LOT"; Put $state $sheet "M2" "month"; Put $state $sheet "N2" "lastday"; Put $state $sheet "O2" "cleared"; Put $state $sheet "P2" "financial"; Put $state $sheet "Q2" "ICE Clear"; Put $state $sheet "R2" "+1bd"; Put $state $sheet "S2" "=D13"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_time_lag"; Put $state $sheet "R1" "payment_holiday_calendar"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
     Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
-    Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,14)"
+    Put $state $sheet "D16" "=INDEX(util_ReadHandle(D15),3,13)"
     $id = Id $state
     $template = Text $state $sheet "D14"
     Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:trade_template:")) $template
@@ -553,7 +556,7 @@ $trades = {
     Check "a cleared template fails the batch in the seam's words" ($failed -eq "#ERROR _CreateTrades: template is blank, expected trade template handle") $failed
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 1) }
     Check "the template and the batch are released, twelve live" ($c.Live -eq 12 -and $c.Released -eq 5 -and $c.Published -eq 17) $c.Text
-    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:S1,K2:S2)'
+    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
     Check "the template typed back rebuilds the batch" ((Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
     Check "which pays as before" ((Text $state $sheet "D16") -eq "46197") (Text $state $sheet "D16")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) }
@@ -592,6 +595,25 @@ $trades = {
     Check "the vector stands" ((Text $state $sheet "D10") -eq $vector) (Text $state $sheet "D10")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 13 }
     Check "the old fixings, history, market, preparation and results are released; sixteen live, five more published" ($c.Live -eq 16 -and $c.Released -eq 13 -and $c.Published -eq 29 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # A changed selection: the quantity unit names the index's other specification, a barrel of
+    # 42 gallons, and the template, the batch, the preparation and the results publish anew, the
+    # old four released; two barrels are two barrels of oil, so the mark is 7, a thousandth of
+    # the two lots' 7,000. The history and the market stand.
+    $template = Text $state $sheet "D14"
+    $trades = Text $state $sheet "D15"
+    $prepared = Text $state $sheet "D17"
+    $results = Text $state $sheet "D18"
+    $history = Text $state $sheet "D9"
+    Put $state $sheet "K2" "barrel"
+    Check "a changed quantity unit gives the template a new handle" ((Text $state $sheet "D14") -ne $template -and (Text $state $sheet "D14").StartsWith("${id}:trade_template:")) (Text $state $sheet "D14")
+    Check "the batch a new one" ((Text $state $sheet "D15") -ne $trades -and (Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "the preparation a new one" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "and the results a new one" ((Text $state $sheet "D18") -ne $results -and (Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "the mark follows the lot size, 7 for two barrels" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
+    Check "the history stands" ((Text $state $sheet "D9") -eq $history) (Text $state $sheet "D9")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 17 }
+    Check "the old template, batch, preparation and results are released; sixteen live, four more published" ($c.Live -eq 16 -and $c.Released -eq 17 -and $c.Published -eq 33 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 $quit = {

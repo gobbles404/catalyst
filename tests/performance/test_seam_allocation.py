@@ -973,14 +973,15 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 
 # --- the instrument catalog -------------------------------------------------------------------
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
-# 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by sixteen
-# columns, 112 cells of which 97 are text, is laid out one cell at a time and joined for the way
-# out: measured 11,204 bytes, about 100 bytes a cell, which a hundred a cell and the slack cover.
+# 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by fifteen
+# columns, 105 cells of which 91 are text, is laid out one cell at a time and joined for the way
+# out: measured 11,246 bytes on 2026-10-06, about 107 bytes a cell, which a hundred a cell and
+# the slack cover.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
-    cells = 7 * 16
+    cells = 7 * 15
     assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 100 * cells + SLACK
     assert bridge.live_handles() == live
 
@@ -998,15 +999,15 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
     assert least_peak(lambda: ENTRY["CountFieldRows"]("future", headers, body)) <= rows + 2 * SLACK
     calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
     one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
-    row = Cells.from_rows([["LOT", calendar, 46164.0, 10.0]])
+    row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["EchoFieldRow"]("future", one, row)) <= 4 * SLACK
     assert bridge.live_handles() == live
 
 
 # --- the trade creators -------------------------------------------------------------------------
-# A template of the toy's nine fields, one with a handle cell, keeps nine scalars and the objects
-# the library already holds: measured 2,412 bytes on 2026-10-04, which four times the slack
+# A template of the toy's eight fields, one with a handle cell, keeps eight scalars and the objects
+# the library already holds: measured 2,331 bytes on 2026-10-06, which four times the slack
 # covers. A batch of 2,500 single-month rows keeps sixteen columns of eight bytes a row, the terms'
 # five and the encoding's three by component, the payment terms' lag, calendar and day by
 # occurrence and component, and the observations' component, day, weight and slot by observation,
@@ -1039,7 +1040,6 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     names = Cells.from_rows(
         [
             [
-                "contract_specification",
                 "quantity_unit",
                 "quantity_per",
                 "schedule_method",
@@ -1052,7 +1052,7 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         ]
     )
     values = Cells.from_rows(
-        [["lot", "LOT", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
+        [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
     )
     assert least_peak(lambda: ENTRY["_CreateTradeTemplate"]("future", names, values)) <= 4 * SLACK
     template = ENTRY["_CreateTradeTemplate"]("future", names, values)

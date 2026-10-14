@@ -92,7 +92,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
     headers = row("quantity_unit", "payment_holiday_calendar", "trade_date", "quantity")
     kinds, slots, text = cast(
         tuple[NDArray[np.uint8], NDArray[np.float64], str],
-        ENTRY["EchoFieldRow"]("future", headers, row("LOT", calendar, 46164.0, 10.0)),
+        ENTRY["EchoFieldRow"]("future", headers, row("lots", calendar, 46164.0, 10.0)),
     )
     assert kinds.shape == (2, 4)
     assert text.split("\0") == [
@@ -100,7 +100,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
         "payment_holiday_calendar",
         "trade_date",
         "quantity",
-        "LOT",
+        "lots",
         "a holiday calendar",
     ]
     assert slots[1, 2] == 46164.0 and slots[1, 3] == 10.0

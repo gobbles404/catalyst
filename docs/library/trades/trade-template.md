@@ -19,10 +19,10 @@ The user's example, two fields:
 | | A | B |
 |---|---|---|
 | 1 | quantity_unit | schedule_method |
-| 2 | LOT | lastday |
+| 2 | NYMEX NG | lastday |
 | 3 | `=_CreateTradeTemplate("future", A1:B1, A2:B2)` | shows `30512:trade_template:40` |
 
-The NG example's template, every field of the `future` the five ticket rows do not supply, in A1:G2 with the creator in B3: `contract_specification` NYMEX NG, `quantity_unit` LOT, `quantity_per` month, `schedule_method` lastday, `route` cleared, `settlement_method` physical, `clearing_house` CME Clearing.
+The NG example's template, every field of the `future` the five ticket rows do not supply, in A1:F2 with the creator in B3: `quantity_unit` NYMEX NG, the specification the quantities count, `quantity_per` month, `schedule_method` lastday, `route` cleared, `settlement_method` physical, `clearing_house` CME Clearing.
 
 Three arguments, all required, none with a default. The instrument is first: one exact name from `_ListInstruments`, `future`, which selects the definition the headers are checked against. The fields are one row of field names as `_ShowInstrument` shows them, spelled exactly, case and all, in any order; the values one aligned row beneath them. One field takes the same path as many, and a template carries at least one. Omit a field entirely when the template should not supply it; a listed field with a blank cell is an input error, not an instruction to inherit something. The row crosses as `FieldRow[str]`, the seam's one-row form of decision 42, bound against the instrument named: the seam checks the name's type, the width, each header against the definition, unknown and repeated headers named, and each cell by its field's type, a date as a date, a number as a number, a code as text and `payment_holiday_calendar` as a holiday calendar handle resolved to its object; more than one row of values is refused as `values is 2x1 array, expected one row of field values`. The result is a handle, `30512:trade_template:40`, the kind and the count alone, since a template carries no index's name. Other formulas refer to the cell; a worksheet heading or an Excel name such as `ICE_Futs` or `NYMEX_Futs` says what the template is for, and the library object has no label field. An unchanged recalculation shares the live template; a changed cell under it, a value or the holiday calendar's own creator, makes a new one and every batch over it anew, the old released when Excel disconnects its last creator.
 
@@ -44,11 +44,11 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 | `schedule_method` | `lastday` and `penultimate`, the two methods built; `asian` and `last3day` fail by name until they are | `schedule_method is 'asian', expected lastday or penultimate, the two methods built` |
 | `route` | `cleared` or `bilateral`, exactly | `route is 'Cleared', expected cleared or bilateral` |
 | `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
-| `quantity_unit` | `LOT`, the one unit built, the kernel's own rule | `quantity_unit is 'lot', expected LOT, the one quantity unit built` |
+| `quantity_unit` | any nonempty text, held as typed: it names one of the index's specifications, and the template has no index to ask, so `_CreateTrades` checks the name against the index it is given | nothing here; `quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'` at `_CreateTrades` |
 | `quantity_per` | `month`, the one basis built | `quantity_per is 'day', expected month, the one basis built` |
 | `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd` |
 | `contract_code` | a contract or strip the period grammar reads, in either case | `contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
-| `quantity` | a whole nonzero number of lots, the kernel's own rule | `quantity is 1.5, expected a whole number of lots`; `quantity is 0.0, expected a nonzero quantity` |
+| `quantity` | a whole nonzero count of the quantity unit, the kernel's own rule | `quantity is 1.5, expected a whole number`; `quantity is 0.0, expected a nonzero quantity` |
 | `fixed_price` | a finite number, the kernel's own rule | `fixed_price is inf, expected a finite price` |
 
 Nothing is required of a template: not `trade_date`, `contract_code`, `quantity` or `fixed_price`, which a ticket supplies, and not the payment fields of a financial settlement. The conditions, which fields are required and which present, whether the template and the ticket overlap, whether a specification is the index's, whether a code is a contract of the schedule, need the ticket and the index, and `_CreateTrades` checks them against the completed batch, so there is no second validator here anticipating every ticket. The seam owns shape, type and the reference's resolution; the library reads meaning and never parses a handle or coerces a number from text.
@@ -58,7 +58,7 @@ Nothing is required of a template: not `trade_date`, `contract_code`, `quantity`
 ```text
 TradeTemplate
     instrument   the library's future definition, by reference
-    defaults     by field name, in the sheet's order: quantity_unit LOT, schedule_method lastday
+    defaults     by field name, in the sheet's order: quantity_unit NYMEX NG, schedule_method lastday
 ```
 
 Each default is the one value the row held, owned: a number as a float, a date as a day, text and a code as text, and a holiday calendar as the object its handle stood for, the same object the calendar's own cell publishes, held by reference so that a batch resolved under the template counts its payment days on it. No duplicate instrument schema is authored by the workbook, no per-field permission list exists, and no trade encoding, history binding or evaluation is performed. The template is the one kind whose handle selects an instrument for the seam, through `goosedove.instruments.fields.selected`, so `_CreateTrades` binds its ticket against the template's definition.
@@ -75,11 +75,11 @@ The same template supplies its fields to one or many ticket rows. Template field
 
 | Case | Where |
 |---|---|
-| LOT and lastday make the page's template; one field and the NG template's seven take one path; each value the scalar its type names and a calendar the object itself | `tests/unit/test_trade_template.py` |
+| NYMEX NG and lastday make the page's template; one field and the NG template's six take one path; each value the scalar its type names and a calendar the object itself; a unit held as typed, the index asked later | `tests/unit/test_trade_template.py` |
 | A template selects its instrument for a ticket; a field the ticket must supply is not required | the same |
-| Sixteen values against their fields' rules refused naming the field, a fraction and a zero of a lot and an infinite price among them; a template's numbers passing the kernel's rules; the builder takes one row | the same |
+| Fifteen values against their fields' rules refused naming the field, a fraction and a zero of a quantity and an infinite price among them; a template's numbers passing the kernel's rules; the builder takes one row | the same |
 | The creator's handle, the seam's refusals in order before the library's, the reader's spill | the same, 26 in all |
-| One read per value and one publication, 2,412 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
+| One read per value and one publication, 2,331 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
 | A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |
 | The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289 |
 

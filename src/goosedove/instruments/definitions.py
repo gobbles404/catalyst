@@ -71,16 +71,6 @@ FUTURE = Instrument(
             "The day the deal was struck, never inferred from the valuation date or today",
         ),
         Field(
-            "contract_specification",
-            "Name selecting the lot and quantity specification from the index",
-            True,
-            NONE,
-            FieldType.TEXT,
-            "the index's specification names",
-            "Selects the lot size and unit from the index given to _CreateTrades; "
-            "the template may supply it",
-        ),
-        Field(
             "contract_code",
             "One monthly contract or a strip of monthly contracts",
             True,
@@ -140,21 +130,23 @@ FUTURE = Instrument(
         ),
         Field(
             "quantity",
-            "Signed size of the position",
+            "Signed size of the position, a count of the quantity unit",
             True,
             NONE,
             FieldType.NUMBER,
-            "whole nonzero lots",
-            "Signed; whole nonzero lots for the first future profile",
+            "a whole nonzero count",
+            "Signed; a whole nonzero count of the selected quantity definition, the first future "
+            "profile's rule",
         ),
         Field(
             "quantity_unit",
-            "How the supplied quantity is measured",
+            "The desk's word for a quantity of the index, one of its contract specifications",
             True,
             NONE,
-            FieldType.CODE,
-            "LOT",
-            "LOT is the one unit built; the specification gives the quantity per lot",
+            FieldType.TEXT,
+            "the index's specification names",
+            "Selects the lot size and unit from the index given to _CreateTrades, exactly as "
+            "named there; the template may supply it, and the index owns what it means",
         ),
         Field(
             "quantity_per",
@@ -182,8 +174,8 @@ FUTURE = Instrument(
             "settlement_method = financial",
             FieldType.TEXT,
             "+1bd, +2bd and other positive whole business days",
-            "Counted strictly after the traded contract's last trading day on the payment "
-            "calendar; +1bd for PHH, +2bd for ETE",
+            "Counted strictly after the component's observation day on the payment calendar, "
+            "the expiry under lastday and the pen day under penultimate; +1bd for PHH",
         ),
         Field(
             "payment_holiday_calendar",
