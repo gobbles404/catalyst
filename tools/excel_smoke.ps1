@@ -538,7 +538,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
     "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP9)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the penultimate method; a penultimate future is cash settled on the business day before its contract's expiry"
-    # The market history: a creator over the calendar in CT7 and the fixings in CT6, both over
+    # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
     # valuation day and after; a fixing on the valuation date, a fixed day without a fixing and
@@ -822,10 +822,10 @@ $cells = [ordered]@{
     "EP5" = "1"; "EQ5" = "3.1"; "EP6" = "2"; "EQ6" = "3.2"; "EP7" = "3"; "EQ7" = "3.3"
     "EP9" = "Quantity"; "EP10" = "ten"
     "EN12" = "=_CreateContractSpecifications(EI1:EM1,EI12:EM12)"
-    # The trade template's seven shared fields over the lots specification in BY1, the template
+    # The trade template's six shared fields over the lots specification in BY1, the template
     # creator in EW3; the ticket's headers and three rows, a code in lowercase and one in uppercase
     # and a repeated row, the trades creator in EW8 over the futures index in EB1; a financial
-    # template of nine fields, its payment calendar the holiday calendar in AM1, in EW11, and a
+    # template of eight fields, its payment calendar the holiday calendar in AM1, in EW11, and a
     # strip row under four of the ticket's headers, in EW13; a row with a code the schedule lacks
     # and a row with a fraction of a lot, for the creator to refuse.
     "EW1" = "quantity_unit"; "EX1" = "quantity_per"; "EY1" = "schedule_method"; "EZ1" = "route"; "FA1" = "settlement_method"; "FB1" = "clearing_house"
@@ -867,8 +867,8 @@ $cells = [ordered]@{
     # FM5; the valuation day 30-Nov-2026 and its calendar in FM6 and FM7; the fixings of every
     # business day from 29 October to 27 November, newest first, 3.00 but for Z26's final 3.23 on
     # the 25th, in FW and FX, their history in FM9; F27 and G27 quoted at 3.50 and 3.60, the market
-    # in FM11; the financial template over nine fields in FZ to GH with the payment calendar held
-    # through GH2, in FM12; the two trades in GJ to GN, their batch in FM13, prepared in FM14 and
+    # in FM11; the financial template over eight fields in FZ to GG with the payment calendar held
+    # through GG2, in FM12; the two trades in GJ to GN, their batch in FM13, prepared in FM14 and
     # evaluated in FM15.
     "FN2" = "TOY"; "FO2" = "10000"; "FP2" = "MMBTU"; "FQ2" = "0"; "FR2" = "0"
     "FS1" = "X26"; "FT1" = "28-Oct-2026"

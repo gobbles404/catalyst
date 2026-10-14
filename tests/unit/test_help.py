@@ -580,7 +580,7 @@ def test_the_preparation_explains_itself() -> None:
         (
             "history",
             "The market-history handle of the trades' index: the cell showing "
-            "_CreateMarketHistory's result, such as B12, or a name for it, valued on the day the "
+            "_CreateMarketHistory's result, such as I11, or a name for it, valued on the day the "
             "trades are prepared for.",
         ),
     ]
@@ -603,7 +603,7 @@ def test_the_evaluation_explains_itself() -> None:
         (
             "market",
             "The market handle over the history the trades were prepared against: the cell "
-            "showing _CreateMarket's result, such as B13, or a name for it, with the day's quotes.",
+            "showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
         ),
     ]
 
@@ -624,8 +624,8 @@ def test_the_two_reports_explain_themselves() -> None:
     assert not hidden and arguments == [results]
     assert description == (
         "Reports the batch's risk from its results: the total delta, the change in mark for a "
-        "move of one quote unit in every contract, with its unit, the DV01 with its unit, and the "
-        "valuation day, as evaluation stored them."
+        "move of one quote unit in every contract, with its unit, the DV01 and the valuation "
+        "day, as evaluation stored them, and the DV01's unit, the currency per basis point."
     )
 
 

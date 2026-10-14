@@ -1,12 +1,12 @@
 """The two children of _CreateTrades and the batch they make. Resolution completes a template's
 shared values and a ticket's rows into the resolved terms of one batch on one index: every field
 from exactly one of the two, the required fields present and the conditional ones present when
-their condition holds, one route, settlement, method, quantity unit and basis for the batch, the
-quantity unit naming one of the index's specifications, every code of the index's schedule read
-for its month
-once, each contract code or strip of the ticket resolved by month to the schedule's rows, the
-schedule method's observations made once, and for a financial settlement each component's payment
-day counted strictly after its observation day on the payment calendar. Then the kernel:
+their condition holds, one quantity unit, method, route, settlement and basis for the batch, in
+that order, the quantity unit naming one of the index's specifications, every code of the index's
+schedule read for its month once, each contract code or strip of the ticket resolved by month to
+the schedule's rows, the schedule method's observations made once, and for a financial settlement
+each component's payment day counted strictly after its observation day on the payment calendar.
+Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -109,18 +109,17 @@ def resolved(
     agrees on, and each is read for its meaning: the quantity unit by name among the index's
     specifications, exactly as the index names them, the method, the route, the settlement and
     the basis from their lists, each named with its row where the ticket supplied it, since the
-    page promises a ticket's field its row. Each conditional field
-    is present exactly when its condition holds, a clearing house with a cleared route and the
-    two payment fields with a financial settlement, and absent otherwise, since a label for a
-    clearing house a bilateral trade has not, or a payment a physical contract never makes, would
-    say something false. The index is a futures index, and every code of its schedule is read for
-    its month, the rows the ticket does not use included, a label that is no contract code and
-    two rows for one month refused by row. Each contract code of the ticket is read once per
-    distinct text, in the order the sheet first shows each, so that the first row that breaks the
-    grammar is the one named, through the period grammar, in either case, for the months it
-    spans, and each
-    month is resolved to its schedule row, a month the schedule lacks refused by the trade's row
-    and the month; a strip makes one component per month, in order, all on the one occurrence.
+    page promises a ticket's field its row. Each conditional field is present exactly when its
+    condition holds, a clearing house with a cleared route and the two payment fields with a
+    financial settlement, and absent otherwise, since a label for a clearing house a bilateral
+    trade has not, or a payment a physical contract never makes, would say something false. The
+    index is a futures index, and every code of its schedule is read for its month, the rows the
+    ticket does not use included, a label that is no contract code and two rows for one month
+    refused by row. Each contract code of the ticket is read once per distinct text, in the order
+    the sheet first shows each, so that the first row that breaks the grammar is the one named,
+    through the period grammar, in either case, for the months it spans, and each month is
+    resolved to its schedule row, a month the schedule lacks refused by the trade's row and the
+    month; a strip makes one component per month, in order, all on the one occurrence.
     The schedule method gives each component its observation day, the expiry under lastday and
     the business day before it under penultimate. For a financial settlement, each occurrence's
     lag is read once per distinct text and each component pays that many business days strictly

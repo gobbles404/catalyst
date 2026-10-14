@@ -87,8 +87,8 @@ A futures index's four rules stand from #82 word for word but the first, whose m
 |---|---|
 | the index's schedule has two contracts or more, the first only bounding the calendar | `index has 1 contract, expected at least 2` |
 | each code once, spelling and case as typed, the boundary's included | `contract_code row 2 is 'm26', already given at row 1` |
+| the last future within 1,048,574 days of the first, a sheet's rows less the two heading rows `util_ReadHandle` spills first, the bound the discount curve holds, so whatever is created can be read back; checked before the order since #140, the guard against an unreadable calendar coming first | `future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19` |
 | each future expiring after the one above, in the order given | `future_expiry row 2 is 2026-05-19, expected a date after row 1's 2026-06-22` |
-| the last future within 1,048,574 days of the first, a sheet's rows less the two heading rows `util_ReadHandle` spills first, the bound the discount curve holds, so whatever is created can be read back | `future_expiry row 2 is 4897-04-12, expected within 1048574 days of row 1's 2026-05-19` |
 
 A Gas Daily index's four rules, one month being a calendar:
 

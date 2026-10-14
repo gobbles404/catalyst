@@ -3,12 +3,10 @@ template's row and taken, last and required, by every batch of trades whose tick
 rest. The template retains the definition and its own values and no index, so one template
 serves every compatible index. It reads each value it holds for the rule intrinsic to its field,
 a code from its list, a lag of positive business days within the sheet's calendar, a contract
-code or strip the period
-grammar reads, a whole quantity, zero included, a finite price, and leaves the rules that need
-the
-ticket or the index, which fields are required, whether the two overlap, the schedule, to the
-resolution of a batch. Those readers live here, since resolution reads the ticket's values by
-the same rules, and the two numeric ones are the kernel's own.
+code or strip the period grammar reads, a whole quantity, zero included, a finite price, and
+leaves the rules that need the ticket or the index, which fields are required, whether the two
+overlap, the schedule, to the resolution of a batch. Those readers live here, since resolution
+reads the ticket's values by the same rules, and the two numeric ones are the kernel's own.
 docs/library/trades/trade-template.md is the page."""
 
 import re

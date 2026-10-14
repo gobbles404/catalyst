@@ -16,7 +16,7 @@ def _PrepareTrades(
 | | A | B |
 |---|---|---|
 | 10 | `=_CreateTrades(I3, A4:E4, A5:E9, B3)` | shows `30512:trades:Henry Hub NYMEX:41`, the NG example's five rows |
-| 11 | `=_PrepareTrades(A10, B12)` | shows `30512:prepared_trades:Henry Hub NYMEX:43`, B12 the index's history valued on 24 November 2026 |
+| 11 | `=_PrepareTrades(A10, I11)` | shows `30512:prepared_trades:Henry Hub NYMEX:43`, I11 the index's history valued on 24 November 2026, beside the index in I3 and outside the reports' spills below |
 
 Two handles, both required, neither with a default: the batch, the cell showing `_CreateTrades`'s result or a name for it, and the market history of the batch's index, the cell showing `_CreateMarketHistory`'s result or a name for it, valued on the day the batch is prepared for. The seam resolves the two handles and nothing else; a cell of another kind fails in the seam's words, `history is market handle '30512:market:Henry Hub NYMEX:44', expected market history handle`, before the function runs. The result is a handle, `30512:prepared_trades:Henry Hub NYMEX:43`, the index's name between the kind and the count, as [handles.md](../../seam/handles.md) says. A successful call publishes a prepared batch and changes neither input; a recalculation with the same arguments shares the live one; a new history, or a new batch, makes a new one, the old released when Excel disconnects its last creator.
 
@@ -26,7 +26,7 @@ Two handles, both required, neither with a default: the batch, the cell showing 
 |---|---|
 | Function | Prepares a batch of trades against one market history, each observation whose day has passed fixed at that day's settle and each payment that has fallen due settled, and shows its handle, the text _EvaluateTrades takes as the prepared trades. |
 | trades | The trades handle: the cell showing _CreateTrades's result, such as A10, or a name for it. |
-| history | The market-history handle of the trades' index: the cell showing _CreateMarketHistory's result, such as B12, or a name for it, valued on the day the trades are prepared for. |
+| history | The market-history handle of the trades' index: the cell showing _CreateMarketHistory's result, such as I11, or a name for it, valued on the day the trades are prepared for. |
 
 ## The library checks
 

@@ -153,3 +153,7 @@ released while the template, the history and the market stand, the mark 0 and th
 7 and 2 again;
 the kept workbook holds the block at row 1405, two lots of n26 at 70 beside a row of nothing on
 q26 at 72, 4,200 of mark and 2,000 of delta, the -1 of the block above one keystroke away.
+
+The boundary this page settled, a row kept ready held to every rule, a spare row that fails one failing the batch, is recorded with the others under
+[Accepted constraints](README.md#accepted-constraints) in the packet's README, the one record
+the library pages link to.

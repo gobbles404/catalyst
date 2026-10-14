@@ -55,9 +55,11 @@ class FieldValues:
 @singledispatch
 def selected(selector: object) -> Instrument:
     """The instrument a selector argument names, read off the value the seam validated: an
-    instrument's name as text, matched exactly against the catalog; or, once templates exist,
-    the template an object holds. The kinds that select register themselves here, as the
-    market's binders do by fixings kind; registration refuses a selector of any other kind."""
+    instrument's name as text, matched exactly against the catalog, or the instrument a trade
+    template holds. The kinds that select register themselves here, text in this module and
+    the template in its own, as the market's binders do by fixings kind; registration asks
+    only that a selector be text or a handle kind, so a kind with no rule here fails on the
+    call, saying it selects no instrument."""
     raise ValueError(f"{named(selector)} selects no instrument")
 
 

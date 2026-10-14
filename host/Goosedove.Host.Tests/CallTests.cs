@@ -192,7 +192,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("payment_holiday_calendar"), "x:holiday_calendar:9" }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             yield return new object[] { "EchoFieldRow", new object[] { "future", Row("quantity"), Column(1.0, 2.0) }, "#ERROR EchoFieldRow: values is 2x1 array, expected one row of field values" };
-            // The trade template: the name in another case in the library's words; two rows where one is wanted and a number where a code is expected in the seam's; a value against its field's own rule in the library's. The trades: the index and the template left out, and a text naming no live object, in the seam's words, before any binding; the batch itself is in the fact below.
+            // The trade template: the name in another case in the library's words; two rows where one is wanted, the extra row filled or blank, and a number where text is expected in the seam's; a value against its field's own rule in the library's. The trades: the index and the template left out, and a text naming no live object, in the seam's words, before any binding; the batch itself is in the fact below.
             yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("NYMEX NG", "NYMEX NG") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "future", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
@@ -371,10 +371,10 @@ namespace Goosedove.Host.Tests
         }
 
         // The NG example of the trade-valuation pipeline: a template of the future's six shared
-        // fields, a batch of its five rows and a sixth kept ready at nothing on the NG index, the codes in either case, the handle
-        // named for the index, the spill one row per component with the kernel's numbers; a
-        // template field repeated in the ticket refused, and a financial template whose strip
-        // pays two business days after each expiry.
+        // fields, a batch of its five rows and a sixth kept ready at nothing on the NG index, the
+        // codes in either case, the handle named for the index, the spill one row per component
+        // with the kernel's numbers; a template field repeated in the ticket refused, and a
+        // financial template whose strip pays two business days after each expiry.
         [Fact]
         public void a_batch_of_trades_is_created_from_a_template_and_a_ticket_on_an_index()
         {

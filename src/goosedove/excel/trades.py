@@ -97,7 +97,7 @@ def _PrepareTrades(
     history: Annotated[
         Handle[MarketHistory],
         "The market-history handle of the trades' index: the cell showing _CreateMarketHistory's "
-        "result, such as B12, or a name for it, valued on the day the trades are prepared for.",
+        "result, such as I11, or a name for it, valued on the day the trades are prepared for.",
     ],
 ) -> Handle[PreparedTrades]:
     """Prepares a batch of trades against one market history, each observation whose day has
@@ -116,7 +116,7 @@ def _EvaluateTrades(
     market: Annotated[
         Handle[Market],
         "The market handle over the history the trades were prepared against: the cell showing "
-        "_CreateMarket's result, such as B13, or a name for it, with the day's quotes.",
+        "_CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
     ],
 ) -> Handle[TradeResults]:
     """Evaluates prepared trades against one market, the live observations at their contracts'
@@ -157,8 +157,8 @@ def _ReportRisk(
     ],
 ) -> MixedArray:
     """Reports the batch's risk from its results: the total delta, the change in mark for a move
-    of one quote unit in every contract, with its unit, the DV01 with its unit, and the
-    valuation day, as evaluation stored them."""
+    of one quote unit in every contract, with its unit, the DV01 and the valuation day, as
+    evaluation stored them, and the DV01's unit, the currency per basis point."""
     return MixedArray.table(
         [
             ("delta_total", "delta_unit", "dv01", "dv01_unit", "as_of"),

@@ -17,7 +17,7 @@ whether those desk terms are synonyms is needed for this scope.
 
 The candidate methods are `asian`, `lastday`, `penultimate` and `last3day`. Use
 `penultimate` as the proposed canonical spelling rather than introducing a second `pen`
-alias. `lastday` is the one method supported first; the others fail by name until built,
+alias. `lastday` and `penultimate` are built; `asian` and `last3day` fail by name until they are,
 never accepted and ignored. Their precise definitions remain proposals for review:
 
 | schedule_method | Static observations selected | Proposed weights |
@@ -44,7 +44,7 @@ are independent of which observations set the price. Partial-month allocation is
 The existing contract specification remains the lot/quantity/fee definition. It does not
 become a container for all observation and payment rules. The resolved trade retains its
 selected schedule method, quantity basis and explicit payment dates. Physical-delivery
-handling is outside scope; payment-date resolution is the next lifecycle concern.
+handling is outside scope; payment-date resolution is built, #139 and #144.
 
 Proposed library homes, not files implemented by this refinement:
 

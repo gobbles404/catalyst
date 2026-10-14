@@ -2020,10 +2020,10 @@ def test_a_price_vector_is_a_name_and_one_column_in_and_one_copy_out(
 # Two readers of library data, no handle and no numpy of the library's: the list is one table of
 # two text columns, seven calls across seven functions and the mixed way out's looks, the two
 # contiguity checks that copy nothing, the count of the text cells, and two arrays made for the
-# way out. The shown schema is the same way out over seven rows and sixteen columns laid out one
-# cell at a time, the one classification per cell and the generator that feeds it, 112 of each
-# for the future's fifteen fields: the one spill the seam builds per cell, and a new field adds
-# seven to each count.
+# way out. The shown schema is the same way out over seven rows and fifteen columns laid out one
+# cell at a time, the one classification per cell and the generator that feeds it, 105 of each
+# for the future's fourteen fields and the row labels: the one spill the seam builds per cell,
+# and a new field adds seven to each count.
 def test_the_instrument_list_is_one_table_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
@@ -2059,7 +2059,7 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_ShowInstrument": 1,
         "instrument": 1,
         "schema_cells": 1,
-        "schema_cells.<locals>.<genexpr>": 105,  # seven rows of fifteen fields, and the labels
+        "schema_cells.<locals>.<genexpr>": 105,  # seven rows of fourteen fields and the labels
         "MixedArray.cells": 1,
         "_classify": 105,
         "_mixed_out": 1,

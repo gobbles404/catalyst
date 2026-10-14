@@ -15,8 +15,8 @@ def _EvaluateTrades(
 
 | | A | B |
 |---|---|---|
-| 11 | `=_PrepareTrades(A10, B12)` | shows `30512:prepared_trades:Henry Hub NYMEX:43` |
-| 12 | `=_EvaluateTrades(A11, B13)` | shows `30512:trade_results:Henry Hub NYMEX:45`, B13 the market over B12 quoting Z26 at 3.20 and F27 at 3.50 |
+| 11 | `=_PrepareTrades(A10, I11)` | shows `30512:prepared_trades:Henry Hub NYMEX:43` |
+| 12 | `=_EvaluateTrades(A11, I12)` | shows `30512:trade_results:Henry Hub NYMEX:45`, I12 the market over the history in I11 quoting Z26 at 3.20 and F27 at 3.50, the two handles beside the index in I3 and outside the reports' spills, A13:D15 and A17:E19 |
 
 Two handles, both required, neither with a default: the prepared trades, the cell showing `_PrepareTrades`'s result or a name for it, and the market over the history they were prepared against, the cell showing `_CreateMarket`'s result or a name for it, with the day's quotes. The seam resolves the two handles and nothing else; a cell of another kind fails in the seam's words, `prepared is trades handle '30512:trades:Henry Hub NYMEX:41', expected prepared trades handle`. The result is a handle, `30512:trade_results:Henry Hub NYMEX:45`, named for the index. A successful call publishes results and changes neither input; a recalculation with the same arguments shares the live results; a new market makes new results and the old are released when Excel disconnects their last creator, a report referring to the old cell holding them meanwhile.
 
@@ -26,7 +26,7 @@ Two handles, both required, neither with a default: the prepared trades, the cel
 |---|---|
 | Function | Evaluates prepared trades against one market, the live observations at their contracts' quotes and the fixed at their settles, into the batch's mark, cash and delta, and shows its handle, the text the two reports take as the results. |
 | prepared | The prepared-trades handle: the cell showing _PrepareTrades's result, such as A11, or a name for it. |
-| market | The market handle over the history the trades were prepared against: the cell showing _CreateMarket's result, such as B13, or a name for it, with the day's quotes. |
+| market | The market handle over the history the trades were prepared against: the cell showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes. |
 
 ## The library checks
 
@@ -37,6 +37,8 @@ The kernel's rules, in [kernel.md](kernel.md)'s words after `#ERROR _EvaluateTra
 | The market is over the history the batch was prepared against, the one object; a later history is a new preparation, never a silent one here | `market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against` |
 | The route is cleared; bilateral valuation needs discount factors and a DV01 convention | `route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet` |
 | Every live contract is quoted, the market's own rule | `requested contract 'F27' is beyond live-price coverage ending at 'Z26'` |
+
+The quotes carry no labels, as [market.md](../market/market.md#when-the-first-contract-rolls) records: the first price is the first unfixed contract's and the rest follow the schedule. A batch prepared again after the valuation date rolls past a contract's expiry takes the first quote for the next contract, so a vector left in place across the roll values the batch's live contracts at the quotes of the contracts before them, and nothing refuses it unless the vector reached the schedule's end, where it is now a price too many. Move the vector with the date; labels for the vector are deferred work, recorded under [Accepted constraints](../../engineering-tickets/trade-valuation-pipeline/README.md#accepted-constraints).
 
 For the NG example on 24 November 2026 at 3.20 and 3.50: a mark of 7,000 USD, no cash, delta 160,000 and -50,000 USD per USD/MMBTU, total 110,000; at 3.21 the mark is 8,600 and the delta unchanged. For the toy on 30 November, Z26 fixed at 3.23 and paid, F27 at 3.50: a mark of -11,000 and cash of 22,800; its seven states are the example page's table, and [kernel.md](kernel.md) has them with the quotes and fixings read.
 

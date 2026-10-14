@@ -18,7 +18,7 @@ How a function page is written, the skeleton to copy for a new one, and the few 
 
 The bridge exports the declared function name verbatim, so the Python name *is* the worksheet name. Every function the library lists is `_Name` or `util_Name` since #73; the seam's `Ping` and its hidden probes keep their names, being the seam's instruments and not the desk's.
 
-Trade-input exception, decided on 3 October 2026 and not yet implemented: `_CreateTradeTemplate`
+Trade-input exception, decided on 3 October 2026 and built in #138 and #139: `_CreateTradeTemplate`
 and `_CreateTrades` require exact field identifiers from the selected instrument definition,
 including case, with no trimming or aliases. Column order may vary. The
 [trade-input binding page](../engineering-tickets/trade-valuation-pipeline/excel-trade-input-binding.md)
@@ -34,8 +34,11 @@ A worksheet function leads with a verb that says what it does, and the verbs sta
 |---|---|---|
 | Create | makes an object from what the sheet supplies and shows its handle | `_CreateDiscountCurve` |
 | Read | shows what an object holds, and changes nothing | `util_ReadHandle` |
-| List | spills the identifiers and descriptions in a library-owned definition catalog | `_ListInstruments` (agreed design, implementation pending) |
-| Show | spills the field definition for a named catalog entry supplied as text | `_ShowInstrument` (agreed design, implementation pending) |
+| List | spills the identifiers and descriptions in a library-owned definition catalog | `_ListInstruments`, built in #137 |
+| Show | spills the field definition for a named catalog entry supplied as text | `_ShowInstrument`, built in #137 |
+| Prepare | binds a batch to one market history, the dated side settled once, and shows its handle: a Create by another name, kept apart since what it makes is a step of the pipeline and not a thing the sheet types | `_PrepareTrades`, built in #141 |
+| Evaluate | values a preparation against one market and shows its handle, the other step | `_EvaluateTrades`, built in #141 |
+| Report | spills one aspect of a result's numbers under their labels, a Read by another name, kept for what a desk reads off a sheet | `_ReportValues`, `_ReportRisk`, built in #141 |
 
 List and Show are the owner's agreed verbs for instrument-definition inspection. Both read
 the library catalog directly and return tables without creating handles; they precede

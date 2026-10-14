@@ -352,7 +352,7 @@ the selected representation; zero unwanted work at these boundaries is part of t
 
 Three current-code gaps must be visible in the relevant implementation slices:
 
-- [Template transport](../../library/trades/trade-template.md) does not yet exist in the seam:
+- [Template transport](../../library/trades/trade-template.md), a gap until #138 and #139 built it:
   the [Excel binding page](excel-trade-input-binding.md) specifies the agreed extension,
   instrument-selected tables with exact headers and reference cells, its error order and its
   dependency/lifetime acceptance cases; inputs.md records it when it is built.
@@ -420,6 +420,23 @@ tick, fixing update, date roll, trade amendment, rate-input change when supporte
 Dense versus sparse arrays, shared exposure-pattern evaluation, selective repricing, incremental
 fixing edits, row-level cache reuse and broad product inheritance are not prerequisites for those contracts. Measure before
 choosing them. Report unsupported measures explicitly; a zero result is not a placeholder.
+
+## Accepted constraints
+
+Boundaries the owner settled in the review of #136 to #146 and the hardening that followed, as of 7 October 2026. They are current decisions, not open questions, and the library pages link here rather than restating them.
+
+| Constraint | Where it bites |
+|---|---|
+| `quantity_unit` names one of the index's specifications exactly as the index spells it: no alias, no trimming, no case folding, and nothing inferred from the name, a row called `MMBTU` being trusted at whatever size the index states | [create-trades.md](../../library/trades/create-trades.md), [quantity-unit-selection.md](quantity-unit-selection.md) |
+| A row kept ready at a quantity of zero is a row like any other: coverage, expiry, identity and the payment rules apply to it, and a spare row that fails them fails the batch, the refusal naming what the rule names | [zero-quantities.md](zero-quantities.md) |
+| `trade_date` is kept with the terms and read by nothing; a rule on it is a separate discussion | [kernel.md](../../library/trades/kernel.md) |
+| The price vector is positional and carries no labels: the first quote is the first unfixed contract's and the rest follow the schedule, so a vector left in place across a roll is the desk's to move; labels are deferred | [evaluate-trades.md](../../library/trades/evaluate-trades.md), [market.md](../../library/market/market.md#when-the-first-contract-rolls) |
+| A penultimate future settles financially; a physical trade uses `lastday`, its observation and expiry one day | [penultimate-trades.md](penultimate-trades.md) |
+| A schedule-date refusal names its contract and no trade row, the schedule's day being every row's | [create-trades.md](../../library/trades/create-trades.md) |
+| A blank cell in a ticket's rows is named before a wrong width or an unknown header, since each argument is checked alone before the binding, the order #138's review decided; a wrong shape is named before any cell, inputs.md decision 15, since #151 | [inputs.md](../../seam/inputs.md) |
+| The calendar checks a schedule's span before the order of its expiries, the guard against an unreadable calendar first | [calendar.md](../../library/calendar/calendar.md) |
+
+Open questions, each waiting for its own discussion and none a prerequisite for the work above: a rule on `trade_date`; the penultimate method given an already shifted schedule; tying a specification to a schedule method, a route or a settlement; whether a physical `lastday` trade whose expiry the market closes should be refused at creation; the risk spill's value basis and index; schedule months increasing down the rows; the observations tied to the component count; the schedule's boundary contract accepted at creation and refused at preparation; the payment calendar and the units in the spills; and naming the trade in the market's coverage refusal.
 
 ## Relationship to earlier artifacts
 
