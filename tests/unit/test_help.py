@@ -563,6 +563,72 @@ def test_the_trades_creator_explains_itself() -> None:
     ]
 
 
+def test_the_preparation_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_PrepareTrades"]
+    assert not hidden
+    assert description == (
+        "Prepares a batch of trades against one market history, each observation whose day has "
+        "passed fixed at that day's settle and each payment that has fallen due settled, and shows "
+        "its handle, the text _EvaluateTrades takes as the prepared trades."
+    )
+    assert arguments == [
+        (
+            "trades",
+            "The trades handle: the cell showing _CreateTrades's result, such as A10, or a name "
+            "for it.",
+        ),
+        (
+            "history",
+            "The market-history handle of the trades' index: the cell showing "
+            "_CreateMarketHistory's result, such as B12, or a name for it, valued on the day the "
+            "trades are prepared for.",
+        ),
+    ]
+
+
+def test_the_evaluation_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_EvaluateTrades"]
+    assert not hidden
+    assert description == (
+        "Evaluates prepared trades against one market, the live observations at their contracts' "
+        "quotes and the fixed at their settles, into the batch's mark, cash and delta, and shows "
+        "its handle, the text the two reports take as the results."
+    )
+    assert arguments == [
+        (
+            "prepared",
+            "The prepared-trades handle: the cell showing _PrepareTrades's result, such as A11, "
+            "or a name for it.",
+        ),
+        (
+            "market",
+            "The market handle over the history the trades were prepared against: the cell "
+            "showing _CreateMarket's result, such as B13, or a name for it, with the day's quotes.",
+        ),
+    ]
+
+
+def test_the_two_reports_explain_themselves() -> None:
+    results = (
+        "results",
+        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
+        "for it.",
+    )
+    description, arguments, hidden = SPECS["_ReportValues"]
+    assert not hidden and arguments == [results]
+    assert description == (
+        "Reports the batch's values from its results: the mark and the cash under the route's "
+        "labels, the currency and the valuation day, as evaluation stored them."
+    )
+    description, arguments, hidden = SPECS["_ReportRisk"]
+    assert not hidden and arguments == [results]
+    assert description == (
+        "Reports the batch's risk from its results: the total delta, the change in mark for a "
+        "move of one quote unit in every contract, with its unit, the DV01 with its unit, and the "
+        "valuation day, as evaluation stored them."
+    )
+
+
 # --- what registration derives from the signature ---------------------------------------
 
 

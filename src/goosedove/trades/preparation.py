@@ -17,7 +17,7 @@ FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slo
 
 
 @dataclass(frozen=True, slots=True)
-class Prepared:
+class PreparedTrades:
     """The encoding and the history, by reference, and what the two make together, read-only.
 
     Per slot, aligned with the encoding's slots: is_fixed[s], whether the slot's day is on the
@@ -56,9 +56,11 @@ class Prepared:
     delta_total: float
 
 
-def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> Prepared:
-    """The one way to make a Prepared: three rules, checked once, in this order, the first failure
-    being the message; then the arrays, one pass over the slots and one read per fixed slot.
+def prepared_trades(
+    encoded: Encoded, history: MarketHistory, counter: WorkCounter
+) -> PreparedTrades:
+    """The one way to make a PreparedTrades: three rules, checked once, in this order, the first
+    failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
     The history is over the trades' index, the one object the terms hold, as the history itself
     requires of its fixings; another index of the same name is another index. Each slot's day is
@@ -141,7 +143,7 @@ def prepared(encoded: Encoded, history: MarketHistory, counter: WorkCounter) -> 
     )
     for array in (*arrays, delta):
         array.setflags(write=False)
-    return Prepared(
+    return PreparedTrades(
         encoded,
         history,
         *arrays,

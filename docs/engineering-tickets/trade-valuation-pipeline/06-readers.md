@@ -41,7 +41,8 @@ its shared context. The internal valuation section stores one `mark` and one `ca
 route determines their outward labels without duplicating amounts. A risk spill follows
 the stored market/rate axes, not the number of trades in the supplied batch.
 The initial result represents the supplied batch as a whole, whether it contains one trade
-or many. The two functions are not yet implemented, and no grouping API is introduced.
+or many. The two functions are built in #141, [report-values.md](../../library/trades/report-values.md)
+and [report-risk.md](../../library/trades/report-risk.md), and no grouping API is introduced.
 
 ## Allowed work and dependencies
 

@@ -14,14 +14,14 @@ from numpy.typing import NDArray
 
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
-from goosedove.trades.preparation import Prepared
+from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.terms import Route
 
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
 
 
 @dataclass(frozen=True, slots=True)
-class Results:
+class TradeResults:
     """The preparation and the market, by reference, and the snapshot they make, read-only. The
     route and the currency name what the numbers are: for a cleared batch, mark is the
     undiscounted entry-to-current-price P&L of the groups not yet settled, live slots at their
@@ -38,7 +38,7 @@ class Results:
     is undiscounted, so a rate move changes nothing, a result of the model and not a placeholder.
     as_of is the history's valuation day."""
 
-    prepared: Prepared
+    prepared: PreparedTrades
     market: Market
     route: Route
     currency: str
@@ -58,8 +58,8 @@ class Results:
         return tuple([schedule.codes[int(row)] for row in self.contracts])
 
 
-def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results:
-    """The one way to make Results: two rules, checked once, in this order, the first failure
+def trade_results(prepared: PreparedTrades, market: Market, counter: WorkCounter) -> TradeResults:
+    """The one way to make TradeResults: two rules, checked once, in this order, the first failure
     being the message; then the quotes read, one kernel call, and the snapshot.
 
     The market is over the history the batch was prepared against, the one object: a market over
@@ -100,7 +100,7 @@ def results(prepared: Prepared, market: Market, counter: WorkCounter) -> Results
     counter.hit(LIVE_PRICES_READ, int(prepared.live_references.size))
     dated_live_contribution.setflags(write=False)
     conventions = terms.index.conventions
-    return Results(
+    return TradeResults(
         prepared,
         market,
         terms.route,

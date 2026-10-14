@@ -436,7 +436,46 @@ $formulas = [ordered]@{
     "=_CreateTrades(EB1,EW4:FA4,EW15:FA15,EW3)"  = "#ERROR _CreateTrades: ValueError: lots of trade 'T8' at row 1 is 2.5, expected a whole number of lots"
     "=_CreateTrades(EB2,EW4:FA4,EW5:FA7,EW3)"    = "#ERROR _CreateTrades: ValueError: index is an IFERC index, expected a futures index for a future"
     '=_CreateTrades(EB1,EW4:FA4,EW5:FA7,"x:trade_template:9")' = "#ERROR _CreateTrades: template is text 'x:trade_template:9' naming no live object, expected trade template handle"
-    # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
+    # The valuation path: the batch in FG5, one trade of two lots of n26 at 70 on the index in ED1,
+    # prepared in FG6 against the history in CT7, valued on 26-May-2026, and evaluated in FG7
+    # against the market in CW1, n26 quoted at 74.25: the handles named for the index; the values
+    # report, a mark of 8,500 and no cash, in dollars, on the valuation day; the risk report, a
+    # total delta of 2,000 dollars per dollar a barrel and a DV01 of zero; the two readers one row
+    # per slot, n26 on its expiry day, live, its exposure, its contribution and its contract's
+    # delta named as the contract's; a history over
+    # another index of the same name, a market over another history and a trade on m26, the
+    # schedule's first contract, which only bounds the calendar, refused in the library's words,
+    # a handle naming nothing, a market left out and a blank where the results should be in the
+    # seam's.
+    '=MID(FG6,FIND(":",FG6)+1,32)' = "prepared_trades:Henry Hub NYMEX:"
+    '=MID(FG7,FIND(":",FG7)+1,30)' = "trade_results:Henry Hub NYMEX:"
+    "=INDEX(_ReportValues(FG7),1,1)" = "cleared_mark"
+    "=INDEX(_ReportValues(FG7),3,1)" = "8500"
+    "=INDEX(_ReportValues(FG7),3,2)" = "0"
+    "=INDEX(_ReportValues(FG7),3,3)" = "USD"
+    "=INDEX(_ReportValues(FG7),3,4)" = "46168"
+    "=COLUMNS(_ReportValues(FG7))"   = "4"
+    "=INDEX(_ReportRisk(FG7),1,1)" = "delta_total"
+    "=INDEX(_ReportRisk(FG7),3,1)" = "2000"
+    "=INDEX(_ReportRisk(FG7),3,2)" = "USD per USD/BBL"
+    "=INDEX(_ReportRisk(FG7),3,3)" = "0"
+    "=INDEX(_ReportRisk(FG7),3,4)" = "USD per basis point"
+    "=COLUMNS(_ReportRisk(FG7))"   = "5"
+    "=INDEX(util_ReadHandle(FG6),3,1)" = "n26"
+    "=INDEX(util_ReadHandle(FG6),3,3)" = "FALSE"
+    "=INDEX(util_ReadHandle(FG6),3,5)" = "2000"
+    "=ROWS(util_ReadHandle(FG6))"      = "3"
+    "=INDEX(util_ReadHandle(FG7),1,6)" = "contract_delta"
+    "=INDEX(util_ReadHandle(FG7),3,4)" = "2000"
+    "=INDEX(util_ReadHandle(FG7),3,5)" = "148500"
+    "=INDEX(util_ReadHandle(FG7),3,6)" = "2000"
+    "=_PrepareTrades(FG5,CW5)"  = "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
+    "=_PrepareTrades(FG8,CT7)"  = "#ERROR _PrepareTrades: ValueError: trade 'V3' at row 1 observes m26 on 2026-05-19, before the calendar begins; the schedule's first contract bounds the calendar and nothing prices it"
+    "=_EvaluateTrades(FG6,CW6)" = "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against"
+    '=_PrepareTrades("x:trades:9",CT7)' = "#ERROR _PrepareTrades: trades is text 'x:trades:9' naming no live object, expected trades handle"
+    "=_EvaluateTrades(FG6)" = "#ERROR _EvaluateTrades: market is missing, expected market handle"
+    "=_ReportValues(C2)"    = "#ERROR _ReportValues: results is blank, expected trade results handle"
+    # The market history: a creator over the calendar in CT7 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
     # fixing price, a number on a fixed business day, closed on a weekend and unfixed on the
     # valuation day and after; a fixing on the valuation date, a fixed day without a fixing and
@@ -741,6 +780,17 @@ $cells = [ordered]@{
     "EW13" = "=_CreateTrades(EB1,EX4:FA4,EX12:FA12,EW11)"
     "EW14" = "T9"; "EX14" = "24-Sep-2026"; "EY14" = "F27"; "EZ14" = "1"; "FA14" = "70"
     "EW15" = "T8"; "EX15" = "24-Sep-2026"; "EY15" = "u26"; "EZ15" = "2.5"; "FA15" = "70"
+    # The valuation path's tickets: one row of two lots of n26 at 70 and one of a lot of m26, the
+    # schedule's first contract; the batch on the index in ED1, whose schedule is CT4's m26 and
+    # n26, under the physical template in EW3, prepared against the history in CT7 and evaluated
+    # against the market in CW1; and the batch on m26, for the preparation to refuse.
+    "FG1" = "trade_id"; "FH1" = "trade_date"; "FI1" = "contract_code"; "FJ1" = "quantity"; "FK1" = "fixed_price"
+    "FG2" = "V1"; "FH2" = "11-May-2026"; "FI2" = "n26"; "FJ2" = "2"; "FK2" = "70"
+    "FG3" = "V3"; "FH3" = "11-May-2026"; "FI3" = "m26"; "FJ3" = "1"; "FK3" = "70"
+    "FG5" = "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,EW3)"
+    "FG6" = "=_PrepareTrades(FG5,CT7)"
+    "FG7" = "=_EvaluateTrades(FG6,CW1)"
+    "FG8" = "=_CreateTrades(ED1,FG1:FK1,FG3:FK3,EW3)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

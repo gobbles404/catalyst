@@ -31,9 +31,9 @@ from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import Results, results
+from goosedove.trades.evaluation import TradeResults, trade_results
 from goosedove.trades.observations import Observations, observations, observed
-from goosedove.trades.preparation import prepared
+from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -179,7 +179,7 @@ def evaluated(
     settlement: Settlement = Settlement.PHYSICAL,
     pays: NDArray[np.datetime64] | None = None,
     keep: slice = slice(None),
-) -> tuple[Results, WorkCounter]:
+) -> tuple[TradeResults, WorkCounter]:
     """The page's rows, or the rows kept, taken through the four steps on one counter."""
     counter = WorkCounter()
     enc = encoded(
@@ -189,8 +189,8 @@ def evaluated(
         counter,
     )
     history = history_on(ix, as_of, finals)
-    prep = prepared(enc, history, counter)
-    return results(prep, quoted(history, *quotes), counter), counter
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
 
 
 # --- the resolved terms ---------------------------------------------------------------------
@@ -425,7 +425,7 @@ CENTS = an_index(
 
 def one_lot_in_cents(
     as_of: str, finals: dict[str, float], *quotes: float
-) -> tuple[Results, WorkCounter]:
+) -> tuple[TradeResults, WorkCounter]:
     counter = WorkCounter()
     terms = resolved_trades(
         FUTURE, CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY, "LOT",
@@ -433,8 +433,8 @@ def one_lot_in_cents(
         numbers(1), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
     history = history_on(CENTS, as_of, finals)
-    prep = prepared(encoded(terms, observed(terms), UNITS, counter), history, counter)
-    return results(prep, quoted(history, *quotes), counter), counter
+    prep = prepared_trades(encoded(terms, observed(terms), UNITS, counter), history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
 
 
 @pytest.mark.parametrize(
@@ -517,7 +517,7 @@ def test_payment_days_that_cannot_be_encoded_say_why(
 def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> None:
     counter = WorkCounter()
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
-    prep = prepared(enc, history_on(NG, "2026-11-24", {}), counter)
+    prep = prepared_trades(enc, history_on(NG, "2026-11-24", {}), counter)
     np.testing.assert_array_equal(prep.is_fixed, [False, False])
     np.testing.assert_array_equal(prep.is_settled, [False, False])
     np.testing.assert_array_equal(prep.set_amount, [0.0, 0.0])
@@ -533,10 +533,10 @@ def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> No
 
 def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() -> None:
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
-    on_the_day = prepared(enc, history_on(NG, "2026-11-25", {}), WorkCounter())
+    on_the_day = prepared_trades(enc, history_on(NG, "2026-11-25", {}), WorkCounter())
     np.testing.assert_array_equal(on_the_day.is_fixed, [False, False])
     with pytest.raises(ValueError) as refused:
-        prepared(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
+        prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
     assert str(refused.value) == (
         "trade 'NG-001' at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
         "a physical future after its expiry is not supported"
@@ -547,7 +547,7 @@ def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
     twin = an_index()  # the same facts, another object
     with pytest.raises(ValueError) as refused:
-        prepared(enc, history_on(twin, "2026-11-24", {}), WorkCounter())
+        prepared_trades(enc, history_on(twin, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
         "history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
     )
@@ -561,7 +561,7 @@ def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices
     )  # fmt: skip
     enc = encoded(boundary, observed(boundary), UNITS, WorkCounter())
     with pytest.raises(ValueError) as refused:
-        prepared(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
+        prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
         "trade at row 1 observes X26 on 2026-10-28, before the calendar begins; "
         "the schedule's first contract bounds the calendar and nothing prices it"
@@ -634,7 +634,7 @@ def test_the_batch_equals_its_five_singletons_summed_and_the_duplicate_counts() 
 def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
-    prep = prepared(enc, history, WorkCounter())
+    prep = prepared_trades(enc, history, WorkCounter())
     before = (
         prep.dated_live_exposure.copy(),
         prep.delta.copy(),
@@ -642,7 +642,7 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
         prep.cash,
     )
     counter = WorkCounter()
-    later = results(prep, quoted(history, 3.21, 3.50), counter)
+    later = trade_results(prep, quoted(history, 3.21, 3.50), counter)
     assert later.mark == pytest.approx(8_600)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 2}
     assert later.prepared is prep and later.market.market_history is history
@@ -654,10 +654,10 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
 
 def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -> None:
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
-    prep = prepared(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
+    prep = prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     other = history_on(NG, "2026-11-23", {})  # the same index, another valuation date
     with pytest.raises(ValueError) as refused:
-        results(prep, quoted(other, 3.20, 3.50), WorkCounter())
+        trade_results(prep, quoted(other, 3.20, 3.50), WorkCounter())
     assert str(refused.value) == (
         "market is over another history of index 'Henry Hub NYMEX', "
         "expected the one the trades were prepared against"
@@ -667,11 +667,11 @@ def test_a_market_over_another_history_is_refused_rather_than_prepared_again() -
 def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market() -> None:
     enc = encoded(terms_of(), observed(terms_of()), UNITS, WorkCounter())
     history = history_on(NG, "2026-11-24", {})
-    prep = prepared(enc, history, WorkCounter())
+    prep = prepared_trades(enc, history, WorkCounter())
     with pytest.raises(
         ValueError, match=r"^requested contract 'F27' is beyond live-price coverage"
     ):
-        results(prep, quoted(history, 3.20), WorkCounter())
+        trade_results(prep, quoted(history, 3.20), WorkCounter())
 
 
 def test_a_bilateral_batch_is_refused_until_rates_exist() -> None:
@@ -682,9 +682,9 @@ def test_a_bilateral_batch_is_refused_until_rates_exist() -> None:
         WorkCounter(),
     )
     history = history_on(NG, "2026-11-24", {})
-    prep = prepared(enc, history, WorkCounter())
+    prep = prepared_trades(enc, history, WorkCounter())
     with pytest.raises(ValueError) as refused:
-        results(prep, quoted(history, 3.20, 3.50), WorkCounter())
+        trade_results(prep, quoted(history, 3.20, 3.50), WorkCounter())
     assert str(refused.value) == (
         "route is bilateral, expected cleared; bilateral valuation needs discount factors "
         "and a DV01 convention, not built yet"
@@ -774,10 +774,10 @@ def test_a_fully_fixed_batch_inside_a_live_market_reads_no_quote() -> None:
         WorkCounter(),
     )
     history = history_on(TOY, "2026-12-30", {"Z26": 3.23, "F27": 3.45})
-    prep = prepared(enc, history, WorkCounter())
+    prep = prepared_trades(enc, history, WorkCounter())
     assert prep.live_references.size == 0 and prep.is_fixed.all()
     counter = WorkCounter()
-    result = results(prep, quoted(history, 3.60), counter)
+    result = trade_results(prep, quoted(history, 3.60), counter)
     assert (result.mark, result.cash) == (pytest.approx(-8_500), pytest.approx(22_800))
     assert result.dated_live_contribution.size == 0
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 0}
@@ -839,13 +839,13 @@ def daily_evaluated(
     as_of: str,
     lots: tuple[float, ...] = (60.0, -30.0),
     prices: tuple[float, ...] = (70.0, 72.0),
-) -> tuple[Results, WorkCounter]:
+) -> tuple[TradeResults, WorkCounter]:
     terms = daily_terms(lots, prices)
     counter = WorkCounter()
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,) * len(lots)), UNITS, counter)
     history = daily_history(as_of, SETTLES)
-    prep = prepared(enc, history, counter)
-    return results(prep, daily_market(history), counter), counter
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, daily_market(history), counter), counter
 
 
 def daily_market(history: MarketHistory) -> Market:
@@ -933,7 +933,9 @@ def test_the_daily_toy_equals_its_two_singletons_summed() -> None:
     terms = daily_terms((-30.0,), (72.0,))
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,)), UNITS, WorkCounter())
     history = daily_history("2026-12-02", SETTLES)
-    b = results(prepared(enc, history, WorkCounter()), daily_market(history), WorkCounter())
+    b = trade_results(
+        prepared_trades(enc, history, WorkCounter()), daily_market(history), WorkCounter()
+    )
     assert b.mark == pytest.approx(2_160 - 10 * 71 - 2 * 10 * 74)
     assert a.mark + b.mark == pytest.approx(whole.mark)
 
@@ -949,23 +951,48 @@ def test_offsetting_dates_keep_their_slots_though_the_contract_delta_nets_to_zer
     np.testing.assert_allclose(enc.slot_exposure, [10, -10])
     np.testing.assert_array_equal(enc.slot_date, dates("2026-12-01", "2026-12-02"))
     before = daily_history("2026-12-01", SETTLES)
-    live = results(prepared(enc, before, WorkCounter()), daily_market(before), WorkCounter())
+    live = trade_results(
+        prepared_trades(enc, before, WorkCounter()), daily_market(before), WorkCounter()
+    )
     assert live.mark == pytest.approx(0.0) and live.delta_total == pytest.approx(0.0)
     np.testing.assert_allclose(live.dated_live_contribution, [740, -740])
     after = daily_history("2026-12-02", SETTLES)
-    fixed = results(prepared(enc, after, WorkCounter()), daily_market(after), WorkCounter())
+    fixed = trade_results(
+        prepared_trades(enc, after, WorkCounter()), daily_market(after), WorkCounter()
+    )
     assert fixed.mark == pytest.approx(-30)
     np.testing.assert_allclose(fixed.delta, [-10])
     np.testing.assert_allclose(fixed.dated_live_contribution, [-740])
+
+
+def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_named() -> None:
+    # The review's case: after 1 December fixes, the slots' live exposure is 0, 10, 10, their
+    # contributions 0, 740, 740, and Z26's delta 20 stands beside each as the contract's.
+    from goosedove.excel.utilities import shown
+
+    result, _ = daily_evaluated("2026-12-02")
+    table = shown(result)
+    assert table.texts[:6] == (
+        "contract_code",
+        "observation_date",
+        "is_fixed",
+        "live_exposure",
+        "live_contribution",
+        "contract_delta",
+    )
+    np.testing.assert_array_equal(table.numeric_slots[2:, 2], [1.0, 0.0, 0.0])  # is_fixed
+    np.testing.assert_allclose(table.numeric_slots[2:, 3], [0.0, 10.0, 10.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 740.0, 740.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 5], [20.0, 20.0, 20.0])
 
 
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
     terms = daily_terms()
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,) * 2), UNITS, WorkCounter())
     history = daily_history("2026-12-02", SETTLES)
-    prep = prepared(enc, history, WorkCounter())
+    prep = prepared_trades(enc, history, WorkCounter())
     counter = WorkCounter()
-    later = results(prep, quoted(history, 75.0, 74.5), counter)
+    later = trade_results(prep, quoted(history, 75.0, 74.5), counter)
     assert later.mark == pytest.approx(-2_040 + 710 + 2 * 10 * 75)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
     assert later.delta is prep.delta
@@ -1119,7 +1146,7 @@ prices_strategy = st.floats(min_value=1.0, max_value=9.0, allow_nan=False, allow
 def test_any_batch_equals_its_singletons_summed(
     trades: list[tuple[int, int, float]], quotes: tuple[float, float]
 ) -> None:
-    def valued(selected: list[tuple[int, int, float]]) -> Results:
+    def valued(selected: list[tuple[int, int, float]]) -> TradeResults:
         n = len(selected)
         terms = resolved_trades(
             FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY, "LOT",
@@ -1128,10 +1155,10 @@ def test_any_batch_equals_its_singletons_summed(
             numbers(*(q for _, q, _ in selected)), numbers(*(p for _, _, p in selected)), None,
         )  # fmt: skip
         history = history_on(NG, "2026-11-24", {})
-        prep = prepared(
+        prep = prepared_trades(
             encoded(terms, observed(terms), UNITS, WorkCounter()), history, WorkCounter()
         )
-        return results(prep, quoted(history, *quotes), WorkCounter())
+        return trade_results(prep, quoted(history, *quotes), WorkCounter())
 
     whole = valued(trades)
     singles = [valued([trade]) for trade in trades]
