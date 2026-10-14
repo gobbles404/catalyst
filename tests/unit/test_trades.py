@@ -297,10 +297,6 @@ GAS_DAILY = index(
             "quantity of trade 'NG-003' at row 3 is nan, expected a whole number",
         ),
         (
-            {"quantity": numbers(10, 0, 7, -12, 10)},
-            "quantity of trade 'NG-002' at row 2 is 0.0, expected a nonzero quantity",
-        ),
-        (
             {"fixed_price": numbers(3.1, 3.15, 3.4, np.inf, 3.1)},
             "fixed_price of trade 'NG-004' at row 4 is inf, expected a finite price",
         ),
@@ -1348,9 +1344,179 @@ def test_observations_own_frozen_copies_and_a_seventh_shared_seven_times_is_one(
     assert sevenths.component.size == 7
 
 
+# --- a quantity of zero: a row kept ready ----------------------------------------------------
+# zero-quantities.md: a numeric zero is a whole count like any other, encoded, prepared and
+# evaluated through the one path, contributing nothing and keeping its contract on the axis. The
+# page's example: NG-001, two lots of Z26 at 3.00, and ENTRY-002, a row of F27 at 3.30 kept ready.
+
+
+def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
+    return resolved_trades(
+        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH, ("NG-001", "ENTRY-002"), None, None, dates("2026-10-06", "2026-10-06"),
+        rows(0, 1), rows(1, 2), numbers(*quantities), numbers(3.0, 3.3), None,
+    )  # fmt: skip
+
+
+def zero_toy_terms() -> ResolvedTrades:
+    """One row kept ready on the toy: nothing of Z26 at 3.10, financial, paying 30 November."""
+    return resolved_trades(
+        FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH, ("ENTRY-000",), None, None, dates("2026-10-06"), rows(0), rows(1),
+        numbers(0.0), numbers(3.1), paying(dates("2026-11-30"), 1),
+    )  # fmt: skip
+
+
+def valued_entry(
+    quantities: tuple[float, float], *quotes: float
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = entry_terms(quantities)
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_on(NG, "2026-11-24", {})
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_a_zero_quantity_is_a_whole_count_the_terms_keep() -> None:
+    terms = entry_terms()
+    np.testing.assert_array_equal(terms.quantity, [2.0, 0.0])
+    assert terms.named(1) == "trade 'ENTRY-002' at row 2"
+    assert entry_terms((2.0, -0.0)).quantity[1] == 0.0  # numeric negative zero is whole too
+    with pytest.raises(ValueError) as refused:
+        entry_terms((2.0, 0.5))
+    assert (
+        str(refused.value)
+        == "quantity of trade 'ENTRY-002' at row 2 is 0.5, expected a whole number"
+    )
+
+
+def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> None:
+    counter = WorkCounter()
+    terms = entry_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    np.testing.assert_array_equal(enc.quote_quantity, [20_000, 0])
+    np.testing.assert_array_equal(enc.coefficient, [20_000, 0])
+    np.testing.assert_array_equal(enc.offset, [-60_000, 0])
+    np.testing.assert_array_equal(enc.groups, [1, 2])  # F27 held, at nothing
+    np.testing.assert_array_equal(enc.slot_exposure, [20_000, 0])
+    np.testing.assert_array_equal(enc.references, [1, 2])
+    assert enc.named_slot(1) == "trade 'ENTRY-002' at row 2 observes F27 on 2026-12-29"
+    assert counter.freeze().as_dict() == {
+        "encoded_components": 2,
+        "encoded_observations": 2,
+        "encoded_slots": 2,
+    }
+
+
+def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_is_sold() -> None:
+    kept, counter = valued_entry((2.0, 0.0), 3.10, 3.40)
+    assert (kept.mark, kept.cash) == (pytest.approx(2_000), 0.0)
+    np.testing.assert_array_equal(kept.delta, [20_000, 0])
+    assert kept.delta_total == 20_000 and kept.codes() == ("Z26", "F27")
+    np.testing.assert_allclose(kept.dated_live_contribution, [62_000, 0])
+    assert counter.freeze()["live_prices_read"] == 2  # the zero slot takes its quote like any other
+    sold, _ = valued_entry((2.0, -1.0), 3.10, 3.40)
+    assert sold.mark == pytest.approx(1_000)
+    np.testing.assert_array_equal(sold.delta, [20_000, -10_000])
+    assert sold.delta_total == 10_000
+
+
+def test_an_all_zero_batch_values_to_nothing_with_its_axis_kept() -> None:
+    nothing, counter = valued_entry((0.0, 0.0), 3.10, 3.40)
+    assert (nothing.mark, nothing.cash, nothing.delta_total, nothing.dv01) == (0.0, 0.0, 0.0, 0.0)
+    np.testing.assert_array_equal(nothing.delta, [0, 0])
+    assert nothing.codes() == ("Z26", "F27")
+    np.testing.assert_array_equal(nothing.dated_live_contribution, [0, 0])
+    assert counter.freeze()["live_prices_read"] == 2
+
+
+def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
+    whole, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
+    spares = resolved_trades(
+        FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
+        QuantityPer.MONTH, (*LABELS, "ENTRY-A", "ENTRY-B"), None, None,
+        np.concatenate([TRADE_DATES, dates("2026-10-06", "2026-10-06")]),
+        np.arange(7, dtype=np.intp), np.concatenate([CONTRACT, rows(1, 2)]),
+        np.concatenate([LOTS, numbers(0, 0)]),
+        np.concatenate([FIXED_PRICE, numbers(3.0, 3.3)]), None,
+    )  # fmt: skip
+    history = history_on(NG, "2026-11-24", {})
+    prep = prepared_trades(
+        encoded(spares, observed_of(spares), UNITS, WorkCounter()), history, WorkCounter()
+    )
+    spared = trade_results(prep, quoted(history, 3.20, 3.50), WorkCounter())
+    assert spared.mark == pytest.approx(whole.mark) == pytest.approx(7_000)
+    np.testing.assert_array_equal(spared.delta, whole.delta)
+    assert spared.codes() == whole.codes() and prep.live_slot.size == 2
+
+
+def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() -> None:
+    # A quote missing for the zero row's contract is still missing, a physical contract past its
+    # expiry is still past it, and an all-zero batch is held to the identity rules, whether
+    # anything is held on a contract or nothing.
+    terms = entry_terms((2.0, 0.0))
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_on(NG, "2026-11-24", {})
+    prep = prepared_trades(enc, history, WorkCounter())
+    with pytest.raises(
+        ValueError, match=r"^requested contract 'F27' is beyond live-price coverage"
+    ):
+        trade_results(prep, quoted(history, 3.10), WorkCounter())
+    nothing = entry_terms((0.0, 0.0))
+    enc = encoded(nothing, observed_of(nothing), UNITS, WorkCounter())
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
+    assert str(refused.value) == (
+        "trade 'NG-001' at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
+        "a physical future after its expiry is not supported"
+    )
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(an_index(), "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
+    )
+    prep = prepared_trades(enc, history, WorkCounter())
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(history_on(NG, "2026-11-23", {}), 3.10, 3.40), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'Henry Hub NYMEX', "
+        "expected the one the trades were prepared against"
+    )
+
+
+@pytest.mark.parametrize(
+    ("as_of", "finals", "quotes", "live_reads", "fixings_read"),
+    [
+        ("2026-11-24", {}, (3.20, 3.50, 3.60), 1, 0),
+        ("2026-11-26", {"Z26": 3.23}, (3.50, 3.60), 0, 1),
+        ("2026-11-30", {"Z26": 3.23}, (3.50, 3.60), 0, 1),
+    ],
+    ids=["live", "fixed, unpaid", "paid"],
+)
+def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(
+    as_of: str,
+    finals: dict[str, float],
+    quotes: tuple[float, ...],
+    live_reads: int,
+    fixings_read: int,
+) -> None:
+    counter = WorkCounter()
+    terms = zero_toy_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_on(TOY, as_of, finals)
+    prep = prepared_trades(enc, history, counter)
+    result = trade_results(prep, quoted(history, *quotes), counter)
+    assert (result.mark, result.cash, result.delta_total) == (0.0, 0.0, 0.0)
+    np.testing.assert_array_equal(result.delta, [0.0])
+    assert result.codes() == ("Z26",)
+    counts = counter.freeze()
+    assert (counts["live_prices_read"], counts["fixings_read"]) == (live_reads, fixings_read)
+
+
 # --- properties -------------------------------------------------------------------------------
 
-lots_strategy = st.integers(min_value=-20, max_value=20).filter(lambda n: n != 0)
+lots_strategy = st.integers(min_value=-20, max_value=20)  # zero included, a row kept ready
 prices_strategy = st.floats(min_value=1.0, max_value=9.0, allow_nan=False, allow_infinity=False)
 
 

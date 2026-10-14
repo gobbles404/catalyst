@@ -3,7 +3,8 @@ template's row and taken, last and required, by every batch of trades whose tick
 rest. The template retains the definition and its own values and no index, so one template
 serves every compatible index. It reads each value it holds for the rule intrinsic to its field,
 a code from its list, a lag of positive business days, a contract code or strip the period
-grammar reads, a whole nonzero lot count, a finite price, and leaves the rules that need the
+grammar reads, a whole quantity, zero included, a finite price, and leaves the rules that need
+the
 ticket or the index, which fields are required, whether the two overlap, the schedule, to the
 resolution of a batch. Those readers live here, since resolution reads the ticket's values by
 the same rules, and the two numeric ones are the kernel's own.
@@ -130,7 +131,7 @@ def business_days_of(where: str, text: str) -> int:
 
 
 def quantity_of(where: str, number: float) -> float:
-    """A quantity by the kernel's rule, whole and nonzero, named by its field."""
+    """A quantity by the kernel's rule, whole, zero included, named by its field."""
     whole_quantities(np.array([number]), lambda _: where)
     return number
 

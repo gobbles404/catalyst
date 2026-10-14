@@ -474,6 +474,22 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG7),3,4)" = "2000"
     "=INDEX(util_ReadHandle(FG7),3,5)" = "148500"
     "=INDEX(util_ReadHandle(FG7),3,6)" = "2000"
+    # A quantity of zero, a row kept ready: the batch in FG12 holds the two lots of n26 beside a
+    # row of nothing on n26 at 72, FG10:FK11; prepared in FG13 and evaluated in FG14 as FG5 is, it
+    # marks the two lots' 8,500 with their delta of 2,000, one slot of the two components, and
+    # the zero row reads back with its label and its amounts of nothing; a template holding a
+    # quantity of nothing is a template.
+    "=ROWS(util_ReadHandle(FG12))"       = "4"
+    "=INDEX(util_ReadHandle(FG12),4,1)"  = "2"
+    "=INDEX(util_ReadHandle(FG12),4,2)"  = "V0"
+    "=INDEX(util_ReadHandle(FG12),4,9)"  = "0"
+    "=INDEX(util_ReadHandle(FG12),4,13)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,15)" = "0"
+    "=ROWS(util_ReadHandle(FG13))"       = "3"
+    "=INDEX(util_ReadHandle(FG13),3,5)"  = "2000"
+    "=INDEX(_ReportValues(FG14),3,1)"    = "8500"
+    "=INDEX(_ReportRisk(FG14),3,1)"      = "2000"
+    '=MID(_CreateTradeTemplate("future",EZ4,FJ11),FIND(":",_CreateTradeTemplate("future",EZ4,FJ11))+1,15)' = "trade_template:"
     "=_PrepareTrades(FG5,CW5)"  = "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', expected the trades', 'Henry Hub NYMEX'"
     "=_PrepareTrades(FG8,CT7)"  = "#ERROR _PrepareTrades: ValueError: trade 'V3' at row 1 observes m26 on 2026-05-19, before the calendar begins; the schedule's first contract bounds the calendar and nothing prices it"
     "=_EvaluateTrades(FG6,CW6)" = "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against"
@@ -835,6 +851,13 @@ $cells = [ordered]@{
     "FG6" = "=_PrepareTrades(FG5,CT7)"
     "FG7" = "=_EvaluateTrades(FG6,CW1)"
     "FG8" = "=_CreateTrades(ED1,FG1:FK1,FG3:FK3,EW3)"
+    # The two lots of n26 again beside a row kept ready at nothing, FG10:FK11, as one batch in
+    # FG12, prepared in FG13 and evaluated in FG14 against the same history and market.
+    "FG10" = "V1"; "FH10" = "11-May-2026"; "FI10" = "n26"; "FJ10" = "2"; "FK10" = "70"
+    "FG11" = "V0"; "FH11" = "11-May-2026"; "FI11" = "n26"; "FJ11" = "0"; "FK11" = "72"
+    "FG12" = "=_CreateTrades(ED1,FG1:FK1,FG10:FK11,EW3)"
+    "FG13" = "=_PrepareTrades(FG12,CT7)"
+    "FG14" = "=_EvaluateTrades(FG13,CW1)"
     # The toy lifecycle's paid state, the example page's fifth: the index TOY_GAS over a schedule
     # of X26, Z26, F27 and G27, energy conventions in MMBTU, one specification of 10,000 MMBTU a
     # lot and a holiday calendar closed on 26 November, 25 December and New Year's Day, in FM1 to

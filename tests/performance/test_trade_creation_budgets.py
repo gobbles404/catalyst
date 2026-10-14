@@ -176,12 +176,13 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
 
 # The resolution's numpy, the same at both sizes but for the two months of each distinct code: the
 # contracts' arithmetic, the observations' builder, which checks the order and the weights, counts
-# twice and copies and freezes three columns, the payment offset and the kernel's frozen copies.
+# twice and copies and freezes three columns, the payment offset and the kernel's frozen copies;
+# the quantity rule is one look, whole or not, since zero is a count, zero-quantities.md.
 def resolution_numpy(contracts: int) -> dict[str, int]:
     return {
         "generic.astype": 2 * contracts,  # each distinct code's two months as counts
         "ndarray.all": 1,
-        "ndarray.any": 12,
+        "ndarray.any": 11,
         "ndarray.argsort": 4,
         "ndarray.astype": 3,
         "ndarray.clip": 1,
@@ -201,7 +202,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "numpy.empty": 10,
         "numpy.fromiter": 1,
         "numpy.normalize_axis_index": 1,
-        "ufunc.reduce": 15,
+        "ufunc.reduce": 14,
     }
 
 
@@ -247,8 +248,8 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
     }
     assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
-        "ndarray.any": 13,  # whether any expiry is closed
-        "ufunc.reduce": 16,
+        "ndarray.any": 12,  # whether any expiry is closed
+        "ufunc.reduce": 15,
     }
 
 

@@ -134,9 +134,9 @@ FUTURE = Instrument(
             True,
             NONE,
             FieldType.NUMBER,
-            "a whole nonzero count",
-            "Signed; a whole nonzero count of the selected quantity definition, the first future "
-            "profile's rule",
+            "a signed whole count, zero included",
+            "A whole count of the selected quantity definition, positive, negative or zero; a "
+            "zero row is kept, contributes nothing and can be filled in later",
         ),
         Field(
             "quantity_unit",

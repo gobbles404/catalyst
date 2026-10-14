@@ -123,8 +123,8 @@ def resolved(
     after its observation day, counted on its occurrence's payment calendar with Monday to Friday
     eligible, the observation day itself rolled back first so that a day the payment calendar
     closes is not counted; the rule of the two methods built, a later method stating its own.
-    Then the kernel's rules, through resolved_trades: whole nonzero quantities and finite prices,
-    each named by its trade, and a financial settlement with penultimate.
+    Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
+    prices, each named by its trade, and a financial settlement with penultimate.
 
     Work: one occurrence per ticket row, one component per contract month and one schedule code
     per row of the schedule, reported to the counter.

@@ -722,6 +722,142 @@ def test_the_old_field_is_refused_at_the_seam_as_unknown(ng: dict[str, Any]) -> 
     ).startswith("#ERROR _CreateTrades: fields cell (1, 6) is text 'contract_specification', ")
 
 
+# --- a quantity of zero on the sheet: the row kept ready ------------------------------------------
+# zero-quantities.md's example through the entries: NG-001, two lots of Z26 at 3.00, and ENTRY-002,
+# a row of F27 at 3.30 kept ready at nothing, valued with both live, Z26 at 3.10 and F27 at 3.40;
+# then the row sold, one lot, through a new batch over the same history and market.
+
+ENTRY_ROWS: list[list[object]] = [
+    ["NG-001", serial("2026-10-06"), "Z26", 2.0, 3.0],
+    ["ENTRY-002", serial("2026-10-06"), "F27", 0.0, 3.3],
+]
+
+
+def entry_state(ng: dict[str, Any], second: float) -> tuple[str, str, str]:
+    """The two rows with that many of F27, created on the NG index under its template, prepared
+    against the fixture's history of 24 November and evaluated at 3.10 and 3.40: the trades, the
+    prepared and the results handles."""
+    trades = str(
+        ENTRY["_CreateTrades"](
+            ng["index"],
+            row(*NG_HEADERS),
+            rows(ENTRY_ROWS[0], [*ENTRY_ROWS[1][:3], second, 3.3]),
+            ng["template"],
+        )
+    )
+    prepared = str(ENTRY["_PrepareTrades"](trades, ng["history"]))
+    market = a_market(ng["history"], "Henry Hub NYMEX", 3.10, 3.40)
+    return trades, prepared, str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_is_sold(
+    ng: dict[str, Any],
+) -> None:
+    trades, prepared, results = entry_state(ng, 0.0)
+    assert valued(results) == (pytest.approx(2_000), 0.0, pytest.approx(20_000))
+    batch = spilled(ENTRY["util_ReadHandle"](trades))
+    assert [line[1] for line in batch[2:]] == ["NG-001", "ENTRY-002"]  # the row kept, in its place
+    assert batch[3][batch[0].index("quantity")] == 0.0
+    assert batch[3][batch[0].index("offset")] == 0.0
+    table = spilled(ENTRY["util_ReadHandle"](results))
+    assert table[2][:4] == ["Z26", serial("2026-11-25"), False, 20_000.0]
+    assert table[2][5] == 20_000.0
+    assert table[3] == [
+        "F27",
+        serial("2026-12-29"),
+        False,
+        0.0,
+        0.0,
+        0.0,
+    ]  # on the axis, at nothing
+    sold_trades, sold_prepared, sold = entry_state(ng, -1.0)
+    assert sold_trades != trades and sold_prepared != prepared and sold != results
+    assert valued(sold) == (pytest.approx(1_000), 0.0, pytest.approx(10_000))
+    assert spilled(ENTRY["util_ReadHandle"](sold))[3][5] == -10_000.0
+    assert valued(results) == (pytest.approx(2_000), 0.0, pytest.approx(20_000))  # the old stand
+
+
+def test_an_all_zero_batch_is_a_batch_like_any_other_reporting_nothing(ng: dict[str, Any]) -> None:
+    trades = ENTRY["_CreateTrades"](
+        ng["index"],
+        row(*NG_HEADERS),
+        rows([*ENTRY_ROWS[0][:3], 0.0, 3.0], ENTRY_ROWS[1]),
+        ng["template"],
+    )
+    assert re.fullmatch(rf"{os.getpid()}:trades:Henry Hub NYMEX:\d+", str(trades))
+    prepared = ENTRY["_PrepareTrades"](trades, ng["history"])
+    results = ENTRY["_EvaluateTrades"](prepared, ng["market"])
+    assert spilled(ENTRY["_ReportValues"](results))[2] == [0.0, 0.0, "USD", serial("2026-11-24")]
+    assert spilled(ENTRY["_ReportRisk"](results))[2] == [
+        0.0,
+        "USD per USD/MMBTU",
+        0.0,
+        "USD per basis point",
+        serial("2026-11-24"),
+    ]
+    assert len(spilled(ENTRY["util_ReadHandle"](trades))) == 4  # both rows kept
+    assert [line[0] for line in spilled(ENTRY["util_ReadHandle"](prepared))[2:]] == ["Z26", "F27"]
+
+
+def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(toy: dict[str, Any]) -> None:
+    trades = ENTRY["_CreateTrades"](
+        toy["index"],
+        row(*NG_HEADERS),
+        rows(["ENTRY-000", serial("2026-10-06"), "Z26", 0.0, 3.1]),
+        toy["template"],
+    )
+    history = ""
+    for as_of, settles, quotes in (
+        ("2026-11-24", {}, (3.20, 3.50, 3.60)),
+        ("2026-11-26", Z26, (3.50, 3.60)),
+        ("2026-11-30", Z26, (3.50, 3.60)),
+    ):
+        history = a_history(toy["index"], "2026-10-29", as_of, TOY_HOLIDAYS, settles)
+        prepared = ENTRY["_PrepareTrades"](trades, history)
+        results = ENTRY["_EvaluateTrades"](prepared, a_market(history, "TOY_GAS", *quotes))
+        assert valued(str(results)) == (0.0, 0.0, 0.0), as_of
+    slots = spilled(ENTRY["util_ReadHandle"](ENTRY["_PrepareTrades"](trades, history)))
+    assert slots[2] == ["Z26", serial("2026-11-25"), True, True, 0.0]  # fixed and paid, at nothing
+
+
+def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
+    ng: dict[str, Any],
+) -> None:
+    trades, prepared, _ = entry_state(ng, 0.0)
+    assert ENTRY["_EvaluateTrades"](prepared, a_market(ng["history"], "Henry Hub NYMEX", 3.10)) == (
+        "#ERROR _EvaluateTrades: ValueError: requested contract 'F27' is beyond live-price "
+        "coverage ending at 'Z26'"
+    )
+    expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
+    assert ENTRY["_PrepareTrades"](trades, expired) == (
+        "#ERROR _PrepareTrades: ValueError: trade 'NG-001' at row 1 on Z26 expired 2026-11-25, "
+        "before valuation date 2026-11-26; a physical future after its expiry is not supported"
+    )
+    # An all-zero batch is held to the identity rules as any batch is: a history over another
+    # index of the same facts and name, and a market over another history of the same index.
+    nothing = ENTRY["_CreateTrades"](
+        ng["index"],
+        row(*NG_HEADERS),
+        rows([*ENTRY_ROWS[0][:3], 0.0, 3.0], ENTRY_ROWS[1]),
+        ng["template"],
+    )
+    twin, _ = an_index("Henry Hub NYMEX", NG_CONTRACTS, NG_HOLIDAYS, [("NYMEX NG", 10_000.0)])
+    other = a_history(twin, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
+    assert ENTRY["_PrepareTrades"](nothing, other) == (
+        "#ERROR _PrepareTrades: ValueError: history is over another index, 'Henry Hub NYMEX', "
+        "expected the trades', 'Henry Hub NYMEX'"
+    )
+    prepared_nothing = ENTRY["_PrepareTrades"](nothing, ng["history"])
+    yesterday = a_history(ng["index"], "2026-10-29", "2026-11-23", NG_HOLIDAYS, {})
+    assert ENTRY["_EvaluateTrades"](
+        prepared_nothing, a_market(yesterday, "Henry Hub NYMEX", 3.10, 3.40)
+    ) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index "
+        "'Henry Hub NYMEX', expected the one the trades were prepared against"
+    )
+    assert valued(str(ENTRY["_EvaluateTrades"](prepared_nothing, ng["market"]))) == (0.0, 0.0, 0.0)
+
+
 # --- what is refused, in the seam's order and then the library's ------------------------------
 
 

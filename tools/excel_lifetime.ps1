@@ -513,7 +513,9 @@ $processes = {
 # template's cell is cleared, the batch fails as its consumer, both are released, and the
 # template typed back rebuilds the batch. At the end the template's quantity unit changes from
 # the NYMEX lot to the index's barrel of 42 gallons, and the template, the batch, the
-# preparation and the results publish anew, the mark following the lot size.
+# preparation and the results publish anew, the mark following the lot size; then the ticket's
+# quantity goes to nothing and back, the batch, the preparation and the results remade each
+# time while the template, the history and the market stand.
 
 $trades = {
     param($state)
@@ -614,6 +616,32 @@ $trades = {
     Check "the history stands" ((Text $state $sheet "D9") -eq $history) (Text $state $sheet "D9")
     $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 17 }
     Check "the old template, batch, preparation and results are released; sixteen live, four more published" ($c.Live -eq 16 -and $c.Released -eq 17 -and $c.Published -eq 33 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # A quantity of zero, a row kept ready: the ticket's two barrels become none and the batch,
+    # the preparation and the results publish anew, the old three released, the mark 0 and the
+    # delta 0; the template, the history and the market stand. Typed back to two, the mark is
+    # 7 and the delta 2 again. The risk report in D20 reads the delta, publishing nothing.
+    Put $state $sheet "D20" "=INDEX(_ReportRisk(D18),3,1)"
+    Check "the risk report reads the delta, 2 for two barrels" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
+    $template = Text $state $sheet "D14"
+    $trades = Text $state $sheet "D15"
+    $prepared = Text $state $sheet "D17"
+    $results = Text $state $sheet "D18"
+    $market = Text $state $sheet "D11"
+    Put $state $sheet "M5" "0"
+    Check "a quantity of zero gives the batch a new handle" ((Text $state $sheet "D15") -ne $trades -and (Text $state $sheet "D15").StartsWith("${id}:trades:WTI NYMEX:")) (Text $state $sheet "D15")
+    Check "the preparation a new one" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "and the results a new one" ((Text $state $sheet "D18") -ne $results -and (Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "the mark is 0, the row kept ready" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
+    Check "and the delta is 0" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
+    Check "the template, the history and the market stand" ((Text $state $sheet "D14") -eq $template -and (Text $state $sheet "D9") -eq $history -and (Text $state $sheet "D11") -eq $market) (Text $state $sheet "D14")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 20 }
+    Check "the old batch, preparation and results are released; sixteen live, three more published" ($c.Live -eq 16 -and $c.Released -eq 20 -and $c.Published -eq 36 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Put $state $sheet "M5" "2"
+    Check "typed back to two barrels, the mark is 7 again" ((Text $state $sheet "D19") -eq "7") (Text $state $sheet "D19")
+    Check "and the delta 2 again" ((Text $state $sheet "D20") -eq "2") (Text $state $sheet "D20")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 23 }
+    Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 23 -and $c.Published -eq 39 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
 $quit = {

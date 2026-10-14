@@ -147,8 +147,9 @@ def resolved_trades(
     the ticket's rows: one date each, and one label, clearing house and broker each where those
     are given. The components are aligned, one or more, each belonging to an occurrence, every
     occurrence holding at least one, since a trade with no contract month has no economics; each
-    contract is a row of the schedule; each quantity is a whole, nonzero number, the first
-    profile's convention, a signed count of the specification; each fixed price is a finite
+    contract is a row of the schedule; each quantity is a whole number, positive, negative or
+    zero, the first profile's convention, a signed count of the specification, a zero row kept
+    ready for a deal and contributing nothing; each fixed price is a finite
     number, the quantity and the price named by the trade they belong to, as the sheet counts
     its rows. A financial settlement has payment terms, a lag and a calendar per occurrence and
     one payment day per component, and a physical one has none: a physical future pays on no
@@ -252,7 +253,7 @@ def _the_components(
     schedule_rows: int,
 ) -> None:
     """Aligned, one or more, each of an occurrence and every occurrence holding one; each
-    contract a row of the schedule, each quantity whole and nonzero, each price finite, a
+    contract a row of the schedule, each quantity whole, zero included, each price finite, a
     quantity or a price refused naming the trade it belongs to, since a strip's component is no
     row of the sheet."""
     components = occurrence.size
@@ -290,16 +291,15 @@ def _the_components(
 
 
 def whole_quantities(quantity: NDArray[np.float64], where: Callable[[int], str]) -> None:
-    """Each quantity a whole, nonzero number, the first profile's convention, a signed count of
-    the specification selected: the first that is not is refused, named by the caller's words
-    for its position, the trade it belongs to in a batch and the field in a template."""
+    """Each quantity a whole number, the first profile's convention, a signed count of the
+    specification selected, zero included, since a row kept ready for a deal holds a zero and
+    contributes nothing: the first that is not whole, a fraction, a NaN or an infinity, is
+    refused, named by the caller's words for its position, the trade it belongs to in a batch
+    and the field in a template."""
     fractional = ~np.isfinite(quantity) | (quantity != np.round(quantity))
     if fractional.any():
         k = int(fractional.argmax())
         raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a whole number")
-    if (quantity == 0).any():
-        k = int((quantity == 0).argmax())
-        raise ValueError(f"{where(k)} is {float(quantity[k])!r}, expected a nonzero quantity")
 
 
 def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> None:
