@@ -31,6 +31,7 @@ from goosedove.trades.terms import (
     ScheduleMethod,
     Settlement,
     finite_prices,
+    marketing_reserves,
     whole_quantities,
     whole_trade_ids,
 )
@@ -185,6 +186,14 @@ def trade_id_of(where: str, number: float) -> int:
     return int(whole_trade_ids(np.array([number]), lambda _: where)[0])
 
 
+def marketing_reserve_of(where: str, number: float) -> float:
+    """A marketing reserve by the reserves' rule, finite and zero or more, named by its field,
+    since #175: the one amount a template holds, read once here and booked once by every row of
+    a batch made under it."""
+    marketing_reserves(np.array([number]), lambda _: where)
+    return number
+
+
 def months_of(where: str, text: str) -> tuple[int, int]:
     """The first month of a contract code or strip and the month after its last, as numpy counts
     months, through the period grammar, which reads `Z26`, `z26`, `CAL27` and `Z27-X28` alike;
@@ -198,9 +207,10 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 
 # The readers by field name: the text fields whose text means something beyond being text, and
-# the three numbers the kernel has a rule for, the trade ID since #168; the two labels and the
-# dates are read by nobody, and since #172 neither is a contract code, which the resolution reads
-# for the rows that book by it, a row with both dates keeping it as entered text.
+# the four numbers the library has a rule for, the trade ID since #168 and the marketing
+# reserve since #175; the three labels and the dates are read by nobody, and since #172 neither
+# is a contract code, which the resolution reads for the rows that book by it, a row with both
+# dates keeping it as entered text.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {
         "schedule_method": schedule_method_of,
@@ -211,5 +221,10 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     }
 )
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(
-    {"trade_id": trade_id_of, "quantity": quantity_of, "fixed_price": price_of}
+    {
+        "trade_id": trade_id_of,
+        "quantity": quantity_of,
+        "fixed_price": price_of,
+        "marketing_reserve": marketing_reserve_of,
+    }
 )

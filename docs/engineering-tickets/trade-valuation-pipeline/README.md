@@ -18,8 +18,12 @@ prototype is renamed `fixed_float`, keeping the existing cleared/bilateral route
 The [bilateral representation inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
 records the agreed fields, new counterparty and nonnegative marketing reserve, and the
 agreed direct curve input at evaluation. Existing pages and examples using `future` migrated
-with the rename; futures index/schedule names remain. New fields and bilateral evaluation
-follow in separate work.
+with the rename; futures index/schedule names remain.
+[Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) followed in #175,
+awaiting review. Bilateral evaluation comes next: the curve an optional argument to evaluation,
+DV01 the analytic signed sensitivity of the discounted mark to a one basis point rise, and both
+nominal and discounted lot deltas reported, as the [bilateral plan](bilateral-discounting-and-dv01.md)
+records.
 
 | Material | How engineering should use it |
 |---|---|
@@ -29,8 +33,9 @@ follow in separate work.
 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | Each row chooses its period, complete dates taking precedence over a code kept as entered text, blank and empty-text absence scoped to the three period fields; UAT item 4, built in #172 |
 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | Explicit handle supplies BAL `as_of`; future periods start at their first day, expired periods fail in both helpers, and users freeze booking dates by pasting values; UAT item 3, built in #173 |
 | [Rename future to fixed_float](rename-instrument-fixed-float.md) | The catalog's one instrument renamed `fixed_float`, the same fields, rules, numbers and work budgets, `future` refused as any other word; the first slice of the bilateral arc, built in #174 |
+| [Counterparty and marketing reserve](booking-fields-and-marketing-reserve.md) | `counterparty` required with a bilateral route and refused with a cleared one, a label kept per row; `marketing_reserve` an optional nonnegative amount booked once per ticket row, summed into the reserves `_ReportReserves` shows; UAT items 8 and 11, built in #175 |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
-| [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on its evaluated results and read through `_ReportReserves`, marketing zero until after bilateral; built in #170 |
+| [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on the evaluated results and read through `_ReportReserves`; since #175 the marketing reserve is the optional amount a row books, summed the same way; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |
 | [Numeric trade IDs](numeric-trade-ids.md) | `trade_id` as the source system's whole number of at most 15 digits, numeric entry and readback, text refused, duplicates kept; built in #168 |
 | [IFERC basis futures](iferc-basis-futures.md) | Cleared financial basis futures on an IFERC index through the existing functions: the month's published index the one `lastday` observation, payment counted from last trading; built in #167 |

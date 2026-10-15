@@ -187,6 +187,18 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
         ({"quantity": float("inf")}, "quantity is inf, expected a whole number"),
+        (  # since #175: a marketing reserve is a finite amount of zero or more
+            {"marketing_reserve": -5.0},
+            "marketing_reserve is -5.0, expected a finite amount of zero or more",
+        ),
+        (
+            {"marketing_reserve": float("inf")},
+            "marketing_reserve is inf, expected a finite amount of zero or more",
+        ),
+        (
+            {"marketing_reserve": float("nan")},
+            "marketing_reserve is nan, expected a finite amount of zero or more",
+        ),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
         (
             {"payment_time_lag": LONG_LAG},

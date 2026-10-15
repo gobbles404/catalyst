@@ -472,10 +472,15 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),4,4)'  = "no start_date and end_date on the row"
     '=INDEX(_ShowInstrument("fixed_float"),4,5)'  = "no contract_code on the row, or with end_date"
     '=INDEX(_ShowInstrument("fixed_float"),4,10)' = "route = cleared"
-    '=INDEX(_ShowInstrument("fixed_float"),5,17)' = "holiday calendar handle"
-    '=INDEX(_ShowInstrument("fixed_float"),6,13)' = "the index's specification names"
+    '=INDEX(_ShowInstrument("fixed_float"),5,18)' = "holiday calendar handle"
+    '=INDEX(_ShowInstrument("fixed_float"),6,14)' = "the index's specification names"
+    '=INDEX(_ShowInstrument("fixed_float"),1,11)' = "counterparty"
+    '=INDEX(_ShowInstrument("fixed_float"),4,11)' = "route = bilateral"
+    '=INDEX(_ShowInstrument("fixed_float"),1,19)' = "marketing_reserve"
+    '=INDEX(_ShowInstrument("fixed_float"),3,19)' = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),6,19)' = "a finite amount of zero or more"
     '=ROWS(_ShowInstrument("fixed_float"))'       = "7"
-    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "17"
+    '=COLUMNS(_ShowInstrument("fixed_float"))'    = "19"
     '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
     '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
@@ -490,7 +495,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -995,6 +1000,49 @@ $formulas = [ordered]@{
     '=_ReportReserves("x:trade_results:9")' = "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, expected trade results handle"
     "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 9e+307 a lot"
     "=_CreateTrades(OR27,OR10:OW10,OR29:OW30,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number"
+    # Counterparty and the marketing reserve, booking-fields-and-marketing-reserve.md: the ticket's
+    # rows in OR32:OX36 on the RESERVES index, 2 and -2 LOT of Z26, 1 LOT of the strip Z26-F27 and
+    # 0 LOT of Z26, booking 15, 20, 25 and 5 of marketing, 65 USD once per row over the five
+    # components' 60 of brokerage and 24 of clearing, the strip's two components each showing its
+    # one amount in the readback; the template in OR44 booking 7 on each of the four plain rows, 28,
+    # the mark and the lot as without; a negative amount refused by its row, by its template, and
+    # the field by both; the bilateral template in OR51 naming its counterparty, its batch made and
+    # prepared and refused at evaluation as before, the counterparty read back; a cleared batch with
+    # a counterparty column and a bilateral template without one refused by the condition.
+    "=INDEX(_ReportReserves(OR39),3,1)"    = "60"
+    "=INDEX(_ReportReserves(OR39),3,2)"    = "24"
+    "=INDEX(_ReportReserves(OR39),3,3)"    = "65"
+    "=INDEX(_ReportReserves(OR39),3,4)"    = "USD"
+    "=COLUMNS(util_ReadHandle(OR37))"      = "23"
+    "=INDEX(util_ReadHandle(OR37),1,15)"   = "marketing_reserve"
+    "=INDEX(util_ReadHandle(OR37),2,15)"   = "float64"
+    "=INDEX(util_ReadHandle(OR37),3,15)"   = "15"
+    "=INDEX(util_ReadHandle(OR37),5,15)"   = "25"
+    "=INDEX(util_ReadHandle(OR37),6,15)"   = "25"
+    "=INDEX(util_ReadHandle(OR37),6,4)"    = "F27"
+    "=INDEX(util_ReadHandle(OR37),7,15)"   = "5"
+    "=INDEX(util_ReadHandle(OR37),1,16)"   = "entered_contract_code"
+    "=INDEX(_ReportReserves(OR47),3,1)"    = "50"
+    "=INDEX(_ReportReserves(OR47),3,3)"    = "28"
+    "=INDEX(_ReportValues(OR47),3,1)"      = "1260"
+    "=INDEX(_ReportRisk(OR47),3,1)"        = "1"
+    "=INDEX(util_ReadHandle(OR44),1,9)"    = "marketing_reserve"
+    "=INDEX(util_ReadHandle(OR44),3,9)"    = "7"
+    "=INDEX(util_ReadHandle(OR45),3,15)"   = "7"
+    "=_CreateTrades(OR5,OR32:OX32,OR40:OX40,OR9)" = "#ERROR _CreateTrades: ValueError: marketing_reserve row 1 is -5.0, expected a finite amount of zero or more"
+    '=_CreateTradeTemplate("fixed_float",{"marketing_reserve"},{-5})' = "#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more"
+    "=_CreateTrades(OR5,OR32:OX32,OR33:OX36,OR44)" = "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them"
+    "=COLUMNS(util_ReadHandle(OR52))"      = "22"
+    "=INDEX(util_ReadHandle(OR52),1,8)"    = "counterparty"
+    "=INDEX(util_ReadHandle(OR52),3,8)"    = "ACME Trading"
+    "=INDEX(util_ReadHandle(OR52),1,6)"    = "route"
+    "=INDEX(util_ReadHandle(OR52),3,6)"    = "bilateral"
+    "=INDEX(util_ReadHandle(OR51),3,6)"    = "ACME Trading"
+    "=_EvaluateTrades(OR53,OR21)" = "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet"
+    "=INDEX(util_ReadHandle(OR58),3,8)"    = "ACME Trading"
+    "=INDEX(util_ReadHandle(OR58),4,8)"    = "Beta Energy"
+    "=_CreateTrades(OR5,OR55:OX55,OR56:OX57,OR9)" = "#ERROR _CreateTrades: ValueError: counterparty is 'ACME Trading', expected none unless route = bilateral"
+    "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR60)" = "#ERROR _CreateTrades: ValueError: counterparty is missing, expected it when route = bilateral"
     "=_CreateTrades(EB1,EW4:FA4,OJ2:ON3,OJ12)" = "#ERROR _CreateTrades: ValueError: trade_id is supplied by the template and by the ticket, expected by one of them"
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{5,"Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
@@ -1853,6 +1901,39 @@ $cells = [ordered]@{
     "OR28" = "101"; "OS28" = "20-Nov-2026"; "OT28" = "Z26"; "OU28" = "2"; "OV28" = "LOT"; "OW28" = "0.25"
     "OR29" = "101"; "OS29" = "20-Nov-2026"; "OT29" = "Z26"; "OU29" = "1"; "OV29" = "LOT"; "OW29" = "0.25"
     "OR30" = "102"; "OS30" = "20-Nov-2026"; "OT30" = "Z26"; "OU30" = "1"; "OV30" = "LOT"; "OW30" = "0.25"
+    # Counterparty and the marketing reserve, booking-fields-and-marketing-reserve.md: the ticket's
+    # rows with a marketing column, OR32:OX36, their batch, preparation and results in OR37:OR39; a
+    # row booking -5 in OR40; the cleared template booking 7 in OR44 over the four plain rows,
+    # OR45:OR47; the bilateral template naming ACME Trading in OR51, its batch and preparation in
+    # OR52:OR53; two rows naming their own counterparties in OR55:OX57, their batch under the
+    # bilateral template without a counterparty, OR60 over OR61:OW62, in OR58.
+    "OR32" = "trade_id"; "OS32" = "trade_date"; "OT32" = "contract_code"; "OU32" = "quantity"; "OV32" = "quantity_unit"; "OW32" = "fixed_price"; "OX32" = "marketing_reserve"
+    "OR33" = "1001"; "OS33" = "20-Nov-2026"; "OT33" = "Z26"; "OU33" = "2"; "OV33" = "LOT"; "OW33" = "0.25"; "OX33" = "15"
+    "OR34" = "1002"; "OS34" = "20-Nov-2026"; "OT34" = "Z26"; "OU34" = "-2"; "OV34" = "LOT"; "OW34" = "0.25"; "OX34" = "20"
+    "OR35" = "1003"; "OS35" = "20-Nov-2026"; "OT35" = "Z26-F27"; "OU35" = "1"; "OV35" = "LOT"; "OW35" = "0.25"; "OX35" = "25"
+    "OR36" = "1004"; "OS36" = "20-Nov-2026"; "OT36" = "Z26"; "OU36" = "0"; "OV36" = "LOT"; "OW36" = "0.25"; "OX36" = "5"
+    "OR37" = "=_CreateTrades(OR5,OR32:OX32,OR33:OX36,OR9)"
+    "OR38" = "=_PrepareTrades(OR37,OR19)"
+    "OR39" = "=_EvaluateTrades(OR38,OR21)"
+    "OR40" = "1002"; "OS40" = "20-Nov-2026"; "OT40" = "Z26"; "OU40" = "-2"; "OV40" = "LOT"; "OW40" = "0.25"; "OX40" = "-5"
+    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_time_lag"; "OX42" = "payment_holiday_calendar"; "OY42" = "marketing_reserve"
+    "OR43" = "month"; "OS43" = "lastday"; "OT43" = "cleared"; "OU43" = "financial"; "OV43" = "Prototype Clearing"; "OW43" = "+2bd"; "OX43" = "=IC2"; "OY43" = "7"
+    "OR44" = '=_CreateTradeTemplate("fixed_float",OR42:OY42,OR43:OY43)'
+    "OR45" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR44)"
+    "OR46" = "=_PrepareTrades(OR45,OR19)"
+    "OR47" = "=_EvaluateTrades(OR46,OR21)"
+    "OR49" = "quantity_per"; "OS49" = "schedule_method"; "OT49" = "route"; "OU49" = "settlement_method"; "OV49" = "counterparty"; "OW49" = "payment_time_lag"; "OX49" = "payment_holiday_calendar"
+    "OR50" = "month"; "OS50" = "lastday"; "OT50" = "bilateral"; "OU50" = "financial"; "OV50" = "ACME Trading"; "OW50" = "+2bd"; "OX50" = "=IC2"
+    "OR51" = '=_CreateTradeTemplate("fixed_float",OR49:OX49,OR50:OX50)'
+    "OR52" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR51)"
+    "OR53" = "=_PrepareTrades(OR52,OR19)"
+    "OR55" = "trade_id"; "OS55" = "trade_date"; "OT55" = "contract_code"; "OU55" = "quantity"; "OV55" = "quantity_unit"; "OW55" = "fixed_price"; "OX55" = "counterparty"
+    "OR56" = "101"; "OS56" = "20-Nov-2026"; "OT56" = "Z26"; "OU56" = "2"; "OV56" = "LOT"; "OW56" = "0.25"; "OX56" = "ACME Trading"
+    "OR57" = "102"; "OS57" = "20-Nov-2026"; "OT57" = "Z26"; "OU57" = "-2"; "OV57" = "LOT"; "OW57" = "0.25"; "OX57" = "Beta Energy"
+    "OR58" = "=_CreateTrades(OR5,OR55:OX55,OR56:OX57,OR60)"
+    "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_time_lag"; "OW61" = "payment_holiday_calendar"
+    "OR62" = "month"; "OS62" = "lastday"; "OT62" = "bilateral"; "OU62" = "financial"; "OV62" = "+2bd"; "OW62" = "=IC2"
+    "OR60" = '=_CreateTradeTemplate("fixed_float",OR61:OW61,OR62:OW62)'
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

@@ -1179,9 +1179,12 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )
     bilateral = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method"),
-        row("NYMEX NG", "month", "lastday", "bilateral", "physical"),
-    )
+        row(
+            "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method",
+            "counterparty",
+        ),
+        row("NYMEX NG", "month", "lastday", "bilateral", "physical", "ACME Trading"),
+    )  # fmt: skip
     trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*NG_ROWS), bilateral)
     assert evaluate(prepare(trades, ng["history"]), ng["market"]) == (
         "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral "
@@ -3856,3 +3859,178 @@ def test_a_row_booking_half_a_period_or_none_fails_on_the_sheet_in_the_librarys_
         )
         == "#ERROR _CreateTrades: trade_rows cell (1, 4) is text 'October', expected date"
     )
+
+
+# --- counterparty and the marketing reserve, booking-fields-and-marketing-reserve.md -------------
+# The ticket's four rows on the ETE fee index, LOT each: 2 and -2 of Z26, 1 of the strip Z26-F27 and
+# 0 of Z26 at 25 cents, booking 15, 20, 25 and 5 of marketing: 65 USD once per row, the strip's two
+# components carrying its one amount, over 60 of brokerage and 24 of clearing; the same rows without
+# the column value the same and book nought. A bilateral template names its counterparty, kept per
+# row, and its batch is made and prepared and refused at evaluation as before; since #175.
+MARKETING_HEADERS = (*ETE_HEADERS, "marketing_reserve")
+MARKETING_ROWS: list[list[object]] = [
+    [1001.0, serial("2026-11-20"), "Z26", 2.0, "LOT", 25.0, "lastday", 15.0],
+    [1002.0, serial("2026-11-20"), "Z26", -2.0, "LOT", 25.0, "lastday", 20.0],
+    [1003.0, serial("2026-11-20"), "Z26-F27", 1.0, "LOT", 25.0, "lastday", 25.0],
+    [1004.0, serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday", 5.0],
+]
+BILATERAL_FIELDS = ("quantity_per", "route", "settlement_method", "payment_time_lag")
+BILATERAL_VALUES: tuple[object, ...] = ("month", "bilateral", "financial", "+1bd")
+BILATERAL_REFUSAL = (
+    "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation "
+    "needs discount factors and a DV01 convention, not built yet"
+)
+
+
+def a_template_of(fields: tuple[str, ...], values: tuple[object, ...]) -> str:
+    payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])))
+    return str(
+        ENTRY["_CreateTradeTemplate"](
+            "fixed_float",
+            row(*fields, "payment_holiday_calendar"),
+            row(*values, payments),
+        )
+    )
+
+
+def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_seam(
+    fees: dict[str, Any],
+) -> None:
+    trades, _, results = ete_state(
+        fees["index"],
+        fees["template"],
+        MARKETING_ROWS,
+        "2026-12-02",
+        {},
+        (28.0, 29.0),
+        MARKETING_HEADERS,
+    )
+    assert reserved(results) == [
+        RESERVE_SPILL[0],
+        RESERVE_SPILL[1],
+        [60.0, 24.0, 65.0, "USD"],
+    ]
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    i = table[0].index("marketing_reserve")
+    assert table[0][i - 1] == "payment_date" and table[0][i + 1] == "entered_contract_code"
+    assert table[1][i] == "float64"
+    # Five components, the strip's two carrying the one amount the row booked, no allocation.
+    assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1003.0, 1003.0, 1004.0]
+    assert [line[i] for line in table[2:]] == [15.0, 20.0, 25.0, 25.0, 5.0]
+    readback = spilled(ENTRY["util_ReadHandle"](results))
+    assert readback[2][-4:] == [60.0, 24.0, 65.0, "USD"]
+    # The same rows without the column: the same value and risk, nought of marketing.
+    plain_rows = [line[:-1] for line in MARKETING_ROWS]
+    plain_trades, _, plain = ete_state(
+        fees["index"], fees["template"], plain_rows, "2026-12-02", {}, (28.0, 29.0)
+    )
+    assert valued(plain) == valued(results)
+    assert reserved(plain)[2] == [60.0, 24.0, 0.0, "USD"]
+    assert "marketing_reserve" not in spilled(ENTRY["util_ReadHandle"](plain_trades))[0]
+    # A duplicate of the first row counts again; a template's seven books once per row; a tick,
+    # a fixing and payment leave the booked amounts where they were.
+    _, _, doubled = ete_state(
+        fees["index"],
+        fees["template"],
+        [*MARKETING_ROWS, MARKETING_ROWS[0]],
+        "2026-12-02",
+        {},
+        (28.0, 29.0),
+        MARKETING_HEADERS,
+    )
+    assert reserved(doubled)[2] == [80.0, 32.0, 80.0, "USD"]
+    seven = a_template_of(
+        ("quantity_per", *ETE_FIELDS, "marketing_reserve"),
+        ("month", "cleared", "financial", "ETE Clearing", "+1bd", 7.0),
+    )
+    _, _, templated = ete_state(fees["index"], seven, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
+    assert reserved(templated)[2] == [50.0, 20.0, 28.0, "USD"]
+    _, _, paid = ete_state(
+        fees["index"], seven, RESERVE_ROWS, "2027-01-04", {"2026-12-31": 27.0}, (30.0,)
+    )
+    assert valued(paid)[1] == pytest.approx(840.0) and reserved(paid)[2] == [
+        50.0,
+        20.0,
+        28.0,
+        "USD",
+    ]
+
+
+def test_a_marketing_reserve_is_refused_by_its_row_its_cell_or_its_template(
+    fees: dict[str, Any],
+) -> None:
+    create = ENTRY["_CreateTrades"]
+    index, template = fees["index"], fees["template"]
+    negative = [[*line[:-1], -5.0] if line[0] == 1002.0 else line for line in MARKETING_ROWS]
+    assert create(index, row(*MARKETING_HEADERS), rows(*negative), template) == (
+        "#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite "
+        "amount of zero or more"
+    )
+    blank = [[*line[:-1], None] if line[0] == 1003.0 else line for line in MARKETING_ROWS]
+    assert create(index, row(*MARKETING_HEADERS), rows(*blank), template) == (
+        "#ERROR _CreateTrades: trade_rows cell (3, 8) is blank, expected number"
+    )
+    worded = [[*line[:-1], "ten"] if line[0] == 1001.0 else line for line in MARKETING_ROWS]
+    assert create(index, row(*MARKETING_HEADERS), rows(*worded), template) == (
+        "#ERROR _CreateTrades: trade_rows cell (1, 8) is text 'ten', expected number"
+    )
+    assert ENTRY["_CreateTradeTemplate"]("fixed_float", row("marketing_reserve"), row(-5.0)) == (
+        "#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite "
+        "amount of zero or more"
+    )
+    seven = a_template_of(
+        ("quantity_per", *ETE_FIELDS, "marketing_reserve"),
+        ("month", "cleared", "financial", "ETE Clearing", "+1bd", 7.0),
+    )
+    assert create(index, row(*MARKETING_HEADERS), rows(*MARKETING_ROWS), seven) == (
+        "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by "
+        "the ticket, expected by one of them"
+    )
+
+
+def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_as_before(
+    fees: dict[str, Any],
+) -> None:
+    index = fees["index"]
+    shared = a_template_of((*BILATERAL_FIELDS, "counterparty"), (*BILATERAL_VALUES, "ACME Trading"))
+    trades = str(ENTRY["_CreateTrades"](index, row(*ETE_HEADERS), rows(*RESERVE_ROWS), shared))
+    assert trades.split(":")[1:3] == ["trades", "ETE"]
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    i = table[0].index("counterparty")
+    assert table[0][i - 1] == "settlement_method" and table[0][i + 1] == "quantity"
+    assert "clearing_house" not in table[0]
+    assert [line[i] for line in table[2:]] == ["ACME Trading"] * 4
+    shown = spilled(ENTRY["util_ReadHandle"](shared))
+    assert shown[0][1 + BILATERAL_FIELDS.index("route")] == "route"
+    assert shown[2][shown[0].index("counterparty")] == "ACME Trading"
+    history = a_history(index, "2026-11-30", "2026-12-02", ETE_HOLIDAYS, {})
+    prepared = str(ENTRY["_PrepareTrades"](trades, history))
+    assert prepared.split(":")[1] == "prepared_trades"
+    assert (
+        ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", 28.0, 29.0))
+        == BILATERAL_REFUSAL
+    )
+    # Each row its own counterparty from a ticket column, kept as typed.
+    by_row = a_template_of(BILATERAL_FIELDS, BILATERAL_VALUES)
+    names = ["ACME Trading", "Beta Energy", "ACME Trading", "gamma gas"]
+    lines = [[*line, name] for line, name in zip(RESERVE_ROWS, names, strict=True)]
+    trades = str(
+        ENTRY["_CreateTrades"](index, row(*ETE_HEADERS, "counterparty"), rows(*lines), by_row)
+    )
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    assert [line[table[0].index("counterparty")] for line in table[2:]] == names
+    # The conditions: a bilateral batch without one, a cleared batch with one, a blank cell.
+    assert ENTRY["_CreateTrades"](index, row(*ETE_HEADERS), rows(*RESERVE_ROWS), by_row) == (
+        "#ERROR _CreateTrades: ValueError: counterparty is missing, expected it when "
+        "route = bilateral"
+    )
+    assert ENTRY["_CreateTrades"](
+        index, row(*ETE_HEADERS, "counterparty"), rows(*lines), fees["template"]
+    ) == (
+        "#ERROR _CreateTrades: ValueError: counterparty is 'ACME Trading', expected none unless "
+        "route = bilateral"
+    )
+    blank = [[*line[:-1], None] for line in lines]
+    assert ENTRY["_CreateTrades"](
+        index, row(*ETE_HEADERS, "counterparty"), rows(*blank), by_row
+    ) == ("#ERROR _CreateTrades: trade_rows cell (1, 8) is blank, expected text")

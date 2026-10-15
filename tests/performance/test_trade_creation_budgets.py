@@ -220,17 +220,19 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "quantity_per_of": 1,
         "choice": 4,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
-        "_Fields.has": 15,  # the required fields, the code the first period field found
+        "_Fields.has": 18,  # the required fields, the code the first period field found, and
+        # since #175 the counterparty's condition and the marketing reserve looked for
         "_Fields.rows": 10,
         "_Fields.texts": 5,  # the three row fields' columns read once each, the codes apart
         "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #172
         "_Fields.period_dates": 2,  # the two dates, none supplied by this ticket
-        "_Fields.labels": 2,  # clearing_house and broker; the trade IDs are read by ids
+        "_Fields.labels": 3,  # clearing_house, counterparty and broker; the IDs are read by ids
+        "_Fields.amounts": 1,  # the marketing reserve, None when neither supplies it, since #175
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
         "_Fields.objects": 1,
-        "FieldValues.has": 9,
+        "FieldValues.has": 12,
         "FieldValues.supplied_rows": 1,  # which rows hold a code: every one, the column full
         "FieldValues.texts": 1,
         "FieldValues.numbers": 2,
@@ -702,11 +704,11 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 6,  # the lag and the five batch fields, no code named
-        "_Fields.has": 16,  # the three period fields looked for, the two dates found
+        "_Fields.has": 19,  # the three period fields looked for, the two dates found
         "_the_required.<locals>.<genexpr>": 3,
         "_Fields.rows": 9,
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
-        "FieldValues.has": 10,
+        "FieldValues.has": 13,
         "FieldValues.dates": 3,
         "FieldValues.supplied_rows": 2,  # which rows hold a start and an end: every one
     }
@@ -899,7 +901,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_Fields.where": contracts + 11,  # five more distinct texts named
         "_each_distinct.<locals>.<lambda>": 9,  # likewise
         "_Fields.rows": 7,  # three fewer: the ticket's three columns, no template value repeated
-        "FieldValues.has": 12,  # three columns more looked for
+        "FieldValues.has": 15,  # three columns more looked for
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open
@@ -1003,3 +1005,36 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
         "generic.astype": 2 * contracts,
     }
     assert numpy_calls(lambda: resolved(BASIS, ticket, template, WorkCounter())) == numpy
+
+
+# --- the marketing reserve, booking-fields-and-marketing-reserve.md ------------------------------
+# A ticket with a marketing column sums its amounts once per row, reported as reserved_occurrences
+# beside the components' brokerage and clearing; nothing else in the counter moves, since #175.
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
+    rows: int, contracts: int
+) -> None:
+    base = a_ticket(rows, contracts)
+    ticket = FieldValues(
+        FIXED_FLOAT,
+        rows,
+        (*base.names, "marketing_reserve"),
+        {**base.columns, "marketing_reserve": np.full(rows, 7.5)},
+    )
+    counter = WorkCounter()
+    batch = trades(GAS, ticket, a_template(), UNITS, counter)
+    assert batch.encoded.reserves.marketing == pytest.approx(7.5 * rows)
+    assert counter.freeze().as_dict() == {
+        "encoded_components": rows,
+        "encoded_groups": contracts,
+        "encoded_observations": rows,
+        "encoded_slots": contracts,
+        "reserved_components": rows,
+        "reserved_occurrences": rows,  # the rows' amounts summed once each, since #175
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+        "ticket_codes_read": contracts,
+    }

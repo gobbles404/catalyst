@@ -3,9 +3,10 @@ the resolution child of _CreateTrades establishes them from a template and a tic
 tests supply them in Python. One instrument and one index for the batch, one route and one
 settlement; then the occurrences, the ticket's rows, each with its date, the specification of
 the index its quantity counts, its schedule method and its quantity basis, so that one batch
-mixes units, methods and bases row by row, and its label, its clearing house and its broker
-where given; then the components, one per contract month an occurrence holds, each with its
-occurrence, its contract, its signed quantity as entered, the days it covers within its
+mixes units, methods and bases row by row, its clearing house, its counterparty and its broker
+where given and the marketing reserve it booked; then the components, one per contract month
+an occurrence holds, each with its occurrence, its contract, its signed quantity as entered,
+the days it covers within its
 contract's month, the quantity its occurrence's basis gives it and its fixed price; and for a
 financial settlement the payment terms, the lag and the calendar each occurrence pays by and the
 day each component pays. docs/library/trades/kernel.md is the page."""
@@ -113,9 +114,12 @@ class ResolvedTrades:
     among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
     trade_dates[i] the day the deal was struck, trade_ids[i] its trade_id, the source system's
     whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
-    organization and broker[i] its broker, the IDs an array and the two labels tuples, each None
-    as a whole when the field was not given, each kept as given and read for nothing but a
-    message's words. Per
+    organization, counterparty[i] since #175 the counterparty it faces and broker[i] its broker,
+    the IDs an array and the three labels tuples, each None as a whole when the field was not
+    given, each kept as given and read for nothing but a message's words; marketing_reserve[i]
+    since #175 the marketing cost the row booked once, a finite amount of zero or more in the
+    settlement currency, None as a whole when neither the template nor the ticket supplied it,
+    read by the reserves alone. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
     count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
@@ -139,6 +143,7 @@ class ResolvedTrades:
     quantity_per: NDArray[np.intp]
     trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
+    counterparty: tuple[str, ...] | None
     broker: tuple[str, ...] | None
     trade_dates: NDArray[np.datetime64]
     occurrence: NDArray[np.intp]
@@ -149,6 +154,7 @@ class ResolvedTrades:
     covered_days: NDArray[np.int64]
     component_quantity: NDArray[np.float64]
     fixed_price: NDArray[np.float64]
+    marketing_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
 
     def named(self, component: int) -> str:
@@ -186,6 +192,9 @@ def resolved_trades(
     end_date: NDArray[np.datetime64],
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
+    *,
+    counterparty: tuple[str, ...] | None = None,
+    marketing_reserve: NDArray[np.float64] | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
@@ -228,7 +237,9 @@ def resolved_trades(
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
-    occurrences = _the_occurrences(trade_dates, trade_ids, clearing_house, broker)
+    occurrences = _the_occurrences(
+        trade_dates, trade_ids, clearing_house, counterparty, broker, marketing_reserve
+    )
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(
@@ -259,6 +270,7 @@ def resolved_trades(
         _frozen_rows(quantity_per),
         None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
+        counterparty,
         broker,
         _frozen_days(trade_dates),
         _frozen_rows(occurrence),
@@ -269,6 +281,7 @@ def resolved_trades(
         days,
         _the_component_quantity(quantity_per, quantities, days, trade_ids, occurrence),
         _frozen_numbers(fixed_price),
+        None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         pays,
     )
 
@@ -411,10 +424,12 @@ def _the_occurrences(
     trade_dates: NDArray[np.datetime64],
     trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
+    counterparty: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
+    marketing_reserve: NDArray[np.float64] | None,
 ) -> int:
-    """One or more, a date each and, for the IDs and each label tuple given, one each: their
-    count."""
+    """One or more, a date each and, for the IDs, each label tuple and the marketing reserves
+    given, one each: their count."""
     occurrences = trade_dates.size
     if occurrences == 0:
         raise ValueError("trade_dates has 0 dates, expected at least 1, one per occurrence")
@@ -422,11 +437,20 @@ def _the_occurrences(
         raise ValueError(
             f"trade_ids has {trade_ids.size} ids, expected {occurrences}, one per occurrence"
         )
-    for name, texts in (("clearing_house", clearing_house), ("broker", broker)):
+    for name, texts in (
+        ("clearing_house", clearing_house),
+        ("counterparty", counterparty),
+        ("broker", broker),
+    ):
         if texts is not None and len(texts) != occurrences:
             raise ValueError(
                 f"{name} has {len(texts)} texts, expected {occurrences}, one per occurrence"
             )
+    if marketing_reserve is not None and marketing_reserve.size != occurrences:
+        raise ValueError(
+            f"marketing_reserve has {marketing_reserve.size} amounts, expected {occurrences}, "
+            "one per occurrence"
+        )
     return occurrences
 
 
@@ -543,6 +567,21 @@ def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> N
     if unfinished.any():
         k = int(unfinished.argmax())
         raise ValueError(f"{where(k)} is {float(prices[k])!r}, expected a finite price")
+
+
+def marketing_reserves(
+    amounts: NDArray[np.float64], where: Callable[[int], str]
+) -> NDArray[np.float64]:
+    """Each marketing reserve a finite amount of zero or more, since #175, the first that is not
+    refused in the caller's words, a negative amount, NaN and the infinities alike; the amounts
+    handed back for the record, the one rule a template's value and a ticket's column share."""
+    bad = ~(np.isfinite(amounts) & (amounts >= 0.0))
+    if bad.any():
+        k = int(bad.argmax())
+        raise ValueError(
+            f"{where(k)} is {float(amounts[k])!r}, expected a finite amount of zero or more"
+        )
+    return amounts
 
 
 def _the_component_quantity(

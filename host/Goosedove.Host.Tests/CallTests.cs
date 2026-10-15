@@ -220,7 +220,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -378,7 +378,7 @@ namespace Goosedove.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills seven rows by seventeen columns, the labels down the first column, the
+        // the shown fixed_float spills seven rows by nineteen columns since #175, the labels down the first column, the
         // fields across the first row and the required row booleans, every other cell text.
         [Fact]
         public void the_instrument_catalog_is_listed_and_the_future_shown()
@@ -391,11 +391,13 @@ namespace Goosedove.Host.Tests
             Assert.Equal("fixed_float", listed[1, 0]);
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(7, shown.GetLength(0));
-            Assert.Equal(17, shown.GetLength(1));
+            Assert.Equal(19, shown.GetLength(1));
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
             Assert.Equal("start_date", shown[0, 4]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 16]);
+            Assert.Equal("counterparty", shown[0, 10]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 17]);
+            Assert.Equal("marketing_reserve", shown[0, 18]);
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);
@@ -403,9 +405,11 @@ namespace Goosedove.Host.Tests
             Assert.Equal("no start_date and end_date on the row", shown[3, 3]);
             Assert.Equal("no contract_code on the row, or with start_date", shown[3, 5]);
             Assert.Equal("route = cleared", shown[3, 9]);
-            Assert.Equal("holiday calendar handle", shown[4, 16]);
-            Assert.Equal("the index's specification names", shown[5, 12]);
-            Assert.Equal("month, calday", shown[5, 13]);
+            Assert.Equal("route = bilateral", shown[3, 10]);
+            Assert.Equal("a finite amount of zero or more", shown[5, 18]);
+            Assert.Equal("holiday calendar handle", shown[4, 17]);
+            Assert.Equal("the index's specification names", shown[5, 13]);
+            Assert.Equal("month, calday", shown[5, 14]);
         }
 
         // The NG example of the trade-valuation pipeline: a template of the fixed_float's six shared
@@ -1948,6 +1952,54 @@ namespace Goosedove.Host.Tests
             var huge = (string)Seam.Call("_CreateIndex", "HUGE", "A rate a cell holds that two lots outrun", schedule, conventions, dear, holidays, "LOT");
             Assert.Equal("#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 1e+308 a lot", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 } }, template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number", Seam.Call("_CreateTrades", huge, headers, new object[,] { { 101.0, 46346.0, "Z26", 1.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", 1.0, "LOT", 0.25 } }, template));
+            // Since #175, booking-fields-and-marketing-reserve.md: a marketing column books 15, 20, 25 and 5
+            // once per row, 65, the strip Z26-F27 showing its one amount on both components, over 60 and
+            // 24; a template's 7 books 28 on the four plain rows, the mark and the lot as without; a
+            // bilateral template names its counterparty, kept per row, its batch made and prepared and
+            // refused at evaluation as before; the conditions and the rule refuse the rest.
+            var marketedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "marketing_reserve");
+            var marketedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0 } };
+            var marketed = (string)Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, template);
+            var marketedTable = (object[,])Seam.Call("util_ReadHandle", marketed);
+            Assert.Equal(23, marketedTable.GetLength(1));
+            Assert.Equal("marketing_reserve", marketedTable[0, 14]);
+            Assert.Equal("entered_contract_code", marketedTable[0, 15]);
+            Assert.Equal(15.0, (double)marketedTable[2, 14], 9);
+            Assert.Equal(25.0, (double)marketedTable[4, 14], 9);
+            Assert.Equal(25.0, (double)marketedTable[5, 14], 9);
+            Assert.Equal("F27", marketedTable[5, 3]);
+            Assert.Equal(5.0, (double)marketedTable[6, 14], 9);
+            string Market() => (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "RESERVES", Column(0.28, 0.30, 0.32)));
+            var marketedReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", marketed, history), Market()));
+            Assert.Equal(60.0, (double)marketedReserves[2, 0], 9);
+            Assert.Equal(24.0, (double)marketedReserves[2, 1], 9);
+            Assert.Equal(65.0, (double)marketedReserves[2, 2], 9);
+            Assert.Equal("USD", marketedReserves[2, 3]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTrades", index, marketedHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -5.0 } }, template));
+            var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar", "marketing_reserve"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays, 7.0));
+            var templated = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, seven), history), Market());
+            var templatedReserves = (object[,])Seam.Call("_ReportReserves", templated);
+            Assert.Equal(50.0, (double)templatedReserves[2, 0], 9);
+            Assert.Equal(28.0, (double)templatedReserves[2, 2], 9);
+            Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", templated))[2, 0], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", templated))[2, 0], 6);
+            Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
+            var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
+            var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
+            var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
+            Assert.Equal(22, facedTable.GetLength(1));
+            Assert.Equal("counterparty", facedTable[0, 7]);
+            Assert.Equal("ACME Trading", facedTable[2, 7]);
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market()));
+            var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
+            var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
+            var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "+2bd", pays));
+            var byRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, facedHeaders, facedRows, unfaced));
+            Assert.Equal("ACME Trading", byRow[2, 7]);
+            Assert.Equal("Beta Energy", byRow[3, 7]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: counterparty is 'ACME Trading', expected none unless route = bilateral", Seam.Call("_CreateTrades", index, facedHeaders, facedRows, template));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: counterparty is missing, expected it when route = bilateral", Seam.Call("_CreateTrades", index, headers, rows, unfaced));
         }
 
         // Contract codes and dates on one ticket, contract-codes-and-dates.md: the synthetic index

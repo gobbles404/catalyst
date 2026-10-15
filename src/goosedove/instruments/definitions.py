@@ -154,6 +154,16 @@ FIXED_FLOAT = Instrument(
             "A label kept as typed; nothing is inferred from it",
         ),
         Field(
+            "counterparty",
+            "The counterparty to a bilateral trade",
+            False,
+            "route = bilateral",
+            FieldType.TEXT,
+            "no fixed list",
+            "A label kept as typed, each row its own; nothing is inferred from it, no netting, "
+            "credit treatment or curve",
+        ),
+        Field(
             "broker",
             "The broker recorded for the deal",
             False,
@@ -170,7 +180,8 @@ FIXED_FLOAT = Instrument(
             FieldType.NUMBER,
             "a signed whole count, zero included",
             "A whole count of the selected quantity definition, positive, negative or zero; a "
-            "zero row is kept, contributes nothing and can be filled in later",
+            "zero row is kept, has no exposure and no quantity-based reserve, keeps a marketing "
+            "reserve it entered and can be filled in later",
         ),
         Field(
             "quantity_unit",
@@ -220,6 +231,17 @@ FIXED_FLOAT = Instrument(
             FieldType.HOLIDAY_CALENDAR,
             "a _CreateHolidayCalendar handle",
             "Monday to Friday less its holidays; separate from the pricing calendar",
+        ),
+        Field(
+            "marketing_reserve",
+            "A marketing cost booked once with the trade",
+            False,
+            NONE,
+            FieldType.NUMBER,
+            "a finite amount of zero or more",
+            "In the index's settlement currency, counted once per ticket row whatever its months, "
+            "quantity or days; left out of the template and the ticket, zero; static, never a "
+            "contribution to value",
         ),
     ),
 )

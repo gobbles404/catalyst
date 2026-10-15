@@ -10,12 +10,16 @@ then broader Excel UAT, with rebuilding conditional on what that UAT reveals.
 This ticket does not authorize landing the prototype stack or require a rebuild.
 Updated 10 October against the discussion after reviewed PR #173: the owner agreed to
 pass a discount curve directly to evaluation as an optional final argument, with no
-additional public preparation step initially. The DV01 direction, curve-date policy and
-final reader layout still need alignment; no bilateral valuation is implemented by this ticket.
+additional public preparation step initially. Agreed since: DV01 is the analytic signed
+sensitivity of the discounted mark to a one basis point rise in continuously compounded zero
+rates, ACT/365F, not a finite bump, and the readers expose both lot deltas as distinct columns,
+`nominal_delta` and `delta`. The curve-date policy is agreed too: the curve is anchored at `as_of`,
+its start date the valuation day and a mismatch refused. No bilateral valuation is implemented by
+this ticket. Counterparty and marketing reserve are built in #175.
 
 **Subsequent UAT steer:** The owner expects reported delta in **lots**. The monetary
-delta formulas below remain valuation sensitivities; their reporting must be reconciled
-with that lot view before this ticket is finalized. The agreed index-specific basis
+delta formulas below remain valuation sensitivities; the reporting is settled as two lot columns,
+`nominal_delta` and `delta`, beside the monetary sensitivity. The agreed index-specific basis
 and cleared implementation are in [Lot-delta reporting](lot-delta-reporting.md).
 The owner now wants **both nominal and discounted lot delta**, separately named, alongside
 DV01; the desk generally hedges to discounted delta. Neither measure replaces the other.
@@ -56,7 +60,7 @@ decision; the prototype exposes `fixed_float` since #174.
 ## Trade representation field inventory
 
 There are 16 existing fields and two additions. The table describes the intended
-`fixed_float` representation, agreed by the owner and pending implementation.
+`fixed_float` representation, agreed by the owner and built in #174 and #175.
 The public pipeline signatures remain:
 
 ```text
@@ -110,7 +114,7 @@ and existing mixed schedules, units, quantity bases and payment terms.
 The owner agreed the representation inventory, including counterparty required on
 bilateral only and marketing reserve optional on either route. The subsequent discussion
 settled the evaluation boundary and separate risk measures. Detailed rate conventions
-and report layouts below still need alignment rather than being implemented behavior.
+and report layouts below are agreed, not yet implemented behavior.
 
 ## Static encoding and changing rate inputs
 
@@ -141,8 +145,9 @@ would require evidence and a separate surface decision.
 First scope: one explicitly supplied curve for the evaluated batch's settlement currency.
 No curve selection inferred from counterparty. If multiple curve
 assignments are introduced later, define their stable selection and retain their payment
-ownership before allowing compression across them. Curve-date alignment, DV01 convention
-and how readers expose both lot-risk measures still need agreement before rate implementation.
+ownership before allowing compression across them. Curve-date alignment is agreed, the curve anchored at `as_of`, its start date the valuation day;
+the DV01 convention is the analytic derivative below and the readers
+expose both lot-risk measures as `nominal_delta` and `delta`.
 
 ## Outcome
 
@@ -165,22 +170,20 @@ Fees remain reserves and affect none of these measures.
 
 | Topic | First implementation |
 |---|---|
-| Product | Broad definition renamed to `fixed_float`, `route = bilateral`, `settlement_method = financial`; the rename is agreed and not yet implemented |
+| Product | Broad definition renamed to `fixed_float`, `route = bilateral`, `settlement_method = financial`; renamed in #174, the two booking fields added in #175 |
 | Batch | One index, route, settlement treatment and settlement currency unit, as today; existing mixed schedule methods, quantity terms and payment terms remain supported |
 | Rate input | Agreed: existing `DiscountCurve` as optional final evaluation argument, required for bilateral; no rate curve on the static trade or template |
 | Commodity risk | Agreed: retain nominal remaining lots and discounted lot equivalents as distinct vectors and totals, alongside monetary NPV sensitivity |
-| Curve date — owner choice pending | Require `curve.start_date == history.calendar.valuation_date.as_of`; the existing first factor is exactly 1. Refuse mismatches rather than implicitly rebase an old curve |
+| Curve date — agreed | Require `curve.start_date == history.calendar.valuation_date.as_of`; the existing first factor is exactly 1. Refuse mismatches rather than implicitly rebase an old curve |
 | Curve coverage | Every unpaid group's payment date must be covered, including fixed-but-unpaid groups. Paid dates require no factors. No extrapolation |
-| DV01 — direction pending | Recommend signed NPV change for a **+1 bp** parallel shift in continuously compounded zero rates, holding commodity prices, fixings, dates and quantities fixed |
-| Time basis for that bump | Recommend ACT/365F: actual calendar days from valuation date to payment divided by 365; day-level valuation, without `day_fraction_elapsed` |
-| Bump calculation | Exact finite change under the specified shift, not the first-order derivative approximation and not a bump to curve input discount factors |
+| DV01 — agreed | The analytic signed sensitivity of the discounted mark to a **+1 bp** parallel rise in continuously compounded zero rates, holding commodity prices, fixings, dates and quantities fixed: `-0.0001 * tau * D * payment_amount` per unpaid group, summed; negative for an amount receivable, positive for one payable |
+| Time basis | ACT/365F: actual calendar days from valuation date to payment divided by 365; day-level valuation, without `day_fraction_elapsed` |
+| No bump | The derivative is taken on the already resolved payment-date factor: no finite shift, no bumped anchors re-interpolated and no second evaluation |
 | Payment cutoff | Existing rule: all observations fixed and `payment_date <= as_of`; full signed payment moves to cash, not yesterday's discounted value |
 
 These are deliberately narrow conventions, not assertions that every desk defines DV01
-this way. Resolve the two pending owner choices and confirm the rest before implementation.
-If direction changes to a rate fall, change the bump and the independent expectations;
-do not just negate the finite up-bump answer. If curve rebasing is chosen, specify its
-date coverage and valuation-relative factors explicitly before coding it.
+this way. Every convention above is agreed; confirm the wording, not the choices, before
+implementation. The curve is never rebased: a curve starting on another day is refused.
 
 Reuse `_CreateDiscountCurve(header_row, table)`: it already builds daily factors from
 anchors, interpolating linearly on discount factors. Do not add a zero-rate builder,
@@ -256,10 +259,9 @@ payment_amount[g]    = fixed_leg[g] + floating_leg_set[g] + floating_leg_live[g]
 
 D[g]   = supplied curve's factor on payment_date[g]
 tau[g] = calendar_days(payment_date[g] - as_of) / 365
-K[g]   = D[g] * expm1(-0.0001 * tau[g])
 
 npv_by_group[g]  = payment_amount[g] * D[g]
-dv01_by_group[g] = payment_amount[g] * K[g]
+dv01_by_group[g] = -0.0001 * tau[g] * D[g] * payment_amount[g]
 
 bilateral_mark = sum(npv_by_group)
 dv01           = sum(dv01_by_group)
@@ -271,11 +273,11 @@ explain the economics; this ticket does not require a repository-wide rename.
 Fixed and set floating amounts both receive the payment's factor. Do not discount only
 the live portion, and do not discount the batch's already-summed undiscounted mark.
 
-`K` is the factor change under the chosen rate bump, not a second market input. Compute it
-from the **already resolved payment-date factor**. Bumping sparse curve anchors and then
-interpolating again gives a different sensitivity. No second full trade evaluation or
-mutated curve is needed. Retain the finite convention: `-0.0001 * tau * D` is its linear
-approximation, not the specified result.
+The DV01 is analytic: the derivative of `payment_amount * D` with respect to a parallel rise of
+the continuously compounded zero rate, taken on the **already resolved payment-date factor**, so
+`-0.0001 * tau * D` per unit of payment is the specification itself. It is no second market
+input: bumping sparse curve anchors and interpolating again would give a different number, and
+no second trade evaluation or mutated curve is needed.
 
 Keep commodity exposure and NPV sensitivity distinct. With `lot_coefficient` the index's
 existing reporting-lot coefficient, compute the following on the stable pricing-contract axis:
@@ -304,12 +306,12 @@ lot delta in this linear model. A DF change changes discounted lots while nomina
 Paid groups have zero remaining NPV, commodity delta and DV01. Their full signed amount is
 cash, even when their payment date predates the supplied curve. A fully fixed but unpaid
 group has zero commodity delta but generally nonzero DV01. A zero-rate curve with all
-factors equal to 1 still has bilateral rate sensitivity under a rate bump.
+factors equal to 1 still has bilateral rate sensitivity, `-0.0001 * tau` per unit of payment.
 
 ## Preparation and tick work
 
 Evaluation gathers factors once per distinct unpaid payment date, maps them to groups,
-computes the required bump weights and builds discounted delta. Distinct dates and group
+computes the time fractions and builds discounted delta. Distinct dates and group
 mappings come from stable encoded/prepared state rather than repeated trade interpretation.
 Time fractions depend on valuation date and payment dates; work already held in preparation
 may be reused without a new public step. Record exactly what is computed and what is reused.
@@ -335,7 +337,7 @@ to establish the correct payment amounts and stored contributions in this slice.
 | Commodity price tick | Trades, history preparation and nominal delta | Live group amounts, rate gathering/weighting, discounted delta, mark, DV01 and result snapshot; both lot deltas numerically unchanged for the same curve/history |
 | Discount curve update, same as-of/history | Trades, history preparation and nominal delta | Evaluation including rate gathering, discounted delta, mark, DV01 and result snapshot; no fixing reads |
 | Fixing correction | Static trades/encoding; curve may remain the same if its date still matches | History preparation and evaluation; a corrected paid amount can change cumulative modeled cash |
-| Valuation-date roll | Static trades/encoding | History preparation and payment status, a matching curve under the proposed date policy, evaluation |
+| Valuation-date roll | Static trades/encoding | History preparation and payment status, a matching curve under the agreed date policy, evaluation |
 | Ticket or template change | Independent market inputs where compatible | Trade creation and all dependent preparation/results |
 
 A price tick **can change DV01** because it changes future payment amounts. A rate tick
@@ -353,7 +355,7 @@ references. Names and record placement below describe required meaning, not new 
 | Discounted lot delta | Same stable contract axis; payment-weighted live lots summed by pricing reference; zero after fixing |
 | Monetary price sensitivity | Same axis; NPV sensitivity in settlement currency per quote unit, consistent with discounted lots and the reporting-lot coefficient |
 | Payment amounts and NPV contributions | Existing payment-group axis; paid groups have zero NPV and their nominal amount remains inspectable |
-| DV01 contributions | Existing payment-group axis, paid entries zero; additive contributions to the **same parallel curve bump**, not independent curve-node or market-quote sensitivities |
+| DV01 contributions | Existing payment-group axis, paid entries zero; additive contributions to the **same parallel rise**, the analytic derivative per group, not independent curve-node or market-quote sensitivities |
 | Dated live contributions | Preserve today's slot-level undiscounted price-times-exposure meaning; retain resolved payment factors and their mapping for inspection |
 | Context | Prepared trades, commodity market, supplied curve, as-of, route, settlement unit, both risk bases and precise DV01 convention |
 
@@ -365,20 +367,23 @@ group-by-contract matrix are required.
 Result contribution vectors use the full, stable payment-group axis. Results may keep
 factors only for unpaid groups with a mapping; do not invent discount factors for paid groups.
 
-`_ReportValues` already derives its mark/cash headers from route. The risk readers must
-expose nominal and discounted lots with explicit distinct meanings; final column names
-or a basis selector need agreement. Do not promise the current risk layout remains unchanged.
+`_ReportValues` already derives its mark/cash headers from route. The risk readers expose both
+lot measures as distinct columns, agreed: `nominal_delta`, the remaining exposure in reporting
+lots as today, and `delta`, the discounted lots the desk hedges to, in the scalar risk report and
+in the day, month and year buckets alike; no basis selector. The current risk layout changes by
+those columns and by the DV01 beside them.
 In particular, `_ReportDelta` currently reads nominal day/month/year buckets from preparation:
 it must not label those as discounted or silently disagree with the scalar risk report.
 Any reported discounted time buckets must be computed during evaluation and saved, preserving
-payment ownership until after weighting. DV01 help must state its bump direction, time basis
-and units. `util_ReadHandle` shows stored contents and their axes/conventions for inspection.
+payment ownership until after weighting. DV01 help must state its direction, a one basis point
+rise, its ACT/365F time basis and its units. `util_ReadHandle` shows stored contents and their axes/conventions for inspection.
 Readers access no current markets, gather no factors, reprice nothing and calculate no
 missing total. Combining separate evaluated batches is outside this slice.
 
 ## Independent acceptance examples
 
-These targets assume the proposed +1 bp finite convention. Record explicit tolerances,
+These targets use the agreed analytic convention, `-0.0001 * tau * D * payment_amount` per unpaid
+group. Record explicit tolerances,
 for example absolute `1e-10` currency units for these small fixtures and a separately
 justified tolerance for large cancellation-heavy batches. Do not obtain expected answers
 by snapshotting the implementation being tested.
@@ -398,23 +403,23 @@ and -10 at 70 with lags `+261bd` and `+522bd` resolve the two payment dates abov
 
 | Group | Nominal lots (one-unit reporting lot) | Fixed leg | Live floating leg | Net payment | DF | NPV | Discounted lot contribution | DV01 contribution |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| A | +10 | -700 | +800 | +100 | 0.95 | +95 | +9.5 | -0.00949952501583294 |
-| B | -10 | +700 | -800 | -100 | 0.90 | -90 | -9.0 | +0.0179982001199940 |
-| Aggregate | 0 | 0 | 0 | 0 | — | **5** | **0.5** | **0.00849867510416106** |
+| A | +10 | -700 | +800 | +100 | 0.95 | +95 | +9.5 | -0.0095 |
+| B | -10 | +700 | -800 | -100 | 0.90 | -90 | -9.0 | +0.018 |
+| Aggregate | 0 | 0 | 0 | 0 | — | **5** | **0.5** | **+0.0085** |
 
 This fixture catches compression before discounting and loss of payment ownership.
 
 | Change from the base case | Mark | Cash | Discounted lots | DV01 |
 |---|---:|---:|---:|---:|
-| Price 80 to 81, same curve | 5.5 | 0 | 0.5 | 0.00934854261457717 |
-| DFs 0.96 / 0.92, price still 80 | 4 | 0 | 0.4 | 0.00879864010666093 |
+| Price 80 to 81, same curve | 5.5 | 0 | 0.5 | +0.00935 |
+| DFs 0.96 / 0.92, price still 80 | 4 | 0 | 0.4 | +0.0088 |
 
 Nominal aggregate lot delta remains zero in both changes; retain it alongside discounted lots.
 
 Use an additional off-anchor case: curve anchors at day 0, DF 1, and day 730, DF 0.90.
-The day-365 factor is 0.95. A +100 payment's DV01 is -0.00949952501583294. This prevents
-an implementation from substituting anchor bumping/reinterpolation for the proposed bump.
-The first table's analytic approximation would be 0.0085; that is not its finite target.
+The day-365 factor is 0.95, linear on the factor, and a +100 payment's DV01 there is -0.0095:
+the derivative is taken on the resolved factor, never by bumping the anchors and interpolating
+again, which would give another number.
 
 ### Live, fixed and paid
 
@@ -425,10 +430,10 @@ contract so these fixtures do not depend on the deferred entirely-ended-calendar
 
 | State | Mark | Cash | Nominal and discounted lots (DF = 1) | DV01 |
 |---|---:|---:|---:|---:|
-| Day 0, price 80; observation still live on its own day | 100 | 0 | 10 | -0.00999950001666625 |
-| Day 0, price ticks to 81 | 110 | 0 | 10 | -0.01099945001833288 |
-| Day 1, prior observation fixed at 82 | 120 | 0 | 0 | -0.01196652659067438 |
-| Day 364, fixed and still unpaid | 120 | 0 | 0 | -0.0000328767078251083 |
+| Day 0, price 80; observation still live on its own day | 100 | 0 | 10 | -0.01 |
+| Day 0, price ticks to 81 | 110 | 0 | 10 | -0.011 |
+| Day 1, prior observation fixed at 82 | 120 | 0 | 0 | -0.0119671232877 |
+| Day 364, fixed and still unpaid | 120 | 0 | 0 | -0.0000328767123288 |
 | Day 365, modeled paid | 0 | 120 | 0 | 0 |
 
 Day 1 uses 364/365 years, not one year. Add a non-unit-factor fixed-but-unpaid case:
@@ -442,8 +447,9 @@ Include a batch with one group paid and another unpaid, and a correction of a kn
   month/calday quantities, unit selections, signed and zero quantities, strips and partial Asians.
 - Discounted lots times the reporting-lot coefficient match an independent one-quote-unit
   move in each reference; nominal lots match the live observation weights. DV01
-  matches independent scalar payment repricing under the declared shift, without calling
-  the production bump helper to build its expected factors. Include a leap-day span.
+  matches the independent sum of `-0.0001 * tau * D * payment` over the unpaid groups, computed
+  in the test from the resolved factors and day counts, not by the production code. Include a
+  leap-day span.
 - Same-payment-date groups can aggregate without changing answers; different dates stay
   distinct. A net-zero amount can still have commodity delta, and a raw-zero contract delta
   can become nonzero after discounting. Zero quantities retain normal validation.
@@ -455,8 +461,8 @@ Include a batch with one group paid and another unpaid, and a correction of a kn
 - Work/allocation budgets distinguish components, slots, groups, distinct unpaid dates and
   live references. A commodity tick reads each distinct live reference once, folds no fixings,
   rebuilds no schedules/conversions/payment dates, and counts factors gathered, groups valued,
-  live slots discounted and risk aggregations on every evaluation. Count time fractions and
-  bump exponentials where actually computed; do not preserve the superseded zero-rate-work
+  live slots discounted and risk aggregations on every evaluation. Count time fractions where
+  actually computed; do not preserve the superseded zero-rate-work
   tick budget. Readers perform no valuation. Rate-only changes do not rebuild trade encoding
   or history preparation. Use counts and allocation evidence, not timing gates; do not claim
   acceptable performance from vectorization alone.
@@ -471,7 +477,7 @@ the stack. The first PR is agreed as rename-only; remaining PR boundaries can be
 1. **Instrument rename only:** [rename `future` to `fixed_float`](rename-instrument-fixed-float.md), built in #174,
    migrating discovery, templates, help, tests and kept workbook callers. Preserve the
    entire current schema and numerical behavior; no new fields or bilateral valuation.
-2. **Representation additions:** the agreed counterparty and marketing-reserve fields,
+2. **Representation additions:** the agreed counterparty and marketing-reserve fields, built in #175,
    preserving static encoding and the stated reserve treatment.
 3. **Bilateral evaluation and risks:** settle the outstanding conventions and reader contract,
    add the optional curve argument and private rate-input arithmetic, complete valuation and
@@ -500,5 +506,5 @@ Payment-level present value uses a factor for the payment currency/date; Strata 
 that separation in its [payment pricer](https://strata.opengamma.io/apidocs/com/opengamma/strata/pricer/DiscountingPaymentPricer.html).
 Its [risk measures](https://strata.opengamma.io/apidocs/com/opengamma/strata/measure/Measures.html)
 also distinguish curve-parameter and market-quote PV01. Those references support the
-distinctions, not our particular choice of sign, ACT/365F or finite parallel shift; those
+distinctions, not our particular choice of sign, ACT/365F or analytic parallel rise; those
 are the explicit local conventions proposed above.
