@@ -105,8 +105,8 @@ beside the function but chosen on the call, by the instrument another argument s
 
 | Declared | Accepts | Example | Hands over | Fails on |
 |---|---|---|---|---|
-| `FieldRow[S]`, after a `TextRow`, `S` the type of the one parameter that selects the instrument, `str` for its name or a class whose handle holds one | a body of one row whose headers are any of the instrument's fields, exactly spelled, in any order | `=_CreateTradeTemplate("future", A1:F1, A2:F2)` | a `FieldValues`: the instrument, the fields present in the sheet's order, each column typed by its field, a handle column as the objects the handles stood for | a header unknown or given twice, a header count that is not the body's width, a body of more than one row, a cell that fails its field's type, named; a handle cell naming no live object or an object of another kind, named |
-| `FieldRows[S]`, likewise | a body of one or more rows | `=_CreateTrades(I3, A4:E4, A5:E9, B3)` | the same, with a value per row in each column | the same, but for the row count |
+| `FieldRow[S]`, after a `TextRow`, `S` the type of the one parameter that selects the instrument, `str` for its name or a class whose handle holds one | a body of one row whose headers are any of the instrument's fields, exactly spelled, in any order | `=_CreateTradeTemplate("future", A1:F1, A2:F2)` | a `FieldValues`: the instrument, the fields present in the sheet's order, each column typed by its field, a handle column as the objects the handles stood for, and since #172, for a field whose definition lets a cell go unsupplied, `contract_code`, `start_date` and `end_date`, which rows supplied a value, a mask beside the values of those rows alone | a header unknown or given twice, a header count that is not the body's width, a body of more than one row, a cell that fails its field's type, named, a blank or an empty text among them for every field but the three, since #172 after the headers and in the field's own words, `trade_rows cell (2, 4) is blank, expected number`; a handle cell naming no live object or an object of another kind, named |
+| `FieldRows[S]`, likewise | a body of one or more rows | `=_CreateTrades(I3, A4:E4, A5:E9, B3)` | the same, with a value per row in each column, and for the three period fields the rows that supplied one | the same, but for the row count |
 
 The schema of a table is declared beside the function:
 
@@ -240,8 +240,8 @@ holds a handle, `holiday calendar handle`, is a column of handle texts resolved 
 time through decision 35's rule, in row order, each cell's text found at its own place in the
 body and each cell named as a scalar handle argument is named, the first bad cell down the
 column whichever way it is bad; a blank
-cell fails as the mixed range refuses it, and leaving a field out is the only way not to
-supply it. A row of field values is held to its one row before any cell is looked at, since
+cell failed as the mixed range refuses it, and leaving a field out was the only way not to
+supply it, until decision 43. A row of field values is held to its one row before any cell is looked at, since
 #151, as decision 15 holds every row type: a range one row too tall fails by its shape, whatever
 its extra row holds. The order of failures is the review's decision 11: each argument alone, in
 signature order, the instrument selected, the shape of a row, the width, the headers in input
@@ -250,6 +250,32 @@ column left to right, and then the function, which checks meaning, the template 
 ticket disjoint, the required fields present, the choices supported. The function receives a
 `FieldValues`, defined in the library, which never imports the seam: the instrument, the fields
 present and each typed column by name. `EchoFieldRow` and `CountFieldRows` are the probes.
+
+Decided 2026-10-10, a cell of a field that supplied nothing, by the owner, as the ticket
+[contract-codes-and-dates.md](../engineering-tickets/trade-valuation-pipeline/contract-codes-and-dates.md);
+built in #172.
+
+43. A blank cell and an exact empty text, a formula's `""` among them, mean that the row
+supplied no value, in a template's row and a ticket's rows alike, for exactly the fields whose
+definition says so, `may_be_unsupplied` on the field: the three period fields of the future,
+`contract_code`, `start_date` and `end_date`, and no other. Whitespace is text. A missing cell
+inside the array is refused as it always was. The permission comes from the field the header
+identified, never from a cell's position, so the body's cells are checked after its headers and
+not before: the arguments alone, the instrument, the shape of a row, the width, the headers in
+input order, and then the cells column by column left to right, a blank or an empty text in any
+other field refused as that field's type refuses it, `trade_rows cell (2, 4) is blank, expected
+number`, where decision 22's words stood until now, and a wrong header still named before any
+cell. Presence of a header and presence of a row's value are two facts: the record carries,
+for each such field present, a read-only mask of the rows that supplied a value beside the
+typed values of those rows alone, never a sentinel date or an empty text among the values,
+so that nothing absent can enter arithmetic; a header present with no row supplying a value
+is a field the template or the ticket owns and supplies to no row. Each text cell is found at
+its own place among the body's texts, counted once over the cells, so a blank or an empty text
+in one column displaces no text of another, and a handle column is read the same way. Decisions
+4, 7 and 22 stand for every scalar, range and table: this is the field table's rule alone, read
+off the definition, and nothing about what a cell may hold is relaxed anywhere else. The library
+decides what an unsupplied value means, the resolution of a batch choosing each row's period
+from the fields it holds, [create-trades.md](../library/trades/create-trades.md).
 
 ## Not supported
 

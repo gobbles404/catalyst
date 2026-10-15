@@ -27,7 +27,10 @@ class Field:
     """One field of an instrument: its name, the exact header a template or a ticket must use;
     what it means; whether it must always be present once the trade is resolved; the condition
     that makes it required when it is not always, or none; its type; its choices, or where they
-    come from; and its rule, what holds of its value beyond the type."""
+    come from; its rule, what holds of its value beyond the type; and whether a cell of it may be
+    left unsupplied, a blank or an empty text meaning the row supplies no value, which since #172
+    the three period fields allow and no other does: the seam reads the flag off the field a
+    header identified and never guesses it from a cell's position."""
 
     name: str
     description: str
@@ -36,6 +39,7 @@ class Field:
     type: FieldType
     options: str
     rule: str
+    may_be_unsupplied: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,33 +77,41 @@ FUTURE = Instrument(
         ),
         Field(
             "contract_code",
-            "One monthly contract or a strip of monthly contracts",
+            "One monthly contract or a strip of monthly contracts, the row's period when it "
+            "supplies no dates",
             False,
-            "no start_date and end_date",
+            "no start_date and end_date on the row",
             FieldType.TEXT,
             "a contract or strip, F26, 1Q27, CAL27, Z27-X28",
-            "Typed in either case and resolved by month against the index's schedule, every "
-            "schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through "
-            "November 2028; or the two dates in its place",
+            "Typed in either case and resolved by month against the index's schedule when the "
+            "row supplies no dates, every schedule code read; CAL27 is F27 through Z27, Z27-X28 "
+            "December 2027 through November 2028; beside both dates it is kept as entered text "
+            "and not read; a blank or empty cell is not supplied",
+            may_be_unsupplied=True,
         ),
         Field(
             "start_date",
-            "First day of a booked period, in place of a code",
+            "First day of a booked period; with end_date it takes precedence over a code",
             False,
-            "no contract_code",
+            "no contract_code on the row, or with end_date",
             FieldType.DATE,
             "no fixed list",
-            "With end_date the days the deal covers, split at month ends; util_StartDate "
-            "gives it from a label",
+            "With end_date the inclusive days the deal covers, split at month ends, whatever "
+            "the row's code; one date without the other fails; a blank or empty cell is not "
+            "supplied; util_StartDate gives it from a label",
+            may_be_unsupplied=True,
         ),
         Field(
             "end_date",
             "Last day of a booked period, inclusive",
             False,
-            "no contract_code",
+            "no contract_code on the row, or with start_date",
             FieldType.DATE,
             "no fixed list",
-            "On or after start_date; a part of a month prices under asian alone",
+            "On or after start_date; the two dates book the row's period together, so one "
+            "without the other fails; a blank or empty cell is not supplied; a part of a month "
+            "prices under asian alone",
+            may_be_unsupplied=True,
         ),
         Field(
             "schedule_method",

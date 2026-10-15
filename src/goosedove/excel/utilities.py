@@ -330,16 +330,28 @@ def contract_specifications_table(obj: ContractSpecifications) -> MixedArray:
     )
 
 
+# The words a readback shows where a row supplied no value, since #172: display alone, never a
+# value the library holds, takes or defaults to; a reader who pastes a spill back types nothing.
+NOT_SUPPLIED = "(not supplied)"
+
+
 @shown.register
 def trade_template_table(obj: TradeTemplate) -> MixedArray:
-    # The instrument, then each default under its field name in the sheet's order, one row: a
-    # number, a day and text as they are, a holiday calendar as the words of its kind, since the
-    # spill shows what the template holds and is no round trip of a handle.
+    # The instrument, then each field the template's row named, in the sheet's order, one row:
+    # its default, a number, a day and text as they are, a holiday calendar as the words of its
+    # kind, since the spill shows what the template holds and is no round trip of a handle; and
+    # since #172 the words `(not supplied)`, text, under a period field whose cell held nothing,
+    # the header the template owns and the value it supplies to no row.
     headers: list[str] = ["instrument"]
     types: list[str] = ["str"]
     columns: list[NDArray[Any] | tuple[str, ...]] = [(obj.instrument.name,)]
-    for name, value in obj.defaults.items():
+    for name in obj.names:
         headers.append(name)
+        if name not in obj.defaults:
+            types.append("str")
+            columns.append((NOT_SUPPLIED,))
+            continue
+        value = obj.defaults[name]
         field_type = next(field for field in obj.instrument.fields if field.name == name).type
         match field_type:
             case FieldType.NUMBER:
@@ -368,11 +380,14 @@ def trades_table(obj: Trades) -> MixedArray:
     # then what the encoding made of the terms. trade_id, a number since #168,
     # clearing_house and broker where the batch has them; quantity_unit the specification's name
     # as the index spells it; the payment lag and the day it gives for a financial settlement;
-    # then what the resolution derived, start_date and end_date, the days the component covers,
-    # its whole month from a code and its share of a booked period from dates, covered_days, the
-    # calendar days between them, and component_quantity, the quantity the basis gives it, the
-    # entered quantity times those days under calday, so that a reader never takes the month's
-    # total for the entered daily quantity;
+    # then what the resolution derived, since #172 entered_contract_code, the code text the row
+    # entered as typed, kept apart from the contract its components resolved to under
+    # contract_code, and the words `(not supplied)` where the row entered none and booked by
+    # its dates, display and no value, then start_date and end_date, the days the component
+    # covers, its whole month from a code and its share of a booked period from dates,
+    # covered_days, the calendar days between them, and component_quantity, the quantity the
+    # basis gives it, the entered quantity times those days under calday, so that a reader never
+    # takes the month's total for the entered daily quantity;
     # then what the encoding made, quote_quantity the component quantity in the index's quote
     # quantity unit, coefficient and offset in the settlement currency.
     terms, encoding = obj.resolved, obj.encoded
@@ -417,6 +432,9 @@ def trades_table(obj: Trades) -> MixedArray:
         lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
         text("payment_time_lag", tuple(lags[rows]))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
+    entered = np.full(obj.code_entered.size, NOT_SUPPLIED, dtype=object)
+    entered[obj.code_entered] = np.array(obj.entered_codes, dtype=object)
+    text("entered_contract_code", tuple(entered[rows]))
     numbers("start_date", "datetime64[D]", terms.start_date)
     numbers("end_date", "datetime64[D]", terms.end_date)
     numbers("covered_days", "int64", terms.covered_days)

@@ -119,7 +119,22 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "future",
             row("quantity"),
             row(None),
-            "values cell (1, 1) is blank, expected number, nonempty text or boolean",
+            "values cell (1, 1) is blank, expected number",
+        ),
+        ("future", row("quantity"), row(""), "values cell (1, 1) is empty text, expected number"),
+        ("future", row("route"), row(""), "values cell (1, 1) is empty text, expected text"),
+        ("future", row("trade_date"), row(None), "values cell (1, 1) is blank, expected date"),
+        (
+            "future",
+            row("payment_holiday_calendar"),
+            row(""),
+            "values cell (1, 1) is empty text, expected holiday calendar handle",
+        ),
+        (
+            "future",
+            row("contract_code"),
+            row(bridge.MISSING),
+            "values cell (1, 1) is missing, expected text",
         ),
         (
             "future",
@@ -269,6 +284,84 @@ def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
     # Two wrong cells: the leftmost column's is refused first.
     out = ENTRY["EchoFieldRow"]("future", row("quantity", "fixed_price"), row("ten", "eleven"))
     assert out == "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number"
+
+
+# --- cells left unsupplied in the three period fields, since #172 -------------------------------
+
+
+def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
+    calendar: str,
+) -> None:
+    # Alternating rows: a code with formula-empty dates, a pair with a blank code, a pair with a
+    # formula-empty code; text and a handle on both sides of the three columns, each cell's text
+    # found at its own place whatever the cells around it hold.
+    headers = row(
+        "route", "contract_code", "start_date", "end_date", "payment_holiday_calendar", "broker"
+    )
+    values = bound(
+        "future",
+        headers,
+        rows(
+            ["cleared", "Z26", "", "", calendar, "ION"],
+            ["cleared", None, 46357.0, 46387.0, calendar, "TP"],
+            ["bilateral", "", 46388.0, 46418.0, calendar, "ION"],
+        ),
+        one_row=False,
+    )
+    assert values.rows == 3
+    assert values.texts("route") == ("cleared", "cleared", "bilateral")
+    assert values.texts("broker") == ("ION", "TP", "ION")
+    assert all(type(held) is HolidayCalendar for held in values.objects("payment_holiday_calendar"))
+    assert values.texts("contract_code") == ("Z26",)
+    np.testing.assert_array_equal(values.supplied_rows("contract_code"), [True, False, False])
+    np.testing.assert_array_equal(values.supplied_rows("start_date"), [False, True, True])
+    np.testing.assert_array_equal(values.supplied_rows("end_date"), [False, True, True])
+    np.testing.assert_array_equal(
+        values.dates("start_date"), np.array(["2026-12-01", "2027-01-01"], dtype="datetime64[D]")
+    )
+    np.testing.assert_array_equal(
+        values.dates("end_date"), np.array(["2026-12-31", "2027-01-31"], dtype="datetime64[D]")
+    )
+    assert set(values.supplied) == {"contract_code", "start_date", "end_date"}
+    assert not values.supplied["start_date"].flags.writeable
+    # A field without a mask was supplied on every row, as the record says.
+    np.testing.assert_array_equal(values.supplied_rows("route"), [True, True, True])
+    # One row with nothing in a period cell: the field is present and no row supplied it.
+    one = bound("future", row("contract_code", "quantity"), row("", 10.0))
+    assert one.names == ("contract_code", "quantity") and one.texts("contract_code") == ()
+    np.testing.assert_array_equal(one.supplied_rows("contract_code"), [False])
+    np.testing.assert_array_equal(one.numbers("quantity"), [10.0])
+
+
+def test_a_populated_period_cell_is_held_to_its_type_and_a_blank_elsewhere_is_refused() -> None:
+    count = ENTRY["CountFieldRows"]
+    assert count("future", row("contract_code"), rows(["Z26"], [26.0])) == (
+        "#ERROR CountFieldRows: rows cell (2, 1) is number 26.0, expected text"
+    )
+    assert count("future", row("start_date"), rows([46357.0], ["x"])) == (
+        "#ERROR CountFieldRows: rows cell (2, 1) is text 'x', expected date"
+    )
+    assert count("future", row("end_date"), rows([None], [46387.5])) == (
+        "#ERROR CountFieldRows: rows cell (2, 1) is number 46387.5, expected date"
+    )
+    # The cells are checked after the headers, since the field a header names says what a cell
+    # may hold: a blank under a wrong header is a wrong header, and under quantity a blank.
+    assert str(ENTRY["EchoFieldRow"]("future", row("Quantity"), row(None))).startswith(
+        "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future"
+    )
+    assert count("future", row("quantity", "contract_code"), rows([1.0, "Z26"], [None, ""])) == (
+        "#ERROR CountFieldRows: rows cell (2, 1) is blank, expected number"
+    )
+    # The echo probe shows the words where a row supplied nothing and the value where it did.
+    kinds, slots, text = cast(
+        tuple[NDArray[np.uint8], NDArray[np.float64], str],
+        ENTRY["EchoFieldRow"](
+            "future", row("contract_code", "start_date", "quantity"), row("", 46357.0, 10.0)
+        ),
+    )
+    assert kinds.shape == (2, 3)
+    assert text.split("\0") == ["contract_code", "start_date", "quantity", "(not supplied)"]
+    assert slots[1, 1] == 46357.0 and slots[1, 2] == 10.0
 
 
 # --- the selector by handle kind --------------------------------------------------------------

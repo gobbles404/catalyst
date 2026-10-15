@@ -181,15 +181,6 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             "such as +1bd",
         ),
         (
-            {"contract_code": "Z2026"},
-            "contract_code is 'Z2026', expected a contract or strip with two-digit years, "
-            "such as F26, 1Q27, CAL28, W29, S28 or F26-Z28",
-        ),
-        (
-            {"contract_code": "Z27-F27"},
-            "contract_code is 'Z27-F27', expected range endpoints in chronological order",
-        ),
-        (
             {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
             "schedule_method is 'pen', expected lastday, penultimate, last3day or asian",
         ),
@@ -287,3 +278,42 @@ def test_a_zero_quantity_is_held_as_a_row_kept_ready() -> None:
     assert a_template(quantity=-0.0).defaults["quantity"] == 0.0
     handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity"), row(0.0))
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
+
+
+# --- the period fields, contract-codes-and-dates.md, since #172 ----------------------------------
+
+
+def test_a_period_cell_left_empty_is_owned_by_the_template_and_supplied_to_no_row() -> None:
+    # contract_code, start_date and end_date may stand with nothing in their cells, a blank or a
+    # formula's "": the template owns the header for every batch made under it and supplies the
+    # value to no row. Every other field's blank or empty cell is refused as its type refuses it.
+    template = a_template(contract_code="", start_date=None, quantity_unit="GAL")
+    assert template.names == ("contract_code", "start_date", "quantity_unit")
+    assert dict(template.defaults) == {"quantity_unit": "GAL"}
+    full = a_template(quantity_unit="NYMEX NG", schedule_method="lastday")
+    assert full.names == tuple(full.defaults)
+    create = ENTRY["_CreateTradeTemplate"]
+    assert create("future", row("quantity_unit", "quantity"), row("GAL", None)) == (
+        "#ERROR _CreateTradeTemplate: values cell (1, 2) is blank, expected number"
+    )
+    assert create("future", row("route"), row("")) == (
+        "#ERROR _CreateTradeTemplate: values cell (1, 1) is empty text, expected text"
+    )
+    # The spill shows the words where the cell held nothing, text under the field's header.
+    handle = create("future", row("contract_code", "start_date", "quantity"), row("", None, 10.0))
+    assert spilled(handle) == [
+        ["instrument", "contract_code", "start_date", "quantity"],
+        ["str", "str", "str", "float64"],
+        ["future", "(not supplied)", "(not supplied)", 10.0],
+    ]
+
+
+def test_a_contract_code_is_text_here_and_read_for_its_months_when_a_row_books_by_it() -> None:
+    # The grammar's refusal moved to _CreateTrades, for the rows that book by the code: a template
+    # holds a label the grammar refuses as typed, since a ticket of dated rows never reads it.
+    template = a_template(contract_code="Z2026", end_date=46387.0)
+    assert dict(template.defaults) == {
+        "contract_code": "Z2026",
+        "end_date": np.datetime64("2026-12-31"),
+    }
+    assert a_template(contract_code="Z27-F27").defaults["contract_code"] == "Z27-F27"

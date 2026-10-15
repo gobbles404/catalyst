@@ -1,12 +1,15 @@
 """A trade template: shared field values under one instrument's definition, created once from a
 template's row and taken, last and required, by every batch of trades whose ticket supplies the
-rest. The template retains the definition and its own values and no index, so one template
-serves every compatible index. It reads each value it holds for the rule intrinsic to its field,
-a code from its list, a lag of positive business days within the sheet's calendar, a contract
-code or strip the period grammar reads, a whole quantity, zero included, a finite price, and
-leaves the rules that need the ticket or the index, which fields are required, whether the two
-overlap, the schedule, to the resolution of a batch. Those readers live here, since resolution
-reads the ticket's values by the same rules, and the two numeric ones are the kernel's own.
+rest. The template retains the definition, the fields its row named and its own values and no
+index, so one template serves every compatible index. It reads each value it holds for the rule
+intrinsic to its field, a code from its list, a lag of positive business days within the sheet's
+calendar, a whole quantity, zero included, a finite price, and leaves the rules that need the
+ticket or the index, which fields are required, whether the two overlap, the schedule, whether a
+contract code is the period of any row, to the resolution of a batch: since #172 a template's
+contract_code is text the seam typed and nothing more until a row without dates uses it, and a
+period field's cell may hold nothing, the header then owning the field for every batch while no
+row takes a value from it. Those readers live here, since resolution reads the ticket's values
+by the same rules, and the two numeric ones are the kernel's own.
 docs/library/trades/trade-template.md is the page."""
 
 import re
@@ -35,26 +38,39 @@ from goosedove.trades.terms import (
 
 @dataclass(frozen=True, slots=True)
 class TradeTemplate:
-    """The instrument, the definition the fields were bound against, and the defaults by field
-    name, in the sheet's order: each the one value the template's row held, a number as a
-    float, a date as a numpy day, text and a code as text, a holiday calendar as the object its
+    """The instrument, the definition the fields were bound against; the names, the fields the
+    template's row named, in the sheet's order, each one the template owns for every batch made
+    under it, so that a ticket's column of the same name is refused whatever either holds; and
+    the defaults by field name, in the same order: each the one value the row held, a number as
+    a float, a date as a numpy day, text and a code as text, a holiday calendar as the object its
     handle stood for; owned, each being a scalar or an object the library already holds, and
-    read for nothing until a batch is resolved."""
+    read for nothing until a batch is resolved. Since #172 a name may stand with no default: a
+    period field, contract_code, start_date or end_date, whose cell held nothing, which the
+    template then supplies to no row, as its page says."""
 
     instrument: Instrument
+    names: tuple[str, ...]
     defaults: Mapping[str, object]
 
 
 def trade_template(values: FieldValues) -> TradeTemplate:
     """The one way to make a TradeTemplate: one row of field values, each value taken off its
     column and read once for the rule intrinsic to its field, in the sheet's order, the first
-    failure being the message. Nothing is required, since a template is a partial record and the
-    ticket supplies the rest, and no index is read, since the template retains none: a
-    specification name waits for the index the batch is created on."""
+    failure being the message; a period field whose cell held nothing is a name without a value.
+    Nothing is required, since a template is a partial record and the ticket supplies the rest,
+    and no index is read, since the template retains none: a specification name waits for the
+    index the batch is created on, and a contract code for the rows that book by it."""
     if values.rows != 1:
         raise ValueError(f"values has {values.rows} rows, expected one row of field values")
-    defaults = {name: _value(values, name) for name in values.names}
-    return TradeTemplate(values.instrument, MappingProxyType(defaults))
+    defaults = {name: _value(values, name) for name in values.names if _holds(values, name)}
+    return TradeTemplate(values.instrument, values.names, MappingProxyType(defaults))
+
+
+def _holds(values: FieldValues, name: str) -> bool:
+    """Whether the one row supplied the field's value: every field but one whose cells may go
+    unsupplied did, and that one did when its cell held a value."""
+    mask = values.supplied.get(name)
+    return mask is None or bool(mask[0])
 
 
 @selected.register
@@ -66,7 +82,8 @@ def by_template(selector: TradeTemplate) -> Instrument:
 def _value(values: FieldValues, name: str) -> object:
     """The one value of a field in a one-row record, as the scalar its type names, read for the
     field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
-    date and a holiday calendar mean what they are."""
+    date, a holiday calendar and since #172 a contract code mean what they are, the code read for
+    its months by the resolution, for the rows that book by it, and by nothing here."""
     field_type = values.field(name).type
     match field_type:
         case FieldType.NUMBER:
@@ -182,10 +199,10 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 # The readers by field name: the text fields whose text means something beyond being text, and
 # the three numbers the kernel has a rule for, the trade ID since #168; the two labels and the
-# dates are read by nobody.
+# dates are read by nobody, and since #172 neither is a contract code, which the resolution reads
+# for the rows that book by it, a row with both dates keeping it as entered text.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {
-        "contract_code": months_of,
         "schedule_method": schedule_method_of,
         "route": route_of,
         "settlement_method": settlement_of,
