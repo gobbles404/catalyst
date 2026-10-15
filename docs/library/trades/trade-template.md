@@ -81,7 +81,7 @@ The same template supplies its fields to one or many ticket rows. Template field
 | The creator's handle, the seam's refusals in order before the library's, a range one row too tall refused by its shape whatever its extra row holds, the reader's spill | the same, 29 in all |
 | One read per value and one publication, 2,331 bytes | `tests/performance/test_trade_creation_budgets.py`, `test_seam_allocation.py` |
 | A typed holiday calendar survives through the template into a batch's payment days; the calendar's change republishes the template and the batch; the template's cell cleared fails the batch and releases both | `tools/excel_lifetime.ps1 -Groups trades` |
-| The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289 |
+| The creator, its spill and its refusals on a sheet | `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` B1273 and B1289, read back in F1273 and F1289, and B1296, the headers taken into the values and refused by the shape, since #154 |
 
 ## Not here
 
