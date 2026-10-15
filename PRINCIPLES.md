@@ -2,7 +2,7 @@
 
 ## Why this exists
 
-Alignment is everything. A person and an agent build a better product when their vectors point the same way, and this file is where the direction is written down. The rules in CLAUDE.md derive from these tenets. When no rule applies, or a rule and a tenet conflict, the tenet decides. This file changes only in a pull request that changes nothing else.
+Alignment is everything. A person and an agent build a better product when their vectors point the same way, and this file is where the direction is written down. The rules in AGENTS.md derive from these tenets. When no rule applies, or a rule and a tenet conflict, the tenet decides. This file changes only in a pull request that changes nothing else.
 
 **Surface the fork.** When a path is possible but conflicts with a tenet or a rule, or two tenets conflict, stop and present the choice before taking either path: what is possible, what it conflicts with, and a recommendation. A silent choice is a failure of alignment even when it complies. Present it in conversation before the work, and record it in the pull request under "Conflicts".
 
@@ -66,7 +66,7 @@ Not an SDK, a code library for other programmers. Nothing outside this repo call
 
 ## How this file is used
 
-- CLAUDE.md points here with the precedence line above.
+- AGENTS.md points here with the precedence line above.
 - A pull request cites the tenet that decided a hard call and lists the conflicts it surfaced.
 - A tenet never cited in twenty pull requests is cut or sharpened.
 - Amendments are their own pull request.
