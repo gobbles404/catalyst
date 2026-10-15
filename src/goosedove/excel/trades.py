@@ -2,9 +2,8 @@
 created once and taken last by the trades creator; the trades, a batch of one or many on one
 index, resolved from a template and a ticket and encoded; the batch prepared against one market
 history, as often as the history moves; the prepared batch evaluated against one market, as often
-as the quotes move; and the reports of a result, its values, its risk, its delta by time and,
-since #170, its reserves, each handle to handle. docs/library/trades/ holds a page per
-function.
+as the quotes move; and the reports of a result, its values, its risk by time and, since
+#170, its reserves, each handle to handle. docs/library/trades/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -16,6 +15,8 @@ from typing import Annotated
 import numpy as np
 
 from goosedove.excel.bridge import (
+    NUMBER_CODE,
+    TEXT_CODE,
     FieldRow,
     FieldRows,
     Handle,
@@ -29,7 +30,14 @@ from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
-from goosedove.trades.evaluation import Bucket, TradeResults, bucketed, trade_results
+from goosedove.trades.evaluation import (
+    Bucket,
+    Risk,
+    RiskView,
+    TradeResults,
+    risk_view,
+    trade_results,
+)
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import Trades, trades
 from goosedove.trades.template import TradeTemplate, choice, trade_template
@@ -41,7 +49,6 @@ __all__ = [
     "_CreateTrades",
     "_EvaluateTrades",
     "_PrepareTrades",
-    "_ReportDelta",
     "_ReportReserves",
     "_ReportRisk",
     "_ReportValues",
@@ -165,52 +172,63 @@ def _ReportRisk(
         "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
         "for it.",
     ],
-) -> MixedArray:
-    """Reports the batch's risk from its results: the nominal and the discounted delta in lots of
-    the index's reporting specification, with that unit, the DV01 with its unit, the currency per
-    basis point, and the valuation day, as evaluation stored them."""
-    return MixedArray.table(
-        [
-            ("nominal_delta", "delta", "delta_unit", "dv01", "dv01_unit", "as_of"),
-            ("float64", "float64", "str", "float64", "str", "datetime64[D]"),
-        ],
-        np.array([results.lot_delta_total]),
-        np.array([results.discounted_lot_delta_total]),
-        (results.lot_unit,),
-        np.array([results.dv01]),
-        (f"{results.currency} per basis point",),
-        np.array([results.as_of], dtype="datetime64[D]"),
-    )
-
-
-@excel_function
-def _ReportDelta(
-    results: Annotated[
-        Handle[TradeResults],
-        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
-        "for it.",
+    risk: Annotated[
+        str,
+        "Which risk: nominal_delta, delta, dv01 or all, exactly so; the deltas in lots of the "
+        "index's reporting specification by observation day, the DV01 in the currency per basis "
+        "point by payment day.",
     ],
     bucket: Annotated[
-        str, "What to sum the delta by: day, month or year, exactly so; day when left out."
-    ] = "day",
+        str,
+        "What to sum by: day, month or year, exactly so; a month or a year is labelled by its "
+        "first day, and the Total is the saved number.",
+    ],
 ) -> MixedArray:
-    """Reports the batch's delta by observation time from its results: one row per day, calendar
-    month or calendar year the batch observes in, its nominal and discounted lots still to price,
-    with the lot unit and the valuation day, as the results store them."""
-    starts, nominal, discounted = bucketed(
-        results, choice("bucket", bucket, Bucket, "day, month or year")
+    """Reports one risk of the batch from its results, or all three, by day, calendar month or
+    calendar year: the saved Total first, then one row per date, the deltas on observation days
+    and the DV01 on payment days, as evaluation stored them."""
+    view = risk_view(
+        results,
+        choice("risk", risk, Risk, "nominal_delta, delta, dv01 or all"),
+        choice("bucket", bucket, Bucket, "day, month or year"),
     )
-    return MixedArray.table(
-        [
-            ("bucket_start", "nominal_delta", "delta", "delta_unit", "as_of"),
-            ("datetime64[D]", "float64", "float64", "str", "datetime64[D]"),
-        ],
-        starts,
-        nominal,
-        discounted,
-        (results.lot_unit,) * starts.size,
-        np.full(starts.size, results.as_of, dtype="datetime64[D]"),
+    return _risk_table(results.as_of, view)
+
+
+def _risk_table(as_of: np.datetime64, view: RiskView) -> MixedArray:
+    """The risk report's rectangle, since #178: a context row, `as_of`, the valuation day and a
+    dash in every other cell; a header row, `period` and the risk labels; a type row, `str |
+    datetime64[D]` for the period column and `float64` for each risk; the Total row, the word and
+    the saved scalars; then one row per date, the bucket start and the saved values. The period
+    column holds a word above dates and the context row a word before a date, so the rectangle is
+    written by kind, as the results readback's once-per-group columns are: the kinds, the slots
+    and the texts in sheet order. The two date columns become serials through the table builder,
+    the check a date result gets, and the numbers are placed as they are, the evaluation having
+    checked them finite. Nothing is summed or converted here.
+
+    Work: the rectangle filled once, a copy per column; one serial per date."""
+    width = 1 + len(view.labels)
+    rows = 4 + view.dates.size
+    kinds = np.full((rows, width), NUMBER_CODE, dtype=np.uint8)
+    kinds[:3] = TEXT_CODE
+    kinds[0, 1] = NUMBER_CODE  # the valuation day
+    kinds[3, 0] = TEXT_CODE  # the word Total
+    slots = np.full((rows, width), np.nan)
+    slots[0, 1] = MixedArray.table([], np.array([as_of], dtype="datetime64[D]")).numeric_slots[0, 0]
+    slots[4:, 0] = MixedArray.table([], view.dates).numeric_slots[:, 0]
+    slots[3, 1:] = view.totals
+    for j, column in enumerate(view.columns):
+        slots[4:, 1 + j] = column
+    texts = (
+        "as_of",
+        *("-",) * (width - 2),
+        "period",
+        *view.labels,
+        "str | datetime64[D]",
+        *("float64",) * len(view.labels),
+        "Total",
     )
+    return MixedArray(kinds, slots, texts)
 
 
 @excel_function

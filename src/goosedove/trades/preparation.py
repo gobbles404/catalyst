@@ -2,7 +2,7 @@
 settle, which payment groups have settled, what remains live and the exposure to each live
 reference, and the risk that no tick changes, the price sensitivity in the settlement currency,
 the delta in lots of the index's reporting lot by contract and the same lots by observation day,
-calendar month and calendar year, the three views _ReportDelta selects among. One record per
+calendar month and calendar year, the three views _ReportRisk selects among. One record per
 history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
 page."""
 
@@ -72,7 +72,7 @@ class PreparedTrades:
     half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
     the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
     days, monthly_lots[m] those summed onto its calendar months and yearly_lots[y] onto its
-    calendar years, the three views _ReportDelta selects among, a bucket's lots zero once its
+    calendar years, the three views _ReportRisk selects among, a bucket's lots zero once its
     days have fixed and its row kept; every one of them checked finite before the record is
     made; the result shares them. And since #176, for a bilateral financial batch, unpaid_payments,
     the distinct payment days of the groups not yet settled with each such group's place among

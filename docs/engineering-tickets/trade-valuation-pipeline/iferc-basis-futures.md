@@ -137,7 +137,8 @@ counted from last trading even though publication occurs later.
 
 For multiple trades on one month, equal payment dates may compress together. Different
 payment dates remain separate groups for mark and cash. Their live contract delta and
-observation-date delta may still sum. On this IFERC path, `_ReportDelta(..., "day")`
+observation-date delta may still sum. On this IFERC path, the delta by day, `_ReportDelta`
+then and `_ReportRisk(results, "nominal_delta", "day")` since #178,
 puts the live lots on publication day, then retains a zero when fixed. Month/year reports
 bucket that observation date, not payment date or an invented daily delivery exposure.
 

@@ -212,7 +212,6 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
     live = bridge.live_handles()
     for name, numeric, dated in (
         ("_ReportValues", 3, True),
-        ("_ReportRisk", 4, True),  # both deltas, the DV01 and the day, since #177
         ("_ReportReserves", 3, False),  # three totals and a currency, no day, since #170
     ):
         profile = call_profile(lambda name=name: PATH[name](results))
@@ -241,7 +240,12 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
 # the quotes and the contributions by live reference and slot; a report at one row laid out;
 # none by trade, since the batch of five rows and two slots prepares at 3,527 bytes and the one
 # of 2,500 rows at 8,912. Measured 2026-10-04: preparing 8,912 bytes, a tick 1,144, the values
-# report 1,967 and the risk report 1,948; the risk report 2,079 since #177, its sixth column.
+# report 1,967 and the risk report 1,948; the risk report 2,079 since #177, its sixth column, and
+# since #178 3,591 bytes for all three by day, 24 observation days under the Total in four
+# columns, the rectangle and the DV01 column of zeros, within four slacks.
+RISK_PEAK = 4 * SLACK
+
+
 def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str, Any]) -> None:
     trades = a_batch(sheet, 2_500, 24)
     assert least_peak(lambda: PATH["_PrepareTrades"](trades, sheet["history"])) <= 10 * SLACK
@@ -252,7 +256,7 @@ def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     assert least_peak(lambda: PATH["_ReportValues"](results)) <= 2 * SLACK
-    assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 3 * SLACK
+    assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= RISK_PEAK
     assert least_peak(lambda: PATH["_ReportReserves"](results)) <= 2 * SLACK
 
 
@@ -296,37 +300,62 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
     }
 
 
-def test_the_time_report_resolves_one_handle_and_selects_a_view(
+def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
     call_profile: CallProfile, sheet: dict[str, Any], bilateral: dict[str, Any]
 ) -> None:
+    # Since #178: the three arguments validated, the two words chosen, the view selected by
+    # reference, the observation axis for a delta, the payment axis for the DV01 and both with
+    # the union for all three of a bilateral result, a cleared result's all on the observation
+    # axis; the rectangle laid out by kind with the two date columns through the table builder;
+    # nothing summed, nothing sorted, nothing published, the same over either route.
+    prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2), sheet["history"])
+    cleared = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2, bilateral["template"]), sheet["history"])
-    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+    discounted = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
     live = bridge.live_handles()
-    for bucket in ("day", "month", "year"):
-        profile = call_profile(lambda bucket=bucket: PATH["_ReportDelta"](results, bucket))
-        assert profile == {
-            "Registered.run": 1,
-            "_arguments": 1,
-            "_validate": 2,  # the results and the bucket
-            "_text": 2,
-            "_resolve": 1,
-            "_ReportDelta": 1,
-            "choice": 1,  # the bucket's word, one of three
-            "bucketed": 1,  # the two vectors selected by reference, nothing summed
-            "MixedArray.table": 1,
-            "_table_column": 4,  # the starts, both deltas and the day
-            "_serials": 2,
-            "_unit": 2,
-            "_mixed_out": 1,
-            "_bad_mixed": 1,
-        }, bucket
+    views = {
+        "nominal_delta": {"_observation_view": 1},
+        "delta": {"_observation_view": 1},
+        "dv01": {"_payment_view": 1},
+    }
+    for results, everything in (
+        (cleared, {"_observation_view": 1}),
+        (discounted, {"_observation_view": 1, "_payment_view": 1, "_union_view": 1}),
+    ):
+        for risk, selected in (*views.items(), ("all", everything)):
+            for bucket in ("day", "month", "year"):
+                profile = call_profile(
+                    lambda handle=results, risk=risk, bucket=bucket: PATH["_ReportRisk"](
+                        handle, risk, bucket
+                    )
+                )
+                assert profile == {
+                    "Registered.run": 1,
+                    "_arguments": 1,
+                    "_validate": 3,  # the results and the two words
+                    "_text": 3,
+                    "_resolve": 1,
+                    "_ReportRisk": 1,
+                    "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
+                    "risk_view": 1,
+                    **selected,
+                    "_risk_table": 1,
+                    "MixedArray.table": 2,  # the valuation day and the dates to serials
+                    "_table_column": 2,
+                    "_serials": 2,
+                    "_unit": 2,
+                    "_mixed_out": 1,
+                    "_bad_mixed": 1,
+                }, (risk, bucket)
     assert bridge.live_handles() == live  # a report publishes nothing
 
 
-# Measured 2026-10-11 at 2,500 trades over 24 slots: a bilateral tick 5,093 bytes against the
-# cleared tick's 1,418, the curve's handle, the groups' amounts, factors, NPVs and DV01s and the
-# discounted lots by reference, day, month and year; the time report 4,709 bytes under either
-# route, 24 rows of five columns and the headings; the risk report 2,079, its sixth column.
+# Measured 2026-10-11 at 2,500 trades over 24 slots: a bilateral tick 5,901 bytes against the
+# cleared tick's 1,490, the curve's handle, the groups' amounts, factors, NPVs and DV01s, the
+# discounted lots by reference, day, month and year and, since #178, the DV01 by payment day,
+# month and year, 5,093 before them; the risk report of all three by day 6,263 bytes, 48 rows
+# under the Total, the 24 observation days and the 24 payment days in four columns, the three
+# vectors placed on the union, against the cleared batch's 3,591, within seven slacks.
 def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     sheet: dict[str, Any], bilateral: dict[str, Any]
 ) -> None:
@@ -338,5 +367,4 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
         <= 8 * SLACK
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
-    assert least_peak(lambda: PATH["_ReportRisk"](results)) <= 3 * SLACK
-    assert least_peak(lambda: PATH["_ReportDelta"](results, "day")) <= 6 * SLACK
+    assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 7 * SLACK

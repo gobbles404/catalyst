@@ -13,6 +13,8 @@ observing 519 days with 429 of them live; and the same asian trades over twenty-
 valued on 10 October 2028, every one of their 497 days fixed and every group paid, the long strip
 whose sums are over no live slot at all."""
 
+from dataclasses import fields
+
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -41,8 +43,8 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.market.market import Market
-from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import TradeResults, trade_results
+from goosedove.trades.encoding import PaymentAxes, encoded
+from goosedove.trades.evaluation import Bucket, Risk, TradeResults, risk_view, trade_results
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments, prepared_trades
 from goosedove.trades.resolution import month_bounds
 from goosedove.trades.terms import (
@@ -252,7 +254,9 @@ def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
         "kernel": 1,
         "live_prices_read": prep.live_references.size,  # one quote a live contract
         "payment_factors_read": unpaid,  # one payment day a contract: a factor an unpaid group
-        "risk_reductions": 4,  # the lots onto the references, the days, the months, the years
+        # The lots onto the references, the days, the months and the years; the DV01s onto the
+        # payment days, their months and their years.
+        "risk_reductions": 7,
         "slots_discounted": slots_of(method, contracts),  # every slot, a fixed one by nothing
     }
 
@@ -287,29 +291,32 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     # days on the curve, the one conversion; the error state set once, the rules the judge; the
     # ones over the groups and the two zeros, the NPVs and the DV01s; the sums of the live
     # amount, the NPVs, the DV01s and the discounted lots; the looks that hold the coverage, the
-    # amounts, the discounted lots by reference, the sensitivity and the three views finite, with
-    # the market's own; the bincounts' reductions among the rest; and the new arrays frozen, ten
-    # of them. The same with no slot live: the sums are over every slot and never over none.
+    # amounts, the discounted lots by reference, the sensitivity, the three views of the lots and
+    # the three of the DV01 finite, with the market's own; the bincounts' reductions among the
+    # rest; and the new arrays frozen, thirteen of them. The same with no slot live: the sums are
+    # over every slot and never over none.
     assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
-        "ndarray.any": 8,
+        "ndarray.any": 11,
         "ndarray.astype": 1,
-        "ndarray.setflags": 10,
+        "ndarray.setflags": 13,
         "ndarray.sum": 4,
         "numpy._make_extobj": 1,
         "numpy.empty": 1,
         "numpy.zeros": 2,
-        "ufunc.reduce": 12,
+        "ufunc.reduce": 15,
     }
 
 
 # The peak follows the payment groups, the slots, the live slots and the time buckets: a dozen
 # arrays over the groups; the factor gathered onto every slot and the slot's lots, 16 bytes a slot;
 # the cleared tick's quote and contribution on a live slot and the bilateral path's live groups, 32
-# a live slot; and the three views over the days, the months and the years; within four slacks.
-# Measured 2,992 bytes for two groups and no live slot, 5,093 for twenty-four groups and twenty
-# live slots, 3,648 for two asian groups over 43 days, 22,808 for twenty-four over 519 days with 429
-# live and 15,203 for the fully paid strip of 497 days, on 2026-10-10, against 1,210, 1,418, 1,210,
-# 10,960 and 1,210 for the cleared tick of the same batches. The retained arrays are exactly the new
+# a live slot; the three views over the days, the months and the years; and, since #178, the three
+# DV01 views over the payment days, their months and their years; within four slacks.
+# Measured 3,440 bytes for two groups and no live slot, 5,909 for twenty-four groups and twenty
+# live slots, 4,105 for two asian groups over 43 days, 22,744 for twenty-four over 519 days with 429
+# live and 15,139 for the fully paid strip of 497 days, on 2026-10-11 with the three DV01 views,
+# against 2,992, 5,093, 3,648, 22,808 and 15,203 the day before and 1,210, 1,418, 1,210, 10,960
+# and 1,210 for the cleared tick of the same batches. The retained arrays are exactly the new
 # vectors' bytes, floats every one, the fully paid strip's as well.
 @pytest.mark.parametrize(
     ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
@@ -322,10 +329,13 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     groups = encoding.group_contract.size
     slots = encoding.slot_group.size
     buckets = encoding.days.size + encoding.months.size + encoding.years.size
+    axes = encoding.payment_axes
+    assert axes is not None
+    paid = axes.days.size + axes.months.size + axes.years.size
     quoted = a_market(prep.history)
     curve = curve_on(as_of)
     assert least_peak(lambda: tick(prep, quoted, curve)) <= (
-        128 * groups + 16 * slots + 32 * live + 8 * buckets + 4 * SLACK
+        128 * groups + 16 * slots + 32 * live + 8 * (buckets + paid) + 4 * SLACK
     )
     result = tick(prep, quoted, curve)
     new: tuple[NDArray[np.float64] | None, ...] = (
@@ -338,9 +348,117 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
         result.npv_by_group,
         result.dv01_by_group,
         result.payment_factor,
+        result.dv01_by_day,
+        result.dv01_by_month,
+        result.dv01_by_year,
     )
     retained = sum(0 if array is None else array.nbytes for array in new)
-    assert retained == 8 * (2 * encoding.references.size + buckets + 4 * groups)
+    assert retained == 8 * (2 * encoding.references.size + buckets + paid + 4 * groups)
     assert all(array is None or array.dtype == np.float64 for array in new)
     # The nominal vectors are the preparation's, by reference, not copies.
     assert result.lot_delta is prep.lot_delta and result.price_sensitivity is prep.price_sensitivity
+
+
+# --- the payment-time axes and the risk views, since #178 -----------------------------------------
+
+
+def axes_of(prep: PreparedTrades) -> PaymentAxes:
+    axes = prep.encoded.payment_axes
+    assert axes is not None
+    return axes
+
+
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
+def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
+    call_profile: CallProfile,
+    method: ScheduleMethod,
+    components: int,
+    contracts: int,
+    as_of: str,
+    live: int,
+    unpaid: int,
+) -> None:
+    terms = bilateral_terms(components, contracts, method)
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    axes = enc.payment_axes
+    assert axes is not None
+    payment_date = enc.payment_date
+    assert payment_date is not None
+    distinct = np.unique(payment_date)
+    # One payment day a contract, counted; the three payment axes and the three unions as the
+    # definitions say, every place saved, every array frozen.
+    assert counter.freeze().as_dict()["encoded_payment_days"] == distinct.size
+    assert distinct.size == contracts
+    np.testing.assert_array_equal(axes.days, distinct)
+    np.testing.assert_array_equal(axes.days[axes.day_of_group], payment_date)
+    months = np.unique(distinct.astype("datetime64[M]")).astype("datetime64[D]")
+    years = np.unique(distinct.astype("datetime64[Y]")).astype("datetime64[D]")
+    np.testing.assert_array_equal(axes.months, months)
+    np.testing.assert_array_equal(axes.months[axes.month_of_day], distinct.astype("datetime64[M]"))
+    np.testing.assert_array_equal(axes.years, years)
+    np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
+    for observed, paid, union, observed_in, paid_in in (
+        (enc.days, axes.days, axes.union_days, axes.observed_in_days, axes.paid_in_days),
+        (enc.months, axes.months, axes.union_months, axes.observed_in_months, axes.paid_in_months),
+        (enc.years, axes.years, axes.union_years, axes.observed_in_years, axes.paid_in_years),
+    ):
+        np.testing.assert_array_equal(union, np.union1d(observed, paid))
+        np.testing.assert_array_equal(union[observed_in], observed)
+        np.testing.assert_array_equal(union[paid_in], paid)
+    arrays = [getattr(axes, field.name) for field in fields(axes)]
+    assert all(not array.flags.writeable for array in arrays)
+    # Retained: eight bytes an entry of every array, the three axes with their places and the
+    # three unions with both kinds' places.
+    d, m, y = axes.days.size, axes.months.size, axes.years.size
+    unions = axes.union_days.size + axes.union_months.size + axes.union_years.size
+    observed = enc.days.size + enc.months.size + enc.years.size
+    assert sum(array.nbytes for array in arrays) == 8 * (
+        d + payment_date.size + m + d + y + m + unions + observed + d + m + y
+    )
+    # The cleared encoding's functions and, beside them, the axes once and a union a level.
+    cleared = call_profile(lambda: encoded(terms, observed_of(terms), UNITS, WorkCounter()))
+    assert cleared["_the_payment_axes"] == 1 and cleared["_the_union"] == 3
+    assert cleared["WorkCounter.hit"] == 6
+
+
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
+)
+def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    method: ScheduleMethod,
+    components: int,
+    contracts: int,
+    as_of: str,
+    live: int,
+    unpaid: int,
+) -> None:
+    prep = a_bilateral_batch(components, contracts, method, as_of)
+    result = tick(prep, a_market(prep.history), curve_on(as_of))
+    axes = axes_of(prep)
+    for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01):
+        for bucket in Bucket:
+            # By reference: no numpy call at all and nothing allocated beyond the record.
+            assert numpy_calls(lambda r=risk, b=bucket: risk_view(result, r, b)) == {}
+            assert least_peak(lambda r=risk, b=bucket: risk_view(result, r, b)) <= SLACK
+    for bucket, union in (
+        (Bucket.DAY, axes.union_days),
+        (Bucket.MONTH, axes.union_months),
+        (Bucket.YEAR, axes.union_years),
+    ):
+        # All three: three zeros over the union, each filled through its saved places; nothing
+        # sorted, nothing summed, nothing unique.
+        assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 3}
+        assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
+            "risk_view": 1,
+            "_observation_view": 1,
+            "_payment_view": 1,
+            "_union_view": 1,
+        }
+        assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
+            24 * union.size + SLACK
+        )

@@ -241,7 +241,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_PrepareTrades", new object[] { "x:trades:gas:9", "y:market_history:gas:9" }, "#ERROR _PrepareTrades: trades is text 'x:trades:gas:9' naming no live object, expected trades handle" };
             yield return new object[] { "_EvaluateTrades", new object[] { ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _EvaluateTrades: prepared is blank, expected prepared trades handle" };
             yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
-            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value }, "#ERROR _ReportRisk: results is blank, expected trade results handle" };
+            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results handle" };
             yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -513,15 +513,27 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, values[2, 1]);
             Assert.Equal("USD", values[2, 2]);
             Assert.Equal(46168.0, values[2, 3]);
-            var risk = (object[,])Seam.Call("_ReportRisk", results);
-            Assert.Equal(6, risk.GetLength(1));
-            Assert.Equal("nominal_delta", risk[0, 0]);
-            Assert.Equal("delta", risk[0, 1]);
-            Assert.Equal(1.0, risk[2, 0]);
-            Assert.Equal(1.0, risk[2, 1]);
-            Assert.Equal("lots of NYMEX NG (10000 MMBTU)", risk[2, 2]);
-            Assert.Equal(0.0, risk[2, 3]);
-            Assert.Equal("USD per basis point", risk[2, 4]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "year");
+            Assert.Equal(5, risk.GetLength(0));
+            Assert.Equal(4, risk.GetLength(1));
+            Assert.Equal("as_of", risk[0, 0]);
+            Assert.Equal(46168.0, risk[0, 1]);
+            Assert.Equal("-", risk[0, 3]);
+            Assert.Equal("period", risk[1, 0]);
+            Assert.Equal("sample nominal_delta [NYMEX NG]", risk[1, 1]);
+            Assert.Equal("sample delta [NYMEX NG]", risk[1, 2]);
+            Assert.Equal("cleared USD dv01 [USD per basis point]", risk[1, 3]);
+            Assert.Equal("str | datetime64[D]", risk[2, 0]);
+            Assert.Equal("float64", risk[2, 1]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(1.0, risk[3, 1]);
+            Assert.Equal(1.0, risk[3, 2]);
+            Assert.Equal(0.0, risk[3, 3]);
+            Assert.Equal(46023.0, risk[4, 0]);
+            Assert.Equal(1.0, risk[4, 1]);
+            var dv01 = (object[,])Seam.Call("_ReportRisk", results, "dv01", "day");
+            Assert.Equal(4, dv01.GetLength(0));  // cleared: a Total of nothing over no dated row
+            Assert.Equal(0.0, dv01[3, 1]);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(4, slots.GetLength(0));
             Assert.Equal("live_coefficient", slots[0, 5]);
@@ -561,7 +573,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(36000.0, (double)((object[,])Seam.Call("_ReportValues", later))[2, 0], 6);
             Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market, ExcelMissing.Value));
-            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_ReportRisk", prepared));
+            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
         }
 
         // The penultimate method on the host's chain: a financial template paying one business day
@@ -651,7 +663,7 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", results);
             Assert.Equal(150.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, values[2, 1]);
-            Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var ticked = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "SYN", Column(75.0, 80.0))), ExcelMissing.Value);
             Assert.Equal(170.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
@@ -704,9 +716,9 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", results);
             Assert.Equal(84.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, values[2, 1]);
-            var risk = (object[,])Seam.Call("_ReportRisk", results);
-            Assert.Equal(2100.0, (double)risk[2, 0], 6);
-            Assert.Equal("lots of GAL (1 GAL)", risk[2, 2]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year");
+            Assert.Equal(2100.0, (double)risk[3, 1], 6);
+            Assert.Equal("ETHANE nominal_delta [GAL]", risk[1, 1]);
             var ticked = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "ETHANE", Column(0.29, 0.30, 0.32))), ExcelMissing.Value);
             Assert.Equal(105.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             Assert.Equal(84.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
@@ -796,7 +808,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(24, ((object[,])Seam.Call("util_ReadHandle", prepared)).GetLength(0));
             var results = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "ETHANE", Column(0.28, 0.30, 0.32))), ExcelMissing.Value);
             Assert.Equal(122.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal(4100.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            Assert.Equal(4100.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var lastday = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("GAL", "month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
             Assert.Equal("#ERROR _CreateTrades: ValueError: Z26 of trade 16 at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian", Seam.Call("_CreateTrades", index, headers, Row(16.0, 46346.0, start, end, 2000.0, 0.25), lastday));
             Assert.Equal("#ERROR _CreateTrades: ValueError: start_date row 1 is 2026-12-15 without end_date row 1, expected both dates, the period's first and last day, or neither and a contract_code", Seam.Call("_CreateTrades", index, Row("trade_date", "contract_code", "start_date", "quantity", "fixed_price"), Row(46346.0, "Z26", start, 2000.0, 0.25), template));
@@ -837,7 +849,7 @@ namespace Goosedove.Host.Tests
             var market = (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "PAYS", Column(74.0, 80.0)));
             var results = (string)Seam.Call("_EvaluateTrades", live, market, ExcelMissing.Value);
             Assert.Equal(150.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            Assert.Equal(20.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var ticked = (string)Seam.Call("_EvaluateTrades", live, (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "PAYS", Column(75.0, 80.0))), ExcelMissing.Value);
             Assert.Equal(170.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             var seventh = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46363.0, 0.5), index);
@@ -860,7 +872,7 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", paid);
             Assert.Equal(-30.0, (double)values[2, 0], 6);
             Assert.Equal(180.0, (double)values[2, 1], 6);
-            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid))[2, 0], 6);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
             Assert.Equal(22, contributions.GetLength(1));
             Assert.Equal("contract_lot_delta", contributions[0, 10]);
@@ -915,7 +927,7 @@ namespace Goosedove.Host.Tests
             var market = (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(12.0, 13.0, 14.0)));
             var results = (string)Seam.Call("_EvaluateTrades", live, market, ExcelMissing.Value);
             Assert.Equal(194.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal(66.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            Assert.Equal(66.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var ticked = (string)Seam.Call("_EvaluateTrades", live, (string)Seam.Call("_CreateMarket", early, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(13.0, 13.0, 14.0))), ExcelMissing.Value);
             Assert.Equal(260.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             var last = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46387.0, 0.5), index);
@@ -932,9 +944,9 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", paid);
             Assert.Equal(275.0, (double)values[2, 0], 6);
             Assert.Equal(-62.0, (double)values[2, 1], 6);
-            var risk = (object[,])Seam.Call("_ReportRisk", paid);
-            Assert.Equal(85.0, (double)risk[2, 0], 6);
-            Assert.Equal("lots of GAL (1 GAL)", risk[2, 2]);
+            var risk = (object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year");
+            Assert.Equal(85.0, (double)risk[3, 1], 6);
+            Assert.Equal("MIXED nominal_delta [GAL]", risk[1, 1]);
             var withMethod = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_time_lag", "payment_holiday_calendar", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, headers, rows, withMethod));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit row 2 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { 5.0, "Z26", 1.0, "ICE", "month", "lastday", "Clearer A" } }, template));
@@ -1719,9 +1731,9 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.2, (double)slots[2, 7], 6);
             var results = Valued(eighteenth, live, 72.0, 75.0);
             Assert.Equal(4800.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            var risk = (object[,])Seam.Call("_ReportRisk", results);
-            Assert.Equal(1.2, (double)risk[2, 0], 6);
-            Assert.Equal("lots of LOT (1000 BBL)", risk[2, 2]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year");
+            Assert.Equal(1.2, (double)risk[3, 1], 6);
+            Assert.Equal("WTI nominal_delta [LOT]", risk[1, 1]);
             var contributions = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal("booked_contract", contributions[0, 1]);
             Assert.Equal(0.4, (double)contributions[2, 10], 6);
@@ -1730,7 +1742,7 @@ namespace Goosedove.Host.Tests
             var rolled = History(46378.0, 5);
             var after = Valued(rolled, (string)Seam.Call("_PrepareTrades", trades, rolled), 76.0);
             Assert.Equal(5600.0, (double)((object[,])Seam.Call("_ReportValues", after))[2, 0], 6);
-            Assert.Equal(0.8, (double)((object[,])Seam.Call("_ReportRisk", after))[2, 0], 6);
+            Assert.Equal(0.8, (double)((object[,])Seam.Call("_ReportRisk", after, "nominal_delta", "year"))[3, 1], 6);
             var thirtieth = History(46386.0, 0);
             var paid = (object[,])Seam.Call("_ReportValues", Valued(thirtieth, (string)Seam.Call("_PrepareTrades", trades, thirtieth), 75.0));
             Assert.Equal(0.0, (double)paid[2, 0], 6);
@@ -1781,42 +1793,49 @@ namespace Goosedove.Host.Tests
             }
             var first = Results(46357.0, 21);
             Assert.Equal(125000.0, (double)((object[,])Seam.Call("_ReportValues", first))[2, 0], 6);
-            Assert.Equal(25.0, (double)((object[,])Seam.Call("_ReportRisk", first))[2, 0], 6);
-            var byDay = (object[,])Seam.Call("_ReportDelta", first, ExcelMissing.Value);
-            Assert.Equal(24, byDay.GetLength(0));
-            Assert.Equal(5, byDay.GetLength(1));
-            Assert.Equal("bucket_start", byDay[0, 0]);
-            Assert.Equal("nominal_delta", byDay[0, 1]);
-            Assert.Equal("delta", byDay[0, 2]);
-            Assert.Equal("delta_unit", byDay[0, 3]);
-            Assert.Equal("as_of", byDay[0, 4]);
-            Assert.Equal(46357.0, byDay[2, 0]);
-            Assert.Equal(1.0, (double)byDay[2, 1], 6);
-            Assert.Equal(1.0, (double)byDay[2, 2], 6);  // the discounted lots the nominal, cleared
-            Assert.Equal("lots of LOT (1000 BBL)", byDay[2, 3]);
-            Assert.Equal(46357.0, byDay[2, 4]);
-            Assert.Equal(46386.0, byDay[22, 0]);
-            Assert.Equal(4.0, (double)byDay[22, 1], 6);
-            Assert.Equal(46387.0, byDay[23, 0]);
-            Assert.Equal(1.0, (double)byDay[23, 1], 6);
-            var chosen = (object[,])Seam.Call("_ReportDelta", first, "day");
-            Assert.Equal(byDay, chosen);
-            var byMonth = (object[,])Seam.Call("_ReportDelta", first, "month");
-            Assert.Equal(3, byMonth.GetLength(0));
-            Assert.Equal(46357.0, byMonth[2, 0]);
-            Assert.Equal(25.0, (double)byMonth[2, 1], 6);
-            var byYear = (object[,])Seam.Call("_ReportDelta", first, "year");
-            Assert.Equal(46023.0, byYear[2, 0]);
-            Assert.Equal(25.0, (double)byYear[2, 1], 6);
-            Assert.Equal("#ERROR _ReportDelta: ValueError: bucket is 'quarter', expected day, month or year", Seam.Call("_ReportDelta", first, "quarter"));
+            Assert.Equal(25.0, (double)((object[,])Seam.Call("_ReportRisk", first, "nominal_delta", "year"))[3, 1], 6);
+            var byDay = (object[,])Seam.Call("_ReportRisk", first, "nominal_delta", "day");
+            Assert.Equal(26, byDay.GetLength(0));
+            Assert.Equal(2, byDay.GetLength(1));
+            Assert.Equal("as_of", byDay[0, 0]);
+            Assert.Equal(46357.0, byDay[0, 1]);
+            Assert.Equal("period", byDay[1, 0]);
+            Assert.Equal("MONTHLY nominal_delta [LOT]", byDay[1, 1]);
+            Assert.Equal("str | datetime64[D]", byDay[2, 0]);
+            Assert.Equal("float64", byDay[2, 1]);
+            Assert.Equal("Total", byDay[3, 0]);
+            Assert.Equal(25.0, (double)byDay[3, 1], 6);
+            Assert.Equal(46357.0, byDay[4, 0]);
+            Assert.Equal(1.0, (double)byDay[4, 1], 6);
+            Assert.Equal(46386.0, byDay[24, 0]);
+            Assert.Equal(4.0, (double)byDay[24, 1], 6);
+            Assert.Equal(46387.0, byDay[25, 0]);
+            Assert.Equal(1.0, (double)byDay[25, 1], 6);
+            var delta = (object[,])Seam.Call("_ReportRisk", first, "delta", "day");
+            Assert.Equal("MONTHLY delta [LOT]", delta[1, 1]);
+            Assert.Equal(1.0, (double)delta[4, 1], 6);  // the discounted lots the nominal, cleared
+            var everything = (object[,])Seam.Call("_ReportRisk", first, "all", "month");
+            Assert.Equal(5, everything.GetLength(0));
+            Assert.Equal(4, everything.GetLength(1));
+            Assert.Equal("cleared USD dv01 [USD per basis point]", everything[1, 3]);
+            Assert.Equal(46357.0, everything[4, 0]);
+            Assert.Equal(25.0, (double)everything[4, 1], 6);
+            Assert.Equal(25.0, (double)everything[4, 2], 6);
+            Assert.Equal(0.0, (double)everything[4, 3], 6);
+            var byYear = (object[,])Seam.Call("_ReportRisk", first, "nominal_delta", "year");
+            Assert.Equal(46023.0, byYear[4, 0]);
+            Assert.Equal(25.0, (double)byYear[4, 1], 6);
+            Assert.Equal("#ERROR _ReportRisk: ValueError: bucket is 'quarter', expected day, month or year", Seam.Call("_ReportRisk", first, "nominal_delta", "quarter"));
+            Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or all", Seam.Call("_ReportRisk", first, "gamma", "day"));
+            Assert.Equal("#ERROR _ReportRisk: bucket is missing, expected text", Seam.Call("_ReportRisk", first, "delta", ExcelMissing.Value));
             var last = Results(46387.0, 0);
             var values = (object[,])Seam.Call("_ReportValues", last);
             Assert.Equal(110000.0, (double)values[2, 0], 6);
             Assert.Equal(15000.0, (double)values[2, 1], 6);
-            var lastDays = (object[,])Seam.Call("_ReportDelta", last, ExcelMissing.Value);
-            Assert.Equal(0.0, (double)lastDays[22, 1], 6);
-            Assert.Equal(1.0, (double)lastDays[23, 1], 6);
-            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportDelta", last, "month"))[2, 1], 6);
+            var lastDays = (object[,])Seam.Call("_ReportRisk", last, "nominal_delta", "day");
+            Assert.Equal(0.0, (double)lastDays[24, 1], 6);
+            Assert.Equal(1.0, (double)lastDays[25, 1], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", last, "nominal_delta", "month"))[4, 1], 6);
         }
 
         // IFERC basis futures, iferc-basis-futures.md: the Waha-like index, X26, Z26 and F27 last
@@ -1871,13 +1890,13 @@ namespace Goosedove.Host.Tests
             var values = (object[,])Seam.Call("_ReportValues", first);
             Assert.Equal(500.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, (double)values[2, 1], 6);
-            var risk = (object[,])Seam.Call("_ReportRisk", first);
-            Assert.Equal(1.0, (double)risk[2, 0], 6);
-            Assert.Equal("lots of LOT (2500 MMBTU)", risk[2, 2]);
-            var byDay = (object[,])Seam.Call("_ReportDelta", first, ExcelMissing.Value);
-            Assert.Equal(3, byDay.GetLength(0));
-            Assert.Equal(46357.0, byDay[2, 0]);
-            Assert.Equal(1.0, (double)byDay[2, 1], 6);
+            var risk = (object[,])Seam.Call("_ReportRisk", first, "nominal_delta", "year");
+            Assert.Equal(1.0, (double)risk[3, 1], 6);
+            Assert.Equal("WAHA nominal_delta [LOT]", risk[1, 1]);
+            var byDay = (object[,])Seam.Call("_ReportRisk", first, "nominal_delta", "day");
+            Assert.Equal(5, byDay.GetLength(0));
+            Assert.Equal(46357.0, byDay[4, 0]);
+            Assert.Equal(1.0, (double)byDay[4, 1], 6);
             var ticked = Valued(live, prepared, -0.25, -0.1);
             Assert.Equal(625.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
             Assert.Equal(500.0, (double)((object[,])Seam.Call("_ReportValues", first))[2, 0], 6);
@@ -1890,8 +1909,8 @@ namespace Goosedove.Host.Tests
             var unpaidValues = (object[,])Seam.Call("_ReportValues", unpaid);
             Assert.Equal(750.0, (double)unpaidValues[2, 0], 6);
             Assert.Equal(0.0, (double)unpaidValues[2, 1], 6);
-            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", unpaid))[2, 0], 6);
-            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportDelta", unpaid, "day"))[2, 1], 6);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", unpaid, "nominal_delta", "year"))[3, 1], 6);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", unpaid, "nominal_delta", "day"))[4, 1], 6);
             var paidHistory = History(46359.0, Column("Z26", "X26"), Column(-0.2, -0.4));
             var paid = (object[,])Seam.Call("_ReportValues", Valued(paidHistory, (string)Seam.Call("_PrepareTrades", trades, paidHistory), -0.1));
             Assert.Equal(0.0, (double)paid[2, 0], 6);
@@ -1937,7 +1956,7 @@ namespace Goosedove.Host.Tests
             }
             var results = Valued(0.28, 0.30, 0.32);
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
             var reserves = (object[,])Seam.Call("_ReportReserves", results);
             Assert.Equal(3, reserves.GetLength(0));
             Assert.Equal(4, reserves.GetLength(1));
@@ -1996,7 +2015,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(50.0, (double)templatedReserves[2, 0], 9);
             Assert.Equal(28.0, (double)templatedReserves[2, 2], 9);
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", templated))[2, 0], 6);
-            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", templated))[2, 0], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", templated, "nominal_delta", "year"))[3, 1], 6);
             Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
@@ -2075,11 +2094,11 @@ namespace Goosedove.Host.Tests
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "BBL_ASIAN", Column(72.0, 72.0, 72.0)));
             var results = (string)Seam.Call("_EvaluateTrades", prepared, market, ExcelMissing.Value);
             Assert.Equal(580.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
-            Assert.Equal(0.29, (double)((object[,])Seam.Call("_ReportRisk", results))[2, 0], 6);
-            var byMonth = (object[,])Seam.Call("_ReportDelta", results, "month");
-            Assert.Equal(3, byMonth.GetLength(0));
-            Assert.Equal(46296.0, byMonth[2, 0]);
-            Assert.Equal(0.29, (double)byMonth[2, 1], 6);
+            Assert.Equal(0.29, (double)((object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "year"))[3, 1], 6);
+            var byMonth = (object[,])Seam.Call("_ReportRisk", results, "nominal_delta", "month");
+            Assert.Equal(5, byMonth.GetLength(0));
+            Assert.Equal(46296.0, byMonth[4, 0]);
+            Assert.Equal(0.29, (double)byMonth[4, 1], 6);
             var alone = new[] { 200.0, 200.0, 180.0 };
             for (var r = 0; r < 3; r++)
             {

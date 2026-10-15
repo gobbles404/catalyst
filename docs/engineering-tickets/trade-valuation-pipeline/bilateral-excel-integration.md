@@ -4,7 +4,9 @@
 [Calculation kernel](bilateral-calculation-kernel.md) · [UAT notes](surface-uat-notes.md)
 
 **Status:** Built in #177 on `claude/bilateral-excel`, stacked on the reviewed PR #176 at
-`7557d8b`, 11 October 2026; owner UAT follows. The final planned implementation slice of the
+`7557d8b`, 11 October 2026; owner UAT follows. The two risk readers' layouts below are
+history since #178, [unified-risk-reporting.md](unified-risk-reporting.md): one
+`_ReportRisk(results, risk, bucket)` with the saved Total first, `_ReportDelta` retired. The final planned implementation slice of the
 first bilateral arc. PR #176's review fixes, the finite-output guards and the payment-date
 mapping made once at preparation, are in that PR and carried forward untouched here. PR #175
 supplies the booked fields.
@@ -264,7 +266,7 @@ public rate-preparation function remain outside this first bilateral arc.
 
 PR #177 on `claude/bilateral-excel`, stacked on #176. The pages are
 [evaluate-trades.md](../../library/trades/evaluate-trades.md), [report-risk.md](../../library/trades/report-risk.md),
-[report-delta.md](../../library/trades/report-delta.md) and [report-values.md](../../library/trades/report-values.md),
+[report-risk.md](../../library/trades/report-risk.md), which holds the time views since #178, and [report-values.md](../../library/trades/report-values.md),
 with [kernel.md](../../library/trades/kernel.md#the-bilateral-path) for the arithmetic; the seam's
 record is the #177 row of [history.md](../../seam/history.md).
 
