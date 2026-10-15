@@ -55,7 +55,10 @@ def an_index(
     holidays: tuple[str, ...] = ("2026-11-26", "2026-12-25"),
     lots: tuple[tuple[str, float, str], ...] = (("NYMEX NG", 10_000.0, "MMBTU"),),
     measure: tuple[str, str] = ("ENERGY", "MMBTU"),
+    reporting_lot: str | None = "",
 ) -> Index:
+    # The first lot given is the reporting lot unless another name is given; None makes an
+    # index without one.
     codes = tuple(code for code, _ in contracts)
     schedule = futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
     names = tuple(name for name, _, _ in lots)
@@ -72,6 +75,7 @@ def an_index(
             UNITS,
         ),
         holiday_calendar(dates(*holidays)),
+        names[0] if reporting_lot == "" else reporting_lot,
         UNITS,
     )
 
@@ -1665,6 +1669,7 @@ def test_the_index_must_be_a_futures_index_with_one_contract_per_month() -> None
         NG.conventions,
         NG.specifications,
         None,
+        None,
         UNITS,
     )
     assert refused(daily) == "index is a Gas Daily index, expected a futures index for a future"
@@ -1797,7 +1802,9 @@ def sheet() -> dict[str, Any]:
         row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
         row("NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0),
     )
-    ng = ENTRY["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specs, holidays)
+    ng = ENTRY["_CreateIndex"](
+        "Henry Hub NYMEX", schedule, conventions, specs, holidays, "NYMEX NG"
+    )
     template = ENTRY["_CreateTradeTemplate"](
         "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
     )
@@ -2305,3 +2312,16 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     }
     batch, _ = created(MIXED, lastday_rows, physical)
     np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])
+
+
+def test_an_index_without_a_reporting_lot_refuses_a_batch_before_any_row_is_read() -> None:
+    lotless = an_index(reporting_lot=None)
+    message = (
+        "index 'Henry Hub NYMEX' has no reporting_lot, expected one of its specifications named "
+        "when the index was made; a batch's delta is reported in lots of it"
+    )
+    assert refused(lotless) == message
+    assert refused(lotless, {**NG_TICKET, "contract_code": ["Z2026"] * 5}) == message
+    batch, _ = created(NG, NG_TICKET, NG_TEMPLATE)
+    assert NG.reporting_lot is not None and batch.resolved.reporting_lot is NG.reporting_lot
+    assert NG.reporting_lot.words == "lots of NYMEX NG (10000 MMBTU)"

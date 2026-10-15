@@ -276,19 +276,38 @@ def index_conventions_table(obj: IndexConventions) -> MixedArray:
 @shown.register
 def index_table(obj: Index) -> MixedArray:
     # What the index holds, one row: its name, its kind, how many contracts its schedule has,
-    # how many the specifications name, and whether a holiday calendar was given. The parts
-    # spill through their own handles; nothing of them is read here but two lengths.
-    return MixedArray.table(
-        [
-            ("name", "kind", "contracts", "specifications", "has_holiday_calendar"),
-            ("str", "str", "int64", "int64", "bool"),
-        ],
+    # how many the specifications name, whether a holiday calendar was given, and the reporting
+    # lot, its name with its size, its unit and the two conversions the index resolved, or the
+    # word unset and nothing after it for an index made without one. The parts spill through
+    # their own handles; nothing of them is read here but two lengths.
+    headers = [
+        "name",
+        "kind",
+        "contracts",
+        "specifications",
+        "has_holiday_calendar",
+        "reporting_lot",
+    ]
+    types = ["str", "str", "int64", "int64", "bool", "str"]
+    lot = obj.reporting_lot
+    columns: list[NDArray[Any] | tuple[str, ...]] = [
         (obj.name,),
         (obj.kind.value,),
         np.array([len(obj.schedule.codes)], dtype=np.int64),
         np.array([len(obj.specifications.names)], dtype=np.int64),
         np.array([obj.holiday_calendar is not None], dtype=bool),
-    )
+        ("unset" if lot is None else lot.name,),
+    ]
+    if lot is not None:
+        headers += ["lot_size", "lot_unit", "lot_quote_quantity", "lot_coefficient"]
+        types += ["float64", "str", "float64", "float64"]
+        columns += [
+            np.array([lot.lot_size]),
+            (lot.lot_unit,),
+            np.array([lot.quote_quantity]),
+            np.array([lot.coefficient]),
+        ]
+    return MixedArray.table([tuple(headers), tuple(types)], *columns)
 
 
 @shown.register
@@ -422,42 +441,66 @@ def _slot_names(
 @shown.register
 def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
     # One row per slot, the dated axis as the preparation left it: the slot named, whether it has
-    # fixed, whether its payment group has settled, and its live exposure, zero where it has
-    # fixed; nothing is made again, every column the record's own or a gather of one.
+    # fixed, whether its payment group has settled, its live coefficient, the settlement currency
+    # its price moves the mark by, zero where it has fixed, and the same exposure in lots of the
+    # index's reporting lot; nothing is made again, every column the record's own or a gather of
+    # one.
     encoding = obj.encoded
     names, types, columns = _slot_names(encoding)
     return MixedArray.table(
-        [(*names, "is_fixed", "is_settled", "live_exposure"), (*types, "bool", "bool", "float64")],
+        [
+            (*names, "is_fixed", "is_settled", "live_coefficient", "live_lots"),
+            (*types, "bool", "bool", "float64", "float64"),
+        ],
         *columns,
         obj.is_fixed,
         obj.is_settled[encoding.slot_group],
         obj.dated_live_exposure,
+        obj.dated_live_lots,
     )
 
 
 @shown.register
 def trade_results_table(obj: TradeResults) -> MixedArray:
     # One row per slot, the dated contents of the result: the slot named, whether it has fixed,
-    # the slot's own live exposure and its live contribution, exposure times its contract's
-    # quote, both zero where it has fixed, and the delta of its contract, the retained vector read
-    # by each slot's reference and so the same number on every slot of one contract, whatever
-    # group holds it, named contract_delta so that it is not read as the slot's; the mark, the
-    # cash and the totals are the two reports' to show.
+    # the slot's own live coefficient and the same exposure in lots, its live contribution,
+    # coefficient times its contract's quote, all zero where it has fixed, and its contract's
+    # risk, the two retained vectors read by each slot's reference and so the same number on
+    # every slot of one contract, whatever group holds it, named contract_sensitivity and
+    # contract_lot_delta so that neither is read as the slot's; then the two units those numbers
+    # are in, the sensitivity's, currency per quote unit, and the lot's words, the batch's facts
+    # on every row so that a row reads whole, as the trades spill carries the route; the mark,
+    # the cash and the totals are the two reports' to show.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
-    contribution = np.zeros(encoding.slot_group.size)
+    slots = encoding.slot_group.size
+    contribution = np.zeros(slots)
     contribution[prepared.live_slot] = obj.dated_live_contribution
     return MixedArray.table(
         [
-            (*names, "is_fixed", "live_exposure", "live_contribution", "contract_delta"),
-            (*types, "bool", "float64", "float64", "float64"),
+            (
+                *names,
+                "is_fixed",
+                "live_coefficient",
+                "live_lots",
+                "live_contribution",
+                "contract_sensitivity",
+                "contract_lot_delta",
+                "sensitivity_unit",
+                "lot_unit",
+            ),
+            (*types, "bool", "float64", "float64", "float64", "float64", "float64", "str", "str"),
         ],
         *columns,
         prepared.is_fixed,
         prepared.dated_live_exposure,
+        prepared.dated_live_lots,
         contribution,
-        obj.delta[encoding.reference_of_slot],
+        obj.price_sensitivity[encoding.reference_of_slot],
+        obj.lot_delta[encoding.reference_of_slot],
+        (obj.price_sensitivity_unit,) * slots,
+        (obj.lot_unit,) * slots,
     )
 
 

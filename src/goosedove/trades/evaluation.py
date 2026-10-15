@@ -1,9 +1,11 @@
 """The prepared batch evaluated against one market: the quotes of its live references read off
 the market once each, gathered onto the live slots and multiplied by their exposure, one
 multiplication and one sum for the live amount, which the unsettled offsets and set amounts
-complete into the mark; the cash as the preparation settled it; delta by reference on the batch's
-own axis and its total, shared with the preparation that settled them, since no tick changes
-them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch as a whole,
+complete into the mark; the cash as the preparation settled it; the risk by reference on the
+batch's own axis, the price sensitivity in the settlement currency and the delta in lots of the
+index's reporting lot with its total, shared with the preparation that settled them, since no
+tick changes them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch
+as a whole,
 immutable, retained with everything that explains it, the dated live contributions among it.
 docs/library/trades/kernel.md is the page."""
 
@@ -30,13 +32,16 @@ class TradeResults:
     currency. dated_live_contribution[i] is live slot i's exposure times its reference's quote,
     paired with the preparation's live_slot; their sum is the live amount, and they allocate
     neither the offsets nor the mark among dates. contracts is the batch's axis, the schedule
-    rows of its references in the schedule's order, the same whatever has fixed; delta[r] is the
-    change in mark for a move of one quote unit in contract r, the live exposure referencing it
-    and zero where every slot of it has fixed, in delta_unit, currency per quote currency per
-    quote quantity unit, the preparation's own array shared and never written; delta_total is the
-    change for a common move of one in every contract, the sum. dv01 is zero: the cleared model
-    is undiscounted, so a rate move changes nothing, a result of the model and not a placeholder.
-    as_of is the history's valuation day."""
+    rows of its references in the schedule's order, the same whatever has fixed;
+    price_sensitivity[r] is the change in mark for a move of one quote unit in contract r, the
+    live exposure referencing it and zero where every slot of it has fixed, in
+    price_sensitivity_unit, currency per quote currency per quote quantity unit; lot_delta[r] is
+    the exposure still to price in contract r counted in lots of the index's reporting
+    specification, the sensitivity over the lot's coefficient, in lot_unit, `lots of LOT (1000
+    BBL)`, and lot_delta_total their sum, the number the risk report shows as the delta; the
+    three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
+    model is undiscounted, so a rate move changes nothing, a result of the model and not a
+    placeholder. as_of is the history's valuation day."""
 
     prepared: PreparedTrades
     market: Market
@@ -47,10 +52,12 @@ class TradeResults:
     cash: float
     dated_live_contribution: NDArray[np.float64]
     contracts: NDArray[np.intp]
-    delta: NDArray[np.float64]
-    delta_total: float
+    price_sensitivity: NDArray[np.float64]
+    price_sensitivity_unit: str
+    lot_delta: NDArray[np.float64]
+    lot_delta_total: float
+    lot_unit: str
     dv01: float
-    delta_unit: str
 
     def codes(self) -> tuple[str, ...]:
         """The axis spelled as the schedule spells its codes, one per contract of the batch."""
@@ -72,8 +79,8 @@ def trade_results(prepared: PreparedTrades, market: Market, counter: WorkCounter
     contract, and refuses a contract past its coverage by name, as it does for every reader; the
     quotes are gathered onto the live slots, each slot's exposure times its reference's quote is
     its contribution, and the live amount is their sum. The mark is the unsettled offsets and set
-    amounts plus the live amount; the cash is the preparation's. Delta and its total are the
-    preparation's, shared.
+    amounts plus the live amount; the cash is the preparation's. The sensitivity, the lot delta
+    and its total are the preparation's, shared, and the lot's words the index's.
 
     Work: one kernel call, one quote per live reference, reported to the counter; nothing of the
     encoding or the preparation is done again, and nothing per slot but the gather and the
@@ -110,9 +117,11 @@ def trade_results(prepared: PreparedTrades, market: Market, counter: WorkCounter
         prepared.cash,
         dated_live_contribution,
         prepared.encoded.references,
-        prepared.delta,
-        prepared.delta_total,
-        0.0,
+        prepared.price_sensitivity,
         f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
         f"{conventions.quote_quantity_unit}",
+        prepared.lot_delta,
+        prepared.lot_delta_total,
+        terms.reporting_lot.words,
+        0.0,
     )

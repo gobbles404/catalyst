@@ -64,7 +64,9 @@ SPECIFICATIONS = contract_specifications(
 
 def an_index(holidays: NDArray[np.datetime64]) -> Index:
     """A futures index whose holiday calendar lists those days."""
-    return index("sample", SCHEDULE, CONVENTIONS, SPECIFICATIONS, holiday_calendar(holidays), UNITS)
+    return index(
+        "sample", SCHEDULE, CONVENTIONS, SPECIFICATIONS, holiday_calendar(holidays), None, UNITS
+    )
 
 
 # --- what is kept -------------------------------------------------------------
@@ -144,6 +146,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
         CONVENTIONS,
         SPECIFICATIONS,
         None,
+        None,
         UNITS,
     )
     with pytest.raises(ValueError) as failure:
@@ -154,6 +157,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
         iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")),
         CONVENTIONS,
         SPECIFICATIONS,
+        None,
         None,
         UNITS,
     )

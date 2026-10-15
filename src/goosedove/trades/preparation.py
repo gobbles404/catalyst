@@ -1,7 +1,8 @@
 """The encoded batch prepared against one market history: which slots have fixed and at what
 settle, which payment groups have settled, what remains live and the exposure to each live
-reference, and the risk that no tick changes. One record per history; a tick reads it and makes
-nothing of it again. docs/library/trades/kernel.md is the page."""
+reference, and the risk that no tick changes, the price sensitivity in the settlement currency
+and the delta in lots of the index's reporting lot. One record per history; a tick reads it and
+makes nothing of it again. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
 
@@ -23,7 +24,9 @@ class PreparedTrades:
     Per slot, aligned with the encoding's slots: is_fixed[s], whether the slot's day is on the
     fixed side of the valuation date, so its price is the history's settle on that day, else a
     quote; dated_live_exposure[s], the slot's exposure where it is live and zero where it has
-    fixed, a contribution of nothing rather than a price of nothing. Per payment group, aligned
+    fixed, a contribution of nothing rather than a price of nothing, the settlement currency per
+    unit of quote price; dated_live_lots[s], the same exposure counted in lots of the index's
+    reporting lot, the exposure over the lot's coefficient. Per payment group, aligned
     with the encoding's groups, a contract paying on two days being two of them: set_amount[g],
     the sum over the group's fixed slots of exposure times settle; is_settled[g], whether every
     slot of the group has fixed and it pays on or before the valuation date, so its amount is
@@ -36,15 +39,20 @@ class PreparedTrades:
     And three sums: offset_unsettled and set_unsettled, the entry-price offsets and set amounts
     of the groups not yet settled, which the tick adds to the live amount for the mark; and cash,
     the whole amounts of the settled groups, offset and set together, moved out of the mark on
-    the day they pay and never discounted. And the risk, which no tick changes: delta[r], the
-    live exposure summed by reference over the batch's whole axis, the encoding's references,
-    zero where every slot of a reference has fixed, and delta_total, their sum, the change for a
-    common move of one in every contract; the result shares them."""
+    the day they pay and never discounted. And the risk, which no tick changes:
+    price_sensitivity[r], the live exposure summed by reference over the batch's whole axis, the
+    encoding's references, zero where every slot of a reference has fixed, the settlement
+    currency the mark moves for a move of one unit of quote price in that contract; lot_delta[r],
+    the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
+    price in lots of that specification, signed and fractional, a fully live lot one and a lot
+    half of whose observation weight has fixed a half; and lot_delta_total, their sum, checked
+    finite before the record is made; the result shares them."""
 
     encoded: Encoded
     history: MarketHistory
     is_fixed: NDArray[np.bool_]
     dated_live_exposure: NDArray[np.float64]
+    dated_live_lots: NDArray[np.float64]
     set_amount: NDArray[np.float64]
     is_settled: NDArray[np.bool_]
     live_slot: NDArray[np.intp]
@@ -53,14 +61,15 @@ class PreparedTrades:
     offset_unsettled: float
     set_unsettled: float
     cash: float
-    delta: NDArray[np.float64]
-    delta_total: float
+    price_sensitivity: NDArray[np.float64]
+    lot_delta: NDArray[np.float64]
+    lot_delta_total: float
 
 
 def prepared_trades(
     encoded: Encoded, history: MarketHistory, counter: WorkCounter
 ) -> PreparedTrades:
-    """The one way to make a PreparedTrades: three rules, checked once, in this order, the first
+    """The one way to make a PreparedTrades: four rules, checked once, in this order, the first
     failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
     The history is over the trades' index, the one object the terms hold, as the history itself
@@ -78,10 +87,18 @@ def prepared_trades(
     against the same holiday calendar the history's calendar was built from. A group is settled
     when every slot of it has fixed and its payment day is on or before the valuation date, the
     inclusive cutoff of the pipeline; fixed is not paid, and a contract whose components pay on
-    two days is two groups, one of which may be cash while the other is live or unpaid. Delta
+    two days is two groups, one of which may be cash while the other is live or unpaid. The risk
     is settled here too, since nothing a tick brings changes it: the live exposure summed by
     reference over the batch's axis, each contract once whatever groups hold it, zero where
-    everything has fixed.
+    everything has fixed, and that sensitivity and the live exposure of each slot divided by the
+    reporting lot's coefficient, the conversion the index resolved once, so that the delta is
+    counted in lots of the index's reporting specification whatever words the rows were entered
+    in, and no specification is looked up and nothing is converted here or on a tick. Every live
+    lot, every lot delta and their total are finite, else the first that is not is refused by its
+    slot, its contract or the batch, the fourth rule: a lot small enough, a BTU against quantities
+    in the trillions of MMBTU, divides a finite exposure past the largest number once it is counted
+    in lots, or two contracts' finite deltas sum past it, and nothing is published that a reader
+    would then fail on.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
     counter; nothing per component, nothing per observation, nothing per day of the calendar.
@@ -134,22 +151,48 @@ def prepared_trades(
     live_references, reference_of_live_slot = np.unique(
         encoded.slot_reference[live_slot], return_inverse=True
     )
-    delta = np.bincount(
+    price_sensitivity = np.bincount(
         encoded.reference_of_slot, weights=dated_live_exposure, minlength=encoded.references.size
     )
+    lot = terms.reporting_lot
+    with np.errstate(over="ignore"):  # a finite exposure may outrun the largest number in lots
+        dated_live_lots = dated_live_exposure / lot.coefficient
+        lot_delta = price_sensitivity / lot.coefficient
+        lot_delta_total = float(lot_delta.sum())
+    words = lot.words
+    outrun = ~np.isfinite(dated_live_lots)
+    if outrun.any():
+        s = int(outrun.argmax())
+        raise ValueError(
+            f"{encoded.named_slot(s)} with {float(dated_live_lots[s])!r} live lots, expected a "
+            f"finite number of {words}; the exposure in lots outruns the largest number"
+        )
+    outrun = ~np.isfinite(lot_delta)
+    if outrun.any():
+        r = int(outrun.argmax())
+        raise ValueError(
+            f"{codes[int(encoded.references[r])]} has {float(lot_delta[r])!r} of lot delta, "
+            f"expected a finite number of {words}; the exposure in lots outruns the largest number"
+        )
+    if not np.isfinite(lot_delta_total):
+        raise ValueError(
+            f"the batch has {lot_delta_total!r} of lot delta in all, expected a finite number of "
+            f"{words}; the contracts' deltas, each finite, sum past the largest number"
+        )
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
     arrays = (
         is_fixed,
         dated_live_exposure,
+        dated_live_lots,
         set_amount,
         is_settled,
         live_slot,
         live_references,
         reference_of_live_slot,
     )
-    for array in (*arrays, delta):
+    for array in (*arrays, price_sensitivity, lot_delta):
         array.setflags(write=False)
     return PreparedTrades(
         encoded,
@@ -158,6 +201,7 @@ def prepared_trades(
         float(encoded.offset_of_group[unsettled].sum()),
         float(set_amount[unsettled].sum()),
         float((encoded.offset_of_group + set_amount)[is_settled].sum()),
-        delta,
-        float(delta.sum()),
+        price_sensitivity,
+        lot_delta,
+        lot_delta_total,
     )

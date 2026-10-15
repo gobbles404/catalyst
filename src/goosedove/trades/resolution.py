@@ -51,6 +51,7 @@ from goosedove.trades.terms import (
     Settlement,
     futures_schedule_of,
     named_trade,
+    reporting_lot_of,
     resolved_trades,
 )
 
@@ -115,7 +116,8 @@ def resolved(
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
-    index is a futures index, and every code of its schedule is read for its month, the rows the
+    index is a futures index made with a reporting lot, the specification the batch's delta is
+    counted in lots of, and every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
     refused by row. The batch has one period form, a contract_code or start_date with end_date,
     from the template or the ticket as any field: both forms, either date alone and neither are
@@ -166,6 +168,7 @@ def resolved(
     schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
     quantity_per = np.array([BASES.index(b) for b in bases], dtype=np.intp)[by_basis]
     schedule = futures_schedule_of(index)
+    reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract, start, end = _the_periods(fields, months)

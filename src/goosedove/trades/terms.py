@@ -20,7 +20,7 @@ from numpy.typing import NDArray
 
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.index import Index
+from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
 
@@ -98,17 +98,18 @@ class PaymentTerms:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedTrades:
-    """The instrument, the definition the terms were resolved under; the index, by reference, and
-    its futures schedule, the same object the index holds, typed as the kind rule found it; the
-    route and the settlement, one each for the batch. Then two sets of columns aligned by
-    position, all read-only. Per occurrence, the ticket's rows in order: specification[i] the
-    row of the index's specifications its quantity counts, the desk's word for a quantity of the
-    index that the row's quantity_unit named; schedule_method[i] its method and quantity_per[i]
-    the basis its quantity is stated per, each the position of the member among METHODS and
-    BASES, so that one batch mixes units, methods and bases row by row; trade_dates[i] the day
-    the deal was struck, and labels[i] its trade_id, clearing_house[i] its clearing organization
-    and broker[i] its broker, each tuple None as a whole when the field was not given, each a
-    label kept as typed and read for nothing. Per
+    """The instrument, the definition the terms were resolved under; the index, by reference, its
+    futures schedule, the same object the index holds, typed as the kind rule found it, and its
+    reporting lot, the specification the batch's delta is counted in lots of, the one the index
+    was made with; the route and the settlement, one each for the batch. Then two sets of columns
+    aligned by position, all read-only. Per occurrence, the ticket's rows in order:
+    specification[i] the row of the index's specifications its quantity counts, the desk's word
+    for a quantity of the index that the row's quantity_unit named; schedule_method[i] its method
+    and quantity_per[i] the basis its quantity is stated per, each the position of the member
+    among METHODS and BASES, so that one batch mixes units, methods and bases row by row;
+    trade_dates[i] the day the deal was struck, and labels[i] its trade_id, clearing_house[i] its
+    clearing organization and broker[i] its broker, each tuple None as a whole when the field was
+    not given, each a label kept as typed and read for nothing. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
     count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
@@ -124,6 +125,7 @@ class ResolvedTrades:
     instrument: Instrument
     index: Index
     schedule: FuturesSchedule
+    reporting_lot: ReportingLot
     specification: NDArray[np.intp]
     route: Route
     settlement: Settlement
@@ -182,7 +184,9 @@ def resolved_trades(
     in this order, the first failure being the message; then the columns copied and frozen.
 
     The index is a futures index, since a future's contract is a row of a futures schedule and
-    its final price the settlement on that row's expiry day. The occurrences are the ticket's
+    its final price the settlement on that row's expiry day, and it was made with a reporting
+    lot, since the batch's delta is a count of that lot and a batch without one could not report
+    its risk. The occurrences are the ticket's
     rows: one date each, and one label, clearing house and broker each where those are given;
     one specification, method and basis each, the specification a row of the index's
     specifications, since the lot size and the lot unit are read there, its quantities counting
@@ -211,6 +215,7 @@ def resolved_trades(
     is kept as the definition the terms stand under, and read for nothing here.
     """
     schedule = futures_schedule_of(index)
+    lot = reporting_lot_of(index)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
     _the_method(schedule_method, settlement, labels)
@@ -234,6 +239,7 @@ def resolved_trades(
         instrument,
         index,
         schedule,
+        lot,
         _frozen_rows(specification),
         route,
         settlement,
@@ -264,6 +270,19 @@ def futures_schedule_of(index: Index) -> FuturesSchedule:
             f"index is {described(index.kind, 'index')}, expected a futures index for a future"
         )
     return cast(FuturesSchedule, index.schedule)  # what the kind just said
+
+
+def reporting_lot_of(index: Index) -> ReportingLot:
+    """The specification the index reports delta in lots of, named when the index was made: a
+    batch's delta is a count of it, so an index made without one is refused, in the resolution
+    of a batch and in the kernel alike, before any row is read; a market needs none, and an
+    index that only builds markets is made without one."""
+    if index.reporting_lot is None:
+        raise ValueError(
+            f"index {index.name!r} has no reporting_lot, expected one of its specifications named "
+            "when the index was made; a batch's delta is reported in lots of it"
+        )
+    return index.reporting_lot
 
 
 def _the_selections(

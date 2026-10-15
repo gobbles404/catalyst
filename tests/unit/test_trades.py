@@ -133,7 +133,10 @@ def an_index(
     quote: tuple[str, str] = ("USD", "MMBTU"),
     measure: tuple[str, str] = ("ENERGY", "MMBTU"),
     lot: tuple[str, float, str] = ("NYMEX NG", 10_000.0, "MMBTU"),
+    reporting_lot: str | None = "",
 ) -> Index:
+    # The one specification is the reporting lot unless another name is given; None makes
+    # an index without one, as an index that only builds markets is made.
     codes = tuple(code for code, _ in contracts)
     schedule = futures_schedule(codes, dates(*(expiry for _, expiry in contracts)), None)
     spec_name, lot_size, lot_unit = lot
@@ -145,6 +148,7 @@ def an_index(
             (spec_name,), numbers(lot_size), (lot_unit,), numbers(0.0), numbers(0.0), UNITS
         ),
         holiday_calendar(dates(*holidays)),
+        spec_name if reporting_lot == "" else reporting_lot,
         UNITS,
     )
 
@@ -289,6 +293,7 @@ GAS_DAILY = index(
     gas_daily_schedule(("c0",), dates("2026-01-01"), dates("2026-01-31")),
     NG.conventions,
     NG.specifications,
+    None,
     None,
     UNITS,
 )
@@ -536,8 +541,8 @@ def one_lot_in_cents(
 @pytest.mark.parametrize(
     ("as_of", "finals", "quotes", "mark", "cash", "delta"),
     [
-        ("2026-11-24", {}, (300.0, 350.0, 360.0), 0, 0, 100),
-        ("2026-11-24", {}, (310.0, 350.0, 360.0), 1_000, 0, 100),
+        ("2026-11-24", {}, (300.0, 350.0, 360.0), 0, 0, 1),
+        ("2026-11-24", {}, (310.0, 350.0, 360.0), 1_000, 0, 1),
         ("2026-11-26", {"Z26": 300.0}, (350.0, 360.0), 0, 0, 0),
         ("2026-11-26", {"Z26": 310.0}, (350.0, 360.0), 1_000, 0, 0),
         ("2026-11-30", {"Z26": 300.0}, (350.0, 360.0), 0, 0, 0),
@@ -563,9 +568,10 @@ def test_one_lot_quoted_in_cents_values_in_dollars_through_live_fixed_and_paid(
     result, _ = one_lot_in_cents(as_of, finals, *quotes)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    np.testing.assert_allclose(result.delta, [delta])
-    assert result.delta_total == pytest.approx(delta)
-    assert result.delta_unit == "USD per CENT/MMBTU" and result.currency == "USD"
+    np.testing.assert_allclose(result.price_sensitivity, [100 * delta])  # 100 dollars a cent a lot
+    assert result.lot_delta_total == pytest.approx(delta)
+    assert result.price_sensitivity_unit == "USD per CENT/MMBTU" and result.currency == "USD"
+    assert result.lot_unit == "lots of NYMEX NG (10000 MMBTU)"
 
 
 # Quoted in dollars and settled in cents, the other way round from CENTS: four rows on the toy's
@@ -587,6 +593,7 @@ CENT_SETTLED = index(
         ("NG",), numbers(10_000.0), ("MMBTU",), numbers(0.0), numbers(0.0), UNITS
     ),
     holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-01")),
+    "NG",
     UNITS,
 )
 
@@ -607,10 +614,11 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
     prep = prepared_trades(enc, history, counter)
     result = trade_results(prep, quoted(history, 3.20, 3.50, 3.65), counter)
     assert result.mark == pytest.approx(350_000) and result.cash == 0
-    np.testing.assert_allclose(result.delta, [6_000_000, -3_000_000, -1_000_000])
-    assert result.delta_total == pytest.approx(2_000_000)
+    np.testing.assert_allclose(result.price_sensitivity, [6_000_000, -3_000_000, -1_000_000])
+    assert result.lot_delta_total == pytest.approx(2)  # a lot is 1,000,000 cents a dollar
     assert result.codes() == ("Z26", "F27", "G27")
-    assert result.delta_unit == "CENT per USD/MMBTU" and result.currency == "CENT"
+    assert result.price_sensitivity_unit == "CENT per USD/MMBTU" and result.currency == "CENT"
+    assert result.lot_unit == "lots of NG (10000 MMBTU)"
 
 
 # Fees are reserves, outside value: the index's brokerage and clearing rates per lot change no
@@ -624,13 +632,14 @@ def test_fees_per_lot_are_reserves_and_move_no_value() -> None:
             ("NYMEX NG",), numbers(10_000.0), ("MMBTU",), numbers(12.5), numbers(3.75), UNITS
         ),
         NG.holiday_calendar,
+        "NYMEX NG",
         UNITS,
     )
     plain, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
     charged, _ = evaluated(with_fees, "2026-11-24", {}, (3.20, 3.50))
     assert charged.mark == pytest.approx(plain.mark) == pytest.approx(7_000)
-    np.testing.assert_array_equal(charged.delta, plain.delta)
-    np.testing.assert_array_equal(charged.delta, [160_000, -50_000])
+    np.testing.assert_array_equal(charged.price_sensitivity, plain.price_sensitivity)
+    np.testing.assert_array_equal(charged.price_sensitivity, [160_000, -50_000])
     np.testing.assert_array_equal(charged.prepared.encoded.offset, plain.prepared.encoded.offset)
 
 
@@ -763,9 +772,9 @@ def test_a_contract_expiring_on_a_closed_day_is_refused_when_the_batch_is_encode
 def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
     initial, counter = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
     assert (initial.mark, initial.cash) == (7_000, 0)
-    np.testing.assert_array_equal(initial.delta, [160_000, -50_000])
-    assert initial.delta_total == 110_000 and initial.dv01 == 0.0
-    assert initial.delta_unit == "USD per USD/MMBTU"
+    np.testing.assert_array_equal(initial.price_sensitivity, [160_000, -50_000])
+    assert initial.lot_delta_total == 11 and initial.dv01 == 0.0  # lots of ten thousand
+    assert initial.price_sensitivity_unit == "USD per USD/MMBTU"
     assert initial.codes() == ("Z26", "F27") and initial.currency == "USD"
     assert initial.route is Route.CLEARED and initial.as_of == day("2026-11-24")
     np.testing.assert_allclose(initial.dated_live_contribution, [512_000, -175_000])
@@ -781,8 +790,8 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
     }
     tick, _ = evaluated(NG, "2026-11-24", {}, (3.21, 3.50))
     assert tick.mark == pytest.approx(8_600)
-    np.testing.assert_array_equal(tick.delta, initial.delta)
-    assert not tick.delta.flags.writeable
+    np.testing.assert_array_equal(tick.price_sensitivity, initial.price_sensitivity)
+    assert not tick.price_sensitivity.flags.writeable
 
 
 def test_the_batch_equals_its_five_singletons_summed_and_the_duplicate_counts() -> None:
@@ -795,7 +804,7 @@ def test_the_batch_equals_its_five_singletons_summed_and_the_duplicate_counts() 
     first_four, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50), keep=slice(0, 4))
     assert first_four.mark == pytest.approx(-3_000)
     assert whole.mark - first_four.mark == pytest.approx(10_000)
-    assert whole.delta[0] - first_four.delta[0] == 100_000
+    assert whole.price_sensitivity[0] - first_four.price_sensitivity[0] == 100_000
 
 
 def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
@@ -804,7 +813,7 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
     prep = prepared_trades(enc, history, WorkCounter())
     before = (
         prep.dated_live_exposure.copy(),
-        prep.delta.copy(),
+        prep.price_sensitivity.copy(),
         prep.offset_unsettled,
         prep.cash,
     )
@@ -813,9 +822,12 @@ def test_a_tick_takes_the_preparation_as_it_is_and_folds_nothing() -> None:
     assert later.mark == pytest.approx(8_600)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 2}
     assert later.prepared is prep and later.market.market_history is history
-    assert later.delta is prep.delta and not later.delta.flags.writeable  # shared, never written
+    assert (
+        later.price_sensitivity is prep.price_sensitivity
+        and not later.price_sensitivity.flags.writeable
+    )  # shared, never written
     np.testing.assert_array_equal(prep.dated_live_exposure, before[0])
-    np.testing.assert_array_equal(prep.delta, before[1])
+    np.testing.assert_array_equal(prep.price_sensitivity, before[1])
     assert (prep.offset_unsettled, prep.cash) == before[2:]
 
 
@@ -925,8 +937,8 @@ def test_the_toy_lifecycle_marks_and_pays_as_the_page_says(
     result, counter = evaluated(TOY, as_of, finals, quotes, Settlement.FINANCIAL, TOY_PAYS)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    np.testing.assert_array_equal(result.delta, delta)
-    assert result.delta_total == pytest.approx(sum(delta))
+    np.testing.assert_array_equal(result.price_sensitivity, delta)
+    assert result.lot_delta_total == pytest.approx(sum(delta) / 10_000)  # TOY lots
     assert result.codes() == ("Z26", "F27")  # the axis stable, G27 on it nowhere
     counts = counter.freeze()
     assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
@@ -1154,7 +1166,7 @@ def test_the_phh_pen_marks_fixes_and_pays_as_the_page_says(
     result, counter = pen_evaluated(as_of, settles, quotes, lots)
     assert result.mark == pytest.approx(sign * mark)
     assert result.cash == pytest.approx(sign * cash)
-    assert result.delta_total == pytest.approx(sign * delta)
+    assert result.lot_delta_total == pytest.approx(sign * delta / 2_500)  # ICE PHH lots
     assert result.codes() == ("N27",)
     assert result.dv01 == 0.0
     counts = counter.freeze()
@@ -1198,7 +1210,7 @@ def test_a_fixed_pen_inside_a_live_market_reads_no_quote_whatever_the_underlying
         for quotes in ((3.10, 3.15), (3.50, 3.55))
     ]
     for result, counter in results:
-        assert (result.mark, result.delta_total) == (pytest.approx(1_000), 0.0)
+        assert (result.mark, result.lot_delta_total) == (pytest.approx(1_000), 0.0)
         assert counter.freeze()["live_prices_read"] == 0
         assert result.prepared.live_references.size == 0
     assert results[0][0].market.first_contract == 1  # N27, still quoted, read by no slot
@@ -1304,8 +1316,9 @@ def test_the_pen_strip_batch_marks_fixes_and_pays_as_the_hand_says(
 ) -> None:
     result, counter = strip_valued(STRIP_ROWS, as_of, settles, quotes)
     assert result.mark == pytest.approx(mark) and result.cash == pytest.approx(cash)
-    np.testing.assert_array_equal(result.delta, delta)
-    assert result.delta_total == pytest.approx(sum(delta)) and result.codes() == ("N27", "Q27")
+    np.testing.assert_array_equal(result.price_sensitivity, delta)
+    assert result.lot_delta_total == pytest.approx(sum(delta) / 2_500)  # ICE PHH lots
+    assert result.codes() == ("N27", "Q27")
     counts = counter.freeze()
     assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
         live_reads,
@@ -1315,7 +1328,7 @@ def test_the_pen_strip_batch_marks_fixes_and_pays_as_the_hand_says(
     # The rows the other way round make the same batch, and the three rows each alone sum to it.
     turned, _ = strip_valued(STRIP_ROWS[::-1], as_of, settles, quotes)
     assert turned.mark == pytest.approx(mark) and turned.cash == pytest.approx(cash)
-    np.testing.assert_array_equal(turned.delta, delta)
+    np.testing.assert_array_equal(turned.price_sensitivity, delta)
     singles = [strip_valued((line,), as_of, settles, quotes)[0] for line in STRIP_ROWS]
     assert sum(s.mark for s in singles) == pytest.approx(mark)
     assert sum(s.cash for s in singles) == pytest.approx(cash)
@@ -1458,8 +1471,8 @@ def test_the_daily_toy_marks_as_the_page_says_date_by_date(
     assert result.dated_live_contribution.sum() == pytest.approx(live_amount)
     np.testing.assert_allclose(result.dated_live_contribution, [x * 74 for x in live if x])
     assert (result.mark, result.cash) == (pytest.approx(mark), 0.0)
-    np.testing.assert_allclose(result.delta, [delta])
-    assert result.delta_total == pytest.approx(delta) and result.codes() == ("Z26",)
+    np.testing.assert_allclose(result.price_sensitivity, [delta])
+    assert result.lot_delta_total == pytest.approx(delta) and result.codes() == ("Z26",)
     counts = counter.freeze()
     assert (counts["fixings_read"], counts["live_prices_read"]) == (fixings, quotes)
     assert counts["prepared_slots"] == 3 and counts["kernel"] == 1
@@ -1469,7 +1482,7 @@ def test_the_daily_toy_marks_as_the_page_says_date_by_date(
 def test_the_daily_toy_pays_on_its_day_and_the_whole_amount_becomes_cash() -> None:
     paid, _ = daily_evaluated("2027-01-05")
     assert (paid.mark, paid.cash) == (0.0, pytest.approx(150))
-    assert paid.dated_live_contribution.size == 0 and paid.delta_total == 0.0
+    assert paid.dated_live_contribution.size == 0 and paid.lot_delta_total == 0.0
     unpaid, _ = daily_evaluated("2027-01-04")
     assert (unpaid.mark, unpaid.cash) == (pytest.approx(150), 0.0)
 
@@ -1504,14 +1517,14 @@ def test_offsetting_dates_keep_their_slots_though_the_contract_delta_nets_to_zer
     live = trade_results(
         prepared_trades(enc, before, WorkCounter()), daily_market(before), WorkCounter()
     )
-    assert live.mark == pytest.approx(0.0) and live.delta_total == pytest.approx(0.0)
+    assert live.mark == pytest.approx(0.0) and live.lot_delta_total == pytest.approx(0.0)
     np.testing.assert_allclose(live.dated_live_contribution, [740, -740])
     after = daily_history("2026-12-02", SETTLES)
     fixed = trade_results(
         prepared_trades(enc, after, WorkCounter()), daily_market(after), WorkCounter()
     )
     assert fixed.mark == pytest.approx(-30)
-    np.testing.assert_allclose(fixed.delta, [-10])
+    np.testing.assert_allclose(fixed.price_sensitivity, [-10])
     np.testing.assert_allclose(fixed.dated_live_contribution, [-740])
 
 
@@ -1522,20 +1535,24 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
 
     result, _ = daily_evaluated("2026-12-02")
     table = shown(result)
-    assert table.texts[:7] == (
+    assert table.texts[:9] == (
         "contract_code",
         "observation_date",
         "payment_date",
         "is_fixed",
-        "live_exposure",
+        "live_coefficient",
+        "live_lots",
         "live_contribution",
-        "contract_delta",
+        "contract_sensitivity",
+        "contract_lot_delta",
     )
     np.testing.assert_array_equal(table.numeric_slots[2:, 2], [46_392.0] * 3)  # 5 January
     np.testing.assert_array_equal(table.numeric_slots[2:, 3], [1.0, 0.0, 0.0])  # is_fixed
     np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 10.0, 10.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 740.0, 740.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 6], [20.0, 20.0, 20.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 10.0, 10.0])  # a unit lot
+    np.testing.assert_allclose(table.numeric_slots[2:, 6], [0.0, 740.0, 740.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 7], [20.0, 20.0, 20.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 8], [20.0, 20.0, 20.0])
 
 
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
@@ -1547,7 +1564,7 @@ def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_sl
     later = trade_results(prep, quoted(history, 75.0, 74.5), counter)
     assert later.mark == pytest.approx(-2_040 + 710 + 2 * 10 * 75)
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
-    assert later.delta is prep.delta
+    assert later.price_sensitivity is prep.price_sensitivity
 
 
 def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsupported() -> None:
@@ -1753,20 +1770,25 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
 def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_is_sold() -> None:
     kept, counter = valued_entry((2.0, 0.0), 3.10, 3.40)
     assert (kept.mark, kept.cash) == (pytest.approx(2_000), 0.0)
-    np.testing.assert_array_equal(kept.delta, [20_000, 0])
-    assert kept.delta_total == 20_000 and kept.codes() == ("Z26", "F27")
+    np.testing.assert_array_equal(kept.price_sensitivity, [20_000, 0])
+    assert kept.lot_delta_total == 2 and kept.codes() == ("Z26", "F27")
     np.testing.assert_allclose(kept.dated_live_contribution, [62_000, 0])
     assert counter.freeze()["live_prices_read"] == 2  # the zero slot takes its quote like any other
     sold, _ = valued_entry((2.0, -1.0), 3.10, 3.40)
     assert sold.mark == pytest.approx(1_000)
-    np.testing.assert_array_equal(sold.delta, [20_000, -10_000])
-    assert sold.delta_total == 10_000
+    np.testing.assert_array_equal(sold.price_sensitivity, [20_000, -10_000])
+    assert sold.lot_delta_total == 1
 
 
 def test_an_all_zero_batch_values_to_nothing_with_its_axis_kept() -> None:
     nothing, counter = valued_entry((0.0, 0.0), 3.10, 3.40)
-    assert (nothing.mark, nothing.cash, nothing.delta_total, nothing.dv01) == (0.0, 0.0, 0.0, 0.0)
-    np.testing.assert_array_equal(nothing.delta, [0, 0])
+    assert (nothing.mark, nothing.cash, nothing.lot_delta_total, nothing.dv01) == (
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    )
+    np.testing.assert_array_equal(nothing.price_sensitivity, [0, 0])
     assert nothing.codes() == ("Z26", "F27")
     np.testing.assert_array_equal(nothing.dated_live_contribution, [0, 0])
     assert counter.freeze()["live_prices_read"] == 2
@@ -1791,8 +1813,8 @@ def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -
         WorkCounter(),
     )
     result = trade_results(prep, quoted(history, 3.10, 3.40), WorkCounter())
-    assert result.mark == pytest.approx(-1_000) and result.delta_total == pytest.approx(-10_000)
-    np.testing.assert_array_equal(result.delta, [0, -10_000])
+    assert result.mark == pytest.approx(-1_000) and result.lot_delta_total == pytest.approx(-1)
+    np.testing.assert_array_equal(result.price_sensitivity, [0, -10_000])
     assert result.codes() == ("Z26", "F27")
 
 
@@ -1821,8 +1843,8 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
         )
         result = trade_results(prep, quoted(history, 3.10, 3.40), WorkCounter())
         assert result.mark == pytest.approx(1_500), order
-        np.testing.assert_array_equal(result.delta, [10_000, 0])
-        assert result.codes() == ("Z26", "F27") and result.delta_total == pytest.approx(10_000)
+        np.testing.assert_array_equal(result.price_sensitivity, [10_000, 0])
+        assert result.codes() == ("Z26", "F27") and result.lot_delta_total == pytest.approx(1)
 
 
 def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
@@ -1843,7 +1865,7 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     )
     spared = trade_results(prep, quoted(history, 3.20, 3.50), WorkCounter())
     assert spared.mark == pytest.approx(whole.mark) == pytest.approx(7_000)
-    np.testing.assert_array_equal(spared.delta, whole.delta)
+    np.testing.assert_array_equal(spared.price_sensitivity, whole.price_sensitivity)
     assert spared.codes() == whole.codes() and prep.live_slot.size == 2
 
 
@@ -1903,8 +1925,8 @@ def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(
     history = history_on(TOY, as_of, finals)
     prep = prepared_trades(enc, history, counter)
     result = trade_results(prep, quoted(history, *quotes), counter)
-    assert (result.mark, result.cash, result.delta_total) == (0.0, 0.0, 0.0)
-    np.testing.assert_array_equal(result.delta, [0.0])
+    assert (result.mark, result.cash, result.lot_delta_total) == (0.0, 0.0, 0.0)
+    np.testing.assert_array_equal(result.price_sensitivity, [0.0])
     assert result.codes() == ("Z26",)
     counts = counter.freeze()
     assert (counts["live_prices_read"], counts["fixings_read"]) == (live_reads, fixings_read)
@@ -1950,12 +1972,12 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
     whole = valued(trades)
     singles = [valued([trade]) for trade in trades]
     assert whole.mark == pytest.approx(sum(s.mark for s in singles), abs=1e-6)
-    assert whole.delta_total == pytest.approx(sum(s.delta_total for s in singles))
+    assert whole.lot_delta_total == pytest.approx(sum(s.lot_delta_total for s in singles))
     by_hand = sum(q * 10_000 * (quotes[c - 1] - p) for c, q, p in trades)
     assert whole.mark == pytest.approx(by_hand, abs=1e-6)
     doubled = valued(trades + trades)
     assert doubled.mark == pytest.approx(2 * whole.mark, abs=1e-6)
-    np.testing.assert_allclose(doubled.delta, 2 * whole.delta)
+    np.testing.assert_allclose(doubled.price_sensitivity, 2 * whole.price_sensitivity)
     axis = tuple(sorted({("Z26", "F27")[c - 1] for c, _, _ in trades}, key=("Z26", "F27").index))
     assert whole.codes() == axis
     # The delta contract by contract, by hand on the batch's own axis: the lots held on each
@@ -1963,11 +1985,11 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
     by_contract = [
         sum(q * 10_000 for c, q, _ in trades if ("Z26", "F27")[c - 1] == code) for code in axis
     ]
-    np.testing.assert_allclose(whole.delta, by_contract)
+    np.testing.assert_allclose(whole.price_sensitivity, by_contract)
     # The rows the other way round make the same batch: mark, axis and delta.
     turned = valued(trades[::-1])
     assert turned.mark == pytest.approx(whole.mark, abs=1e-6) and turned.codes() == axis
-    np.testing.assert_allclose(turned.delta, whole.delta)
+    np.testing.assert_allclose(turned.price_sensitivity, whole.price_sensitivity)
 
 
 # --- the last3day method: three equally weighted observations, one payment --------------------
@@ -2182,8 +2204,10 @@ def test_the_last3day_batch_marks_fixes_and_pays_as_the_page_says(
     result, counter = l3d_evaluated(as_of, quotes)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    assert result.delta_total == pytest.approx(delta)
-    np.testing.assert_allclose(result.delta, [delta])  # Z26, the one contract on the axis
+    assert result.lot_delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(
+        result.price_sensitivity, [delta]
+    )  # Z26, the one contract on the axis
     assert result.codes() == ("Z26",)
     assert result.dv01 == 0.0
     counts = counter.freeze().as_dict()
@@ -2204,7 +2228,7 @@ def test_a_tick_moves_the_live_last3day_slots_and_a_corrected_fixing_takes_a_new
         150
     )
     ticked = trade_results(prep, quoted(history, 75.0, 80.0), WorkCounter())
-    assert (ticked.mark, ticked.delta_total) == (pytest.approx(170), pytest.approx(20))
+    assert (ticked.mark, ticked.lot_delta_total) == (pytest.approx(170), pytest.approx(20))
     corrected = history_by_day(SYN, "2026-12-03", {**SYN_SETTLES, "2026-12-02": 72.0})
     with pytest.raises(ValueError) as refused:
         trade_results(prep, quoted(corrected, 74.0, 80.0), WorkCounter())
@@ -2231,9 +2255,9 @@ def test_the_last3day_batch_equals_its_singletons_summed_whatever_the_order() ->
     assert (a.mark, b.mark) == (pytest.approx(180), pytest.approx(-30))  # 1,420 + 2,960 - 4,200
     assert both.mark == pytest.approx(a.mark + b.mark) == pytest.approx(150)
     assert reversed_rows.mark == pytest.approx(both.mark)
-    assert reversed_rows.delta_total == pytest.approx(both.delta_total) == pytest.approx(20)
+    assert reversed_rows.lot_delta_total == pytest.approx(both.lot_delta_total) == pytest.approx(20)
     assert twice.mark == pytest.approx(both.mark + a.mark)
-    assert twice.delta_total == pytest.approx(both.delta_total + a.delta_total)
+    assert twice.lot_delta_total == pytest.approx(both.lot_delta_total + a.lot_delta_total)
 
 
 def test_a_zero_quantity_row_keeps_its_three_slots_and_its_contract_at_nothing() -> None:
@@ -2246,11 +2270,11 @@ def test_a_zero_quantity_row_keeps_its_three_slots_and_its_contract_at_nothing()
     np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09", "2027-01-11"))
     result, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), with_f27)
     assert (result.mark, result.cash) == (pytest.approx(150), 0.0)
-    np.testing.assert_allclose(result.delta, [20.0, 0.0])
+    np.testing.assert_allclose(result.price_sensitivity, [20.0, 0.0])
     assert result.codes() == ("Z26", "F27")
     with_zero_z26 = l3d_terms((60.0, -30.0, 0.0), (70.0, 72.0, 71.0), (1, 1, 1))
     same, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), with_zero_z26)
-    assert (same.mark, same.delta_total) == (pytest.approx(150), pytest.approx(20))
+    assert (same.mark, same.lot_delta_total) == (pytest.approx(150), pytest.approx(20))
     assert same.prepared.encoded.slot_group.size == 3
 
 
@@ -2488,8 +2512,10 @@ def test_the_asian_batch_marks_fixes_and_pays_as_the_page_says(
     result, counter = asian_evaluated(as_of, quotes)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    assert result.delta_total == pytest.approx(delta)
-    np.testing.assert_allclose(result.delta, [delta])  # Z26, the one contract on the axis
+    assert result.lot_delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(
+        result.price_sensitivity, [delta]
+    )  # Z26, the one contract on the axis
     assert result.codes() == ("Z26",)
     assert result.dv01 == 0.0
     counts = counter.freeze().as_dict()
@@ -2512,7 +2538,7 @@ def test_a_tick_moves_the_live_asian_slots_and_a_corrected_fixing_takes_a_new_hi
         84
     )
     ticked = trade_results(prep, quoted(history, 0.29, 0.30, 0.32), WorkCounter())
-    assert (ticked.mark, ticked.delta_total) == (pytest.approx(105), pytest.approx(2_100))
+    assert (ticked.mark, ticked.lot_delta_total) == (pytest.approx(105), pytest.approx(2_100))
     corrected = history_by_day(ETHANE, "2026-12-02", {**ETHANE_SETTLES, "2026-12-01": 0.25})
     with pytest.raises(ValueError) as refused:
         trade_results(prep, quoted(corrected, *LIVE_QUOTES), WorkCounter())
@@ -2552,9 +2578,11 @@ def test_the_asian_batch_equals_its_singletons_summed_whatever_the_order() -> No
     assert (a.mark, b.mark) == (pytest.approx(124), pytest.approx(-40))  # 48 + 1,176 - 1,100
     assert both.mark == pytest.approx(a.mark + b.mark) == pytest.approx(84)
     assert reversed_rows.mark == pytest.approx(both.mark)
-    assert reversed_rows.delta_total == pytest.approx(both.delta_total) == pytest.approx(2_100)
+    assert (
+        reversed_rows.lot_delta_total == pytest.approx(both.lot_delta_total) == pytest.approx(2_100)
+    )
     assert twice.mark == pytest.approx(both.mark + a.mark)
-    assert twice.delta_total == pytest.approx(both.delta_total + a.delta_total)
+    assert twice.lot_delta_total == pytest.approx(both.lot_delta_total + a.lot_delta_total)
 
 
 def test_a_zero_quantity_row_keeps_its_months_days_at_nothing_under_asian() -> None:
@@ -2565,7 +2593,7 @@ def test_a_zero_quantity_row_keeps_its_months_days_at_nothing_under_asian() -> N
     np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05", "2027-02-02"))
     result, _ = asian_evaluated("2026-12-02", LIVE_QUOTES, with_f27)
     assert (result.mark, result.cash) == (pytest.approx(84), 0.0)
-    np.testing.assert_allclose(result.delta, [2_100.0, 0.0])
+    np.testing.assert_allclose(result.price_sensitivity, [2_100.0, 0.0])
     assert result.codes() == ("Z26", "F27")
 
 
@@ -2670,8 +2698,8 @@ def test_the_encoding_converts_the_component_quantity_and_nothing_later_scales_a
     np.testing.assert_array_equal(by_day_quoted, [310_000])
     np.testing.assert_array_equal(by_month_quoted, [10_000])
     assert by_day.mark == pytest.approx(62_000) and by_month.mark == pytest.approx(2_000)
-    assert by_day.delta_total == pytest.approx(310_000)
-    assert by_month.delta_total == pytest.approx(10_000)
+    assert by_day.lot_delta_total == pytest.approx(31)  # a lot a day, 31 days
+    assert by_month.lot_delta_total == pytest.approx(1)
     assert by_day.codes() == by_month.codes() == ("Z26",)
 
 
@@ -2836,12 +2864,12 @@ def test_the_booked_period_values_as_the_page_says_and_calday_scales_it_by_its_d
 ) -> None:
     result = period_valued(period_terms(), as_of, quotes)
     assert result.mark == pytest.approx(mark) and result.cash == pytest.approx(cash)
-    assert result.delta_total == pytest.approx(delta)
+    assert result.lot_delta_total == pytest.approx(delta)
     # 2,000 a calendar day over 17 days is 34,000 units: every number seventeen times the month's,
     # the dates and the twelve weights unchanged; 1,020 of mark on the 15th and 850 of cash paid.
     by_day = period_valued(period_terms(basis=QuantityPer.CALDAY), as_of, quotes)
     assert by_day.mark == pytest.approx(17 * mark) and by_day.cash == pytest.approx(17 * cash)
-    assert by_day.delta_total == pytest.approx(17 * delta)
+    assert by_day.lot_delta_total == pytest.approx(17 * delta)
 
 
 def test_a_fixing_before_the_period_moves_nothing_of_it() -> None:
@@ -2850,7 +2878,7 @@ def test_a_fixing_before_the_period_moves_nothing_of_it() -> None:
         before = period_valued(period_terms(), as_of, quotes)
         after = period_valued(period_terms(), as_of, quotes, changed)
         assert (before.mark, before.cash) == (after.mark, after.cash)
-        np.testing.assert_array_equal(before.delta, after.delta)
+        np.testing.assert_array_equal(before.price_sensitivity, after.price_sensitivity)
 
 
 def test_two_rows_on_one_contract_from_different_starts_value_like_their_singletons() -> None:
@@ -2865,7 +2893,9 @@ def test_two_rows_on_one_contract_from_different_starts_value_like_their_singlet
     q = period_valued(period_terms((("2026-12-01", "2026-12-31"),), (2_200,)), "2026-12-02", quotes)
     assert together.mark == pytest.approx(p.mark + q.mark) == pytest.approx(126)
     assert (
-        together.delta_total == pytest.approx(p.delta_total + q.delta_total) == pytest.approx(4_100)
+        together.lot_delta_total
+        == pytest.approx(p.lot_delta_total + q.lot_delta_total)
+        == pytest.approx(4_100)
     )
     np.testing.assert_array_equal(observed_of(both).component, [0] * 12 + [1] * 22)
     # Ending on different days they pay on different days, P2 on 4 January and P1 on the 5th:
@@ -2893,7 +2923,9 @@ def test_two_rows_on_one_contract_from_different_starts_value_like_their_singlet
         p2 = period_valued(shorter, as_of, state_quotes)
         assert apart.mark == pytest.approx(p1.mark + p2.mark)
         assert apart.cash == pytest.approx(p1.cash + p2.cash)
-        np.testing.assert_allclose(apart.delta, p1.delta + p2.delta)
+        np.testing.assert_allclose(
+            apart.price_sensitivity, p1.price_sensitivity + p2.price_sensitivity
+        )
     on_fourth = period_valued(ends, "2027-01-04", (0.30, 0.32))
     assert (on_fourth.mark, on_fourth.cash) == (pytest.approx(50), pytest.approx(1_298 / 21))
     np.testing.assert_array_equal(on_fourth.prepared.is_settled, [True, False])
@@ -3087,8 +3119,10 @@ def test_two_payment_days_on_one_contract_mark_and_pay_as_the_ticket_says(
     result, counter = group_evaluated(as_of, quotes)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    assert result.delta_total == pytest.approx(delta)
-    np.testing.assert_allclose(result.delta, [delta])  # Z26, the one contract on the axis
+    assert result.lot_delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(
+        result.price_sensitivity, [delta]
+    )  # Z26, the one contract on the axis
     assert result.codes() == ("Z26",)
     counts = counter.freeze().as_dict()
     assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
@@ -3110,7 +3144,7 @@ def test_a_tick_moves_both_groups_live_slots_and_a_corrected_fixing_takes_a_new_
     )
     counter = WorkCounter()
     ticked = trade_results(prep, quoted(history, 75.0, 80.0), counter)
-    assert (ticked.mark, ticked.delta_total) == (pytest.approx(170), pytest.approx(20))
+    assert (ticked.mark, ticked.lot_delta_total) == (pytest.approx(170), pytest.approx(20))
     assert counter.freeze().as_dict() == {
         "kernel": 1,
         "live_prices_read": 1,
@@ -3127,7 +3161,7 @@ def test_a_tick_moves_both_groups_live_slots_and_a_corrected_fixing_takes_a_new_
         160
     )
     assert again.encoded is enc  # the payment days, the weights and the slots stand
-    np.testing.assert_allclose(again.delta, prep.delta)
+    np.testing.assert_allclose(again.price_sensitivity, prep.price_sensitivity)
 
 
 def test_opposite_positions_paying_on_different_days_net_to_nothing_and_both_pay() -> None:
@@ -3140,7 +3174,7 @@ def test_opposite_positions_paying_on_different_days_net_to_nothing_and_both_pay
         ("2026-12-05", (80.0,)),
     ):
         result, _ = group_evaluated(as_of, quotes, flat)
-        assert (result.mark, result.cash, result.delta_total) == (
+        assert (result.mark, result.cash, result.lot_delta_total) == (
             pytest.approx(0),
             0.0,
             pytest.approx(0),
@@ -3212,7 +3246,7 @@ def test_one_quote_serves_every_group_of_a_contract_and_the_axis_holds_each_once
     np.testing.assert_array_equal(result.prepared.live_references, [1, 2])
     assert result.prepared.live_slot.size == 10
     assert result.mark == pytest.approx(150) and result.codes() == ("Z26", "F27")
-    np.testing.assert_allclose(result.delta, [20.0, 30.0])
+    np.testing.assert_allclose(result.price_sensitivity, [20.0, 30.0])
 
 
 def test_a_group_paying_on_or_before_its_last_observation_is_still_refused() -> None:
@@ -3245,10 +3279,12 @@ def test_two_payment_days_equal_their_singletons_summed_in_every_state_and_order
         only_c, _ = group_evaluated(as_of, quotes, c)
         assert both.mark == pytest.approx(only_a.mark + only_b.mark)
         assert both.cash == pytest.approx(only_a.cash + only_b.cash)
-        np.testing.assert_allclose(both.delta, only_a.delta + only_b.delta)
+        np.testing.assert_allclose(
+            both.price_sensitivity, only_a.price_sensitivity + only_b.price_sensitivity
+        )
         swapped, _ = group_evaluated(as_of, quotes, reversed_rows)
         assert (swapped.mark, swapped.cash) == (pytest.approx(both.mark), pytest.approx(both.cash))
-        np.testing.assert_allclose(swapped.delta, both.delta)
+        np.testing.assert_allclose(swapped.price_sensitivity, both.price_sensitivity)
         doubled, _ = group_evaluated(as_of, quotes, twice)
         assert doubled.mark == pytest.approx(both.mark + only_a.mark)
         assert doubled.cash == pytest.approx(both.cash + only_a.cash)
@@ -3258,7 +3294,10 @@ def test_two_payment_days_equal_their_singletons_summed_in_every_state_and_order
         spread, _ = group_evaluated(as_of, quotes, with_f27)
         assert spread.mark == pytest.approx(both.mark + only_c.mark)
         assert spread.cash == pytest.approx(both.cash + only_c.cash)
-        np.testing.assert_allclose(spread.delta, np.concatenate([both.delta, only_c.delta]))
+        np.testing.assert_allclose(
+            spread.price_sensitivity,
+            np.concatenate([both.price_sensitivity, only_c.price_sensitivity]),
+        )
         assert spread.codes() == ("Z26", "F27")
 
 
@@ -3276,7 +3315,7 @@ def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
     )
     settles = {text: 72.0 for text in pricing_days("2026-12-01", "2027-01-01")}
     result = period_valued(terms, "2026-12-07", (74.0, 80.0, 80.0), settles)
-    assert (result.mark, result.cash, result.delta_total) == (
+    assert (result.mark, result.cash, result.lot_delta_total) == (
         pytest.approx(120),
         pytest.approx(60),
         pytest.approx(10),
@@ -3288,7 +3327,7 @@ def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
     np.testing.assert_array_equal(prep.is_settled, [True, False])
     assert prep.encoded.slot_group.size == 3 + 5
     on_ninth = period_valued(terms, "2026-12-09", (74.0, 80.0, 80.0), settles)
-    assert (on_ninth.mark, on_ninth.cash, on_ninth.delta_total) == (
+    assert (on_ninth.mark, on_ninth.cash, on_ninth.lot_delta_total) == (
         pytest.approx(0),
         pytest.approx(160),
         0.0,
@@ -3330,6 +3369,7 @@ MIXED = index(
         UNITS,
     ),
     holiday_calendar(dates("2026-12-25")),
+    "GAL",
     UNITS,
 )
 MIXED_DECEMBER = pricing_days(
@@ -3542,9 +3582,9 @@ def test_the_mixed_batch_marks_fixes_and_pays_as_the_ticket_says(
     result, counter = mixed_evaluated(as_of, quotes)
     assert result.mark == pytest.approx(mark)
     assert result.cash == pytest.approx(cash)
-    assert result.delta_total == pytest.approx(delta)
-    np.testing.assert_allclose(result.delta, [delta])
-    assert result.codes() == ("Z26",) and result.delta_unit == "USD per USD/GAL"
+    assert result.lot_delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(result.price_sensitivity, [delta])
+    assert result.codes() == ("Z26",) and result.price_sensitivity_unit == "USD per USD/GAL"
     counts = counter.freeze().as_dict()
     assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
         live_reads,
@@ -3565,7 +3605,7 @@ def test_a_tick_moves_the_mixed_batch_and_a_corrected_fixing_takes_a_new_history
     )
     counter = WorkCounter()
     ticked = trade_results(prep, quoted(history, 13.0, 13.0, 14.0), counter)
-    assert (ticked.mark, ticked.delta_total) == (pytest.approx(260), pytest.approx(66))
+    assert (ticked.mark, ticked.lot_delta_total) == (pytest.approx(260), pytest.approx(66))
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
     corrected = history_by_day(MIXED, "2026-12-30", {**MIXED_SETTLES, "2026-12-29": 12.0})
     with pytest.raises(ValueError) as refused:
@@ -3593,10 +3633,12 @@ def test_the_mixed_batch_equals_its_singletons_in_every_state_and_order() -> Non
         alone = [mixed_evaluated(as_of, quotes, mixed_terms((entry,)))[0] for entry in MIXED_ROWS]
         assert batch.mark == pytest.approx(sum(one.mark for one in alone)) == pytest.approx(mark)
         assert batch.cash == pytest.approx(sum(one.cash for one in alone)) == pytest.approx(cash)
-        np.testing.assert_allclose(batch.delta, sum(one.delta for one in alone))
+        np.testing.assert_allclose(
+            batch.price_sensitivity, sum(one.price_sensitivity for one in alone)
+        )
         swapped, _ = mixed_evaluated(as_of, quotes, mixed_terms(MIXED_ROWS[::-1]))
         assert (swapped.mark, swapped.cash) == (pytest.approx(mark), pytest.approx(cash))
-        np.testing.assert_allclose(swapped.delta, batch.delta)
+        np.testing.assert_allclose(swapped.price_sensitivity, batch.price_sensitivity)
         twice, _ = mixed_evaluated(as_of, quotes, mixed_terms((*MIXED_ROWS, MIXED_ROWS[0])))
         assert twice.mark == pytest.approx(mark + alone[0].mark)
         assert twice.cash == pytest.approx(cash + alone[0].cash)
@@ -3607,7 +3649,7 @@ def test_the_mixed_batch_equals_its_singletons_in_every_state_and_order() -> Non
         assert kept.prepared.encoded.slot_group.size == 23
         spread, _ = mixed_evaluated(as_of, quotes, mixed_terms((*MIXED_ROWS, strip)))
         assert spread.mark == pytest.approx(mark + 205) and spread.cash == pytest.approx(cash)
-        np.testing.assert_allclose(spread.delta, [delta, 31.0, 28.0])
+        np.testing.assert_allclose(spread.price_sensitivity, [delta, 31.0, 28.0])
         assert spread.codes() == ("Z26", "F27", "G27")
     with_strip = mixed_terms((*MIXED_ROWS, strip))
     np.testing.assert_array_equal(with_strip.component_quantity, [1, -62, 3, 22, 31, 28])
@@ -3630,7 +3672,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
     np.testing.assert_array_equal(twin.payment_date, enc.payment_date)
     for as_of, quotes, mark, cash, delta, *_ in MIXED_LIFECYCLE:
         result, _ = mixed_evaluated(as_of, quotes, in_gallons)
-        assert (result.mark, result.cash, result.delta_total) == (
+        assert (result.mark, result.cash, result.lot_delta_total) == (
             pytest.approx(mark),
             pytest.approx(cash),
             pytest.approx(delta),
@@ -3648,6 +3690,7 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
             UNITS,
         ),
         CENTS.holiday_calendar,
+        "lot",
         UNITS,
     )
     pair = mixed_terms(
@@ -3666,8 +3709,9 @@ def test_equivalent_quantities_compress_alike_whatever_unit_states_them() -> Non
     np.testing.assert_allclose(enc.offset, [-30_000.0, -30_000.0])
     np.testing.assert_allclose(enc.slot_exposure, [200.0])
     result, _ = mixed_evaluated("2026-11-24", (310.0, 350.0, 360.0), pair)
-    assert result.mark == pytest.approx(2_000) and result.delta_total == pytest.approx(200)
-    assert result.delta_unit == "USD per CENT/MMBTU"
+    assert result.mark == pytest.approx(2_000) and result.lot_delta_total == pytest.approx(2)
+    assert result.price_sensitivity_unit == "USD per CENT/MMBTU"
+    assert result.lot_unit == "lots of lot (10000 MMBTU)"
 
 
 def test_the_payment_conventions_combine_with_mixed_methods() -> None:
@@ -3724,7 +3768,7 @@ def test_a_partial_asian_row_stands_beside_whole_months_under_other_methods() ->
     enc = encoded(whole_and_part, obs, UNITS, WorkCounter())
     np.testing.assert_array_equal(enc.payment_date, dates("2026-12-16", "2027-01-04"))
     result, counter = mixed_evaluated("2026-12-16", MIXED_QUOTES, whole_and_part)
-    assert (result.mark, result.cash, result.delta_total) == (
+    assert (result.mark, result.cash, result.lot_delta_total) == (
         pytest.approx(84),
         pytest.approx(15),
         pytest.approx(42),
@@ -3816,3 +3860,95 @@ def test_the_mixed_batchs_refusals_keep_their_meaning() -> None:
             by(ScheduleMethod.LASTDAY, 2), MIXED, rows(1), *bounds_of(MIXED, rows(1)), unlabeled
         )
     assert str(refused.value) == "method has 2, expected 1, one per component"
+
+
+# The review's extreme input: a BTU as the reporting lot on the cent-quoted index, a coefficient
+# of 1e-8 dollars a cent an MMBTU a lot, so that quantities hundreds of orders of magnitude above
+# any book count their lots past the largest number while every monetary number stays finite.
+TINY_LOT = index(
+    "tiny lot",
+    CENTS.schedule,
+    CENTS.conventions,
+    contract_specifications(
+        ("BTU", "MMBTU"),
+        numbers(1.0, 1.0),
+        ("BTU", "MMBTU"),
+        numbers(0.0, 0.0),
+        numbers(0.0, 0.0),
+        UNITS,
+    ),
+    CENTS.holiday_calendar,
+    "BTU",
+    UNITS,
+)
+
+
+def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() -> None:
+    # The review's case: a BTU as the reporting lot on a cent-quoted index and a quantity of 1e303
+    # MMBTU, whole and finite as a quantity, finite as a sensitivity, 1e301 dollars a cent, and not
+    # as lots, 1e301 over a coefficient of 1e-8; refused when the batch is prepared, by its slot,
+    # before anything a reader would fail on is published. Extreme-input hardening, not pricing.
+    tiny = TINY_LOT
+    assert tiny.reporting_lot is not None
+    assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
+    terms = resolved_trades(
+        FUTURE, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ("H",), None, None,
+        dates("2026-09-24"), rows(0), rows(1),
+        numbers(1e303), *bounds_of(tiny, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.coefficient, [1e301])  # finite, in dollars a cent an MMBTU
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(tiny, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "trade 'H' at row 1 observes Z26 on 2026-11-25 with inf live lots, expected a finite "
+        "number of lots of BTU (1 BTU); the exposure in lots outruns the largest number"
+    )
+
+
+def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract() -> None:
+    # The aggregate: two rows of Z26 paying on two days, so two slots, each 9e303 lots of 10,000
+    # MMBTU, 9e307 MMBTU, finite as an exposure and as lots, 9e303 each, and their sum past the
+    # largest number as the contract's sensitivity and so as its lot delta; the sum is bincount's,
+    # which raises no flag, so the rule looks at the vector and refuses by the contract before
+    # anything is published. Paying on one day, the two rows would share a slot whose exposure
+    # is already infinite, and the slot rule would speak first. A price of zero keeps the offsets
+    # finite; this is the arithmetic's edge, not a trade anyone books.
+    terms = resolved_trades(
+        FUTURE, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("A", "B"), None, None,
+        dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 1),
+        numbers(9e303, 9e303), *bounds_of(NG, rows(1, 1)), numbers(0.0, 0.0),
+        paying(dates("2026-11-30", "2026-12-01"), 2),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.slot_exposure, [9e307, 9e307])  # two slots, finite each
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "Z26 has inf of lot delta, expected a finite number of lots of NYMEX NG (10000 MMBTU); "
+        "the exposure in lots outruns the largest number"
+    )
+
+
+def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_batch() -> None:
+    # The review's third case: Z26 and F27 each 1e302 MMBTU, 1e300 dollars a cent of sensitivity
+    # and 1e308 lots, finite by the slot and by the contract, and their sum past the largest
+    # number; refused for the batch before the record is made, so that the risk report never
+    # meets an infinite total. The sum runs with the overflow flag down and the rule judges.
+    terms = resolved_trades(
+        FUTURE, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ("Z", "F"), None, None,
+        dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 2),
+        numbers(1e302, 1e302), *bounds_of(TINY_LOT, rows(1, 2)), numbers(300.0, 300.0),
+        paying(dates("2026-11-30", "2026-12-31"), 2),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.coefficient, [1e300, 1e300])  # finite, in dollars a cent
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, history_on(TINY_LOT, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "the batch has inf of lot delta in all, expected a finite number of lots of BTU (1 BTU); "
+        "the contracts' deltas, each finite, sum past the largest number"
+    )

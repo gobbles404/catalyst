@@ -37,10 +37,14 @@ model; a future actual-cash/reconciliation feature would need its own settlement
 Both routes use `delta` and `dv01`. Their differentiated remaining-value measure is
 `bilateral_mark` or `cleared_mark`, explicitly identified in metadata. Mark is a monetary
 amount, not a quoted commodity price.
-Delta carries the commodity axis, units and projection/risk mapping. DV01 carries the
-curve/bucket axis, one-basis-point bump, sign convention and held-fixed inputs; the detailed
-bump/sign convention still needs agreement. The shared names do not make bilateral NPV and
-cleared P&L interchangeable measures.
+Delta carries the commodity axis, units and projection/risk mapping. Since #164 the reported
+delta is a count of lots of the specification the index names as its reporting lot, the
+batch's exposure still to price, and the monetary price sensitivity, the settlement currency
+per unit of quote price, is retained beside it under its own name and never under the
+same one, [lot-delta-reporting.md](lot-delta-reporting.md). DV01 carries the curve/bucket
+axis, one-basis-point bump, sign convention and held-fixed inputs; the detailed bump/sign
+convention still needs agreement. The shared names do not make bilateral NPV and cleared
+P&L interchangeable measures.
 
 For the explicitly undiscounted cleared model, holding commodity inputs fixed gives zero
 rate sensitivity. That is a valid model result. An unimplemented bilateral DV01 calculation
@@ -81,10 +85,10 @@ measure and supplied inputs establish it.
 | Group | Required meaning |
 |---|---|
 | Requested collection | Reference to the supplied batch, including its original occurrences and display labels |
-| Measures | The route's two completed value fields plus `delta` and `dv01`, with their meanings and units; intermediate amount results remain explicitly identified |
+| Measures | The route's two completed value fields plus `delta` and `dv01`, with their meanings and units, the delta in lots of the index's reporting specification since #164; intermediate amount results remain explicitly identified |
 | Conventions | Route, currency, as-of, remaining-value basis, date cutoff and cumulative modeled-settlement scope |
 | Optional diagnostics | Aggregate `fixed_leg`, `floating_leg_set`, `floating_leg_live` when meaningful; these are not extra required fields in the four-output target. Fees are reserves and appear in no measure |
-| Risk | Aggregate sensitivity vector, measure differentiated, ordered market/curve coordinates, units and bump convention where applicable |
+| Risk | The lot delta by contract and the monetary sensitivity vector, measure differentiated, each with its unit, ordered market/curve coordinates, and bump convention where applicable |
 | Provenance | The resolved trade/definition inputs and valuation/market context used; sufficient immutable references or metadata to prevent mixed snapshots |
 | Completeness | The declared result scope and every measure it requires; no partial publication of the four-field target |
 
@@ -110,8 +114,9 @@ EvaluationResult
         mark                     # aggregate currency amount
         cash                     # aggregate modeled settled amount
     risk
-        delta: float64[M]         # by contract, the batch's static axis, zero where fixed; retained, not reported
-        delta_total: float64      # a common one-price-unit move across the contracts; what _ReportRisk spills
+        price_sensitivity: float64[M]  # by contract, the batch's static axis, the settlement currency per unit of quote price, zero where fixed; retained, not reported
+        lot_delta: float64[M]          # the same over the reporting lot's coefficient, lots of the index's reporting specification, since #164
+        lot_delta_total: float64       # their sum; what _ReportRisk spills as delta_total
         dv01: float64[R]          # where supported
     source_batch                 # shared immutable occurrence and payment facts
 ```
@@ -134,8 +139,9 @@ completed snapshot; no evaluated amount per trade is required.
 
 Published NumPy arrays must be owned and read-only, or safely share already immutable
 backing with no writable aliases. A frozen dataclass or a read-only view alone does not
-establish that guarantee. Reusing an immutable prepared delta array is valid when its
-meaning matches the result; later ticks must never mutate it. Handle ownership must retain
+establish that guarantee. Reusing the immutable prepared risk arrays, the sensitivity and the
+lot delta, is valid when their meaning matches the result; later ticks must never mutate
+them. Handle ownership must retain
 the required references while readers remain live and release obsolete results and their
 dependencies when no owner remains, without an unbounded global result store.
 
@@ -153,6 +159,10 @@ result.projected_unpaid_amount = 140
 result.amount_delta = [30]
 result.mark_axis = [(toy_index, "Z26", "remaining_assessments", "USD/unit")]
 ```
+
+Since #164 the reported delta is this amount delta over the index's reporting lot's
+coefficient, a count of lots, which reads 30 as well for a reporting lot of one unit; the
+monetary vector keeps its own name beside it and is read back as the contract's sensitivity.
 
 The scalar notation describes one batch value. A one-row numerical representation is also
 possible; the result shape does not gain one row for every input trade. The aggregate value

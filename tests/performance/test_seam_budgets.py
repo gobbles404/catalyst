@@ -1082,6 +1082,7 @@ def an_index(schedule: object, holidays: object = MISSING) -> object:
         PATH["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU"),
         PATH["_CreateContractSpecifications"](SPECIFICATION_HEADERS, specification_body(1)),
         holidays,
+        MISSING,
     )
 
 
@@ -1173,25 +1174,28 @@ def index_parts() -> tuple[object, object, object, object]:
 
 
 # Text through its rule and four handles, each through the text rule and one lookup, the
-# builder's dispatch to the futures index, its holiday rule and one publication: twenty-one
-# calls across ten functions, and not one numpy call, no copy and no look at the schedule,
+# builder's dispatch to the futures index, its holiday rule and one publication: twenty-two
+# calls across ten functions, the reporting lot left out validated as missing, and not one
+# numpy call, no copy and no look at the schedule,
 # whatever its length. The lot-unit rule of #115 is one lookup per row of the specifications and
 # calls nothing the ledger counts. An IFERC index leaves the holiday calendar out, one handle
-# fewer through the text rule and the lookup, and runs the other holiday rule: nineteen calls
+# fewer through the text rule and the lookup, and runs the other holiday rule: twenty calls
 # across ten functions.
 def test_an_index_is_text_and_four_handles_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     schedule, conventions, specifications, holidays = index_parts()
-    PATH["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    PATH["_CreateIndex"](
+        "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
+    )
     assert call_profile(
         lambda: PATH["_CreateIndex"](
-            "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+            "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
         )
     ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 5,
+        "_validate": 6,  # the six declared, the reporting lot left out among them
         "_text": 5,  # the name's rule, and each handle's text rule
         "_resolve": 4,  # each handle's one lookup
         "_CreateIndex": 1,
@@ -1203,21 +1207,21 @@ def test_an_index_is_text_and_four_handles_in_and_one_publication_out(
     assert (
         numpy_calls(
             lambda: PATH["_CreateIndex"](
-                "Henry Hub NYMEX", schedule, conventions, specifications, holidays
+                "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
             )
         )
         == {}
     )
     months = PATH["_CreateIfercSchedule"](*iferc_columns(120))
-    PATH["_CreateIndex"]("Henry Hub IFERC", months, conventions, specifications, MISSING)
+    PATH["_CreateIndex"]("Henry Hub IFERC", months, conventions, specifications, MISSING, MISSING)
     assert call_profile(
         lambda: PATH["_CreateIndex"](
-            "Henry Hub IFERC", months, conventions, specifications, MISSING
+            "Henry Hub IFERC", months, conventions, specifications, MISSING, MISSING
         )
     ) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 5,
+        "_validate": 6,
         "_text": 4,
         "_resolve": 3,
         "_CreateIndex": 1,
@@ -1234,7 +1238,9 @@ def test_reading_an_index_back_costs_one_row(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     schedule, conventions, specifications, holidays = index_parts()
-    made = PATH["_CreateIndex"]("Henry Hub NYMEX", schedule, conventions, specifications, holidays)
+    made = PATH["_CreateIndex"](
+        "Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING
+    )
     PATH["util_ReadHandle"](made)
     assert call_profile(lambda: PATH["util_ReadHandle"](made)) == {
         "Registered.run": 1,
