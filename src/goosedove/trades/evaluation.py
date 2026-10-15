@@ -12,7 +12,7 @@ batch takes a discount curve: its live contributions summed onto the payment gro
 group's amount discounted on the curve's factor for its payment day, the mark their sum, DV01 the
 analytic sensitivity of that mark to a rise of one basis point, and the lots each live slot holds
 weighted by its group's factor, summed onto the references and the days and, by reference since
-#NN, onto the contract months and years, beside the nominal vectors the preparation shares; a
+#186, onto the contract months and years, beside the nominal vectors the preparation shares; a
 cleared batch takes no curve and is as it was.
 docs/library/trades/kernel.md is the page."""
 
@@ -45,7 +45,7 @@ RISK_REDUCTIONS = "risk_reductions"
 
 
 class Bucket(Enum):
-    """What a risk report sums by: the day, or since #NN the calendar month or year, the pricing
+    """What a risk report sums by: the day, or since #186 the calendar month or year, the pricing
     contract's for the deltas and the payment's for the DV01, _ReportRisk's three choices, a
     quarter none of them."""
 
@@ -128,7 +128,7 @@ class TradeResults:
     onto the payment-time axes the encoding made once, the day a group's amount is paid, the
     calendar month it falls in and the calendar year, a paid group's nothing on its day, each
     view checked finite; None for a cleared batch, whose DV01 has no dated axis. _ReportRisk
-    reads them by reference through risk_view. Since #NN early_delta and early_dv01, the facts
+    reads them by reference through risk_view. Since #186 early_delta and early_dv01, the facts
     refusing a month or a year report whose discounted lots or DV01 stand in a period before the
     valuation day's, or none, a cleared result's delta the preparation's nominal facts, its lots
     being the same, and its DV01 none; a reader words them with the measure asked for and
@@ -335,7 +335,7 @@ def _discounted(
     the continuously compounded zero rates, the batch's DV01 their sum, negative for an amount
     receivable. The discounted lots are each slot's lots times its group's factor, a fixed slot's
     lots being zero, before any sum, since two slots of one day and one contract may pay on
-    different days; summed over every slot onto the references and the days and, since #NN, by
+    different days; summed over every slot onto the references and the days and, since #186, by
     reference onto the contract months and years exactly as the preparation sums the nominal
     lots, one path whether a slot is live or
     not and whether any is, since a sum over no slot is numpy's integer zeros and not a sum; and
@@ -474,7 +474,7 @@ def _discounted(
                 f"amount of {currency} per basis point; its groups' DV01s sum past the largest "
                 "number"
             )
-    # Since #NN the facts refusing a month or a year report of the discounted lots or the DV01
+    # Since #186 the facts refusing a month or a year report of the discounted lots or the DV01
     # standing before the valuation day's period, found once here against the preparation's
     # display axes.
     early_delta = early_risk(
@@ -564,7 +564,7 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     cleared result's a total of nothing over no dated row, its DV01 having no dated axis; all three
     are on the union of the two axes the encoding made, each vector copied through its saved
     places and zero where only the other kind has a date, a cleared result's all on the
-    observation days with a DV01 column of zeros. By month or by year, since #NN,
+    observation days with a DV01 column of zeros. By month or by year, since #186,
     risk-contract-month-bucketing.md: the preparation's display axis, consecutive periods from the
     valuation day's, a delta report through the last contract period and a DV01 report through
     the last payment period, all three through the later, each saved vector copied through the
@@ -652,7 +652,7 @@ def _day_view(results: TradeResults, risk: Risk, labels: tuple[str, str, str]) -
 def _period_view(
     results: TradeResults, risk: Risk, bucket: Period, labels: tuple[str, str, str]
 ) -> RiskView:
-    """The month or the year report's content, since #NN: the preparation's display axis cut to
+    """The month or the year report's content, since #186: the preparation's display axis cut to
     the selected risks' rows, the saved vectors copied through the saved places from the first
     period on or after the start, a saved value before it refused from the saved facts, worded
     with the measure asked for."""

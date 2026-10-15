@@ -4476,7 +4476,7 @@ def test_day_buckets_follow_the_observation_and_month_buckets_the_pricing_contra
     # The ticket's boundary case on the WTI-like index: 1 LOT a calendar day over 30 December to
     # 5 January, two December pricing days of a lot and two January ones of 2.5, and 3 LOT over
     # 1 and 2 February, 1.5 each; the months paying 5 January, 7 January and 4 February. Daily lots
-    # 1, 1, 2.5, 2.5, 1.5 and 1.5 off G27 then H27 by observation day; by month, since #NN,
+    # 1, 1, 2.5, 2.5, 1.5 and 1.5 off G27 then H27 by observation day; by month, since #186,
     # risk-contract-month-bucketing.md, the contracts' own months, February 2027 for G27 and
     # March for H27, 7 and 3, whatever days they were observed on, and one year of 10; the
     # December days fix by 1 January and the 4th by the 5th, the axes standing, and a payment
@@ -4526,7 +4526,7 @@ def test_a_lastday_f27_observed_in_december_counts_in_january_and_the_asian_by_i
     None
 ):
     # 3 LOT of F27 under lastday over its own January month observes 21 December and pays the 23rd:
-    # on 18 December its 3 lots stand on the 21st by day and, since #NN, in January 2027 and in
+    # on 18 December its 3 lots stand on the 21st by day and, since #186, in January 2027 and in
     # 2027 by month and year, the contract's own, never in December, the month it is observed in.
     # The ticket's six-day asian: 0.2 a day, F27 twice then G27, so 0.4 in January and 0.8 in
     # February 2027 and one 2027 bucket of 1.2; after the roll the first two days read zero, the
@@ -4564,7 +4564,7 @@ def test_a_lastday_f27_observed_in_december_counts_in_january_and_the_asian_by_i
 
 def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_year() -> None:
     # The same day bought and sold: one slot of nothing, the day kept at zero in every view. Two
-    # days bought and sold: both kept, 1.2 and -1.2 off F27 and G27, so since #NN the two
+    # days bought and sold: both kept, 1.2 and -1.2 off F27 and G27, so since #186 the two
     # contracts' months keep 1.2 and -1.2 and the year nets to zero.
     same = wti_terms(
         periods=(("2026-12-18", "2026-12-18"),) * 2,
@@ -4599,7 +4599,7 @@ def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_year()
 def test_two_decembers_price_off_four_contract_months_in_two_years() -> None:
     # Fifteen monthly contracts from Z26 to G28, each expiring the month before its own: a December
     # 2026 asian and a December 2027 asian of 2,200 barrels each, 100 a day, price off F27 then
-    # G27 and off F28 then G28, so since #NN they are four month buckets, January and February of
+    # G27 and off F28 then G28, so since #186 they are four month buckets, January and February of
     # each year, and two year buckets, 2.2 lots each year while live on 1 December 2026; by day
     # they are 45 December pricing days.
     letters = "FGHJKMNQUVXZ"
@@ -4637,7 +4637,7 @@ def test_a_days_lots_past_the_largest_number_are_refused_by_their_day() -> None:
     # holds 1e308 lots on 23 November and -1e308 on the 24th, group two, paying the 30th, 1e308 on
     # the 23rd again; the contract sums 1e308, 0 and 1e308 and stays finite, the 23rd sums to
     # infinity and is refused by its day. With the negative lot on the 25th instead, every day is
-    # finite, and so is the month: since #NN a month bucket is one contract's delta, checked by
+    # finite, and so is the month: since #186 a month bucket is one contract's delta, checked by
     # its contract, and a year's sum of finite contracts past the largest number is the batch
     # total's refusal first, the contracts' deltas summing in the same order.
     def tiny(

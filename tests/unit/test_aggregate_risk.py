@@ -172,7 +172,7 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     np.testing.assert_array_equal(agg.by_day.union, dates(AS_OF, A_YEAR, TWO_YEARS))
     np.testing.assert_array_equal(agg.by_day.observed_in_union[0], [0])
     np.testing.assert_array_equal(agg.by_day.paid_in_union[0], [1, 2])
-    # Since #NN the month axis is dense from the valuation month: January 2027 through January
+    # Since #186 the month axis is dense from the valuation month: January 2027 through January
     # 2029, the contract month its first row and the two payment months the 13th and the 25th.
     assert agg.by_month.union.size == 25 and agg.by_month.observed.size == 1
     np.testing.assert_array_equal(agg.by_month.union[[0, 12, 24]], dates(JAN_27, JAN_28, JAN_29))

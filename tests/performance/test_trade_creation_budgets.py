@@ -305,13 +305,13 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
         "ndarray.setflags": 17,  # the kernel's twelve copies, the three selections among them, the
-        # schedule's months since #NN,
+        # schedule's months since #186,
         # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
         "ndarray.sort": 1,  # the methods present, numpy's unique over the components' codes
         "numpy._unique_hash": 1,  # numpy's own look within that unique
         "numpy.array": 25,  # the four distinct reads' texts and three of their values, the rules
-        # and the terms' copy of the schedule's months since #NN,
+        # and the terms' copy of the schedule's months since #186,
         # kept as text since #181, the coded rows' texts
         # and their spans, the three selections copied into the kernel's record, two of them the
         # dates copied, the mask of the rows that entered a code
@@ -590,7 +590,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "contract_on": 1,
         "_the_slots": 1,
         "_the_day_axis": 1,  # the day axis, since #166
-        "_the_contract_periods": 1,  # the contract month and year axes, since #NN
+        "_the_contract_periods": 1,  # the contract month and year axes, since #186
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,

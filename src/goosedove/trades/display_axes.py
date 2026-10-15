@@ -1,11 +1,12 @@
-"""The display axes of the month and year risk reports, since #NN, risk-contract-month-bucketing.md:
-consecutive calendar months or years from the one holding the valuation day through the farthest
-saved period, so that a report begins at the valuation month and shows the current period even
-when nothing stands in it, the periods between filled with zero; and the facts of a saved risk
-before that start, found where the vector is made, which a report words with the measure asked
-for and raises, scanning nothing. A batch's axes are made once when it is prepared, the valuation
-day being the history's, and a collection's once when it is made; a held result keeps its axes
-whatever the sheet's valuation date does after. docs/library/trades/report-risk.md is the page."""
+"""The display axes of the month and year risk reports, since #186,
+risk-contract-month-bucketing.md: consecutive calendar months or years from the one holding the
+valuation day through the farthest saved period, so that a report begins at the valuation month
+and shows the current period even when nothing stands in it, the periods between filled with
+zero; and the facts of a saved risk before that start, found where the vector is made, which a
+report words with the measure asked for and raises, scanning nothing. A batch's axes are made
+once when it is prepared, the valuation day being the history's, and a collection's once when it
+is made; a held result keeps its axes whatever the sheet's valuation date does after.
+docs/library/trades/report-risk.md is the page."""
 
 from dataclasses import dataclass
 from typing import Literal

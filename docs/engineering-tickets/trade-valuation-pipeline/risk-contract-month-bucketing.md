@@ -4,12 +4,12 @@
 [Existing report design](unified-risk-reporting.md) ·
 [Aggregate integration](aggregate-risk-excel-integration.md)
 
-**Status:** Built in #NN on `claude/risk-contract-month`, stacked on PR #183 at `c72befe`, the
-baseline inspected, 15 October 2026, the page as the ticket, two commits as asked; the
-[As built](#as-built-nn) section at the end says what was built and what was not. This ticket
-supersedes the earlier report design's observation-month/year bucketing and, for month/year
-displays, its requirement to retain every past zero row; it does not claim the stack has
-shipped.
+**Status:** Built in #186 on `claude/risk-contract-month` above PR #183 at `c72befe`, the
+baseline inspected, and rebased onto `main` at `6083dcc` once the stack landed, 15 October
+2026, the page as the ticket, two commits as asked; the [As built](#as-built-186) section at the
+end says what was built and what was not. This ticket supersedes the earlier report design's
+observation-month/year bucketing and, for month/year displays, its requirement to retain every
+past zero row.
 
 ## Outcome
 
@@ -226,10 +226,10 @@ forward pointer. Mark this ticket and the UAT entry implemented only after both
 commits pass. New quoting behavior, contract-month hedging algorithms, rates
 key-tenor attribution and quarterly/hourly reports are outside this PR.
 
-## As built (#NN)
+## As built (#186)
 
-Built on `claude/risk-contract-month` above #183's `c72befe`, one pull request of two commits and
-the number stamped after.
+Built on `claude/risk-contract-month` above #183's `c72befe` and rebased onto `main` at `6083dcc`
+after #183 and #147 landed, one pull request of two commits and the number stamped after.
 
 **Commit 1, `fix(risk): bucket delta by pricing contract month`.** The terms keep the schedule's
 months the resolution read, `ResolvedTrades.schedule_month`, read by the builder itself when a

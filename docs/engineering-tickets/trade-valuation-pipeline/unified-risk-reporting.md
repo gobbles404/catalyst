@@ -8,7 +8,7 @@
 **Status:** Built in #178 on `claude/risk-vectors`, stacked on the reviewed PR #177 at `788e5a7`,
 11 October 2026, the page as the ticket; the [As built](#as-built-178) section at the end says
 what was built and what was not. The first reporting/aggregation slice, not an extension to
-the bilateral integration PR; the owner's answers of 11 October are recorded there. Since #NN
+the bilateral integration PR; the owner's answers of 11 October are recorded there. Since #186
 the month and year buckets of the deltas follow the pricing contract's month and year,
 [risk-contract-month-bucketing.md](risk-contract-month-bucketing.md), which supersedes this
 page's observation-month buckets and, for the month and year displays, its rule that every

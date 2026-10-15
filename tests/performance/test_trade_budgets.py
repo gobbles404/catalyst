@@ -244,30 +244,30 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
 
 
 def display_periods(prep: PreparedTrades) -> int:
-    """The periods of the two display axes the preparation made, since #NN: the valuation day's
+    """The periods of the two display axes the preparation made, since #186: the valuation day's
     month and year through the last contract's, two for the five-trade fixtures and twenty-two
     for two thousand trades over two years."""
     return prep.by_month.periods.size + prep.by_year.periods.size
 
 
 PREPARATION_NUMPY = {
-    "generic.astype": 2,  # the valuation day to its month and its year, since #NN
+    "generic.astype": 2,  # the valuation day to its month and its year, since #186
     "ndarray.any": 6,  # the boundary slot; the lots, the lot delta and the three views finite
     "ndarray.argsort": 1,
-    "ndarray.astype": 7,  # the slot rows, and since #NN the two display axes' keys, periods and
+    "ndarray.astype": 7,  # the slot rows, and since #186 the two display axes' keys, periods and
     # first days, three a bucket
     "ndarray.cumsum": 1,
     "ndarray.flatten": 1,
-    "ndarray.nonzero": 3,  # the live slots, and since #NN the two looks for lots before the start
+    "ndarray.nonzero": 3,  # the live slots, and since #186 the two looks for lots before the start
     "ndarray.ravel": 3,
     "ndarray.reshape": 1,
-    "ndarray.searchsorted": 3,  # the fixed rows, and since #NN the contract periods' places, one
+    "ndarray.searchsorted": 3,  # the fixed rows, and since #186 the contract periods' places, one
     # a bucket
     "ndarray.setflags": 19,  # the eight, the two lot arrays since the lot delta, the three views,
-    # and since #NN the two display axes' three arrays each
+    # and since #186 the two display axes' three arrays each
     "ndarray.sum": 4,
     "numpy._make_extobj": 1,  # the error state set once, the overflow the fourth rule's to catch
-    "numpy.arange": 2,  # the display periods, since #NN
+    "numpy.arange": 2,  # the display periods, since #186
     "numpy.asanyarray": 5,
     "numpy.zeros": 1,
     "numpy.empty": 2,
@@ -355,7 +355,7 @@ ENCODING_LEDGER = {
     "contract_on": 1,
     "_the_slots": 1,
     "_the_day_axis": 1,  # the day axis, since #166
-    "_the_contract_periods": 1,  # the contract month and year axes, since #NN
+    "_the_contract_periods": 1,  # the contract month and year axes, since #186
     "_payments_after_observations": 1,
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "UnitConversions.factor": 2,
@@ -374,7 +374,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -477,7 +477,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -521,7 +521,7 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -631,7 +631,7 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -693,7 +693,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -795,7 +795,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -983,7 +983,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -1114,7 +1114,7 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -1267,7 +1267,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,

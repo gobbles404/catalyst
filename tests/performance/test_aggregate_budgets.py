@@ -163,7 +163,7 @@ def test_a_collection_runs_the_same_functions_at_any_size(
         "_summed": 7,
         "_compensated": 11,
         "_outrun": 3,
-        "_report_axes": 1,  # by day; since #NN the month and year axes are the display's
+        "_report_axes": 1,  # by day; since #186 the month and year axes are the display's
         "_period_report_axes": 2,
         "period_start": 2,
         "places_from": 4,
@@ -181,7 +181,7 @@ def test_a_collection_runs_the_same_functions_at_any_size(
     # and at twenty-four: a pass adds each occurrence's entries at once, so more occurrences are
     # more steps of the same arithmetic and not more of these calls.
     assert numpy_calls(lambda: aggregate_results(sources, WorkCounter())) == {
-        "generic.astype": 2,  # the valuation day to its month and its year, since #NN
+        "generic.astype": 2,  # the valuation day to its month and its year, since #186
         "ndarray.any": 11,
         "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
         "ndarray.flatten": 10,
@@ -234,7 +234,7 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
     d, m, y, refs = g.days.size, g.months.size, g.years.size, g.references.size
     p, pm, py = r.days.size, r.months.size, r.years.size
     # The report axes' bytes as the helper counts them: each axis, each group's places twice,
-    # once per union they place onto; by month and by year, since #NN, the display's rows.
+    # once per union they place onto; by month and by year, since #186, the display's rows.
     axes = 0
     for bucket in (agg.by_day, agg.by_month, agg.by_year):
         axes += bucket.observed.size + bucket.paid.size + bucket.union.size
@@ -274,7 +274,7 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
     ):
         for bucket in Bucket:
             # One column of zeros over the axis, the saved vector copied through its places; by
-            # month and by year, since #NN, every selected group's saved facts read.
+            # month and by year, since #186, every selected group's saved facts read.
             assert numpy_calls(lambda r=risk, b=bucket: aggregate_view(agg, r, b)) == {
                 "numpy.zeros": columns
             }

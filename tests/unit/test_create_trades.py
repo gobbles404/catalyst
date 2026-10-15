@@ -2709,7 +2709,7 @@ DECEMBER_PRICING_DAYS = ethane_days("2026-12-01", "2027-01-01")  # the same holi
 def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_year() -> None:
     # Two groups, Z26 paying 4 January and Z26 paying 31 December, 23 slots: the asian's 22 days
     # and the pen's one, 30 December, which the asian observes too; the days axis is December's 22
-    # pricing days once, every one priced by Z26, and since #NN the month axis Z26's own month,
+    # pricing days once, every one priced by Z26, and since #186 the month axis Z26's own month,
     # 1 December, and the year axis 1 January 2026, the buckets that stand whatever fixes.
     batch, _ = created(MONTHLY, ASIAN_AND_PEN, PEN_ASIAN_TEMPLATE)
     enc = batch.encoded

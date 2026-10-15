@@ -3,7 +3,7 @@ ticket of the risk reporting and aggregation series: one or many results, each a
 combined into one immutable record of risk, nothing priced, discounted or converted again.
 
 A result's risk is already saved on it: the nominal lots and the discounted lots by pricing
-reference, by observation day and since #NN by contract month and year, with their totals, and
+reference, by observation day and since #186 by contract month and year, with their totals, and
 for a bilateral batch
 the DV01 by payment day, month and year with its total, each vector frozen when the batch was
 prepared or valued. The collector reads those vectors and nothing else. It groups the occurrences
@@ -75,7 +75,7 @@ class IndexGroup:
     increasing. references is the union of the occurrences' pricing references, rows of the
     index's schedule increasing, with the nominal lots and the discounted lots summed onto them
     and the two totals, the saved scalars summed; days are the union of the occurrences'
-    observation days and months and years, since #NN, the unions of their contract months and
+    observation days and months and years, since #186, the unions of their contract months and
     contract years, with both lot vectors summed onto each. Every array frozen."""
 
     index: Index
@@ -125,7 +125,7 @@ class ReportAxes:
     the index groups' observation days, with each group's places; paid, the union of the rate
     groups' payment days, with each group's places, no day when no curve values; and union, the
     two together, with every group's places on it; observed_from and paid_from zero, every saved
-    entry placed. By month or by year, since #NN, risk-contract-month-bucketing.md: one display
+    entry placed. By month or by year, since #186, risk-contract-month-bucketing.md: one display
     axis of consecutive periods from the valuation day's, observed its first rows through the
     last contract period of any index group, paid its rows through the last payment period of
     any rate group, no day when no curve values, and union the rows through the later; each
@@ -151,7 +151,7 @@ class AggregateResults:
     order given, every one and by reference, so that a held collection keeps its sources
     readable; the index groups and the rate groups in first-appearance order; the currencies of
     the sources in first-appearance order, the DV01 columns of nothing a collection with no curve
-    reports; and the report axes by day, by month and by year. Since #NN early_nominal and
+    reports; and the report axes by day, by month and by year. Since #186 early_nominal and
     early_delta, one EarlyRisk per index group, and early_dv01, one per rate group: the facts
     refusing a month or a year report whose summed risk stands in a period before the valuation
     day's, or none, found here so that a report words them with the measure asked for and scans
@@ -216,7 +216,7 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
         as_of, [g.years for g in index_groups], [r.years for r in rate_groups], "Y", counter
     )
     currencies = tuple(dict.fromkeys([source.currency for source in results]))
-    # Since #NN the facts refusing a month or a year report of a group's risk standing before
+    # Since #186 the facts refusing a month or a year report of a group's risk standing before
     # the valuation day's period, found once here against the display axes and worded by the
     # reader with the measure asked for.
     early_nominal = tuple(
@@ -606,7 +606,7 @@ def _period_report_axes(
     unit: Unit,
     counter: WorkCounter,
 ) -> ReportAxes:
-    """One bucket's report axes by month or by year, since #NN: the display periods from the
+    """One bucket's report axes by month or by year, since #186: the display periods from the
     valuation day's through the farthest saved period of any group, the index groups' rows through
     their last contract period and the rate groups' through their last payment period, no day
     when no curve values; each group's places counted from the start and its first saved period
@@ -775,7 +775,7 @@ def _dv01(group: RateGroup, bucket: Bucket) -> NDArray[np.float64]:
 
 def _refuse_early(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> None:
     """Raises the refusal prepared for a month or a year report whose selected groups hold risk
-    before the valuation day's period, since #NN, worded with the measure asked for; a day report
+    before the valuation day's period, since #186, worded with the measure asked for; a day report
     is never refused."""
     match bucket:
         case Bucket.DAY:

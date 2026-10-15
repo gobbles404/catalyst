@@ -173,7 +173,7 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_PrepareTrades": 1,
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
         "rows_through": 2,
@@ -301,7 +301,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "DiscountCurve.max_date": 1,
         "Market.live_prices": 1,
         "_discounted": 1,
-        "early_risk": 2,  # since #NN
+        "early_risk": 2,  # since #186
         "early_fact": 4,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
@@ -325,7 +325,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
 
     def selected(on_curve: bool, risk: str, bucket: str) -> dict[str, int]:
         # By day, by reference, all three of a bilateral result copied through the day union;
-        # by month and by year, since #NN, the display axis, the saved refusals read for every
+        # by month and by year, since #186, the display axis, the saved refusals read for every
         # risk shown and a copy per column, a cleared result's DV01 nothing to copy or refuse.
         if bucket == "day":
             copies = {"placed": 3} if risk == "all" and on_curve else {}
@@ -460,7 +460,7 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
     # handles and at twenty-four, as test_aggregate_budgets.py pins them; before #180's review a
     # look per text cell counted the texts before it, n squared over the range.
     assert numpy_calls(lambda: PATH["_AggregateResults"](cells)) == {
-        "generic.astype": 2,  # the valuation day to its month and its year, since #NN
+        "generic.astype": 2,  # the valuation day to its month and its year, since #186
         "ndarray.any": 11,
         "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
         "ndarray.flatten": 10,
@@ -493,7 +493,7 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
     live = bridge.live_handles()
     # The collection's handle resolved by the two-kind rule, the two words chosen, the collection's
     # own selection with a copy per column, and #178's rectangle; nothing summed, nothing published.
-    # By month and by year, since #NN, the saved facts read: the one index group's for a delta,
+    # By month and by year, since #186, the saved facts read: the one index group's for a delta,
     # the one rate group's for the DV01, all three under all.
     for risk, selected, refused in (
         ("nominal_delta", {"_lots": 1, "placed": 1}, 1),
@@ -516,7 +516,7 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
                 "AggregateResults.report": 1,
                 "aggregate_view": 1,
                 "_axes_of": 1,
-                "_refuse_early": 1,  # since #NN; the saved refusals read by month and by year
+                "_refuse_early": 1,  # since #186; the saved refusals read by month and by year
                 **({} if bucket == "day" else {"_early_of": 1, "EarlyRisk.refuse": refused}),
                 **selected,
                 "_risk_table": 1,

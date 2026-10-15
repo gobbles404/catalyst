@@ -7,7 +7,7 @@
 reader contract below is superseded since #178 by [unified-risk-reporting.md](unified-risk-reporting.md):
 `_ReportRisk(results, risk, bucket)` spills these views as `nominal_delta` and `delta`, the
 saved Total above the dated rows, and `_ReportDelta` is retired; the vectors and their
-ownership stand as this page says, but since #NN the month and year vectors are by the
+ownership stand as this page says, but since #186 the month and year vectors are by the
 pricing contract's period, [risk-contract-month-bucketing.md](risk-contract-month-bucketing.md),
 and the day view alone is by observation. The
 [As built](#as-built-166) section at the end says what was built and what was not.

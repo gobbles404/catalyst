@@ -618,7 +618,7 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     # Two groups paying a year apart: two payment days in two months of two years, and on the
     # day union the observation day a third entry before them, every place saved and every
     # array frozen; the encoding counts the distinct payment days; the cleared twin and the
-    # physical one make no axes at all. Since #NN the month and year displays are the
+    # physical one make no axes at all. Since #186 the month and year displays are the
     # preparation's: from the valuation day's period, the observation's own, through the last
     # payment period, every saved period placed from the start.
     counter = WorkCounter()
@@ -706,7 +706,7 @@ def test_groups_paying_on_one_day_share_it_and_days_in_one_month_share_the_month
     np.testing.assert_array_equal(axes.months, dates("2027-12-01", "2028-01-01"))
     np.testing.assert_array_equal(axes.years, dates("2027-01-01", "2028-01-01"))
     np.testing.assert_array_equal(axes.year_of_month, [0, 1])
-    # The displays, since #NN: by year 2027 and 2028, both payment years placed; by month
+    # The displays, since #186: by year 2027 and 2028, both payment years placed; by month
     # January 2027 through January 2028, the two payment months the 12th and 13th rows.
     assert (straddle.by_year.delta_rows, straddle.by_year.dv01_rows) == (1, 2)
     np.testing.assert_array_equal(straddle.by_year.paid_in, [0, 1])
@@ -742,7 +742,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (15.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    # Since #NN the month view is dense from the valuation month: January 2027 through
+    # Since #186 the month view is dense from the valuation month: January 2027 through
     # January 2029, F27's lots first and F29's last, nothing between.
     assert delta.dates.size == 25
     np.testing.assert_array_equal(delta.dates[[0, 24]], dates("2027-01-01", "2029-01-01"))

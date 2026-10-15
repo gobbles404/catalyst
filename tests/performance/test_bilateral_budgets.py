@@ -156,7 +156,7 @@ def mapped(prep: PreparedTrades) -> UnpaidPayments:
 # The mapping's numpy over the cleared preparation's: the flatnonzero over the unsettled groups, the
 # unique over their payment days with its sort, its inverse and the copies those take, the day
 # counts' one conversion, and the four arrays frozen.
-# The display axes' two more searches, since #NN: the payment months and years placed from the
+# The display axes' two more searches, since #186: the payment months and years placed from the
 # valuation day's period beside the contract periods the cleared preparation places.
 PAID_DISPLAY_NUMPY = {
     "ndarray.searchsorted": 2,
@@ -196,7 +196,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     prep = prepared_trades(enc, history, counter)
     slots = slots_of(method, contracts)
     assert counter.freeze().as_dict() == {
-        "display_periods": prep.by_month.periods.size + prep.by_year.periods.size,  # since #NN
+        "display_periods": prep.by_month.periods.size + prep.by_year.periods.size,  # since #186
         "fixings_read": slots - live,
         "payment_days_mapped": unpaid,  # one payment day a contract: a day an unpaid group
         "prepared_slots": slots,
@@ -224,7 +224,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
-        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 4,
         "rows_through": 4,
@@ -298,7 +298,7 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "DiscountCurve.max_date": 1,  # the coverage rule
         "Market.live_prices": 1,
         "_discounted": 1,
-        "early_risk": 2,  # the discounted lots and the DV01 before the start, since #NN
+        "early_risk": 2,  # the discounted lots and the DV01 before the start, since #186
         "early_fact": 4,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
@@ -314,7 +314,7 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
         "ndarray.any": 11,
         "ndarray.astype": 1,
-        "ndarray.nonzero": 4,  # the discounted lots and the DV01 before the start, since #NN
+        "ndarray.nonzero": 4,  # the discounted lots and the DV01 before the start, since #186
         "ndarray.ravel": 4,
         "ndarray.setflags": 13,
         "ndarray.sum": 4,
@@ -419,7 +419,7 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     np.testing.assert_array_equal(axes.months[axes.month_of_day], distinct.astype("datetime64[M]"))
     np.testing.assert_array_equal(axes.years, years)
     np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
-    # The one union, the days': since #NN the month and year displays are the preparation's.
+    # The one union, the days': since #186 the month and year displays are the preparation's.
     np.testing.assert_array_equal(axes.union_days, np.union1d(enc.days, axes.days))
     np.testing.assert_array_equal(axes.union_days[axes.observed_in_days], enc.days)
     np.testing.assert_array_equal(axes.union_days[axes.paid_in_days], axes.days)
@@ -454,7 +454,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
     result = tick(prep, a_market(prep.history), curve_on(as_of))
     for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01):
         # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
-        # month and by year, since #NN, one zeros over the display axis filled through the saved
+        # month and by year, since #186, one zeros over the display axis filled through the saved
         # places, eight bytes a row.
         assert numpy_calls(lambda r=risk: risk_view(result, r, Bucket.DAY)) == {}
         assert least_peak(lambda r=risk: risk_view(result, r, Bucket.DAY)) <= SLACK

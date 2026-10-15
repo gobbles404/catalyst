@@ -974,7 +974,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(MY8,"nominal_delta","day"),10,2)' = "0.2"
     '=INDEX(_ReportRisk(MY8,"delta","day"),2,2)'          = "WTI delta [LOT]"
     '=INDEX(_ReportRisk(MY8,"delta","day"),5,2)'          = "0.2"
-    # Since #NN, risk-contract-month-bucketing.md, the month and year rows follow the pricing
+    # Since #186, risk-contract-month-bucketing.md, the month and year rows follow the pricing
     # contract and the spill starts at the valuation month: the six-day asian's 0.4 off F27 stands
     # in January 2027 and its 0.8 off G27 in February under a December row of zero, 1.2 in 2027
     # under a zero 2026, whatever December days they are observed on; after the roll January reads
@@ -1421,7 +1421,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(QV8),1,1)"      = "bilateral_mark"
     "=INDEX(_ReportValues(QV8),3,1)"      = "5"
     "=INDEX(_ReportValues(QV8),3,2)"      = "0"
-    # Since #NN the month spill runs from the valuation month, January 2027, through the last
+    # Since #186 the month spill runs from the valuation month, January 2027, through the last
     # payment month, January 2029: twenty-five dated rows, the DV01s on the 17th and the 29th.
     '=ROWS(_ReportRisk(QV8,"all","month"))'      = "29"
     '=COLUMNS(_ReportRisk(QV8,"all","month"))'   = "4"

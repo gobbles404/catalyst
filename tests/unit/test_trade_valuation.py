@@ -3220,7 +3220,7 @@ def test_the_delta_reports_by_day_month_and_year_on_the_sheet_as_the_ticket_says
     # December's pricing days with a lot each and 4 on the 30th while live and zero once fixed,
     # the discounted lots the nominal on a cleared batch; the month view one row and the year view
     # one row, both the live lots, from Z26's December and 2026 while the day is in December and,
-    # since #NN, from January 2027 and 2027 once it has rolled, the spill starting at the
+    # since #186, from January 2027 and 2027 once it has rolled, the spill starting at the
     # valuation day's period with Z26's December before it and nothing live in it; all three by
     # month with the DV01 nothing, and the DV01 alone a Total of nothing over no dated row; the
     # rows reversed the same.
@@ -3312,7 +3312,7 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
     wti: dict[str, Any],
 ) -> None:
     # The rolling asian's six days at 0.2 a day on 18 December, two days off F27 and four off G27,
-    # so since #NN a January 2027 bucket of 0.4 and a February bucket of 0.8 under the valuation
+    # so since #186 a January 2027 bucket of 0.4 and a February bucket of 0.8 under the valuation
     # month, December, at zero, and a 2027 bucket of 1.2 under a zero 2026; a tick over the same
     # preparation spills the same views; after the roll on the 22nd the first two days read zero
     # and the axes stand.
@@ -3495,7 +3495,7 @@ def test_the_waha_basis_future_values_on_the_sheet_as_the_ticket_says(
     assert by_header(results, "lot_unit")[0] == WAHA_LOT
     by_month = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", "month"))[4:]
     assert by_month[-1] == [serial("2026-12-01"), pytest.approx(live)]
-    # Since #NN the spill starts at the valuation month: a November row of zero on 30 November.
+    # Since #186 the spill starts at the valuation month: a November row of zero on 30 November.
     assert len(by_month) == (2 if as_of < "2026-12-01" else 1)
     assert spilled(ENTRY["_ReportRisk"](results, "nominal_delta", "year"))[4] == [
         serial("2026-01-01"),
@@ -4398,7 +4398,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [pytest.approx(5.0), 0.0, "USD", serial(UNIT_AS_OF)],
     ]
     # The ticket's spill, all by month: F27's month holds the deltas, the two payment months the
-    # DV01s, the Total row the saved scalars above them and, since #NN, the months between at
+    # DV01s, the Total row the saved scalars above them and, since #186, the months between at
     # zero, January 2027 through January 2029 in twenty-five rows.
     months = [
         serial(str(m))
@@ -4432,7 +4432,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
             ["Total", pytest.approx(0.5)],
             [serial(start), pytest.approx(0.5)],
         ]
-    # The DV01 alone keeps its payment axis by day; by month and by year, since #NN, it runs from
+    # The DV01 alone keeps its payment axis by day; by month and by year, since #186, it runs from
     # the valuation month or year through the second payment, the periods between at zero.
     assert spilled(ENTRY["_ReportRisk"](results, "dv01", "day")) == [
         *risk_head(UNIT_AS_OF, CURVE_DV01),
@@ -4727,7 +4727,7 @@ def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
     # keeps the payment axis: the asian's two days in two months of 2027, the two payment days
     # in one December, and the mixed rows' December and February in two years.
     paid_rows = {
-        "rolling asian over a year end": (2, 3, 2),  # from December, since #NN
+        "rolling asian over a year end": (2, 3, 2),  # from December, since #186
         "two payment days": (2, 1, 1),
         "mixed": (2, 2, 2),
     }[which]

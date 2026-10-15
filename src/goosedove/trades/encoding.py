@@ -8,7 +8,7 @@ the summed offset and, for a financial settlement, the day it pays. Per slot, th
 input the batch consumes, an observation date within a payment group: the date, the contract
 pricing that date, derived by the calendar's rule and retained, the group's own under the
 expiry-based methods and whichever the calendar gives under asian, and the summed exposure
-every settle or quote of that date multiplies. Per pricing reference, since #NN, the contract's
+every settle or quote of that date multiplies. Per pricing reference, since #186, the contract's
 calendar month and year, the axes a delta report by month or by year sums onto. And the
 reserves, the brokerage and the clearing each component incurs, summed for the batch, since #170.
 Nothing here changes on a tick, a fixing
@@ -49,7 +49,7 @@ class PaymentAxes:
     year_of_month[m]. Then, for the report of every risk at once by day, the union of the
     observation days and the payment days, increasing, with each axis's places on it:
     union_days, observed_in_days and paid_in_days; the month and year displays are the
-    preparation's since #NN, made from the valuation day. Made once when the batch is made, so
+    preparation's since #186, made from the valuation day. Made once when the batch is made, so
     that a report copies saved vectors through saved places and discovers, sorts and sums
     nothing; None for a cleared batch, whose DV01 has no dated axis, and for a physical one."""
 
@@ -105,7 +105,7 @@ class Encoded:
     Then the time axes a delta report is summed onto, static for the batch: since #166 days[d],
     the distinct observation days, increasing, day_of_slot[s] each slot's day and
     day_reference[d] the contract pricing each day, one per day by the calendar's rule; and
-    since #NN, risk-contract-month-bucketing.md, contract_months[m], the first day of the
+    since #186, risk-contract-month-bucketing.md, contract_months[m], the first day of the
     calendar month of each distinct contract among the references, increasing, the month the
     contract is named for and not the month its days are observed in,
     contract_month_of_reference[r] each reference's place, contract_years[y], the first day of
@@ -123,7 +123,7 @@ class Encoded:
     Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and the
     union of their days with the observation days, PaymentAxes, made once here for a bilateral
     batch and None for a cleared or a physical one; the month and year displays are the
-    preparation's since #NN."""
+    preparation's since #186."""
 
     terms: ResolvedTrades
     observations: Observations
@@ -214,7 +214,7 @@ def encoded(
     axis is the distinct references, one unique, each contract once whatever groups hold it, the
     contracts that price the batch's days and not the ones it was booked on. The time axes are
     the distinct observation days, one unique, each day's pricing contract its first slot's,
-    and since #NN the distinct calendar months of the references' contracts, the terms'
+    and since #186 the distinct calendar months of the references' contracts, the terms'
     schedule months gathered by reference, and those months' years, two uniques, so that a
     delta report by day sums what the preparation leaves live onto the days, a report by month
     or by year sums the delta by reference onto the contracts' periods, and nothing is sorted
@@ -223,7 +223,7 @@ def encoded(
     more, and the union of the payment days with the observation days with each axis's places
     on it, one union and two searches, so that a DV01 report by payment day and a report of
     every risk by day copy saved vectors through saved places, the month and year displays
-    being the preparation's since #NN; a cleared batch, whose DV01 has no dated axis, makes none
+    being the preparation's since #186; a cleared batch, whose DV01 has no dated axis, makes none
     of this and its ledger stands.
 
     For a financial settlement, each group pays after its last observation, else its contract and
@@ -409,7 +409,7 @@ def _the_day_axis(
 def _the_contract_periods(
     months: NDArray[np.int64],
 ) -> tuple[NDArray[np.datetime64], NDArray[np.intp], NDArray[np.datetime64], NDArray[np.intp]]:
-    """The month and year axes a delta report by month or by year is summed onto, since #NN,
+    """The month and year axes a delta report by month or by year is summed onto, since #186,
     static for the batch: the distinct calendar months of the references' contracts, as the terms
     count them, increasing, as the first day of each, with each reference's place; and the first
     day of each of those months' calendar years, increasing, with each month's place. Two uniques
@@ -431,7 +431,7 @@ def _the_payment_axes(
     each month's, three uniques; and the union of the observation days given and the payment
     days, one union, with each axis's places on it, two searches, so that a report of every risk
     by day copies the saved vectors onto one axis through saved places; the month and year
-    displays are the preparation's since #NN. Every array frozen; one payment day per distinct
+    displays are the preparation's since #186. Every array frozen; one payment day per distinct
     payment day reported to the counter."""
     paid, day_of_group = np.unique(payment_date, return_inverse=True)
     month_keys, month_of_day = np.unique(paid.astype("datetime64[M]"), return_inverse=True)

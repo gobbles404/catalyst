@@ -188,7 +188,7 @@ def test_the_sources_value_as_the_ticket_says(sheet: dict[str, Any]) -> None:
 def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[str, Any]) -> None:
     # B2:B3 as a column: one handle of the new kind, no index name in it; all three by month under
     # the HNG labels and curve_1, the Total 20, 19.5 and -0.0095 over January 2027's lots and
-    # January 2028's DV01, the eleven months between at zero since #NN, the spill running from
+    # January 2028's DV01, the eleven months between at zero since #186, the spill running from
     # the valuation month to the last payment month.
     agg = collected(sheet["b2"], sheet["b3"])
     assert re.fullmatch(rf"{os.getpid()}:aggregate_results:\d+", agg)

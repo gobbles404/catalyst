@@ -133,7 +133,7 @@ class ResolvedTrades:
     the encoding converts and nothing later scales again, and fixed_price[k] the price agreed, in
     the index's quote units. Then payment, the terms a financial settlement pays by and the days
     they give, and None for a physical one, which pays on no day. Then schedule_month[i], since
-    #NN, the calendar month of every row of the schedule as numpy counts months from 1970, read
+    #186, the calendar month of every row of the schedule as numpy counts months from 1970, read
     once by the resolution against the ticket's codes and kept for the encoding, which gathers it
     by the pricing references for the delta's month and year buckets."""
 
@@ -184,7 +184,7 @@ def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int
     code that is no contract code is refused by row, and so are two rows for one month, since a
     month resolved to two rows would name no contract. The resolution reads them once,
     resolves the ticket's periods against them and hands them to the terms, which keep them for
-    the encoding's contract-month axes since #NN."""
+    the encoding's contract-month axes since #186."""
     codes = schedule.codes
     months = np.empty(len(codes), dtype=np.int64)
     for i, code in enumerate(codes):
@@ -275,7 +275,7 @@ def resolved_trades(
     pays on no
     day, and giving it terms would invent a payment the contract does not make. The instrument
     is kept as the definition the terms stand under, and read for nothing here. The schedule's
-    months, since #NN, are the resolution's reading of every row's code handed over, or read here
+    months, since #186, are the resolution's reading of every row's code handed over, or read here
     once by schedule_months when a Python caller gives none; kept frozen for the encoding's
     contract-month axes and read for nothing here.
     """

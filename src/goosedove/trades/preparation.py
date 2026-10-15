@@ -2,7 +2,7 @@
 settle, which payment groups have settled, what remains live and the exposure to each live
 reference, and the risk that no tick changes, the price sensitivity in the settlement currency,
 the delta in lots of the index's reporting lot by contract and the same lots by observation day
-and, since #NN, by the pricing contracts' calendar month and year, the three views _ReportRisk
+and, since #186, by the pricing contracts' calendar month and year, the three views _ReportRisk
 selects among. One record per
 history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
 page."""
@@ -25,7 +25,7 @@ from goosedove.trades.terms import Route
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot
 PAYMENT_DAYS_MAPPED = "payment_days_mapped"  # distinct unpaid payment days, bilateral, since #176
-DISPLAY_PERIODS = "display_periods"  # periods of the month and year display axes made, since #NN
+DISPLAY_PERIODS = "display_periods"  # periods of the month and year display axes made, since #186
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +74,7 @@ class PreparedTrades:
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
     half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
     the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
-    days, and since #NN monthly_lots[m] the lot delta by reference summed onto the encoding's
+    days, and since #186 monthly_lots[m] the lot delta by reference summed onto the encoding's
     contract months and yearly_lots[y] onto its contract years, the month and the year a
     contract is named for whatever days it is observed on, the three views _ReportRisk selects
     among, a bucket's lots zero once its contracts have fixed and its row kept; every one of
@@ -83,7 +83,7 @@ class PreparedTrades:
     the distinct payment days of the groups not yet settled with each such group's place among
     them and its time fraction, made once here, since the groups settled and the valuation date
     change only when a batch is prepared again, so that a tick gathers the curve's factors and
-    sorts nothing; None for a cleared batch and for a physical one. And since #NN,
+    sorts nothing; None for a cleared batch and for a physical one. And since #186,
     risk-contract-month-bucketing.md, by_month and by_year, the display axes of the month and
     the year reports, PeriodAxis, consecutive periods from the valuation day's through the
     farthest contract or payment period with every saved period's place, made here since the
@@ -203,7 +203,7 @@ def prepared_trades(
     once, _unpaid_payments, for the ticks to gather the curve's factors by.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
-    counter, and since #NN the periods of the two display axes made; nothing per component,
+    counter, and since #186 the periods of the two display axes made; nothing per component,
     nothing per observation, nothing per day of the calendar.
     """
     terms = encoded.terms
@@ -307,7 +307,7 @@ def prepared_trades(
             f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
             "settled groups' offsets and set amounts sum past the largest number"
         )
-    # Since #NN the month and year displays start at the valuation day's period: the axes made
+    # Since #186 the month and year displays start at the valuation day's period: the axes made
     # once here, two searches a bucket, and the nominal lots before the start checked zero.
     paid = encoded.payment_axes
     by_month = period_axis(
