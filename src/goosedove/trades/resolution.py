@@ -4,9 +4,9 @@ from exactly one of the two, the required fields present and the conditional one
 their condition holds, one quantity unit, method, route, settlement and basis for the batch, in
 that order, the quantity unit naming one of the index's specifications, every code of the index's
 schedule read for its month once, each contract code or strip of the ticket resolved by month to
-the schedule's rows, the schedule method's observations made once, and for a financial settlement
-each component's payment day counted strictly after its last observation day on the payment
-calendar. Then the kernel:
+the schedule's rows, each component's covered days the calendar days of its contract's month, the
+schedule method's observations made once, and for a financial settlement each component's payment
+day counted strictly after its last observation day on the payment calendar. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -111,7 +111,9 @@ def resolved(
     the sheet first shows each, so that the first row that breaks the grammar is the one named,
     through the period grammar, in either case, for the months it spans, and each month is
     resolved to its schedule row, a month the schedule lacks refused by the trade's row and the
-    month; a strip makes one component per month, in order, all on the one occurrence.
+    month; a strip makes one component per month, in order, all on the one occurrence. Each
+    component covers the calendar days of its contract's month, weekends and holidays included,
+    the whole month here, what a quantity per calendar day multiplies; no calendar moves them.
     The schedule method gives each component its observation days, the expiry under lastday, the
     business day before it under penultimate, the expiry and the two business days before it
     under last3day, a third each, and every pricing day of its calendar month under asian, an
@@ -122,7 +124,8 @@ def resolved(
     that day itself rolled back first so that a day the payment calendar closes is not counted;
     the rule of the four methods.
     Then the kernel's rules, through resolved_trades: whole quantities, zero included, and finite
-    prices, each named by its trade, and a financial settlement with penultimate.
+    prices, each named by its trade, a financial settlement with penultimate, and each component's
+    quantity formed once by the basis, the entered quantity times its covered days under calday.
 
     Work: one occurrence per ticket row, one component per contract month and one schedule code
     per row of the schedule, reported to the counter.
@@ -145,6 +148,7 @@ def resolved(
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     occurrence, contract = _the_contracts(fields, months)
+    covered = covered_days(months, contract)
     observations = observed(schedule_method, index, contract, months)
     payment = _the_payment_terms(
         settlement, fields, _last_days(observations, occurrence.size), occurrence
@@ -166,6 +170,7 @@ def resolved(
         occurrence,
         contract,
         fields.numbers("quantity")[occurrence],
+        covered,
         fields.numbers("fixed_price")[occurrence],
         payment,
     )
@@ -390,6 +395,19 @@ def _the_contracts(
 def _month(count: object) -> str:
     """A month as numpy counts them, written as the sheet reads one: 2027-04."""
     return str(np.datetime64(int(cast(Any, count)), "M"))
+
+
+def covered_days(months: NDArray[np.int64], contract: NDArray[np.intp]) -> NDArray[np.int64]:
+    """The calendar days each component covers, what a quantity per calendar day multiplies: the
+    whole of its contract's month, the first day to the last, weekends and holidays included, 31
+    for December and 28 or 29 for February, counted once over the schedule's months and gathered
+    per component. A December contract expiring in November covers December's 31 days: the days
+    are the contract's month's, not the days between expiries, and no pricing or payment calendar
+    moves them, the pricing days being the schedule method's to choose. A booked period shorter
+    than the month, slice C of the periods ticket, will clip them at its ends."""
+    first = months.astype("datetime64[M]").astype("datetime64[D]")
+    after = (months + 1).astype("datetime64[M]").astype("datetime64[D]")
+    return (after - first).astype(np.int64)[contract]
 
 
 # --- the payment days of a financial settlement ---------------------------------------------

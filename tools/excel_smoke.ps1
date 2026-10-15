@@ -420,10 +420,10 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),3,9)" = "10"
     "=INDEX(util_ReadHandle(EW8),1,10)" = "quantity_unit"
     "=INDEX(util_ReadHandle(EW8),3,10)" = "lots"
-    "=INDEX(util_ReadHandle(EW8),3,13)" = "10000"
-    "=INDEX(util_ReadHandle(EW8),3,15)" = "-700000"
+    "=INDEX(util_ReadHandle(EW8),3,15)" = "10000"
+    "=INDEX(util_ReadHandle(EW8),3,17)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "15"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "17"
     "=INDEX(util_ReadHandle(EW13),1,13)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,3)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,3)"  = "u26"
@@ -431,7 +431,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),3,13)" = "46226"
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
-    "=COLUMNS(util_ReadHandle(EW13))"    = "16"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "18"
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
     '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
@@ -486,8 +486,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG12),4,1)"  = "2"
     "=INDEX(util_ReadHandle(FG12),4,2)"  = "V0"
     "=INDEX(util_ReadHandle(FG12),4,9)"  = "0"
-    "=INDEX(util_ReadHandle(FG12),4,13)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,14)" = "0"
     "=INDEX(util_ReadHandle(FG12),4,15)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,17)" = "0"
     "=ROWS(util_ReadHandle(FG13))"       = "3"
     "=INDEX(util_ReadHandle(FG13),3,5)"  = "2000"
     "=INDEX(_ReportValues(FG14),3,1)"    = "8500"
@@ -529,7 +530,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP4),3,5)"   = "penultimate"
     "=INDEX(util_ReadHandle(GP4),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(GP4),3,14)"  = "46195"
-    "=COLUMNS(util_ReadHandle(GP4))"     = "17"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "19"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,2)"   = "46192"
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "FALSE"
@@ -579,6 +580,30 @@ $formulas = [ordered]@{
     "=INDEX(_ReportRisk(IY16),3,1)"      = "2100"
     "=INDEX(_ReportRisk(IY16),3,2)"      = "USD per USD/GAL"
     "=INDEX(util_ReadHandle(IY16),4,6)"  = "2100"
+    # Calendar day quantities, trade-periods-and-bal.md slice A: the batch in IS12 under the
+    # calday template in IJ9, C over the strip X26-Z26 at 100 gallons a day and D of Z26 at 110 a
+    # day, read back with the days each month covers, 30 and 31, and the months' quantities,
+    # 3,000, 3,100 and 3,410, the entered quantities beside them, two columns more than before; D
+    # alone in IS14 valued on 2 December against the asian block's history and market as the
+    # month batch of 3,410 gallons in IS16 values, 96.1 of mark and 3,255 of delta each; a basis
+    # that is neither word refused by name.
+    "=INDEX(util_ReadHandle(IS12),1,15)" = "covered_days"
+    "=INDEX(util_ReadHandle(IS12),2,15)" = "int64"
+    "=INDEX(util_ReadHandle(IS12),1,16)" = "component_quantity"
+    "=INDEX(util_ReadHandle(IS12),3,9)"  = "100"
+    "=INDEX(util_ReadHandle(IS12),3,11)" = "calday"
+    "=INDEX(util_ReadHandle(IS12),3,15)" = "30"
+    "=INDEX(util_ReadHandle(IS12),4,15)" = "31"
+    "=INDEX(util_ReadHandle(IS12),3,16)" = "3000"
+    "=INDEX(util_ReadHandle(IS12),4,16)" = "3100"
+    "=INDEX(util_ReadHandle(IS12),5,16)" = "3410"
+    "=INDEX(util_ReadHandle(IS12),5,17)" = "3410"
+    "=COLUMNS(util_ReadHandle(IS12))"    = "19"
+    "=INDEX(_ReportValues(IY18),3,1)"    = "96.1"
+    "=INDEX(_ReportRisk(IY18),3,1)"      = "3255"
+    "=INDEX(_ReportValues(IY20),3,1)"    = "96.1"
+    "=INDEX(_ReportRisk(IY20),3,1)"      = "3255"
+    '=_CreateTradeTemplate("future",IK1,IL2)' = "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'asian', expected month or calday"
     "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method; an asian future is cash settled on the average of its month's pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
     # the index in ED1, read back through util_ReadHandle, the calendar's four columns and the
@@ -1071,6 +1096,24 @@ $cells = [ordered]@{
     "IY14" = "=_CreateMarket(IY8,IY13)"
     "IY15" = "=_PrepareTrades(IS5,IY8)"
     "IY16" = "=_EvaluateTrades(IY15,IY14)"
+    # Calendar day quantities, trade-periods-and-bal.md slice A: the calday template in IJ9 over
+    # the asian template's fields in IJ1:IQ1 with the basis calday in IJ8:IQ8; the ticket C, the
+    # strip X26-Z26 at 100 gallons a day, and D, Z26 at 110 a day, in IS8:IW9 under the headers
+    # in IS1:IW1, and their batch in IS12; D alone as a batch in IS14, and M, Z26 at 3,410 gallons
+    # a month in IS11:IW11, as a batch under the month template in IJ3 in IS16, the two prepared
+    # against the 2 December history in IY8 and valued against the market in IY14 in IY17:IY20.
+    "IJ8" = "GAL"; "IK8" = "calday"; "IL8" = "asian"; "IM8" = "cleared"; "IN8" = "financial"; "IO8" = "Prototype Clearing"; "IP8" = "+2bd"; "IQ8" = "=IC2"
+    "IJ9" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ8:IQ8)'
+    "IS8" = "C"; "IT8" = "20-Nov-2026"; "IU8" = "X26-Z26"; "IV8" = "100"; "IW8" = "0.25"
+    "IS9" = "D"; "IT9" = "20-Nov-2026"; "IU9" = "Z26"; "IV9" = "110"; "IW9" = "0.25"
+    "IS11" = "M"; "IT11" = "20-Nov-2026"; "IU11" = "Z26"; "IV11" = "3410"; "IW11" = "0.25"
+    "IS12" = "=_CreateTrades(IA6,IS1:IW1,IS8:IW9,IJ9)"
+    "IS14" = "=_CreateTrades(IA6,IS1:IW1,IS9:IW9,IJ9)"
+    "IS16" = "=_CreateTrades(IA6,IS1:IW1,IS11:IW11,IJ3)"
+    "IY17" = "=_PrepareTrades(IS14,IY8)"
+    "IY18" = "=_EvaluateTrades(IY17,IY14)"
+    "IY19" = "=_PrepareTrades(IS16,IY8)"
+    "IY20" = "=_EvaluateTrades(IY19,IY14)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

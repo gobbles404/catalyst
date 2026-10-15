@@ -35,7 +35,7 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import TradeResults, trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import schedule_months
+from goosedove.trades.resolution import covered_days, schedule_months
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -66,6 +66,11 @@ def numbers(*values: float) -> NDArray[np.float64]:
 def months_of(ix: Index) -> NDArray[np.int64]:
     """The schedule's months as the resolution reads them once, for the observations builder."""
     return schedule_months(cast(FuturesSchedule, ix.schedule))
+
+
+def days_of(ix: Index, contract: NDArray[np.intp]) -> NDArray[np.int64]:
+    """The calendar days of each component's contract month, as the resolution hands the kernel."""
+    return covered_days(months_of(ix), contract)
 
 
 def observed_of(terms: ResolvedTrades) -> Observations:
@@ -160,6 +165,7 @@ def terms_of(
         np.arange(occurrences, dtype=np.intp),
         CONTRACT[keep],
         LOTS[keep],
+        days_of(ix, CONTRACT[keep]),
         FIXED_PRICE[keep],
         None if pays is None else paying(pays[keep], occurrences),
     )
@@ -212,14 +218,23 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     terms = resolved_trades(
         FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, LABELS, ("CME Clearing",) * 5, None, TRADE_DATES,
-        np.arange(5, dtype=np.intp), CONTRACT, lots, FIXED_PRICE,
+        np.arange(5, dtype=np.intp), CONTRACT, lots, days_of(TOY, CONTRACT), FIXED_PRICE,
         PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
     )  # fmt: skip
     lots[0], pays[0], lags[0] = 99.0, day("2030-01-01"), 9  # the arrays passed, changed after
     assert terms.quantity[0] == 10.0 and terms.schedule is TOY.schedule
+    np.testing.assert_array_equal(terms.covered_days, [31, 31, 31, 31, 31])  # December, January
+    np.testing.assert_array_equal(terms.component_quantity, terms.quantity)  # month: as entered
     assert terms.payment is not None and terms.payment.date[0] == day("2026-11-30")
     assert terms.payment.lag_days[0] == 2 and terms.payment.calendar[0] is PAYMENT_CALENDAR
-    for column in (terms.trade_dates, terms.occurrence, terms.contract, terms.quantity):
+    for column in (
+        terms.trade_dates,
+        terms.occurrence,
+        terms.contract,
+        terms.quantity,
+        terms.covered_days,
+        terms.component_quantity,
+    ):
         assert not column.flags.writeable
     assert not terms.payment.date.flags.writeable and not terms.payment.lag_days.flags.writeable
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
@@ -353,6 +368,7 @@ def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: 
         "occurrence": rows(0, 1, 2, 3, 4),
         "contract": CONTRACT,
         "quantity": LOTS,
+        "covered_days": days_of(NG, CONTRACT),
         "fixed_price": FIXED_PRICE,
         "payment": None,
     }
@@ -449,7 +465,7 @@ def one_lot_in_cents(
     terms = resolved_trades(
         FUTURE, CENTS, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("C-1",), None, None, dates("2026-09-24"), rows(0), rows(1),
-        numbers(1), numbers(300.0), paying(dates("2026-11-30"), 1),
+        numbers(1), days_of(CENTS, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
     history = history_on(CENTS, as_of, finals)
     prep = prepared_trades(encoded(terms, observed_of(terms), UNITS, counter), history, counter)
@@ -519,7 +535,7 @@ def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None
         FUTURE, CENT_SETTLED, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("A", "B", "C", "D"), None, None, dates(*["2026-09-24"] * 4),
         rows(0, 1, 2, 2, 3), rows(1, 2, 2, 3, 1), numbers(3, -2, -1, -1, 3),
-        numbers(3.10, 3.40, 3.55, 3.55, 3.10), None,
+        days_of(CENT_SETTLED, rows(1, 2, 2, 3, 1)), numbers(3.10, 3.40, 3.55, 3.55, 3.10), None,
     )  # fmt: skip
     counter = WorkCounter()
     enc = encoded(terms, observed_of(terms), UNITS, counter)
@@ -641,7 +657,7 @@ def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices
     boundary = resolved_trades(
         FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, None, None, None, dates("2026-09-24"), rows(0), rows(0), numbers(1),
-        numbers(3.0), None,
+        days_of(NG, rows(0)), numbers(3.0), None,
     )  # fmt: skip
     enc = encoded(boundary, observed_of(boundary), UNITS, WorkCounter())
     with pytest.raises(ValueError) as refused:
@@ -935,6 +951,7 @@ def pen_terms(
         rows(0),
         rows(1),
         numbers(lots),
+        days_of(PHH, rows(1)),
         numbers(3.0),
         payment,
     )
@@ -1138,6 +1155,7 @@ def strip_terms(order: tuple[tuple[str, tuple[int, ...], float, float], ...]) ->
         QuantityPer.MONTH, tuple(label for label, _, _, _ in order), ("ICE Clear Europe",) * n,
         None, np.repeat(day("2027-06-01"), n), rows(*(i for i, _, _, _ in components)),
         rows(*(c for _, c, _, _ in components)), numbers(*(q for _, _, q, _ in components)),
+        days_of(STRIP_INDEX, rows(*(c for _, c, _, _ in components))),
         numbers(*(p for _, _, _, p in components)),
         PaymentTerms(
             np.full(n, 1),
@@ -1251,7 +1269,8 @@ def daily_terms(
     return resolved_trades(
         FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, None, None, None, np.repeat(day("2026-11-20"), n),
-        np.arange(n, dtype=np.intp), np.ones(n, dtype=np.intp), numbers(*lots), numbers(*prices),
+        np.arange(n, dtype=np.intp), np.ones(n, dtype=np.intp), numbers(*lots),
+        days_of(DAILY, np.ones(n, dtype=np.intp)), numbers(*prices),
         paying(np.repeat(day(pays), n), n),
     )  # fmt: skip
 
@@ -1447,7 +1466,7 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     terms = resolved_trades(
         FUTURE, DAILY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("G-1",), None, None, dates("2026-11-20"), rows(0), rows(2), numbers(1),
-        numbers(70.0), paying(dates("2027-02-02"), 1),
+        days_of(DAILY, rows(2)), numbers(70.0), paying(dates("2027-02-02"), 1),
     )  # fmt: skip
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, (("2026-12-01",),)), UNITS, WorkCounter())
@@ -1581,7 +1600,8 @@ def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
     return resolved_trades(
         FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("NG-001", "ENTRY-002"), None, None, dates("2026-10-06", "2026-10-06"),
-        rows(0, 1), rows(1, 2), numbers(*quantities), numbers(3.0, 3.3), None,
+        rows(0, 1), rows(1, 2), numbers(*quantities), days_of(NG, rows(1, 2)),
+        numbers(3.0, 3.3), None,
     )  # fmt: skip
 
 
@@ -1590,7 +1610,7 @@ def zero_toy_terms() -> ResolvedTrades:
     return resolved_trades(
         FUTURE, TOY, 0, Route.CLEARED, Settlement.FINANCIAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("ENTRY-000",), None, None, dates("2026-10-06"), rows(0), rows(1),
-        numbers(0.0), numbers(3.1), paying(dates("2026-11-30"), 1),
+        numbers(0.0), days_of(TOY, rows(1)), numbers(3.1), paying(dates("2026-11-30"), 1),
     )  # fmt: skip
 
 
@@ -1666,7 +1686,8 @@ def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -
     first_nothing = resolved_trades(
         FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
         QuantityPer.MONTH, ("ENTRY-002", "NG-001"), None, None, dates("2026-10-06", "2026-10-06"),
-        rows(0, 1), rows(1, 2), numbers(0.0, -1.0), numbers(3.0, 3.3), None,
+        rows(0, 1), rows(1, 2), numbers(0.0, -1.0), days_of(NG, rows(1, 2)),
+        numbers(3.0, 3.3), None,
     )  # fmt: skip
     history = history_on(NG, "2026-11-24", {})
     prep = prepared_trades(
@@ -1697,7 +1718,7 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
             FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
             QuantityPer.MONTH, labels, None, None, np.repeat(day("2026-10-06"), 4),
             np.arange(4, dtype=np.intp), rows(*contracts), numbers(*quantities),
-            numbers(*prices), None,
+            days_of(NG, rows(*contracts)), numbers(*prices), None,
         )  # fmt: skip
         prep = prepared_trades(
             encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
@@ -1716,6 +1737,7 @@ def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
         np.concatenate([TRADE_DATES, dates("2026-10-06", "2026-10-06")]),
         np.arange(7, dtype=np.intp), np.concatenate([CONTRACT, rows(1, 2)]),
         np.concatenate([LOTS, numbers(0, 0)]),
+        days_of(NG, np.concatenate([CONTRACT, rows(1, 2)])),
         np.concatenate([FIXED_PRICE, numbers(3.0, 3.3)]), None,
     )  # fmt: skip
     history = history_on(NG, "2026-11-24", {})
@@ -1817,7 +1839,8 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
             FUTURE, NG, 0, Route.CLEARED, Settlement.PHYSICAL, ScheduleMethod.LASTDAY,
             QuantityPer.MONTH, None, None, None, np.repeat(day("2026-09-24"), n),
             np.arange(n, dtype=np.intp), rows(*(c for c, _, _ in selected)),
-            numbers(*(q for _, q, _ in selected)), numbers(*(p for _, _, p in selected)), None,
+            numbers(*(q for _, q, _ in selected)), days_of(NG, rows(*(c for c, _, _ in selected))),
+            numbers(*(p for _, _, p in selected)), None,
         )  # fmt: skip
         history = history_on(NG, "2026-11-24", {})
         prep = prepared_trades(
@@ -1908,6 +1931,7 @@ def l3d_terms(
         np.arange(n, dtype=np.intp),
         rows(*contracts),
         numbers(*quantities),
+        days_of(ix, rows(*contracts)),
         numbers(*prices),
         payment,
     )
@@ -2200,6 +2224,7 @@ def asian_terms(
         np.arange(n, dtype=np.intp),
         rows(*contracts),
         numbers(*quantities),
+        days_of(ix, rows(*contracts)),
         numbers(*prices),
         payment,
     )
@@ -2429,3 +2454,149 @@ def test_a_zero_quantity_row_keeps_its_months_days_at_nothing_under_asian() -> N
     assert (result.mark, result.cash) == (pytest.approx(84), 0.0)
     np.testing.assert_allclose(result.delta, [2_100.0, 0.0])
     assert result.codes() == ("Z26", "F27")
+
+
+# --- the calendar day basis: the entered quantity times the days each month covers ------------
+# trade-periods-and-bal.md, slice A: under month the entered quantity stands in every contract
+# month, unprorated; under calday it is per calendar day, weekends and holidays included, and the
+# kernel forms each component's quantity once, the entered quantity times the days the resolution
+# says it covers, the whole month here. The encoding converts that quantity and nothing later
+# scales again, so a calday batch values as the month batch of its component quantities.
+
+# An index of the months the ticket's acceptance list names: November and December 2026, 30 and
+# 31 days, February 2027, 28, and February 2028, 29.
+LEAP = an_index(
+    "LEAP",
+    (("X26", "2026-11-25"), ("Z26", "2026-12-29"), ("G27", "2027-02-24"), ("G28", "2028-02-25")),
+)
+
+
+def basis_terms(
+    ix: Index,
+    contracts: tuple[int, ...],
+    quantities: tuple[float, ...],
+    basis: QuantityPer = QuantityPer.CALDAY,
+    days: NDArray[np.int64] | None = None,
+    occurrence: tuple[int, ...] | None = None,
+) -> ResolvedTrades:
+    """Physical lastday trades at 3.0 on an index under the basis given, one occurrence per
+    component unless said, covering the days the resolution would count unless said."""
+    n = len(contracts)
+    on = rows(*contracts)
+    occurrences = n if occurrence is None else max(occurrence) + 1
+    return resolved_trades(
+        FUTURE,
+        ix,
+        0,
+        Route.CLEARED,
+        Settlement.PHYSICAL,
+        ScheduleMethod.LASTDAY,
+        basis,
+        tuple(f"C-{i + 1}" for i in range(occurrences)),
+        None,
+        None,
+        np.repeat(day("2026-10-06"), occurrences),
+        np.arange(n, dtype=np.intp) if occurrence is None else rows(*occurrence),
+        on,
+        numbers(*quantities),
+        days_of(ix, on) if days is None else days,
+        numbers(*([3.0] * n)),
+        None,
+    )
+
+
+def test_a_calday_quantity_is_the_entered_quantity_times_the_days_its_month_covers() -> None:
+    terms = basis_terms(LEAP, (0, 1, 2, 3), (100, 100, 100, 100))
+    np.testing.assert_array_equal(terms.covered_days, [30, 31, 28, 29])
+    np.testing.assert_array_equal(terms.component_quantity, [3_000, 3_100, 2_800, 2_900])
+    np.testing.assert_array_equal(terms.quantity, [100, 100, 100, 100])  # kept as entered
+    assert terms.quantity_per is QuantityPer.CALDAY
+    assert terms.covered_days.dtype == np.dtype(np.int64)
+    assert not terms.covered_days.flags.writeable
+    assert not terms.component_quantity.flags.writeable
+    # Under month the same rows hold the entered quantity in every month, whatever its length.
+    month = basis_terms(LEAP, (0, 1, 2, 3), (100, 100, 100, 100), QuantityPer.MONTH)
+    np.testing.assert_array_equal(month.covered_days, [30, 31, 28, 29])
+    np.testing.assert_array_equal(month.component_quantity, [100, 100, 100, 100])
+
+
+def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_100() -> None:
+    # X26-Z26 as the two components of one occurrence, on the NG index: November and December.
+    strip = basis_terms(NG, (0, 1), (100, 100), occurrence=(0, 0))
+    np.testing.assert_array_equal(strip.component_quantity, [3_000, 3_100])
+    month = basis_terms(NG, (0, 1), (100, 100), QuantityPer.MONTH, occurrence=(0, 0))
+    np.testing.assert_array_equal(month.component_quantity, [100, 100])
+    # Signed and duplicate rows, and a row kept ready at nothing, keep the arithmetic.
+    signed = basis_terms(
+        NG,
+        (0, 1) * 4,
+        (-100, -100, 100, 100, -100, -100, 0, 0),
+        occurrence=(0, 0, 1, 1, 2, 2, 3, 3),
+    )
+    np.testing.assert_array_equal(signed.covered_days, [30, 31] * 4)
+    np.testing.assert_array_equal(
+        signed.component_quantity, [-3_000, -3_100, 3_000, 3_100, -3_000, -3_100, 0, 0]
+    )
+    np.testing.assert_array_equal(signed.quantity, [-100, -100, 100, 100, -100, -100, 0, 0])
+
+
+def test_the_encoding_converts_the_component_quantity_and_nothing_later_scales_again() -> None:
+    # One lot of Z26 a day at 3.0 against one lot a month: 31 lots of 10,000 MMBtu, a quote
+    # quantity of 310,000 against 10,000; valued on 24 November at 3.20, a mark of 62,000 against
+    # 2,000 and a delta of 310,000 against 10,000, each number 31 times the month's, since the
+    # quantity was formed once and the encoding, the preparation and the evaluation take it as
+    # it is.
+    def valued(basis: QuantityPer) -> tuple[NDArray[np.float64], TradeResults]:
+        terms = basis_terms(NG, (1,), (1,), basis)
+        enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+        history = history_on(NG, "2026-11-24", {})
+        prep = prepared_trades(enc, history, WorkCounter())
+        return enc.quote_quantity, trade_results(prep, quoted(history, 3.20, 3.50), WorkCounter())
+
+    by_day_quoted, by_day = valued(QuantityPer.CALDAY)
+    by_month_quoted, by_month = valued(QuantityPer.MONTH)
+    np.testing.assert_array_equal(by_day_quoted, [310_000])
+    np.testing.assert_array_equal(by_month_quoted, [10_000])
+    assert by_day.mark == pytest.approx(62_000) and by_month.mark == pytest.approx(2_000)
+    assert by_day.delta_total == pytest.approx(310_000)
+    assert by_month.delta_total == pytest.approx(10_000)
+    assert by_day.codes() == by_month.codes() == ("Z26",)
+
+
+def test_the_covered_days_are_per_component_and_positive_and_the_product_finite() -> None:
+    with pytest.raises(ValueError) as refused:
+        basis_terms(NG, (1, 2), (1, 1), days=np.array([31], dtype=np.int64))
+    assert str(refused.value) == "covered_days has 1 rows, expected 2, one per component"
+    with pytest.raises(ValueError) as refused:
+        basis_terms(NG, (1, 2), (1, 1), days=np.array([31, 0], dtype=np.int64))
+    assert str(refused.value) == (
+        "covered_days of trade 'C-2' at row 2 is 0, expected a positive count of calendar days"
+    )
+    with pytest.raises(ValueError) as refused:
+        basis_terms(NG, (1,), (1e308,))
+    assert str(refused.value) == (
+        "quantity of trade 'C-1' at row 1 is 1e+308 over 31 days, expected a finite quantity"
+    )
+    # The same entered quantity is a whole, finite count under month and stands.
+    assert basis_terms(NG, (1,), (1e308,), QuantityPer.MONTH).component_quantity[0] == 1e308
+
+
+def test_a_quantity_at_the_rounded_bound_is_refused_with_its_infinite_product() -> None:
+    # The review of #159: the largest finite number over 31 days is a quotient that rounds up, so a
+    # quantity exactly at it passed a look at the bound and its product was infinite, the offset a
+    # NaN. The product itself is looked at now, the overflow handled where it happens, positive or
+    # negative; one step below the bound the product is finite and stands.
+    at_bound = 5.799010112459083e306
+    assert at_bound * 31 == float("inf")
+    for quantity in (at_bound, -at_bound):
+        with pytest.raises(ValueError) as refused:
+            basis_terms(NG, (1,), (quantity,))
+        assert str(refused.value) == (
+            f"quantity of trade 'C-1' at row 1 is {quantity!r} over 31 days, expected a finite "
+            "quantity"
+        )
+    below = float(np.nextafter(at_bound, 0))
+    terms = basis_terms(NG, (1,), (below,))
+    assert terms.component_quantity[0] == below * 31 and np.isfinite(terms.component_quantity[0])
+    month = basis_terms(NG, (1,), (-below,), QuantityPer.MONTH)  # a whole count under month
+    assert month.component_quantity[0] == -below and month.covered_days[0] == 31

@@ -45,7 +45,7 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 | `route` | `cleared` or `bilateral`, exactly | `route is 'Cleared', expected cleared or bilateral` |
 | `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
 | `quantity_unit` | any nonempty text, held as typed: it names one of the index's specifications, and the template has no index to ask, so `_CreateTrades` checks the name against the index it is given | nothing here; `quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'` at `_CreateTrades` |
-| `quantity_per` | `month`, the one basis built | `quantity_per is 'day', expected month, the one basis built` |
+| `quantity_per` | `month` or `calday` | `quantity_per is 'day', expected month or calday` |
 | `payment_time_lag` | `+1bd`, `+2bd`, a positive whole number of business days, at most the 2,113,146 of the sheet's calendar end to end since #149, nothing else | `payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd`; `payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end` |
 | `contract_code` | a contract or strip the period grammar reads, in either case | `contract_code is 'Z2026', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28` |
 | `quantity` | a whole count of the quantity unit, zero included since #146, a row kept ready, the kernel's own rule | `quantity is 1.5, expected a whole number` |

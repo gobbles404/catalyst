@@ -150,13 +150,13 @@ FUTURE = Instrument(
         ),
         Field(
             "quantity_per",
-            "Whether quantity applies per month or per day",
+            "Whether quantity is per month or per calendar day",
             True,
             NONE,
             FieldType.CODE,
-            "month, day",
-            "The quantity for each contract month, or for each calendar day of it; month is "
-            "built first",
+            "month, calday",
+            "The quantity per contract month, or per calendar day of it, weekends and holidays "
+            "included",
         ),
         Field(
             "fixed_price",

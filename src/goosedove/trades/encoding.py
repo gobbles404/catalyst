@@ -32,11 +32,11 @@ class Encoded:
     read-only.
 
     Per component, aligned with the terms' components: quote_quantity[k], the signed quantity in
-    the quote quantity unit, the count times the specification's lot size, converted where the
-    lot unit differs; coefficient[k], the settlement currency the component makes for a move of
-    one unit of quote price, the quote quantity converted from the quote currency to the
-    settlement currency, so that a cent-quoted price settles in dollars, and the quote quantity
-    itself where the two are one; and
+    the quote quantity unit, the component's count, the quantity the basis formed, times the
+    specification's lot size, converted where the lot unit differs; coefficient[k], the
+    settlement currency the component makes for a move of one unit of quote price, the quote
+    quantity converted from the quote currency to the settlement currency, so that a cent-quoted
+    price settles in dollars, and the quote quantity itself where the two are one; and
     offset[k], the entry-price offset in the settlement currency, minus the coefficient times the
     fixed price, so that the coefficient times the contract's price plus the offset is the
     component's entry-to-price P&L.
@@ -93,10 +93,12 @@ def encoded(
     each over the components, the observations and the slots, and the rules of the dated axis and
     of a financial settlement, checked once, the first failure being the message.
 
-    The quote quantity: the quantity times the specification's lot size restates a count of the
-    named row in its lot unit, and the unit tables' factor restates that in the conventions'
-    quote quantity unit, both units of the conventions' quantity type, as the index checked when
-    it was made; one multiplication over the array, the sign kept. The coefficient: the quote
+    The quote quantity: the component quantity, the count the terms formed by the basis, the
+    entered quantity times its covered days under calday, times the specification's lot size
+    restates a count of the named row in its lot unit, and the unit tables' factor restates that
+    in the conventions' quote quantity unit, both units of the conventions' quantity type, as the
+    index checked when it was made; one multiplication over the array, the sign kept. The
+    coefficient: the quote
     quantity times the factor from the quote currency to the settlement currency, USD or CENT to
     USD or CENT, so that a price in cents times it is an amount in dollars; every price the batch
     meets, a quote, a settle or the fixed price, multiplies the coefficient and never the
@@ -138,7 +140,7 @@ def encoded(
         conventions.quantity_type, lot_unit, conventions.quote_quantity_unit
     )
     to_currency = units.factor(CURRENCY, conventions.quote_currency_unit, conventions.currency_unit)
-    quote_quantity = terms.quantity * (lot_size * to_quote_unit)
+    quote_quantity = terms.component_quantity * (lot_size * to_quote_unit)
     coefficient = quote_quantity * to_currency
     offset = -coefficient * terms.fixed_price
     groups = np.unique(terms.contract)

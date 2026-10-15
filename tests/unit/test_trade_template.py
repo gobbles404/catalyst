@@ -164,7 +164,7 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             {"settlement_method": "cash"},
             "settlement_method is 'cash', expected physical or financial",
         ),
-        ({"quantity_per": "day"}, "quantity_per is 'day', expected month, the one basis built"),
+        ({"quantity_per": "day"}, "quantity_per is 'day', expected month or calday"),
         (
             {"payment_time_lag": "+0bd"},
             "payment_time_lag is '+0bd', expected a positive whole number of business days, "

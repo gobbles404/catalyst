@@ -33,7 +33,7 @@ from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import schedule_months
+from goosedove.trades.resolution import covered_days, schedule_months
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -102,7 +102,10 @@ def a_batch(components: int, contracts: int) -> Encoded:
 
 
 def some_terms(
-    components: int, contracts: int, method: ScheduleMethod = ScheduleMethod.LASTDAY
+    components: int,
+    contracts: int,
+    method: ScheduleMethod = ScheduleMethod.LASTDAY,
+    basis: QuantityPer = QuantityPer.MONTH,
 ) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
@@ -112,7 +115,7 @@ def some_terms(
         Route.CLEARED,
         Settlement.FINANCIAL,
         method,
-        QuantityPer.MONTH,
+        basis,
         None,
         None,
         None,
@@ -120,6 +123,7 @@ def some_terms(
         np.arange(components, dtype=np.intp),
         rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        covered_days(SCHEDULE_MONTHS, rows),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
@@ -372,6 +376,7 @@ def asian_terms(components: int, contracts: int) -> ResolvedTrades:
         np.arange(components, dtype=np.intp),
         rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        covered_days(SCHEDULE_MONTHS, rows),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
     )
@@ -571,3 +576,41 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     small = a_daily_batch(*DAILY[0])
     small_prep = prepared_trades(small, history, WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+
+
+@pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
+def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
+) -> None:
+    # The basis is the terms' business: the encoding converts the component quantity the kernel
+    # formed, the preparation and a tick take the coefficients as they are, and none of the three
+    # counts a day or scales a quantity, so each runs the same functions and numpy as over a month
+    # batch; the quote quantities are the month batch's times the days each month covers.
+    terms = some_terms(components, contracts, basis=QuantityPer.CALDAY)
+    obs = observed_of(terms)
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    enc = encoded(terms, obs, UNITS, WorkCounter())
+    np.testing.assert_array_equal(
+        enc.quote_quantity, a_batch(components, contracts).quote_quantity * terms.covered_days
+    )
+    history = a_history()
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
+    prep = prepared_trades(enc, history, WorkCounter())
+    quoted = a_market(history)
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "ndarray.any": 1,
+        "ndarray.setflags": 1,
+        "ndarray.sum": 1,
+        "ufunc.reduce": 2,
+    }
