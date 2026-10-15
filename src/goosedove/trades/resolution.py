@@ -52,14 +52,6 @@ RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
 RESOLVED_COMPONENTS = "resolved_components"  # contract months resolved to schedule rows
 SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule read for their month
 
-# The fields a batch has one of: the template's value or a ticket column every row agrees on.
-BATCH_FIELDS: Final = (
-    "schedule_method",
-    "route",
-    "settlement_method",
-    "quantity_unit",
-    "quantity_per",
-)
 # The conditions of the future's required_when fields, as library rules: the field, the batch
 # fact it depends on and the value that fact must have, rendered as the definition shows them,
 # `route = cleared`; a field is present exactly when its condition holds.
