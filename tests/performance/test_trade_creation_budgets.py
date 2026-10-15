@@ -153,9 +153,10 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
 ) -> None:
     counter = WorkCounter()
     batch = trades(GAS, a_ticket(rows, contracts), a_template(), UNITS, counter)
-    assert batch.encoded.groups.size == contracts
+    assert batch.encoded.group_contract.size == contracts
     assert counter.freeze().as_dict() == {
         "encoded_components": rows,
+        "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": rows,
         "encoded_slots": contracts,
         "resolved_components": rows,
@@ -512,6 +513,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_CreateTrades": 1,
         "trades": 1,
         "encoded": 1,
+        "_the_groups": 1,
+        "_distinct": 2,  # the groups by contract and day, the slots by group and day
         "_the_references": 1,
         "with_holiday_calendar": 1,
         "open_days": 1,
@@ -519,10 +522,10 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_the_slots": 1,
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
-        "_one_payment_day_per_group": 1,
+        "_payments_after_observations": 1,
         "_publish": 1,
     }
-    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 6}
+    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 7}
     assert call_profile(call) == expected
 
 

@@ -22,7 +22,7 @@ from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -396,7 +396,7 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
         enc.coefficient, enc.quote_quantity
     )  # dollars quoted, dollars paid
     np.testing.assert_array_equal(enc.offset, [-310_000, 126_000, -238_000, 402_000, -310_000])
-    np.testing.assert_array_equal(enc.groups, [1, 2])
+    np.testing.assert_array_equal(enc.group_contract, [1, 2])
     np.testing.assert_array_equal(enc.group_of_component, [0, 0, 1, 1, 0])
     np.testing.assert_array_equal(enc.offset_of_group, [-494_000, 164_000])
     assert enc.offset_of_group.sum() == -330_000
@@ -413,13 +413,14 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
     assert enc.named_slot(0) == "trade 'NG-001' at row 1 observes Z26 on 2026-11-25"
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
+        "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
     }
     for array in (
         enc.quote_quantity,
         enc.offset,
-        enc.groups,
+        enc.group_contract,
         enc.slot_exposure,
         enc.offset_of_group,
     ):
@@ -580,43 +581,46 @@ def test_fees_per_lot_are_reserves_and_move_no_value() -> None:
     np.testing.assert_array_equal(charged.prepared.encoded.offset, plain.prepared.encoded.offset)
 
 
-def test_a_financial_settlement_keeps_one_payment_day_per_contract() -> None:
-    enc = encoded(
-        terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS),
-        observed_of(terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)),
-        UNITS,
-        WorkCounter(),
-    )
+def test_a_financial_settlement_groups_each_contract_by_its_payment_day() -> None:
+    # Paying as the toy pays, one day per contract, the five rows make two groups, Z26 and F27;
+    # NG-002 paying a day after the other Z26 rows makes Z26 two groups, the earlier day first,
+    # each with its own offset and its own slot on the one expiry day, while the delta axis
+    # holds Z26 once.
+    terms = terms_of(TOY, Settlement.FINANCIAL, TOY_PAYS)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert enc.payment_date is not None
+    np.testing.assert_array_equal(enc.group_contract, [1, 2])
     np.testing.assert_array_equal(enc.payment_date, dates("2026-11-30", "2026-12-31"))
     assert not enc.payment_date.flags.writeable
+    pays = dates("2026-11-30", "2026-12-01", "2026-12-31", "2026-12-31", "2026-11-30")
+    split = terms_of(TOY, Settlement.FINANCIAL, pays)
+    counter = WorkCounter()
+    enc = encoded(split, observed_of(split), UNITS, counter)
+    assert enc.payment_date is not None
+    np.testing.assert_array_equal(enc.group_contract, [1, 1, 2])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-11-30", "2026-12-01", "2026-12-31"))
+    np.testing.assert_array_equal(enc.group_of_component, [0, 1, 2, 2, 0])
+    np.testing.assert_array_equal(enc.offset_of_group, [-620_000, 126_000, 164_000])
+    np.testing.assert_array_equal(enc.slot_group, [0, 1, 2])
+    np.testing.assert_array_equal(enc.slot_date, dates("2026-11-25", "2026-11-25", "2026-12-29"))
+    np.testing.assert_array_equal(enc.slot_reference, [1, 1, 2])
+    np.testing.assert_array_equal(enc.slot_exposure, [200_000, -40_000, -50_000])
+    np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 2, 0])
+    np.testing.assert_array_equal(enc.references, [1, 2])
+    np.testing.assert_array_equal(enc.reference_of_slot, [0, 0, 1])
+    assert enc.named_slot(1) == "trade 'NG-002' at row 2 observes Z26 on 2026-11-25"
+    assert counter.freeze()["encoded_groups"] == 3
 
 
-@pytest.mark.parametrize(
-    ("pays", "message"),
-    [
-        (
-            dates("2026-11-30", "2026-12-01", "2026-12-31", "2026-12-31", "2026-11-30"),
-            "Z26 pays on 2026-11-30 for trade 'NG-001' at row 1 and on 2026-12-01 for trade 'NG-002"
-            "' at row 2, expected one payment day per contract",
-        ),
-        (
-            dates("2026-11-30", "2026-11-30", "2026-12-29", "2026-12-29", "2026-11-30"),
-            "F27 pays on 2026-12-29, expected a day after its last observation, 2026-12-29, "
-            "when its final price exists",
-        ),
-    ],
-)
-def test_payment_days_that_cannot_be_encoded_say_why(
-    pays: NDArray[np.datetime64], message: str
-) -> None:
-    with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
-        encoded(
-            terms_of(TOY, Settlement.FINANCIAL, pays),
-            observed_of(terms_of(TOY, Settlement.FINANCIAL, pays)),
-            UNITS,
-            WorkCounter(),
-        )
+def test_a_payment_on_or_before_the_groups_last_observation_is_refused() -> None:
+    pays = dates("2026-11-30", "2026-11-30", "2026-12-29", "2026-12-29", "2026-11-30")
+    terms = terms_of(TOY, Settlement.FINANCIAL, pays)
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "F27 pays on 2026-12-29, expected a day after its last observation, 2026-12-29, when its "
+        "final price exists"
+    )
 
 
 # --- the preparation ------------------------------------------------------------------------
@@ -713,6 +717,7 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
     np.testing.assert_allclose(initial.dated_live_contribution, [512_000, -175_000])
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
+        "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
         "fixings_read": 0,
@@ -1336,7 +1341,7 @@ def test_the_daily_toy_encodes_three_slots_off_one_contract_for_two_components()
     enc = encoded(terms, daily_observations(terms, (DAILY_DATES_TEXT,) * 2), UNITS, counter)
     np.testing.assert_array_equal(enc.quote_quantity, [60, -30])
     np.testing.assert_array_equal(enc.offset, [-4_200, 2_160])
-    np.testing.assert_array_equal(enc.groups, [1])
+    np.testing.assert_array_equal(enc.group_contract, [1])
     np.testing.assert_array_equal(enc.offset_of_group, [-2_040])
     np.testing.assert_array_equal(enc.slot_date, DAILY_DATES)
     np.testing.assert_array_equal(enc.slot_group, [0, 0, 0])
@@ -1348,6 +1353,7 @@ def test_the_daily_toy_encodes_three_slots_off_one_contract_for_two_components()
     np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05"))
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
+        "encoded_groups": 1,
         "encoded_observations": 6,
         "encoded_slots": 3,
     }
@@ -1444,18 +1450,20 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
 
     result, _ = daily_evaluated("2026-12-02")
     table = shown(result)
-    assert table.texts[:6] == (
+    assert table.texts[:7] == (
         "contract_code",
         "observation_date",
+        "payment_date",
         "is_fixed",
         "live_exposure",
         "live_contribution",
         "contract_delta",
     )
-    np.testing.assert_array_equal(table.numeric_slots[2:, 2], [1.0, 0.0, 0.0])  # is_fixed
-    np.testing.assert_allclose(table.numeric_slots[2:, 3], [0.0, 10.0, 10.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 740.0, 740.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 5], [20.0, 20.0, 20.0])
+    np.testing.assert_array_equal(table.numeric_slots[2:, 2], [46_392.0] * 3)  # 5 January
+    np.testing.assert_array_equal(table.numeric_slots[2:, 3], [1.0, 0.0, 0.0])  # is_fixed
+    np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 10.0, 10.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 740.0, 740.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 6], [20.0, 20.0, 20.0])
 
 
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
@@ -1655,12 +1663,13 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
     np.testing.assert_array_equal(enc.quote_quantity, [20_000, 0])
     np.testing.assert_array_equal(enc.coefficient, [20_000, 0])
     np.testing.assert_array_equal(enc.offset, [-60_000, 0])
-    np.testing.assert_array_equal(enc.groups, [1, 2])  # F27 held, at nothing
+    np.testing.assert_array_equal(enc.group_contract, [1, 2])  # F27 held, at nothing
     np.testing.assert_array_equal(enc.slot_exposure, [20_000, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
     assert enc.named_slot(1) == "trade 'ENTRY-002' at row 2 observes F27 on 2026-12-29"
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
+        "encoded_groups": 2,
         "encoded_observations": 2,
         "encoded_slots": 2,
     }
@@ -2663,9 +2672,10 @@ def period_terms(
     quantities: tuple[float, ...] = (2_000.0,),
     basis: QuantityPer = QuantityPer.MONTH,
     pays: tuple[str, ...] | None = None,
+    price: float = 0.25,
 ) -> ResolvedTrades:
-    """Asian trades of Z26 on the ethane index at 0.25, financial and cleared, each covering the
-    days given and paying on the day given, the dates the resolution would make."""
+    """Asian trades of Z26 on the ethane index at 0.25 unless said, financial and cleared, each
+    covering the days given and paying on the day given, the dates the resolution would make."""
     n = len(periods)
     return resolved_trades(
         FUTURE,
@@ -2684,7 +2694,7 @@ def period_terms(
         numbers(*quantities),
         dates(*(start for start, _ in periods)),
         dates(*(end for _, end in periods)),
-        numbers(*([0.25] * n)),
+        numbers(*([price] * n)),
         PaymentTerms(
             np.full(n, 2), (PAY_JAN_1,) * n, dates(*(("2027-01-05",) * n if pays is None else pays))
         ),
@@ -2769,18 +2779,37 @@ def test_two_rows_on_one_contract_from_different_starts_value_like_their_singlet
         together.delta_total == pytest.approx(p.delta_total + q.delta_total) == pytest.approx(4_100)
     )
     np.testing.assert_array_equal(observed_of(both).component, [0] * 12 + [1] * 22)
-    # Ending on different days they would pay on different days, which one contract cannot.
+    # Ending on different days they pay on different days, P2 on 4 January and P1 on the 5th:
+    # two groups of Z26, the earlier day first, the two singletons summed in every state and
+    # each cash on its own day, P2's 1,298/21, twenty days at 0.28 and the 15th at 0.24 over
+    # its 21 days, on the 4th beside P1's 50 still in mark, and both cash on the 5th.
     ends = period_terms(
         (("2026-12-15", "2026-12-31"), ("2026-12-01", "2026-12-30")),
         (2_000, 2_200),
         pays=("2027-01-05", "2027-01-04"),
     )
-    with pytest.raises(ValueError) as refused:
-        encoded(ends, observed_of(ends), UNITS, WorkCounter())
-    assert str(refused.value) == (
-        "Z26 pays on 2027-01-05 for trade 'P1' at row 1 and on 2027-01-04 for trade 'P2' at row 2, "
-        "expected one payment day per contract"
-    )
+    enc = encoded(ends, observed_of(ends), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [1, 1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-01-04", "2027-01-05"))
+    np.testing.assert_array_equal(enc.group_of_component, [1, 0])
+    assert enc.slot_group.size == 21 + 12 and enc.references.size == 1
+    shorter = period_terms((("2026-12-01", "2026-12-30"),), (2_200,), pays=("2027-01-04",))
+    for as_of, state_quotes in (
+        ("2026-12-02", quotes),
+        ("2027-01-04", (0.30, 0.32)),
+        ("2027-01-05", (0.30, 0.32)),
+    ):
+        apart = period_valued(ends, as_of, state_quotes)
+        p1 = period_valued(period_terms(), as_of, state_quotes)
+        p2 = period_valued(shorter, as_of, state_quotes)
+        assert apart.mark == pytest.approx(p1.mark + p2.mark)
+        assert apart.cash == pytest.approx(p1.cash + p2.cash)
+        np.testing.assert_allclose(apart.delta, p1.delta + p2.delta)
+    on_fourth = period_valued(ends, "2027-01-04", (0.30, 0.32))
+    assert (on_fourth.mark, on_fourth.cash) == (pytest.approx(50), pytest.approx(1_298 / 21))
+    np.testing.assert_array_equal(on_fourth.prepared.is_settled, [True, False])
+    on_fifth = period_valued(ends, "2027-01-05", (0.30, 0.32))
+    assert (on_fifth.mark, on_fifth.cash) == (pytest.approx(0), pytest.approx(50 + 1_298 / 21))
 
 
 def test_the_expiry_based_methods_refuse_a_part_of_a_month_and_asian_a_part_without_a_day() -> None:
@@ -2802,4 +2831,368 @@ def test_the_expiry_based_methods_refuse_a_part_of_a_month_and_asian_a_part_with
         "Z26 has no pricing day from 2026-12-26 to 2026-12-27, expected a Monday to Friday of the "
         "days it covers the index's market is open on; the asian method averages the pricing days "
         "a component covers"
+    )
+
+
+# --- payment groups: two payment days on one contract, multiple-payment-groups.md -------------
+# The ticket's synthetic index: USD per MMBTU, one UNIT of one MMBTU, X26 expiring 30 November
+# 2026, Z26 Friday 4 December and F27 8 January 2027, no holiday on either calendar. A, 60 of Z26
+# at 70 paying one weekday after the last observation, Monday 7 December, and B, -30 at 72 paying
+# three weekdays after, Wednesday the 9th, both last3day, so each observes the 2nd, the 3rd and
+# the 4th with a third of its quantity. By hand: two components, two groups, six observations and
+# six slots off one reference, the fixed legs -4,200 and 2,160, A's 20 and B's -10 a day; all
+# three days live at 74, the mark is 60 * 4 - 30 * 2 = 180 and the delta 30; the 2nd fixed at 71,
+# 150 and 20; the 3rd at 75 too, 160 and 10; the 4th at 73, the average 73, 150 and nothing live;
+# A paid on the 7th, 180 of cash beside B's -30 of mark; B paid on the 9th, 150 of cash, 180 - 30,
+# and nothing in mark.
+PAYS = an_index(
+    "PAYS",
+    (("X26", "2026-11-30"), ("Z26", "2026-12-04"), ("F27", "2027-01-08")),
+    (),
+    lot=("UNIT", 1.0, "MMBTU"),
+)
+PAYS_SETTLES = {"2026-12-02": 71.0, "2026-12-03": 75.0, "2026-12-04": 73.0}
+PAYS_DAYS = dates("2026-12-02", "2026-12-03", "2026-12-04")
+# The payment days the resolution would make on the open calendar, by schedule row and lag: Z26's
+# last observation is Friday 4 December, F27's Friday 8 January, and 28 weekdays after the one is
+# three after the other, Wednesday 13 January.
+PAYS_BY_LAG = {
+    (1, 1): "2026-12-07",
+    (1, 2): "2026-12-08",
+    (1, 3): "2026-12-09",
+    (1, 28): "2027-01-13",
+    (2, 1): "2027-01-11",
+    (2, 3): "2027-01-13",
+}
+
+
+def group_terms(
+    quantities: tuple[float, ...] = (60.0, -30.0),
+    prices: tuple[float, ...] = (70.0, 72.0),
+    contracts: tuple[int, ...] = (1, 1),
+    lags: tuple[int, ...] = (1, 3),
+    pays: tuple[str, ...] | None = None,
+    calendars: tuple[HolidayCalendar, ...] | None = None,
+) -> ResolvedTrades:
+    """Last3day trades on the PAYS index, A and B of Z26 at +1bd and +3bd unless said, each paying
+    the weekdays after its contract's last observation its lag counts, on the open calendar unless
+    a calendar is given, the dates the resolution would make unless given."""
+    n = len(quantities)
+    days = (
+        dates(*(PAYS_BY_LAG[c, lag] for c, lag in zip(contracts, lags, strict=True)))
+        if pays is None
+        else dates(*pays)
+    )
+    return resolved_trades(
+        FUTURE,
+        PAYS,
+        0,
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        ScheduleMethod.LAST3DAY,
+        QuantityPer.MONTH,
+        tuple("AB"[k] if k < 2 else f"T{k + 1}" for k in range(n)),
+        ("Prototype Clearing",) * n,
+        None,
+        dates(*(["2026-11-30"] * n)),
+        np.arange(n, dtype=np.intp),
+        rows(*contracts),
+        numbers(*quantities),
+        *bounds_of(PAYS, rows(*contracts)),
+        numbers(*prices),
+        PaymentTerms(
+            np.array(lags, dtype=np.int64),
+            (WEEKDAYS,) * n if calendars is None else calendars,
+            days,
+        ),
+    )
+
+
+def group_evaluated(
+    as_of: str,
+    quotes: tuple[float, ...],
+    terms: ResolvedTrades | None = None,
+    settles: dict[str, float] = PAYS_SETTLES,
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = group_terms() if terms is None else terms
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_by_day(PAYS, as_of, settles)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_two_payment_days_on_one_contract_encode_as_two_groups_off_one_reference() -> None:
+    terms = group_terms()
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    assert enc.payment_date is not None
+    np.testing.assert_array_equal(enc.group_contract, [1, 1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-07", "2026-12-09"))
+    np.testing.assert_array_equal(enc.group_of_component, [0, 1])
+    np.testing.assert_array_equal(enc.offset, [-4_200.0, 2_160.0])
+    np.testing.assert_array_equal(enc.offset_of_group, [-4_200.0, 2_160.0])
+    np.testing.assert_array_equal(enc.slot_group, [0, 0, 0, 1, 1, 1])
+    np.testing.assert_array_equal(enc.slot_date, np.concatenate([PAYS_DAYS, PAYS_DAYS]))
+    np.testing.assert_array_equal(enc.slot_reference, [1] * 6)  # Z26 prices its own three days
+    np.testing.assert_allclose(enc.slot_exposure, [20.0] * 3 + [-10.0] * 3)
+    np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 3, 4, 5])
+    np.testing.assert_array_equal(enc.references, [1])  # the axis holds Z26 once
+    np.testing.assert_array_equal(enc.reference_of_slot, [0] * 6)
+    assert enc.named_slot(3) == "trade 'B' at row 2 observes Z26 on 2026-12-02"
+    assert counter.freeze().as_dict() == {
+        "encoded_components": 2,
+        "encoded_groups": 2,
+        "encoded_observations": 6,
+        "encoded_slots": 6,
+    }
+    # Six slots where one payment day has three: the growth is the payment ownership, eight bytes
+    # a slot in each slot column and a day per group, no calendar widened and no history copied.
+    assert enc.slot_exposure.nbytes == 48 and enc.payment_date.nbytes == 16
+
+
+# The ticket's six states and the hand answers, with the quotes read per live reference, one while
+# Z26 is live and none after, and the settles read, one per fixed slot, two a day for the two
+# groups; and which groups have settled.
+GROUP_LIFECYCLE: list[tuple[str, tuple[float, ...], float, float, float, int, int, list[bool]]] = [
+    ("2026-12-02", (74.0, 80.0), 180, 0, 30, 1, 0, [False, False]),
+    ("2026-12-03", (74.0, 80.0), 150, 0, 20, 1, 2, [False, False]),
+    ("2026-12-04", (74.0, 80.0), 160, 0, 10, 1, 4, [False, False]),
+    ("2026-12-05", (80.0,), 150, 0, 0, 0, 6, [False, False]),
+    ("2026-12-07", (80.0,), -30, 180, 0, 0, 6, [True, False]),
+    ("2026-12-09", (80.0,), 0, 150, 0, 0, 6, [True, True]),
+]
+GROUP_IDS = [
+    "2 Dec, all three live",
+    "3 Dec, the 2nd fixed",
+    "4 Dec, the 3rd fixed too",
+    "5 Dec, both final, neither paid",
+    "7 Dec, A paid, B unpaid",
+    "9 Dec, B paid",
+]
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "delta", "live_reads", "fixings_read", "settled"),
+    GROUP_LIFECYCLE,
+    ids=GROUP_IDS,
+)
+def test_two_payment_days_on_one_contract_mark_and_pay_as_the_ticket_says(
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+    live_reads: int,
+    fixings_read: int,
+    settled: list[bool],
+) -> None:
+    result, counter = group_evaluated(as_of, quotes)
+    assert result.mark == pytest.approx(mark)
+    assert result.cash == pytest.approx(cash)
+    assert result.delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(result.delta, [delta])  # Z26, the one contract on the axis
+    assert result.codes() == ("Z26",)
+    counts = counter.freeze().as_dict()
+    assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
+        live_reads,
+        fixings_read,
+        1,
+    )
+    assert (counts["encoded_groups"], counts["prepared_slots"]) == (2, 6)
+    np.testing.assert_array_equal(result.prepared.is_settled, settled)  # each on its own day
+
+
+def test_a_tick_moves_both_groups_live_slots_and_a_corrected_fixing_takes_a_new_history() -> None:
+    terms = group_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_by_day(PAYS, "2026-12-03", PAYS_SETTLES)
+    prep = prepared_trades(enc, history, WorkCounter())
+    assert trade_results(prep, quoted(history, 74.0, 80.0), WorkCounter()).mark == pytest.approx(
+        150
+    )
+    counter = WorkCounter()
+    ticked = trade_results(prep, quoted(history, 75.0, 80.0), counter)
+    assert (ticked.mark, ticked.delta_total) == (pytest.approx(170), pytest.approx(20))
+    assert counter.freeze().as_dict() == {
+        "kernel": 1,
+        "live_prices_read": 1,
+    }  # one quote, two groups
+    corrected = history_by_day(PAYS, "2026-12-03", {**PAYS_SETTLES, "2026-12-02": 72.0})
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(corrected, 74.0, 80.0), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'PAYS', expected the one the trades were prepared "
+        "against"
+    )
+    again = prepared_trades(enc, corrected, WorkCounter())
+    assert trade_results(again, quoted(corrected, 74.0, 80.0), WorkCounter()).mark == pytest.approx(
+        160
+    )
+    assert again.encoded is enc  # the payment days, the weights and the slots stand
+    np.testing.assert_allclose(again.delta, prep.delta)
+
+
+def test_opposite_positions_paying_on_different_days_net_to_nothing_and_both_pay() -> None:
+    # B at -60 and 70: nothing in mark and no delta while both are unpaid, both groups standing;
+    # A paid on the 7th, 180 of cash beside -180 of mark; both paid on the 9th, nothing anywhere.
+    flat = group_terms((60.0, -60.0), (70.0, 70.0))
+    for as_of, quotes in (
+        ("2026-12-02", (74.0, 80.0)),
+        ("2026-12-04", (74.0, 80.0)),
+        ("2026-12-05", (80.0,)),
+    ):
+        result, _ = group_evaluated(as_of, quotes, flat)
+        assert (result.mark, result.cash, result.delta_total) == (
+            pytest.approx(0),
+            0.0,
+            pytest.approx(0),
+        )
+        enc = result.prepared.encoded
+        assert enc.group_contract.size == 2 and enc.slot_group.size == 6
+    paid_a, _ = group_evaluated("2026-12-07", (80.0,), flat)
+    assert (paid_a.mark, paid_a.cash) == (pytest.approx(-180), pytest.approx(180))
+    paid_both, _ = group_evaluated("2026-12-09", (80.0,), flat)
+    assert (paid_both.mark, paid_both.cash) == (pytest.approx(0), pytest.approx(0))
+
+
+def test_matching_payment_days_compress_into_one_group_whatever_made_them() -> None:
+    # Both at +3bd: one group of Z26 paying the 9th, three slots and the one-payment answers, 160
+    # on the 4th and 150 unpaid on the 7th. +1bd on a payment calendar closed on the 7th and the
+    # 8th reaches the 9th as +3bd on the open calendar does, and the two are one group too, the
+    # grouping by the day and not by the lag or the calendar. Two contracts paying on one day, Z26
+    # at +28bd and F27 at +3bd both on 13 January, stay two groups.
+    same = group_terms(lags=(3, 3))
+    enc = encoded(same, observed_of(same), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09"))
+    assert enc.slot_group.size == 3
+    on_fourth, _ = group_evaluated("2026-12-04", (74.0, 80.0), same)
+    on_seventh, _ = group_evaluated("2026-12-07", (80.0,), same)
+    assert (on_fourth.mark, on_seventh.mark, on_seventh.cash) == (
+        pytest.approx(160),
+        pytest.approx(150),
+        0.0,
+    )
+    closed = holiday_calendar(dates("2026-12-07", "2026-12-08"))
+    coalesced = group_terms(
+        lags=(1, 3), pays=("2026-12-09", "2026-12-09"), calendars=(closed, WEEKDAYS)
+    )
+    enc = encoded(coalesced, observed_of(coalesced), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09"))
+    assert enc.slot_group.size == 3
+    apart = group_terms((60.0, 10.0), (70.0, 80.0), (1, 2), (28, 3))
+    enc = encoded(apart, observed_of(apart), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [1, 2])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-01-13", "2027-01-13"))
+    np.testing.assert_array_equal(enc.references, [1, 2])
+
+
+def test_one_quote_serves_every_group_of_a_contract_and_the_axis_holds_each_once() -> None:
+    # Z26 at +1bd and +3bd beside F27 at +1bd and +3bd, C 10 and D 20 at 80: four groups, twelve
+    # slots, two references; on 3 December the tick reads two quotes, Z26's and F27's, for the
+    # four groups' ten live slots, the fixings two, the 2nd in each Z26 group, and the delta stands
+    # on the two contracts, 20 and 30.
+    four = group_terms(
+        (60.0, -30.0, 10.0, 20.0), (70.0, 72.0, 80.0, 80.0), (1, 1, 2, 2), (1, 3, 1, 3)
+    )
+    result, counter = group_evaluated("2026-12-03", (74.0, 80.0), four)
+    enc = result.prepared.encoded
+    np.testing.assert_array_equal(enc.group_contract, [1, 1, 2, 2])
+    np.testing.assert_array_equal(
+        enc.payment_date, dates("2026-12-07", "2026-12-09", "2027-01-11", "2027-01-13")
+    )
+    np.testing.assert_array_equal(enc.references, [1, 2])
+    assert enc.slot_group.size == 12
+    counts = counter.freeze().as_dict()
+    assert (
+        counts["encoded_groups"],
+        counts["encoded_slots"],
+        counts["live_prices_read"],
+        counts["fixings_read"],
+    ) == (4, 12, 2, 2)
+    np.testing.assert_array_equal(result.prepared.live_references, [1, 2])
+    assert result.prepared.live_slot.size == 10
+    assert result.mark == pytest.approx(150) and result.codes() == ("Z26", "F27")
+    np.testing.assert_allclose(result.delta, [20.0, 30.0])
+
+
+def test_a_group_paying_on_or_before_its_last_observation_is_still_refused() -> None:
+    # B paying on the 4th, its last observation: its group, the earlier day's and so the first,
+    # is refused by its contract and the two days, as one payment day was.
+    early = group_terms(pays=("2026-12-07", "2026-12-04"))
+    with pytest.raises(ValueError) as refused:
+        encoded(early, observed_of(early), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "Z26 pays on 2026-12-04, expected a day after its last observation, 2026-12-04, when its "
+        "final price exists"
+    )
+
+
+def test_two_payment_days_equal_their_singletons_summed_in_every_state_and_order() -> None:
+    # In each of the six states: A and B alone summed, the rows reversed, A twice, a row kept
+    # ready at +2bd, a third group paying the 8th and changing nothing, and C of F27 at +1bd
+    # beside them, its own group and its own contract on the axis.
+    a = group_terms((60.0,), (70.0,), (1,), (1,))
+    b = group_terms((-30.0,), (72.0,), (1,), (3,))
+    c = group_terms((5.0,), (80.0,), (2,), (1,))
+    reversed_rows = group_terms((-30.0, 60.0), (72.0, 70.0), (1, 1), (3, 1))
+    twice = group_terms((60.0, -30.0, 60.0), (70.0, 72.0, 70.0), (1, 1, 1), (1, 3, 1))
+    with_zero = group_terms((60.0, -30.0, 0.0), (70.0, 72.0, 71.0), (1, 1, 1), (1, 3, 2))
+    with_f27 = group_terms((60.0, -30.0, 5.0), (70.0, 72.0, 80.0), (1, 1, 2), (1, 3, 1))
+    for as_of, quotes, *_ in GROUP_LIFECYCLE:
+        both, _ = group_evaluated(as_of, quotes)
+        only_a, _ = group_evaluated(as_of, quotes, a)
+        only_b, _ = group_evaluated(as_of, quotes, b)
+        only_c, _ = group_evaluated(as_of, quotes, c)
+        assert both.mark == pytest.approx(only_a.mark + only_b.mark)
+        assert both.cash == pytest.approx(only_a.cash + only_b.cash)
+        np.testing.assert_allclose(both.delta, only_a.delta + only_b.delta)
+        swapped, _ = group_evaluated(as_of, quotes, reversed_rows)
+        assert (swapped.mark, swapped.cash) == (pytest.approx(both.mark), pytest.approx(both.cash))
+        np.testing.assert_allclose(swapped.delta, both.delta)
+        doubled, _ = group_evaluated(as_of, quotes, twice)
+        assert doubled.mark == pytest.approx(both.mark + only_a.mark)
+        assert doubled.cash == pytest.approx(both.cash + only_a.cash)
+        kept, _ = group_evaluated(as_of, quotes, with_zero)
+        assert (kept.mark, kept.cash) == (pytest.approx(both.mark), pytest.approx(both.cash))
+        assert kept.prepared.encoded.group_contract.size == 3
+        spread, _ = group_evaluated(as_of, quotes, with_f27)
+        assert spread.mark == pytest.approx(both.mark + only_c.mark)
+        assert spread.cash == pytest.approx(both.cash + only_c.cash)
+        np.testing.assert_allclose(spread.delta, np.concatenate([both.delta, only_c.delta]))
+        assert spread.codes() == ("Z26", "F27")
+
+
+def test_partial_asian_periods_on_one_contract_settle_independently() -> None:
+    # The ticket's case on the ethane index: A covering 1 to 3 December, 30 at 70, and B 1 to 7
+    # December, 50 at 70, both at +2bd, A paying the 7th and B the 9th. Every settle 72 and the
+    # projection 74: on the 7th A is cash, 30 * (72 - 70) = 60, and B mark, its 1st to 4th fixed
+    # at 72 and its 7th live at 74, 10 * (4 * 72 + 74) - 50 * 70 = 120, with 10 of delta, a fifth
+    # of 50; the group that paid does not retire the contract. On the 9th B is cash too, 100.
+    terms = period_terms(
+        (("2026-12-01", "2026-12-03"), ("2026-12-01", "2026-12-07")),
+        (30.0, 50.0),
+        pays=("2026-12-07", "2026-12-09"),
+        price=70.0,
+    )
+    settles = {text: 72.0 for text in pricing_days("2026-12-01", "2027-01-01")}
+    result = period_valued(terms, "2026-12-07", (74.0, 80.0, 80.0), settles)
+    assert (result.mark, result.cash, result.delta_total) == (
+        pytest.approx(120),
+        pytest.approx(60),
+        pytest.approx(10),
+    )
+    assert result.codes() == ("Z26",)
+    prep = result.prepared
+    np.testing.assert_array_equal(prep.encoded.group_contract, [1, 1])
+    np.testing.assert_array_equal(prep.encoded.payment_date, dates("2026-12-07", "2026-12-09"))
+    np.testing.assert_array_equal(prep.is_settled, [True, False])
+    assert prep.encoded.slot_group.size == 3 + 5
+    on_ninth = period_valued(terms, "2026-12-09", (74.0, 80.0, 80.0), settles)
+    assert (on_ninth.mark, on_ninth.cash, on_ninth.delta_total) == (
+        pytest.approx(0),
+        pytest.approx(160),
+        0.0,
     )

@@ -539,14 +539,17 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(FM15),3,4)" = "46356"
     "=INDEX(_ReportRisk(FM15),3,1)"   = "70000"
     "=INDEX(util_ReadHandle(FM14),3,1)" = "Z26"
-    "=INDEX(util_ReadHandle(FM14),3,3)" = "TRUE"
+    "=INDEX(util_ReadHandle(FM14),1,3)" = "payment_date"
+    "=INDEX(util_ReadHandle(FM14),3,3)" = "46356"
+    "=INDEX(util_ReadHandle(FM14),4,3)" = "46387"
     "=INDEX(util_ReadHandle(FM14),3,4)" = "TRUE"
-    "=INDEX(util_ReadHandle(FM14),3,5)" = "0"
-    "=INDEX(util_ReadHandle(FM14),4,3)" = "FALSE"
-    "=INDEX(util_ReadHandle(FM14),4,5)" = "70000"
-    "=INDEX(util_ReadHandle(FM15),4,5)" = "245000"
-    "=INDEX(util_ReadHandle(FM15),3,6)" = "0"
-    "=INDEX(util_ReadHandle(FM15),4,6)" = "70000"
+    "=INDEX(util_ReadHandle(FM14),3,5)" = "TRUE"
+    "=INDEX(util_ReadHandle(FM14),3,6)" = "0"
+    "=INDEX(util_ReadHandle(FM14),4,4)" = "FALSE"
+    "=INDEX(util_ReadHandle(FM14),4,6)" = "70000"
+    "=INDEX(util_ReadHandle(FM15),4,6)" = "245000"
+    "=INDEX(util_ReadHandle(FM15),3,7)" = "0"
+    "=INDEX(util_ReadHandle(FM15),4,7)" = "70000"
     # The penultimate method on the smoke's index: the template in GP3 is the ICE WTI T analogue,
     # financial, paying one business day after the pen day on the holiday calendar in AM1, and
     # GP4 the I5 ticket's two lots of n26 at 70 under it. n26 expires Monday 22-Jun-2026, so the
@@ -560,8 +563,9 @@ $formulas = [ordered]@{
     "=COLUMNS(util_ReadHandle(GP4))"     = "21"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,2)"   = "46192"
-    "=INDEX(util_ReadHandle(GP5),3,3)"   = "FALSE"
-    "=INDEX(util_ReadHandle(GP5),3,5)"   = "2000"
+    "=INDEX(util_ReadHandle(GP5),3,3)"   = "46195"
+    "=INDEX(util_ReadHandle(GP5),3,4)"   = "FALSE"
+    "=INDEX(util_ReadHandle(GP5),3,6)"   = "2000"
     "=INDEX(_ReportValues(GP6),3,1)"     = "8500"
     "=INDEX(_ReportValues(GP6),3,2)"     = "0"
     "=INDEX(_ReportRisk(GP6),3,1)"       = "2000"
@@ -578,14 +582,15 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(HY14),3,2)"  = "46358"
     "=INDEX(util_ReadHandle(HY14),4,2)"  = "46359"
     "=INDEX(util_ReadHandle(HY14),5,2)"  = "46363"
-    "=INDEX(util_ReadHandle(HY14),3,3)"  = "TRUE"
-    "=INDEX(util_ReadHandle(HY14),4,3)"  = "FALSE"
-    "=INDEX(util_ReadHandle(HY14),3,5)"  = "0"
-    "=INDEX(util_ReadHandle(HY14),5,5)"  = "10"
+    "=INDEX(util_ReadHandle(HY14),3,3)"  = "46365"
+    "=INDEX(util_ReadHandle(HY14),3,4)"  = "TRUE"
+    "=INDEX(util_ReadHandle(HY14),4,4)"  = "FALSE"
+    "=INDEX(util_ReadHandle(HY14),3,6)"  = "0"
+    "=INDEX(util_ReadHandle(HY14),5,6)"  = "10"
     "=INDEX(_ReportValues(HY15),3,1)"    = "150"
     "=INDEX(_ReportValues(HY15),3,2)"    = "0"
     "=INDEX(_ReportRisk(HY15),3,1)"      = "20"
-    "=INDEX(util_ReadHandle(HY15),4,6)"  = "20"
+    "=INDEX(util_ReadHandle(HY15),4,7)"  = "20"
     "=_CreateTrades(HA5,HS1:HW1,HS2:HW3,HJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the last3day method; a last3day future is cash settled on the average of its last three pricing days"
     # Calendar month Asian trades: the batch in IS5 under the asian template in IJ3, two trades of
     # Z26 on the synthetic ethane index, observing every pricing day of December, 22 of them, and
@@ -598,15 +603,16 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(IY15))"       = "24"
     "=INDEX(util_ReadHandle(IY15),3,2)"  = "46357"
     "=INDEX(util_ReadHandle(IY15),24,2)" = "46387"
-    "=INDEX(util_ReadHandle(IY15),3,3)"  = "TRUE"
-    "=INDEX(util_ReadHandle(IY15),4,3)"  = "FALSE"
-    "=INDEX(util_ReadHandle(IY15),3,5)"  = "0"
-    "=INDEX(util_ReadHandle(IY15),4,5)"  = "100"
+    "=INDEX(util_ReadHandle(IY15),3,3)"  = "46392"
+    "=INDEX(util_ReadHandle(IY15),3,4)"  = "TRUE"
+    "=INDEX(util_ReadHandle(IY15),4,4)"  = "FALSE"
+    "=INDEX(util_ReadHandle(IY15),3,6)"  = "0"
+    "=INDEX(util_ReadHandle(IY15),4,6)"  = "100"
     "=INDEX(_ReportValues(IY16),3,1)"    = "84"
     "=INDEX(_ReportValues(IY16),3,2)"    = "0"
     "=INDEX(_ReportRisk(IY16),3,1)"      = "2100"
     "=INDEX(_ReportRisk(IY16),3,2)"      = "USD per USD/GAL"
-    "=INDEX(util_ReadHandle(IY16),4,6)"  = "2100"
+    "=INDEX(util_ReadHandle(IY16),4,7)"  = "2100"
     # Calendar day quantities, trade-periods-and-bal.md slice A: the batch in IS12 under the
     # calday template in IJ9, C over the strip X26-Z26 at 100 gallons a day and D of Z26 at 110 a
     # day, read back with the days each month covers, 30 and 31, and the months' quantities,
@@ -654,6 +660,33 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(IY22),3,1)"    = "122"
     "=INDEX(_ReportValues(IY22),3,2)"    = "0"
     "=INDEX(_ReportRisk(IY22),3,1)"      = "4100"
+    # Two payment days on one contract, multiple-payment-groups.md: A at +1bd pays Monday
+    # 7 December and B at +3bd Wednesday the 9th, two groups of Z26, the lags and the days read
+    # back off the batch in JT5; on the 7th, every settle in, A is cash, 60 * (73 - 70) = 180,
+    # and B mark, -30 * (73 - 72) = -30, nothing live; the preparation in KA13 spills six slots,
+    # the three days once per group, each with its payment day, A's settled and B's not, and the
+    # results in KA14 the contract's delta of nothing on every slot.
+    "=INDEX(util_ReadHandle(JT5),3,13)"  = "+1bd"
+    "=INDEX(util_ReadHandle(JT5),4,13)"  = "+3bd"
+    "=INDEX(util_ReadHandle(JT5),3,14)"  = "46363"
+    "=INDEX(util_ReadHandle(JT5),4,14)"  = "46365"
+    "=ROWS(util_ReadHandle(KA13))"       = "8"
+    "=COLUMNS(util_ReadHandle(KA13))"    = "6"
+    "=INDEX(util_ReadHandle(KA13),1,3)"  = "payment_date"
+    "=INDEX(util_ReadHandle(KA13),3,2)"  = "46358"
+    "=INDEX(util_ReadHandle(KA13),6,2)"  = "46358"
+    "=INDEX(util_ReadHandle(KA13),3,3)"  = "46363"
+    "=INDEX(util_ReadHandle(KA13),6,3)"  = "46365"
+    "=INDEX(util_ReadHandle(KA13),3,4)"  = "TRUE"
+    "=INDEX(util_ReadHandle(KA13),3,5)"  = "TRUE"
+    "=INDEX(util_ReadHandle(KA13),6,5)"  = "FALSE"
+    "=INDEX(util_ReadHandle(KA13),8,6)"  = "0"
+    "=INDEX(_ReportValues(KA14),3,1)"    = "-30"
+    "=INDEX(_ReportValues(KA14),3,2)"    = "180"
+    "=INDEX(_ReportRisk(KA14),3,1)"      = "0"
+    "=COLUMNS(util_ReadHandle(KA14))"    = "7"
+    "=INDEX(util_ReadHandle(KA14),1,7)"  = "contract_delta"
+    "=INDEX(util_ReadHandle(KA14),6,7)"  = "0"
     "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
     '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one period form, a contract_code or start_date with end_date"
     '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date is supplied without end_date, expected both dates, the period's first and last day, or a contract_code"
@@ -1183,6 +1216,48 @@ $cells = [ordered]@{
     "IS21" = "=_CreateTrades(IA6,IS17:IX17,IS18:IX19,IJ3)"
     "IY21" = "=_PrepareTrades(IS21,IY8)"
     "IY22" = "=_EvaluateTrades(IY21,IY14)"
+    # Two payment days on one contract, multiple-payment-groups.md: the synthetic index PAYS of
+    # X26, Z26 and F27 expiring 30-Nov-2026, 4-Dec-2026 and 8-Jan-2027 in JB1:JC3 and its
+    # schedule in JB4, a calendar closed on New Year's Day 2026 alone in JD1 over JD3, the energy
+    # conventions in JE1, one specification UNIT of one MMBTU in JF2:JJ2 under the headers in
+    # EI1:EM1 and in JF1, the index in JB5; the template in JL3 over seven fields in JL1:JR2,
+    # last3day, cleared, financial, paying on that calendar, the lag left to the ticket; the
+    # ticket's headers and two rows, A, 60 of Z26 at 70 at +1bd, and B, -30 at 72 at +3bd, in
+    # JT1:JY3, and their batch in JT5; the valuation day, 7-Dec-2026 at midday, in KA1 and KA2,
+    # the settles of the 4th, 3rd, 2nd and 1st newest first in KA3:KB6, the calendar, the fixings
+    # and the history in KA7:KA9, F27's quote of 80 in KA10, the one contract left, the vector
+    # and the market in KA11:KA12, the batch prepared in KA13 and evaluated in KA14.
+    "JB1" = "X26"; "JC1" = "30-Nov-2026"
+    "JB2" = "Z26"; "JC2" = "4-Dec-2026"
+    "JB3" = "F27"; "JC3" = "8-Jan-2027"
+    "JB4" = "=_CreateFuturesSchedule(JB1:JB3,JC1:JC3)"
+    "JD3" = "1-Jan-2026"
+    "JD1" = "=_CreateHolidayCalendar(JD3)"
+    "JE1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "JF2" = "UNIT"; "JG2" = "1"; "JH2" = "MMBTU"; "JI2" = "0"; "JJ2" = "0"
+    "JF1" = "=_CreateContractSpecifications(EI1:EM1,JF2:JJ2)"
+    "JB5" = '=_CreateIndex("PAYS",JB4,JE1,JF1,JD1)'
+    "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_holiday_calendar"
+    "JL2" = "UNIT"; "JM2" = "month"; "JN2" = "last3day"; "JO2" = "cleared"; "JP2" = "financial"; "JQ2" = "Prototype Clearing"; "JR2" = "=JD1"
+    "JL3" = '=_CreateTradeTemplate("future",JL1:JR1,JL2:JR2)'
+    "JT1" = "trade_id"; "JU1" = "trade_date"; "JV1" = "contract_code"; "JW1" = "quantity"; "JX1" = "fixed_price"; "JY1" = "payment_time_lag"
+    "JT2" = "A"; "JU2" = "30-Nov-2026"; "JV2" = "Z26"; "JW2" = "60"; "JX2" = "70"; "JY2" = "+1bd"
+    "JT3" = "B"; "JU3" = "30-Nov-2026"; "JV3" = "Z26"; "JW3" = "-30"; "JX3" = "72"; "JY3" = "+3bd"
+    "JT5" = "=_CreateTrades(JB5,JT1:JY1,JT2:JY3,JL3)"
+    "KA1" = "7-Dec-2026"
+    "KA2" = "=_CreateValuationDate(KA1,0.5)"
+    "KA3" = "4-Dec-2026"; "KB3" = "73"
+    "KA4" = "3-Dec-2026"; "KB4" = "75"
+    "KA5" = "2-Dec-2026"; "KB5" = "71"
+    "KA6" = "1-Dec-2026"; "KB6" = "74"
+    "KA7" = "=_CreateCalendar(KA2,JB5)"
+    "KA8" = "=_CreateFuturesFixings(KA3:KA6,KB3:KB6,JB5)"
+    "KA9" = "=_CreateMarketHistory(KA7,KA8)"
+    "KA10" = "80"
+    "KA11" = '=_CreatePriceVector("PAYS",KA10)'
+    "KA12" = "=_CreateMarket(KA9,KA11)"
+    "KA13" = "=_PrepareTrades(JT5,KA9)"
+    "KA14" = "=_EvaluateTrades(KA13,KA12)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
