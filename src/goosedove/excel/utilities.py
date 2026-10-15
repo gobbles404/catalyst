@@ -433,7 +433,7 @@ def trades_table(obj: Trades) -> MixedArray:
     text("quantity_per", tuple(BASIS_NAMES[terms.quantity_per[rows]]))
     numbers("fixed_price", "float64", terms.fixed_price)
     if terms.payment is not None:
-        lags = np.array([f"+{days}bd" for days in terms.payment.lag_days], dtype=object)
+        lags = np.array(terms.payment.lag, dtype=object)  # as the ticket or the template wrote
         text("payment_time_lag", tuple(lags[rows]))
         numbers("payment_date", "datetime64[D]", terms.payment.date)
     if terms.marketing_reserve is not None:  # the row's one amount on each of its components
@@ -797,8 +797,9 @@ def util_ShiftDate(
     date: Annotated[Date, "The day to shift, such as A2 or DATE(2026,10,9)."],
     offset: Annotated[
         str,
-        "The shift as text: a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or "
-        "+0em, typed or in a cell such as B2.",
+        "The shift as text: one or more of a sign, a whole count and bd, cd or em, such as +1bd, "
+        "-1bd, +7cd, +0em or +3em+25cd-1bd+1bd, applied left to right, typed or in a cell such "
+        "as B2.",
     ],
     holiday_calendar: Annotated[
         Handle[HolidayCalendar] | None,
@@ -807,5 +808,6 @@ def util_ShiftDate(
     ] = None,
 ) -> Date:
     """Shifts a date by business days, calendar days or month ends, +1bd the next business day,
-    -1bd the one before, +7cd a week on, +0em the month's last day, and shows the date."""
+    -1bd the one before, +7cd a week on, +0em the month's last day, a chain such as
+    +3em+25cd-1bd+1bd applied left to right, and shows the date."""
     return Date(shift_date(date, offset, holiday_calendar))

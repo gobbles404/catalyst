@@ -201,7 +201,20 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ShiftDate", new object[] { 46371.0, "+1em", ExcelMissing.Value }, 46418.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+001cD", ExcelMissing.Value }, 46305.0 };
             yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+0em", ExcelMissing.Value }, 2958465.0 };
-            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
+            // Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 without a calendar, 25 December; the order the rule and no roll at the end; a chain malformed late, one leaving the sheet at its first instruction and too many digits in a later one.
+            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+3em+25cd-1bd+1bd", ExcelMissing.Value }, 46381.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46246.0, "+003EM+025cD-01BD+001bd", ExcelMissing.Value }, 46381.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "-1bd+1bd", ExcelMissing.Value }, 46304.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "-1bd+1bd", ExcelMissing.Value }, 46307.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+1cd+0em", ExcelMissing.Value }, 46053.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46052.0, "+0em+1cd", ExcelMissing.Value }, 46054.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46783.0, "+1em+1cd", ExcelMissing.Value }, 46813.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46305.0, "+0bd+0cd", ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1cd", ExcelMissing.Value }, 46305.0 };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+2xd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
+            yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd-1cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
+            yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd+99999999cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits in instruction 2, '+99999999cd', expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
             yield return new object[] { "util_ShiftDate", new object[] { 2958465.0, "+1cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31" };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+99999999cd", ExcelMissing.Value }, "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31" };
             yield return new object[] { "util_ShiftDate", new object[] { ExcelMissing.Value, "+1bd", ExcelMissing.Value }, "#ERROR util_ShiftDate: date is missing, expected date" };
@@ -232,7 +245,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "Asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'Asian', expected lastday, penultimate, last3day or asian" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "+0bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+0bd', expected a positive whole number of business days, such as +1bd" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "2bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "+1bd+2xd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
@@ -2007,6 +2021,15 @@ namespace Goosedove.Host.Tests
             var batch = (object[,])Seam.Call("util_ReadHandle", trades);
             Assert.Equal(22, batch.GetLength(1));
             Assert.Equal("offset", batch[0, 21]);
+            // Since #181, compound-date-offsets.md: a payment rule of several instructions reads as the date
+            // utility's offset does and is kept as written beside the day it made: Z26's 31 December 2026 to its
+            // month's end, the same day, and the business day after, past New Year's Day closed, Monday 4 January.
+            var chained = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+0em+1bd", pays));
+            var ruled = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, headers, rows, chained));
+            Assert.Equal("payment_time_lag", ruled[0, 12]);
+            Assert.Equal("payment_date", ruled[0, 13]);
+            Assert.Equal("+0em+1bd", ruled[2, 12]);
+            Assert.Equal(46391.0, ruled[2, 13]);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46358.0, 0.5), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", Column(46357.0, 46356.0), Column(0.24, 0.28), index));
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);

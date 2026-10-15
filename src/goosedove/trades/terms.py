@@ -89,14 +89,15 @@ def one_choice[E: Enum](members: tuple[E, ...], choice: E, occurrences: int) -> 
 @dataclass(frozen=True, slots=True)
 class PaymentTerms:
     """How a financial settlement pays, kept with the days it gives so that a batch explains its
-    own payment days. Per occurrence: lag_days[i], the positive whole number of business days
-    after a component's last observation day the occurrence pays, `+2bd` read once as 2, and
-    calendar[i], the holiday calendar those days are counted on, the object the ticket's handle
-    stood for, held by reference. Per component: date[k], the day it pays, counted from its last
-    observation day, its contract's expiry under lastday and the business day before under
-    penultimate, by its occurrence's lag on its occurrence's calendar."""
+    own payment days. Per occurrence: lag[i], the payment rule as the ticket or the template wrote
+    it, `+2bd` or since #181 a chain such as `+3em+25cd-1bd+1bd`, its instructions read once at
+    creation and applied then, and calendar[i], the holiday calendar its business days are counted
+    on, the object the ticket's handle stood for, held by reference. Per component: date[k], the
+    day it pays, its occurrence's rule applied instruction by instruction to its anchor, its
+    contract's expiry under lastday and the business day before under penultimate, on its
+    occurrence's calendar."""
 
-    lag_days: NDArray[np.int64]
+    lag: tuple[str, ...]
     calendar: tuple[HolidayCalendar, ...]
     date: NDArray[np.datetime64]
 
@@ -629,7 +630,7 @@ def _the_payment(
                     "date per component with a financial settlement"
                 )
             for name, count in (
-                ("lag_days", payment.lag_days.size),
+                ("lag", len(payment.lag)),
                 ("calendar", len(payment.calendar)),
             ):
                 if count != occurrences:
@@ -641,9 +642,7 @@ def _the_payment(
                     f"payment date has {payment.date.size} dates, expected {components}, "
                     "one per component"
                 )
-            lag_days = np.array(payment.lag_days, dtype=np.int64)
-            lag_days.setflags(write=False)
-            return PaymentTerms(lag_days, payment.calendar, _frozen_days(payment.date))
+            return PaymentTerms(tuple(payment.lag), payment.calendar, _frozen_days(payment.date))
         case Settlement.PHYSICAL:
             if payment is not None:
                 raise ValueError(

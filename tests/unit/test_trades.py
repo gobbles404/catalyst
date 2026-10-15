@@ -188,7 +188,7 @@ PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-0
 
 def paying(pays: NDArray[np.datetime64], occurrences: int, lag: int = 2) -> PaymentTerms:
     """The toy's terms over those days: the lag and the calendar for every occurrence."""
-    return PaymentTerms(np.full(occurrences, lag), (PAYMENT_CALENDAR,) * occurrences, pays)
+    return PaymentTerms((f"+{lag}bd",) * occurrences, (PAYMENT_CALENDAR,) * occurrences, pays)
 
 
 def terms_of(
@@ -264,7 +264,7 @@ def evaluated(
 
 
 def test_the_terms_own_frozen_copies_of_their_columns() -> None:
-    lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), np.full(5, 2)
+    lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), ("+2bd",) * 5
     terms = resolved_trades(
         FIXED_FLOAT, TOY, spec(5), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), TRADE_IDS, ("CME Clearing",) * 5,
@@ -272,12 +272,12 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
         np.arange(5, dtype=np.intp), CONTRACT, lots, *bounds_of(TOY, CONTRACT), FIXED_PRICE,
         PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
     )  # fmt: skip
-    lots[0], pays[0], lags[0] = 99.0, day("2030-01-01"), 9  # the arrays passed, changed after
+    lots[0], pays[0] = 99.0, day("2030-01-01")  # the arrays passed, changed after
     assert terms.quantity[0] == 10.0 and terms.schedule is TOY.schedule
     np.testing.assert_array_equal(terms.covered_days, [31, 31, 31, 31, 31])  # December, January
     np.testing.assert_array_equal(terms.component_quantity, terms.quantity)  # month: as entered
     assert terms.payment is not None and terms.payment.date[0] == day("2026-11-30")
-    assert terms.payment.lag_days[0] == 2 and terms.payment.calendar[0] is PAYMENT_CALENDAR
+    assert terms.payment.lag[0] == "+2bd" and terms.payment.calendar[0] is PAYMENT_CALENDAR
     for column in (
         terms.trade_dates,
         terms.occurrence,
@@ -289,7 +289,7 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
         terms.component_quantity,
     ):
         assert not column.flags.writeable
-    assert not terms.payment.date.flags.writeable and not terms.payment.lag_days.flags.writeable
+    assert not terms.payment.date.flags.writeable
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
     assert terms.named(4) == "trade 1001 at row 5"
     assert terms_of(trade_ids=None).named(2) == "trade at row 3"
@@ -410,12 +410,12 @@ GAS_DAILY = index(
         ),
         (
             {"settlement": Settlement.FINANCIAL, "payment": paying(TOY_PAYS, 4)},
-            "payment lag_days has 4, expected 5, one per occurrence",
+            "payment lag has 4, expected 5, one per occurrence",
         ),
         (
             {
                 "settlement": Settlement.FINANCIAL,
-                "payment": PaymentTerms(np.full(5, 2), (PAYMENT_CALENDAR,) * 3, TOY_PAYS),
+                "payment": PaymentTerms(("+2bd",) * 5, (PAYMENT_CALENDAR,) * 3, TOY_PAYS),
             },
             "payment calendar has 3, expected 5, one per occurrence",
         ),
@@ -1029,7 +1029,7 @@ def pen_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(np.full(1, 1), (CLEARING_CALENDAR,), dates(pays))
+        else PaymentTerms(("+1bd",), (CLEARING_CALENDAR,), dates(pays))
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -1272,7 +1272,7 @@ def strip_terms(order: tuple[tuple[int, tuple[int, ...], float, float], ...]) ->
         *bounds_of(STRIP_INDEX, rows(*(c for _, c, _, _ in components))),
         numbers(*(p for _, _, _, p in components)),
         PaymentTerms(
-            np.full(n, 1),
+            ("+1bd",) * n,
             (CLEARING_CALENDAR,) * n,
             dates(*(STRIP_PAYS[c] for _, c, _, _ in components)),
         ),
@@ -2056,7 +2056,7 @@ def l3d_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(np.full(n, 2), (WEEKDAYS,) * n, dates(*(L3D_PAYS[c] for c in contracts)))
+        else PaymentTerms(("+2bd",) * n, (WEEKDAYS,) * n, dates(*(L3D_PAYS[c] for c in contracts)))
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -2361,7 +2361,7 @@ def asian_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(np.full(n, 2), (PAY_JAN_1,) * n, dates(*(pays[c] for c in contracts)))
+        else PaymentTerms(("+2bd",) * n, (PAY_JAN_1,) * n, dates(*(pays[c] for c in contracts)))
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -2835,7 +2835,7 @@ def period_terms(
         dates(*(end for _, end in periods)),
         numbers(*([price] * n)),
         PaymentTerms(
-            np.full(n, 2), (PAY_JAN_1,) * n, dates(*(("2027-01-05",) * n if pays is None else pays))
+            ("+2bd",) * n, (PAY_JAN_1,) * n, dates(*(("2027-01-05",) * n if pays is None else pays))
         ),
     )
 
@@ -3052,7 +3052,7 @@ def group_terms(
         *bounds_of(PAYS, rows(*contracts)),
         numbers(*prices),
         PaymentTerms(
-            np.array(lags, dtype=np.int64),
+            tuple(f"+{lag}bd" for lag in lags),
             (WEEKDAYS,) * n if calendars is None else calendars,
             days,
         ),
@@ -3470,7 +3470,7 @@ def mixed_terms(
         None
         if settlement is Settlement.PHYSICAL
         else PaymentTerms(
-            lag_days,
+            tuple(f"+{lag}bd" for lag in lag_days.tolist()),
             (pay_calendar,) * n,
             np.busday_offset(anchors, lag_days[occurrence], holidays=pay_calendar.holiday),
         )
@@ -4078,7 +4078,7 @@ def wti_terms(
         dates(*(start for start, _ in periods)),
         dates(*(end for _, end in periods)),
         numbers(*([price] * n)),
-        PaymentTerms(np.full(n, 2), (WTI_PAYS,) * n, dates(*pays)),
+        PaymentTerms(("+2bd",) * n, (WTI_PAYS,) * n, dates(*pays)),
     )
 
 
@@ -4743,7 +4743,7 @@ def waha_terms(
         pay_days = (
             dates(*(WAHA_PAYMENT[int(c)] for c in contract)) if pays is None else dates(*pays)
         )
-        lag = np.full(m, 3) if lags is None else np.array(lags, dtype=np.int64)
+        lag = ("+3bd",) * m if lags is None else tuple(f"+{n}bd" for n in lags)
         payment = PaymentTerms(lag, (WAHA_PAYS,) * m, pay_days)
     return resolved_trades(
         FIXED_FLOAT,

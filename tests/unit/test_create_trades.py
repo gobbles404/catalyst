@@ -23,7 +23,7 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
@@ -258,7 +258,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     np.testing.assert_array_equal(
         terms.payment.date, dates("2026-11-30", "2026-12-31", "2026-12-31")
     )  # two business days after each expiry, the page's dates, 26 November closed
-    np.testing.assert_array_equal(terms.payment.lag_days, [2, 2])  # the terms, per occurrence
+    assert terms.payment.lag == ("+2bd", "+2bd")  # the rule as written, per occurrence
     assert terms.payment.calendar == (PAYMENT_CALENDAR, PAYMENT_CALENDAR)
     assert terms.named(1) == "trade 1 at row 1"
     assert counter.freeze()["resolved_components"] == 3
@@ -397,40 +397,43 @@ def payment_refusal(lag: str, in_ticket: bool = False) -> str:
 
 
 def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day() -> None:
-    # Representability and no term of business: a day past 31 December 9999 could reach no cell,
-    # so the lag that would pay there is refused naming the lag, the anchor and the day, with
-    # the row when the ticket supplied it, and the longest lag that still pays on the last day
-    # is taken: from Z26's 25 November 2026 that is 2,080,082 business days on an open calendar.
-    # A lag beyond the sheet's whole calendar, 2,113,146 business days, is refused by the grammar
-    # before any day is counted, so no number overflows the arithmetic unnamed.
+    # Representability and no term of business: a day outside the sheet's calendar could reach no
+    # cell, so the rule that would pay there is refused naming the rule, the anchor and the day,
+    # with the row when the ticket supplied it and the instruction when the rule has more than
+    # one, since #181; the longest lag that still pays on the last day is taken: from Z26's 25
+    # November 2026 that is 2,080,082 business days on an open calendar. A count of more than
+    # seven significant digits is refused by its digits before any day is counted, so no number
+    # overflows the arithmetic unnamed.
     assert payment_refusal("+2100000bd") == (
-        "payment_time_lag is '+2100000bd', counted from 2026-11-25 to 10076-05-06, "
-        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+        "payment_time_lag is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected a "
+        "payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     assert payment_refusal("+2100000bd", in_ticket=True) == (
-        "payment_time_lag row 1 is '+2100000bd', counted from 2026-11-25 to 10076-05-06, "
-        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+        "payment_time_lag row 1 is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected "
+        "a payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     assert payment_refusal("+99999999999999999999bd", in_ticket=True) == (
-        "payment_time_lag row 1 is '+99999999999999999999bd', expected at most 2,113,146 business "
-        "days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
+        "payment_time_lag row 1 has a count of 20 digits, expected at most 7; the sheet's "
+        "calendar runs 1900-03-01 to 9999-12-31"
     )
     long_lag = "+" + "9" * 4301 + "bd"  # fits a cell, and would fail Python's own conversion
     bound = (
-        "expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to "
-        "9999-12-31 end to end"
+        "has a count of 4301 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to "
+        "9999-12-31"
     )
-    assert payment_refusal(long_lag) == f"payment_time_lag is {long_lag!r}, {bound}"
-    assert (
-        payment_refusal(long_lag, in_ticket=True)
-        == f"payment_time_lag row 1 is {long_lag!r}, {bound}"
-    )
+    assert payment_refusal(long_lag) == f"payment_time_lag {bound}"
+    assert payment_refusal(long_lag, in_ticket=True) == f"payment_time_lag row 1 {bound}"
     longest = int(np.busday_count(day("2026-11-25"), day("9999-12-31")))
     assert longest == 2_080_082
     assert one_payment_day("2026-11-25", (), f"+{longest}bd") == day("9999-12-31")
     assert payment_refusal(f"+{longest + 1}bd") == (
-        "payment_time_lag is '+2080083bd', counted from 2026-11-25 to 10000-01-03, "
-        "expected a payment day on or before 9999-12-31, the last a sheet can show"
+        "payment_time_lag is '+2080083bd', counted from 2026-11-25 to 10000-01-03, expected a "
+        "payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
+    )
+    assert payment_refusal("+9999999cd-9999999cd", in_ticket=True) == (
+        "payment_time_lag row 1 is '+9999999cd-9999999cd', counted from 2026-11-25 to 29405-12-20 "
+        "at instruction 1, '+9999999cd', expected a payment day within the sheet's calendar, "
+        "1900-03-01 to 9999-12-31"
     )
 
 
@@ -463,7 +466,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     payment = batch.resolved.payment
     assert payment is not None
     np.testing.assert_array_equal(payment.date, dates("2026-11-27", "2027-01-04"))
-    np.testing.assert_array_equal(payment.lag_days, [1, 3])
+    assert payment.lag == ("+1bd", "+3bd")
     assert payment.calendar == (after_z26, before_new_year)
 
 
@@ -1752,11 +1755,13 @@ def test_a_code_or_a_lag_the_grammar_refuses_is_named_by_its_first_bad_row() -> 
     template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_time_lag"}
     lags: dict[str, list[object]] = {
         **NG_TICKET,
-        "payment_time_lag": ["+2BD", "+0bd", "+2bd", "+2bd", "+2bd"],
+        "payment_time_lag": ["+2BD", "+2bd+", "+2xd", "+2bd", "+2bd"],
     }
-    assert refused(TOY, lags, template) == (
-        "payment_time_lag row 1 is '+2BD', expected a positive whole number of business days, "
-        "such as +1bd"
+    assert refused(TOY, lags, template) == (  # row 1 reads since #181; row 2 is the first bad
+        "payment_time_lag row 2 is '+2bd+', expected one or more of a sign, a whole count and bd, "
+        "cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+' "
+        "begins with no "
+        "instruction"
     )
 
 
@@ -2501,6 +2506,8 @@ def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_
         "encoded_groups": 2,
         "encoded_observations": 27,
         "encoded_slots": 23,
+        "payment_rules_read": 1,
+        "payment_shifts": 1,
         "reserved_components": 4,
         "resolved_components": 4,
         "resolved_occurrences": 4,
@@ -2794,7 +2801,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
     np.testing.assert_array_equal(terms.quantity, [1])
     np.testing.assert_array_equal(terms.fixed_price, [-0.5])
     assert terms.payment is not None
-    np.testing.assert_array_equal(terms.payment.lag_days, [3])
+    assert terms.payment.lag == ("+3bd",)
     assert terms.payment.calendar == (WAHA_PAYS,)
     np.testing.assert_array_equal(terms.payment.date, dates("2026-12-03"))
     enc = batch.encoded
@@ -2811,6 +2818,8 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
         "encoded_groups": 1,
         "encoded_observations": 1,
         "encoded_slots": 1,
+        "payment_rules_read": 1,
+        "payment_shifts": 1,
         "reserved_components": 1,
         "resolved_components": 1,
         "resolved_occurrences": 1,
@@ -3025,4 +3034,170 @@ def test_a_strips_rows_carry_their_id_and_row_and_a_later_bad_row_is_named_by_it
             NG, {**ID_TICKET, "contract_code": ["Z26-F27", "F27", "Z26"], "quantity": [1, 2.5, 1]}
         )
         == "quantity of trade 123457 at row 2 is 2.5, expected a whole number"
+    )
+
+
+# --- compound payment rules, compound-date-offsets.md --------------------------------------------
+
+# The ticket's fixture: a financial futures index whose V26 expires Friday 9 October 2026, the
+# anchor under lastday, X26 a month on; a payment calendar of weekdays and no holiday.
+CHAIN = an_index(
+    "chain",
+    (("U26", "2026-09-09"), ("V26", "2026-10-09"), ("X26", "2026-11-09")),
+    holidays=(),
+    lots=(("TOY", 10_000.0, "MMBTU"),),
+)
+WEEKDAYS_ONLY = holiday_calendar(dates())
+
+
+def chained(
+    rows: list[tuple[str, str]],
+    template_rule: str | None = None,
+    calendars: tuple[HolidayCalendar, ...] | None = None,
+) -> tuple[Trades, WorkCounter]:
+    """A batch on CHAIN of one lot per row, each row its code and, unless the template gives one
+    rule for all, its own payment rule, on the weekday calendar unless each row's is given."""
+    ticket: dict[str, list[object]] = {
+        "trade_id": list(range(1, len(rows) + 1)),
+        "trade_date": ["2026-09-24"] * len(rows),
+        "contract_code": [code for code, _ in rows],
+        "quantity": [1] * len(rows),
+        "fixed_price": [3.0] * len(rows),
+    }
+    template: dict[str, object] = {**TOY_TEMPLATE, "payment_holiday_calendar": WEEKDAYS_ONLY}
+    if template_rule is None:
+        del template["payment_time_lag"]
+        ticket["payment_time_lag"] = [rule for _, rule in rows]
+    else:
+        template["payment_time_lag"] = template_rule
+    if calendars is not None:
+        del template["payment_holiday_calendar"]
+        ticket["payment_holiday_calendar"] = list(calendars)
+    return created(CHAIN, ticket, template)
+
+
+def paid_on(batch: Trades) -> NDArray[np.datetime64]:
+    assert batch.resolved.payment is not None
+    return batch.resolved.payment.date
+
+
+def test_the_compound_tickets_payment_rules_on_the_chain_fixture() -> None:
+    # +1bd and +3cd both pay Monday 12 October from Friday the 9th and are one group; +4cd pays
+    # Tuesday the 13th, a group of its own; the rules are kept as written, and three rules over
+    # one calendar are three instructions applied.
+    batch, counter = chained([("V26", "+1bd"), ("V26", "+3cd"), ("V26", "+4cd")])
+    assert batch.resolved.payment is not None
+    assert batch.resolved.payment.lag == ("+1bd", "+3cd", "+4cd")
+    np.testing.assert_array_equal(paid_on(batch), dates("2026-10-12", "2026-10-12", "2026-10-13"))
+    np.testing.assert_array_equal(batch.encoded.payment_date, dates("2026-10-12", "2026-10-13"))
+    np.testing.assert_array_equal(batch.encoded.group_contract, [1, 1])
+    counts = counter.freeze().as_dict()
+    assert counts["payment_rules_read"] == 3 and counts["payment_shifts"] == 3
+    # The month's end, Saturday the 31st, back to Friday the 30th and on to Monday 2 November.
+    np.testing.assert_array_equal(
+        paid_on(chained([("V26", "+0em-1bd+1bd")])[0]), dates("2026-11-02")
+    )
+    # +1cd lands on Saturday the 10th and is kept there: no roll is added at the end of a rule.
+    np.testing.assert_array_equal(paid_on(chained([("V26", "+1cd")])[0]), dates("2026-10-10"))
+    # +1bd-1bd comes back to the anchor and pays on the last observation, which the kernel refuses
+    # as it always has; the utility may make that day, a payment may not.
+    with pytest.raises(ValueError) as early:
+        chained([("V26", "+1bd-1bd")])
+    assert str(early.value) == (
+        "V26 pays on 2026-10-09, expected a day after its last observation, 2026-10-09, when its "
+        "final price exists"
+    )
+
+
+def test_rules_and_calendars_vary_by_row_and_a_strip_applies_its_rule_per_component() -> None:
+    # Row a's calendar closes the Monday, so its +1bd pays the Tuesday; rows b and c pay the
+    # Monday by +3cd and by +1bd on the open calendar, one group; three groups of rule and
+    # calendar, three instructions applied.
+    closed_monday = holiday_calendar(dates("2026-10-12"))
+    batch, counter = chained(
+        [("V26", "+1bd"), ("V26", "+3cd"), ("V26", "+1bd")],
+        calendars=(closed_monday, WEEKDAYS_ONLY, WEEKDAYS_ONLY),
+    )
+    np.testing.assert_array_equal(paid_on(batch), dates("2026-10-13", "2026-10-12", "2026-10-12"))
+    np.testing.assert_array_equal(batch.encoded.payment_date, dates("2026-10-12", "2026-10-13"))
+    counts = counter.freeze().as_dict()
+    assert counts["payment_rules_read"] == 2 and counts["payment_shifts"] == 3
+    # A strip applies the chain to each component's own anchor: V26's 9 October to the month's
+    # end and the business day after, 2 November; X26's 9 November to 30 November and 1 December.
+    strip, counter = chained([("V26-X26", "+0em+1bd")])
+    np.testing.assert_array_equal(paid_on(strip), dates("2026-11-02", "2026-12-01"))
+    counts = counter.freeze().as_dict()
+    assert counts["payment_rules_read"] == 1 and counts["payment_shifts"] == 2
+    # The rule in the template or in the ticket makes the same days; a row repeated is two
+    # occurrences of one group; each row alone pays what it pays in the batch.
+    rows = [
+        ("V26", "+1bd"),
+        ("V26", "+3cd"),
+        ("V26", "+4cd"),
+        ("V26", "+0em-1bd+1bd"),
+        ("V26", "+1cd"),
+    ]
+    batch, _ = chained(rows)
+    for k, (code, rule) in enumerate(rows):
+        np.testing.assert_array_equal(
+            paid_on(chained([(code, rule)])[0]), paid_on(batch)[k : k + 1]
+        )
+    templated, _ = chained([("V26", ""), ("X26", "")], template_rule="+0em-1bd+1bd")
+    ticketed, _ = chained([("V26", "+0em-1bd+1bd"), ("X26", "+0em-1bd+1bd")])
+    np.testing.assert_array_equal(paid_on(templated), paid_on(ticketed))
+    np.testing.assert_array_equal(paid_on(templated), dates("2026-11-02", "2026-11-30"))
+    twice, _ = chained([("V26", "+0EM-1bd+1BD"), ("V26", "+0EM-1bd+1BD")])
+    assert twice.resolved.payment is not None
+    assert twice.resolved.payment.lag == ("+0EM-1bd+1BD", "+0EM-1bd+1BD")  # as written, each
+    np.testing.assert_array_equal(twice.encoded.payment_date, dates("2026-11-02"))
+    assert twice.encoded.slot_group.size == 1
+
+
+def test_a_rule_that_leaves_the_sheet_names_the_first_offending_row_in_ticket_order() -> None:
+    # Row 1's rule reaches the sheet's last day exactly from V26's 9 October; row 3 shares that
+    # rule on a calendar of its own and strays from X26's anchor a month on; row 2 strays by a
+    # rule of its own. The groups are made rule by rule, so row 3's is made before row 2's, and
+    # the refusal still names row 2, the first offending row of the ticket.
+    cal_x, cal_y, cal_z = (
+        holiday_calendar(dates(closed)) for closed in ("2026-10-12", "2026-10-13", "2026-10-14")
+    )
+    with pytest.raises(ValueError) as strayed:
+        chained(
+            [("V26", "+2912161cd"), ("V26", "+9999999cd"), ("X26", "+2912161cd")],
+            calendars=(cal_x, cal_y, cal_z),
+        )
+    assert str(strayed.value) == (
+        "payment_time_lag row 2 is '+9999999cd', counted from 2026-10-09 to 29405-11-03, expected "
+        "a payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
+    )
+    exact, _ = chained([("V26", "+2912161cd")])
+    np.testing.assert_array_equal(paid_on(exact), dates("9999-12-31"))
+
+
+def test_an_iferc_chain_counts_from_last_trading_and_may_not_pay_on_publication_day() -> None:
+    # Z26's last trading day is Monday 30 November and its index prints on 1 December: +0em+2bd
+    # is the month's end, the 30th itself, and two business days on, 2 December; +3cd is 3
+    # December, the day +3bd pays, so the two are one group; +1cd is the publication day, refused
+    # by the existing rule, since the final price does not exist until that day is done.
+    chain, _ = created(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0em+2bd"})
+    np.testing.assert_array_equal(paid_on(chain), dates("2026-12-02"))
+    np.testing.assert_array_equal(chain.encoded.slot_date, dates("2026-12-01"))
+    pair, _ = created(
+        WAHA,
+        {
+            "trade_id": [12, 19],
+            "trade_date": ["2026-11-30", "2026-11-30"],
+            "contract_code": ["Z26", "Z26"],
+            "quantity": [1, -1],
+            "fixed_price": [-0.50, -0.50],
+            "payment_time_lag": ["+3bd", "+3cd"],
+        },
+        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_time_lag"},
+    )
+    assert pair.resolved.payment is not None
+    assert pair.resolved.payment.lag == ("+3bd", "+3cd")
+    np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-03"))
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+1cd"}) == (
+        "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
+        "final price exists"
     )

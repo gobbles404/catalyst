@@ -449,7 +449,24 @@ $formulas = [ordered]@{
     '=util_ShiftDate(DATE(2026,12,15),"+1em")' = "46418"
     '=util_ShiftDate(PA3,"+001cD")'          = "46305"
     '=util_ShiftDate(DATE(9999,12,31),"+0em")' = "2958465"
-    '=util_ShiftDate(PA3,"1bd")'             = "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em"
+    '=util_ShiftDate(PA3,"1bd")'             = "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
+    # Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on H in
+    # PB2, Christmas Day closed, 28 December, and 25 December without it, the zeros and cases as one;
+    # the order the rule, no roll at the end; a chain malformed late, one leaving the sheet at its
+    # first instruction and too many digits in a later one, each refused naming where.
+    '=util_ShiftDate(PB3,"+3em+25cd-1bd+1bd",PB2)' = "46384"
+    '=util_ShiftDate(PB3,"+3em+25cd-1bd+1bd")'     = "46381"
+    '=util_ShiftDate(PB3,"+003EM+025cD-01BD+001bd",PB2)' = "46384"
+    '=util_ShiftDate(PA3,"-1bd+1bd")'       = "46304"
+    '=util_ShiftDate(PA4,"-1bd+1bd")'       = "46307"
+    '=util_ShiftDate(PB4,"+1cd+0em")'       = "46053"
+    '=util_ShiftDate(PB4,"+0em+1cd")'       = "46054"
+    '=util_ShiftDate(PB5,"+1em+1cd")'       = "46813"
+    '=util_ShiftDate(PA4,"+0bd+0cd")'       = "46305"
+    '=util_ShiftDate(PA3,"+1cd")'           = "46305"
+    '=util_ShiftDate(PA3,"+1bd+2xd")'       = "#ERROR util_ShiftDate: ValueError: offset is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction"
+    '=util_ShiftDate(DATE(9999,12,31),"+1cd-1cd")' = "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31"
+    '=util_ShiftDate(PA3,"+1bd+99999999cd")' = "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits in instruction 2, '+99999999cd', expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     '=util_ShiftDate(DATE(9999,12,31),"+1cd")' = "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31"
     '=util_ShiftDate(PA3,"+99999999cd")'     = "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
     '=util_ShiftDate(E1,"+1bd")'             = "#ERROR util_ShiftDate: date is text 'x', expected date"
@@ -546,7 +563,8 @@ $formulas = [ordered]@{
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
-    '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end"
+    '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
+    '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"2bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
     '=_CreateTradeTemplate("fixed_float",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
     '=_CreateTradeTemplate("fixed_float",EY1,EY2:EY3)'     = "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     "=_CreateTrades(EB1,EW1:FB1,EW2:FB2,EW3)"    = "#ERROR _CreateTrades: ValueError: quantity_unit is supplied by the template and by the ticket, expected by one of them"
@@ -1425,6 +1443,12 @@ $formulas = [ordered]@{
     '=COLUMNS(_ReportRisk(QV24,"all","day"))'     = "4"
     '=INDEX(_ReportRisk(QV24,"all","day"),5,4)'   = "0"
     "=INDEX(util_ReadHandle(QV24),3,15)"  = "-"
+    # The chain's trade, since #181: the rule as written beside the day it made, 25 May 2027; a rule
+    # coming back to the expiry refused by the kernel as any payment on the last observation is.
+    "=INDEX(util_ReadHandle(QJ15),1,13)"  = "payment_time_lag"
+    "=INDEX(util_ReadHandle(QJ15),3,13)"  = "+3em+25cd-1bd+1bd"
+    "=INDEX(util_ReadHandle(QJ15),3,14)"  = "46532"
+    '=_CreateTrades(QJ8,QM9:QR9,{1003,46391,"F27",10,70,"+1bd-1bd"},QJ11)' = "#ERROR _CreateTrades: ValueError: F27 pays on 2027-01-04, expected a day after its last observation, 2027-01-04, when its final price exists"
     "=INDEX(_ReportReserves(QV24),3,3)"   = "5"
     "=INDEX(_ReportValues(RF8),3,1)"      = "120"
     "=INDEX(_ReportValues(RF8),3,2)"      = "0"
@@ -2445,6 +2469,11 @@ $cells = [ordered]@{
     "PA1" = "12-Oct-2026"
     "PA2" = "=_CreateHolidayCalendar(PA1)"
     "PA3" = "9-Oct-2026"; "PA4" = "10-Oct-2026"; "PA5" = "11-Oct-2026"; "PA6" = "12-Oct-2026"
+    # Since #181 the compound ticket's calendar H, Christmas Day 2026 closed and nothing else, in PB2
+    # over PB1, and its dates: 12 August 2026, 30 January 2026 and 31 January 2028.
+    "PB1" = "25-Dec-2026"
+    "PB2" = "=_CreateHolidayCalendar(PB1)"
+    "PB3" = "12-Aug-2026"; "PB4" = "30-Jan-2026"; "PB5" = "31-Jan-2028"
     # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
     # a schedule runs, the codes in BV, ICE's last trading days and Platts' publication days
     # beside them, and an index over it.
@@ -2546,6 +2575,10 @@ $cells = [ordered]@{
     "QJ12" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR11,QJ10)"
     "QJ13" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR10,QJ10)"
     "QJ14" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR10,QJ11)"
+    # Since #181 a chain in the ticket's own column: F27 cleared, paying the end of the month three
+    # ahead of its 4 January 2027 expiry, 25 days on, the business day before and the one after.
+    "QM12" = "1003"; "QN12" = "4-Jan-2027"; "QO12" = "F27"; "QP12" = "10"; "QQ12" = "70"; "QR12" = "+3em+25cd-1bd+1bd"
+    "QJ15" = "=_CreateTrades(QJ8,QM9:QR9,QM12:QR12,QJ11)"
     "QV1" = "4-Jan-2027"
     "QV2" = "=_CreateValuationDate(QV1,0.5)"
     "QV3" = "=_CreateCalendar(QV2,QJ8)"

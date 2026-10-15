@@ -166,6 +166,8 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
         "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": rows,
         "encoded_slots": contracts,
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "reserved_components": rows,
         "resolved_components": rows,
         "resolved_occurrences": rows,
@@ -204,16 +206,20 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
         "_schedule_rows": 1,
         "month_bounds": 1,  # the first and last day of each component's month
-        "_each_distinct": 4,  # the units, the methods, the bases and the lags
-        "_each_distinct.<locals>.<lambda>": 4,  # each distinct text named for its first row
+        "_each_distinct": 3,  # the units, the methods and the bases; the rules below
+        "_each_distinct.<locals>.<lambda>": 3,  # each distinct text named for its first row
         "_distinct_texts": 5,  # those four, and the codes of the rows that book by code
         "months_of": distinct,
         "period_months": distinct,
         "_period_months": distinct,  # the reading under it, shared with the balance of a period
         "_label_months": distinct,
         "_Fields.where": distinct + 6,  # and once each for the lag and the five batch fields
-        "business_days_of": 1,  # one distinct lag
+        "payment_rule_of": 1,  # one distinct rule, read whole into its instructions, since #181
+        "read_offset": 1,
+        "shift_days": 1,  # the rule applied to its components on their one calendar at once
+        "_business_days_on": 1,  # the one business-day instruction, one numpy offset
         "_the_payment_terms": 1,
+        "_the_payment_terms.<locals>.<lambda>": 1,  # the distinct rule named for its first row
         "schedule_method_of": 1,
         "route_of": 1,
         "settlement_of": 1,
@@ -250,7 +256,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_frozen_numbers": 2,
         "_the_component_quantity": 1,  # each component's quantity by the basis
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 4,  # the rows, the components, the schedule's codes and the ticket's
+        "WorkCounter.hit": 6,  # the rows, the components, the schedule's codes and the ticket's,
+        # and since #181 the rules read and the shifts applied
     }
 
 
@@ -274,41 +281,49 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
     return {
         "generic.astype": 2 * contracts,  # each distinct code's two months as counts
         "ndarray.all": 1,
-        "ndarray.any": 23,  # three the selections in range, two the methods present, one the
+        "ndarray.any": 24,  # three the selections in range, two the methods present, one the
+        # payment instruction's look at the sheet's calendar, since #181, one the
         # basis, two each component's end on or after its start and in one month, three the
         # periods' since #172
-        "ndarray.argsort": 12,  # two per distinct read, the texts and their first rows, five reads
+        "ndarray.argsort": 13,  # two per distinct read, the texts and their first rows, five reads,
+        # and the rule-and-calendar groups' unique, since #181
         "ndarray.astype": 17,  # the month bounds four, the one-month look two, the days one, the
         # three row fields' positions among their distinct texts, the dated rows' months four
         "ndarray.clip": 1,
-        "ndarray.cumsum": 11,  # one per distinct read within numpy's unique, five, two more, and
+        "ndarray.cumsum": 12,  # one per distinct read within numpy's unique, five, two more, the
+        # rule-and-calendar groups' since #181, and
         # the four ranks of the rows since #172
-        "ndarray.flatten": 7,  # one per unique, the five reads and the methods present, one more
+        "ndarray.flatten": 8,  # one per unique, the five reads and the methods present, one more,
+        # and the rule-and-calendar groups' since #181
         "ndarray.max": 1,
         "ndarray.min": 1,
         "ndarray.nonzero": 4,  # the first look at the missing months, the components of each
         # method, the dated rows and the coded rows
         "ndarray.ravel": 4,
         "ndarray.repeat": 1,
-        "ndarray.reshape": 7,
+        "ndarray.reshape": 8,  # one more within the groups' unique, since #181
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
-        "ndarray.setflags": 17,  # the kernel's thirteen copies, the three selections among them,
+        "ndarray.setflags": 16,  # the kernel's twelve copies, the three selections among them, the
+        # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
         "ndarray.sort": 1,  # the methods present, numpy's unique over the components' codes
         "numpy._unique_hash": 1,  # numpy's own look within that unique
-        "numpy.array": 26,  # the four distinct reads' texts and their values, the coded rows' texts
+        "numpy.array": 24,  # the four distinct reads' texts and three of their values, the rules
+        # kept as text since #181, the coded rows' texts
         # and their spans, the three selections copied into the kernel's record, two of them the
         # dates copied, the mask of the rows that entered a code
-        "numpy.asanyarray": 19,
+        "numpy.asanyarray": 21,  # two more within the groups' unique, since #181
+        "numpy.asarray": 1,  # the stray days' NaT fill, read for its type, since #181
         "numpy.arange": 4,  # one of them the components counted off for the anchor search; the
         # lastday days take their components from the methods' positions, not a count
-        "numpy.empty": 21,  # among them each row's first month and the month after its last, and
-        # the two dates' empty values
+        "numpy.empty": 27,  # among them each row's first month and the month after its last, the
+        # two dates' empty values, and since #181 the payment days, the stray instruction and the
+        # stray day of the shift and of the resolution, and the groups' unique
         "numpy.fromiter": 1,
         "numpy.normalize_axis_index": 1,
         "numpy.zeros": 2,  # the two dates supplied by no row
-        "ufunc.reduce": 26,  # one per look
+        "ufunc.reduce": 27,  # one per look
     }
 
 
@@ -316,7 +331,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
 # does, two conversions of its month and one look; the asian method, which takes a part of a
 # month, has no such look.
 WHOLE_MONTHS = {"_whole_months": 1}
-WHOLE_MONTHS_NUMPY = {"ndarray.any": 24, "ndarray.astype": 20, "ufunc.reduce": 27}
+WHOLE_MONTHS_NUMPY = {"ndarray.any": 25, "ndarray.astype": 20, "ufunc.reduce": 28}
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -352,6 +367,8 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
         terms.payment.date, np.busday_offset(observations.date, 2, holidays=HOLIDAYS)
     )
     assert counter.freeze().as_dict() == {
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -367,8 +384,8 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
     assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 25,  # and whether any expiry is closed
-        "ufunc.reduce": 28,
+        "ndarray.any": 26,  # and whether any expiry is closed
+        "ufunc.reduce": 29,
     }
 
 
@@ -396,6 +413,8 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
         terms.payment.date, np.busday_offset(expiries, 2, holidays=HOLIDAYS)
     )
     assert counter.freeze().as_dict() == {
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -411,11 +430,11 @@ def test_the_last3day_method_gives_three_days_per_component_and_one_payment_afte
     assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 25,  # and whether any expiry is closed
+        "ndarray.any": 26,  # and whether any expiry is closed
         "ndarray.repeat": 2,  # each component three times, for its three observations
         "ndarray.ravel": 5,  # the three days of each component laid out in one column
-        "numpy.asarray": 1,  # the three offsets, taken as an array by the business-day offset
-        "ufunc.reduce": 28,
+        "numpy.asarray": 2,  # the three offsets as an array for the offset, and the NaT fill
+        "ufunc.reduce": 29,
     }
 
 
@@ -450,6 +469,8 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
         terms.payment.date, np.busday_offset(MONTH_ENDS[terms.contract], 2, holidays=HOLIDAYS)
     )
     assert counter.freeze().as_dict() == {
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -461,13 +482,13 @@ def test_the_asian_method_gives_a_month_of_days_per_component_and_one_payment_af
     }
     assert numpy_calls(lambda: resolved(ASIAN_GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
-        "ndarray.any": 24,  # whether any component has no pricing day
-        "ndarray.cumsum": 12,  # where each component's observations start
+        "ndarray.any": 25,  # whether any component has no pricing day
+        "ndarray.cumsum": 13,  # where each component's observations start
         "ndarray.repeat": 5,  # the components, their starts, their first days and their weights
         "ndarray.sum": 1,  # how many observations in all
         "numpy.arange": 5,  # the place of each observation within its component
-        "numpy.empty": 20,  # one fewer: no array of ones for the weights
-        "ufunc.reduce": 28,
+        "numpy.empty": 26,  # one fewer: no array of ones for the weights
+        "ufunc.reduce": 29,
     }
 
 
@@ -573,7 +594,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_publish": 1,
     }
-    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 9}
+    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 11}
     assert call_profile(call) == expected
 
 
@@ -626,7 +647,8 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "schedule_method_of": 1,
         "quantity_per_of": 1,
         "choice": 4,
-        "business_days_of": 1,
+        "payment_rule_of": 1,  # the rule read whole, since #181
+        "read_offset": 1,
         "_publish": 1,
     }
 
@@ -653,10 +675,10 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
     assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 25,  # and whether any product would outrun the largest number
-        "ndarray.setflags": 18,  # the product frozen
+        "ndarray.any": 26,  # and whether any product would outrun the largest number
+        "ndarray.setflags": 17,  # the product frozen
         "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
-        "ufunc.reduce": 28,
+        "ufunc.reduce": 29,
     }
 
 
@@ -722,7 +744,7 @@ def dated_numpy(contracts: int) -> dict[str, int]:
     del numpy["generic.astype"]
     return {
         **numpy,
-        "numpy.empty": 20,  # the codes' empty values, no dates' empty values
+        "numpy.empty": 26,  # the codes' empty values, no dates' empty values
         "numpy.zeros": 1,
     }
 
@@ -777,13 +799,13 @@ def test_a_part_of_each_month_under_asian_observes_its_own_days_and_nothing_per_
     }
     assert numpy_calls(lambda: resolved(ASIAN_GAS, ticket, template, WorkCounter())) == {
         **dated_numpy(contracts),
-        "ndarray.any": 24,  # and whether any component has no pricing day
-        "ndarray.cumsum": 12,  # where each component's observations start
+        "ndarray.any": 25,  # and whether any component has no pricing day
+        "ndarray.cumsum": 13,  # where each component's observations start
         "ndarray.repeat": 5,  # the components, their starts, their first days and their weights
         "ndarray.sum": 1,  # how many observations in all
         "numpy.arange": 5,  # the place of each observation within its component
-        "numpy.empty": 19,  # no array of ones for the weights
-        "ufunc.reduce": 28,
+        "numpy.empty": 25,  # no array of ones for the weights
+        "ufunc.reduce": 29,
     }
 
 
@@ -876,6 +898,8 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
     counter = WorkCounter()
     terms, observations, _ = resolved(MIXED_GAS, ticket, template, counter)
     assert counter.freeze().as_dict() == {
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -899,7 +923,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "quantity_per_of": 2,  # two distinct bases
         "choice": 8,  # the methods, the bases, the route and the settlement
         "_Fields.where": contracts + 11,  # five more distinct texts named
-        "_each_distinct.<locals>.<lambda>": 9,  # likewise
+        "_each_distinct.<locals>.<lambda>": 8,  # likewise
         "_Fields.rows": 7,  # three fewer: the ticket's three columns, no template value repeated
         "FieldValues.has": 15,  # three columns more looked for
         "FieldValues.texts": 4,  # and read
@@ -910,20 +934,20 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
     assert numpy_calls(lambda: resolved(MIXED_GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 27,  # the open expiries, the asian pricing days and the calday products
+        "ndarray.any": 28,  # the open expiries, the asian pricing days and the calday products
         "ndarray.astype": 21,  # the observations' days as counts, to put them back in order
-        "ndarray.cumsum": 12,  # where each asian component's observations start
+        "ndarray.cumsum": 13,  # where each asian component's observations start
         "ndarray.nonzero": 7,  # the components of each of the four methods
         "ndarray.ravel": 8,  # the same, and the last3day days laid out in one column
         "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-        "ndarray.setflags": 18,  # the calday products frozen
+        "ndarray.setflags": 17,  # the calday products frozen
         "ndarray.sum": 1,  # how many asian observations in all
         "numpy._make_extobj": 1,  # the error state set once for the calday products
         "numpy.arange": 5,  # the place of each asian observation within its component
-        "numpy.asanyarray": 22,
-        "numpy.asarray": 1,  # the three last3day offsets taken as an array
-        "numpy.empty": 23,
-        "ufunc.reduce": 31,
+        "numpy.asanyarray": 24,
+        "numpy.asarray": 2,  # the three last3day offsets taken as an array, the NaT fill
+        "numpy.empty": 29,
+        "ufunc.reduce": 32,
     }
 
 
@@ -964,12 +988,12 @@ IFERC_RESOLUTION_NUMPY = {
     for name, count in {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 23,
+        "ndarray.any": 24,
         "ndarray.all": 2,
         "ndarray.nonzero": 3,
         "ndarray.ravel": 3,
-        "ndarray.flatten": 6,
-        "numpy.asanyarray": 16,
+        "ndarray.flatten": 7,
+        "numpy.asanyarray": 18,
     }.items()
     if name not in ("ndarray.sort", "ndarray.searchsorted", "numpy._unique_hash")
 }
@@ -990,6 +1014,8 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
         np.busday_offset(IFERC_LAST_TRADING[terms.contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -1031,6 +1057,8 @@ def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
         "encoded_groups": contracts,
         "encoded_observations": rows,
         "encoded_slots": contracts,
+        "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
+        "payment_shifts": 1,
         "reserved_components": rows,
         "reserved_occurrences": rows,  # the rows' amounts summed once each, since #175
         "resolved_components": rows,

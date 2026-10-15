@@ -124,7 +124,7 @@ def bilateral_terms(components: int, contracts: int, method: ScheduleMethod) -> 
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0), *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(
-            np.full(components, 2),
+            ("+2bd",) * components,
             (PAYMENT_CALENDAR,) * components,
             (ASIAN_PAYS if asian else PAYS)[rows],
         ),

@@ -15,15 +15,10 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells, Handle, register
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.template import (
-    MOST_BUSINESS_DAYS,
-    SHEET_FIRST_DAY,
-    SHEET_LAST_DAY,
-    TradeTemplate,
-    trade_template,
-)
+from goosedove.trades.template import TradeTemplate, trade_template
 
 ENTRY = {
     name: bridge.entry(name)
@@ -165,20 +160,24 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
             "settlement_method is 'cash', expected physical or financial",
         ),
         ({"quantity_per": "day"}, "quantity_per is 'day', expected month or calday"),
-        (
-            {"payment_time_lag": "+0bd"},
-            "payment_time_lag is '+0bd', expected a positive whole number of business days, "
-            "such as +1bd",
-        ),
-        (
+        (  # since #181 the utility's grammar, one or more instructions, read whole
             {"payment_time_lag": "2bd"},
-            "payment_time_lag is '2bd', expected a positive whole number of business days, "
-            "such as +1bd",
+            "payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd "
+            "or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd",
         ),
         (
-            {"payment_time_lag": "+01bd"},
-            "payment_time_lag is '+01bd', expected a positive whole number of business days, "
-            "such as +1bd",
+            {"payment_time_lag": "+1bd+2xd"},
+            "payment_time_lag is '+1bd+2xd', expected one or more of a sign, a whole count and "
+            "bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, "
+            "'+2xd' begins "
+            "with no instruction",
+        ),
+        (
+            {"payment_time_lag": "+1bd "},
+            "payment_time_lag is '+1bd ', expected one or more of a sign, a whole count and bd, "
+            "cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, ' ' "
+            "begins with no "
+            "instruction",
         ),
         (
             {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
@@ -202,13 +201,13 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
         (
             {"payment_time_lag": LONG_LAG},
-            f"payment_time_lag is {LONG_LAG!r}, expected at most 2,113,146 business days, "
-            "the sheet's calendar from 1900-03-01 to 9999-12-31 end to end",
+            "payment_time_lag has a count of 4301 digits, expected at most 7; the sheet's "
+            "calendar runs 1900-03-01 to 9999-12-31",
         ),
         (
             {"payment_time_lag": "+99999999999999999999bd"},
-            "payment_time_lag is '+99999999999999999999bd', expected at most 2,113,1"
-            "46 business days, the sheet's calendar from 1900-03-01 to 9999-12-31 end to end",
+            "payment_time_lag has a count of 20 digits, expected at most 7; the sheet's calendar "
+            "runs 1900-03-01 to 9999-12-31",
         ),
     ],
 )
@@ -224,7 +223,6 @@ def test_a_value_against_its_fields_own_rule_is_refused_naming_the_field(
 def test_the_sheets_calendar_the_lag_is_held_to_is_the_seams() -> None:
     assert bridge.EXCEL_EPOCH + np.timedelta64(bridge.FIRST_SERIAL, "D") == SHEET_FIRST_DAY
     assert bridge.EXCEL_EPOCH + np.timedelta64(bridge.LAST_SERIAL, "D") == SHEET_LAST_DAY
-    assert MOST_BUSINESS_DAYS == 2_113_146
 
 
 def test_the_builder_takes_one_row_of_field_values() -> None:
@@ -332,3 +330,12 @@ def test_a_contract_code_is_text_here_and_read_for_its_months_when_a_row_books_b
         "end_date": np.datetime64("2026-12-31"),
     }
     assert a_template(contract_code="Z27-F27").defaults["contract_code"] == "Z27-F27"
+
+
+# Since #181 the template reads a payment rule as the date utility reads an offset: a zero, leading
+# zeros, either case and a chain are rules, kept as written; the day each makes is the batch's to
+# check, against the sheet's calendar and after the last observation.
+def test_a_payment_rule_in_any_of_the_grammars_forms_is_a_template() -> None:
+    for rule in ("+0bd", "+01bd", "+2BD", "+3em+25cd-1bd+1bd", "-1BD+1bd", "+0em+0cd+0bd"):
+        made = ENTRY["_CreateTradeTemplate"]("fixed_float", row("payment_time_lag"), row(rule))
+        assert ":trade_template:" in str(made), (rule, made)

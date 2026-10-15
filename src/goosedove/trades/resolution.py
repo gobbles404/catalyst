@@ -8,8 +8,8 @@ schedule read for its month once, each row's period chosen row by row since #172
 when both are supplied and its contract code otherwise, the code resolved by month to the
 schedule's rows or the dates split at month ends, every component
 with the days it covers, its method's observations made once over those days, and for a
-financial settlement each component's payment day counted strictly after its last observation day
-on the payment calendar. Then the kernel:
+financial settlement each component's payment day, its rule applied to its last observation day
+instruction by instruction on the payment calendar, since #181. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -24,12 +24,13 @@ from numpy.typing import NDArray
 
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.contract_codes import month_and_year
+from goosedove.index_definitions.date_offsets import shift_days
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
-from goosedove.index_definitions.sheet_days import SHEET_LAST_DAY
+from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT, FieldType
 from goosedove.instruments.fields import FieldValues
@@ -37,8 +38,8 @@ from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.observations import Observations, observed
 from goosedove.trades.template import (
     TradeTemplate,
-    business_days_of,
     months_of,
+    payment_rule_of,
     quantity_per_of,
     route_of,
     schedule_method_of,
@@ -61,6 +62,9 @@ from goosedove.trades.terms import (
 
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
 RESOLVED_COMPONENTS = "resolved_components"  # contract months resolved to schedule rows
+PAYMENT_RULES_READ = "payment_rules_read"  # distinct payment rules read, since #181
+PAYMENT_SHIFTS = "payment_shifts"  # instructions applied, each over one rule's components
+# on one calendar, since #181
 SCHEDULE_CODES_READ = "schedule_codes_read"  # codes of the index's schedule read for their month
 # Distinct codes of the rows that book by code, read for their months, since #172: a row that
 # books by its dates has its code, if any, read for nothing and counted here for nothing.
@@ -227,12 +231,12 @@ def resolved(
     match schedule:
         case FuturesSchedule():
             payment = _the_payment_terms(
-                settlement, fields, _last_days(observations, occurrence.size), occurrence
+                settlement, fields, _last_days(observations, occurrence.size), occurrence, counter
             )
         case IfercSchedule():
             # Since #167: the month's last trading day, the exchange's; the index prints later.
             payment = _the_payment_terms(
-                settlement, fields, schedule.last_trading_date[contract], occurrence
+                settlement, fields, schedule.last_trading_date[contract], occurrence, counter
             )
         case _:
             assert_never(schedule)
@@ -687,48 +691,73 @@ def _the_payment_terms(
     fields: _Fields,
     anchors: NDArray[np.datetime64],
     occurrence: NDArray[np.intp],
+    counter: WorkCounter,
 ) -> PaymentTerms | None:
-    """For a financial settlement, the payment terms: each occurrence's lag in business days and
-    its payment calendar, retained, and each component's payment day, the lag counted strictly
-    after its anchor, on a futures index its last observation day, the one day under lastday and
-    penultimate, the third under last3day and the month's last pricing day under asian, and on
-    an IFERC index since #167 its month's last trading day, the exchange's, the index printing
-    later, on that calendar,
-    Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
-    on or before it first, so that a day the calendar closes is not itself counted; one busday
-    offset over the components on each distinct calendar. Each day made is on or before the
-    sheet's last day, 31 December 9999, since a later one could reach no cell: the first
-    component paying past it is refused naming its lag, with the row when the ticket gave it,
-    the anchor it was counted from and the day it reached, representability and no term of
-    business. None for a physical settlement."""
+    """For a financial settlement, the payment terms: each occurrence's payment rule as written and
+    its payment calendar, retained, and each component's payment day, the rule applied to its
+    anchor instruction by instruction, since #181: on a futures index its last observation day, the
+    one day under lastday and penultimate, the third under last3day and the month's last pricing
+    day under asian, and on an IFERC index since #167 its month's last trading day, the exchange's,
+    the index printing later; business days on that calendar, Monday to Friday less its holidays,
+    the anchor rolled back to the last eligible day on or before it first, so that a day the
+    calendar closes is not itself counted, calendar days and month ends whatever the calendar.
+    Each distinct rule is read once, `payment_rule_of`, and applied once per calendar it is paid
+    on, to every component of that rule and calendar at once, `shift_days`. Each day an
+    instruction makes lies within the sheet's calendar, 1 March 1900 to 31 December 9999, since
+    one outside could reach no cell: the first component, in ticket order, whose rule leaves it is
+    refused naming its rule, with the row when the ticket gave it, the anchor, the day reached and
+    the instruction that reached it when the rule has more than one, representability and no term
+    of business; the kernel then holds every final day after its group's last observation. None
+    for a physical settlement.
+
+    Work: `payment_rules_read`, the distinct rules; `payment_shifts`, the instructions applied,
+    each over one rule's components on one calendar."""
     match settlement:
         case Settlement.PHYSICAL:
             return None
         case Settlement.FINANCIAL:
-            lags, by_lag = _each_distinct(fields, "payment_time_lag", business_days_of)
-            lag_days = np.array(lags, dtype=np.int64)[by_lag]
-            lag = lag_days[occurrence]
+            texts = fields.texts("payment_time_lag")
+            rules, by_rule = _distinct_texts(
+                np.array(texts),
+                None,
+                lambda i: fields.where("payment_time_lag", i),
+                payment_rule_of,
+            )
             calendars = cast(
                 tuple[HolidayCalendar, ...], fields.objects("payment_holiday_calendar")
             )
             ids = np.fromiter(map(id, calendars), dtype=np.int64, count=len(calendars))
             _, first_rows, inverse = np.unique(ids, return_index=True, return_inverse=True)
+            # One group per rule and calendar paid together, numbered rule-major, so the groups
+            # come in the order of the rules' first rows and then of the calendars'.
+            key = (by_rule * first_rows.size + inverse)[occurrence]
+            groups, group_of = np.unique(key, return_inverse=True)
             pays = np.empty(anchors.size, dtype="datetime64[D]")
-            for g, row in enumerate(first_rows):
-                on = inverse[occurrence] == g
-                pays[on] = np.busday_offset(
-                    anchors[on], lag[on], roll="backward", holidays=calendars[int(row)].holiday
-                )
-            late = pays > SHEET_LAST_DAY
-            if late.any():
-                k = int(late.argmax())  # the first component paying past the sheet's last day
+            strayed_at = np.full(anchors.size, -1, dtype=np.intp)
+            strayed_to = np.empty(anchors.size, dtype="datetime64[D]")
+            shifts = 0
+            for g, group in enumerate(groups):
+                on = group_of == g
+                r, c = divmod(int(group), first_rows.size)
+                shifted = shift_days(anchors[on], rules[r], calendars[int(first_rows[c])])
+                pays[on] = shifted.days
+                strayed_at[on] = shifted.strayed_at
+                strayed_to[on] = shifted.strayed_to
+                shifts += len(rules[r])
+            counter.hit(PAYMENT_RULES_READ, len(rules))
+            counter.hit(PAYMENT_SHIFTS, shifts)
+            strayed = strayed_at >= 0
+            if strayed.any():
+                k = int(strayed.argmax())  # the first component, in ticket order, whose rule strays
                 row = int(occurrence[k])
+                rule = rules[int(by_rule[row])]
+                step = int(strayed_at[k])
+                named = "" if len(rule) == 1 else f" at instruction {step + 1}, {rule[step].text!r}"
                 raise ValueError(
-                    f"{fields.where('payment_time_lag', row)} is "
-                    f"{fields.texts('payment_time_lag')[row]!r}, counted from {anchors[k]} to "
-                    f"{pays[k]}, expected a payment day on or before {SHEET_LAST_DAY}, the last a "
-                    "sheet can show"
+                    f"{fields.where('payment_time_lag', row)} is {texts[row]!r}, counted from "
+                    f"{anchors[k]} to {strayed_to[k]}{named}, expected a payment day within the "
+                    f"sheet's calendar, {SHEET_FIRST_DAY} to {SHEET_LAST_DAY}"
                 )
-            return PaymentTerms(lag_days, calendars, pays)
+            return PaymentTerms(texts, calendars, pays)
         case _:
             assert_never(settlement)

@@ -535,26 +535,29 @@ def test_the_date_helpers_make_one_day_at_most_and_publish_nothing() -> None:
     assert bridge.live_handles() == live
 
 
-# A shifted date makes one day, by one numpy offset or two conversions, then pays the seam's way
-# out for a date: within twice the slack for one business day and for two million, for the sheet's
-# calendar of days end to end and for ninety thousand month ends alike, since nothing is made per
-# day shifted; nothing is published.
+# A shifted date makes one day, by one numpy offset or two conversions per instruction, beside
+# the one-day array in and the two small arrays that would name a stray instruction, since #181,
+# then pays the seam's way out for a date: within three slacks for one business day and for two
+# million, for the sheet's calendar of days end to end and for ninety thousand month ends alike,
+# since nothing is made per day shifted, measured 2026-10-12 at 2,264, 2,292, 2,088 and 2,116
+# bytes; the requested chain of four instructions 3,270, within four; nothing is published.
 @pytest.mark.parametrize(
-    ("date", "offset"),
+    ("date", "offset", "slacks"),
     [
-        (46304.0, "+1bd"),
-        (46304.0, "+2000000bd"),
-        (61.0, "+2958404cd"),
-        (46304.0, "-7cd"),
-        (46304.0, "+0em"),
-        (46304.0, "+90000em"),
+        (46304.0, "+1bd", 3),
+        (46304.0, "+2000000bd", 3),
+        (61.0, "+2958404cd", 3),
+        (46304.0, "-7cd", 3),
+        (46304.0, "+0em", 3),
+        (46304.0, "+90000em", 3),
+        (46246.0, "+3em+25cd-1bd+1bd", 4),
     ],
 )
 def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
-    date: float, offset: str
+    date: float, offset: str, slacks: int
 ) -> None:
     live = bridge.live_handles()
-    assert least_peak(lambda: ENTRY["util_ShiftDate"](date, offset, MISSING)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY["util_ShiftDate"](date, offset, MISSING)) <= slacks * SLACK
     assert bridge.live_handles() == live
 
 

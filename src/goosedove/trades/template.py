@@ -2,8 +2,8 @@
 template's row and taken, last and required, by every batch of trades whose ticket supplies the
 rest. The template retains the definition, the fields its row named and its own values and no
 index, so one template serves every compatible index. It reads each value it holds for the rule
-intrinsic to its field, a code from its list, a lag of positive business days within the sheet's
-calendar, a whole quantity, zero included, a finite price, and leaves the rules that need the
+intrinsic to its field, a code from its list, a payment rule of one or more date instructions
+read whole, a whole quantity, zero included, a finite price, and leaves the rules that need the
 ticket or the index, which fields are required, whether the two overlap, the schedule, whether a
 contract code is the period of any row, to the resolution of a batch: since #172 a template's
 contract_code is text the seam typed and nothing more until a row without dates uses it, and a
@@ -12,7 +12,6 @@ row takes a value from it. Those readers live here, since resolution reads the t
 by the same rules, and the two numeric ones are the kernel's own.
 docs/library/trades/trade-template.md is the page."""
 
-import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -21,8 +20,8 @@ from typing import Final, assert_never
 
 import numpy as np
 
+from goosedove.index_definitions.date_offsets import Instruction, read_offset
 from goosedove.index_definitions.periods import period_months
-from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instruments.definitions import FieldType, Instrument
 from goosedove.instruments.fields import FieldValues, selected
 from goosedove.trades.terms import (
@@ -134,38 +133,15 @@ def quantity_per_of(where: str, text: str) -> QuantityPer:
     return choice(where, text, QuantityPer, "month or calday")
 
 
-_LAG: Final = re.compile(r"\+([1-9]\d*)bd")
-
-# The business days from the sheet's first day to its last, Monday to Friday: the most a lag can
-# count between two days a sheet can show, since a holiday calendar only lowers the count. A
-# payment day outside the sheet's calendar could never reach a cell, so a lag is held to it
-# here, where the lag is read, and the day it makes is held to it where the day is made.
-MOST_BUSINESS_DAYS: Final = int(np.busday_count(SHEET_FIRST_DAY, SHEET_LAST_DAY))
-
-
-def business_days_of(where: str, text: str) -> int:
-    """The positive whole number of business days a payment lag states, `+1bd` or `+2bd`: counted
-    strictly after the anchor by the resolution, so zero, which would need a rule for a closed
-    anchor, is refused with every other spelling; and at most the business days of the sheet's
-    calendar end to end, since a longer lag could pay on no day a cell can show, and a longer
-    number still would fail unnamed, in the day arithmetic or, past 4,300 digits, in Python's
-    own conversion. The day itself is checked where it is made, against the calendar it is
-    counted on."""
-    found = _LAG.fullmatch(text)
-    if found is None:
-        raise ValueError(
-            f"{where} is {text!r}, expected a positive whole number of business days, such as +1bd"
-        )
-    digits = found.group(1)
-    # Counted before any is converted: a cell holds up to 32,767 characters and Python refuses
-    # to convert more than 4,300 digits with words of its own, so a lag with more digits than
-    # the bound has is refused here by name, and only a shorter one is read as a number.
-    if len(digits) > len(str(MOST_BUSINESS_DAYS)) or int(digits) > MOST_BUSINESS_DAYS:
-        raise ValueError(
-            f"{where} is {text!r}, expected at most {MOST_BUSINESS_DAYS:,} business days, "
-            f"the sheet's calendar from {SHEET_FIRST_DAY} to {SHEET_LAST_DAY} end to end"
-        )
-    return int(digits)
+def payment_rule_of(where: str, text: str) -> tuple[Instruction, ...]:
+    """The instructions of a payment rule, `+1bd`, `+3cd`, `+0em` or a chain such as
+    `+3em+25cd-1bd+1bd`, read whole before any is applied, as the date utility reads an offset and
+    in its words, since #181: one or more of a sign, a whole count of at most seven significant
+    digits and bd, cd or em in either case, nothing between or after. Zero and negative counts are
+    steps like any other; the day the rule makes is held to the sheet's calendar where it is made
+    and after each component's last observation by the kernel, so a rule that pays on or before
+    the final price is refused there, not here."""
+    return read_offset(where, text)
 
 
 def quantity_of(where: str, number: float) -> float:
@@ -217,7 +193,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "route": route_of,
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
-        "payment_time_lag": business_days_of,
+        "payment_time_lag": payment_rule_of,
     }
 )
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(

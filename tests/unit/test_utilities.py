@@ -950,19 +950,41 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
         ("9999-12-31", "+0em", MISSING, "9999-12-31"),
     ):
         assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
+    # Since #181 a chain, compound-date-offsets.md: the requested chain from 12 August 2026 on a
+    # calendar closing Christmas Day, 28 December, and 25 December without it; the order the rule.
+    christmas = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[serial("2026-12-25")]])])
+    for date, offset, calendar, expected in (
+        ("2026-08-12", "+3em+25cd-1bd+1bd", christmas, "2026-12-28"),
+        ("2026-08-12", "+003EM+025cD-01BD+001bd", christmas, "2026-12-28"),
+        ("2026-08-12", "+3em+25cd-1bd+1bd", MISSING, "2026-12-25"),
+        ("2026-10-10", "-1bd+1bd", MISSING, "2026-10-12"),
+        ("2026-01-30", "+1cd+0em", MISSING, "2026-01-31"),
+        ("2026-01-30", "+0em+1cd", MISSING, "2026-02-01"),
+    ):
+        assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
     shifted = bridge.call("util_ShiftDate", [serial("2026-10-09"), "+1bd", MISSING])
     assert isinstance(shifted, float)
-    assert bridge.live_handles()[0] == live[0] + 1  # the calendar, and nothing of the shifts
+    assert bridge.live_handles()[0] == live[0] + 2  # the calendars, and nothing of the shifts
 
 
 # The library's words through the seam: an instruction that is no offset, a result past the
 # sheet's calendar, and a count of too many digits, named by its digits and not echoed.
 def test_a_shift_the_library_refuses_is_refused_in_its_words_through_the_seam() -> None:
-    for offset in ("1bd", "+1.5bd", "+1wd", "+1bd+2cd", " +1bd"):
+    for offset in ("1bd", "+1.5bd", "+1wd", " +1bd"):
         assert bridge.call("util_ShiftDate", [serial("2026-10-09"), offset, MISSING]) == (
-            f"#ERROR util_ShiftDate: ValueError: offset is {offset!r}, expected a sign, a whole "
-            "count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em"
+            f"#ERROR util_ShiftDate: ValueError: offset is {offset!r}, expected one or more of a "
+            "sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or "
+            "+3em+25cd-1bd+1bd"
         )
+    assert bridge.call("util_ShiftDate", [serial("2026-10-09"), "+1bd+2xd", MISSING]) == (
+        "#ERROR util_ShiftDate: ValueError: offset is '+1bd+2xd', expected one or more of a "
+        "sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or "
+        "+3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction"
+    )
+    assert bridge.call("util_ShiftDate", [serial("9999-12-31"), "+1cd-1cd", MISSING]) == (
+        "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd-1cd' is 10000-01-01 "
+        "at instruction 1, '+1cd', outside the sheet's calendar, 1900-03-01 to 9999-12-31"
+    )
     assert bridge.call("util_ShiftDate", [serial("9999-12-31"), "+1cd", MISSING]) == (
         "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, "
         "outside the sheet's calendar, 1900-03-01 to 9999-12-31"
