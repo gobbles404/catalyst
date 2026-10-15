@@ -45,12 +45,14 @@ FIELDS = tuple([field.name for field in FUTURE.fields])
 # --- the definitions ------------------------------------------------------------------------
 
 
-def test_the_catalog_holds_the_future_with_its_fourteen_fields_in_order() -> None:
+def test_the_catalog_holds_the_future_with_its_sixteen_fields_in_order() -> None:
     assert [each.name for each in CATALOG] == ["future"]
     assert FIELDS == (
         "trade_id",
         "trade_date",
         "contract_code",
+        "start_date",
+        "end_date",
         "schedule_method",
         "route",
         "settlement_method",
@@ -66,7 +68,6 @@ def test_the_catalog_holds_the_future_with_its_fourteen_fields_in_order() -> Non
     by_name = {field.name: field for field in FUTURE.fields}
     assert [field.name for field in FUTURE.fields if field.required] == [
         "trade_date",
-        "contract_code",
         "schedule_method",
         "route",
         "settlement_method",
@@ -76,6 +77,9 @@ def test_the_catalog_holds_the_future_with_its_fourteen_fields_in_order() -> Non
         "fixed_price",
     ]
     assert by_name["clearing_house"].required_when == "route = cleared"
+    assert by_name["contract_code"].required_when == "no start_date and end_date"
+    assert by_name["start_date"].required_when == "no contract_code"
+    assert by_name["end_date"].type is FieldType.DATE
     assert by_name["payment_time_lag"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].required_when == "settlement_method = financial"
     assert by_name["payment_holiday_calendar"].type is FieldType.HOLIDAY_CALENDAR
@@ -183,9 +187,9 @@ def test_a_one_field_definition_shows_seven_rows_and_two_columns() -> None:
 
 def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     shown = _ShowInstrument("future")
-    assert shown.shape == (7, 15)
-    assert tuple([shown.texts[i] for i in (0, 15, 30, 31, 46, 61, 76)]) == ROWS  # column one
-    assert shown.texts[:15] == ("field", *FIELDS)
+    assert shown.shape == (7, 17)
+    assert tuple([shown.texts[i] for i in (0, 17, 34, 35, 52, 69, 86)]) == ROWS  # column one
+    assert shown.texts[:17] == ("field", *FIELDS)
     required = shown.kinds[2]
     assert required[0] == TEXT_CODE and (required[1:] == BOOLEAN_CODE).all()
     np.testing.assert_array_equal(
@@ -194,7 +198,7 @@ def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     )
     other_rows = np.delete(shown.kinds, 2, axis=0)
     assert (other_rows == TEXT_CODE).all()
-    assert len(shown.texts) == 7 * 15 - 14
+    assert len(shown.texts) == 7 * 17 - 16
     assert "" not in shown.texts
 
 
@@ -207,7 +211,7 @@ def test_the_show_page_shows_the_same_cells_as_the_spill() -> None:
     shown = schema_cells(FUTURE)
     texts = iter(shown.texts)
     for r in range(7):
-        for c in range(15):
+        for c in range(17):
             kind = shown.kinds[r, c]
             if kind == TEXT_CODE:
                 cell = next(texts)
@@ -220,7 +224,7 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
     assert kinds.shape == (2, 2) and text.split("\0")[2] == "future"
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("future"))
-    assert kinds.shape == (7, 15) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert kinds.shape == (7, 17) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'"
     )

@@ -1614,3 +1614,229 @@ def test_a_calday_batch_values_as_the_month_batch_of_its_component_quantity(
         3_410.0,
         3_410.0,
     ]
+
+
+# --- explicit dates on the sheet ---------------------------------------------------------------
+# trade-periods-and-bal.md, slice C: the booked period of the page, 15 to 31 December 2026 on the
+# ethane index, 2,000 gallons a month at 0.25, asian, financial and cleared, paying two weekdays
+# after the last pricing day: 17 covered days, 12 observations a twelfth each, the fixed leg -500
+# and the payment 5 January; the fixings 0.24 on the 15th, 0.26 on the 31st and 0.28 on every
+# other December pricing day, the live projection 0.28. The dates come from the helpers,
+# util_StartDate and util_EndDate on BALZ26 with the reference date, or are typed, alike.
+
+DATE_HEADERS = ("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price")
+DECEMBER_PRICING = [
+    str(d)
+    for d in np.arange(np.datetime64("2026-11-30"), np.datetime64("2027-01-01"))
+    if np.is_busday(d, holidays=np.array(ETHANE_HOLIDAYS, dtype="datetime64[D]"))
+]
+PERIOD_SETTLES = {**{d: 0.28 for d in DECEMBER_PRICING}, "2026-12-15": 0.24, "2026-12-31": 0.26}
+PERIOD_STATES = [
+    ("2026-12-15", LIVE_QUOTES, 60, 0, 2_000),
+    ("2026-12-16", LIVE_QUOTES, 160 / 3, 0, 5_500 / 3),
+    ("2027-01-01", LATER_QUOTES, 50, 0, 0),
+    ("2027-01-05", LATER_QUOTES, 0, 50, 0),
+]
+
+
+def dated_rows(*trades: tuple[str, float, float, float]) -> Cells:
+    """Rows of the dated ticket: a label, the first and last day as serials and the quantity, each
+    at 0.25 and struck on 20 November."""
+    return rows(
+        *[
+            [label, serial("2026-11-20"), start, end, quantity, 0.25]
+            for label, start, end, quantity in trades
+        ]
+    )
+
+
+def period_state(
+    ethane: dict[str, Any],
+    trades: object,
+    as_of: str,
+    quotes: tuple[float, ...],
+    settles: dict[str, float] = PERIOD_SETTLES,
+) -> tuple[str, str, str]:
+    """One state of a dated batch: the history valued that day over the page's series from
+    30 November, the market quoting from the prompt contract on, the batch prepared and
+    evaluated."""
+    history = a_history(ethane["index"], "2026-11-30", as_of, ETHANE_HOLIDAYS, settles)
+    market = a_market(history, "ETHANE", *quotes)
+    prepared = ENTRY["_PrepareTrades"](trades, history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.fixture(scope="module")
+def booked(ethane: dict[str, Any]) -> dict[str, Any]:
+    """The page's booking two ways: the dates from the helpers on BALZ26 with 15 December as the
+    reference, and the same dates typed; and the calday twin, 2,000 a day over the 17 days."""
+    start = cast(float, ENTRY["util_StartDate"]("BALZ26", serial("2026-12-15")))
+    end = cast(float, ENTRY["util_EndDate"]("BALZ26", serial("2026-12-15")))
+    assert (start, end) == (serial("2026-12-15"), serial("2026-12-31"))
+    headers = row(*DATE_HEADERS)
+    helped = ENTRY["_CreateTrades"](
+        ethane["index"], headers, dated_rows(("P", start, end, 2_000.0)), ethane["template"]
+    )
+    typed = ENTRY["_CreateTrades"](
+        ethane["index"],
+        headers,
+        dated_rows(("P", serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
+        ethane["template"],
+    )
+    by_day = ENTRY["_CreateTrades"](
+        ethane["index"],
+        headers,
+        dated_rows(("P", serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
+        asian_template(["2027-01-01"], basis="calday"),
+    )
+    return {"headers": headers, "helped": helped, "typed": typed, "by_day": by_day}
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "delta"),
+    PERIOD_STATES,
+    ids=["15 Dec, all live", "16 Dec, one fixed", "1 Jan, all fixed, unpaid", "5 Jan, paid"],
+)
+def test_the_booked_period_values_on_the_sheet_as_the_page_says(
+    ethane: dict[str, Any],
+    booked: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, _, helped = period_state(ethane, booked["helped"], as_of, quotes)
+    _, _, typed = period_state(ethane, booked["typed"], as_of, quotes)
+    assert valued(helped) == valued(typed)
+    assert valued(helped) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+    _, _, by_day = period_state(ethane, booked["by_day"], as_of, quotes)
+    assert valued(by_day) == (
+        pytest.approx(17 * mark),
+        pytest.approx(17 * cash),
+        pytest.approx(17 * delta),
+    )
+
+
+def test_the_booked_period_reads_back_its_days_and_a_roll_moves_only_the_states(
+    ethane: dict[str, Any], booked: dict[str, Any]
+) -> None:
+    batch = spilled(ENTRY["util_ReadHandle"](booked["helped"]))
+    columns = batch[0]
+    line = batch[2]
+    names = (
+        "contract_code",
+        "quantity",
+        "quantity_per",
+        "start_date",
+        "end_date",
+        "covered_days",
+        "component_quantity",
+    )
+    assert [line[columns.index(name)] for name in names] == [
+        "Z26",
+        2_000.0,
+        "month",
+        serial("2026-12-15"),
+        serial("2026-12-31"),
+        17.0,
+        2_000.0,
+    ]
+    assert spilled(ENTRY["util_ReadHandle"](booked["typed"]))[2] == line
+    assert (
+        spilled(ENTRY["util_ReadHandle"](booked["by_day"]))[2][columns.index("component_quantity")]
+        == 34_000.0
+    )
+    history, prepared, results = period_state(ethane, booked["helped"], "2026-12-16", LIVE_QUOTES)
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))[2:]
+    assert [line[1] for line in slots] == [
+        serial(d)
+        for d in (
+            "2026-12-15",
+            "2026-12-16",
+            "2026-12-17",
+            "2026-12-18",
+            "2026-12-21",
+            "2026-12-22",
+            "2026-12-23",
+            "2026-12-24",
+            "2026-12-28",
+            "2026-12-29",
+            "2026-12-30",
+            "2026-12-31",
+        )
+    ]
+    assert [line[2] for line in slots] == [True] + [False] * 11
+    assert slots[1][4] == pytest.approx(2_000 / 12)
+    # A tick reuses the preparation over the same history; the old results stand.
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETHANE", 0.30, 0.30, 0.32))
+    assert valued(str(ticked)) == (
+        pytest.approx(2_000 / 12 * (0.24 + 11 * 0.30) - 500),
+        0.0,
+        pytest.approx(5_500 / 3),
+    )
+    assert valued(results) == (pytest.approx(160 / 3), 0.0, pytest.approx(5_500 / 3))
+    # The day rolled on: a new preparation, the same booked days, quantities and weights.
+    _, rolled, _ = period_state(ethane, booked["helped"], "2026-12-17", LIVE_QUOTES)
+    assert rolled != prepared
+    later = spilled(ENTRY["util_ReadHandle"](rolled))[2:]
+    assert [line[1] for line in later] == [line[1] for line in slots]
+    assert [line[2] for line in later] == [True, True] + [False] * 10
+    assert spilled(ENTRY["util_ReadHandle"](booked["helped"]))[2] == line
+    # A fixing before the period, changed: the value stands once prepared against the new history.
+    _, _, changed = period_state(
+        ethane, booked["helped"], "2026-12-16", LIVE_QUOTES, {**PERIOD_SETTLES, "2026-12-14": 0.50}
+    )
+    assert valued(changed) == valued(results)
+
+
+def test_two_starts_on_one_contract_share_a_batch_and_two_ends_do_not(
+    ethane: dict[str, Any], booked: dict[str, Any]
+) -> None:
+    # P from the 15th and Q from the 1st, both to the 31st: on 2 December the batch is the two
+    # singletons summed, 60 and 66 of mark, 2,000 and 2,100 of delta; reversed rows and a duplicate
+    # of P alike; a zero row adds nothing; ending on the 30th Q would pay on 4 January, refused.
+    headers = booked["headers"]
+    first, last = serial("2026-12-01"), serial("2026-12-31")
+    p = ("P", serial("2026-12-15"), last, 2_000.0)
+    q = ("Q", first, last, 2_200.0)
+    together = ENTRY["_CreateTrades"](
+        ethane["index"], headers, dated_rows(p, q), ethane["template"]
+    )
+    reversed_rows = ENTRY["_CreateTrades"](
+        ethane["index"], headers, dated_rows(q, p), ethane["template"]
+    )
+    doubled = ENTRY["_CreateTrades"](
+        ethane["index"], headers, dated_rows(p, q, p), ethane["template"]
+    )
+    with_zero = ENTRY["_CreateTrades"](
+        ethane["index"], headers, dated_rows(p, q, ("Z", first, last, 0.0)), ethane["template"]
+    )
+    _, _, both = period_state(ethane, together, "2026-12-02", LIVE_QUOTES)
+    _, _, only_p = period_state(ethane, booked["typed"], "2026-12-02", LIVE_QUOTES)
+    _, _, only_q = period_state(
+        ethane,
+        ENTRY["_CreateTrades"](ethane["index"], headers, dated_rows(q), ethane["template"]),
+        "2026-12-02",
+        LIVE_QUOTES,
+    )
+    assert valued(both) == (pytest.approx(126), 0.0, pytest.approx(4_100))
+    assert valued(only_p) == (pytest.approx(60), 0.0, pytest.approx(2_000))
+    assert valued(only_q) == (pytest.approx(66), 0.0, pytest.approx(2_100))
+    _, _, swapped = period_state(ethane, reversed_rows, "2026-12-02", LIVE_QUOTES)
+    assert valued(swapped) == valued(both)
+    _, _, twice = period_state(ethane, doubled, "2026-12-02", LIVE_QUOTES)
+    assert valued(twice) == (pytest.approx(186), 0.0, pytest.approx(6_100))
+    _, _, zeroed = period_state(ethane, with_zero, "2026-12-02", LIVE_QUOTES)
+    assert valued(zeroed) == valued(both)
+    assert str(
+        ENTRY["_CreateTrades"](
+            ethane["index"],
+            headers,
+            dated_rows(p, ("Q", first, serial("2026-12-30"), 2_200.0)),
+            ethane["template"],
+        )
+    ) == (
+        "#ERROR _CreateTrades: ValueError: Z26 pays on 2027-01-05 for trade 'P' at row 1 and on "
+        "2027-01-04 for trade 'Q' at row 2, expected one payment day per contract"
+    )

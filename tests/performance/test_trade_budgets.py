@@ -33,7 +33,7 @@ from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import covered_days, schedule_months
+from goosedove.trades.resolution import month_bounds, schedule_months
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -54,9 +54,11 @@ def dates(*texts: str) -> NDArray[np.datetime64]:
 
 
 def observed_of(terms: ResolvedTrades) -> Observations:
-    """The observations the terms' schedule method gives them, as resolution makes them, over the
-    schedule's months read once below, outside what the ledgers measure."""
-    return observed(terms.schedule_method, terms.index, terms.contract, SCHEDULE_MONTHS)
+    """The observations the terms' schedule method gives them over the days each component
+    covers, as resolution makes them."""
+    return observed(
+        terms.schedule_method, terms.index, terms.contract, terms.start_date, terms.end_date
+    )
 
 
 # A financial index of 25 monthly contracts from October 2026, each expiring on the last
@@ -123,7 +125,7 @@ def some_terms(
         np.arange(components, dtype=np.intp),
         rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
-        covered_days(SCHEDULE_MONTHS, rows),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, PAYS[rows]),
     )
@@ -274,6 +276,7 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
         "futures_schedule_of": 1,
+        "_whole_months": 1,  # each component covers its whole month, the expiry-based rule
         "observations": 1,
     }
     # The penultimate method reads the holiday calendar and looks once at the expiries; the
@@ -282,6 +285,7 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     with_expiries = {
         "observed": 1,
         "futures_schedule_of": 1,
+        "_whole_months": 1,
         "_with_expiries_priced": 1,
         "with_holiday_calendar": 1,
         "open_days": 1,
@@ -376,7 +380,7 @@ def asian_terms(components: int, contracts: int) -> ResolvedTrades:
         np.arange(components, dtype=np.intp),
         rows,
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
-        covered_days(SCHEDULE_MONTHS, rows),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
     )

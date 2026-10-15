@@ -389,11 +389,15 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("future"),1,2)'  = "trade_id"
     '=INDEX(_ShowInstrument("future"),3,2)'  = "FALSE"
     '=INDEX(_ShowInstrument("future"),3,3)'  = "TRUE"
-    '=INDEX(_ShowInstrument("future"),4,8)'  = "route = cleared"
-    '=INDEX(_ShowInstrument("future"),5,15)' = "holiday calendar handle"
-    '=INDEX(_ShowInstrument("future"),6,11)' = "the index's specification names"
+    '=INDEX(_ShowInstrument("future"),1,5)'  = "start_date"
+    '=INDEX(_ShowInstrument("future"),3,4)'  = "FALSE"
+    '=INDEX(_ShowInstrument("future"),4,4)'  = "no start_date and end_date"
+    '=INDEX(_ShowInstrument("future"),4,5)'  = "no contract_code"
+    '=INDEX(_ShowInstrument("future"),4,10)' = "route = cleared"
+    '=INDEX(_ShowInstrument("future"),5,17)' = "holiday calendar handle"
+    '=INDEX(_ShowInstrument("future"),6,13)' = "the index's specification names"
     '=ROWS(_ShowInstrument("future"))'       = "7"
-    '=COLUMNS(_ShowInstrument("future"))'    = "15"
+    '=COLUMNS(_ShowInstrument("future"))'    = "17"
     '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'future'"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
     # A row of an instrument's fields bound against the instrument named, the handle cell resolved
@@ -407,7 +411,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("future",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("future",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'future'"
-    '=EchoFieldRow("future",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_code, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar"
+    '=EchoFieldRow("future",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar"
     '=EchoFieldRow("future",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("future",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("future",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -443,10 +447,10 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW8),3,9)" = "10"
     "=INDEX(util_ReadHandle(EW8),1,10)" = "quantity_unit"
     "=INDEX(util_ReadHandle(EW8),3,10)" = "lots"
-    "=INDEX(util_ReadHandle(EW8),3,15)" = "10000"
-    "=INDEX(util_ReadHandle(EW8),3,17)" = "-700000"
+    "=INDEX(util_ReadHandle(EW8),3,17)" = "10000"
+    "=INDEX(util_ReadHandle(EW8),3,19)" = "-700000"
     "=ROWS(util_ReadHandle(EW8))"      = "5"
-    "=COLUMNS(util_ReadHandle(EW8))"   = "17"
+    "=COLUMNS(util_ReadHandle(EW8))"   = "19"
     "=INDEX(util_ReadHandle(EW13),1,13)" = "payment_date"
     "=INDEX(util_ReadHandle(EW13),3,3)"  = "q26"
     "=INDEX(util_ReadHandle(EW13),4,3)"  = "u26"
@@ -454,7 +458,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),3,13)" = "46226"
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
-    "=COLUMNS(util_ReadHandle(EW13))"    = "18"
+    "=COLUMNS(util_ReadHandle(EW13))"    = "20"
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
     '=_CreateTradeTemplate("future",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("future",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
@@ -509,9 +513,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(FG12),4,1)"  = "2"
     "=INDEX(util_ReadHandle(FG12),4,2)"  = "V0"
     "=INDEX(util_ReadHandle(FG12),4,9)"  = "0"
-    "=INDEX(util_ReadHandle(FG12),4,14)" = "0"
-    "=INDEX(util_ReadHandle(FG12),4,15)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,16)" = "0"
     "=INDEX(util_ReadHandle(FG12),4,17)" = "0"
+    "=INDEX(util_ReadHandle(FG12),4,19)" = "0"
     "=ROWS(util_ReadHandle(FG13))"       = "3"
     "=INDEX(util_ReadHandle(FG13),3,5)"  = "2000"
     "=INDEX(_ReportValues(FG14),3,1)"    = "8500"
@@ -553,7 +557,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(GP4),3,5)"   = "penultimate"
     "=INDEX(util_ReadHandle(GP4),3,13)"  = "+1bd"
     "=INDEX(util_ReadHandle(GP4),3,14)"  = "46195"
-    "=COLUMNS(util_ReadHandle(GP4))"     = "19"
+    "=COLUMNS(util_ReadHandle(GP4))"     = "21"
     "=INDEX(util_ReadHandle(GP5),3,1)"   = "n26"
     "=INDEX(util_ReadHandle(GP5),3,2)"   = "46192"
     "=INDEX(util_ReadHandle(GP5),3,3)"   = "FALSE"
@@ -610,22 +614,49 @@ $formulas = [ordered]@{
     # alone in IS14 valued on 2 December against the asian block's history and market as the
     # month batch of 3,410 gallons in IS16 values, 96.1 of mark and 3,255 of delta each; a basis
     # that is neither word refused by name.
-    "=INDEX(util_ReadHandle(IS12),1,15)" = "covered_days"
-    "=INDEX(util_ReadHandle(IS12),2,15)" = "int64"
-    "=INDEX(util_ReadHandle(IS12),1,16)" = "component_quantity"
+    "=INDEX(util_ReadHandle(IS12),1,15)" = "start_date"
+    "=INDEX(util_ReadHandle(IS12),3,15)" = "46327"
+    "=INDEX(util_ReadHandle(IS12),3,16)" = "46356"
+    "=INDEX(util_ReadHandle(IS12),4,15)" = "46357"
+    "=INDEX(util_ReadHandle(IS12),1,17)" = "covered_days"
+    "=INDEX(util_ReadHandle(IS12),2,17)" = "int64"
+    "=INDEX(util_ReadHandle(IS12),1,18)" = "component_quantity"
     "=INDEX(util_ReadHandle(IS12),3,9)"  = "100"
     "=INDEX(util_ReadHandle(IS12),3,11)" = "calday"
-    "=INDEX(util_ReadHandle(IS12),3,15)" = "30"
-    "=INDEX(util_ReadHandle(IS12),4,15)" = "31"
-    "=INDEX(util_ReadHandle(IS12),3,16)" = "3000"
-    "=INDEX(util_ReadHandle(IS12),4,16)" = "3100"
-    "=INDEX(util_ReadHandle(IS12),5,16)" = "3410"
-    "=INDEX(util_ReadHandle(IS12),5,17)" = "3410"
-    "=COLUMNS(util_ReadHandle(IS12))"    = "19"
+    "=INDEX(util_ReadHandle(IS12),3,17)" = "30"
+    "=INDEX(util_ReadHandle(IS12),4,17)" = "31"
+    "=INDEX(util_ReadHandle(IS12),3,18)" = "3000"
+    "=INDEX(util_ReadHandle(IS12),4,18)" = "3100"
+    "=INDEX(util_ReadHandle(IS12),5,18)" = "3410"
+    "=INDEX(util_ReadHandle(IS12),5,19)" = "3410"
+    "=COLUMNS(util_ReadHandle(IS12))"    = "21"
     "=INDEX(_ReportValues(IY18),3,1)"    = "96.1"
     "=INDEX(_ReportRisk(IY18),3,1)"      = "3255"
     "=INDEX(_ReportValues(IY20),3,1)"    = "96.1"
     "=INDEX(_ReportRisk(IY20),3,1)"      = "3255"
+    # Explicit dates, trade-periods-and-bal.md slice C: the ticket in IS17:IX19 books by start_date
+    # and end_date, P the balance of Z26 from 15 December through the helpers on BALZ26 and Q the
+    # whole of December through them on Z26, under the asian month template in IJ3; the batch in
+    # IS21 read back with the code the resolution bound and the days each covers, 17 and 31, and
+    # valued on 2 December against the asian block's history and market, 122 of mark, P's 60 and
+    # Q's 62 with the 1st fixed at 0.24, and 4,100 of delta, 2,000 and 2,100, over 22 slots; a
+    # part of a month under the lastday template in IJ12, both forms together and a date alone
+    # refused in the library's words.
+    "=INDEX(util_ReadHandle(IS21),3,4)"  = "Z26"
+    "=INDEX(util_ReadHandle(IS21),3,14)" = "46392"
+    "=INDEX(util_ReadHandle(IS21),3,15)" = "46371"
+    "=INDEX(util_ReadHandle(IS21),3,16)" = "46387"
+    "=INDEX(util_ReadHandle(IS21),3,17)" = "17"
+    "=INDEX(util_ReadHandle(IS21),3,18)" = "2000"
+    "=INDEX(util_ReadHandle(IS21),4,15)" = "46357"
+    "=INDEX(util_ReadHandle(IS21),4,17)" = "31"
+    "=ROWS(util_ReadHandle(IY21))"       = "24"
+    "=INDEX(_ReportValues(IY22),3,1)"    = "122"
+    "=INDEX(_ReportValues(IY22),3,2)"    = "0"
+    "=INDEX(_ReportRisk(IY22),3,1)"      = "4100"
+    "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
+    '=_CreateTrades(IA6,{"trade_date","contract_code","start_date","quantity","fixed_price"},{46345,"Z26",46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one period form, a contract_code or start_date with end_date"
+    '=_CreateTrades(IA6,{"trade_date","start_date","quantity","fixed_price"},{46345,46371,2000,0.25},IJ3)' = "#ERROR _CreateTrades: ValueError: start_date is supplied without end_date, expected both dates, the period's first and last day, or a contract_code"
     '=_CreateTradeTemplate("future",IK1,IL2)' = "#ERROR _CreateTradeTemplate: ValueError: quantity_per is 'asian', expected month or calday"
     "=_CreateTrades(IA6,IS1:IW1,IS2:IW3,IJ6)" = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' with the asian method; an asian future is cash settled on the average of its month's pricing days"
     # The market history: a creator over the calendar in CT5 and the fixings in CT6, both over
@@ -1137,6 +1168,21 @@ $cells = [ordered]@{
     "IY18" = "=_EvaluateTrades(IY17,IY14)"
     "IY19" = "=_PrepareTrades(IS16,IY8)"
     "IY20" = "=_EvaluateTrades(IY19,IY14)"
+    # Explicit dates, trade-periods-and-bal.md slice C: a lastday template over the asian fields in
+    # IJ11:IQ12; the dated ticket's headers in IS17:IX17, trade_id, trade_date, start_date,
+    # end_date, quantity and fixed_price, and two rows, P the balance of Z26 from 15 December, the
+    # two dates from util_StartDate and util_EndDate on BALZ26 with the reference date, 2,000 at
+    # 0.25, and Q the whole of December, the dates from the helpers on Z26, 2,200 at 0.25; their
+    # batch in IS21 under the asian month template in IJ3, prepared against the 2 December
+    # history in IY8 and valued against the market in IY14 in IY21:IY22.
+    "IJ11" = "GAL"; "IK11" = "month"; "IL11" = "lastday"; "IM11" = "cleared"; "IN11" = "financial"; "IO11" = "Prototype Clearing"; "IP11" = "+2bd"; "IQ11" = "=IC2"
+    "IJ12" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ11:IQ11)'
+    "IS17" = "trade_id"; "IT17" = "trade_date"; "IU17" = "start_date"; "IV17" = "end_date"; "IW17" = "quantity"; "IX17" = "fixed_price"
+    "IS18" = "P"; "IT18" = "20-Nov-2026"; "IU18" = '=util_StartDate("BALZ26",DATE(2026,12,15))'; "IV18" = '=util_EndDate("BALZ26",DATE(2026,12,15))'; "IW18" = "2000"; "IX18" = "0.25"
+    "IS19" = "Q"; "IT19" = "20-Nov-2026"; "IU19" = '=util_StartDate("Z26",DATE(2026,12,15))'; "IV19" = '=util_EndDate("Z26",DATE(2026,12,15))'; "IW19" = "2200"; "IX19" = "0.25"
+    "IS21" = "=_CreateTrades(IA6,IS17:IX17,IS18:IX19,IJ3)"
+    "IY21" = "=_PrepareTrades(IS21,IY8)"
+    "IY22" = "=_EvaluateTrades(IY21,IY14)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

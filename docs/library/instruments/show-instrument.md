@@ -41,14 +41,14 @@ recognized trade fields; the selected traded product/agreement constrains the re
 The index is not among the fields: `_CreateTrades(index, fields, trade_rows, template)` takes
 it as its first argument, once for the whole batch.
 
-| field | trade_id | trade_date | contract_code | schedule_method | route | settlement_method | clearing_house | broker | quantity | quantity_unit | quantity_per | fixed_price | payment_time_lag | payment_holiday_calendar |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| description | External label identifying the deal | Date the deal was executed | One monthly contract or a strip of monthly contracts | How observations determine the floating price | The actual trade's clearing arrangement | Descriptive final-settlement form of the actual trade | The clearing organization for this trade | The broker recorded for the deal | Signed size of the position, a count of the quantity unit | The desk's word for a quantity of the index, one of its contract specifications | Whether quantity is per month or per calendar day | The fixed price agreed when the deal was executed | Business-day offset from the payment anchor defined by the supported product | Calendar supplying holidays for payment-day counting |
-| required | FALSE | TRUE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE |
-| required_when | none | none | none | none | none | none | route = cleared | none | none | none | none | none | settlement_method = financial | settlement_method = financial |
-| type | text | date | text | code | code | code | text | text | number | text | code | number | text | holiday calendar handle |
-| options | no fixed list | no fixed list | a contract or strip, F26, 1Q27, CAL27, Z27-X28 | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list | no fixed list | a signed whole count, zero included | the index's specification names | month, calday | no fixed list | +1bd, +2bd and other positive whole business days | a _CreateHolidayCalendar handle |
-| rule | Duplicate labels keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Typed in either case and resolved by month against the index's schedule, every schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through November 2028 | A library rule selected by the trade; all four are built, asian averaging the month's pricing days | Must be supported for the traded product; bilateral valuation waits on rates | A fact of the trade; a physical future past its expiry is refused, a financial one pays on its payment day | A label kept as typed; nothing is inferred from it | Attribution; no fee or clearing role inferred from the label | A whole count of the selected quantity definition, positive, negative or zero; a zero row is kept, contributes nothing and can be filled in later | Selects the lot size and unit from the index given to _CreateTrades, exactly as named there; the template may supply it, and the index owns what it means | The quantity per contract month, or per calendar day of it, weekends and holidays included | A finite number in the index's quote units; the same for every month of a strip | Counted strictly after the component's observation day on the payment calendar, the expiry under lastday and the pen day under penultimate; +1bd for PHH | Monday to Friday less its holidays; separate from the pricing calendar |
+| field | trade_id | trade_date | contract_code | start_date | end_date | schedule_method | route | settlement_method | clearing_house | broker | quantity | quantity_unit | quantity_per | fixed_price | payment_time_lag | payment_holiday_calendar |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| description | External label identifying the deal | Date the deal was executed | One monthly contract or a strip of monthly contracts | First day of a booked period, in place of a code | Last day of a booked period, inclusive | How observations determine the floating price | The actual trade's clearing arrangement | Descriptive final-settlement form of the actual trade | The clearing organization for this trade | The broker recorded for the deal | Signed size of the position, a count of the quantity unit | The desk's word for a quantity of the index, one of its contract specifications | Whether quantity is per month or per calendar day | The fixed price agreed when the deal was executed | Business-day offset from the payment anchor defined by the supported product | Calendar supplying holidays for payment-day counting |
+| required | FALSE | TRUE | FALSE | FALSE | FALSE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | TRUE | TRUE | TRUE | FALSE | FALSE |
+| required_when | none | none | no start_date and end_date | no contract_code | no contract_code | none | none | none | route = cleared | none | none | none | none | none | settlement_method = financial | settlement_method = financial |
+| type | text | date | text | date | date | code | code | code | text | text | number | text | code | number | text | holiday calendar handle |
+| options | no fixed list | no fixed list | a contract or strip, F26, 1Q27, CAL27, Z27-X28 | no fixed list | no fixed list | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list | no fixed list | a signed whole count, zero included | the index's specification names | month, calday | no fixed list | +1bd, +2bd and other positive whole business days | a _CreateHolidayCalendar handle |
+| rule | Duplicate labels keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Typed in either case and resolved by month against the index's schedule, every schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through November 2028; or the two dates in its place | With end_date the days the deal covers, split at month ends; util_StartDate gives it from a label | On or after start_date; a part of a month prices under asian alone | A library rule selected by the trade; all four are built, asian averaging the month's pricing days | Must be supported for the traded product; bilateral valuation waits on rates | A fact of the trade; a physical future past its expiry is refused, a financial one pays on its payment day | A label kept as typed; nothing is inferred from it | Attribution; no fee or clearing role inferred from the label | A whole count of the selected quantity definition, positive, negative or zero; a zero row is kept, contributes nothing and can be filled in later | Selects the lot size and unit from the index given to _CreateTrades, exactly as named there; the template may supply it, and the index owns what it means | The quantity per contract month, or per calendar day of it, weekends and holidays included | A finite number in the index's quote units; the same for every month of a strip | Counted strictly after the component's observation day on the payment calendar, the expiry under lastday and the pen day under penultimate; +1bd for PHH | Monday to Friday less its holidays; separate from the pricing calendar |
 
 `future` is the one instrument defined: a monthly contract or strip on a futures index, built in
 #139 through #144 as [create-trades.md](../trades/create-trades.md) and
@@ -69,7 +69,12 @@ and nothing later looks the name up again.
 
 `contract_code` is one month or a monthly strip in the period grammar behind `util_StartDate`,
 `Z26`, `z26`, `CAL27`, `Z27-X28`, resolved by month against the index's schedule, every code of
-the schedule read. `schedule_method` is `lastday`, `penultimate`, `last3day` or `asian`, the four
+the schedule read. Since #161 `start_date` and `end_date` are the other period form, in place of the
+code and never beside it: the first and the last day the deal covers, split at month ends into
+components, a whole month by dates the code's own components; a part of a month prices under
+`asian` alone, and [util_StartDate](../utilities/start-date.md) and
+[util_EndDate](../utilities/end-date.md) give both days from a label, `BALZ26` with its reference
+date. `schedule_method` is `lastday`, `penultimate`, `last3day` or `asian`, the four
 built, any other word refused by name. `route` is `cleared` or `bilateral`, the bilateral route
 accepted at creation and refused at evaluation until rates exist. `settlement_method` is
 `physical`, which pays on no day and supplies no payment field, or `financial`, which requires
@@ -181,16 +186,16 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| the future's fourteen fields in order, which are required, the conditions, the types and the codes | example |
+| the future's sixteen fields in order, which are required, the conditions, the period form's three among them since #161, the types and the codes | example |
 | a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
 | the name matched exactly, `Future` and ` future` refused naming `future`, an empty catalog saying so, two instruments both named | example |
-| seven rows and fifteen columns, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
+| seven rows and seventeen columns, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
 | the page's table equals the spill, cell for cell | example against the page |
 | through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
 | every listed name is shown; a one-field definition shows seven rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 105 for the future, and the mixed way out's numpy; a peak of 11,411 bytes since #159's basis texts, kept short, about 109 a cell, within a hundred a cell and the slack; nothing published | budget |
+| twelve functions, the classification once per cell, 119 for the future, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, within 110 a cell and the slack, what a text cell costs, where a hundred a cell and the slack covered fifteen columns and would cover seventeen by 55 bytes; nothing published | budget |
 | the labels, the fields, two booleans, a condition and a type in a real Excel; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which

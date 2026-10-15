@@ -73,13 +73,32 @@ FUTURE = Instrument(
         Field(
             "contract_code",
             "One monthly contract or a strip of monthly contracts",
-            True,
-            NONE,
+            False,
+            "no start_date and end_date",
             FieldType.TEXT,
             "a contract or strip, F26, 1Q27, CAL27, Z27-X28",
             "Typed in either case and resolved by month against the index's schedule, every "
             "schedule code read; CAL27 is F27 through Z27, Z27-X28 December 2027 through "
-            "November 2028",
+            "November 2028; or the two dates in its place",
+        ),
+        Field(
+            "start_date",
+            "First day of a booked period, in place of a code",
+            False,
+            "no contract_code",
+            FieldType.DATE,
+            "no fixed list",
+            "With end_date the days the deal covers, split at month ends; util_StartDate "
+            "gives it from a label",
+        ),
+        Field(
+            "end_date",
+            "Last day of a booked period, inclusive",
+            False,
+            "no contract_code",
+            FieldType.DATE,
+            "no fixed list",
+            "On or after start_date; a part of a month prices under asian alone",
         ),
         Field(
             "schedule_method",

@@ -2109,9 +2109,9 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_ShowInstrument": 1,
         "instrument": 1,
         "schema_cells": 1,
-        "schema_cells.<locals>.<genexpr>": 105,  # seven rows of fourteen fields and the labels
+        "schema_cells.<locals>.<genexpr>": 119,  # seven rows of sixteen fields and the labels
         "MixedArray.cells": 1,
-        "_classify": 105,
+        "_classify": 119,
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }

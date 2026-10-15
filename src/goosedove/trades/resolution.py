@@ -4,9 +4,10 @@ from exactly one of the two, the required fields present and the conditional one
 their condition holds, one quantity unit, method, route, settlement and basis for the batch, in
 that order, the quantity unit naming one of the index's specifications, every code of the index's
 schedule read for its month once, each contract code or strip of the ticket resolved by month to
-the schedule's rows, each component's covered days the calendar days of its contract's month, the
-schedule method's observations made once, and for a financial settlement each component's payment
-day counted strictly after its last observation day on the payment calendar. Then the kernel:
+the schedule's rows, or each start and end date of the ticket split at month ends, every component
+with the days it covers, the schedule method's observations made once over those days, and for a
+financial settlement each component's payment day counted strictly after its last observation day
+on the payment calendar. Then the kernel:
 resolved_trades checks the first profile's rules and encoded turns the terms and the observations
 into arrays, and the batch holds both. Nothing here reads a history, a price or a valuation date.
 docs/library/trades/create-trades.md is the page."""
@@ -107,17 +108,25 @@ def resolved(
     trade has not, or a payment a physical contract never makes, would say something false. The
     index is a futures index, and every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
-    refused by row. Each contract code of the ticket is read once per distinct text, in the order
-    the sheet first shows each, so that the first row that breaks the grammar is the one named,
-    through the period grammar, in either case, for the months it spans, and each month is
-    resolved to its schedule row, a month the schedule lacks refused by the trade's row and the
-    month; a strip makes one component per month, in order, all on the one occurrence. Each
-    component covers the calendar days of its contract's month, weekends and holidays included,
-    the whole month here, what a quantity per calendar day multiplies; no calendar moves them.
+    refused by row. The batch has one period form, a contract_code or start_date with end_date,
+    from the template or the ticket as any field: both forms, either date alone and neither are
+    refused at the code's place in the definition's order. Each contract code of the ticket is
+    read once per distinct text, in the order the sheet first shows each, so that the first row
+    that breaks the grammar is the one named, through the period grammar, in either case, for
+    the months it spans; each pair of dates, an end before its start refused by row, for the
+    months from the start's to the end's; and each month is resolved to its schedule row, a
+    month the schedule lacks refused by the row and the month. A period makes one component per
+    month, in order, all on the one occurrence, each covering its month's days, weekends and
+    holidays included: the whole month from a code, and from dates the whole month too but for
+    the first and the last, which start and end on the dates given, so 12 November to
+    31 December is X26 over 12 to 30 November and Z26 over the whole of December; what a
+    quantity per calendar day multiplies, and what the schedule method prices over. No calendar
+    moves the days.
     The schedule method gives each component its observation days, the expiry under lastday, the
     business day before it under penultimate, the expiry and the two business days before it
-    under last3day, a third each, and every pricing day of its calendar month under asian, an
-    equal share each, the month the one read of the code gave. For a financial settlement, each
+    under last3day, a third each, the three refusing a component that covers a part of its
+    month, and every pricing day of the days it covers under asian, an equal share each, a
+    partial month's share of them. For a financial settlement, each
     occurrence's lag is read once per distinct text and each component pays that many business days
     strictly after its last observation day, counted on its occurrence's payment calendar with
     Monday to Friday eligible,
@@ -147,9 +156,8 @@ def resolved(
     schedule = futures_schedule_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
-    occurrence, contract = _the_contracts(fields, months)
-    covered = covered_days(months, contract)
-    observations = observed(schedule_method, index, contract, months)
+    occurrence, contract, start, end = _the_periods(fields, months)
+    observations = observed(schedule_method, index, contract, start, end)
     payment = _the_payment_terms(
         settlement, fields, _last_days(observations, occurrence.size), occurrence
     )
@@ -170,7 +178,8 @@ def resolved(
         occurrence,
         contract,
         fields.numbers("quantity")[occurrence],
-        covered,
+        start,
+        end,
         fields.numbers("fixed_price")[occurrence],
         payment,
     )
@@ -278,13 +287,42 @@ def _fields(template: TradeTemplate, ticket: FieldValues) -> _Fields:
 
 
 def _the_required(fields: _Fields) -> None:
-    """Every field the definition always requires, present in one of the two."""
+    """Every field the definition always requires, present in one of the two, in the definition's
+    order; at the contract code's place the one period form, a code or the two dates, since the
+    code was the required field before the dates could stand in for it."""
     for field in fields.template.instrument.fields:
-        if field.required and not fields.has(field.name):
+        if field.name == "contract_code":
+            _the_period_form(fields)
+        elif field.required and not fields.has(field.name):
             raise ValueError(
                 f"{field.name} is missing, expected a value in the template or a column in the "
                 "ticket"
             )
+
+
+def _the_period_form(fields: _Fields) -> None:
+    """Exactly one period form, a contract_code or start_date with end_date, from the template or
+    the ticket as any field is supplied: both forms, either date alone and neither form are
+    refused naming the field at fault, since a batch with two periods, or half of one, covers
+    nobody knows what. The dates' order is checked where they are read."""
+    code = fields.has("contract_code")
+    start, end = fields.has("start_date"), fields.has("end_date")
+    if code and (start or end):
+        raise ValueError(
+            f"contract_code is supplied with {'start_date' if start else 'end_date'}, expected "
+            "one period form, a contract_code or start_date with end_date"
+        )
+    if start != end:
+        given, other = ("start_date", "end_date") if start else ("end_date", "start_date")
+        raise ValueError(
+            f"{given} is supplied without {other}, expected both dates, the period's first and "
+            "last day, or a contract_code"
+        )
+    if not code and not start:
+        raise ValueError(
+            "contract_code is missing, expected a value in the template or a column in the "
+            "ticket, or start_date and end_date in its place"
+        )
 
 
 def _the_conditions(fields: _Fields, route: Route, settlement: Settlement) -> None:
@@ -319,9 +357,8 @@ def _the_specification(index: Index, where: str, name: str) -> int:
 def schedule_months(schedule: FuturesSchedule) -> NDArray[np.int64]:
     """The month of every code of the schedule, as numpy counts months, one read per code: a
     code that is no contract code is refused by row, and so are two rows for one month, since a
-    month resolved to two rows would name no contract. The resolution reads them once, resolves
-    the ticket's codes against them and hands them to the observations, whose asian method takes
-    each component's month from them rather than reading its code again."""
+    month resolved to two rows would name no contract. The resolution reads them once and
+    resolves the ticket's periods against them."""
     codes = schedule.codes
     months = np.empty(len(codes), dtype=np.int64)
     for i, code in enumerate(codes):
@@ -362,19 +399,61 @@ def _each_distinct[T](
     return [read_values[i] for i in range(distinct.size)], inverse.astype(np.intp)
 
 
-def _the_contracts(
+def _the_periods(
     fields: _Fields, months: NDArray[np.int64]
-) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
-    """Each occurrence's contract code read for its months and each month resolved to its
-    schedule row, in one pass over the components: the occurrence of each component and the
-    schedule row of its contract, aligned."""
-    spans, inverse = _each_distinct(fields, "contract_code", months_of)
-    bounds = np.array(spans, dtype=np.int64).reshape(-1, 2)[inverse]
-    first, after = bounds[:, 0], bounds[:, 1]
+) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.datetime64], NDArray[np.datetime64]]:
+    """Each occurrence's period resolved to its components, one per calendar month it covers, in
+    one pass over the components: the occurrence of each, the schedule row of its contract and
+    the first and the last day it covers, aligned. From a contract code, read once per distinct
+    text, every month of the code, each covered whole; from start_date and end_date, the months
+    from the start's to the end's, each covered whole but the first from the start date and the
+    last to the end date, an end before its start refused by its row. The month bounds are one
+    conversion each over the components, the clipping one maximum and one minimum, and the days
+    are the kernel's to count."""
+    if fields.has("contract_code"):
+        spans, inverse = _each_distinct(fields, "contract_code", months_of)
+        bounds = np.array(spans, dtype=np.int64).reshape(-1, 2)[inverse]
+        first, after = bounds[:, 0], bounds[:, 1]
+        dates = None
+    else:
+        starts, ends = fields.dates("start_date"), fields.dates("end_date")
+        backwards = ends < starts
+        if backwards.any():
+            i = int(backwards.argmax())
+            raise ValueError(
+                f"{fields.where('end_date', i)} is {ends[i]}, expected a day on or after "
+                f"{fields.where('start_date', i)}, {starts[i]}"
+            )
+        first = starts.astype("datetime64[M]").astype(np.int64)
+        after = ends.astype("datetime64[M]").astype(np.int64) + 1
+        dates = (starts, ends)
     count = after - first
     occurrence = np.repeat(np.arange(fields.rows, dtype=np.intp), count)
-    starts = np.cumsum(count) - count
-    month = first[occurrence] + (np.arange(occurrence.size) - starts[occurrence])
+    offsets = np.cumsum(count) - count
+    month = first[occurrence] + (np.arange(occurrence.size) - offsets[occurrence])
+    contract = _schedule_rows(fields, months, month, occurrence, dates is None)
+    month_first, month_last = month_bounds(month)
+    if dates is None:
+        return occurrence, contract, month_first, month_last
+    starts, ends = dates
+    return (
+        occurrence,
+        contract,
+        np.maximum(month_first, starts[occurrence]),
+        np.minimum(month_last, ends[occurrence]),
+    )
+
+
+def _schedule_rows(
+    fields: _Fields,
+    months: NDArray[np.int64],
+    month: NDArray[np.int64],
+    occurrence: NDArray[np.intp],
+    by_code: bool,
+) -> NDArray[np.intp]:
+    """Each component's month resolved to its schedule row, one lookup over the components; a
+    month the schedule lacks is refused by the row that covers it and the month, in the words of
+    the period form the row used."""
     low, high = int(months.min()), int(months.max())
     row_of = np.full(high - low + 1, -1, dtype=np.intp)
     row_of[months - low] = np.arange(months.size, dtype=np.intp)
@@ -384,30 +463,34 @@ def _the_contracts(
     if missing.any():
         k = int(missing.argmax())
         i = int(occurrence[k])
+        period = (
+            f"{fields.where('contract_code', i)} is {fields.texts('contract_code')[i]!r}"
+            if by_code
+            else f"{fields.where('start_date', i)} is {fields.dates('start_date')[i]} and "
+            f"{fields.where('end_date', i)} {fields.dates('end_date')[i]}"
+        )
         raise ValueError(
-            f"{fields.where('contract_code', i)} is {fields.texts('contract_code')[i]!r}, "
-            "expected months the index's schedule has a contract for; "
+            f"{period}, expected months the index's schedule has a contract for; "
             f"it has none for {_month(month[k])}"
         )
-    return occurrence, contract.astype(np.intp)
+    return contract.astype(np.intp)
+
+
+def month_bounds(
+    month: NDArray[np.int64],
+) -> tuple[NDArray[np.datetime64], NDArray[np.datetime64]]:
+    """The first and the last calendar day of each month given, as numpy counts months: the days a
+    whole-month component covers, and the bounds an explicit period's components are clipped to,
+    one conversion each way and one day subtracted."""
+    first = month.astype("datetime64[M]").astype("datetime64[D]")
+    after = (month + 1).astype("datetime64[M]").astype("datetime64[D]")
+    last = cast(NDArray[np.datetime64], after - np.timedelta64(1, "D"))  # a day, not a span
+    return first, last
 
 
 def _month(count: object) -> str:
     """A month as numpy counts them, written as the sheet reads one: 2027-04."""
     return str(np.datetime64(int(cast(Any, count)), "M"))
-
-
-def covered_days(months: NDArray[np.int64], contract: NDArray[np.intp]) -> NDArray[np.int64]:
-    """The calendar days each component covers, what a quantity per calendar day multiplies: the
-    whole of its contract's month, the first day to the last, weekends and holidays included, 31
-    for December and 28 or 29 for February, counted once over the schedule's months and gathered
-    per component. A December contract expiring in November covers December's 31 days: the days
-    are the contract's month's, not the days between expiries, and no pricing or payment calendar
-    moves them, the pricing days being the schedule method's to choose. A booked period shorter
-    than the month, slice C of the periods ticket, will clip them at its ends."""
-    first = months.astype("datetime64[M]").astype("datetime64[D]")
-    after = (months + 1).astype("datetime64[M]").astype("datetime64[D]")
-    return (after - first).astype(np.int64)[contract]
 
 
 # --- the payment days of a financial settlement ---------------------------------------------

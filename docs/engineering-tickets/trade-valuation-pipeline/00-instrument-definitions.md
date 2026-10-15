@@ -117,6 +117,8 @@ For example, a future schema could expose:
 | Trade ID | Optional nonempty label | Attribution only; duplicate labels do not merge occurrences |
 | Trade date | Date | Ticket or explicitly permitted default |
 | Contract | One month or monthly strip under the existing period grammar, in either case, `Z26` or `z26`, `CAL27` or `cal27` | Template default or ticket; every constituent month must resolve to one row of the index's schedule |
+| Start date | start_date: a date, with end_date in place of a contract | Template default or ticket; the first day the deal covers, the period split at month ends into components and each bound to its contract by month; since #161 |
+| End date | end_date: a date on or after start_date | Template default or ticket; the last day covered, inclusive; a part of a month prices under asian alone and is refused under the expiry-based methods; since #161 |
 | Schedule method | asian, lastday, penultimate, last3day | Trade selection of a library rule, combined with static reference dates/calendars; `lastday`, `penultimate`, `last3day` and `asian` are built |
 | Signed lots | Whole quantity, zero included since #146, for the initially supported listed product | Ticket; product owns the quantity convention |
 | Quantity per | month, calday | Trade quantity basis, independently of price-observation weights; `calday` the public spelling since #159, `day` never built |

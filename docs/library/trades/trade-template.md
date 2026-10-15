@@ -51,7 +51,7 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 | `quantity` | a whole count of the quantity unit, zero included since #146, a row kept ready, the kernel's own rule | `quantity is 1.5, expected a whole number` |
 | `fixed_price` | a finite number, the kernel's own rule | `fixed_price is inf, expected a finite price` |
 
-Nothing is required of a template: not `trade_date`, `contract_code`, `quantity` or `fixed_price`, which a ticket supplies, and not the payment fields of a financial settlement. The conditions, which fields are required and which present, whether the template and the ticket overlap, whether a specification is the index's, whether a code is a contract of the schedule, need the ticket and the index, and `_CreateTrades` checks them against the completed batch, so there is no second validator here anticipating every ticket. The seam owns shape, type and the reference's resolution; the library reads meaning and never parses a handle or coerces a number from text.
+Nothing is required of a template: not `trade_date`, `contract_code` or the two dates in its place, `start_date` and `end_date`, `quantity` or `fixed_price`, which a ticket supplies, and not the payment fields of a financial settlement. The conditions, which fields are required and which present, whether the template and the ticket overlap, whether a specification is the index's, whether a code is a contract of the schedule, need the ticket and the index, and `_CreateTrades` checks them against the completed batch, so there is no second validator here anticipating every ticket. The seam owns shape, type and the reference's resolution; the library reads meaning and never parses a handle or coerces a number from text.
 
 ## What it retains
 
