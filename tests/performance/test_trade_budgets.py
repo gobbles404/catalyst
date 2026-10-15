@@ -206,6 +206,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
         "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": components,  # lastday: one per component
         "encoded_slots": contracts,  # one per contract, on its expiry day
+        "reserved_components": components,
     }
 
 
@@ -336,10 +337,11 @@ ENCODING_LEDGER = {
     "_the_slots": 1,
     "_the_buckets": 1,  # the day, month and year axes, since #166
     "_payments_after_observations": 1,
+    "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,
-    "WorkCounter.hit": 4,
+    "WorkCounter.hit": 5,
 }
 
 
@@ -523,6 +525,7 @@ def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
         "encoded_groups": contracts,
         "encoded_observations": components * days,
         "encoded_slots": slots,
+        "reserved_components": components,
     }
     assert enc.slot_group.size == slots and enc.references.size == contracts
     np.testing.assert_array_equal(enc.slot_reference, enc.group_contract[enc.slot_group])
@@ -720,6 +723,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "encoded_groups": 2 * contracts,
         "encoded_observations": components,
         "encoded_slots": 2 * contracts,  # each contract's expiry day once per group
+        "reserved_components": components,
         "prepared_slots": 2 * contracts,
         "fixings_read": 2 * fixed,  # one settle read per fixed slot, two slots a fixed day
         "kernel": 1,
@@ -901,6 +905,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "encoded_groups": 2 * contracts,
         "encoded_observations": int(observations_by_method.sum()),
         "encoded_slots": mixed_slots(contracts),
+        "reserved_components": components,
         "prepared_slots": mixed_slots(contracts),
         "fixings_read": fixings,
         "kernel": 1,
@@ -1166,6 +1171,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "encoded_groups": contracts,
         "encoded_observations": components,
         "encoded_slots": contracts,
+        "reserved_components": components,
         "prepared_slots": contracts,
         "fixings_read": fixed,
         "kernel": 1,

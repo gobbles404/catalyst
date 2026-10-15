@@ -481,6 +481,7 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
         "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
+        "reserved_components": 5,
     }
     for array in (
         enc.quote_quantity,
@@ -794,6 +795,7 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
         "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
+        "reserved_components": 5,
         "fixings_read": 0,
         "kernel": 1,
         "live_prices_read": 2,
@@ -1452,6 +1454,7 @@ def test_the_daily_toy_encodes_three_slots_off_one_contract_for_two_components()
         "encoded_groups": 1,
         "encoded_observations": 6,
         "encoded_slots": 3,
+        "reserved_components": 2,
     }
 
 
@@ -1773,6 +1776,7 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
         "encoded_groups": 2,
         "encoded_observations": 2,
         "encoded_slots": 2,
+        "reserved_components": 2,
     }
 
 
@@ -3085,6 +3089,7 @@ def test_two_payment_days_on_one_contract_encode_as_two_groups_off_one_reference
         "encoded_groups": 2,
         "encoded_observations": 6,
         "encoded_slots": 6,
+        "reserved_components": 2,
     }
     # Six slots where one payment day has three: the growth is the payment ownership, eight bytes
     # a slot in each slot column and a day per group, no calendar widened and no history copied.
@@ -3555,6 +3560,7 @@ def test_the_mixed_rows_encode_as_the_ticket_says() -> None:
         "encoded_groups": 2,
         "encoded_observations": 27,
         "encoded_slots": 23,
+        "reserved_components": 4,
     }
 
 
@@ -4806,6 +4812,7 @@ def test_an_iferc_future_observes_its_months_index_once_on_its_publication_day()
         "encoded_groups": 1,
         "encoded_observations": 1,
         "encoded_slots": 1,
+        "reserved_components": 1,
     }
 
 
@@ -5106,3 +5113,157 @@ def test_whole_trade_ids_keeps_15_digits_either_side_of_zero_and_names_the_first
     terms = terms_of(trade_ids=ids(999_999_999_999_999, 2, 3, 4, 5))
     assert terms.trade_ids is not None and not terms.trade_ids.flags.writeable
     assert terms.named(0) == "trade 999999999999999 at row 1"
+
+
+# --- the reserves, reserve-totals.md --------------------------------------------------------------
+# The ticket's specifications on a dollars-a-barrel index over the NG schedule: LOT, a thousand
+# barrels at 10.00 brokerage and 4.00 clearing a lot, and BBL, one barrel at 0.01 and 0.004, the
+# LOT the reporting lot unless another is named; and the four trades of its worked example, each
+# one Z26 month, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT: 20 + 20 + 10 + 0 of brokerage and
+# 8 + 8 + 4 + 0 of clearing, 50 and 20 USD, marketing nought, since #170.
+
+
+def a_fee_index(
+    brokerage: tuple[float, float] = (10.0, 0.01),
+    clearing: tuple[float, float] = (4.0, 0.004),
+    reporting_lot: str = "LOT",
+    schedule: object = NG.schedule,
+) -> Index:
+    return index(
+        "FEES",
+        "Dollars a barrel with the ticket's two specifications",
+        schedule,
+        index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+        contract_specifications(
+            ("LOT", "BBL"),
+            numbers(1000.0, 1.0),
+            ("BBL", "BBL"),
+            numbers(*brokerage),
+            numbers(*clearing),
+            UNITS,
+        ),
+        NG.holiday_calendar,
+        reporting_lot,
+        UNITS,
+    )
+
+
+def fee_terms(
+    ix: Index,
+    quantities: tuple[float, ...] = (2.0, -2.0, 1000.0, 0.0),
+    specs: tuple[int, ...] = (0, 0, 1, 0),
+    trade_ids: tuple[int, ...] = (101, 102, 103, 104),
+) -> ResolvedTrades:
+    """The example's rows, or others shaped like them, each one Z26 month at 70."""
+    n = len(quantities)
+    return resolved_trades(
+        FUTURE, ix, rows(*specs), Route.CLEARED, Settlement.PHYSICAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None, None,
+        dates(*["2026-11-20"] * n), np.arange(n, dtype=np.intp), rows(*([1] * n)),
+        numbers(*quantities), *bounds_of(ix, rows(*([1] * n))), numbers(*([70.0] * n)), None,
+    )  # fmt: skip
+
+
+def reserves_of(terms: ResolvedTrades) -> tuple[float, float]:
+    booked = encoded(terms, observed_of(terms), UNITS, WorkCounter()).reserves
+    return booked.brokerage, booked.clearing
+
+
+def test_the_tickets_four_trades_reserve_fifty_and_twenty_dollars() -> None:
+    ix = a_fee_index()
+    counter = WorkCounter()
+    terms = fee_terms(ix)
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    booked = enc.reserves
+    assert (booked.brokerage, booked.clearing, booked.marketing) == (50.0, 20.0, 0.0)
+    assert booked.currency == "USD"
+    assert counter.freeze()["reserved_components"] == 4
+    # The results carry the encoding's record itself, summed once and never again, and the value
+    # is the free index's: the two LOT rows net, the barrels mark half a dollar on a thousand.
+    history = history_on(ix, "2026-11-24", {})
+    prepared = prepared_trades(enc, history, counter)
+    result = trade_results(prepared, quoted(history, 70.5, 71.0), counter)
+    assert result.reserves is booked
+    assert result.mark == pytest.approx(500.0) and result.cash == 0.0
+    free = a_fee_index((0.0, 0.0), (0.0, 0.0))
+    plain = encoded(fee_terms(free), observed_of(fee_terms(free)), UNITS, WorkCounter())
+    np.testing.assert_array_equal(plain.offset, enc.offset)
+    assert (plain.reserves.brokerage, plain.reserves.clearing) == (0.0, 0.0)
+    assert counter.freeze()["reserved_components"] == 4  # nothing reserved again downstream
+
+
+def test_singletons_sum_to_the_batch_and_order_and_duplicates_count() -> None:
+    ix = a_fee_index()
+    parts = [
+        reserves_of(fee_terms(ix, (quantity,), (spec,), (trade_id,)))
+        for quantity, spec, trade_id in (
+            (2.0, 0, 101),
+            (-2.0, 0, 102),
+            (1000.0, 1, 103),
+            (0.0, 0, 104),
+        )
+    ]
+    assert [p[0] for p in parts] == [20.0, 20.0, 10.0, 0.0]
+    assert [p[1] for p in parts] == [8.0, 8.0, 4.0, 0.0]
+    assert reserves_of(fee_terms(ix)) == (50.0, 20.0)
+    reversed_rows = fee_terms(ix, (0.0, 1000.0, -2.0, 2.0), (0, 1, 0, 0), (104, 103, 102, 101))
+    assert reserves_of(reversed_rows) == (50.0, 20.0)
+    duplicate = fee_terms(ix, (2.0, 2.0), (0, 0), (101, 101))
+    assert reserves_of(duplicate) == (40.0, 16.0)  # the same trade twice reserves twice
+
+
+def test_a_calday_strip_reserves_per_barrel_day_and_the_reporting_lot_changes_nothing() -> None:
+    # 2 BBL a calendar day over X26 and Z26, November's 30 days and December's 31, 122 BBL:
+    # 1.22 of brokerage and 0.488 of clearing, the ticket's numbers, carried through evaluation on
+    # a schedule whose first contract, V26, bounds the calendar; with BBL as the reporting lot the
+    # batch reserves the same, the lot being the delta's unit and no rate's.
+    schedule = futures_schedule(
+        ("V26", "X26", "Z26", "F27"),
+        dates("2026-09-28", "2026-10-28", "2026-11-25", "2026-12-29"),
+        None,
+    )
+    for lot in ("LOT", "BBL"):
+        ix = a_fee_index(reporting_lot=lot, schedule=schedule)
+        terms = resolved_trades(
+            FUTURE, ix, rows(1), Route.CLEARED, Settlement.PHYSICAL,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1), ids(201), None, None,
+            dates("2026-10-20"), rows(0, 0), rows(1, 2), numbers(2.0, 2.0),
+            *bounds_of(ix, rows(1, 2)), numbers(70.0, 70.0), None,
+        )  # fmt: skip
+        np.testing.assert_array_equal(terms.component_quantity, [60.0, 62.0])
+        enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+        assert enc.reserves.brokerage == pytest.approx(1.22)
+        assert enc.reserves.clearing == pytest.approx(0.488)
+        history = history_on(ix, "2026-10-20", {})
+        prepared = prepared_trades(enc, history, WorkCounter())
+        result = trade_results(prepared, quoted(history, 70.5, 71.0), WorkCounter())
+        assert result.reserves is enc.reserves
+
+
+def test_a_rate_that_is_not_a_number_is_refused_by_category_trade_and_row() -> None:
+    terms = fee_terms(a_fee_index(brokerage=(10.0, np.nan)))
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "brokerage reserve of trade 103 at row 3 is nan, expected a finite amount of USD; "
+        "1000.0 of 'BBL' at nan a lot"
+    )
+    # A zero quantity hides nothing: nought times an infinite rate is not a number, and the
+    # clearing rule runs after the brokerage one.
+    terms = fee_terms(a_fee_index(clearing=(np.inf, 0.004)), (0.0,), (0,), (104,))
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of USD; "
+        "0.0 of 'LOT' at inf a lot"
+    )
+
+
+def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -> None:
+    terms = fee_terms(a_fee_index(brokerage=(1e308, 0.0)), (1.0, 1.0), (0, 0), (101, 102))
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "the batch has inf of brokerage reserve in all, expected a finite amount of USD; the "
+        "components' reserves, each finite, sum past the largest number"
+    )

@@ -39,13 +39,13 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 | 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Follow the helper work for one coherent date-entry UAT pass; this is a UX sequence, not a hard code dependency. |
 | 3 / item 9 | [Date-offset utility](#9-date-offsets-from-text): signed `bd`, `cd`, `em`, optional holiday calendar | Direction is specified; focused ticket still needed. Independent of the preceding work and can proceed alongside it. It is not a prerequisite for existing trade payment lags. |
 | 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #169. Required text immediately after `name`; stored on the index and exposed in readback only. |
-| 5 / item 8 | [Reserve totals](#8-clearing-brokerage-and-marketing-reserves): store brokerage, clearing and marketing totals on evaluated results, with a pure reader | Define marketing input/default and amount/sign/basis rules first. Preserve gross booked activity before exposure netting. Can ship before bilateral rates; it is not a rates dependency. |
+| 5 / item 8 | [Reserve totals](reserve-totals.md): calculate static brokerage/clearing totals at creation, carry them into evaluated results and expose a pure reader | Built in #170. Positive costs from absolute component quantities and entry-specification rates, before netting. Marketing returns zero; its inputs and calculation follow bilateral. |
 | 6 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. Plan the arc now; coding need not wait for the unrelated utility or name changes if this becomes the priority. |
 
-The owner selected readable index names as the immediate handoff while the date-helper
-interface is reconsidered. The numbered order above retains the earlier sequencing
-context; it is not a dependency order. Reserve and bilateral discussions can start now, but their
-remaining economic choices should be settled before those implementations start.
+Readable index names and the bounded reserve-totals ticket are ready for handoff while
+the date-helper interface is reconsidered. The numbered order above retains the earlier
+sequencing context; it is not a dependency order. Bilateral's remaining economic choices
+still need alignment, and marketing reserves follow bilateral.
 
 The six pending UAT items remain pending until implemented and reviewed. The broader
 bilateral valuation plan is included in the last row to give item 11 its proper context;
@@ -283,36 +283,36 @@ gate passing. This records the reviewed prototype, not a merge to main.
 
 ## 8. Clearing brokerage and marketing reserves
 
-The owner requested a way to consume these reserve values on 9 October. Preserve the
-agreed boundary: reserves do not affect trade valuation, cash or market risk.
+Built in #170; the [reserve-totals ticket](reserve-totals.md)'s
+[As built](reserve-totals.md#as-built-170) section says what landed.
+Reserves do not affect trade valuation, cash or market risk.
 
-In the inspected prototype through PR #165, contract specifications store
+In the inspected prototype through PR #168, contract specifications store
 `brokerage_rate_per_lot` and `clearing_rate_per_lot`, in the index's settlement currency
 per lot of each specification row. `util_ReadHandle(specifications)` exposes both.
 The trade pipeline does not calculate reserve amounts from them, and the current
 instrument has no implemented marketing-reserve field.
 
-Owner direction, refined 9 October: `_EvaluateTrades` aggregates the batch's booked
-brokerage, clearing and marketing reserves and retains those three totals, with their
-currency, on its results. The proposed reader is `_ReportReserves(results)`: it reads
-the saved scalars and formats them, with no summation, market access or reserve
-calculation. One trade and many trades follow the same path.
+Owner direction, refined 9 October: compute brokerage and clearing reserves once during
+trade creation and carry the three totals, including zero marketing, with their currency
+into evaluated results. `_ReportReserves(results)` reads those saved scalars and formats
+them, with no summation, market access or reserve calculation. This supersedes the earlier
+proposal to aggregate anew during evaluation. One trade and many use the same path.
 
 These are static booked reserves. Fixings, payment dates, valuation-date rolls and price
 ticks do not release or reduce them. This replaces the earlier proposal to expose the
 reserve summary directly from a trade handle; the user wants it on evaluated results.
 
-Keep all three categories in the output. Marketing is zero for instruments that do
-not support it, without requiring a placeholder zero in the template. Where marketing
-is supported, its input basis and default still need definition; no marketing field
-is introduced by this note.
+Keep all three categories in the output. Marketing is zero in this slice, without a
+placeholder in the template. Its inputs and calculation are explicitly deferred until
+after bilateral valuation, as a separate ticket.
 
-Rates and their quantity basis must be resolved before amounts can be computed. An
-entry specification's fee basis is distinct from the index's reporting lot. Preserve
-booked activity before exposure netting: a buy and a sell can cancel delta while both
-incur reserves. Do not infer missing brokerage or clearing rates from the marketing
-zero rule. Detailed amount/sign rules and how static contributions are retained for
-evaluation belong in the implementation ticket. No reserve implementation is claimed here.
+Use positive cost amounts: absolute resolved component quantities multiplied by each
+entry specification's brokerage and clearing rates, then summed. The entry specification's
+basis is distinct from the index's reporting lot; rates already use settlement currency.
+Preserve gross activity before exposure netting, so offsetting buys and sells both count.
+Do not infer missing rates. The ticket pins strips, calendar-day quantities, equivalent
+entry units, finite amounts and unchanged reserves across ticks and payment dates.
 
 ## 9. Date offsets from text
 

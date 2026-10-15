@@ -2,8 +2,9 @@
 created once and taken last by the trades creator; the trades, a batch of one or many on one
 index, resolved from a template and a ticket and encoded; the batch prepared against one market
 history, as often as the history moves; the prepared batch evaluated against one market, as often
-as the quotes move; and the two reports of a result, its values and its risk, each handle to
-handle. docs/library/trades/ holds a page per function.
+as the quotes move; and the reports of a result, its values, its risk, its delta by time and,
+since #170, its reserves, each handle to handle. docs/library/trades/ holds a page per
+function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -40,6 +41,7 @@ __all__ = [
     "_EvaluateTrades",
     "_PrepareTrades",
     "_ReportDelta",
+    "_ReportReserves",
     "_ReportRisk",
     "_ReportValues",
 ]
@@ -199,4 +201,28 @@ def _ReportDelta(
         lots,
         (results.lot_unit,) * starts.size,
         np.full(starts.size, results.as_of, dtype="datetime64[D]"),
+    )
+
+
+@excel_function
+def _ReportReserves(
+    results: Annotated[
+        Handle[TradeResults],
+        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
+        "for it.",
+    ],
+) -> MixedArray:
+    """Reports the batch's reserves from its results, as creation stored them: brokerage and
+    clearing, each trade's monthly quantity without its sign times its specification's rates
+    per lot, summed, marketing at zero until built, and their currency."""
+    reserves = results.reserves
+    return MixedArray.table(
+        [
+            ("brokerage_reserve", "clearing_reserve", "marketing_reserve", "currency"),
+            ("float64", "float64", "float64", "str"),
+        ],
+        np.array([reserves.brokerage]),
+        np.array([reserves.clearing]),
+        np.array([reserves.marketing]),
+        (reserves.currency,),
     )

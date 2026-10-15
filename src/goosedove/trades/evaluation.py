@@ -6,7 +6,8 @@ batch's own axis, the price sensitivity in the settlement currency and the delta
 index's reporting lot with its total, shared with the preparation that settled them, since no
 tick changes them; and DV01, zero by the undiscounted cleared model. One snapshot for the batch
 as a whole,
-immutable, retained with everything that explains it, the dated live contributions among it.
+immutable, retained with everything that explains it, the dated live contributions among it;
+the batch's booked reserves, the encoding's, carried by reference since #170.
 docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from numpy.typing import NDArray
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
 from goosedove.trades.preparation import PreparedTrades
+from goosedove.trades.reserves import Reserves
 from goosedove.trades.terms import Route
 
 LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per live reference
@@ -41,7 +43,10 @@ class TradeResults:
     BBL)`, and lot_delta_total their sum, the number the risk report shows as the delta; the
     three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
     model is undiscounted, so a rate move changes nothing, a result of the model and not a
-    placeholder. as_of is the history's valuation day."""
+    placeholder. as_of is the history's valuation day. reserves, since #170, is the batch's
+    booked brokerage and clearing with marketing at zero and their currency, the encoding's
+    record by reference, which no tick changes, _ReportReserves spills and the results
+    readback shows once."""
 
     prepared: PreparedTrades
     market: Market
@@ -58,6 +63,7 @@ class TradeResults:
     lot_delta_total: float
     lot_unit: str
     dv01: float
+    reserves: Reserves
 
     def codes(self) -> tuple[str, ...]:
         """The axis spelled as the schedule spells its codes, one per contract of the batch."""
@@ -80,7 +86,8 @@ def trade_results(prepared: PreparedTrades, market: Market, counter: WorkCounter
     quotes are gathered onto the live slots, each slot's exposure times its reference's quote is
     its contribution, and the live amount is their sum. The mark is the unsettled offsets and set
     amounts plus the live amount; the cash is the preparation's. The sensitivity, the lot delta
-    and its total are the preparation's, shared, and the lot's words the index's.
+    and its total are the preparation's, shared, and the lot's words the index's. The reserves
+    are the encoding's, by reference, summed when the batch was made and never here.
 
     Work: one kernel call, one quote per live reference, reported to the counter; nothing of the
     encoding or the preparation is done again, and nothing per slot but the gather and the
@@ -124,4 +131,5 @@ def trade_results(prepared: PreparedTrades, market: Market, counter: WorkCounter
         prepared.lot_delta_total,
         terms.reporting_lot.words,
         0.0,
+        prepared.encoded.reserves,
     )

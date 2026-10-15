@@ -643,6 +643,13 @@ def test_the_two_reports_explain_themselves() -> None:
         "reporting specification, with that unit, the DV01 and the valuation day, as evaluation "
         "stored them, and the DV01's unit, the currency per basis point."
     )
+    description, arguments, hidden = SPECS["_ReportReserves"]
+    assert not hidden and arguments == [results]
+    assert description == (
+        "Reports the batch's reserves from its results, as creation stored them: brokerage and "
+        "clearing, each trade's monthly quantity without its sign times its specification's "
+        "rates per lot, summed, marketing at zero until built, and their currency."
+    )
 
 
 # --- what registration derives from the signature ---------------------------------------

@@ -164,6 +164,7 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
         "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": rows,
         "encoded_slots": contracts,
+        "reserved_components": rows,
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -542,9 +543,10 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
+        "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_publish": 1,
     }
-    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 7}
+    expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 8}
     assert call_profile(call) == expected
 
 
