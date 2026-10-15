@@ -12,6 +12,7 @@ from typing import Annotated
 from goosedove.excel.bridge import (
     DateColumn,
     Handle,
+    Handles,
     NumberColumn,
     Table,
     TextColumn,
@@ -25,14 +26,20 @@ from goosedove.index_definitions.contract_specifications import (
 )
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import GasDailySchedule, gas_daily_schedule
-from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.holiday_calendar import (
+    HolidayCalendar,
+    combine_holiday_calendars,
+    holiday_calendar,
+)
 from goosedove.index_definitions.iferc_schedule import IfercSchedule, iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import IndexConventions, index_conventions
+from goosedove.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
+    "_CombineHolidayCalendars",
     "_CreateContractSpecifications",
     "_CreateFuturesSchedule",
     "_CreateGasDailySchedule",
@@ -74,6 +81,21 @@ def _CreateHolidayCalendar(
     """Creates a holiday calendar from the days one market is closed and shows its handle, the
     text other formulas take as the calendar."""
     return holiday_calendar(holiday)
+
+
+@excel_function
+def _CombineHolidayCalendars(
+    calendar_handles: Annotated[
+        Handles[HolidayCalendar],
+        "The calendars to combine: a cell, a row or a column of cells showing "
+        "_CreateHolidayCalendar's or this function's results, such as B2:B3, every one read and a "
+        "repeat read again.",
+    ],
+) -> Handle[HolidayCalendar]:
+    """Combines holiday calendars into one closed on every day any of them is closed, the days
+    in order, once each, and shows its handle, an ordinary calendar for payment_holiday_calendar,
+    util_ShiftDate or another combination."""
+    return combine_holiday_calendars(calendar_handles, WorkCounter())
 
 
 @excel_function

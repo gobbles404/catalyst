@@ -278,7 +278,120 @@ def test_a_handle_of_another_kind_is_not_a_calendar() -> None:
     )
 
 
-# --- _CreateIfercSchedule -------------------------------------------------------
+# --- _CombineHolidayCalendars, combine-holiday-calendars.md -----------------------------------
+
+
+# The ticket's synthetic calendars as the sheet sends them: A lists 14, 12 and 14 October 2026, B
+# the 13th and the 14th; their combination is the 12th, the 13th and the 14th, once each, in order.
+CALENDAR_A = Cells.from_rows([[46309.0], [46307.0], [46309.0]])
+CALENDAR_B = Cells.from_rows([[46308.0], [46309.0]])
+COMBINED_DAYS = "2026-10-12 2026-10-13 2026-10-14"
+
+
+def a_combination(handles: object) -> str:
+    text = bridge.call("_CombineHolidayCalendars", [handles])
+    assert isinstance(text, str) and CALENDAR.fullmatch(text), text
+    return text
+
+
+def test_a_column_of_calendars_combines_into_their_distinct_days_in_order() -> None:
+    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
+    column = a_combination(Cells.from_rows([[a], [b]]))
+    assert bridge.call("ReadHolidayCalendar", [column]) == COMBINED_DAYS
+    # A row and a column give the same calendar; the order of the inputs changes nothing.
+    assert bridge.call("ReadHolidayCalendar", [a_combination(Cells.from_rows([[b, a]]))]) == (
+        COMBINED_DAYS
+    )
+    # One cell is one calendar combined: its own distinct days, in order, the repeat dropped.
+    assert bridge.call("ReadHolidayCalendar", [a_combination(a)]) == "2026-10-12 2026-10-14"
+    # A repeat among the inputs is read again and changes nothing of the days.
+    assert bridge.call(
+        "ReadHolidayCalendar", [a_combination(Cells.from_rows([[a], [b], [a]]))]
+    ) == (COMBINED_DAYS)
+    # A combination is an ordinary calendar, so it combines again.
+    saturday = a_calendar(46305.0)
+    nested = a_combination(Cells.from_rows([[column], [saturday]]))
+    assert bridge.call("ReadHolidayCalendar", [nested]) == "2026-10-10 " + COMBINED_DAYS
+    # The sources stand as they were listed.
+    assert bridge.call("ReadHolidayCalendar", [a]) == "2026-10-14 2026-10-12 2026-10-14"
+    assert bridge.call("ReadHolidayCalendar", [b]) == "2026-10-13 2026-10-14"
+
+
+def test_a_combination_reads_back_as_a_calendar_of_its_days_once_each() -> None:
+    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
+    table = rows(read(a_combination(Cells.from_rows([[a], [b]]))))
+    assert table == [["holiday"], ["datetime64[D]"], [46307.0], [46308.0], [46309.0]]
+    assert rows(read(a_combination(b))) == [["holiday"], ["datetime64[D]"], [46308.0], [46309.0]]
+
+
+def test_a_combination_refuses_its_cells_in_the_seams_words_and_publishes_nothing() -> None:
+    a, b = a_calendar(CALENDAR_A), a_calendar(CALENDAR_B)
+    other = a_schedule(CODES, FUTURES, MISSING)
+    failed = str(bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46023.0], [None]])]))
+    assert failed == "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date"
+    before = number(a_calendar(HOLIDAYS), CALENDAR)
+    combine = bridge.call
+    for handles, text in (
+        (
+            Cells.from_rows([[a, b], [b, a]]),
+            "calendar_handles is 2x2 array, expected one cell, one row or one column of holiday "
+            "calendar handles",
+        ),
+        (
+            Cells.from_rows([[a], [None]]),
+            "calendar_handles cell (2, 1) is blank, expected holiday calendar handle",
+        ),
+        (
+            Cells.from_rows([[a, 46307.0]]),
+            "calendar_handles cell (1, 2) is number 46307.0, expected holiday calendar handle",
+        ),
+        (
+            Cells.from_rows([[a], [""]]),
+            "calendar_handles cell (2, 1) is empty text, expected holiday calendar handle",
+        ),
+        (
+            Cells.from_rows([[a], ["x"]]),
+            "calendar_handles cell (2, 1) is text 'x' naming no live object, expected holiday "
+            "calendar handle",
+        ),
+        (
+            Cells.from_rows([[a], [other]]),
+            f"calendar_handles cell (2, 1) is futures schedule handle {other!r}, expected holiday "
+            "calendar handle",
+        ),
+        (
+            Cells.from_rows([[a], [failed]]),
+            "calendar_handles cell (2, 1) is the creator's failure, expected holiday calendar "
+            "handle: " + failed,
+        ),
+        (
+            MISSING,
+            "calendar_handles is missing, expected holiday calendar handles in a cell, a row or a "
+            "column",
+        ),
+        (
+            None,
+            "calendar_handles is blank, expected holiday calendar handles in a cell, a row or a "
+            "column",
+        ),
+        (
+            other,
+            f"calendar_handles is futures schedule handle {other!r}, expected holiday calendar "
+            "handle",
+        ),
+    ):
+        assert (
+            combine("_CombineHolidayCalendars", [handles])
+            == "#ERROR _CombineHolidayCalendars: " + text
+        )
+    # A consumer of a failed combination shows the creator's text once, through the relay rule.
+    broken = combine("_CombineHolidayCalendars", [Cells.from_rows([[a], [failed]])])
+    assert bridge.call("ReadHolidayCalendar", [broken]) == (
+        f"#ERROR ReadHolidayCalendar: calendar is the creator's failure, expected holiday calendar "
+        f"handle: {failed}"
+    )
+    # Nothing was published by any refusal: the next calendar takes the next number.
+    assert number(a_calendar(HOLIDAYS), CALENDAR) == before + 1
 
 
 # The IFERC schedule page's sample as the sheet sends it: three codes as text and two columns of

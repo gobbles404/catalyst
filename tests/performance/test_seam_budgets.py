@@ -2336,3 +2336,46 @@ def test_a_row_of_fields_with_a_handle_cell_resolves_it_once(
         "_field_dates": 1,
         "_field_numbers": 1,
     }
+
+
+# --- the combination of calendars, combine-holiday-calendars.md: n handles in, one publication out
+
+
+# Two and twenty-four calendars of a hundred days each: the vector's shape checked once, the cells
+# decoded in one pass and each resolved once, so the seam's entries grow with the handles and
+# nothing else does; the library's one union and the builder's one copy; one publication. The
+# numpy is the same at two handles and at twenty-four: concatenate runs in C unseen by the ledger,
+# unique is the flatten, the sort and the hash it is built of over two asanyarray views, then the
+# builder's copy and its freeze.
+@pytest.mark.parametrize("n", [2, 24], ids=["two calendars", "twenty-four calendars"])
+def test_a_combination_resolves_each_calendar_once_and_unites_them_once(
+    call_profile: CallProfile, numpy_calls: CallProfile, n: int
+) -> None:
+    handles = Cells.from_rows(
+        [[PATH["_CreateHolidayCalendar"](holiday_column(100))] for _ in range(n)]
+    )
+    PATH["_CombineHolidayCalendars"](handles)
+    assert call_profile(lambda: PATH["_CombineHolidayCalendars"](handles)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 1,
+        "_resolve_each": 1,
+        "_values": 1,
+        "_decoded": n,
+        "_text": n,
+        "_resolve": n,
+        "_CombineHolidayCalendars": 1,
+        "combine_holiday_calendars": 1,
+        "holiday_calendar": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 3,
+        "_publish": 1,
+    }
+    assert numpy_calls(lambda: PATH["_CombineHolidayCalendars"](handles)) == {
+        "ndarray.flatten": 1,
+        "ndarray.sort": 1,
+        "numpy._unique_hash": 1,
+        "numpy.asanyarray": 2,
+        "numpy.array": 1,  # the one copy the calendar keeps
+        "ndarray.setflags": 1,  # frozen
+    }

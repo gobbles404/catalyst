@@ -1158,3 +1158,14 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
 
     peak = least_peak(created)
     assert peak <= 280 * rows + 2 * SLACK
+
+
+# A combination keeps its distinct days and nothing of its sources: two calendars of the same
+# hundred days combine into a hundred, one column of days, freed on release.
+def test_a_combination_keeps_its_distinct_days_and_release_frees_them() -> None:
+    dates = 100
+    sources = Cells.from_rows(
+        [[ENTRY["_CreateHolidayCalendar"](holiday_column(dates))] for _ in range(2)]
+    )
+    kept = retained_numpy_bytes(lambda: ENTRY["_CombineHolidayCalendars"](sources))
+    assert kept == (dates * DAY_BYTES, 0)

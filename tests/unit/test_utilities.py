@@ -970,9 +970,29 @@ def test_a_date_shifted_by_an_offset_comes_out_as_a_date() -> None:
         ("2026-01-30", "+0em+1cd", MISSING, "2026-02-01"),
     ):
         assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
+    # Since #183 a combination, combine-holiday-calendars.md: the ticket's calendars A, the 14th,
+    # the 12th and the 14th of October 2026, and B, the 13th and the 14th, combined close the
+    # three weekdays after the weekend, so from Friday the 9th +1bd is Thursday the 15th and +2bd
+    # Friday the 16th, and from the 15th -1bd is the 9th; a calendar listing the union agrees.
+    a = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46309.0], [46307.0], [46309.0]])])
+    b = bridge.call("_CreateHolidayCalendar", [Cells.from_rows([[46308.0], [46309.0]])])
+    combined = bridge.call("_CombineHolidayCalendars", [Cells.from_rows([[a], [b]])])
+    union = bridge.call(
+        "_CreateHolidayCalendar", [Cells.from_rows([[46307.0], [46308.0], [46309.0]])]
+    )
+    for date, offset, calendar, expected in (
+        ("2026-10-09", "+1bd", combined, "2026-10-15"),
+        ("2026-10-09", "+2bd", combined, "2026-10-16"),
+        ("2026-10-15", "-1bd", combined, "2026-10-09"),
+        ("2026-10-09", "+1bd", union, "2026-10-15"),
+        ("2026-10-09", "+1bd", a, "2026-10-13"),
+        ("2026-10-09", "+1bd+1bd", combined, "2026-10-16"),
+        ("2026-10-09", "+7cd", combined, "2026-10-16"),
+    ):
+        assert bridge.call("util_ShiftDate", [serial(date), offset, calendar]) == serial(expected)
     shifted = bridge.call("util_ShiftDate", [serial("2026-10-09"), "+1bd", MISSING])
     assert isinstance(shifted, float)
-    assert bridge.live_handles()[0] == live[0] + 2  # the calendars, and nothing of the shifts
+    assert bridge.live_handles()[0] == live[0] + 6  # the calendars, and nothing of the shifts
 
 
 # The library's words through the seam: an instruction that is no offset, a result past the

@@ -405,6 +405,38 @@ $formulas = [ordered]@{
     '=util_EndDate("3H27")' = "#ERROR util_EndDate: ValueError: period is '3H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_StartDate("1H2027")' = "#ERROR util_StartDate: ValueError: period is '1H2027', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_EndDate("2H27-1H27")' = "#ERROR util_EndDate: ValueError: period is '2H27-1H27', expected range endpoints in chronological order"
+    # Combined holiday calendars, combine-holiday-calendars.md: the combination of A and B is the
+    # 12th, the 13th and the 14th once each in order, in a column as in a row; one calendar combined is
+    # its own distinct days; a combination combines again, with the Saturday first; from Friday the
+    # 9th +1bd is Thursday the 15th and +2bd Friday the 16th, from the 15th -1bd the 9th, on A alone
+    # the 13th; the trade anchored on the 9th pays the 15th; a block, a blank cell, a date where a
+    # handle should be, text naming nothing and the argument left out refused in the seam's words.
+    '=LEFT(TE1,FIND(":",TE1,FIND(":",TE1)+1))' = "{pid}:holiday_calendar:"
+    "=ROWS(util_ReadHandle(TE1))"            = "5"
+    "=INDEX(util_ReadHandle(TE1),1,1)"       = "holiday"
+    "=INDEX(util_ReadHandle(TE1),3,1)"       = "46307"
+    "=INDEX(util_ReadHandle(TE1),4,1)"       = "46308"
+    "=INDEX(util_ReadHandle(TE1),5,1)"       = "46309"
+    "=AND(util_ReadHandle(TE2)=util_ReadHandle(TE1))" = "TRUE"
+    "=ROWS(util_ReadHandle(TE3))"            = "4"
+    "=INDEX(util_ReadHandle(TE3),4,1)"       = "46309"
+    "=ROWS(util_ReadHandle(TE4))"            = "6"
+    "=INDEX(util_ReadHandle(TE4),3,1)"       = "46305"
+    "=ROWS(util_ReadHandle(TC1))"            = "5"
+    "=INDEX(util_ReadHandle(TC1),3,1)"       = "46309"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd",TE1)'  = "46310"
+    '=util_ShiftDate(DATE(2026,10,9),"+2bd",TE1)'  = "46311"
+    '=util_ShiftDate(DATE(2026,10,15),"-1bd",TE1)' = "46304"
+    '=util_ShiftDate(DATE(2026,10,9),"+1bd",TC1)'  = "46308"
+    '=util_ShiftDate(DATE(2026,10,9),"+2bd",TE4)'  = "46311"
+    "=INDEX(util_ReadHandle(TE12),1,14)"     = "payment_date"
+    "=INDEX(util_ReadHandle(TE12),3,14)"     = "46310"
+    "=INDEX(util_ReadHandle(TE12),3,4)"      = "X26"
+    "=_CombineHolidayCalendars(TC1:TD2)"     = "#ERROR _CombineHolidayCalendars: calendar_handles is 2x2 array, expected one cell, one row or one column of holiday calendar handles"
+    "=_CombineHolidayCalendars(TC1:TC4)"     = "#ERROR _CombineHolidayCalendars: calendar_handles cell (4, 1) is blank, expected holiday calendar handle"
+    "=_CombineHolidayCalendars(TA1:TA2)"     = "#ERROR _CombineHolidayCalendars: calendar_handles cell (1, 1) is number 46309.0, expected holiday calendar handle"
+    '=_CombineHolidayCalendars("x")'         = "#ERROR _CombineHolidayCalendars: calendar_handles is text 'x' naming no live object, expected holiday calendar handle"
+    "=_CombineHolidayCalendars()"            = "#ERROR _CombineHolidayCalendars: calendar_handles is missing, expected holiday calendar handles in a cell, a row or a column"
     # The balance of a period, date-helper-inputs.md: one BAL prefix in either case on any label and
     # the valuation-date handle beside it, from QH1:QH12, the balance running from the later of the
     # handle's day and the label's first day to the label's last: the ticket's table on October 2026
@@ -2750,6 +2782,41 @@ $cells = [ordered]@{
     "SA28" = "=_EvaluateTrades(SA27,SA26)"
     "SA29" = "=_PrepareTrades(SA18,SA24)"
     "SA30" = "=_EvaluateTrades(SA29,SA26)"
+    # Combined holiday calendars, combine-holiday-calendars.md: the ticket's synthetic calendars, A
+    # listing Wednesday 14 October 2026 twice around Monday the 12th and B the 13th and the 14th, a
+    # Saturday calendar, their combinations in a column, a row, alone and nested; an index whose X26
+    # stops trading on Friday 9 October behind two boundary contracts, a cleared lastday template
+    # paying one business day later on the combined calendar, and one lot of X26 booked on it.
+    "TA1" = "14-Oct-2026"; "TB1" = "13-Oct-2026"
+    "TA2" = "12-Oct-2026"; "TB2" = "14-Oct-2026"
+    "TA3" = "14-Oct-2026"
+    "TA5" = "10-Oct-2026"
+    "TC1" = "=_CreateHolidayCalendar(TA1:TA3)"
+    "TC2" = "=_CreateHolidayCalendar(TB1:TB2)"
+    "TC3" = "=_CreateHolidayCalendar(TA5)"
+    "TD1" = "=TC2"
+    "TE1" = "=_CombineHolidayCalendars(TC1:TC2)"
+    "TE2" = "=_CombineHolidayCalendars(TC1:TD1)"
+    "TE3" = "=_CombineHolidayCalendars(TC1)"
+    "TF1" = "=TE1"; "TF2" = "=TC3"
+    "TE4" = "=_CombineHolidayCalendars(TF1:TF2)"
+    "TG1" = "U26"; "TH1" = "27-Aug-2026"
+    "TG2" = "V26"; "TH2" = "28-Sep-2026"
+    "TG3" = "X26"; "TH3" = "9-Oct-2026"
+    "TI1" = "1-Jan-2030"
+    "TJ1" = "name"; "TK1" = "lot_size"; "TL1" = "lot_unit"; "TM1" = "brokerage_rate_per_lot"; "TN1" = "clearing_rate_per_lot"
+    "TJ2" = "LOT"; "TK2" = "1"; "TL2" = "MMBTU"; "TM2" = "0"; "TN2" = "0"
+    "TE6" = "=_CreateFuturesSchedule(TG1:TG3,TH1:TH3)"
+    "TE7" = "=_CreateHolidayCalendar(TI1)"
+    "TE8" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "TE9" = "=_CreateContractSpecifications(TJ1:TN1,TJ2:TN2)"
+    "TE10" = '=_CreateIndex("ANCHORED","Synthetic index anchored on 9 October 2026",TE6,TE8,TE9,TE7,"LOT")'
+    "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_time_lag"; "TQ4" = "payment_holiday_calendar"
+    "TJ5" = "LOT"; "TK5" = "month"; "TL5" = "lastday"; "TM5" = "cleared"; "TN5" = "financial"; "TO5" = "Prototype Clearing"; "TP5" = "+1bd"; "TQ5" = "=TE1"
+    "TE11" = '=_CreateTradeTemplate("fixed_float",TJ4:TQ4,TJ5:TQ5)'
+    "TJ7" = "trade_id"; "TK7" = "trade_date"; "TL7" = "contract_code"; "TM7" = "quantity"; "TN7" = "fixed_price"
+    "TJ8" = "4001"; "TK8" = "1-Oct-2026"; "TL8" = "X26"; "TM8" = "1"; "TN8" = "3"
+    "TE12" = "=_CreateTrades(TE10,TJ7:TN7,TJ8:TN8,TE11)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

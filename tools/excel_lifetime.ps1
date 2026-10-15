@@ -41,7 +41,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -514,6 +514,67 @@ $processes = {
     }
     catch { $failed = $_; throw }
     finally { Close-Session $other -FailureInFlight:($null -ne $failed) }
+}
+
+# --- calendars ---------------------------------------------------------------------------------
+
+# Combined holiday calendars, combine-holiday-calendars.md: the ticket's calendars A, 14 October
+# 2026 twice around the 12th, and B, the 13th and the 14th, combined in D3 and read by a shift of
+# two business days from Friday the 9th in D4 and by the readback's row count in D5. A's first day
+# moves to the 16th: A publishes anew and the combination with it, the shift steps over the new
+# holiday and the readback grows a row, the two old publications released. B's cell is cleared: the
+# combination fails at B's cell in the seam's words, the shift relays the failure, and the two live
+# publications they held go. B typed back rebuilds both. Nothing of a calendar's object changes
+# in place: every change is a new publication, and the trades group shows a template and a batch
+# following a payment calendar that changes.
+
+$calendars = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Put $state $sheet "A2" "14-Oct-2026"; Put $state $sheet "A3" "12-Oct-2026"; Put $state $sheet "A4" "14-Oct-2026"
+    Put $state $sheet "B2" "13-Oct-2026"; Put $state $sheet "B3" "14-Oct-2026"
+    Put $state $sheet "D1" "=_CreateHolidayCalendar(A2:A4)"
+    Put $state $sheet "D2" "=_CreateHolidayCalendar(B2:B3)"
+    Put $state $sheet "D3" "=_CombineHolidayCalendars(D1:D2)"
+    Put $state $sheet "D4" '=util_ShiftDate(DATE(2026,10,9),"+2bd",D3)'
+    Put $state $sheet "D5" "=ROWS(util_ReadHandle(D3))"
+    $id = Id $state
+    $combined = Text $state $sheet "D3"
+    Check "the combination's cell shows a holiday calendar handle" ($combined.StartsWith("${id}:holiday_calendar:")) $combined
+    Check "two business days from Friday the 9th over the three closed weekdays is Friday the 16th" ((Text $state $sheet "D4") -eq "46311") (Text $state $sheet "D4")
+    Check "the readback holds three days under two heading rows" ((Text $state $sheet "D5") -eq "5") (Text $state $sheet "D5")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
+    Check "three creators, three live publications, three published" ($c.Live -eq 3 -and $c.Published -eq 3 -and $c.Released -eq 0) $c.Text
+
+    # A's first day moves to the 16th: A and the combination publish anew, their consumers follow.
+    Put $state $sheet "A2" "16-Oct-2026"
+    $moved = Text $state $sheet "D3"
+    Check "a changed source gives the combination a new handle" ($moved -ne $combined -and $moved.StartsWith("${id}:holiday_calendar:")) $moved
+    Check "the shift steps over the new holiday to Monday the 19th" ((Text $state $sheet "D4") -eq "46314") (Text $state $sheet "D4")
+    Check "and the readback grows a row" ((Text $state $sheet "D5") -eq "6") (Text $state $sheet "D5")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 3 -and $c.Released -ge 2 }
+    Check "the old source and the old combination are released; three live, five published" ($c.Live -eq 3 -and $c.Released -eq 2 -and $c.Published -eq 5) $c.Text
+
+    # B's cell cleared: the combination fails at B's cell, the shift relays it, both own nothing.
+    Clear-Cell $state $sheet "D2"
+    $failed = Text $state $sheet "D3"
+    Check "a cleared source fails the combination at its cell in the seam's words" ($failed -eq "#ERROR _CombineHolidayCalendars: calendar_handles cell (2, 1) is blank, expected holiday calendar handle") $failed
+    $relayed = Text $state $sheet "D4"
+    Check "and the shift relays the combination's failure once" ($relayed -eq "#ERROR util_ShiftDate: holiday_calendar is the creator's failure, expected holiday calendar handle: $failed") $relayed
+    $c = Settle $state $sheet { param($c) $c.Live -eq 1 }
+    Check "B and the combination are released; one live, nothing more published" ($c.Live -eq 1 -and $c.Released -eq 4 -and $c.Published -eq 5) $c.Text
+
+    # B typed back: both rebuild and the consumers read them again.
+    Put $state $sheet "D2" "=_CreateHolidayCalendar(B2:B3)"
+    $rebuilt = Text $state $sheet "D3"
+    Check "the source typed back rebuilds the combination" ($rebuilt.StartsWith("${id}:holiday_calendar:")) $rebuilt
+    Check "and the shift reads it again" ((Text $state $sheet "D4") -eq "46314") (Text $state $sheet "D4")
+    Check "as the readback does" ((Text $state $sheet "D5") -eq "6") (Text $state $sheet "D5")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
+    Check "three live again, two more published" ($c.Live -eq 3 -and $c.Published -eq 7 -and $c.Released -eq 4) $c.Text
+    Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
 }
 
 # --- quit ---------------------------------------------------------------------------------------
@@ -1061,7 +1122,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]
