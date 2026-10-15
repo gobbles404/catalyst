@@ -28,13 +28,13 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
+from goosedove.index_definitions.sheet_days import SHEET_LAST_DAY
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FUTURE, FieldType
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.observations import Observations, observed
 from goosedove.trades.template import (
-    SHEET_LAST_DAY,
     TradeTemplate,
     business_days_of,
     months_of,

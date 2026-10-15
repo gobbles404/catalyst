@@ -19,6 +19,7 @@ from typing import Final, assert_never
 import numpy as np
 
 from goosedove.index_definitions.periods import period_months
+from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instruments.definitions import FieldType, Instrument
 from goosedove.instruments.fields import FieldValues, selected
 from goosedove.trades.terms import (
@@ -117,14 +118,10 @@ def quantity_per_of(where: str, text: str) -> QuantityPer:
 
 _LAG: Final = re.compile(r"\+([1-9]\d*)bd")
 
-# The sheet's calendar, as the seam holds it: serial 61, 1 March 1900, the first day Excel's
-# serials and the real calendar agree on, to serial 2958465, 31 December 9999, the last day a
-# cell can show. A payment day outside it could never reach a cell, so a lag is held to it
+# The business days from the sheet's first day to its last, Monday to Friday: the most a lag can
+# count between two days a sheet can show, since a holiday calendar only lowers the count. A
+# payment day outside the sheet's calendar could never reach a cell, so a lag is held to it
 # here, where the lag is read, and the day it makes is held to it where the day is made.
-SHEET_FIRST_DAY: Final = np.datetime64("1900-03-01", "D")
-SHEET_LAST_DAY: Final = np.datetime64("9999-12-31", "D")
-# The business days from the first day to the last, Monday to Friday: the most a lag can count
-# between two days a sheet can show, since a holiday calendar only lowers the count.
 MOST_BUSINESS_DAYS: Final = int(np.busday_count(SHEET_FIRST_DAY, SHEET_LAST_DAY))
 
 

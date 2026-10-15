@@ -406,6 +406,38 @@ $formulas = [ordered]@{
     '=util_StartDate("BALZ26",C2)' = "#ERROR util_StartDate: reference_date is blank, expected date"
     '=util_StartDate("BALZ26",E1)' = "#ERROR util_StartDate: reference_date is text 'x', expected date"
     '=util_EndDate("BALZ26",Y2+0.5)' = "#ERROR util_EndDate: reference_date is number 46276.5, expected date"
+    # A date shifted by a text offset, date-offset-utility.md: the ticket's table, 9-Oct-2026 and its
+    # neighbours in PA3 to PA6, the synthetic calendar in PA2 closing Monday the 12th and nothing
+    # else, the serials the cell shows until it is formatted; a closed day counted from without
+    # being counted, the calendar left out meaning Monday to Friday; the month ends through a leap
+    # February and the year end; the library's words for an instruction that is no offset, a
+    # result past the sheet's calendar and a count of too many digits; the seam's for a text
+    # where the date should be, a number where the offset should be, and a blank, a text naming
+    # nothing and a valuation date where the calendar should be.
+    '=util_ShiftDate(PA3,"+1bd")'            = "46307"
+    '=util_ShiftDate(PA3,"+1BD",PA2)'        = "46308"
+    '=util_ShiftDate(PA4,"+1bd")'            = "46307"
+    '=util_ShiftDate(PA5,"-1bd")'            = "46304"
+    '=util_ShiftDate(PA6,"+1bd",PA2)'        = "46308"
+    '=util_ShiftDate(PA6,"-1bd",PA2)'        = "46304"
+    '=util_ShiftDate(PA4,"+0bd",PA2)'        = "46305"
+    '=util_ShiftDate(PA3,"+7cd",PA2)'        = "46311"
+    '=util_ShiftDate(PA3,"-7cd")'            = "46297"
+    '=util_ShiftDate(PA4,"-0cd")'            = "46305"
+    '=util_ShiftDate(PA3,"+0em",PA2)'        = "46326"
+    '=util_ShiftDate(PA3,"+1em")'            = "46356"
+    '=util_ShiftDate(PA3,"-1em")'            = "46295"
+    '=util_ShiftDate(DATE(2028,1,31),"+1em")' = "46812"
+    '=util_ShiftDate(DATE(2026,12,15),"+1em")' = "46418"
+    '=util_ShiftDate(PA3,"+001cD")'          = "46305"
+    '=util_ShiftDate(DATE(9999,12,31),"+0em")' = "2958465"
+    '=util_ShiftDate(PA3,"1bd")'             = "#ERROR util_ShiftDate: ValueError: offset is '1bd', expected a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd or +0em"
+    '=util_ShiftDate(DATE(9999,12,31),"+1cd")' = "#ERROR util_ShiftDate: ValueError: date 9999-12-31 shifted by '+1cd' is 10000-01-01, outside the sheet's calendar, 1900-03-01 to 9999-12-31"
+    '=util_ShiftDate(PA3,"+99999999cd")'     = "#ERROR util_ShiftDate: ValueError: offset has a count of 8 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
+    '=util_ShiftDate(E1,"+1bd")'             = "#ERROR util_ShiftDate: date is text 'x', expected date"
+    "=util_ShiftDate(PA3,A1)"                = "#ERROR util_ShiftDate: offset is number 1.0, expected text"
+    '=util_ShiftDate(PA3,"+1bd",C2)'         = "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle"
+    '=util_ShiftDate(PA3,"+7cd","x:holiday_calendar:9")' = "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle"
     # The instrument catalog: the list and the shown future read one cell at a time with INDEX, the
     # required row booleans among rows of text; a name in another case fails in the library's words
     # and a blank in the seam's.
@@ -1981,6 +2013,12 @@ $cells = [ordered]@{
     "ED6" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR4,AP1,BY1,AM1)'
     "ED7" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR5,AP1,BY1,AM1)'
     "ED8" = '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK3,AP1,BY1)'
+    # A date shifted by a text offset: the synthetic holiday calendar of date-offset-utility.md,
+    # Monday 12 October 2026 closed and nothing else, in PA2 over PA1; Friday 9 October, the
+    # Saturday, the Sunday and the closed Monday in PA3 to PA6.
+    "PA1" = "12-Oct-2026"
+    "PA2" = "=_CreateHolidayCalendar(PA1)"
+    "PA3" = "9-Oct-2026"; "PA4" = "10-Oct-2026"; "PA5" = "11-Oct-2026"; "PA6" = "12-Oct-2026"
     # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
     # a schedule runs, the codes in BV, ICE's last trading days and Platts' publication days
     # beside them, and an index over it.

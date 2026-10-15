@@ -3,12 +3,12 @@
 [Pipeline overview](README.md) · [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md)
 
 Running list started 8 October 2026 while testing the trade prototype in Excel.
-Status and suggested handoff order updated **9 October 2026**. Item numbers are stable
+Status and suggested handoff order updated **10 October 2026**, item 9 built the same day. Item numbers are stable
 references to the detailed notes below; the pending-work order is a recommendation.
 
 ## Implemented and reviewed: release testing
 
-These five items are implemented on the prototype stack through **PR #168 at `d1633d7`**.
+These eight items are implemented on the prototype stack through **PR #171**, stacked on #170 at `716a236`.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
 these additions. This is an implementation checklist, not confirmation of release contents.
@@ -20,6 +20,9 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 3 / item 7 | [Delta by day, month and year](daily-risk-vector.md) | [#166](https://github.com/gobbles404/goosedove/pull/166), `df2bec9` | Use `_ReportDelta` with `day`, `month` and `year`. Mix Asian and pen trades with different payment dates: risk sums by observation date, each bucket view totals to `_ReportRisk`, and fixed dates retain zero rows. |
 | 4 / item 10 | [IFERC basis futures](iferc-basis-futures.md) | [#167](https://github.com/gobbles404/goosedove/pull/167), `9117a39`; payment-help finding closed | Book a Waha/HSC-style basis future with `lastday` and `+3bd`. Verify payment from last trading, fixing from publication, and the live -> fixed-unpaid -> cash progression. The synthetic 1-lot Waha example marks $500 at -0.30 against -0.50, then $750 at a -0.20 fixing, then $750 cash on payment. |
 | 5 / item 2 | [Numeric trade IDs](numeric-trade-ids.md) | [#168](https://github.com/gobbles404/goosedove/pull/168), `d1633d7`; reviewed clean | Enter numeric IDs, including a 15-digit value and a repeated ID. Read back numeric values; duplicates keep both trade occurrences. Fractional values and text IDs fail. |
+| 6 / item 6 | [Readable index names](readable-index-names.md) | [#169](https://github.com/gobbles404/goosedove/pull/169), `3c10318`; workbook-selector corrections verified in the #170 review | Supply required `display_name` after `name` in `_CreateIndex`. Inspect the description beside the existing name; price-vector matching and handle labels still use `name`. |
+| 8 / item 9 | [Shift a date by a text offset](date-offset-utility.md) | #171 | `=util_ShiftDate(DATE(2026,10,9),"+1bd")` shows 12-Oct-2026 once formatted; with a holiday calendar closed on the 12th, `"+1bd"` shows the 13th; try `"-1bd"` from a Sunday, `"+7cd"`, `"+0em"`, `"+1em"` from 31-Jan-2028, `"1bd"` without its sign and a blank where the calendar should be. |
+| 7 / item 8 | [Reserve totals](reserve-totals.md) | [#170](https://github.com/gobbles404/goosedove/pull/170), `716a236`; reviewed clean | `_ReportReserves(results)` reports gross brokerage and clearing costs, zero marketing and currency. The ticket example gives 50 / 20 / 0 / USD, unchanged by a tick, fixing or payment. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -35,21 +38,15 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. The earlier ticket needs alignment on that connection and the rule for a reference before the period. |
-| 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Follow the helper work for one coherent date-entry UAT pass; this is a UX sequence, not a hard code dependency. |
-| 3 / item 9 | [Date-offset utility](#9-date-offsets-from-text): signed `bd`, `cd`, `em`, optional holiday calendar | Direction is specified; focused ticket still needed. Independent of the preceding work and can proceed alongside it. It is not a prerequisite for existing trade payment lags. |
-| 4 / item 6 | [Readable index names](readable-index-names.md): keep `name`, add `display_name` | Built in #169. Required text immediately after `name`; stored on the index and exposed in readback only. |
-| 5 / item 8 | [Reserve totals](reserve-totals.md): calculate static brokerage/clearing totals at creation, carry them into evaluated results and expose a pure reader | Built in #170. Positive costs from absolute component quantities and entry-specification rates, before netting. Marketing returns zero; its inputs and calculation follow bilateral. |
-| 6 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. Plan the arc now; coding need not wait for the unrelated utility or name changes if this becomes the priority. |
+| 1 / item 9 | [Date-offset utility](date-offset-utility.md): signed `bd`, `cd`, `em`, optional holiday calendar | Built in #171, moved to release testing above. Explicit date in, one date out, no implicit valuation context. Existing trade payment-lag rules remain unchanged. |
+| 2 / item 4 | [Contract code and dates on one ticket](#4-contract-codes-and-dates-on-one-ticket): resolve per row, complete dates take precedence | Finish the blank versus formula-empty-text decision and write the ticket. Independent of the offset utility and BAL-context decision; it can support dates already supplied explicitly. |
+| 3 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. Align that connection and the rule for a reference before the period. |
+| 4 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. This arc is independent of the date utilities. |
 
-Readable index names and the bounded reserve-totals ticket are ready for handoff while
-the date-helper interface is reconsidered. The numbered order above retains the earlier
-sequencing context; it is not a dependency order. Bilateral's remaining economic choices
-still need alignment, and marketing reserves follow bilateral.
-
-The six pending UAT items remain pending until implemented and reviewed. The broader
-bilateral valuation plan is included in the last row to give item 11 its proper context;
-it is not an additional completed UAT feature. Detailed decisions and examples follow.
+Readable index names, reserve totals and the date-offset utility have moved to release testing
+above. The remaining order favors the smallest specified change first, not code dependencies.
+Bilateral's remaining economic choices still need alignment; marketing reserves follow bilateral.
+Three UAT items remain unimplemented. Detailed decisions and examples follow.
 
 ## 1. Delta reporting
 
@@ -216,8 +213,9 @@ implemented and reviewed in PR #165 without changing the creator signatures.
 
 ## 6. Human-readable index names
 
-Built in #169; the [readable index names ticket](readable-index-names.md)'s
-[As built](readable-index-names.md#as-built-169) section says what landed. Retain the index's existing `name` used by the current market and
+Implemented in PR #169; its workbook-selector corrections at `3c10318` were verified
+with the PR #170 review. The [readable index names ticket](readable-index-names.md)
+records the contract. Retain the index's existing `name` used by the current market and
 price-vector matching. Add required `display_name` text immediately after `name` in
 `_CreateIndex`, store it on the index and expose it immediately beside `name` through
 `util_ReadHandle`.
@@ -283,15 +281,15 @@ gate passing. This records the reviewed prototype, not a merge to main.
 
 ## 8. Clearing brokerage and marketing reserves
 
-Built in #170; the [reserve-totals ticket](reserve-totals.md)'s
-[As built](reserve-totals.md#as-built-170) section says what landed.
-Reserves do not affect trade valuation, cash or market risk.
+Implemented and reviewed clean in PR #170 at `716a236`, with the full gate passing.
+The [reserve-totals ticket](reserve-totals.md) records the contract. Reserves do not
+affect trade valuation, cash or market risk.
 
-In the inspected prototype through PR #168, contract specifications store
+Before this change, the inspected prototype through PR #168 stored
 `brokerage_rate_per_lot` and `clearing_rate_per_lot`, in the index's settlement currency
 per lot of each specification row. `util_ReadHandle(specifications)` exposes both.
-The trade pipeline does not calculate reserve amounts from them, and the current
-instrument has no implemented marketing-reserve field.
+The trade pipeline did not calculate reserve amounts from them. PR #170 now books
+those amounts during creation; the instrument still has no marketing-reserve field.
 
 Owner direction, refined 9 October: compute brokerage and clearing reserves once during
 trade creation and carry the three totals, including zero marketing, with their currency
@@ -315,6 +313,11 @@ Do not infer missing rates. The ticket pins strips, calendar-day quantities, equ
 entry units, finite amounts and unchanged reserves across ticks and payment dates.
 
 ## 9. Date offsets from text
+
+Built in #171; the ticket page's [As built](date-offset-utility.md#as-built) says what landed.
+
+Not implemented. The [date-offset utility ticket](date-offset-utility.md) is ready for
+engineering and selected as the next small handoff after PR #170.
 
 Provide `util_ShiftDate(date, offset, [holiday_calendar])` returning an Excel date.
 The date is explicit, the offset is one signed whole-number instruction, and the optional
