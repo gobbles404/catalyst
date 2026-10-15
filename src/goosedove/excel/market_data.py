@@ -61,8 +61,8 @@ def _CreateFuturesFixings(
 def _CreateIfercFixings(
     contract_code: Annotated[
         TextColumn,
-        "The column of contract codes, such as A2:A5 holding J26 down to F26, one per month "
-        "published.",
+        "The column of contract codes, newest first, such as A2:A5 holding J26 down to F26, "
+        "one per month published.",
     ],
     price: Annotated[
         NumberColumn,
@@ -71,12 +71,13 @@ def _CreateIfercFixings(
     index: Annotated[
         Handle[Index],
         "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
-        "it; an IFERC index, whose months the codes are checked against.",
+        "it; an IFERC index, whose months the codes are checked against and whose schedule says "
+        "the day each printed.",
     ],
 ) -> Handle[IfercFixings]:
     """Creates the IFERC fixings of one index from the contract months whose index has been
-    published and the index printed for each, checked against the months of its index, and
-    shows its handle, the text other formulas take as the fixings."""
+    published, newest first, and the index printed for each, checked against the months of its
+    index, and shows its handle, the text other formulas take as the fixings."""
     return iferc_fixings(contract_code, price, index)
 
 

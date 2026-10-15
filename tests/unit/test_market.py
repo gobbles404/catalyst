@@ -541,28 +541,21 @@ def test_the_iferc_sample_quotes_the_unpublished_month() -> None:
     )
 
 
-# The desk keeps its months as it keeps its days, the newest in the first row, and an IFERC
-# series is taken in either direction, each index found by its code: the same months either way
-# up make the same history, and a market over each prices every period alike, the fixed months
-# from the history and the unpublished one from the vector.
-def test_iferc_months_given_newest_first_make_the_same_history_and_market_prices() -> None:
+# The desk keeps its months as it keeps its days, the newest in the first row, and the creator
+# keeps them the other way up, each index beside its own code: the history prices the fixed
+# months from them in the calendar's order, and a market over it the unpublished month from
+# the vector.
+def test_iferc_months_given_newest_first_price_the_history_and_the_market() -> None:
     made = calendar(valuation_date(day("2026-11-15"), 0.5), an_index(IFERC_SCHEDULE, None))
-    newest_first = market_history(
-        made, iferc_fixings(("X26", "V26"), np.array([2.10, 1.85]), made.index)
-    )
-    oldest_first = market_history(
-        made, iferc_fixings(("V26", "X26"), np.array([1.85, 2.10]), made.index)
-    )
-    assert newest_first.fixed_rows.tolist() == oldest_first.fixed_rows.tolist() == [0, 1]
-    assert newest_first.fixing_prices.tolist() == [1.85, 2.10]
-    assert oldest_first.fixing_prices.tolist() == [1.85, 2.10]
-    quotes = a_vector(2.20)
-    december = np.array([2], dtype=np.intp)
-    for history in (newest_first, oldest_first):
-        view = market(history, quotes)
-        assert view.first_contract == 2 and view.last_contract == 2
-        assert view.market_history.fixing_prices.tolist() == [1.85, 2.10]
-        assert view.live_prices(december).tolist() == [2.20]
+    indices = iferc_fixings(("X26", "V26"), np.array([2.10, 1.85]), made.index)
+    assert indices.codes == ("V26", "X26") and indices.prices.tolist() == [1.85, 2.10]
+    history = market_history(made, indices)
+    assert history.fixed_rows.tolist() == [0, 1]
+    assert history.fixing_prices.tolist() == [1.85, 2.10]
+    view = market(history, a_vector(2.20))
+    assert view.first_contract == 2 and view.last_contract == 2
+    assert view.market_history.fixing_prices.tolist() == [1.85, 2.10]
+    assert view.live_prices(np.array([2], dtype=np.intp)).tolist() == [2.20]
 
 
 @pytest.mark.parametrize(

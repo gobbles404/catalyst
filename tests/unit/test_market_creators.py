@@ -845,7 +845,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words() -> None:
     )
     assert bridge.call(
         "_CreateMarketHistory",
-        [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10), ("Z26", 2.2))],
+        [an_iferc_calendar(), indices_for(("Z26", 2.2), ("X26", 2.10), ("V26", 1.85))],
     ) == (
         "#ERROR _CreateMarketHistory: ValueError: fixings contract_code 'Z26' is a month not "
         "yet fixed in calendar, expected an index for fixed months alone"
@@ -984,7 +984,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
     iferc = cast(
         str,
         bridge.call(
-            "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10))]
+            "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
         ),
     )
     assert bridge.call("_CreateMarket", [iferc, a_vector(2.10, 2.20, name="Henry Hub IFERC")]) == (
@@ -997,7 +997,7 @@ def test_the_other_kinds_rules_reach_the_sheet_in_the_librarys_words_for_the_mar
             "_CreateMarketHistory",
             [
                 an_iferc_calendar(DEC_1 + 14),
-                indices_for(("V26", 1.85), ("X26", 2.10), ("Z26", 2.2)),
+                indices_for(("Z26", 2.2), ("X26", 2.10), ("V26", 1.85)),
             ],
         ),
     )
@@ -1024,7 +1024,7 @@ def test_a_vector_named_for_another_index_reaches_the_sheet_in_the_librarys_word
         "_CreateMarketHistory", [a_gas_daily_calendar(), prints_through(SEP_1, SEP_25)]
     )
     iferc = bridge.call(
-        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("V26", 1.85), ("X26", 2.10))]
+        "_CreateMarketHistory", [an_iferc_calendar(), indices_for(("X26", 2.10), ("V26", 1.85))]
     )
     assert bridge.call("_CreateMarket", [gas_daily, a_vector(2.20, name="Henry Hub IFERC")]) == (
         "#ERROR _CreateMarket: ValueError: price_vector names index 'Henry Hub IFERC', "

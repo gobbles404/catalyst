@@ -706,26 +706,34 @@ def test_the_other_two_histories_keep_two_short_columns_and_their_readers_pay_pe
 
 
 def iferc_fixing_columns(count: int) -> tuple[Cells, Cells]:
-    """That many contract months' indices as the sheet sends them: the codes of schedule_columns
-    and a price beside each."""
-    codes, _, _, _ = schedule_columns(count)
-    return codes, Cells.from_rows([[2.0 + i / 100] for i in range(count)])
+    """That many contract months' indices as the sheet sends them, the newest month in the first
+    row: the codes of schedule_columns from the last back to the first, since the schedule's
+    publication days increase down the column, and a price beside each."""
+    newest_first = range(count - 1, -1, -1)
+    return (
+        Cells.from_rows([[f"c{i}"] for i in newest_first]),
+        Cells.from_rows([[2.0 + i / 100] for i in newest_first]),
+    )
 
 
-# IFERC fixings keep the seam's tuple of codes as it is and a copy of the price column, 8 bytes
-# per month, and on the way pay the set of the index's months the codes are struck off, one set
-# checking membership and repeats alike, which is most of the peak at a small count: measured
-# 10,600 bytes at 120 months on 2026-09-24 with the set of the codes, and the same shape with the
-# set of the months since #109, about 80 bytes per month at that size on top of a creator's small
-# objects, which twice the slack covers, and 41,348 at 1,200, 34 bytes per month, the set growing
-# slower than the count.
-def test_iferc_fixings_keep_a_copy_of_their_prices() -> None:
+# IFERC fixings keep the codes as a tuple the other way up and a copy of the price column, 8
+# bytes per month each, and on the way pay the set of the index's months the codes are struck
+# off, one set checking membership and repeats alike, then the dict of the months' rows, the
+# rows of the codes' months as a list and an array, the publication days gathered through it
+# and the mask of the look at their order: measured 10,600 bytes at 120 months on 2026-09-24
+# with the set alone, and 15,191 on 2026-10-06 with the order rule of #147, about 127 bytes per
+# month at that size on top of a creator's small objects, which 120 per month covers with twice
+# the slack; 42,888 at 1,200 before and 115,931 after, 97 bytes per month, the dict and the set
+# growing slower than the count. Reading the fixings back was 6,197 bytes at 120 months before
+# and after, the tuple turned over costing nothing the reader's own temporaries did not already
+# reach.
+def test_iferc_fixings_keep_a_copy_of_their_prices_and_the_codes_the_other_way_up() -> None:
     count = 120
     codes, prices = iferc_fixing_columns(count)
     index = an_index(ENTRY["_CreateIfercSchedule"](*iferc_columns(count)))
     assert (
         least_peak(lambda: ENTRY["_CreateIfercFixings"](codes, prices, index))
-        <= 80 * count + 2 * SLACK
+        <= 120 * count + 2 * SLACK
     )
 
 

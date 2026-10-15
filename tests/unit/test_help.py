@@ -374,14 +374,14 @@ def test_the_iferc_fixings_creator_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Creates the IFERC fixings of one index from the contract months whose index has been "
-        "published and the index printed for each, checked against the months of its index, and "
-        "shows its handle, the text other formulas take as the fixings."
+        "published, newest first, and the index printed for each, checked against the months of "
+        "its index, and shows its handle, the text other formulas take as the fixings."
     )
     assert arguments == [
         (
             "contract_code",
-            "The column of contract codes, such as A2:A5 holding J26 down to F26, one per month "
-            "published.",
+            "The column of contract codes, newest first, such as A2:A5 holding J26 down to F26, "
+            "one per month published.",
         ),
         (
             "price",
@@ -390,7 +390,8 @@ def test_the_iferc_fixings_creator_explains_itself() -> None:
         (
             "index",
             "The index handle: the cell showing _CreateIndex's result, such as F3, or a name for "
-            "it; an IFERC index, whose months the codes are checked against.",
+            "it; an IFERC index, whose months the codes are checked against and whose schedule "
+            "says the day each printed.",
         ),
     ]
 
