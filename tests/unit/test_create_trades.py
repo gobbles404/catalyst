@@ -697,9 +697,9 @@ def test_an_observation_crossing_the_preceding_contract_is_refused_when_the_batc
         lots=(("UNIT", 1.0, "MMBTU"),),
     )
     assert refused(crossing, L3D_TICKET, L3D_TEMPLATE) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; an observation of a "
-        "contract other than the day's pricing contract has no settle in a futures history, not "
-        "supported"
+        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
+        "takes the contract's own days, and a futures history holds no settle of Z26 for a day "
+        "X26 prices"
     )
 
 
@@ -836,7 +836,11 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_when_the_batch
     )
 
 
-def test_an_asian_month_another_contract_prices_is_refused_when_the_batch_is_made() -> None:
+def test_an_asian_month_another_contract_prices_takes_the_days_contracts_when_made() -> None:
+    # NYMEX NG's Z26 expires on 25 November: F27 prices December's days through its own expiry
+    # on the 29th and G27 the last two, so the asian ticket on that schedule is made, its 22
+    # days referencing F27 and then G27 while Z26 keeps the fixed leg and the payment;
+    # calendar-driven-asian-references.md.
     ng_like = an_index(
         "x",
         (
@@ -849,11 +853,13 @@ def test_an_asian_month_another_contract_prices_is_refused_when_the_batch_is_mad
         (("GAL", 1.0, "GAL"),),
         ("VOLUME", "GAL"),
     )
-    assert refused(ng_like, ASIAN_TICKET, ASIAN_TEMPLATE) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-01, a day F27 prices; an observation of a "
-        "contract other than the day's pricing contract has no settle in a futures history, not "
-        "supported"
-    )
+    batch, _ = created(ng_like, ASIAN_TICKET, ASIAN_TEMPLATE)
+    enc = batch.encoded
+    codes = ng_like.schedule.codes
+    assert [codes[int(r)] for r in enc.slot_reference] == ["F27"] * 20 + ["G27"] * 2
+    assert [codes[int(g)] for g in enc.group_contract] == ["Z26"]
+    assert batch.resolved.payment is not None
+    assert [str(d) for d in batch.resolved.payment.date] == ["2027-01-05", "2027-01-05"]
 
 
 def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
@@ -2325,3 +2331,86 @@ def test_an_index_without_a_reporting_lot_refuses_a_batch_before_any_row_is_read
     batch, _ = created(NG, NG_TICKET, NG_TEMPLATE)
     assert NG.reporting_lot is not None and batch.resolved.reporting_lot is NG.reporting_lot
     assert NG.reporting_lot.words == "lots of NYMEX NG (10000 MMBTU)"
+
+
+# --- calendar-driven asian references, calendar-driven-asian-references.md ---------------------
+# The ticket's WTI-like index: contracts expiring the month before their own, so that a December
+# booking's days are F27's and then G27's; a barrel the unit entered and a thousand-barrel LOT the
+# lot reported; the asian template in barrels paying +2bd on the same calendar.
+WTI_HOLIDAYS = ("2026-12-25", "2027-01-01")
+WTI = an_index(
+    "WTI",
+    (("Z26", "2026-11-20"), ("F27", "2026-12-21"), ("G27", "2027-01-20"), ("H27", "2027-02-22")),
+    WTI_HOLIDAYS,
+    (("BBL", 1.0, "BBL"), ("LOT", 1_000.0, "BBL")),
+    ("VOLUME", "BBL"),
+    "LOT",
+)
+WTI_TEMPLATE: dict[str, object] = {
+    **ASIAN_TEMPLATE,
+    "quantity_unit": "BBL",
+    "payment_holiday_calendar": holiday_calendar(dates(*WTI_HOLIDAYS)),
+}
+WTI_TICKET: dict[str, list[object]] = {
+    "trade_id": ["W"],
+    "trade_date": ["2026-11-20"],
+    "start_date": ["2026-12-18"],
+    "end_date": ["2026-12-28"],
+    "quantity": [1_200],
+    "fixed_price": [70.0],
+}
+WTI_WINDOW = ["2026-12-18", "2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-28"]
+
+
+def test_the_wti_booking_observes_six_days_off_f27_then_g27_and_pays_30_december() -> None:
+    # The ticket's booking resolved: 18 to 28 December, eleven days covered and six pricing days,
+    # F27 pricing the 18th and the 21st, its expiry, and G27 the four after, 200 barrels each;
+    # booked as Z26, which keeps the fixed leg of -84,000 and pays 30 December, two business days
+    # after the 28th on the payment calendar.
+    batch, _ = created(WTI, WTI_TICKET, WTI_TEMPLATE)
+    assert components_of(batch) == (["Z26"], ["2026-12-18"], ["2026-12-28"], [11], [1_200.0])
+    enc = batch.encoded
+    codes = WTI.schedule.codes
+    assert [str(d) for d in enc.slot_date] == WTI_WINDOW
+    assert [codes[int(r)] for r in enc.slot_reference] == ["F27", "F27", "G27", "G27", "G27", "G27"]
+    assert [codes[int(g)] for g in enc.group_contract] == ["Z26"]
+    np.testing.assert_allclose(enc.slot_exposure, [200.0] * 6)
+    np.testing.assert_allclose(enc.offset_of_group, [-84_000.0])
+    assert batch.resolved.payment is not None
+    assert [str(d) for d in batch.resolved.payment.date] == ["2026-12-30"]
+
+
+def test_a_code_and_the_whole_months_dates_book_the_same_december_on_the_wti_index() -> None:
+    # Z26 typed as a code and 1 to 31 December typed as dates: 22 pricing days, 15 F27's and 7
+    # G27's, 100 barrels a day of 2,200, paying 5 January, the slots the same either way.
+    by_code, _ = created(
+        WTI,
+        {
+            "trade_id": ["Z"],
+            "trade_date": ["2026-11-20"],
+            "contract_code": ["Z26"],
+            "quantity": [2_200],
+            "fixed_price": [70.0],
+        },
+        WTI_TEMPLATE,
+    )
+    by_dates, _ = created(
+        WTI,
+        {
+            **WTI_TICKET,
+            "trade_id": ["Z"],
+            "start_date": ["2026-12-01"],
+            "end_date": ["2026-12-31"],
+            "quantity": [2_200],
+        },
+        WTI_TEMPLATE,
+    )
+    for batch in (by_code, by_dates):
+        enc = batch.encoded
+        assert [WTI.schedule.codes[int(r)] for r in enc.slot_reference] == ["F27"] * 15 + [
+            "G27"
+        ] * 7
+        np.testing.assert_allclose(enc.slot_exposure, [100.0] * 22)
+        assert batch.resolved.payment is not None
+        assert [str(d) for d in batch.resolved.payment.date] == ["2027-01-05"]
+    np.testing.assert_array_equal(by_code.encoded.slot_date, by_dates.encoded.slot_date)

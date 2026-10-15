@@ -59,8 +59,11 @@ history stores that contract's settlement for the day: in the toy below, 1 Decem
 Z26, and the history holds Z26's fixing for that date and no other contract's. So each slot's
 reference is the contract pricing its date, derived once from that rule at encoding and
 retained. An observation whose component's contract is not the day's pricing contract, F27 on
-a day Z26 prices, fails as unsupported rather than silently becoming Z26: a futures history
-holds one settle per day and would never fix it. A reference may appear on several dates;
+a day Z26 prices, fails under the expiry-based methods rather than silently becoming Z26,
+since those methods take the contract's own days and a futures history holds one settle per
+day; under `asian`, since #165, the day's contract is the reference and the booked contract
+keeps the fixed leg and the payment,
+[calendar-driven-asian-references.md](calendar-driven-asian-references.md). A reference may appear on several dates;
 supporting several contracts on one observation date comes later, with a history that holds
 them. This is the slice's supported scope: what the current history covers.
 

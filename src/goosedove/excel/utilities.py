@@ -424,13 +424,20 @@ def trades_table(obj: Trades) -> MixedArray:
 def _slot_names(
     encoding: Encoded,
 ) -> tuple[list[str], list[str], list[NDArray[Any] | tuple[str, ...]]]:
-    # The columns that name a slot: the contract pricing the day, the observation day and, for a
-    # financial settlement, the day the slot's payment group pays, so that two groups of one
-    # contract observing one day read apart; a physical settlement pays on no day and shows none.
-    codes = np.array(encoding.terms.schedule.codes, dtype=object)[encoding.slot_reference]
-    names = ["contract_code", "observation_date"]
-    types = ["str", "datetime64[D]"]
-    columns: list[NDArray[Any] | tuple[str, ...]] = [tuple(codes), encoding.slot_date]
+    # The columns that name a slot: the contract pricing the day, whose settle fixes the slot and
+    # whose quote projects it; the contract the slot's group was booked on, which owns the fixed
+    # leg and the payment and under asian may be another; the observation day; and, for a
+    # financial settlement, the day the slot's payment group pays, so that two groups observing
+    # one day read apart whatever contract prices it; a physical settlement pays on no day and
+    # shows none.
+    codes = np.array(encoding.terms.schedule.codes, dtype=object)
+    names = ["pricing_contract", "booked_contract", "observation_date"]
+    types = ["str", "str", "datetime64[D]"]
+    columns: list[NDArray[Any] | tuple[str, ...]] = [
+        tuple(codes[encoding.slot_reference]),
+        tuple(codes[encoding.group_contract[encoding.slot_group]]),
+        encoding.slot_date,
+    ]
     if encoding.payment_date is not None:
         names.append("payment_date")
         types.append("datetime64[D]")

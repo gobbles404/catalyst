@@ -115,8 +115,9 @@ def prepared_trades(
     if (slot_rows < 0).any():
         s = int((slot_rows < 0).argmax())
         raise ValueError(
-            f"{encoded.named_slot(s)}, before the calendar begins; "
-            "the schedule's first contract bounds the calendar and nothing prices it"
+            f"{encoded.slot_trade(s)} observes {encoded.slot_date[s]}, before the calendar "
+            f"begins on {calendar.dates[0]}; the schedule's first contract, {codes[0]}, bounds "
+            "the calendar and nothing prices its days"
         )
     is_fixed = calendar.is_fixed[slot_rows]
     as_of = calendar.valuation_date.as_of
@@ -164,7 +165,7 @@ def prepared_trades(
     if outrun.any():
         s = int(outrun.argmax())
         raise ValueError(
-            f"{encoded.named_slot(s)} with {float(dated_live_lots[s])!r} live lots, expected a "
+            f"{encoded.named_slot(s)}, has {float(dated_live_lots[s])!r} live lots, expected a "
             f"finite number of {words}; the exposure in lots outruns the largest number"
         )
     outrun = ~np.isfinite(lot_delta)

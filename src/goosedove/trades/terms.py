@@ -43,8 +43,10 @@ class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
     last trading day; penultimate, the settlement on the business day before it; last3day, the
     average of the settlements on the last trading day and the two business days before it, each
-    a third; and asian, the average of the settlements on every pricing day of the contract's
-    calendar month, an equal share each: the four methods the definition lists, all built."""
+    a third; and asian, the average of the settles on every pricing day the component covers, its
+    contract's calendar month or the booked part of it, each day's settle the contract the index's
+    calendar prices that day with, which need not be the component's own, an equal share each:
+    the four methods the definition lists, all built."""
 
     LASTDAY = "lastday"
     PENULTIMATE = "penultimate"

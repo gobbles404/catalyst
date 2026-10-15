@@ -501,29 +501,29 @@ namespace Goosedove.Host.Tests
             Assert.Equal("USD per basis point", risk[2, 3]);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(4, slots.GetLength(0));
-            Assert.Equal("live_coefficient", slots[0, 4]);
-            Assert.Equal("live_lots", slots[0, 5]);
+            Assert.Equal("live_coefficient", slots[0, 5]);
+            Assert.Equal("live_lots", slots[0, 6]);
             Assert.Equal("n26", slots[2, 0]);
-            Assert.Equal(false, slots[2, 2]);
-            Assert.Equal(20000.0, slots[2, 4]);
-            Assert.Equal(-10000.0, slots[3, 4]);
-            Assert.Equal(2.0, slots[2, 5]);
-            Assert.Equal(-1.0, slots[3, 5]);
+            Assert.Equal(false, slots[2, 3]);
+            Assert.Equal(20000.0, slots[2, 5]);
+            Assert.Equal(-10000.0, slots[3, 5]);
+            Assert.Equal(2.0, slots[2, 6]);
+            Assert.Equal(-1.0, slots[3, 6]);
             var contributions = (object[,])Seam.Call("util_ReadHandle", results);
-            Assert.Equal("live_coefficient", contributions[0, 3]);
-            Assert.Equal("live_lots", contributions[0, 4]);
-            Assert.Equal("live_contribution", contributions[0, 5]);
-            Assert.Equal("contract_sensitivity", contributions[0, 6]);
-            Assert.Equal("contract_lot_delta", contributions[0, 7]);
-            Assert.Equal(20000.0, contributions[2, 3]);
-            Assert.Equal(2.0, contributions[2, 4]);
-            Assert.Equal(1442000.0, (double)contributions[2, 5], 6);
-            Assert.Equal(20000.0, contributions[2, 6]);
-            Assert.Equal(2.0, contributions[2, 7]);
-            Assert.Equal("sensitivity_unit", contributions[0, 8]);
-            Assert.Equal("USD per USD/MMBTU", contributions[2, 8]);
-            Assert.Equal("lot_unit", contributions[0, 9]);
-            Assert.Equal("lots of NYMEX NG (10000 MMBTU)", contributions[2, 9]);
+            Assert.Equal("live_coefficient", contributions[0, 4]);
+            Assert.Equal("live_lots", contributions[0, 5]);
+            Assert.Equal("live_contribution", contributions[0, 6]);
+            Assert.Equal("contract_sensitivity", contributions[0, 7]);
+            Assert.Equal("contract_lot_delta", contributions[0, 8]);
+            Assert.Equal(20000.0, contributions[2, 4]);
+            Assert.Equal(2.0, contributions[2, 5]);
+            Assert.Equal(1442000.0, (double)contributions[2, 6], 6);
+            Assert.Equal(20000.0, contributions[2, 7]);
+            Assert.Equal(2.0, contributions[2, 8]);
+            Assert.Equal("sensitivity_unit", contributions[0, 9]);
+            Assert.Equal("USD per USD/MMBTU", contributions[2, 9]);
+            Assert.Equal("lot_unit", contributions[0, 10]);
+            Assert.Equal("lots of NYMEX NG (10000 MMBTU)", contributions[2, 10]);
             var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
             var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked);
             Assert.NotEqual(results, later);
@@ -562,13 +562,13 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46224.0, spill[3, 13]);
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
-            Assert.Equal("observation_date", slots[0, 1]);
-            Assert.Equal("payment_date", slots[0, 2]);
-            Assert.Equal(46192.0, slots[2, 1]);
-            Assert.Equal(46223.0, slots[3, 1]);
-            Assert.Equal(46195.0, slots[2, 2]);
-            Assert.Equal(46224.0, slots[3, 2]);
-            Assert.Equal(false, slots[2, 3]);
+            Assert.Equal("observation_date", slots[0, 2]);
+            Assert.Equal("payment_date", slots[0, 3]);
+            Assert.Equal(46192.0, slots[2, 2]);
+            Assert.Equal(46223.0, slots[3, 2]);
+            Assert.Equal(46195.0, slots[2, 3]);
+            Assert.Equal(46224.0, slots[3, 3]);
+            Assert.Equal(false, slots[2, 4]);
             var values = (object[,])Seam.Call("_ReportValues", (string)Seam.Call("_EvaluateTrades", prepared, market));
             Assert.Equal(34000.0, (double)values[2, 0], 6);
             Assert.Equal(0.0, values[2, 1]);
@@ -607,14 +607,14 @@ namespace Goosedove.Host.Tests
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(5, slots.GetLength(0));
-            Assert.Equal(46358.0, slots[2, 1]);
-            Assert.Equal(46359.0, slots[3, 1]);
-            Assert.Equal(46363.0, slots[4, 1]);
-            Assert.Equal(46365.0, slots[2, 2]);
-            Assert.Equal(true, slots[2, 3]);
-            Assert.Equal(false, slots[3, 3]);
-            Assert.Equal(0.0, slots[2, 5]);
-            Assert.Equal(10.0, (double)slots[4, 5], 6);
+            Assert.Equal(46358.0, slots[2, 2]);
+            Assert.Equal(46359.0, slots[3, 2]);
+            Assert.Equal(46363.0, slots[4, 2]);
+            Assert.Equal(46365.0, slots[2, 3]);
+            Assert.Equal(true, slots[2, 4]);
+            Assert.Equal(false, slots[3, 4]);
+            Assert.Equal(0.0, slots[2, 6]);
+            Assert.Equal(10.0, (double)slots[4, 6], 6);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "SYN", Column(74.0, 80.0)));
             var results = (string)Seam.Call("_EvaluateTrades", prepared, market);
             var values = (object[,])Seam.Call("_ReportValues", results);
@@ -661,13 +661,13 @@ namespace Goosedove.Host.Tests
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(24, slots.GetLength(0));
-            Assert.Equal(46357.0, slots[2, 1]);
-            Assert.Equal(46387.0, slots[23, 1]);
-            Assert.Equal(46392.0, slots[2, 2]);
-            Assert.Equal(true, slots[2, 3]);
-            Assert.Equal(false, slots[3, 3]);
-            Assert.Equal(0.0, slots[2, 5]);
-            Assert.Equal(100.0, (double)slots[3, 5], 6);
+            Assert.Equal(46357.0, slots[2, 2]);
+            Assert.Equal(46387.0, slots[23, 2]);
+            Assert.Equal(46392.0, slots[2, 3]);
+            Assert.Equal(true, slots[2, 4]);
+            Assert.Equal(false, slots[3, 4]);
+            Assert.Equal(0.0, slots[2, 6]);
+            Assert.Equal(100.0, (double)slots[3, 6], 6);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "ETHANE", Column(0.28, 0.30, 0.32)));
             var results = (string)Seam.Call("_EvaluateTrades", prepared, market);
             var values = (object[,])Seam.Call("_ReportValues", results);
@@ -813,27 +813,27 @@ namespace Goosedove.Host.Tests
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(8, slots.GetLength(0));
-            Assert.Equal(7, slots.GetLength(1));
-            Assert.Equal("payment_date", slots[0, 2]);
-            Assert.Equal("live_lots", slots[0, 6]);
-            Assert.Equal(46358.0, slots[2, 1]);
-            Assert.Equal(46358.0, slots[5, 1]);
-            Assert.Equal(46363.0, slots[2, 2]);
-            Assert.Equal(46365.0, slots[5, 2]);
-            Assert.Equal(true, slots[2, 3]);
+            Assert.Equal(8, slots.GetLength(1));
+            Assert.Equal("payment_date", slots[0, 3]);
+            Assert.Equal("live_lots", slots[0, 7]);
+            Assert.Equal(46358.0, slots[2, 2]);
+            Assert.Equal(46358.0, slots[5, 2]);
+            Assert.Equal(46363.0, slots[2, 3]);
+            Assert.Equal(46365.0, slots[5, 3]);
             Assert.Equal(true, slots[2, 4]);
-            Assert.Equal(false, slots[5, 4]);
-            Assert.Equal(0.0, slots[7, 5]);
+            Assert.Equal(true, slots[2, 5]);
+            Assert.Equal(false, slots[5, 5]);
+            Assert.Equal(0.0, slots[7, 6]);
             var paid = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "PAYS", Column(80.0))));
             var values = (object[,])Seam.Call("_ReportValues", paid);
             Assert.Equal(-30.0, (double)values[2, 0], 6);
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid))[2, 0], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(11, contributions.GetLength(1));
-            Assert.Equal("contract_lot_delta", contributions[0, 8]);
-            Assert.Equal(46365.0, contributions[5, 2]);
-            Assert.Equal(0.0, contributions[5, 8]);
+            Assert.Equal(12, contributions.GetLength(1));
+            Assert.Equal("contract_lot_delta", contributions[0, 9]);
+            Assert.Equal(46365.0, contributions[5, 3]);
+            Assert.Equal(0.0, contributions[5, 9]);
         }
 
         // Mixed fields in one batch, mixed-trade-fields.md: the index MIXED, USD per GAL, X26, Z26, F27
@@ -890,11 +890,11 @@ namespace Goosedove.Host.Tests
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(25, slots.GetLength(0));
-            Assert.Equal(46387.0, slots[2, 2]);
-            Assert.Equal(46391.0, slots[3, 2]);
-            Assert.Equal(true, slots[2, 4]);
-            Assert.Equal(false, slots[3, 4]);
-            Assert.Equal(85.0, (double)slots[24, 5], 6);
+            Assert.Equal(46387.0, slots[2, 3]);
+            Assert.Equal(46391.0, slots[3, 3]);
+            Assert.Equal(true, slots[2, 5]);
+            Assert.Equal(false, slots[3, 5]);
+            Assert.Equal(85.0, (double)slots[24, 6], 6);
             var paid = (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "MIXED", Column(12.0, 13.0, 14.0))));
             var values = (object[,])Seam.Call("_ReportValues", paid);
             Assert.Equal(275.0, (double)values[2, 0], 6);
@@ -1606,6 +1606,80 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1, array.GetLength(0));
             Assert.Equal(1, array.GetLength(1));
             Assert.Equal(5.0, array[0, 0]);
+        }
+
+        // Calendar-driven asian references, calendar-driven-asian-references.md: the WTI-like index
+        // of Z26, F27, G27 and H27 expiring 20 November, 21 December, 20 January and 22 February,
+        // 46346, 46377, 46407 and 46440, closed on 25 December and New Year's Day, 46381 and 46388,
+        // dollars a barrel settled in dollars, a barrel and a thousand-barrel LOT the specifications,
+        // the LOT reported; the asian template paying +2bd on the same calendar; W, 1,200 barrels of
+        // 18 to 28 December, 46374 to 46384, at 70. Six observations, the 18th and the 21st F27's and
+        // the four from the 22nd G27's, booked as Z26 and paying 30 December, 46386: all live on the
+        // 18th at 72 and 75 the mark is 4,800 and the delta 1.2 lots, 0.4 on F27 and 0.8 on G27; on
+        // the 22nd, F27's days fixed at 71 and 73 and G27 quoted alone at 76, 5,600; on the 30th,
+        // every day fixed and paid, 5,200 of cash. The settles run from 23 November, newest first.
+        [Fact]
+        public void a_december_asian_prices_off_the_calendars_contract_for_each_day()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27", "H27"), Column(46346.0, 46377.0, 46407.0, 46440.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "WTI", schedule, conventions, specifications, holidays, "LOT");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("BBL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
+            var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { "W", 46346.0, 46374.0, 46384.0, 1200.0, 70.0 } }, template);
+            double[] days = { 46385.0, 46384.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0, 46371.0, 46370.0, 46367.0, 46366.0, 46365.0, 46364.0, 46363.0, 46360.0, 46359.0, 46358.0, 46357.0, 46356.0, 46353.0, 46352.0, 46351.0, 46350.0, 46349.0 };
+            double[] settles = { 78.0, 77.0, 75.0, 76.0, 74.0, 73.0, 71.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0, 60.0 };
+            object[,] From(double[] values, int first)
+            {
+                var column = new object[values.Length - first, 1];
+                for (var i = first; i < values.Length; i++) column[i - first, 0] = values[i];
+                return column;
+            }
+            string History(double asOf, int first)
+            {
+                var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", asOf, 0.5), index);
+                return (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", From(days, first), From(settles, first), index));
+            }
+            string Valued(string history, string prepared, params object[] quotes)
+            {
+                return (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "WTI", Column(quotes))));
+            }
+            var eighteenth = History(46374.0, 7);
+            var live = (string)Seam.Call("_PrepareTrades", trades, eighteenth);
+            var slots = (object[,])Seam.Call("util_ReadHandle", live);
+            Assert.Equal(8, slots.GetLength(0));
+            Assert.Equal("pricing_contract", slots[0, 0]);
+            Assert.Equal("booked_contract", slots[0, 1]);
+            Assert.Equal("F27", slots[2, 0]);
+            Assert.Equal("Z26", slots[2, 1]);
+            Assert.Equal("F27", slots[3, 0]);
+            Assert.Equal("G27", slots[4, 0]);
+            Assert.Equal("G27", slots[7, 0]);
+            Assert.Equal("Z26", slots[7, 1]);
+            Assert.Equal(46374.0, slots[2, 2]);
+            Assert.Equal(46386.0, slots[2, 3]);
+            Assert.Equal(200.0, (double)slots[2, 6], 6);
+            Assert.Equal(0.2, (double)slots[2, 7], 6);
+            var results = Valued(eighteenth, live, 72.0, 75.0);
+            Assert.Equal(4800.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
+            var risk = (object[,])Seam.Call("_ReportRisk", results);
+            Assert.Equal(1.2, (double)risk[2, 0], 6);
+            Assert.Equal("lots of LOT (1000 BBL)", risk[2, 1]);
+            var contributions = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal("booked_contract", contributions[0, 1]);
+            Assert.Equal(0.4, (double)contributions[2, 9], 6);
+            Assert.Equal(0.8, (double)contributions[4, 9], 6);
+            var rolled = History(46378.0, 5);
+            var after = Valued(rolled, (string)Seam.Call("_PrepareTrades", trades, rolled), 76.0);
+            Assert.Equal(5600.0, (double)((object[,])Seam.Call("_ReportValues", after))[2, 0], 6);
+            Assert.Equal(0.8, (double)((object[,])Seam.Call("_ReportRisk", after))[2, 0], 6);
+            var thirtieth = History(46386.0, 0);
+            var paid = (object[,])Seam.Call("_ReportValues", Valued(thirtieth, (string)Seam.Call("_PrepareTrades", trades, thirtieth), 75.0));
+            Assert.Equal(0.0, (double)paid[2, 0], 6);
+            Assert.Equal(5200.0, (double)paid[2, 1], 6);
         }
 
         [Fact]

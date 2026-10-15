@@ -466,7 +466,7 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 0, 1, 1, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
     np.testing.assert_array_equal(enc.reference_of_slot, [0, 1])
-    assert enc.named_slot(0) == "trade 'NG-001' at row 1 observes Z26 on 2026-11-25"
+    assert enc.named_slot(0) == "trade 'NG-001' at row 1 on 2026-11-25, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 5,
         "encoded_groups": 2,
@@ -670,7 +670,7 @@ def test_a_financial_settlement_groups_each_contract_by_its_payment_day() -> Non
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 2, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
     np.testing.assert_array_equal(enc.reference_of_slot, [0, 0, 1])
-    assert enc.named_slot(1) == "trade 'NG-002' at row 2 observes Z26 on 2026-11-25"
+    assert enc.named_slot(1) == "trade 'NG-002' at row 2 on 2026-11-25, a day Z26 prices"
     assert counter.freeze()["encoded_groups"] == 3
 
 
@@ -738,8 +738,8 @@ def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
-        "trade at row 1 observes X26 on 2026-10-28, before the calendar begins; "
-        "the schedule's first contract bounds the calendar and nothing prices it"
+        "trade at row 1 observes 2026-10-28, before the calendar begins on 2026-10-29; the "
+        "schedule's first contract, X26, bounds the calendar and nothing prices its days"
     )
 
 
@@ -761,7 +761,7 @@ def test_a_contract_expiring_on_a_closed_day_is_refused_when_the_batch_is_encode
     with pytest.raises(ValueError) as refused:
         encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'NG-001' at row 1 observes Z26 on 2026-11-26, a day the index's market is closed; "
+        "trade 'NG-001' at row 1 observes 2026-11-26, a day the index's market is closed; "
         "no settle exists or will"
     )
 
@@ -1132,7 +1132,7 @@ def test_the_pen_encodes_one_slot_on_the_day_before_expiry_referencing_its_contr
     np.testing.assert_array_equal(enc.slot_exposure, [5_000.0])  # two lots of 2,500 MMBTU
     np.testing.assert_array_equal(enc.offset, [-15_000.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-06-28"))
-    assert enc.named_slot(0) == "trade 'PHH-1' at row 1 observes N27 on 2027-06-25"
+    assert enc.named_slot(0) == "trade 'PHH-1' at row 1 on 2027-06-25, a day N27 prices"
 
 
 # The page's three states and the hand answers: live on the pen day itself, fixed on the Saturday
@@ -1535,8 +1535,9 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
 
     result, _ = daily_evaluated("2026-12-02")
     table = shown(result)
-    assert table.texts[:9] == (
-        "contract_code",
+    assert table.texts[:10] == (
+        "pricing_contract",
+        "booked_contract",
         "observation_date",
         "payment_date",
         "is_fixed",
@@ -1546,13 +1547,13 @@ def test_the_daily_toys_results_read_back_slot_by_slot_with_the_contracts_delta_
         "contract_sensitivity",
         "contract_lot_delta",
     )
-    np.testing.assert_array_equal(table.numeric_slots[2:, 2], [46_392.0] * 3)  # 5 January
-    np.testing.assert_array_equal(table.numeric_slots[2:, 3], [1.0, 0.0, 0.0])  # is_fixed
-    np.testing.assert_allclose(table.numeric_slots[2:, 4], [0.0, 10.0, 10.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 10.0, 10.0])  # a unit lot
-    np.testing.assert_allclose(table.numeric_slots[2:, 6], [0.0, 740.0, 740.0])
-    np.testing.assert_allclose(table.numeric_slots[2:, 7], [20.0, 20.0, 20.0])
+    np.testing.assert_array_equal(table.numeric_slots[2:, 3], [46_392.0] * 3)  # 5 January
+    np.testing.assert_array_equal(table.numeric_slots[2:, 4], [1.0, 0.0, 0.0])  # is_fixed
+    np.testing.assert_allclose(table.numeric_slots[2:, 5], [0.0, 10.0, 10.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 6], [0.0, 10.0, 10.0])  # a unit lot
+    np.testing.assert_allclose(table.numeric_slots[2:, 7], [0.0, 740.0, 740.0])
     np.testing.assert_allclose(table.numeric_slots[2:, 8], [20.0, 20.0, 20.0])
+    np.testing.assert_allclose(table.numeric_slots[2:, 9], [20.0, 20.0, 20.0])
 
 
 def test_a_tick_on_the_daily_toy_reads_one_quote_and_gathers_it_onto_the_live_slots() -> None:
@@ -1579,9 +1580,9 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, (("2026-12-01",),)), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'G-1' at row 1 observes G27 on 2026-12-01, a day Z26 prices; an observation of a "
-        "contract other than the day's pricing contract has no settle in a futures history, "
-        "not supported"
+        "trade 'G-1' at row 1 observes G27 on 2026-12-01, a day Z26 prices; the lastday method "
+        "takes the contract's own days, and a futures history holds no settle of G27 for a day "
+        "Z26 prices"
     )
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, (("2027-02-01",),)), UNITS, WorkCounter())
@@ -1605,7 +1606,7 @@ def test_an_observation_on_a_closed_day_is_refused_before_it_could_fix(
     with pytest.raises(ValueError) as refused:
         encoded(terms, daily_observations(terms, ((closed_day,),)), UNITS, WorkCounter())
     assert str(refused.value) == (
-        f"trade at row 1 observes Z26 on {closed_day}, a day the index's market is closed; "
+        f"trade at row 1 observes {closed_day}, a day the index's market is closed; "
         "no settle exists or will"
     ), why
 
@@ -1758,7 +1759,7 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
     np.testing.assert_array_equal(enc.group_contract, [1, 2])  # F27 held, at nothing
     np.testing.assert_array_equal(enc.slot_exposure, [20_000, 0])
     np.testing.assert_array_equal(enc.references, [1, 2])
-    assert enc.named_slot(1) == "trade 'ENTRY-002' at row 2 observes F27 on 2026-12-29"
+    assert enc.named_slot(1) == "trade 'ENTRY-002' at row 2 on 2026-12-29, a day F27 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
         "encoded_groups": 2,
@@ -2127,9 +2128,9 @@ def test_an_observation_crossing_the_preceding_contracts_window_is_refused() -> 
     with pytest.raises(ValueError) as refused:
         encoded(terms, observed_of(terms), UNITS, WorkCounter())
     assert str(refused.value) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; an observation of a "
-        "contract other than the day's pricing contract has no settle in a futures history, not "
-        "supported"
+        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
+        "takes the contract's own days, and a futures history holds no settle of Z26 for a day "
+        "X26 prices"
     )
 
 
@@ -2154,7 +2155,7 @@ def test_the_last3day_batch_encodes_three_slots_of_ten_and_one_fixed_leg() -> No
     np.testing.assert_array_equal(enc.offset_of_group, [-2_040.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09"))
     np.testing.assert_array_equal(enc.references, [1])
-    assert enc.named_slot(0) == "trade 'A' at row 1 observes Z26 on 2026-12-02"
+    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-02, a day Z26 prices"
     counts = counter.freeze().as_dict()
     assert (
         counts["encoded_components"],
@@ -2409,10 +2410,11 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_under_asian() 
     )
 
 
-def test_an_asian_month_another_contract_prices_is_refused_when_encoded() -> None:
-    # NYMEX NG's Z26 expires on 25 November: December's days price F27, so an asian Z26 on that
-    # schedule has no settle of its own for them and is refused at its first such day, the
-    # month neither truncated nor priced off another contract.
+def test_an_asian_month_another_contract_prices_takes_the_days_contracts_when_encoded() -> None:
+    # NYMEX NG's Z26 expires on 25 November: F27 prices December's days through its own expiry on
+    # the 29th and G27 the 30th and 31st, so an asian Z26 on that schedule observes its 22 days
+    # with F27 and then G27 as their references, the booked contract keeping the fixed leg and
+    # the payment, nothing truncated or substituted; calendar-driven-asian-references.md.
     ng_like = an_index(
         "x",
         (
@@ -2427,13 +2429,14 @@ def test_an_asian_month_another_contract_prices_is_refused_when_encoded() -> Non
         ("GAL", 1.0, "GAL"),
     )
     terms = asian_terms(ix=ng_like)
-    with pytest.raises(ValueError) as refused:
-        encoded(terms, observed_of(terms), UNITS, WorkCounter())
-    assert str(refused.value) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-01, a day F27 prices; an observation of a "
-        "contract other than the day's pricing contract has no settle in a futures history, not "
-        "supported"
-    )
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [1])  # booked as Z26, one group
+    np.testing.assert_array_equal(enc.slot_reference, [2] * 20 + [3] * 2)  # F27, then G27
+    np.testing.assert_array_equal(enc.references, [2, 3])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05"))
+    np.testing.assert_allclose(enc.slot_exposure, [100.0] * 22)
+    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-01, a day F27 prices"
+    assert enc.named_slot(21) == "trade 'A' at row 1 on 2026-12-31, a day G27 prices"
 
 
 def test_a_physical_asian_future_is_refused_by_the_kernel() -> None:
@@ -2456,7 +2459,7 @@ def test_the_asian_batch_encodes_22_slots_of_100_and_one_fixed_leg() -> None:
     np.testing.assert_allclose(enc.offset_of_group, [-528.0])
     np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05"))
     np.testing.assert_array_equal(enc.references, [1])
-    assert enc.named_slot(0) == "trade 'A' at row 1 observes Z26 on 2026-12-01"
+    assert enc.named_slot(0) == "trade 'A' at row 1 on 2026-12-01, a day Z26 prices"
     counts = counter.freeze().as_dict()
     assert (
         counts["encoded_components"],
@@ -3068,7 +3071,7 @@ def test_two_payment_days_on_one_contract_encode_as_two_groups_off_one_reference
     np.testing.assert_array_equal(enc.slot_of_observation, [0, 1, 2, 3, 4, 5])
     np.testing.assert_array_equal(enc.references, [1])  # the axis holds Z26 once
     np.testing.assert_array_equal(enc.reference_of_slot, [0] * 6)
-    assert enc.named_slot(3) == "trade 'B' at row 2 observes Z26 on 2026-12-02"
+    assert enc.named_slot(3) == "trade 'B' at row 2 on 2026-12-02, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 2,
         "encoded_groups": 2,
@@ -3536,8 +3539,8 @@ def test_the_mixed_rows_encode_as_the_ticket_says() -> None:
     np.testing.assert_allclose(enc.slot_exposure, [-62.0] + [1.0] * 19 + [43.0, 43.0, 85.0])
     np.testing.assert_array_equal(enc.slot_reference, [1] * 23)
     np.testing.assert_array_equal(enc.references, [1])  # one contract on the axis
-    assert enc.named_slot(0) == "trade 'B' at row 2 observes Z26 on 2026-12-30"
-    assert enc.named_slot(21) == "trade 'C' at row 3 observes Z26 on 2026-12-30"
+    assert enc.named_slot(0) == "trade 'B' at row 2 on 2026-12-30, a day Z26 prices"
+    assert enc.named_slot(21) == "trade 'C' at row 3 on 2026-12-30, a day Z26 prices"
     assert counter.freeze().as_dict() == {
         "encoded_components": 4,
         "encoded_groups": 2,
@@ -3902,7 +3905,7 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(tiny, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
-        "trade 'H' at row 1 observes Z26 on 2026-11-25 with inf live lots, expected a finite "
+        "trade 'H' at row 1 on 2026-11-25, a day Z26 prices, has inf live lots, expected a finite "
         "number of lots of BTU (1 BTU); the exposure in lots outruns the largest number"
     )
 
@@ -3952,3 +3955,386 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
         "the batch has inf of lot delta in all, expected a finite number of lots of BTU (1 BTU); "
         "the contracts' deltas, each finite, sum past the largest number"
     )
+
+
+# --- calendar-driven asian references ----------------------------------------------------------
+# calendar-driven-asian-references.md: an asian observation takes the contract the index's calendar
+# prices its day with, which need not be the contract the trade was booked on. A WTI-like index
+# whose contracts expire the month before their code's month, Z26 on 20 November, F27 on Monday
+# 21 December, G27 on 20 January and H27 on 22 February, the market and the payment calendar both
+# closed on 25 December and New Year's Day, quoted in dollars a barrel and settled in dollars, a
+# barrel the specification entered and a thousand-barrel LOT the reporting lot. A December asian
+# booked as Z26 observes December's pricing days, F27 pricing them through its expiry on the 21st
+# and G27 from the 22nd: the booked contract keeps the fixed leg and the payment, the day's
+# contract supplies its settle and its quote.
+WTI_HOLIDAYS = ("2026-12-25", "2027-01-01")
+WTI_CONTRACTS = (
+    ("Z26", "2026-11-20"),
+    ("F27", "2026-12-21"),
+    ("G27", "2027-01-20"),
+    ("H27", "2027-02-22"),
+)
+
+
+def wti_like(name: str, contracts: tuple[tuple[str, str], ...]) -> Index:
+    """An index of those contracts with the WTI-like conventions, the barrel and the lot."""
+    return index(
+        name,
+        futures_schedule(
+            tuple(code for code, _ in contracts), dates(*(expiry for _, expiry in contracts)), None
+        ),
+        index_conventions("USD", "BBL", "USD", "VOLUME", "BBL", UNITS),
+        contract_specifications(
+            ("BBL", "LOT"),
+            numbers(1.0, 1_000.0),
+            ("BBL", "BBL"),
+            numbers(0.0, 0.0),
+            numbers(0.0, 0.0),
+            UNITS,
+        ),
+        holiday_calendar(dates(*WTI_HOLIDAYS)),
+        "LOT",
+        UNITS,
+    )
+
+
+WTI = wti_like("WTI", WTI_CONTRACTS)
+WTI_PAYS = holiday_calendar(dates(*WTI_HOLIDAYS))
+# The ticket's six observation days, the 19th, 20th, 26th and 27th weekends and the 25th a
+# holiday, with their fixings as they arrive; 60 on every other fixed day and 78 on the 29th, a
+# day outside the window whose fixing must change nothing of this trade.
+WTI_WINDOW = ("2026-12-18", "2026-12-21", "2026-12-22", "2026-12-23", "2026-12-24", "2026-12-28")
+WTI_FIXINGS = dict(zip(WTI_WINDOW, (71.0, 73.0, 74.0, 76.0, 75.0, 77.0), strict=True))
+WTI_SETTLES = {**WTI_FIXINGS, "2026-12-29": 78.0}
+JANUARY_BOUNDS = ("2027-01-01", "2027-01-31")  # F27's own month, which a lastday row covers whole
+
+
+def wti_terms(
+    periods: tuple[tuple[str, str], ...] = (("2026-12-18", "2026-12-28"),),
+    quantities: tuple[float, ...] = (1_200.0,),
+    contracts: tuple[int, ...] = (0,),
+    pays: tuple[str, ...] = ("2026-12-30",),
+    methods: tuple[ScheduleMethod, ...] | None = None,
+    ix: Index = WTI,
+    price: float = 70.0,
+) -> ResolvedTrades:
+    """Trades on the WTI-like index, asian unless said, cleared and financial at 70 dollars a
+    barrel in barrels, each covering the days given on the contract row given and paying on the
+    day given, two business days after its last observation as the resolution would count."""
+    n = len(periods)
+    method = (
+        one_choice(METHODS, ScheduleMethod.ASIAN, n)
+        if methods is None
+        else np.array([METHODS.index(m) for m in methods], dtype=np.intp)
+    )
+    return resolved_trades(
+        FUTURE,
+        ix,
+        spec(n),
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        method,
+        one_choice(BASES, QuantityPer.MONTH, n),
+        tuple(f"W{k + 1}" for k in range(n)),
+        ("Prototype Clearing",) * n,
+        None,
+        np.repeat(day("2026-11-20"), n),
+        np.arange(n, dtype=np.intp),
+        rows(*contracts),
+        numbers(*quantities),
+        dates(*(start for start, _ in periods)),
+        dates(*(end for _, end in periods)),
+        numbers(*([price] * n)),
+        PaymentTerms(np.full(n, 2), (WTI_PAYS,) * n, dates(*pays)),
+    )
+
+
+def wti_history(
+    as_of: str, settles: dict[str, float] = WTI_SETTLES, ix: Index = WTI
+) -> MarketHistory:
+    """The index's history valued on that day: 60 on every fixed pricing day from the day after
+    the first contract expires, Saturday 21 November, so from Monday the 23rd, and the settles
+    given standing on their days, newest first as the creator takes them."""
+    cal = calendar(valuation_date(day(as_of), 0.5), ix)
+    priced = cal.dates[cal.is_fixed & cal.is_priced]
+    prices = np.full(priced.size, 60.0)
+    for text, price in settles.items():
+        prices[priced == day(text)] = price
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+
+
+def wti_valued(
+    as_of: str,
+    quotes: tuple[float, ...],
+    terms: ResolvedTrades | None = None,
+    settles: dict[str, float] = WTI_SETTLES,
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = wti_terms() if terms is None else terms
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = wti_history(as_of, settles, terms.index)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_a_december_asian_on_the_wti_like_index_references_f27_and_then_g27() -> None:
+    # The ticket's booking: 18 to 28 December, six pricing days of 200 barrels, F27 pricing the
+    # 18th and the 21st, its expiry day, and G27 the four from the 22nd; one group, Z26's, paying
+    # 30 December, two business days after the 28th; the delta axis F27 and G27, never Z26.
+    terms = wti_terms()
+    obs = observed_of(terms)
+    assert [str(d) for d in obs.date] == list(WTI_WINDOW)
+    np.testing.assert_allclose(obs.weight, np.full(6, 1 / 6))
+    counter = WorkCounter()
+    enc = encoded(terms, obs, UNITS, counter)
+    np.testing.assert_array_equal(enc.group_contract, [0])  # booked as Z26
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-30"))
+    np.testing.assert_array_equal(enc.slot_reference, [1, 1, 2, 2, 2, 2])  # F27 twice, G27 four
+    np.testing.assert_array_equal(enc.references, [1, 2])
+    np.testing.assert_allclose(enc.slot_exposure, [200.0] * 6)
+    np.testing.assert_allclose(enc.offset, [-84_000.0])
+    assert enc.named_slot(0) == "trade 'W1' at row 1 on 2026-12-18, a day F27 prices"
+    assert enc.named_slot(2) == "trade 'W1' at row 1 on 2026-12-22, a day G27 prices"
+    counts = counter.freeze().as_dict()
+    assert (counts["encoded_groups"], counts["encoded_observations"], counts["encoded_slots"]) == (
+        1,
+        6,
+        6,
+    )
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "sensitivity", "lots", "live_reads", "fixings_read"),
+    [
+        ("2026-12-18", (72.0, 75.0), 4_800, 0, (400.0, 800.0), (0.4, 0.8), 2, 0),
+        ("2026-12-19", (72.0, 75.0), 4_600, 0, (200.0, 800.0), (0.2, 0.8), 2, 1),
+        ("2026-12-22", (75.0,), 4_800, 0, (0.0, 800.0), (0.0, 0.8), 1, 2),
+        ("2026-12-22", (76.0,), 5_600, 0, (0.0, 800.0), (0.0, 0.8), 1, 2),
+        ("2026-12-29", (75.0,), 5_200, 0, (0.0, 0.0), (0.0, 0.0), 0, 6),
+        ("2026-12-30", (75.0,), 0, 5_200, (0.0, 0.0), (0.0, 0.0), 0, 6),
+    ],
+    ids=[
+        "18 Dec, all live",
+        "19 Dec, the first fixed",
+        "22 Dec, both F27 days fixed",
+        "22 Dec, G27 at 76",
+        "29 Dec, all fixed, unpaid",
+        "30 Dec, paid",
+    ],
+)
+def test_the_wti_asian_marks_fixes_and_pays_as_the_ticket_says(
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    sensitivity: tuple[float, float],
+    lots: tuple[float, float],
+    live_reads: int,
+    fixings_read: int,
+) -> None:
+    # The fixed leg -84,000; F27 at 72 and G27 at 75 while live; the vector starting at the
+    # contract of the first unfixed day, F27 through the 21st and G27 from the 22nd, when the
+    # retained F27 entry at zero asks the market for nothing.
+    result, counter = wti_valued(as_of, quotes)
+    assert (result.mark, result.cash) == (pytest.approx(mark), pytest.approx(cash))
+    assert result.codes() == ("F27", "G27")
+    np.testing.assert_allclose(result.price_sensitivity, sensitivity)
+    np.testing.assert_allclose(result.lot_delta, lots)
+    assert result.lot_delta_total == pytest.approx(sum(lots))
+    counts = counter.freeze().as_dict()
+    assert (counts["live_prices_read"], counts["fixings_read"], counts["prepared_slots"]) == (
+        live_reads,
+        fixings_read,
+        6,
+    )
+
+
+def test_a_tick_a_correction_and_an_unrelated_fixing_act_on_the_wti_asian_as_the_ticket_says() -> (
+    None
+):
+    # A tick to 76 over the same preparation: 5,600 from 4,800. The first fixing corrected from 71
+    # to 70: 200 less at the end, through a new history and a new preparation, the old results
+    # standing. The 29th's fixing, a day outside the window, moved from 78 to 90: nothing of the
+    # trade changes. Each live reference bumped by one on the 18th moves the mark by its own delta.
+    terms = wti_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = wti_history("2026-12-22")
+    prep = prepared_trades(enc, history, WorkCounter())
+    assert trade_results(prep, quoted(history, 75.0), WorkCounter()).mark == pytest.approx(4_800)
+    assert trade_results(prep, quoted(history, 76.0), WorkCounter()).mark == pytest.approx(5_600)
+    corrected = {**WTI_SETTLES, "2026-12-18": 70.0}
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(wti_history("2026-12-22", corrected), 75.0), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'WTI', expected the one the trades were "
+        "prepared against"
+    )
+    assert wti_valued("2026-12-29", (75.0,))[0].mark == pytest.approx(5_200)
+    assert wti_valued("2026-12-29", (75.0,), settles=corrected)[0].mark == pytest.approx(5_000)
+    paid = wti_valued("2026-12-30", (75.0,), settles={**WTI_SETTLES, "2026-12-29": 90.0})[0]
+    assert (paid.mark, paid.cash) == (0.0, pytest.approx(5_200))
+    assert wti_valued("2026-12-18", (73.0, 75.0))[0].mark == pytest.approx(4_800 + 400)
+    assert wti_valued("2026-12-18", (72.0, 76.0))[0].mark == pytest.approx(4_800 + 800)
+
+
+def test_a_full_december_on_the_wti_like_index_splits_22_days_15_to_f27_and_7_to_g27() -> None:
+    # 2,200 barrels over the whole of December at 70: 100 a day, F27 pricing 15 of the 22 days and
+    # G27 the 7 from the 22nd, exposure 1,500 and 700, the mark 6,500 all live at 72 and 75; the
+    # month's bounds the ones a code entry of Z26 gives, so the two forms agree.
+    starts, ends = bounds_of(WTI, rows(0))
+    assert (str(starts[0]), str(ends[0])) == ("2026-12-01", "2026-12-31")
+    terms = wti_terms(
+        periods=(("2026-12-01", "2026-12-31"),), quantities=(2_200.0,), pays=("2027-01-05",)
+    )
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.slot_reference, [1] * 15 + [2] * 7)
+    np.testing.assert_allclose(enc.slot_exposure, [100.0] * 22)
+    result, _ = wti_valued("2026-12-01", (72.0, 75.0), terms)
+    np.testing.assert_allclose(result.price_sensitivity, [1_500.0, 700.0])
+    assert result.mark == pytest.approx(6_500)
+    assert result.lot_delta_total == pytest.approx(2.2)
+
+
+def test_two_groups_on_one_pricing_day_stay_apart_by_their_booked_contracts() -> None:
+    # A December asian booked as Z26 over the 1st to the 21st and a lastday F27 both observe
+    # Monday 21 December, F27's expiry, off F27, and both pay the 22nd: two groups, Z26's and
+    # F27's, two slots on that day, one reference; the pair values as its singletons summed.
+    pair = wti_terms(
+        periods=(("2026-12-01", "2026-12-21"), JANUARY_BOUNDS),
+        quantities=(1_500.0, 1_000.0),
+        contracts=(0, 1),
+        pays=("2026-12-22", "2026-12-22"),
+        methods=(ScheduleMethod.ASIAN, ScheduleMethod.LASTDAY),
+    )
+    enc = encoded(pair, observed_of(pair), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [0, 1])
+    np.testing.assert_array_equal(enc.references, [1])  # F27 prices every day of both
+    on_the_21st = np.flatnonzero(enc.slot_date == day("2026-12-21"))
+    np.testing.assert_array_equal(enc.slot_group[on_the_21st], [0, 1])
+    asian = wti_terms(
+        periods=(("2026-12-01", "2026-12-21"),), quantities=(1_500.0,), pays=("2026-12-22",)
+    )
+    future = wti_terms(
+        periods=(JANUARY_BOUNDS,),
+        quantities=(1_000.0,),
+        contracts=(1,),
+        pays=("2026-12-22",),
+        methods=(ScheduleMethod.LASTDAY,),
+    )
+    both, _ = wti_valued("2026-12-01", (72.0, 75.0), pair)  # every day live
+    a, _ = wti_valued("2026-12-01", (72.0, 75.0), asian)
+    f, _ = wti_valued("2026-12-01", (72.0, 75.0), future)
+    assert both.codes() == a.codes() == f.codes() == ("F27",)
+    assert both.mark == pytest.approx(a.mark + f.mark)
+    np.testing.assert_allclose(both.price_sensitivity, [1_500.0 + 1_000.0])
+    np.testing.assert_allclose(a.price_sensitivity + f.price_sensitivity, [2_500.0])
+
+
+def test_the_roll_takes_the_calendars_contract_on_each_day_whatever_the_schedule() -> None:
+    # A schedule whose F27 expires Thursday 24 December, the 25th closed and the 26th and 27th a
+    # weekend: the 24th is F27's and Monday the 28th G27's, nothing observed between. A window
+    # within one contract's days references it alone. Contracts expiring every ten days or so
+    # give December four references: one rule, no lead or count assumed.
+    holiday_roll = wti_like(
+        "roll",
+        (
+            ("Z26", "2026-11-20"),
+            ("F27", "2026-12-24"),
+            ("G27", "2027-01-20"),
+            ("H27", "2027-02-22"),
+        ),
+    )
+    terms = wti_terms(ix=holiday_roll)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert [str(d) for d in enc.slot_date] == list(WTI_WINDOW)
+    np.testing.assert_array_equal(enc.slot_reference, [1, 1, 1, 1, 1, 2])
+    within = wti_terms(periods=(("2026-12-01", "2026-12-18"),), pays=("2026-12-22",))
+    enc = encoded(within, observed_of(within), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.references, [1])
+    assert enc.slot_group.size == 14
+    tens = wti_like(
+        "tens",
+        (
+            ("Z26", "2026-11-20"),
+            ("F27", "2026-12-04"),
+            ("G27", "2026-12-14"),
+            ("H27", "2026-12-24"),
+            ("J27", "2027-01-20"),
+        ),
+    )
+    terms = wti_terms(
+        periods=(("2026-12-01", "2026-12-31"),),
+        quantities=(2_200.0,),
+        pays=("2027-01-05",),
+        ix=tens,
+    )
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.slot_reference, [1] * 4 + [2] * 6 + [3] * 8 + [4] * 4)
+    np.testing.assert_array_equal(enc.references, [1, 2, 3, 4])
+    result, _ = wti_valued("2026-12-01", (72.0, 73.0, 74.0, 75.0), terms)
+    np.testing.assert_allclose(result.price_sensitivity, [400.0, 600.0, 800.0, 400.0])
+    assert result.mark == pytest.approx(-154_000 + 400 * 72 + 600 * 73 + 800 * 74 + 400 * 75)
+
+
+def test_an_asian_outside_the_calendars_coverage_is_refused_at_either_end() -> None:
+    # March 2027 lies after H27's expiry, so nothing prices it and the encoding says so; November's
+    # days before Z26 expires are the boundary contract's, which the calendar does not hold, so
+    # the preparation refuses the batch by its first slot, the day named and the contract that
+    # bounds the calendar.
+    march = wti_terms(periods=(("2027-03-01", "2027-03-31"),), contracts=(3,), pays=("2027-04-05",))
+    with pytest.raises(ValueError) as refused:
+        encoded(march, observed_of(march), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "trade 'W1' at row 1 observes 2027-03-01, after the schedule's last expiry, 2027-02-22; "
+        "nothing prices it"
+    )
+    november = wti_terms(periods=(("2026-11-02", "2026-11-19"),), pays=("2026-11-23",))
+    enc = encoded(november, observed_of(november), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.references, [0])
+    with pytest.raises(ValueError) as refused:
+        prepared_trades(enc, wti_history("2026-12-01"), WorkCounter())
+    assert str(refused.value) == (
+        "trade 'W1' at row 1 observes 2026-11-02, before the calendar begins on 2026-11-21; the "
+        "schedule's first contract, Z26, bounds the calendar and nothing prices its days"
+    )
+
+
+def test_an_asian_strip_on_the_wti_like_index_keeps_each_months_quantity_days_and_payment() -> None:
+    # December and January as one strip, 1,200 then 2,400 barrels: December's 22 days 15 to F27
+    # and 7 to G27, January's 20 days 13 to G27 and 7 to H27, each month its own group paying two
+    # business days after its last day, 5 January and 2 February; three references on the axis,
+    # each month's quantity shared over its own days.
+    terms = wti_terms(
+        periods=(("2026-12-01", "2026-12-31"), JANUARY_BOUNDS),
+        quantities=(1_200.0, 2_400.0),
+        contracts=(0, 1),
+        pays=("2027-01-05", "2027-02-02"),
+    )
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.group_contract, [0, 1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2027-01-05", "2027-02-02"))
+    np.testing.assert_array_equal(enc.slot_reference, [1] * 15 + [2] * 7 + [2] * 13 + [3] * 7)
+    np.testing.assert_array_equal(enc.references, [1, 2, 3])
+    result, _ = wti_valued("2026-12-01", (72.0, 75.0, 78.0), terms)
+    a_day = (1_200 / 22, 2_400 / 20)
+    sensitivity = (15 * a_day[0], 7 * a_day[0] + 13 * a_day[1], 7 * a_day[1])
+    np.testing.assert_allclose(result.price_sensitivity, sensitivity)
+    assert result.codes() == ("F27", "G27", "H27")
+    assert result.mark == pytest.approx(
+        -84_000 - 168_000 + 72 * sensitivity[0] + 75 * sensitivity[1] + 78 * sensitivity[2]
+    )
+    assert result.lot_delta_total == pytest.approx(3.6)
+
+
+def test_the_wti_asian_doubles_when_booked_twice_and_sums_into_one_group() -> None:
+    twice = wti_terms(
+        periods=(("2026-12-18", "2026-12-28"),) * 2,
+        quantities=(1_200.0, 1_200.0),
+        contracts=(0, 0),
+        pays=("2026-12-30", "2026-12-30"),
+    )
+    one, _ = wti_valued("2026-12-19", (72.0, 75.0))
+    both, _ = wti_valued("2026-12-19", (72.0, 75.0), twice)
+    assert both.mark == pytest.approx(2 * one.mark)
+    np.testing.assert_allclose(both.lot_delta, 2 * one.lot_delta)
+    assert both.prepared.encoded.slot_group.size == 6  # one group, the two rows' days summed

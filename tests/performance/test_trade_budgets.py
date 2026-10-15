@@ -927,3 +927,106 @@ def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     small_enc = encoded(small, observed_of(small), UNITS, WorkCounter())
     small_prep = prepared_trades(small_enc, history, WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+
+
+# --- the rolling asian batch, calendar-driven-asian-references.md -------------------------------
+# The same months on a schedule whose contracts expire on the 20th of the month before their own,
+# as crude's do, so that each month's pricing days are two contracts', the one expiring in it and
+# the next, and an asian batch references one contract more than it books: the same functions as
+# the month-aligned asian batch runs, every count by component, observation, slot and live
+# reference, and a tick that reads each distinct live reference once. Two months more than the
+# other schedules, so that the last booked month's later days have a contract to price them.
+ROLLING_MONTHS = np.arange("2026-10", "2029-01", dtype="datetime64[M]")
+ROLLING_CODES = tuple(f"{LETTERS[int(m.astype(int)) % 12]}{str(m)[2:4]}" for m in ROLLING_MONTHS)
+ROLLING_EXPIRIES = np.busday_offset(
+    (ROLLING_MONTHS - np.timedelta64(1, "M")).astype("datetime64[D]") + np.timedelta64(19, "D"),
+    0,
+    roll="backward",
+    holidays=HOLIDAYS,
+)
+ROLLING_GAS = index(
+    "rolling",
+    futures_schedule(ROLLING_CODES, ROLLING_EXPIRIES, None),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
+    ),
+    holiday_calendar(HOLIDAYS),
+    "lot",
+    UNITS,
+)
+
+
+def rolling_terms(components: int, contracts: int) -> ResolvedTrades:
+    rows = 1 + np.arange(components, dtype=np.intp) % contracts
+    return resolved_trades(
+        FUTURE,
+        ROLLING_GAS,
+        np.zeros(components, dtype=np.intp),
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        one_choice(METHODS, ScheduleMethod.ASIAN, components),
+        one_choice(BASES, QuantityPer.MONTH, components),
+        None,
+        None,
+        None,
+        np.repeat(np.datetime64("2026-09-24", "D"), components),
+        np.arange(components, dtype=np.intp),
+        rows,
+        np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        *month_bounds(SCHEDULE_MONTHS[rows]),
+        3.0 + (np.arange(components) % 7) / 100,
+        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+    )
+
+
+def rolling_market(history: MarketHistory) -> Market:
+    """A quote for every contract of the rolling schedule from the first unfixed period's on."""
+    cal = history.calendar
+    remaining = len(ROLLING_CODES) - int(cal.contract[cal.first_unfixed])
+    return market(history, price_vector("rolling", 3.5 + np.arange(remaining) / 100))
+
+
+@pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
+def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like_the_month_one(
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
+) -> None:
+    terms = rolling_terms(components, contracts)
+    counter = WorkCounter()
+    obs = observed_of(terms)
+    enc = encoded(terms, obs, UNITS, counter)
+    history = a_history(ix=ROLLING_GAS)
+    prep = prepared_trades(enc, history, counter)
+    quoted = rolling_market(history)
+    trade_results(prep, quoted, counter)
+    counts = counter.freeze().as_dict()
+    rows = 1 + np.arange(components) % contracts
+    assert counts["encoded_components"] == components
+    assert counts["encoded_groups"] == contracts  # one payment day a month: the booked contracts
+    assert counts["encoded_observations"] == int(MONTH_DAYS[rows].sum())
+    assert (
+        counts["encoded_slots"]
+        == counts["prepared_slots"]
+        == int(MONTH_DAYS[1 : contracts + 1].sum())
+    )
+    # Each booked month's days are two contracts', the one expiring in it and the next: the groups
+    # are rows 1 to `contracts`, the references rows 2 to `contracts` + 2, every slot's a row or
+    # two after its group's.
+    np.testing.assert_array_equal(np.unique(enc.group_contract), np.arange(1, contracts + 1))
+    np.testing.assert_array_equal(enc.references, np.arange(2, contracts + 3))
+    assert (enc.slot_reference >= enc.group_contract[enc.slot_group] + 1).all()
+    assert counts["live_prices_read"] == prep.live_references.size
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    assert numpy == PREPARATION_NUMPY, numpy
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }

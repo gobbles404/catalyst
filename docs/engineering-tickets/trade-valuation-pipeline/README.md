@@ -15,7 +15,8 @@ Surface any proposed change to an agreed boundary or economic meaning for design
 | Material | How engineering should use it |
 |---|---|
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
-| [Trade surface UAT notes](surface-uat-notes.md) | Running observations and owner decisions from Excel UAT, including delta in lots and trade identifiers |
+| [Trade surface UAT notes](surface-uat-notes.md) | Running observations and owner decisions from Excel UAT, including delta in lots, trade identifiers, date-helper inputs and ticket period precedence |
+| [Calendar driven Asian pricing references](calendar-driven-asian-references.md) | Generic daily reference resolution from the index schedule/calendar, separating averaging month and payment ownership from the futures supplying prices; built in #165 |
 | [Lot-delta reporting](lot-delta-reporting.md) | Engineering ticket for delta in an explicitly designated index-specific lot, preserving monetary valuation coefficients |
 | [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Planning ticket after the mixed-fields prototype: payment-level discounting, rate preparation, risk conventions and acceptance examples; open choices are marked |
 | [Golden harness plan](../ethane-golden-validation-harness.md) | Active plan for independent financial expectations and separately reviewed production snapshots |

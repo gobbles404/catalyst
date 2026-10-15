@@ -8,6 +8,12 @@ ticket, 7 October 2026. Next prototype slice after PR #157, reviewed at `592a6bc
 as one focused PR on the prototype's current head with that work included. This ticket does not
 decide how the prototype will reach main. The section at the end records what was built.
 
+**Follow-up, 8 October 2026:** [Calendar driven Asian pricing references](calendar-driven-asian-references.md)
+supersedes this initial slice's requirement that each observation reference its booked
+month's contract. The general rule takes the nearby reference from the supplied index
+schedule/calendar for each pricing day; month-aligned and rolling references share one path.
+This page otherwise records the original slice and its acceptance examples. Built in #165.
+
 ## Outcome and scope
 
 Support `schedule_method = asian` through the existing trade pipeline. Each contract
@@ -74,10 +80,10 @@ For each resolved contract component:
 3. Require at least one eligible day. Give each observation weight `1 / N`, where `N`
    is that component's total observation count. Weights sum to one separately for each
    component, including months of different lengths in the same strip.
-4. Retain the date-derived reference and coverage rules: each observation must map to
-   this component's own contract in the supplied index schedule. Refuse a mismatch;
-   do not truncate the month or silently switch to another contract's price or fixing.
-   The schedule's preceding boundary contract is still required for preparation.
+4. The initial slice required each date-derived reference to equal the component's own
+   contract. That restriction is superseded by [Calendar driven Asian pricing references](calendar-driven-asian-references.md).
+   Keep calendar coverage checks and the preceding boundary requirement; the Asian now
+   consumes each day's calendar reference even when it differs from the booked month.
 5. Count payment from the component's **last observation day**, using its existing
    payment lag and payment calendar. Use PR #157's shared anchor derivation. One payment
    per contract group was the compression boundary until #162,
@@ -292,7 +298,10 @@ Built as the page says, on the path the other methods take, with these particula
   anchor through #157's `_last_days`. A day that another contract prices is the encoding's
   existing refusal, `trade 'A' at row 1 observes Z26 on 2026-12-01, a day F27 prices; an
   observation of a contract other than the day's pricing contract has no settle in a futures
-  history, not supported`, and nothing is truncated or substituted.
+  history, not supported`, and nothing is truncated or substituted. Superseded in #165: an
+  asian day another contract prices takes that contract as its reference, the booked contract
+  keeping the fixed leg and the payment,
+  [calendar-driven-asian-references.md](calendar-driven-asian-references.md).
 - **The settlement and the words.** A physical `asian` is refused by the kernel by
   `settlement_method`: `settlement_method is 'physical', expected 'financial' with the asian
   method; an asian future is cash settled on the average of its month's pricing days`. With all
