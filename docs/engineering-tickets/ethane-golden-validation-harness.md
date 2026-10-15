@@ -329,7 +329,7 @@ unchanged can still require a separately reviewed provenance-only baseline updat
 A genuinely new case may include its first golden alongside its
 implementation/input changes, provided existing cases and snapshots remain unchanged and pass.
 
-Codify that new-case exception in `CLAUDE.md` and the related policy docs during harness
+Codify that new-case exception in `AGENTS.md` and the related policy docs during harness
 implementation; the present blanket wording does not express it. This plan adopts the user's
 explicit instruction and does not require another permission step to propose the alignment.
 

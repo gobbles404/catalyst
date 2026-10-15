@@ -275,4 +275,4 @@ uv sync --locked
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
 | what CI runs | `.github/workflows/ci.yml` |
-| the rules, the tenets, and the general learnings | `CLAUDE.md`, `PRINCIPLES.md`, [golden-rules.md](../golden-rules.md) |
+| the rules, the tenets, and the general learnings | `AGENTS.md`, `PRINCIPLES.md`, [golden-rules.md](../golden-rules.md) |

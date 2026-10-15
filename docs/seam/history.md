@@ -267,7 +267,7 @@ The pull request follows the template in the repository, six headings in order: 
 | The numbers at aaa5259, and every row paired with the first session | [baseline.md](baseline.md), [baseline/since-024486f.md](baseline/since-024486f.md), the CSVs in `docs/seam/baseline/` |
 | The first baseline, at 024486f | `docs/baseline.md` at commit 134d6d3, in git history |
 | One call across the seam as it stands, and the two sides | [walk.md](walk.md), [host.md](host.md), [bridge.md](bridge.md) |
-| The tenets, the general learnings, and the rules | [PRINCIPLES.md](../../PRINCIPLES.md), [golden-rules.md](../golden-rules.md), `CLAUDE.md` |
+| The tenets, the general learnings, and the rules | [PRINCIPLES.md](../../PRINCIPLES.md), [golden-rules.md](../golden-rules.md), `AGENTS.md` |
 | The pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
 | The bridge, the prepared path `Registered.run`, and `cells_from_buffers` | `src/goosedove/excel/bridge.py` |
 | The probes | `src/goosedove/excel/probes.py` |
