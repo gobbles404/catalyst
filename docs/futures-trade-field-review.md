@@ -4,6 +4,8 @@ Research collected 27 September 2026; design reconciliation 3 October 2026 · Go
 
 This report preserves research on Henry Hub, Waha, crude oil, refined products, ethane, carbon allowances and COMEX copper. Exchange facts are linked to primary sources; they have not been reverified during this documentation reconciliation. Sample trades and firm/account names are fictional.
 
+The ten commodity-family surveys, the cross-family matrix and the synthesis behind this report are in [docs/research](research/futures-contract-matrix.md), reviewed 14 September 2026 and frozen.
+
 **The [trade-valuation pipeline](engineering-tickets/trade-valuation-pipeline/README.md) is the current engineering contract.** Its [instrument field sketch](engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md), [ShowInstrument specification](library/instruments/show-instrument.md) and [CreateTrades specification](engineering-tickets/trade-valuation-pipeline/create-trade.md) supersede this report's earlier schema and build sequence. This survey is supporting research, not a second backlog or permission to add arbitrary trade fields. Physical delivery processing and margining are outside v1.
 
 ## 1. Research in the agreed pipeline
