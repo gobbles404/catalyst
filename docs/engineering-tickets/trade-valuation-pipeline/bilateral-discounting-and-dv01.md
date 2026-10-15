@@ -15,7 +15,9 @@ sensitivity of the discounted mark to a one basis point rise in continuously com
 rates, ACT/365F, not a finite bump, and the readers expose both lot deltas as distinct columns,
 `nominal_delta` and `delta`. The curve-date policy is agreed too: the curve is anchored at `as_of`,
 its start date the valuation day and a mismatch refused. No bilateral valuation is implemented by
-this ticket. Counterparty and marketing reserve are built in #175.
+this ticket. Counterparty and marketing reserve are built in #175, and the calculation kernel in
+#176, privately, [bilateral-calculation-kernel.md](bilateral-calculation-kernel.md); the public curve
+argument and the readers follow.
 
 **Subsequent UAT steer:** The owner expects reported delta in **lots**. The monetary
 delta formulas below remain valuation sensitivities; the reporting is settled as two lot columns,

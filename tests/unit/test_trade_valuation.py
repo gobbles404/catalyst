@@ -1187,8 +1187,8 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )  # fmt: skip
     trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*NG_ROWS), bilateral)
     assert evaluate(prepare(trades, ng["history"]), ng["market"]) == (
-        "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral "
-        "valuation needs discount factors and a DV01 convention, not built yet"
+        "#ERROR _EvaluateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
+        "with a bilateral batch; a physical delivery has no payment to discount"
     )
 
 
@@ -3877,8 +3877,8 @@ MARKETING_ROWS: list[list[object]] = [
 BILATERAL_FIELDS = ("quantity_per", "route", "settlement_method", "payment_time_lag")
 BILATERAL_VALUES: tuple[object, ...] = ("month", "bilateral", "financial", "+1bd")
 BILATERAL_REFUSAL = (
-    "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation "
-    "needs discount factors and a DV01 convention, not built yet"
+    "#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve "
+    "with a bilateral batch, whose payments it discounts"
 )
 
 

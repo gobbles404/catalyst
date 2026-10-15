@@ -890,7 +890,9 @@ def test_a_vector_that_stops_before_a_traded_contract_is_refused_by_the_market()
         trade_results(prep, quoted(history, 3.20), WorkCounter())
 
 
-def test_a_bilateral_batch_is_refused_until_rates_exist() -> None:
+def test_a_physical_bilateral_batch_is_refused_by_its_settlement() -> None:
+    # Since #176 a bilateral batch is valued on a curve, tests/unit/test_bilateral_kernel.py; the
+    # physical rows of the page under the bilateral route have no payment to discount.
     enc = encoded(
         terms_of(route=Route.BILATERAL),
         observed_of(terms_of(route=Route.BILATERAL)),
@@ -902,8 +904,8 @@ def test_a_bilateral_batch_is_refused_until_rates_exist() -> None:
     with pytest.raises(ValueError) as refused:
         trade_results(prep, quoted(history, 3.20, 3.50), WorkCounter())
     assert str(refused.value) == (
-        "route is bilateral, expected cleared; bilateral valuation needs discount factors "
-        "and a DV01 convention, not built yet"
+        "settlement_method is 'physical', expected 'financial' with a bilateral batch; a physical "
+        "delivery has no payment to discount"
     )
 
 

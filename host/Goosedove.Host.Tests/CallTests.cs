@@ -1991,7 +1991,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(22, facedTable.GetLength(1));
             Assert.Equal("counterparty", facedTable[0, 7]);
             Assert.Equal("ACME Trading", facedTable[2, 7]);
-            Assert.Equal("#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral valuation needs discount factors and a DV01 convention, not built yet", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market()));
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market()));
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
             var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
             var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "+2bd", pays));
