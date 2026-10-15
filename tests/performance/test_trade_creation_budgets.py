@@ -78,6 +78,7 @@ EXPIRIES = np.busday_offset(
 )
 GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, EXPIRIES, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -98,6 +99,7 @@ MONTH_ENDS = np.busday_offset(
 )
 ASIAN_GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -476,7 +478,7 @@ def sheet() -> dict[str, object]:
     ]
     return {
         "index": PATH["_CreateIndex"](
-            "gas", schedule, conventions, specifications, holidays, "lot"
+            "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
         ),
         "template": PATH["_CreateTradeTemplate"](
             "future", Cells.from_rows([list(TEMPLATE_FIELDS)]), Cells.from_rows([values])
@@ -770,6 +772,7 @@ MIXED_SIZES = [(8, 2), (2_000, 24)]
 MIXED_IDS = ["eight rows", "two thousand rows"]
 MIXED_GAS = index(
     "gas",
+    "Sample gas index",
     futures_schedule(CODES, MONTH_ENDS, None),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
@@ -908,6 +911,7 @@ IFERC_PUBLICATION = np.busday_offset(
 )
 BASIS = index(
     "basis",
+    "Sample basis index",
     iferc_schedule(CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(

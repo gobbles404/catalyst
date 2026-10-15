@@ -60,7 +60,9 @@ def an_index(
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either. Each call is a new index, as
     every call of the library's builder is; a calendar and the fixings it binds must share one."""
-    return index(name, schedule, CONVENTIONS, SPECIFICATIONS, holidays, None, UNITS)
+    return index(
+        name, f"{name} index", schedule, CONVENTIONS, SPECIFICATIONS, holidays, None, UNITS
+    )
 
 
 INDEX = an_index()

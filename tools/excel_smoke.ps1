@@ -148,7 +148,7 @@ $formulas = [ordered]@{
     "=_CreateContractSpecifications(EI1:EM1,EI9:EM9)" = "#ERROR _CreateContractSpecifications: ValueError: lot_size row 1 is 0.0, expected 1 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI10:EM10)" = "#ERROR _CreateContractSpecifications: ValueError: brokerage_rate_per_lot row 1 is -0.5, expected 0 or more"
     "=_CreateContractSpecifications(EI1:EM1,EI11:EM11)" = "#ERROR _CreateContractSpecifications: ValueError: lot_unit row 1 is 'usd', expected a VOLUME, MASS or ENERGY unit"
-    "=_CreateIndex(EC2,AI1,AP1,EN12,AM1)" = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,EN12,AM1)' = "#ERROR _CreateIndex: ValueError: specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     # The index: a creator over a name, the futures schedule in AI1, the conventions in AP1, the
     # specifications in BY1 and the holiday calendar in AM1, and over the IFERC schedule in DE1
     # and the Gas Daily schedule in DK1 without one, each read back through util_ReadHandle as one
@@ -177,36 +177,49 @@ $formulas = [ordered]@{
     '=LEFT(AI1,FIND(":",AI1)-1)'  = "{pid}"
     '=LEFT(CW1,FIND(":",CW1)-1)'  = "{pid}"
     "=ROWS(util_ReadHandle(EB1))"      = "3"
-    "=INDEX(util_ReadHandle(EB1),1,5)" = "has_holiday_calendar"
-    "=INDEX(util_ReadHandle(EB1),2,3)" = "int64"
+    "=INDEX(util_ReadHandle(EB1),1,6)" = "has_holiday_calendar"
+    "=INDEX(util_ReadHandle(EB1),2,4)" = "int64"
     "=INDEX(util_ReadHandle(EB1),3,1)" = "Henry Hub NYMEX"
-    "=INDEX(util_ReadHandle(EB1),3,2)" = "futures"
-    "=INDEX(util_ReadHandle(EB1),3,3)" = "6"
-    "=INDEX(util_ReadHandle(EB1),3,4)" = "2"
-    "=INDEX(util_ReadHandle(EB1),3,5)" = "TRUE"
-    "=INDEX(util_ReadHandle(EB1),1,6)" = "reporting_lot"
-    "=INDEX(util_ReadHandle(EB1),3,6)" = "lots"
-    "=INDEX(util_ReadHandle(EB1),1,7)" = "lot_size"
-    "=INDEX(util_ReadHandle(EB1),3,7)" = "1000"
-    "=INDEX(util_ReadHandle(EB1),3,8)" = "BBL"
-    "=INDEX(util_ReadHandle(EB1),1,9)" = "lot_quote_quantity"
-    "=INDEX(util_ReadHandle(EB1),3,9)" = "1000"
-    "=INDEX(util_ReadHandle(EB1),1,10)" = "lot_coefficient"
+    "=INDEX(util_ReadHandle(EB1),3,2)" = "Henry Hub natural gas - NYMEX"
+    "=INDEX(util_ReadHandle(EB1),3,3)" = "futures"
+    "=INDEX(util_ReadHandle(EB1),3,4)" = "6"
+    "=INDEX(util_ReadHandle(EB1),3,5)" = "2"
+    "=INDEX(util_ReadHandle(EB1),3,6)" = "TRUE"
+    "=INDEX(util_ReadHandle(EB1),1,7)" = "reporting_lot"
+    "=INDEX(util_ReadHandle(EB1),3,7)" = "lots"
+    "=INDEX(util_ReadHandle(EB1),1,8)" = "lot_size"
+    "=INDEX(util_ReadHandle(EB1),3,8)" = "1000"
+    "=INDEX(util_ReadHandle(EB1),3,9)" = "BBL"
+    "=INDEX(util_ReadHandle(EB1),1,10)" = "lot_quote_quantity"
     "=INDEX(util_ReadHandle(EB1),3,10)" = "1000"
-    "=COLUMNS(util_ReadHandle(EB1))"   = "10"
-    "=INDEX(util_ReadHandle(EB2),3,2)" = "IFERC"
-    "=INDEX(util_ReadHandle(EB2),3,5)" = "FALSE"
-    "=INDEX(util_ReadHandle(EB2),3,6)" = "unset"
-    "=COLUMNS(util_ReadHandle(EB2))"   = "6"
-    "=INDEX(util_ReadHandle(EB3),3,2)" = "Gas Daily"
-    "=INDEX(util_ReadHandle(EB3),3,3)" = "3"
-    "=_CreateIndex(EC2,AI1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
-    "=_CreateIndex(EC4,DK1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
-    "=_CreateIndex(EC2,AM1,AP1,BY1)" = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
-    "=_CreateIndex(EC2,AI1,AP1)" = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
-    "=_CreateIndex(C2,AI1,AP1,BY1,AM1)" = "#ERROR _CreateIndex: name is blank, expected text"
-    '=_CreateIndex(EC2,AI1,AP1,BY1,AM1,"LOT")' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
-    "=_CreateIndex(EC2,AI1,AP1,BY1,AM1,C2)" = "#ERROR _CreateIndex: reporting_lot is blank, expected text"
+    "=INDEX(util_ReadHandle(EB1),1,11)" = "lot_coefficient"
+    "=INDEX(util_ReadHandle(EB1),3,11)" = "1000"
+    "=COLUMNS(util_ReadHandle(EB1))"   = "11"
+    "=INDEX(util_ReadHandle(EB2),3,2)" = "Henry Hub natural gas - Inside FERC monthly index"
+    "=INDEX(util_ReadHandle(EB2),3,3)" = "IFERC"
+    "=INDEX(util_ReadHandle(EB2),3,6)" = "FALSE"
+    "=INDEX(util_ReadHandle(EB2),3,7)" = "unset"
+    "=COLUMNS(util_ReadHandle(EB2))"   = "7"
+    "=INDEX(util_ReadHandle(EB3),3,3)" = "Gas Daily"
+    "=INDEX(util_ReadHandle(EB3),3,4)" = "3"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
+    '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AM1,AP1,BY1)' = "#ERROR _CreateIndex: ValueError: schedule is a holiday calendar, expected a futures, IFERC or Gas Daily schedule"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1)' = "#ERROR _CreateIndex: contract_specifications is missing, expected contract specifications handle"
+    '=_CreateIndex(C2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: name is blank, expected text"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,"LOT")' = "#ERROR _CreateIndex: ValueError: reporting_lot is 'LOT', expected one of the specifications: 'lots', 'gal'"
+    '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,C2)' = "#ERROR _CreateIndex: reporting_lot is blank, expected text"
+    # Readable index names, readable-index-names.md: the display name right after the name, text
+    # kept as typed and shown beside the name by util_ReadHandle, nothing else reading it; the
+    # handle still carries the name; a missing, blank, numeric or empty display name refused in the
+    # seam's words.
+    "=INDEX(util_ReadHandle(EB1),1,1)"   = "name"
+    "=INDEX(util_ReadHandle(EB1),1,2)"   = "display_name"
+    "=INDEX(util_ReadHandle(EB1),2,2)"   = "str"
+    "=_CreateIndex(EC2)"                 = "#ERROR _CreateIndex: display_name is missing, expected text"
+    '=_CreateIndex(EC2,C2,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is blank, expected text"
+    '=_CreateIndex(EC2,A1,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is number 1.0, expected text"
+    '=_CreateIndex(EC2,I2,AI1,AP1,BY1,AM1)' = "#ERROR _CreateIndex: display_name is empty text, expected text"
     "=_CreateTrades(ED2,FG1:FK1,FG2:FK2,EW3)" = "#ERROR _CreateTrades: ValueError: index 'Henry Hub NYMEX' has no reporting_lot, expected one of its specifications named when the index was made; a batch's delta is reported in lots of it"
     # The futures fixings: a creator over a column of four days, newest first, and a column of
     # their settles and the futures index in EB1, and over the first row alone, read back through
@@ -1269,7 +1282,7 @@ $cells = [ordered]@{
     "FM2" = "=_CreateContractSpecifications(EI1:EM1,FN2:FR2)"
     "FM3" = "=_CreateFuturesSchedule(FS1:FS4,FT1:FT4)"
     "FM4" = "=_CreateHolidayCalendar(FU1:FU3)"
-    "FM5" = '=_CreateIndex("TOY_GAS",FM3,FM1,FM2,FM4,"TOY")'
+    "FM5" = '=_CreateIndex("TOY_GAS","Toy natural gas for the NG example",FM3,FM1,FM2,FM4,"TOY")'
     "FM6" = "=_CreateValuationDate(FV1,0.5)"
     "FM7" = "=_CreateCalendar(FM6,FM5)"
     "FM8" = "=_CreateFuturesFixings(FW1:FW21,FX1:FX21,FM5)"
@@ -1320,7 +1333,7 @@ $cells = [ordered]@{
     "HD1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
     "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
-    "HA5" = '=_CreateIndex("SYN",HA4,HD1,HE1,HC1,"UNIT")'
+    "HA5" = '=_CreateIndex("SYN","Synthetic gas index for the last3day example",HA4,HD1,HE1,HC1,"UNIT")'
     "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_time_lag"; "HQ1" = "payment_holiday_calendar"
     "HJ2" = "UNIT"; "HK2" = "month"; "HL2" = "last3day"; "HM2" = "cleared"; "HN2" = "financial"; "HO2" = "Prototype Clearing"; "HP2" = "+2bd"; "HQ2" = "=HC2"
     "HJ3" = '=_CreateTradeTemplate("future",HJ1:HQ1,HJ2:HQ2)'
@@ -1368,7 +1381,7 @@ $cells = [ordered]@{
     "ID1" = '=_CreateIndexConventions("USD","GAL","USD","VOLUME","GAL")'
     "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
     "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
-    "IA6" = '=_CreateIndex("ETHANE",IA5,ID1,IE1,IC1,"GAL")'
+    "IA6" = '=_CreateIndex("ETHANE","Ethane - synthetic volume index",IA5,ID1,IE1,IC1,"GAL")'
     "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_time_lag"; "IQ1" = "payment_holiday_calendar"
     "IJ2" = "GAL"; "IK2" = "month"; "IL2" = "asian"; "IM2" = "cleared"; "IN2" = "financial"; "IO2" = "Prototype Clearing"; "IP2" = "+2bd"; "IQ2" = "=IC2"
     "IJ3" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ2:IQ2)'
@@ -1443,7 +1456,7 @@ $cells = [ordered]@{
     "JE1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "JF2" = "UNIT"; "JG2" = "1"; "JH2" = "MMBTU"; "JI2" = "0"; "JJ2" = "0"
     "JF1" = "=_CreateContractSpecifications(EI1:EM1,JF2:JJ2)"
-    "JB5" = '=_CreateIndex("PAYS",JB4,JE1,JF1,JD1,"UNIT")'
+    "JB5" = '=_CreateIndex("PAYS","Synthetic gas index for the payment-groups example",JB4,JE1,JF1,JD1,"UNIT")'
     "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_holiday_calendar"
     "JL2" = "UNIT"; "JM2" = "month"; "JN2" = "last3day"; "JO2" = "cleared"; "JP2" = "financial"; "JQ2" = "Prototype Clearing"; "JR2" = "=JD1"
     "JL3" = '=_CreateTradeTemplate("future",JL1:JR1,JL2:JR2)'
@@ -1493,7 +1506,7 @@ $cells = [ordered]@{
     "KH2" = "GAL"; "KI2" = "1"; "KJ2" = "GAL"; "KK2" = "0"; "KL2" = "0"
     "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
     "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
-    "KD6" = '=_CreateIndex("MIXED",KD5,KG1,KH1,KF1,"GAL")'
+    "KD6" = '=_CreateIndex("MIXED","Synthetic volume index for the mixed-fields example",KD5,KG1,KH1,KF1,"GAL")'
     "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_time_lag"; "KS1" = "payment_holiday_calendar"
     "KN2" = "cleared"; "KO2" = "financial"; "KP2" = "30-Nov-2026"; "KQ2" = "10"; "KR2" = "+1bd"; "KS2" = "=KF2"
     "KN3" = '=_CreateTradeTemplate("future",KN1:KS1,KN2:KS2)'
@@ -1551,7 +1564,7 @@ $cells = [ordered]@{
     "ME1" = "BBL"; "MF1" = "1"; "MG1" = "BBL"; "MH1" = "0"; "MI1" = "0"
     "ME2" = "LOT"; "MF2" = "1000"; "MG2" = "BBL"; "MH2" = "0"; "MI2" = "0"
     "ME3" = "=_CreateContractSpecifications(EI1:EM1,ME1:MI2)"
-    "MA6" = '=_CreateIndex("WTI",MA5,MD1,ME3,MC3,"LOT")'
+    "MA6" = '=_CreateIndex("WTI","West Texas Intermediate crude oil - NYMEX",MA5,MD1,ME3,MC3,"LOT")'
     "MJ2" = "BBL"; "MK2" = "month"; "ML2" = "asian"; "MM2" = "cleared"; "MN2" = "financial"; "MO2" = "Prototype Clearing"; "MP2" = "+2bd"; "MQ2" = "=MC3"
     "MJ3" = '=_CreateTradeTemplate("future",IJ1:IQ1,MJ2:MQ2)'
     "MS1" = "trade_id"; "MT1" = "trade_date"; "MU1" = "start_date"; "MV1" = "end_date"; "MW1" = "quantity"; "MX1" = "fixed_price"
@@ -1623,7 +1636,7 @@ $cells = [ordered]@{
     "NM1" = "LOT"; "NN1" = "2500"; "NO1" = "MMBTU"; "NP1" = "0"; "NQ1" = "0"
     "NM2" = "MMBTU"; "NN2" = "1"; "NO2" = "MMBTU"; "NP2" = "0"; "NQ2" = "0"
     "NM3" = "=_CreateContractSpecifications(EI1:EM1,NM1:NQ2)"
-    "NH5" = '=_CreateIndex("WAHA",NH4,NL1,NM3,,"LOT")'
+    "NH5" = '=_CreateIndex("WAHA","Waha basis - ICE",NH4,NL1,NM3,,"LOT")'
     "NR2" = "LOT"; "NS2" = "month"; "NT2" = "lastday"; "NU2" = "cleared"; "NV2" = "financial"; "NW2" = "ICE Clear Europe"; "NX2" = "+3bd"; "NY2" = "=NK2"
     "NR3" = '=_CreateTradeTemplate("future",IJ1:IQ1,NR2:NY2)'
     "NR5" = "1001"; "NS5" = "30-Nov-2026"; "NT5" = "Z26"; "NU5" = "1"; "NV5" = "-0.5"
@@ -1886,21 +1899,21 @@ $cells = [ordered]@{
     # calendar in AM1, the IFERC schedule in DE1 and the Gas Daily schedule in DK1, each with the
     # conventions in AP1 and the specifications in BY1.
     "EC2" = "Henry Hub NYMEX"; "EC3" = "Henry Hub IFERC"; "EC4" = "Henry Hub Gas Daily"
-    "EB1" = '=_CreateIndex(EC2,AI1,AP1,BY1,AM1,"lots")'
-    "EB2" = "=_CreateIndex(EC3,DE1,AP1,BY1)"
-    "EB3" = "=_CreateIndex(EC4,DK1,AP1,BY1)"
+    "EB1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AI1,AP1,BY1,AM1,"lots")'
+    "EB2" = '=_CreateIndex(EC3,"Henry Hub natural gas - Inside FERC monthly index",DE1,AP1,BY1)'
+    "EB3" = '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK1,AP1,BY1)'
     # The indices the calendars and the futures fixings take, the schedule and the holiday calendar
     # reached through them: over the two-contract schedule in CT4 with the holiday calendar in AM1
     # and with the one in CT10, over the two contracts after m26 in CW3, over the four schedules
     # the calendar refuses, AR2 to AR5, and over the Gas Daily schedule with a gap in DK3.
-    "ED1" = '=_CreateIndex(EC2,CT4,AP1,BY1,AM1,"lots")'
-    "ED2" = "=_CreateIndex(EC2,CT4,AP1,BY1,CT10)"
-    "ED3" = "=_CreateIndex(EC2,CW3,AP1,BY1,AM1)"
-    "ED4" = "=_CreateIndex(EC2,AR2,AP1,BY1,AM1)"
-    "ED5" = "=_CreateIndex(EC2,AR3,AP1,BY1,AM1)"
-    "ED6" = "=_CreateIndex(EC2,AR4,AP1,BY1,AM1)"
-    "ED7" = "=_CreateIndex(EC2,AR5,AP1,BY1,AM1)"
-    "ED8" = "=_CreateIndex(EC4,DK3,AP1,BY1)"
+    "ED1" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,AM1,"lots")'
+    "ED2" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CT4,AP1,BY1,CT10)'
+    "ED3" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",CW3,AP1,BY1,AM1)'
+    "ED4" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR2,AP1,BY1,AM1)'
+    "ED5" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR3,AP1,BY1,AM1)'
+    "ED6" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR4,AP1,BY1,AM1)'
+    "ED7" = '=_CreateIndex(EC2,"Henry Hub natural gas - NYMEX",AR5,AP1,BY1,AM1)'
+    "ED8" = '=_CreateIndex(EC4,"Henry Hub natural gas - Platts Gas Daily",DK3,AP1,BY1)'
     # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
     # a schedule runs, the codes in BV, ICE's last trading days and Platts' publication days
     # beside them, and an index over it.
@@ -1910,7 +1923,7 @@ $cells = [ordered]@{
     "EF4" = "27-Feb-2026"; "EG4" = "2-Mar-2026"
     "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
     "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
-    "EE2" = "=_CreateIndex(EC5,EE1,AP1,BY1)"
+    "EE2" = '=_CreateIndex(EC5,"Waha basis - Inside FERC monthly index",EE1,AP1,BY1)'
 }
 
 # --- build the host and tell it where Python is -----------------------------

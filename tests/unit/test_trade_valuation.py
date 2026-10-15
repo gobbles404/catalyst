@@ -95,6 +95,7 @@ def an_index(
     lot = lots[0][0] if reporting_lot == "" else reporting_lot
     made = ENTRY["_CreateIndex"](
         name,
+        f"{name} index",
         schedule,
         conventions,
         specifications,
@@ -2157,7 +2158,15 @@ def mixed() -> dict[str, Any]:
         rows(["GAL", 1.0, "GAL", 0.0, 0.0], ["BBL", 1.0, "BBL", 0.0, 0.0]),
     )
     index = str(
-        ENTRY["_CreateIndex"]("MIXED", schedule, conventions, specifications, holidays, "GAL")
+        ENTRY["_CreateIndex"](
+            "MIXED",
+            "Synthetic volume index for the mixed-fields example",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            "GAL",
+        )
     )
     payments = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
     template = ENTRY["_CreateTradeTemplate"](
@@ -2385,7 +2394,13 @@ def ete_index(
         rows(*[[name, size, unit, 0.0, 0.0] for name, size, unit in ETE_LOTS]),
     )
     made = ENTRY["_CreateIndex"](
-        "ETE", schedule, conventions, specifications, calendar, reporting_lot
+        "ETE",
+        "Ethane - synthetic volume index",
+        schedule,
+        conventions,
+        specifications,
+        calendar,
+        reporting_lot,
     )
     return str(made)
 
@@ -2558,14 +2573,14 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
     assert spilled(ENTRY["_ReportValues"](results))[2][2] == settled
     assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "lots of LOT (1000 BBL)"
     shown = spilled(ENTRY["util_ReadHandle"](index))
-    assert shown[0][5:] == [
+    assert shown[0][6:] == [
         "reporting_lot",
         "lot_size",
         "lot_unit",
         "lot_quote_quantity",
         "lot_coefficient",
     ]
-    assert shown[2][5:] == [
+    assert shown[2][6:] == [
         "LOT",
         1000.0,
         "BBL",
@@ -3096,7 +3111,7 @@ def an_iferc_index(
     )
     return str(
         ENTRY["_CreateIndex"](
-            name, schedule, conventions, specifications, bridge.MISSING, lots[0][0]
+            name, f"{name} index", schedule, conventions, specifications, bridge.MISSING, lots[0][0]
         )
     )
 

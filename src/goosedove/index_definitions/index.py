@@ -47,7 +47,9 @@ class ReportingLot:
 
 @dataclass(frozen=True, slots=True)
 class Index:
-    """The name as the desk typed it, a label and nothing more; the kind, read off the schedule;
+    """The name as the desk typed it, a label and nothing more, and since #169 the display name, a
+    description a reader who does not know the desk's short names would understand, kept as
+    typed and read for nothing but the readback; the kind, read off the schedule;
     the four objects themselves, kept by reference and unchanged: the schedule, the holiday
     calendar, a futures index's own and None on the other two, the conventions and the
     specifications, whose lot units are units of the conventions' quantity type, the one fact
@@ -57,6 +59,7 @@ class Index:
     again."""
 
     name: str
+    display_name: str
     kind: Kind
     schedule: FuturesSchedule | IfercSchedule | GasDailySchedule
     holiday_calendar: HolidayCalendar | None
@@ -67,6 +70,7 @@ class Index:
 
 def index(
     name: str,
+    display_name: str,
     schedule: object,
     conventions: IndexConventions,
     specifications: ContractSpecifications,
@@ -94,7 +98,10 @@ def index(
     looked up once, and the two numbers are finite, since a lot size that outruns the largest
     number would divide every delta into nothing; left out, the index has none, and a batch of
     trades on it is refused when it is made, never a market. The name is a label, kept as typed,
-    neither unique nor looked up; whether the four objects are one index's is otherwise the desk's
+    neither unique nor looked up, and the display name, since #169, a description beside it, kept
+    as typed too, nothing reading it but the readback, the two free to say the same thing; the
+    handle and the price vector's match take the name alone. Whether the four objects are one
+    index's is otherwise the desk's
     to keep right, since nothing in any of them says which index it belongs to. Nothing is copied
     and nothing is built but the small record; the one pass is over the specifications' lot
     units, one lookup per row, and nothing of the schedule is looked at.
@@ -113,7 +120,7 @@ def index(
         else _the_reporting_lot(reporting_lot, conventions, specifications, units)
     )
     typed = cast(FuturesSchedule | IfercSchedule | GasDailySchedule, schedule)  # what the kind said
-    return Index(name, kind, typed, calendar, conventions, specifications, lot)
+    return Index(name, display_name, kind, typed, calendar, conventions, specifications, lot)
 
 
 def _the_reporting_lot(

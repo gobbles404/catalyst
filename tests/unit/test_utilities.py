@@ -175,7 +175,16 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
         ],
     )
     text = bridge.call(
-        "_CreateIndex", ["sample", schedule, conventions, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [
+            "sample",
+            "Sample futures index",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text
@@ -954,15 +963,32 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
     )
     made = bridge.call(
         "_CreateIndex",
-        ["Henry Hub NYMEX", schedule, conventions, specifications, holidays, MISSING],
+        [
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     )
     kinds, slots, joined = read(made)
     assert rows((kinds, slots, joined)) == [
-        ["name", "kind", "contracts", "specifications", "has_holiday_calendar", "reporting_lot"],
-        ["str", "str", "int64", "int64", "bool", "str"],
-        ["Henry Hub NYMEX", "futures", 2.0, 1.0, 1.0, "unset"],
+        [
+            "name",
+            "display_name",
+            "kind",
+            "contracts",
+            "specifications",
+            "has_holiday_calendar",
+            "reporting_lot",
+        ],
+        ["str", "str", "str", "int64", "int64", "bool", "str"],
+        ["Henry Hub NYMEX", "Henry Hub natural gas - NYMEX", "futures", 2.0, 1.0, 1.0, "unset"],
     ]
     assert kinds[2].tolist() == [
+        TEXT_CODE,
         TEXT_CODE,
         TEXT_CODE,
         NUMBER_CODE,
@@ -977,11 +1003,27 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
     kinds, slots, joined = read(
         bridge.call(
             "_CreateIndex",
-            ["Henry Hub IFERC", month, conventions, specifications, MISSING, MISSING],
+            [
+                "Henry Hub IFERC",
+                "Henry Hub natural gas - Inside FERC monthly index",
+                month,
+                conventions,
+                specifications,
+                MISSING,
+                MISSING,
+            ],
         )
     )
-    assert rows((kinds, slots, joined))[2] == ["Henry Hub IFERC", "IFERC", 1.0, 1.0, 0.0, "unset"]
-    assert kinds[2, 4] == BOOLEAN_CODE
+    assert rows((kinds, slots, joined))[2] == [
+        "Henry Hub IFERC",
+        "Henry Hub natural gas - Inside FERC monthly index",
+        "IFERC",
+        1.0,
+        1.0,
+        0.0,
+        "unset",
+    ]
+    assert kinds[2, 5] == BOOLEAN_CODE
 
 
 def test_every_kind_a_creator_publishes_has_a_table() -> None:

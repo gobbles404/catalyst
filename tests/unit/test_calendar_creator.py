@@ -65,7 +65,16 @@ def an_index(schedule: object, holidays: object = MISSING) -> str:
         ],
     )
     text = bridge.call(
-        "_CreateIndex", ["sample", schedule, conventions, specifications, holidays, MISSING]
+        "_CreateIndex",
+        [
+            "sample",
+            "Sample futures index",
+            schedule,
+            conventions,
+            specifications,
+            holidays,
+            MISSING,
+        ],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:index:"), text
     return text

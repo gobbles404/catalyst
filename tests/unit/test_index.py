@@ -83,7 +83,9 @@ def an_index(
     holidays: HolidayCalendar | None = HOLIDAYS,
     reporting_lot: str | None = None,
 ) -> Index:
-    return index(name, schedule, CONVENTIONS, specifications, holidays, reporting_lot, UNITS)
+    return index(
+        name, f"{name} index", schedule, CONVENTIONS, specifications, holidays, reporting_lot, UNITS
+    )
 
 
 # --- the sample ---------------------------------------------------------------
@@ -100,10 +102,28 @@ def test_the_futures_sample_binds_its_four_objects_and_reads_its_kind_off_the_sc
 
 
 def test_the_iferc_and_gas_daily_samples_carry_no_holiday_calendar() -> None:
-    monthly = index("Henry Hub IFERC", IFERC, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    monthly = index(
+        "Henry Hub IFERC",
+        "Henry Hub natural gas - Inside FERC monthly index",
+        IFERC,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        None,
+        None,
+        UNITS,
+    )
     assert monthly.kind is Kind.IFERC
     assert monthly.schedule is IFERC and monthly.holiday_calendar is None
-    daily = index("Henry Hub Gas Daily", GAS_DAILY, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+    daily = index(
+        "Henry Hub Gas Daily",
+        "Henry Hub natural gas - Platts Gas Daily",
+        GAS_DAILY,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        None,
+        None,
+        UNITS,
+    )
     assert daily.kind is Kind.GAS_DAILY
     assert daily.schedule is GAS_DAILY and daily.holiday_calendar is None
     assert monthly.conventions is daily.conventions is CONVENTIONS
@@ -123,7 +143,16 @@ def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None
         (an_index(), "an index"),
     ):
         with pytest.raises(ValueError) as failure:
-            index("Henry Hub NYMEX", wrong, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+            index(
+                "Henry Hub NYMEX",
+                "Henry Hub natural gas - NYMEX",
+                wrong,
+                CONVENTIONS,
+                SPECIFICATIONS,
+                None,
+                None,
+                UNITS,
+            )
         assert str(failure.value) == (
             f"schedule is {what}, expected a futures, IFERC or Gas Daily schedule"
         )
@@ -131,17 +160,44 @@ def test_an_object_that_is_not_a_schedule_is_refused_naming_what_it_is() -> None
 
 def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one() -> None:
     with pytest.raises(ValueError) as failure:
-        index("Henry Hub NYMEX", FUTURES, CONVENTIONS, SPECIFICATIONS, None, None, UNITS)
+        index(
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            FUTURES,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            None,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "holiday_calendar is missing, expected holiday calendar handle with a futures schedule"
     )
     with pytest.raises(ValueError) as failure:
-        index("Henry Hub IFERC", IFERC, CONVENTIONS, SPECIFICATIONS, HOLIDAYS, None, UNITS)
+        index(
+            "Henry Hub IFERC",
+            "Henry Hub natural gas - Inside FERC monthly index",
+            IFERC,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "holiday_calendar is a holiday calendar, expected none with an IFERC schedule"
     )
     with pytest.raises(ValueError) as failure:
-        index("Henry Hub Gas Daily", GAS_DAILY, CONVENTIONS, SPECIFICATIONS, HOLIDAYS, None, UNITS)
+        index(
+            "Henry Hub Gas Daily",
+            "Henry Hub natural gas - Platts Gas Daily",
+            GAS_DAILY,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "holiday_calendar is a holiday calendar, expected none with a Gas Daily schedule"
     )
@@ -149,7 +205,16 @@ def test_a_futures_index_needs_its_holiday_calendar_and_the_other_two_refuse_one
 
 def test_the_schedule_is_checked_before_the_holiday_calendar() -> None:
     with pytest.raises(ValueError) as failure:
-        index("Henry Hub NYMEX", HOLIDAYS, CONVENTIONS, SPECIFICATIONS, HOLIDAYS, None, UNITS)
+        index(
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            HOLIDAYS,
+            CONVENTIONS,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value).startswith("schedule is a holiday calendar")
 
 
@@ -181,7 +246,16 @@ def test_specifications_need_not_answer_to_the_schedules_codes_or_count() -> Non
         UNITS,
     )
     assert (
-        index("Henry Hub IFERC", IFERC, CONVENTIONS, three, None, None, UNITS).specifications
+        index(
+            "Henry Hub IFERC",
+            "Henry Hub natural gas - Inside FERC monthly index",
+            IFERC,
+            CONVENTIONS,
+            three,
+            None,
+            None,
+            UNITS,
+        ).specifications
         is three
     )
 
@@ -195,10 +269,28 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
     barrels_and_gallons = contract_specifications(
         ("lots", "gal"), np.array([1000.0, 1.0]), ("BBL", "GAL"), np.zeros(2), np.zeros(2), UNITS
     )
-    made = index("WTI NYMEX", FUTURES, volume, barrels_and_gallons, HOLIDAYS, None, UNITS)
+    made = index(
+        "WTI NYMEX",
+        "West Texas Intermediate crude oil - NYMEX",
+        FUTURES,
+        volume,
+        barrels_and_gallons,
+        HOLIDAYS,
+        None,
+        UNITS,
+    )
     assert made.specifications is barrels_and_gallons
     with pytest.raises(ValueError) as failure:
-        index("WTI NYMEX", FUTURES, volume, SPECIFICATIONS, HOLIDAYS, None, UNITS)
+        index(
+            "WTI NYMEX",
+            "West Texas Intermediate crude oil - NYMEX",
+            FUTURES,
+            volume,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "specifications row 1 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     )
@@ -211,18 +303,45 @@ def test_lot_units_of_the_indexs_measure_pass_and_another_measures_are_refused()
         UNITS,
     )
     with pytest.raises(ValueError) as failure:
-        index("WTI NYMEX", FUTURES, volume, mixed, HOLIDAYS, None, UNITS)
+        index(
+            "WTI NYMEX",
+            "West Texas Intermediate crude oil - NYMEX",
+            FUTURES,
+            volume,
+            mixed,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "specifications row 3 lot_unit is 'MMBTU', expected a VOLUME unit, GAL, BBL, L or M3"
     )
     with pytest.raises(ValueError) as failure:
-        index("Henry Hub NYMEX", FUTURES, CONVENTIONS, barrels_and_gallons, HOLIDAYS, None, UNITS)
+        index(
+            "Henry Hub NYMEX",
+            "Henry Hub natural gas - NYMEX",
+            FUTURES,
+            CONVENTIONS,
+            barrels_and_gallons,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
     assert str(failure.value) == (
         "specifications row 1 lot_unit is 'BBL', expected an ENERGY unit, MMBTU, BTU, THERM, GJ, "
         "MWH or KWH"
     )
     with pytest.raises(ValueError, match=r"^holiday_calendar is a holiday calendar, expected none"):
-        index("Henry Hub IFERC", IFERC, volume, SPECIFICATIONS, HOLIDAYS, None, UNITS)
+        index(
+            "Henry Hub IFERC",
+            "Henry Hub natural gas - Inside FERC monthly index",
+            IFERC,
+            volume,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            None,
+            UNITS,
+        )
 
 
 # --- ownership ----------------------------------------------------------------
@@ -232,6 +351,7 @@ def test_the_index_keeps_its_objects_themselves_and_refuses_writes() -> None:
     made = an_index()
     assert Index.__slots__ == (
         "name",
+        "display_name",
         "kind",
         "schedule",
         "holiday_calendar",
@@ -280,13 +400,22 @@ def test_any_kind_of_schedule_and_any_name_make_an_index_of_that_kind(
         UNITS,
     )
     holidays = HOLIDAYS if kind is Kind.FUTURES else None
-    made = index(name, schedule, CONVENTIONS, specifications, holidays, None, UNITS)
+    made = index(
+        name, f"{name} index", schedule, CONVENTIONS, specifications, holidays, None, UNITS
+    )
     assert made.name == name and made.kind is kind
     assert made.schedule is schedule and made.holiday_calendar is holidays
     assert made.conventions is CONVENTIONS and made.specifications is specifications
     with pytest.raises(ValueError):
         index(
-            name, schedule, CONVENTIONS, specifications, None if holidays else HOLIDAYS, None, UNITS
+            name,
+            f"{name} index",
+            schedule,
+            CONVENTIONS,
+            specifications,
+            None if holidays else HOLIDAYS,
+            None,
+            UNITS,
         )
 
 
@@ -311,7 +440,14 @@ def ete(
 ) -> Index:
     conventions = index_conventions(quote[0], quote[1], settled, "VOLUME", "GAL", UNITS)
     return index(
-        "ETE", ETE_FUTURES, conventions, ETE_SPECIFICATIONS, HOLIDAYS, reporting_lot, UNITS
+        "ETE",
+        "Ethane - synthetic volume index",
+        ETE_FUTURES,
+        conventions,
+        ETE_SPECIFICATIONS,
+        HOLIDAYS,
+        reporting_lot,
+        UNITS,
     )
 
 
@@ -360,7 +496,16 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
     )
     conventions = index_conventions("CENT", "GAL", "USD", "VOLUME", "GAL", UNITS)
     with pytest.raises(ValueError) as failure:
-        index("ETE", ETE_FUTURES, conventions, huge, HOLIDAYS, "LOT", UNITS)
+        index(
+            "ETE",
+            "Ethane - synthetic volume index",
+            ETE_FUTURES,
+            conventions,
+            huge,
+            HOLIDAYS,
+            "LOT",
+            UNITS,
+        )
     assert str(failure.value) == (
         "reporting_lot 'LOT' is inf GAL a lot, expected a finite quantity; the lot size outruns "
         "the largest number"
@@ -368,5 +513,29 @@ def test_a_reporting_lot_whose_quantity_outruns_the_largest_number_is_refused() 
     # The lot-unit rule comes first: an energy lot under volume conventions is named before any
     # lot is looked for.
     with pytest.raises(ValueError) as failure:
-        index("ETE", ETE_FUTURES, conventions, SPECIFICATIONS, HOLIDAYS, "LOT", UNITS)
+        index(
+            "ETE",
+            "Ethane - synthetic volume index",
+            ETE_FUTURES,
+            conventions,
+            SPECIFICATIONS,
+            HOLIDAYS,
+            "LOT",
+            UNITS,
+        )
     assert str(failure.value).startswith("specifications row 1 lot_unit is 'MMBTU'")
+
+
+# --- the display name, readable-index-names.md ---------------------------------------------------
+
+
+def test_the_display_name_is_kept_as_typed_and_may_repeat_the_name() -> None:
+    # A description beside the name, since #169: text as given, any case, spaces and all, the name
+    # itself allowed, read by nothing here; the name and the kind stand as they were.
+    assert an_index().display_name == "Henry Hub NYMEX index"
+    for text in ("West Texas Intermediate crude oil - NYMEX", " spaced ", "Henry Hub NYMEX", "x"):
+        made = index(
+            "Henry Hub NYMEX", text, FUTURES, CONVENTIONS, SPECIFICATIONS, HOLIDAYS, None, UNITS
+        )
+        assert made.display_name == text and made.name == "Henry Hub NYMEX"
+        assert made.kind is Kind.FUTURES

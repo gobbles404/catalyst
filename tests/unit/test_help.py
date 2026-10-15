@@ -423,14 +423,20 @@ def test_the_index_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateIndex"]
     assert not hidden
     assert description == (
-        "Creates the index behind one reference price from its name, schedule, conventions, "
-        "specifications, a futures index's holiday calendar and the lot its delta is reported in, "
-        "and shows its handle, the text other formulas take as the index."
+        "Creates the index behind one reference price from its name, a description, "
+        "schedule, conventions, specifications, a futures index's holiday calendar and the lot "
+        "its delta is reported in, and shows its handle, the text other formulas take as the "
+        "index."
     )
     assert arguments == [
         (
             "name",
             "The index's name as the desk calls it, such as Henry Hub NYMEX, kept as typed.",
+        ),
+        (
+            "display_name",
+            "A description a reader who does not know the desk's short names would understand, "
+            "such as Henry Hub natural gas - NYMEX, kept as typed and read for nothing else.",
         ),
         (
             "schedule",

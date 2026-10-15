@@ -21,7 +21,7 @@ Henry Hub Gas Daily over Labor Day week 2026, the newest flow day in the first r
 | 1 | flow_date | price | contract_code | first_date | last_date |
 | 2 | 9-Sep-2026 | 2.900 | U26 | 1-Sep-2026 | 30-Sep-2026 |
 | 3 | 8-Sep-2026 | 2.875 | `=_CreateGasDailySchedule(C2, D2, E2)` shows `30512:gas_daily_schedule:44` | | |
-| 4 | 7-Sep-2026 | 2.875 | `=_CreateIndex("Henry Hub Gas Daily", C3, B12, B13)` shows `30512:index:Henry Hub Gas Daily:45`, B12 and B13 holding the conventions and the specifications | | |
+| 4 | 7-Sep-2026 | 2.875 | `=_CreateIndex("Henry Hub Gas Daily", "Henry Hub natural gas - Platts Gas Daily", C3, B12, B13)` shows `30512:index:Henry Hub Gas Daily:45`, B12 and B13 holding the conventions and the specifications | | |
 | 5 | 6-Sep-2026 | 2.875 | | | |
 | 6 | 5-Sep-2026 | 2.875 | | | |
 | 7 | 4-Sep-2026 | 2.930 | | | |

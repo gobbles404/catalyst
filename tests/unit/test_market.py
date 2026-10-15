@@ -65,7 +65,16 @@ def an_index(
 ) -> Index:
     """The index of that schedule and holiday calendar, with one set of conventions and
     specifications throughout, since nothing here reads either."""
-    return index("sample", schedule, CONVENTIONS, SPECIFICATIONS, holidays, None, UNITS)
+    return index(
+        "sample",
+        "Sample futures index",
+        schedule,
+        CONVENTIONS,
+        SPECIFICATIONS,
+        holidays,
+        None,
+        UNITS,
+    )
 
 
 def a_history(
