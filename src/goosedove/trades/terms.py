@@ -20,6 +20,7 @@ from numpy.typing import NDArray
 
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
@@ -41,12 +42,13 @@ class Settlement(Enum):
 
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day; penultimate, the settlement on the business day before it; last3day, the
-    average of the settlements on the last trading day and the two business days before it, each
-    a third; and asian, the average of the settles on every pricing day the component covers, its
-    contract's calendar month or the booked part of it, each day's settle the contract the index's
-    calendar prices that day with, which need not be the component's own, an equal share each:
-    the four methods the definition lists, all built."""
+    last trading day, or on an IFERC index the month's index on its publication day, the one
+    method an IFERC index takes since #167; penultimate, the settlement on the business day before
+    the last trading day; last3day, the average of the settlements on the last trading day and the
+    two business days before it, each a third; and asian, the average of the settles on every
+    pricing day the component covers, its contract's calendar month or the booked part of it, each
+    day's settle the contract the index's calendar prices that day with, which need not be the
+    component's own, an equal share each: the four methods the definition lists, all built."""
 
     LASTDAY = "lastday"
     PENULTIMATE = "penultimate"
@@ -126,7 +128,7 @@ class ResolvedTrades:
 
     instrument: Instrument
     index: Index
-    schedule: FuturesSchedule
+    schedule: FuturesSchedule | IfercSchedule
     reporting_lot: ReportingLot
     specification: NDArray[np.intp]
     route: Route
@@ -185,8 +187,12 @@ def resolved_trades(
     """The one way to make ResolvedTrades: the rules of the first future profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
 
-    The index is a futures index, since a future's contract is a row of a futures schedule and
-    its final price the settlement on that row's expiry day, and it was made with a reporting
+    The index is a futures or, since #167, an IFERC index, since a future's contract is a row of a
+    futures schedule, its final price the settlement on that row's expiry day, or a row of an
+    IFERC schedule, its final price the month's index on that row's publication day, the traded
+    basis; a Gas Daily index is refused by name. An IFERC index takes a financial settlement and
+    the lastday method alone, the first row of another method named, since an IFERC month has
+    one index, published once. The index was made with a reporting
     lot, since the batch's delta is a count of that lot and a batch without one could not report
     its risk. The occurrences are the ticket's
     rows: one date each, and one label, clearing house and broker each where those are given;
@@ -216,11 +222,11 @@ def resolved_trades(
     day, and giving it terms would invent a payment the contract does not make. The instrument
     is kept as the definition the terms stand under, and read for nothing here.
     """
-    schedule = futures_schedule_of(index)
+    schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     occurrences = _the_occurrences(trade_dates, labels, clearing_house, broker)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
-    _the_method(schedule_method, settlement, labels)
+    _the_method(schedule_method, settlement, labels, index.kind)
     _the_components(
         occurrence,
         contract,
@@ -263,15 +269,24 @@ def resolved_trades(
     )
 
 
-def futures_schedule_of(index: Index) -> FuturesSchedule:
-    """The schedule of a futures index, typed as the kind rule found it: a future's contract is
-    a row of a futures schedule and its final price the settlement on that row's expiry day, so
-    an index of another kind is refused, in the resolution of a batch and in the kernel alike."""
-    if index.kind is not Kind.FUTURES:
-        raise ValueError(
-            f"index is {described(index.kind, 'index')}, expected a futures index for a future"
-        )
-    return cast(FuturesSchedule, index.schedule)  # what the kind just said
+def trade_schedule_of(index: Index) -> FuturesSchedule | IfercSchedule:
+    """The schedule of an index a future is booked on, typed as the kind rule found it: a
+    futures schedule, whose rows' expiry days settle the contracts, or since #167 an IFERC
+    schedule, whose rows' publication days print each month's index, the traded basis; a Gas
+    Daily index is refused, in the resolution of a batch and in the kernel alike. The steps
+    that read a day off the schedule dispatch on which it is."""
+    match index.kind:
+        case Kind.FUTURES:
+            return cast(FuturesSchedule, index.schedule)  # what the kind just said
+        case Kind.IFERC:
+            return cast(IfercSchedule, index.schedule)
+        case Kind.GAS_DAILY:
+            raise ValueError(
+                f"index is {described(index.kind, 'index')}, expected a futures or an IFERC "
+                "index for a future"
+            )
+        case _:
+            assert_never(index.kind)
 
 
 def reporting_lot_of(index: Index) -> ReportingLot:
@@ -321,14 +336,36 @@ def _the_selections(
 
 
 def _the_method(
-    schedule_method: NDArray[np.intp], settlement: Settlement, labels: tuple[str, ...] | None
+    schedule_method: NDArray[np.intp],
+    settlement: Settlement,
+    labels: tuple[str, ...] | None,
+    kind: Kind,
 ) -> None:
-    """Each occurrence's method with the batch's settlement: a penultimate future is cash settled
+    """Each occurrence's method with the batch's settlement and the index's kind. On an IFERC
+    index, since #167, the settlement is financial, an IFERC basis future being cash settled on
+    its month's published index, and every row's method is lastday, the one observation of that
+    index, the first row of another method refused by its method and its row. On a futures
+    index: a penultimate future is cash settled
     against the settle on the business day before its contract's expiry, a last3day future
     against the average of its last three pricing days and an asian future against the average
     of its month's pricing days, so a physical settlement is refused with the first row that
     chose any of the three, named by its label and its row; lastday settles either way, and a
     physical batch is lastday rows alone."""
+    if kind is Kind.IFERC:
+        if settlement is Settlement.PHYSICAL:
+            raise ValueError(
+                "settlement_method is 'physical', expected 'financial' on an IFERC index; an "
+                "IFERC basis future is cash settled on its month's published index"
+            )
+        other = schedule_method != METHODS.index(ScheduleMethod.LASTDAY)
+        if other.any():
+            i = int(other.argmax())
+            raise ValueError(
+                f"schedule_method of {named_trade(labels, i)} is "
+                f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
+                "index; an IFERC month has one index, published once"
+            )
+        return
     match settlement:
         case Settlement.FINANCIAL:
             return

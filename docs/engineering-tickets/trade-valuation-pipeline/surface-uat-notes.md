@@ -7,15 +7,21 @@ Record observations and decisions here before turning them into implementation t
 
 | Item | Owner direction | Status |
 |---|---|---|
-| 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Agreed; [engineering ticket](lot-delta-reporting.md) drafted |
+| 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Implemented in prototype PR #164; fixes reviewed at `414b6e0`; [design ticket](lot-delta-reporting.md) |
 | 2. `trade_id` | Treat it as an **alphanumeric identifier**, rather than a quantity. | Proposed; entry details to confirm |
 | 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
 | 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
-| 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Agreed; [engineering ticket](calendar-driven-asian-references.md) drafted |
+| 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Implemented in prototype PR #165; reviewed at `f1f1b91`; [design ticket](calendar-driven-asian-references.md) |
 | 6. Readable index names | Keep the existing short `name` and add a human-readable `display_name` on the index. | Agreed direction; implementation ticket pending |
-| 7. Delta by observation time | Retain day, month and year lot-delta vectors across methods and payment groups; select the bucket in `_ReportDelta`. | Agreed, updated 9 October; [engineering ticket](daily-risk-vector.md) revised; quarters excluded |
+| 7. Delta by observation time | Retain day, month and year lot-delta vectors across methods and payment groups; select the bucket in `_ReportDelta`. | Implemented in prototype PR #166; reviewed at `df2bec9`; [design ticket](daily-risk-vector.md); quarters excluded |
+| 8. Reserve consumption | Aggregate booked brokerage, clearing and marketing reserves during evaluation; retain the batch totals in results for a pure reader. Marketing is zero where unsupported. | Agreed direction 9 October; implementation pending; marketing input where supported and detailed amount rules still need definition |
+| 9. Date offsets from text | `util_ShiftDate(date, offset, [holiday_calendar])` with signed `bd`, `cd` and `em` offsets. | Agreed direction 9 October; implementation ticket pending |
+| 10. IFERC trade support | Support cleared financial basis futures on a supplied IFERC basis index; use its monthly publication fixing and count payment lag from last trading. | Requested 9 October; [engineering ticket](iferc-basis-futures.md); built in #167; `lastday` meaning proposed explicitly |
 
 ## 1. Delta reporting
+
+Implemented in the reviewed prototype PR #164. The UAT description below records the
+problem that prompted the change; the reported delta now uses the index's selected lot.
 
 For the fully live ETE example, `1 LOT`, `1000 BBL` and `42000 GAL` each represent
 one lot of exposure. Three positive trades entered together represent three lots.
@@ -122,6 +128,9 @@ the same dates entered with and without a superseded code.
 
 ## 5. Asian crude observations across a futures roll
 
+Implemented in the reviewed prototype PR #165. The creation failure described below
+is the original UAT case, now supported by calendar-driven pricing references.
+
 The general correction is specified in [Calendar driven Asian pricing references](calendar-driven-asian-references.md):
 one calendar-driven rule across supported commodities, independent of the booked month.
 
@@ -161,8 +170,8 @@ explicitly rolls on expiry day.
 Acceptance needs a calendar-month example spanning a real futures roll: observations on
 both sides and on expiry day, separate forward prices and deltas, partial fixing, payment
 and cash, and mixed batches with existing futures and month-aligned Asians. Readback must
-distinguish the booked period from its pricing references. No signature change is indicated
-by this research; this note records the extension, not an implemented fix.
+distinguish the booked period from its pricing references. These requirements were
+implemented and reviewed in PR #165 without changing the creator signatures.
 
 ## 6. Human-readable index names
 
@@ -224,4 +233,107 @@ for valuation/cash. Keep zero entries as dates fix and the axes stable for the b
 This is reporting aggregation; there is no new index-level or valuation-parameter
 resolution setting. The [revised ticket](daily-risk-vector.md) retains the existing
 aggregate reports and raw debug layout, and replaces its earlier daily-only reader
-proposal. This note and ticket specify the next change; they do not implement it.
+proposal. PR #166 implements this direction in the prototype.
+
+The owner sent the revised day/month/year ticket to engineering on 9 October 2026.
+The implementation was reviewed at `df2bec9` with no actionable findings and the full
+gate passing. This records the reviewed prototype, not a merge to main.
+
+## 8. Clearing brokerage and marketing reserves
+
+The owner requested a way to consume these reserve values on 9 October. Preserve the
+agreed boundary: reserves do not affect trade valuation, cash or market risk.
+
+In the inspected prototype through PR #165, contract specifications store
+`brokerage_rate_per_lot` and `clearing_rate_per_lot`, in the index's settlement currency
+per lot of each specification row. `util_ReadHandle(specifications)` exposes both.
+The trade pipeline does not calculate reserve amounts from them, and the current
+instrument has no implemented marketing-reserve field.
+
+Owner direction, refined 9 October: `_EvaluateTrades` aggregates the batch's booked
+brokerage, clearing and marketing reserves and retains those three totals, with their
+currency, on its results. The proposed reader is `_ReportReserves(results)`: it reads
+the saved scalars and formats them, with no summation, market access or reserve
+calculation. One trade and many trades follow the same path.
+
+These are static booked reserves. Fixings, payment dates, valuation-date rolls and price
+ticks do not release or reduce them. This replaces the earlier proposal to expose the
+reserve summary directly from a trade handle; the user wants it on evaluated results.
+
+Keep all three categories in the output. Marketing is zero for instruments that do
+not support it, without requiring a placeholder zero in the template. Where marketing
+is supported, its input basis and default still need definition; no marketing field
+is introduced by this note.
+
+Rates and their quantity basis must be resolved before amounts can be computed. An
+entry specification's fee basis is distinct from the index's reporting lot. Preserve
+booked activity before exposure netting: a buy and a sell can cancel delta while both
+incur reserves. Do not infer missing brokerage or clearing rates from the marketing
+zero rule. Detailed amount/sign rules and how static contributions are retained for
+evaluation belong in the implementation ticket. No reserve implementation is claimed here.
+
+## 9. Date offsets from text
+
+Provide `util_ShiftDate(date, offset, [holiday_calendar])` returning an Excel date.
+The date is explicit, the offset is one signed whole-number instruction, and the optional
+calendar is an existing holiday-calendar handle. Omission means Monday to Friday with
+no additional holidays. Supplied arguments follow normal seam validation; a blank
+calendar is not omission. The function is deterministic and nonvolatile.
+
+| Offset | Meaning |
+|---|---|
+| `+1bd` | First business day strictly after the date |
+| `-1bd` | First business day strictly before the date |
+| `+7cd` | Seven calendar days later |
+| `-7cd` | Seven calendar days earlier |
+| `+0em` | Last calendar day of the current month |
+| `+1em` | Last calendar day of the next month |
+| `-1em` | Last calendar day of the previous month |
+
+Read suffixes case-insensitively. A small full-match parser can separate the signed
+count from `bd`, `cd` or `em`; unsupported text fails. Use date/calendar operations
+for the arithmetic. `em` follows `EOMONTH(date, count)` semantics, including a weekend
+or holiday month-end. Only `bd` uses the holiday calendar. Zero `bd` or `cd` leaves
+the date unchanged; zero `em` still selects the current month-end.
+
+Business-day counting excludes the anchor even when it is closed: Saturday `+1bd`
+is Monday and Sunday `-1bd` is Friday on a weekday-only calendar. With NumPy, roll
+backward before a positive offset and forward before a negative one; handle zero
+without rolling. Do not roll forward and then add an extra business day for `+1bd`.
+
+Reuse calendar machinery without widening the trade's existing positive-only
+`payment_time_lag` grammar. This utility does not add compound instructions, intraday
+time, a month-end business-day adjustment, or a dependency on today's date.
+
+## 10. IFERC market accepted but trade creation refused
+
+UAT reported: `index is an IFERC index, expected a futures index for a future`.
+In prototype `df2bec9`, `trades.terms.futures_schedule_of` deliberately refuses any
+index whose kind is not `FUTURES`. Trade resolution and the kernel use this boundary.
+
+The library already supports an IFERC index, schedule, fixings, calendar and market.
+The trade path has not been extended to consume them. Its current observations and
+fixing lookup assume a daily futures calendar; an IFERC calendar instead has one row
+per contract month, dated by the index's publication date. The IFERC schedule retains
+last trading and publication dates separately.
+
+Changing the template's schedule method cannot remove this boundary. Removing the kind
+check alone does not connect monthly observations and fixing lookup to the trade kernel.
+
+Owner direction, 9 October: use the existing `future` instrument for ICE Waha/HSC basis
+futures on a single IFERC index. The index supplies the traded basis in both its live
+quotes and monthly fixings; the trade does not construct two legs or subtract Henry Hub.
+Keep `route = cleared` and `settlement_method = financial`. The schedule already retains
+the last trading date: template `payment_time_lag = +3bd` counts from that date on the
+supplied payment holiday calendar. Publication date separately determines fixing state.
+
+The [IFERC basis futures ticket](iferc-basis-futures.md) contains the exchange evidence,
+mapping, payment/cash and lot-delta examples, and implementation acceptance. It proposes
+retaining required `lastday` for one monthly publication fixing on an IFERC index, while
+preserving expiry-day `lastday` on a futures index. That method wording is an explicit
+recommendation, not a new field or a change already implemented. The ticket includes
+full-month bullets/strips and existing quantity bases; partial months, other IFERC
+schedule methods, Gas Daily trades and bilateral rates are outside this slice.
+
+Built in #167; the ticket's [As built](iferc-basis-futures.md#as-built-167) section says what
+landed and what was not built.

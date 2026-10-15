@@ -3058,3 +3058,205 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
     assert [line[1] for line in rolled_days] == [
         pytest.approx(x) for x in (0, 0, 0.2, 0.2, 0.2, 0.2)
     ]
+
+
+# --- an IFERC basis future on the sheet, iferc-basis-futures.md -----------------------------
+# The ticket's Waha-like index through the seam: X26, Z26 and F27 with their last trading and
+# publication days, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported and no
+# pricing calendar; a payment calendar closing New Year's Day; the template cleared, financial,
+# lastday, LOT a month at +3bd; WAH001, 1 LOT of Z26 at -0.50 booked 30 November, paying
+# 3 December.
+WAHA_MONTHS = [
+    ("X26", "2026-10-30", "2026-11-02"),
+    ("Z26", "2026-11-30", "2026-12-01"),
+    ("F27", "2026-12-31", "2027-01-04"),
+]
+WAHA_LOT = "lots of LOT (2500 MMBTU)"
+WAHA_X26 = {"X26": -0.40}  # the earlier month's index, which every December history must hold
+WAHA_Z26 = {"X26": -0.40, "Z26": -0.20}
+WAHA_CORRECTED = {"X26": -0.40, "Z26": -0.10}
+WAHA_ROW: list[object] = ["WAH001", serial("2026-11-30"), "Z26", 1.0, -0.5]
+
+
+def an_iferc_index(
+    name: str, months: list[tuple[str, str, str]], lots: list[tuple[str, float]]
+) -> str:
+    """An IFERC index through the seam: its months with their last trading and publication days,
+    dollars an MMBtu settled in dollars, the specifications given in MMBtu, the first the
+    reporting lot, and no pricing calendar."""
+    schedule = ENTRY["_CreateIfercSchedule"](
+        rows(*[[code] for code, _, _ in months]),
+        column([serial(last) for _, last, _ in months]),
+        column([serial(published) for _, _, published in months]),
+    )
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
+    specifications = ENTRY["_CreateContractSpecifications"](
+        row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
+        rows(*[[lot, size, "MMBTU", 0.0, 0.0] for lot, size in lots]),
+    )
+    return str(
+        ENTRY["_CreateIndex"](
+            name, schedule, conventions, specifications, bridge.MISSING, lots[0][0]
+        )
+    )
+
+
+def an_iferc_history(index: str, as_of: str, indices: dict[str, float]) -> str:
+    """The index's history valued on that day with the months' indices given, newest first as the
+    fixings creator takes them."""
+    codes = list(reversed(indices))
+    fixings = ENTRY["_CreateIfercFixings"](
+        rows(*[[code] for code in codes]), column([indices[code] for code in codes]), index
+    )
+    calendar = ENTRY["_CreateCalendar"](ENTRY["_CreateValuationDate"](serial(as_of), 0.5), index)
+    return str(ENTRY["_CreateMarketHistory"](calendar, fixings))
+
+
+@pytest.fixture(scope="module")
+def waha() -> dict[str, Any]:
+    index = an_iferc_index("WAHA", WAHA_MONTHS, [("LOT", 2_500.0), ("MMBTU", 1.0)])
+    pays = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
+    fields = {
+        "quantity_unit": "LOT",
+        "quantity_per": "month",
+        "schedule_method": "lastday",
+        "route": "cleared",
+        "settlement_method": "financial",
+        "clearing_house": "ICE Clear Europe",
+        "payment_time_lag": "+3bd",
+        "payment_holiday_calendar": pays,
+    }
+    template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(WAHA_ROW), template)
+    return {"index": index, "pays": pays, "fields": fields, "template": template, "trades": trades}
+
+
+def waha_state(
+    waha: dict[str, Any], as_of: str, indices: dict[str, float], quotes: tuple[float, ...]
+) -> tuple[str, str, str]:
+    """One state: the history valued on that day with those months' indices, the market quoting
+    from the first unfixed month on, the batch prepared and evaluated; the history, the prepared
+    and the results handles."""
+    history = an_iferc_history(waha["index"], as_of, indices)
+    market = a_market(history, "WAHA", *quotes)
+    prepared = ENTRY["_PrepareTrades"](waha["trades"], history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.mark.parametrize(
+    ("as_of", "indices", "quotes", "mark", "cash", "live"),
+    [
+        ("2026-11-30", WAHA_X26, (-0.30, -0.10), 500, 0, 1),
+        ("2026-12-01", WAHA_X26, (-0.30, -0.10), 500, 0, 1),
+        ("2026-12-01", WAHA_X26, (-0.25, -0.10), 625, 0, 1),
+        ("2026-12-02", WAHA_Z26, (-0.10,), 750, 0, 0),
+        ("2026-12-03", WAHA_Z26, (-0.10,), 0, 750, 0),
+        ("2026-12-02", WAHA_CORRECTED, (-0.10,), 1_000, 0, 0),
+    ],
+    ids=[
+        "30 Nov, booked, live at -0.30",
+        "1 Dec, publication day, live at -0.30",
+        "1 Dec, a tick to -0.25",
+        "2 Dec, fixed at -0.20 and unpaid",
+        "3 Dec, paid",
+        "2 Dec, the index corrected to -0.10",
+    ],
+)
+def test_the_waha_basis_future_values_on_the_sheet_as_the_ticket_says(
+    waha: dict[str, Any],
+    as_of: str,
+    indices: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    live: int,
+) -> None:
+    # The ticket's table cell to cell: the mark, the cash and the lots; the one slot read back as
+    # Z26 pricing and booked, observed 1 December and paying 3 December, fixed the day after
+    # publication and settled on the payment day; the delta by day one row, 1 December, the lots
+    # while live and zero after, the lot unit and the valuation day beside it, the month and the
+    # year one row each.
+    _, prepared, results = waha_state(waha, as_of, indices, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(live))
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))
+    assert slots[0] == [
+        "pricing_contract",
+        "booked_contract",
+        "observation_date",
+        "payment_date",
+        "is_fixed",
+        "is_settled",
+        "live_coefficient",
+        "live_lots",
+    ]
+    assert slots[2] == [
+        "Z26",
+        "Z26",
+        serial("2026-12-01"),
+        serial("2026-12-03"),
+        live == 0,
+        as_of >= "2026-12-03",
+        2_500.0 * live,
+        float(live),
+    ]
+    by_day = spilled(ENTRY["_ReportDelta"](results, bridge.MISSING))
+    assert by_day[2:] == [[serial("2026-12-01"), pytest.approx(live), WAHA_LOT, serial(as_of)]]
+    assert spilled(ENTRY["_ReportDelta"](results, "month"))[2][:2] == [
+        serial("2026-12-01"),
+        pytest.approx(live),
+    ]
+    assert spilled(ENTRY["_ReportDelta"](results, "year"))[2][:2] == [
+        serial("2026-01-01"),
+        pytest.approx(live),
+    ]
+
+
+def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
+    waha: dict[str, Any],
+) -> None:
+    # The batch's spill carries the resolved payment day, 3 December, beside the lastday method;
+    # a tick on 1 December makes new results over the same preparation, 625 against 500, the first
+    # standing; the risk report counts in lots of the 2,500 MMBtu LOT with 2,500 dollars per
+    # dollar an MMBtu of sensitivity.
+    table = spilled(ENTRY["util_ReadHandle"](waha["trades"]))
+    headers = [str(name) for name in table[0]]
+    at = dict(zip(headers, table[2], strict=True))
+    assert headers[13] == "payment_date"
+    assert (at["contract_code"], at["schedule_method"]) == ("Z26", "lastday")
+    assert (at["payment_time_lag"], at["payment_date"]) == ("+3bd", serial("2026-12-03"))
+    history, prepared, results = waha_state(waha, "2026-12-01", WAHA_X26, (-0.30, -0.10))
+    ticked = str(ENTRY["_EvaluateTrades"](prepared, a_market(history, "WAHA", -0.25, -0.10)))
+    assert ticked != results
+    assert valued(ticked) == (pytest.approx(625), 0, pytest.approx(1))
+    assert valued(results) == (pytest.approx(500), 0, pytest.approx(1))
+    risk = spilled(ENTRY["_ReportRisk"](results))
+    assert risk[0][:2] == ["delta_total", "delta_unit"] and risk[2][:2] == [1, WAHA_LOT]
+
+
+def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made(
+    waha: dict[str, Any],
+) -> None:
+    physical = {
+        **{
+            key: value
+            for key, value in waha["fields"].items()
+            if key not in ("payment_time_lag", "payment_holiday_calendar")
+        },
+        "settlement_method": "physical",
+    }
+    template = ENTRY["_CreateTradeTemplate"]("future", row(*physical), row(*physical.values()))
+    assert ENTRY["_CreateTrades"](waha["index"], row(*NG_HEADERS), rows(WAHA_ROW), template) == (
+        "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
+        "on an IFERC index; an IFERC basis future is cash settled on its month's published index"
+    )
+    by_row = {key: value for key, value in waha["fields"].items() if key != "schedule_method"}
+    template = ENTRY["_CreateTradeTemplate"]("future", row(*by_row), row(*by_row.values()))
+    assert ENTRY["_CreateTrades"](
+        waha["index"],
+        row(*NG_HEADERS, "schedule_method"),
+        rows([*WAHA_ROW, "asian"]),
+        template,
+    ) == (
+        "#ERROR _CreateTrades: ValueError: schedule_method of trade 'WAH001' at row 1 is 'asian', "
+        "expected 'lastday' on an IFERC index; an IFERC month has one index, published once"
+    )

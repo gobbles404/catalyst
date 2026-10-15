@@ -25,6 +25,7 @@ from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.contract_codes import month_and_year
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -49,10 +50,10 @@ from goosedove.trades.terms import (
     ResolvedTrades,
     Route,
     Settlement,
-    futures_schedule_of,
     named_trade,
     reporting_lot_of,
     resolved_trades,
+    trade_schedule_of,
 )
 
 RESOLVED_OCCURRENCES = "resolved_occurrences"  # ticket rows completed and typed
@@ -116,8 +117,9 @@ def resolved(
     condition holds, a clearing house with a cleared route and the two payment fields with a
     financial settlement, and absent otherwise, since a label for a clearing house a bilateral
     trade has not, or a payment a physical contract never makes, would say something false. The
-    index is a futures index made with a reporting lot, the specification the batch's delta is
-    counted in lots of, and every code of its schedule is read for its month, the rows the
+    index is a futures index or, since #167, an IFERC index, a Gas Daily one refused by name,
+    made with a reporting lot, the specification the batch's delta is counted in lots of, and
+    every code of its schedule is read for its month, the rows the
     ticket does not use included, a label that is no contract code and two rows for one month
     refused by row. The batch has one period form, a contract_code or start_date with end_date,
     from the template or the ticket as any field: both forms, either date alone and neither are
@@ -138,9 +140,12 @@ def resolved(
     under last3day, a third each, the three refusing a component that covers a part of its
     month by its contract, its trade and its days, and every pricing day of the days it covers
     under asian, an equal share each, a partial month's share of them, a part with none refused
-    the same way. For a financial settlement, each
+    the same way; on an IFERC index, since #167, the month's index on its publication day under
+    lastday, the one method it takes, the first row of another refused by its method and row.
+    For a financial settlement, each
     occurrence's lag is read once per distinct text and each component pays that many business days
-    strictly after its last observation day, counted on its occurrence's payment calendar with
+    strictly after its anchor, on a futures index its last observation day and on an IFERC index
+    its month's last trading day, counted on its occurrence's payment calendar with
     Monday to Friday eligible,
     that day itself rolled back first so that a day the payment calendar closes is not counted;
     the rule of the four methods.
@@ -167,7 +172,7 @@ def resolved(
     specification = np.array(specifications, dtype=np.intp)[by_unit]
     schedule_method = np.array([METHODS.index(m) for m in methods], dtype=np.intp)[by_method]
     quantity_per = np.array([BASES.index(b) for b in bases], dtype=np.intp)[by_basis]
-    schedule = futures_schedule_of(index)
+    schedule = trade_schedule_of(index)
     reporting_lot_of(index)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
@@ -181,9 +186,19 @@ def resolved(
         end,
         lambda k: named_trade(labels, int(occurrence[k])),
     )
-    payment = _the_payment_terms(
-        settlement, fields, _last_days(observations, occurrence.size), occurrence
-    )
+    # The anchors are handed over as a temporary, not held across the kernel's copies below.
+    match schedule:
+        case FuturesSchedule():
+            payment = _the_payment_terms(
+                settlement, fields, _last_days(observations, occurrence.size), occurrence
+            )
+        case IfercSchedule():
+            # Since #167: the month's last trading day, the exchange's; the index prints later.
+            payment = _the_payment_terms(
+                settlement, fields, schedule.last_trading_date[contract], occurrence
+            )
+        case _:
+            assert_never(schedule)
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     terms = resolved_trades(
@@ -377,7 +392,7 @@ def _the_specification(index: Index, where: str, name: str) -> int:
 # --- the contracts: every schedule code read, each ticket code resolved by month -------------
 
 
-def schedule_months(schedule: FuturesSchedule) -> NDArray[np.int64]:
+def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int64]:
     """The month of every code of the schedule, as numpy counts months, one read per code: a
     code that is no contract code is refused by row, and so are two rows for one month, since a
     month resolved to two rows would name no contract. The resolution reads them once and
@@ -538,8 +553,10 @@ def _the_payment_terms(
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's lag in business days and
     its payment calendar, retained, and each component's payment day, the lag counted strictly
-    after its anchor, its last observation day, the one day under lastday and penultimate, the
-    third under last3day and the month's last pricing day under asian, on that calendar,
+    after its anchor, on a futures index its last observation day, the one day under lastday and
+    penultimate, the third under last3day and the month's last pricing day under asian, and on
+    an IFERC index since #167 its month's last trading day, the exchange's, the index printing
+    later, on that calendar,
     Monday to Friday less the calendar's holidays, the anchor rolled back to the last eligible day
     on or before it first, so that a day the calendar closes is not itself counted; one busday
     offset over the components on each distinct calendar. Each day made is on or before the

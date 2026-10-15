@@ -1762,6 +1762,87 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportDelta", last, "month"))[2, 1], 6);
         }
 
+        // IFERC basis futures, iferc-basis-futures.md: the Waha-like index, X26, Z26 and F27 last
+        // trading 46325, 46356 and 46387 and published 46328, 46357 and 46391, dollars an MMBtu, a
+        // 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the payment
+        // calendar closing New Year's Day, 46388; the template cleared, financial, lastday, LOT a
+        // month at +3bd; WAH001, 1 LOT of Z26 at -0.50 booked 46356, paying 46359, read back in the
+        // batch. On 46357, the publication day, live at -0.30: 500 of mark, a lot, the slot Z26 on
+        // 46357 paying 46359 with 2,500 of live coefficient, a tick to -0.25 625 on the same
+        // preparation with the first results standing; on 46358 with the index at -0.20, 750 of
+        // mark, fixed and unpaid, no lot; on 46359, 750 of cash. The delta by day one row, 46357, a
+        // lot and then zero. A physical template refused by name.
+        [Fact]
+        public void an_iferc_basis_future_marks_fixes_and_pays_from_its_published_index()
+        {
+            var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("X26", "Z26", "F27"), Column(46325.0, 46356.0, 46387.0), Column(46328.0, 46357.0, 46391.0));
+            var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 2500.0, "MMBTU", 0.0, 0.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "WAHA", schedule, conventions, specifications, ExcelMissing.Value, "LOT");
+            Assert.StartsWith(Pid + ":index:WAHA:", index);
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("LOT", "month", "lastday", "cleared", "financial", "ICE Clear Europe", "+3bd", pays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var row = new object[,] { { "WAH001", 46356.0, "Z26", 1.0, -0.5 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, row, template);
+            var batch = (object[,])Seam.Call("util_ReadHandle", trades);
+            Assert.Equal("payment_date", batch[0, 13]);
+            Assert.Equal(46359.0, batch[2, 13]);
+            Assert.Equal("lastday", batch[2, 4]);
+            string History(double asOf, object[,] codes, object[,] indices)
+            {
+                var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", asOf, 0.5), index);
+                return (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateIfercFixings", codes, indices, index));
+            }
+            string Valued(string history, string prepared, params object[] quotes)
+            {
+                return (string)Seam.Call("_EvaluateTrades", prepared, (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "WAHA", Column(quotes))));
+            }
+            var live = History(46357.0, Column("X26"), Column(-0.4));
+            var prepared = (string)Seam.Call("_PrepareTrades", trades, live);
+            var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
+            Assert.Equal(3, slots.GetLength(0));
+            Assert.Equal("Z26", slots[2, 0]);
+            Assert.Equal("Z26", slots[2, 1]);
+            Assert.Equal(46357.0, slots[2, 2]);
+            Assert.Equal(46359.0, slots[2, 3]);
+            Assert.False((bool)slots[2, 4]);
+            Assert.Equal(2500.0, (double)slots[2, 6], 6);
+            Assert.Equal(1.0, (double)slots[2, 7], 6);
+            var first = Valued(live, prepared, -0.3, -0.1);
+            var values = (object[,])Seam.Call("_ReportValues", first);
+            Assert.Equal(500.0, (double)values[2, 0], 6);
+            Assert.Equal(0.0, (double)values[2, 1], 6);
+            var risk = (object[,])Seam.Call("_ReportRisk", first);
+            Assert.Equal(1.0, (double)risk[2, 0], 6);
+            Assert.Equal("lots of LOT (2500 MMBTU)", risk[2, 1]);
+            var byDay = (object[,])Seam.Call("_ReportDelta", first, ExcelMissing.Value);
+            Assert.Equal(3, byDay.GetLength(0));
+            Assert.Equal(46357.0, byDay[2, 0]);
+            Assert.Equal(1.0, (double)byDay[2, 1], 6);
+            var ticked = Valued(live, prepared, -0.25, -0.1);
+            Assert.Equal(625.0, (double)((object[,])Seam.Call("_ReportValues", ticked))[2, 0], 6);
+            Assert.Equal(500.0, (double)((object[,])Seam.Call("_ReportValues", first))[2, 0], 6);
+            var printed = History(46358.0, Column("Z26", "X26"), Column(-0.2, -0.4));
+            var fixedPrepared = (string)Seam.Call("_PrepareTrades", trades, printed);
+            var fixedSlots = (object[,])Seam.Call("util_ReadHandle", fixedPrepared);
+            Assert.True((bool)fixedSlots[2, 4]);
+            Assert.False((bool)fixedSlots[2, 5]);
+            var unpaid = Valued(printed, fixedPrepared, -0.1);
+            var unpaidValues = (object[,])Seam.Call("_ReportValues", unpaid);
+            Assert.Equal(750.0, (double)unpaidValues[2, 0], 6);
+            Assert.Equal(0.0, (double)unpaidValues[2, 1], 6);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", unpaid))[2, 0], 6);
+            Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportDelta", unpaid, "day"))[2, 1], 6);
+            var paidHistory = History(46359.0, Column("Z26", "X26"), Column(-0.2, -0.4));
+            var paid = (object[,])Seam.Call("_ReportValues", Valued(paidHistory, (string)Seam.Call("_PrepareTrades", trades, paidHistory), -0.1));
+            Assert.Equal(0.0, (double)paid[2, 0], 6);
+            Assert.Equal(750.0, (double)paid[2, 1], 6);
+            var physical = (string)Seam.Call("_CreateTradeTemplate", "future", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house"), Row("LOT", "month", "lastday", "cleared", "physical", "ICE Clear Europe"));
+            Assert.Equal("#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis future is cash settled on its month's published index", Seam.Call("_CreateTrades", index, headers, row, physical));
+        }
+
         [Fact]
         public void a_grid_in_gives_one_number_per_row_out()
         {

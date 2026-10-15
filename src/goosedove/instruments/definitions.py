@@ -107,8 +107,9 @@ FUTURE = Instrument(
             NONE,
             FieldType.CODE,
             "asian, lastday, penultimate, last3day",
-            "A library rule selected by the trade; all four are built, asian averaging the "
-            "month's pricing days",
+            "A library rule selected by the trade; all four are built on a futures index, asian "
+            "averaging the month's pricing days; lastday alone on an IFERC index, its published "
+            "month",
         ),
         Field(
             "route",
@@ -193,8 +194,9 @@ FUTURE = Instrument(
             "settlement_method = financial",
             FieldType.TEXT,
             "+1bd, +2bd and other positive whole business days",
-            "Counted strictly after the component's observation day on the payment calendar, "
-            "the expiry under lastday and the pen day under penultimate; +1bd for PHH",
+            "Counted strictly after the component's anchor on the payment calendar: on a futures "
+            "index its last observation day, the expiry under lastday; on an IFERC index the "
+            "month's last_trading_date; +1bd for PHH, +3bd for Waha",
         ),
         Field(
             "payment_holiday_calendar",

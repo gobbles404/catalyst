@@ -19,6 +19,7 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
+from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -189,7 +190,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "with_holiday_calendar": 1,  # the index's calendar typed once for the methods that read it
         "observations": 1,
         "_last_days": 1,  # each component's last observation, the day its payment counts from
-        "futures_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
+        "trade_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
         "reporting_lot_of": 2,  # the resolution's and then the kernel's: the lot delta counts in
         "schedule_months": 1,
         "month_and_year": 25,
@@ -892,3 +893,81 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "numpy.empty": 18,
         "ufunc.reduce": 28,
     }
+
+
+# --- an IFERC ticket, iferc-basis-futures.md ------------------------------------------------
+# The same 25 months on an IFERC index, each last trading on the last business day before its
+# month and published on the first business day of it; the ticket's rows resolve against it as
+# against the futures index, the lastday method the one an IFERC index takes.
+IFERC_LAST_TRADING = np.busday_offset(
+    MONTHS.astype("datetime64[D]"), -1, roll="forward", holidays=HOLIDAYS
+)
+IFERC_PUBLICATION = np.busday_offset(
+    MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
+)
+BASIS = index(
+    "basis",
+    iferc_schedule(CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
+    ),
+    None,
+    "lot",
+    UNITS,
+)
+# The IFERC resolution's functions are the futures lastday resolution's but the three that read
+# the days: no pricing calendar typed, no days made, no last observation searched, the payment
+# anchored on the schedule's last trading day instead. Its numpy loses the search, the unique over
+# the components' methods with its sort, hash, nonzero, ravel and flatten, a look and three
+# conversions, and gains one look, the publication days against the components' own.
+IFERC_RESOLUTION = {
+    name: count
+    for name, count in {**resolution_ledger(1), **WHOLE_MONTHS}.items()
+    if name not in ("_the_days", "with_holiday_calendar", "_last_days")
+}
+IFERC_RESOLUTION_NUMPY = {
+    name: count
+    for name, count in {
+        **resolution_numpy(1),
+        **WHOLE_MONTHS_NUMPY,
+        "ndarray.any": 20,
+        "ndarray.all": 2,
+        "ndarray.nonzero": 1,
+        "ndarray.ravel": 1,
+        "ndarray.flatten": 6,
+        "numpy.asanyarray": 14,
+    }.items()
+    if name not in ("ndarray.sort", "ndarray.searchsorted", "numpy._unique_hash")
+}
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    ticket, template = a_ticket(rows, contracts), a_template()
+    counter = WorkCounter()
+    terms, observations = resolved(BASIS, ticket, template, counter)
+    np.testing.assert_array_equal(observations.date, IFERC_PUBLICATION[terms.contract])
+    np.testing.assert_array_equal(observations.weight, np.ones(rows))
+    assert terms.payment is not None
+    np.testing.assert_array_equal(
+        terms.payment.date,
+        np.busday_offset(IFERC_LAST_TRADING[terms.contract], 2, holidays=HOLIDAYS),
+    )
+    assert counter.freeze().as_dict() == {
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+    }
+    by_distinct = {
+        name: (count if name not in resolution_ledger(1) else resolution_ledger(contracts)[name])
+        for name, count in IFERC_RESOLUTION.items()
+    }
+    assert call_profile(lambda: resolved(BASIS, ticket, template, WorkCounter())) == by_distinct
+    numpy = {
+        **IFERC_RESOLUTION_NUMPY,
+        "generic.astype": 2 * contracts,
+    }
+    assert numpy_calls(lambda: resolved(BASIS, ticket, template, WorkCounter())) == numpy

@@ -8,11 +8,14 @@ page."""
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import assert_never
+from typing import assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.calendar.calendar import Calendar
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.encoding import Encoded
@@ -103,6 +106,31 @@ def bucketed(
             assert_never(bucket)
 
 
+def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
+    """Each slot's row of the calendar, by the kind of schedule the terms hold. On a futures
+    schedule the day's offset from the calendar's first day, one subtraction, a slot before it
+    refused by name: the first contract only bounds the calendar and nothing prices its days. On
+    an IFERC schedule, since #167, the row whose publication day is the slot's, one searchsorted
+    over the calendar's days, every slot's day being a publication day by the encoding's rule and
+    the first month a month like any other, nothing bounding it."""
+    match encoded.terms.schedule:
+        case FuturesSchedule():
+            slot_rows = (encoded.slot_date - calendar.dates[0]).astype(np.intp)
+            if (slot_rows < 0).any():
+                s = int((slot_rows < 0).argmax())
+                raise ValueError(
+                    f"{encoded.slot_trade(s)} observes {encoded.slot_date[s]}, before the "
+                    f"calendar begins on {calendar.dates[0]}; the schedule's first contract, "
+                    f"{encoded.terms.schedule.codes[0]}, bounds the calendar and nothing "
+                    "prices its days"
+                )
+            return slot_rows
+        case IfercSchedule():
+            return np.searchsorted(calendar.dates, encoded.slot_date).astype(np.intp)
+        case _:
+            assert_never(encoded.terms.schedule)
+
+
 def prepared_trades(
     encoded: Encoded, history: MarketHistory, counter: WorkCounter
 ) -> PreparedTrades:
@@ -110,10 +138,12 @@ def prepared_trades(
     failure being the message; then the arrays, one pass over the slots and one read per fixed slot.
 
     The history is over the trades' index, the one object the terms hold, as the history itself
-    requires of its fixings; another index of the same name is another index. Each slot's day is
-    a day of the calendar, which runs from the day after the schedule's first expiry to its last:
-    the first contract only bounds the calendar, so a slot on or before its expiry is refused by
-    name, nothing ever pricing it. A slot has fixed when the calendar marks its day fixed, which
+    requires of its fixings; another index of the same name is another index. On a futures index
+    each slot's day is a day of the calendar, which runs from the day after the schedule's first
+    expiry to its last: the first contract only bounds the calendar, so a slot on or before its
+    expiry is refused by name, nothing ever pricing it. On an IFERC index, since #167, each slot's
+    day is a month's publication day and its row that month's, found by one search, the first
+    month a month like any other. A slot has fixed when the calendar marks its day fixed, which
     is the day after it at the earliest, an observation staying live on its own day as the
     calendar's rule says. A physical future whose contract has expired, its expiry day marked
     fixed, is refused, naming the trade, the contract, its expiry and the valuation date:
@@ -148,18 +178,12 @@ def prepared_trades(
             f"expected the trades', {terms.index.name!r}"
         )
     codes = terms.schedule.codes
-    slot_rows = (encoded.slot_date - calendar.dates[0]).astype(np.intp)
-    if (slot_rows < 0).any():
-        s = int((slot_rows < 0).argmax())
-        raise ValueError(
-            f"{encoded.slot_trade(s)} observes {encoded.slot_date[s]}, before the calendar "
-            f"begins on {calendar.dates[0]}; the schedule's first contract, {codes[0]}, bounds "
-            "the calendar and nothing prices its days"
-        )
+    slot_rows = _the_slot_rows(encoded, calendar)
     is_fixed = calendar.is_fixed[slot_rows]
     as_of = calendar.valuation_date.as_of
     if encoded.payment_date is None:
-        expiries = terms.schedule.future_expiry[encoded.group_contract]
+        # A physical batch is a futures batch: the kernel refuses a physical IFERC one.
+        expiries = cast(FuturesSchedule, terms.schedule).future_expiry[encoded.group_contract]
         expired = calendar.is_fixed[(expiries - calendar.dates[0]).astype(np.intp)]
         if expired.any():
             g = int(expired.argmax())

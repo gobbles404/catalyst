@@ -12,12 +12,15 @@ every settle or quote of that date multiplies. Nothing here changes on a tick, a
 the valuation date. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
+from typing import assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import contract_on, open_days
 from goosedove.globals.unit_conversions import UnitConversions
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import CURRENCY
 from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -265,11 +268,30 @@ def _distinct(
 
 
 def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:
-    """Each observation's reference, the contract pricing its day: the day open on the index's
-    market, within the schedule, and under the expiry-based methods the component's own
-    contract; under asian whichever contract the calendar gives, one gather of the methods onto
-    the observations."""
-    schedule = terms.schedule
+    """Each observation's reference, the contract pricing its day. On a futures index: the day
+    open on the index's market, within the schedule, and under the expiry-based methods the
+    component's own contract; under asian whichever contract the calendar gives, one gather of
+    the methods onto the observations. On an IFERC index, since #167: the component's own
+    contract, whose index publishes on that very day, else refused, an IFERC month pricing
+    once; no calendar is read, an IFERC index having none."""
+    match terms.schedule:
+        case IfercSchedule() as iferc:
+            contract = terms.contract[observations.component]
+            published = iferc.publication_date[contract]
+            off = published != observations.date
+            if off.any():
+                j = int(off.argmax())
+                raise ValueError(
+                    f"{terms.named(int(observations.component[j]))} observes "
+                    f"{observations.date[j]}, expected {published[j]}, the day "
+                    f"{iferc.codes[int(contract[j])]}'s index publishes; an IFERC month prices "
+                    "once, on that day"
+                )
+            return contract
+        case FuturesSchedule() as schedule:
+            pass
+        case _:
+            assert_never(terms.schedule)
     codes = schedule.codes
     closed = ~open_days(with_holiday_calendar(terms.index.holiday_calendar), observations.date)
     if closed.any():

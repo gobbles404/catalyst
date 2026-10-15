@@ -126,6 +126,7 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_resolve": 2,
         "_PrepareTrades": 1,
         "prepared_trades": 1,
+        "_the_slot_rows": 1,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 2,
         "_publish": 1,

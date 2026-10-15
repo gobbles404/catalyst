@@ -23,6 +23,7 @@ from goosedove.index_definitions.contract_specifications import contract_specifi
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar, holiday_calendar
+from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -30,6 +31,7 @@ from goosedove.instruments.definitions import FUTURE
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
+from goosedove.market_data.iferc_fixings import iferc_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import TradeResults, trade_results
@@ -45,7 +47,6 @@ from goosedove.trades.terms import (
     Route,
     ScheduleMethod,
     Settlement,
-    futures_schedule_of,
     named_trade,
     one_choice,
     resolved_trades,
@@ -304,7 +305,7 @@ GAS_DAILY = index(
     [
         (
             {"ix": GAS_DAILY},
-            "index is a Gas Daily index, expected a futures index for a future",
+            "index is a Gas Daily index, expected a futures or an IFERC index for a future",
         ),
         (
             {"specification": spec(5, 1)},
@@ -3420,7 +3421,7 @@ def mixed_terms(
     expiry under lastday and last3day, the business day before it under penultimate and the last
     pricing day on or before the end under asian."""
     names = ix.specifications.names
-    schedule = futures_schedule_of(ix)
+    schedule = cast(FuturesSchedule, ix.schedule)
     occurrence = rows(*(i for i, entry in enumerate(entries) for _ in entry.contracts))
     contract = rows(*(c for entry in entries for c in entry.contracts))
     start, end = bounds_of(ix, contract)
@@ -4630,4 +4631,425 @@ def test_a_days_or_a_months_lots_past_the_largest_number_are_refused_by_their_bu
     assert str(refused.value) == (
         "the month from 2026-11-01 has inf of lot delta in all, expected a finite number of lots "
         "of BTU (1 BTU); its exposures in lots sum past the largest number"
+    )
+
+
+# --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
+# The ticket's synthetic Waha-like index: three months, X26, Z26 and F27, each last trading on the
+# last business day before its month and its index published on the first business day of it,
+# dollars an MMBtu settled in dollars, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, and no
+# pricing calendar, an IFERC index having none; the payment calendar closes New Year's Day. WAH001,
+# 1 LOT of Z26 at -0.50: 2,500 MMBtu of exposure and a fixed leg of 1,250, so an amount of
+# 1,250 + 2,500 times the basis, observed once, on 1 December, the day Z26's index publishes, and
+# paid 3 December, three business days after the 30 November last trading day.
+
+WAHA_SCHEDULE = iferc_schedule(
+    ("X26", "Z26", "F27"),
+    dates("2026-10-30", "2026-11-30", "2026-12-31"),
+    dates("2026-11-02", "2026-12-01", "2027-01-04"),
+)
+WAHA = index(
+    "WAHA",
+    WAHA_SCHEDULE,
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("LOT", "MMBTU"),
+        numbers(2_500.0, 1.0),
+        ("MMBTU", "MMBTU"),
+        numbers(0.0, 0.0),
+        numbers(0.0, 0.0),
+        UNITS,
+    ),
+    None,
+    "LOT",
+    UNITS,
+)
+WAHA_PAYS = holiday_calendar(dates("2027-01-01"))
+WAHA_MONTHS = schedule_months(WAHA_SCHEDULE)
+# Each month's payment day at +3bd from its last trading day on that calendar, the ticket's table:
+# 4 November, 3 December and, New Year's Day closed, 6 January.
+WAHA_PAYMENT = ("2026-11-04", "2026-12-03", "2027-01-06")
+WAHA_LOT = "lots of LOT (2500 MMBTU)"
+X26_INDEX = {"X26": -0.40}  # the earlier month's index, which every December history must hold
+Z26_FIXED = {**X26_INDEX, "Z26": -0.20}
+Z26_CORRECTED = {**X26_INDEX, "Z26": -0.10}
+
+
+def waha_terms(
+    quantities: tuple[float, ...] = (1.0,),
+    contracts: tuple[int, ...] = (1,),
+    occurrence: tuple[int, ...] | None = None,
+    pays: tuple[str, ...] | None = None,
+    lags: tuple[int, ...] | None = None,
+    units: tuple[int, ...] | None = None,
+    bases: tuple[QuantityPer, ...] | None = None,
+    methods: tuple[ScheduleMethod, ...] | None = None,
+    settlement: Settlement = Settlement.FINANCIAL,
+    prices: tuple[float, ...] | None = None,
+    trade_date: str = "2026-11-30",
+    periods: tuple[tuple[str, str], ...] | None = None,
+) -> ResolvedTrades:
+    """Trades on the Waha-like index: lastday, cleared and financial in LOT, a month's quantity at
+    -0.50, or the units, bases, methods and prices given, each component on the schedule row given,
+    its own occurrence unless said, covering its whole month unless periods are given, and paying
+    its month's day at +3bd unless other days and lags are given; the labels WAH001 on."""
+    n = len(quantities)
+    occ = np.arange(n, dtype=np.intp) if occurrence is None else rows(*occurrence)
+    m = int(occ[-1]) + 1
+    contract = rows(*contracts)
+    if periods is None:
+        start, end = month_bounds(WAHA_MONTHS[contract])
+    else:
+        start, end = dates(*(s for s, _ in periods)), dates(*(e for _, e in periods))
+    method = (
+        one_choice(METHODS, ScheduleMethod.LASTDAY, m)
+        if methods is None
+        else np.array([METHODS.index(x) for x in methods], dtype=np.intp)
+    )
+    basis = (
+        one_choice(BASES, QuantityPer.MONTH, m)
+        if bases is None
+        else np.array([BASES.index(b) for b in bases], dtype=np.intp)
+    )
+    payment = None
+    if settlement is Settlement.FINANCIAL:
+        pay_days = (
+            dates(*(WAHA_PAYMENT[int(c)] for c in contract)) if pays is None else dates(*pays)
+        )
+        lag = np.full(m, 3) if lags is None else np.array(lags, dtype=np.int64)
+        payment = PaymentTerms(lag, (WAHA_PAYS,) * m, pay_days)
+    return resolved_trades(
+        FUTURE,
+        WAHA,
+        spec(m) if units is None else rows(*units),
+        Route.CLEARED,
+        settlement,
+        method,
+        basis,
+        tuple(f"WAH{k + 1:03d}" for k in range(m)),
+        ("ICE Clear Europe",) * m,
+        None,
+        np.repeat(day(trade_date), m),
+        occ,
+        contract,
+        numbers(*quantities),
+        start,
+        end,
+        numbers(*([-0.50] * n)) if prices is None else numbers(*prices),
+        payment,
+    )
+
+
+def waha_history(as_of: str, indices: dict[str, float], ix: Index = WAHA) -> MarketHistory:
+    """The index's history valued on that day with the months' indices given, newest first as the
+    desk keeps them; every month published before the day is among them, the history's own rule."""
+    cal = calendar(valuation_date(day(as_of), 0.5), ix)
+    codes = tuple(reversed(indices))
+    return market_history(cal, iferc_fixings(codes, numbers(*(indices[c] for c in codes)), ix))
+
+
+def waha_valued(
+    as_of: str,
+    indices: dict[str, float],
+    quotes: tuple[float, ...],
+    terms: ResolvedTrades | None = None,
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = waha_terms() if terms is None else terms
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = waha_history(as_of, indices, terms.index)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_an_iferc_future_observes_its_months_index_once_on_its_publication_day() -> None:
+    # The terms hold the IFERC schedule as the kind rule found it; the one observation is Z26's
+    # publication day with the whole weight, no pricing calendar read; the encoding converts the
+    # lot once, 2,500 MMBtu and a fixed leg of 1,250, one slot on 1 December referencing Z26, one
+    # group paying 3 December, and the day, month and year axes that one day.
+    terms = waha_terms()
+    assert terms.schedule is WAHA_SCHEDULE and terms.index is WAHA
+    np.testing.assert_array_equal(terms.start_date, dates("2026-12-01"))
+    np.testing.assert_array_equal(terms.end_date, dates("2026-12-31"))
+    np.testing.assert_array_equal(terms.covered_days, [31])
+    obs = observed_of(terms)
+    np.testing.assert_array_equal(obs.component, [0])
+    np.testing.assert_array_equal(obs.date, dates("2026-12-01"))
+    np.testing.assert_array_equal(obs.weight, [1.0])
+    counter = WorkCounter()
+    enc = encoded(terms, obs, UNITS, counter)
+    np.testing.assert_array_equal(enc.quote_quantity, [2_500.0])
+    np.testing.assert_array_equal(enc.offset, [1_250.0])
+    np.testing.assert_array_equal(enc.group_contract, [1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-03"))
+    np.testing.assert_array_equal(enc.slot_date, dates("2026-12-01"))
+    np.testing.assert_array_equal(enc.slot_reference, [1])
+    np.testing.assert_array_equal(enc.slot_exposure, [2_500.0])
+    np.testing.assert_array_equal(enc.references, [1])
+    assert [str(d) for d in enc.days] == ["2026-12-01"]
+    assert [str(m) for m in enc.months] == ["2026-12-01"]
+    assert [str(y) for y in enc.years] == ["2026-01-01"]
+    assert counter.freeze().as_dict() == {
+        "encoded_components": 1,
+        "encoded_groups": 1,
+        "encoded_observations": 1,
+        "encoded_slots": 1,
+    }
+
+
+WAHA_STATES = [
+    ("2026-11-30", X26_INDEX, (-0.30, -0.10), 500, 0, 1),
+    ("2026-12-01", X26_INDEX, (-0.30, -0.10), 500, 0, 1),
+    ("2026-12-01", X26_INDEX, (-0.25, -0.10), 625, 0, 1),
+    ("2026-12-02", Z26_FIXED, (-0.10,), 750, 0, 0),
+    ("2026-12-03", Z26_FIXED, (-0.10,), 0, 750, 0),
+    ("2026-12-02", Z26_CORRECTED, (-0.10,), 1_000, 0, 0),
+]
+WAHA_IDS = [
+    "30 Nov, booked, live at -0.30",
+    "1 Dec, publication day, live at -0.30",
+    "1 Dec, a tick to -0.25",
+    "2 Dec, fixed at -0.20 and unpaid",
+    "3 Dec, paid",
+    "2 Dec, the index corrected to -0.10",
+]
+
+
+@pytest.mark.parametrize(
+    ("as_of", "indices", "quotes", "mark", "cash", "live"), WAHA_STATES, ids=WAHA_IDS
+)
+def test_the_waha_basis_future_marks_fixes_and_pays_as_the_ticket_says(
+    as_of: str,
+    indices: dict[str, float],
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    live: int,
+) -> None:
+    # 1,250 + 2,500 times the basis: 500 at -0.30, 625 at -0.25, 750 once the index prints -0.20,
+    # cash on 3 December, the payment day, and 1,000 under a corrected index. Live on its
+    # publication day and fixed the day after; the one slot's lot is the live delta, on Z26 and on
+    # 1 December, zero once fixed with the day kept; 2,500 dollars per dollar an MMBtu of
+    # sensitivity while live; one fixing read once fixed and one quote read while live.
+    result, counter = waha_valued(as_of, indices, quotes)
+    assert (result.mark, result.cash) == (pytest.approx(mark), pytest.approx(cash))
+    np.testing.assert_array_equal(result.contracts, [1])
+    np.testing.assert_allclose(result.lot_delta, [live])
+    assert result.lot_delta_total == pytest.approx(live)
+    np.testing.assert_allclose(result.price_sensitivity, [2_500.0 * live])
+    assert result.lot_unit == WAHA_LOT
+    prep = result.prepared
+    np.testing.assert_array_equal(prep.is_fixed, [as_of > "2026-12-01"])
+    np.testing.assert_array_equal(prep.is_settled, [as_of >= "2026-12-03"])
+    days, daily, months, monthly, years, yearly = views(prep)
+    assert (days, months, years) == (["2026-12-01"], ["2026-12-01"], ["2026-01-01"])
+    assert (daily, monthly, yearly) == ([live], [live], [live])
+    counts = counter.freeze().as_dict()
+    assert counts["prepared_slots"] == 1 and counts["fixings_read"] == 1 - live
+    assert counts["live_prices_read"] == live
+
+
+def test_a_tick_on_the_waha_future_reads_one_quote_and_prepares_nothing_again() -> None:
+    first, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10))
+    counter = WorkCounter()
+    ticked = trade_results(first.prepared, quoted(first.prepared.history, -0.25, -0.10), counter)
+    assert ticked.prepared is first.prepared and ticked.mark == pytest.approx(625)
+    assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
+    assert first.mark == pytest.approx(500)  # the first results stand
+
+
+def test_a_lot_and_its_2500_mmbtu_value_alike_and_a_calendar_day_quantity_scales_once() -> None:
+    # 1 LOT a month and 2,500 MMBtu a month are one exposure and one reporting lot; 1 MMBtu a
+    # calendar day over December is 31 MMBtu, one observation still, 6.20 of mark at -0.30 and
+    # 9.30 once fixed at -0.20, 31/2500 of a lot while live.
+    in_mmbtu = waha_terms(quantities=(2_500.0,), units=(1,))
+    lot, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10))
+    mmbtu, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10), in_mmbtu)
+    assert mmbtu.mark == pytest.approx(lot.mark) and mmbtu.lot_delta_total == pytest.approx(1)
+    np.testing.assert_array_equal(mmbtu.prepared.encoded.quote_quantity, [2_500.0])
+    daily = waha_terms(quantities=(1.0,), units=(1,), bases=(QuantityPer.CALDAY,))
+    np.testing.assert_array_equal(daily.component_quantity, [31.0])
+    assert observed_of(daily).date.size == 1
+    live, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10), daily)
+    assert live.mark == pytest.approx(6.20) and live.lot_delta_total == pytest.approx(31 / 2_500)
+    fixed, _ = waha_valued("2026-12-02", Z26_FIXED, (-0.10,), daily)
+    assert (fixed.mark, fixed.cash, fixed.lot_delta_total) == (pytest.approx(9.30), 0, 0)
+
+
+def test_two_waha_occurrences_double_the_answers_in_either_order_and_a_zero_row_stands() -> None:
+    # Two identical rows: twice the mark, twice the delta, one slot since one contract, one day
+    # and one payment day; a batch of unlike rows equals its singletons summed whatever the order;
+    # a zero row validates, contributes nothing and keeps its slot.
+    twice = waha_terms(quantities=(1.0, 1.0), contracts=(1, 1))
+    both, counter = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10), twice)
+    one, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10))
+    assert both.mark == pytest.approx(2 * one.mark) and both.lot_delta_total == pytest.approx(2)
+    assert both.prepared.encoded.slot_group.size == 1
+    assert counter.freeze().as_dict()["encoded_components"] == 2
+    paid, _ = waha_valued("2026-12-03", Z26_FIXED, (-0.10,), twice)
+    assert (paid.mark, paid.cash) == (0, pytest.approx(1_500))
+    mixed = waha_terms(quantities=(1.0, 2.0), contracts=(1, 1), prices=(-0.50, -0.40))
+    turned = waha_terms(quantities=(2.0, 1.0), contracts=(1, 1), prices=(-0.40, -0.50))
+    for as_of, indices, quotes in (
+        ("2026-12-01", X26_INDEX, (-0.30, -0.10)),
+        ("2026-12-02", Z26_FIXED, (-0.10,)),
+        ("2026-12-03", Z26_FIXED, (-0.10,)),
+    ):
+        a, _ = waha_valued(as_of, indices, quotes, mixed)
+        b, _ = waha_valued(as_of, indices, quotes, turned)
+        singles = [
+            waha_valued(as_of, indices, quotes, waha_terms(quantities=(q,), prices=(p,)))[0]
+            for q, p in ((1.0, -0.50), (2.0, -0.40))
+        ]
+        assert a.mark == pytest.approx(b.mark)
+        assert a.mark == pytest.approx(sum(s.mark for s in singles))
+        assert a.cash == pytest.approx(b.cash)
+        assert a.cash == pytest.approx(sum(s.cash for s in singles))
+        assert a.lot_delta_total == pytest.approx(b.lot_delta_total)
+    zero, _ = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10), waha_terms(quantities=(0.0,)))
+    assert (zero.mark, zero.lot_delta_total) == (0, 0)
+    assert zero.prepared.encoded.slot_group.size == 1  # the row kept ready, its slot standing
+
+
+def test_a_long_and_a_short_lot_paying_on_two_days_keep_their_groups_as_the_risk_nets() -> None:
+    # Long 1 LOT at +3bd and short 1 LOT at +4bd, both Z26 at -0.50: two groups and two slots on
+    # one day, the live risk netting to zero and nothing disappearing, the one quote still read;
+    # after the index prints -0.20, 3 December has the long's 750 of cash and the short's -750 of
+    # mark, and 4 December both as cash, zero net.
+    pair = waha_terms(
+        quantities=(1.0, -1.0), contracts=(1, 1), pays=("2026-12-03", "2026-12-04"), lags=(3, 4)
+    )
+    live, counter = waha_valued("2026-12-01", X26_INDEX, (-0.30, -0.10), pair)
+    enc = live.prepared.encoded
+    np.testing.assert_array_equal(enc.group_contract, [1, 1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-03", "2026-12-04"))
+    assert enc.slot_group.size == 2 and enc.references.size == 1
+    assert (live.mark, live.cash) == (pytest.approx(0), 0)
+    assert live.lot_delta_total == pytest.approx(0)
+    assert live.prepared.live_references.size == 1
+    assert counter.freeze().as_dict()["live_prices_read"] == 1
+    third, _ = waha_valued("2026-12-03", Z26_FIXED, (-0.10,), pair)
+    assert (third.mark, third.cash) == (pytest.approx(-750), pytest.approx(750))
+    np.testing.assert_array_equal(third.prepared.is_settled, [True, False])
+    fourth, _ = waha_valued("2026-12-04", Z26_FIXED, (-0.10,), pair)
+    assert (fourth.mark, fourth.cash) == (pytest.approx(0), pytest.approx(0))
+    np.testing.assert_array_equal(fourth.prepared.is_settled, [True, True])
+
+
+def test_a_z26_f27_strip_fixes_one_month_and_quotes_the_other_with_its_own_payment_days() -> None:
+    # One occurrence, two components, one index and one payment day a month: on 2 December Z26's
+    # index at -0.20 stands and F27 quotes -0.10, 750 and 1,000 of mark against -0.50, the delta
+    # zero on Z26 and a lot on F27; F27 pays 6 January, its 31 December last trading day plus
+    # three business days with New Year's Day closed.
+    strip = waha_terms(quantities=(1.0, 1.0), contracts=(1, 2), occurrence=(0, 0))
+    np.testing.assert_array_equal(observed_of(strip).date, dates("2026-12-01", "2027-01-04"))
+    result, _ = waha_valued("2026-12-02", Z26_FIXED, (-0.10,), strip)
+    enc = result.prepared.encoded
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-03", "2027-01-06"))
+    np.testing.assert_array_equal(enc.group_contract, [1, 2])
+    assert (result.mark, result.cash) == (pytest.approx(1_750), 0)
+    np.testing.assert_array_equal(result.contracts, [1, 2])
+    np.testing.assert_allclose(result.lot_delta, [0.0, 1.0])
+    days, daily, months, monthly, years, yearly = views(result.prepared)
+    assert days == ["2026-12-01", "2027-01-04"] and daily == [0.0, 1.0]
+    assert months == ["2026-12-01", "2027-01-01"] and monthly == [0.0, 1.0]
+    assert years == ["2026-01-01", "2027-01-01"] and yearly == [0.0, 1.0]
+
+
+def test_the_first_iferc_month_is_a_month_to_trade_and_the_existing_refusals_hold() -> None:
+    # X26 booked on 15 October, its index published 2 November and paying 4 November: on the 3rd
+    # fixed at -0.40 and unpaid, 250 of mark, nothing bounding the calendar; on the 4th cash. A
+    # history without the month's index, a history over another index of the same name and a
+    # vector stopping short of a traded month are the history's and the market's refusals.
+    x26 = waha_terms(contracts=(0,), trade_date="2026-10-15")
+    np.testing.assert_array_equal(observed_of(x26).date, dates("2026-11-02"))
+    third, counter = waha_valued("2026-11-03", X26_INDEX, (-0.30, -0.10), x26)
+    assert (third.mark, third.cash, third.lot_delta_total) == (pytest.approx(250), 0, 0)
+    np.testing.assert_array_equal(third.prepared.encoded.payment_date, dates("2026-11-04"))
+    assert counter.freeze().as_dict()["fixings_read"] == 1
+    fourth, _ = waha_valued("2026-11-04", X26_INDEX, (-0.30, -0.10), x26)
+    assert (fourth.mark, fourth.cash) == (0, pytest.approx(250))
+    with pytest.raises(ValueError) as missing:
+        waha_history("2026-11-03", {})
+    assert str(missing.value) == (
+        "fixings has no index for X26, expected an index for every fixed month in calendar"
+    )
+    twin = index("WAHA", WAHA_SCHEDULE, WAHA.conventions, WAHA.specifications, None, "LOT", UNITS)
+    enc = encoded(x26, observed_of(x26), UNITS, WorkCounter())
+    with pytest.raises(ValueError) as other:
+        prepared_trades(enc, waha_history("2026-11-03", X26_INDEX, twin), WorkCounter())
+    assert str(other.value) == (
+        "history is over another index, 'WAHA', expected the trades', 'WAHA'"
+    )
+    strip = waha_terms(quantities=(1.0, 1.0), contracts=(1, 2), occurrence=(0, 0))
+    history = waha_history("2026-11-30", X26_INDEX)
+    prep = prepared_trades(
+        encoded(strip, observed_of(strip), UNITS, WorkCounter()), history, WorkCounter()
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"^requested contract 'F27' is beyond live-price coverage ending at 'Z26'$",
+    ):
+        trade_results(prep, quoted(history, -0.30), WorkCounter())
+
+
+def test_a_payment_on_the_publication_day_is_refused_when_the_iferc_batch_is_encoded() -> None:
+    # +1bd from 30 November is 1 December, the day the index prints: no final price exists by the
+    # day-based cutoff, the existing rule, and nothing is delayed in its place.
+    same_day = waha_terms(pays=("2026-12-01",), lags=(1,))
+    with pytest.raises(ValueError) as refused:
+        encoded(same_day, observed_of(same_day), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
+        "final price exists"
+    )
+
+
+def test_an_iferc_index_takes_a_financial_lastday_future_alone_and_says_so() -> None:
+    with pytest.raises(ValueError) as physical:
+        waha_terms(settlement=Settlement.PHYSICAL)
+    assert str(physical.value) == (
+        "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
+        "future is cash settled on its month's published index"
+    )
+    with pytest.raises(ValueError) as asian:
+        waha_terms(methods=(ScheduleMethod.ASIAN,))
+    assert str(asian.value) == (
+        "schedule_method of trade 'WAH001' at row 1 is 'asian', expected 'lastday' on an IFERC "
+        "index; an IFERC month has one index, published once"
+    )
+    with pytest.raises(ValueError) as second:
+        waha_terms(
+            quantities=(1.0, 1.0),
+            contracts=(1, 2),
+            methods=(ScheduleMethod.LASTDAY, ScheduleMethod.PENULTIMATE),
+        )
+    assert str(second.value) == (
+        "schedule_method of trade 'WAH002' at row 2 is 'penultimate', expected 'lastday' on an "
+        "IFERC index; an IFERC month has one index, published once"
+    )
+    # The observations builder says the same of a method on bare arrays, and a part of a month
+    # under lastday is refused as the whole month's one price.
+    start, end = month_bounds(WAHA_MONTHS[rows(1)])
+    with pytest.raises(ValueError) as bare:
+        observed(by(ScheduleMethod.LAST3DAY, 1), WAHA, rows(1), start, end, unlabeled)
+    assert str(bare.value) == (
+        "schedule_method of trade at row 1 is 'last3day', expected 'lastday' on an IFERC index; "
+        "an IFERC month has one index, published once"
+    )
+    half = waha_terms(periods=(("2026-12-01", "2026-12-15"),))
+    with pytest.raises(ValueError) as part:
+        observed_of(half)
+    assert str(part.value) == (
+        "Z26 of trade 'WAH001' at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
+        "month, expected the whole month under lastday; an IFERC month's index is one price for "
+        "the whole month"
+    )
+    # An observation on any day but the month's publication day is refused when encoded.
+    off = observations(rows(0), dates("2026-12-02"), numbers(1.0), 1)
+    with pytest.raises(ValueError) as wrong_day:
+        encoded(waha_terms(), off, UNITS, WorkCounter())
+    assert str(wrong_day.value) == (
+        "trade 'WAH001' at row 1 observes 2026-12-02, expected 2026-12-01, the day Z26's index "
+        "publishes; an IFERC month prices once, on that day"
     )

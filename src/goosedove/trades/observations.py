@@ -20,9 +20,10 @@ from numpy.typing import NDArray
 from goosedove.calendar.calendar import open_days
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import with_holiday_calendar
-from goosedove.trades.terms import METHODS, ScheduleMethod, futures_schedule_of
+from goosedove.trades.terms import METHODS, ScheduleMethod, trade_schedule_of
 
 # How far the weights of a component may miss one, a few units in the last place: 1/3 three
 # times is one exactly, 1/7 seven times is not.
@@ -147,15 +148,39 @@ def observed(
     encoding's to derive from the calendar: the component's own under the expiry-based methods,
     whichever the calendar gives under asian. The method is the resolution's to read before any
     payment is counted, so that a payment day counts from the component's last observation."""
-    schedule = futures_schedule_of(index)
+    schedule = trade_schedule_of(index)
     count = contract.size
     if method.size != count:
         raise ValueError(f"method has {method.size}, expected {count}, one per component")
+    match schedule:
+        case IfercSchedule():
+            # Since #167: one observation per component, the month's index on its publication
+            # day with the whole weight, lastday alone and the whole month; no pricing calendar
+            # is read, an IFERC index having none.
+            lastday = method == METHODS.index(ScheduleMethod.LASTDAY)
+            if not lastday.all():
+                k = int((~lastday).argmax())
+                raise ValueError(
+                    f"schedule_method of {named(k)} is {METHODS[int(method[k])].value!r}, "
+                    "expected 'lastday' on an IFERC index; an IFERC month has one index, "
+                    "published once"
+                )
+            _whole_months(schedule, contract, start, end, method, lastday, named, IFERC_WHOLE)
+            return observations(
+                np.arange(count, dtype=np.intp),
+                schedule.publication_date[contract],
+                np.ones(count),
+                count,
+            )
+        case FuturesSchedule():
+            pass
+        case _:
+            assert_never(schedule)
     expiry = schedule.future_expiry[contract]
     holidays = with_holiday_calendar(index.holiday_calendar)
     expiry_based = method != METHODS.index(ScheduleMethod.ASIAN)
     if expiry_based.any():
-        _whole_months(schedule, contract, start, end, method, expiry_based, named)
+        _whole_months(schedule, contract, start, end, method, expiry_based, named, FUTURES_WHOLE)
     before_expiry = (method == METHODS.index(ScheduleMethod.PENULTIMATE)) | (
         method == METHODS.index(ScheduleMethod.LAST3DAY)
     )
@@ -238,14 +263,21 @@ def _the_days(
             assert_never(kind)
 
 
+FUTURES_WHOLE = (
+    "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
+)
+IFERC_WHOLE = "an IFERC month's index is one price for the whole month"
+
+
 def _whole_months(
-    schedule: FuturesSchedule,
+    schedule: FuturesSchedule | IfercSchedule,
     contract: NDArray[np.intp],
     start: NDArray[np.datetime64],
     end: NDArray[np.datetime64],
     method: NDArray[np.intp],
     expiry_based: NDArray[np.bool_],
     named: Callable[[int], str],
+    reason: str,
 ) -> None:
     """Under the expiry-based methods each component covers its whole calendar month: their
     observations are the contract's expiry days, which a part of a month has no share of, so a
@@ -261,8 +293,7 @@ def _whole_months(
         raise ValueError(
             f"{schedule.codes[contract[k]]} of {named(k)} is covered from {start[k]} to {end[k]}, "
             f"part of its month, expected the whole month under {METHODS[int(method[k])].value}; "
-            "the expiry-based methods take the contract's month entire, and a part of it prices "
-            "under asian"
+            f"{reason}"
         )
 
 

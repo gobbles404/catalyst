@@ -484,7 +484,7 @@ $formulas = [ordered]@{
     "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,GP11)"   = "#ERROR _CreateTrades: ValueError: quantity_unit is 'LOT', expected one of the index's specifications: 'lots', 'gal'"
     "=_CreateTrades(EB1,EW4:FA4,EW14:FA14,EW3)"  = "#ERROR _CreateTrades: ValueError: contract_code row 1 is 'F27', expected months the index's schedule has a contract for; it has none for 2027-01"
     "=_CreateTrades(EB1,EW4:FA4,EW15:FA15,EW3)"  = "#ERROR _CreateTrades: ValueError: quantity of trade 'T8' at row 1 is 2.5, expected a whole number"
-    "=_CreateTrades(EB2,EW4:FA4,EW5:FA7,EW3)"    = "#ERROR _CreateTrades: ValueError: index is an IFERC index, expected a futures index for a future"
+    "=_CreateTrades(EB2,EW4:FA4,EW5:FA7,EW3)"    = "#ERROR _CreateTrades: ValueError: index 'Henry Hub IFERC' has no reporting_lot, expected one of its specifications named when the index was made; a batch's delta is reported in lots of it"
     '=_CreateTrades(EB1,EW4:FA4,EW5:FA7,"x:trade_template:9")' = "#ERROR _CreateTrades: template is text 'x:trade_template:9' naming no live object, expected trade template handle"
     # The valuation path: the batch in FG5, one trade of two lots of n26 at 70 on the index in ED1,
     # prepared in FG6 against the history in CT7, valued on 26-May-2026, and evaluated in FG7
@@ -824,6 +824,50 @@ $formulas = [ordered]@{
     "=_ReportDelta(MY8,C2)"        = "#ERROR _ReportDelta: bucket is blank, expected text"
     "=_ReportDelta(MY8,1)"         = "#ERROR _ReportDelta: bucket is number 1.0, expected text"
     "=_ReportDelta(C2)"            = "#ERROR _ReportDelta: results is blank, expected trade results handle"
+    # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, X26, Z26 and F27
+    # last trading 30 October, 30 November and 31 December and published 2 November, 1 December
+    # and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU,
+    # the LOT reported, no pricing calendar; the template in NR3 cleared, financial, lastday, LOT a
+    # month at +3bd on the calendar in NK2 closing New Year's Day; WAH001, 1 LOT of Z26 at -0.50
+    # booked 30 November in NR6, paying 3 December, 46359, read back in the batch. On 1 December in
+    # OC8, the publication day, live at -0.30: 500 of mark, one lot, the slot Z26 on 46357 paying
+    # 46359, 2,500 of live coefficient; a tick to -0.25 in OC16, 625 over the same preparation; on
+    # the 2nd in OE8, the index printed at -0.20, 750 of mark, fixed and unpaid, no lot; on the 3rd
+    # in OG8, 750 of cash, settled. The delta by day one row, 1 December, a lot and then zero, the
+    # month from the same day; a physical template and an asian row refused by name.
+    "=INDEX(util_ReadHandle(NR6),1,14)"  = "payment_date"
+    "=INDEX(util_ReadHandle(NR6),3,14)"  = "46359"
+    "=INDEX(util_ReadHandle(NR6),3,5)"   = "lastday"
+    "=ROWS(util_ReadHandle(OC7))"        = "3"
+    "=INDEX(util_ReadHandle(OC7),3,1)"   = "Z26"
+    "=INDEX(util_ReadHandle(OC7),3,2)"   = "Z26"
+    "=INDEX(util_ReadHandle(OC7),3,3)"   = "46357"
+    "=INDEX(util_ReadHandle(OC7),3,4)"   = "46359"
+    "=INDEX(util_ReadHandle(OC7),3,5)"   = "FALSE"
+    "=INDEX(util_ReadHandle(OC7),3,7)"   = "2500"
+    "=INDEX(util_ReadHandle(OC7),3,8)"   = "1"
+    "=INDEX(_ReportValues(OC8),3,1)"     = "500"
+    "=INDEX(_ReportValues(OC8),3,2)"     = "0"
+    "=INDEX(_ReportRisk(OC8),3,1)"       = "1"
+    "=INDEX(_ReportRisk(OC8),3,2)"       = "lots of LOT (2500 MMBTU)"
+    "=INDEX(_ReportValues(OC16),3,1)"    = "625"
+    "=INDEX(_ReportRisk(OC16),3,1)"      = "1"
+    "=INDEX(_ReportValues(OE8),3,1)"     = "750"
+    "=INDEX(_ReportValues(OE8),3,2)"     = "0"
+    "=INDEX(_ReportRisk(OE8),3,1)"       = "0"
+    "=INDEX(util_ReadHandle(OE7),3,5)"   = "TRUE"
+    "=INDEX(util_ReadHandle(OE7),3,6)"   = "FALSE"
+    "=INDEX(_ReportValues(OG8),3,1)"     = "0"
+    "=INDEX(_ReportValues(OG8),3,2)"     = "750"
+    "=INDEX(util_ReadHandle(OG7),3,6)"   = "TRUE"
+    "=ROWS(_ReportDelta(OC8))"           = "3"
+    "=INDEX(_ReportDelta(OC8),3,1)"      = "46357"
+    "=INDEX(_ReportDelta(OC8),3,2)"      = "1"
+    "=INDEX(_ReportDelta(OC8),3,3)"      = "lots of LOT (2500 MMBTU)"
+    "=INDEX(_ReportDelta(OE8),3,2)"      = "0"
+    '=INDEX(_ReportDelta(OE8,"month"),3,1)' = "46357"
+    "=_CreateTrades(NH5,IS1:IW1,NR5:NV5,NR9)"      = "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis future is cash settled on its month's published index"
+    "=_CreateTrades(NH5,NR11:NW11,NR12:NW12,NR16)" = "#ERROR _CreateTrades: ValueError: schedule_method of trade 'WAH001' at row 1 is 'asian', expected 'lastday' on an IFERC index; an IFERC month has one index, published once"
     "=_CreateTrades(KD6,KU1:LA1,KU2:LA5,KN6)" = "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them"
     '=_CreateTrades(KD6,KU1:LA1,{"E","Z26",1,"ICE","month","lastday","Clearer A"},KN3)' = "#ERROR _CreateTrades: ValueError: quantity_unit row 1 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'"
     "=_CreateTrades(IA6,IS17:IX17,IS18:IX18,IJ12)" = "#ERROR _CreateTrades: ValueError: Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; the expiry-based methods take the contract's month entire, and a part of it prices under asian"
@@ -1545,6 +1589,64 @@ $cells = [ordered]@{
     "NF9" = "=_CreateMarket(NF5,NF6)"
     "NF7" = "=_PrepareTrades(MS4,NF5)"
     "NF8" = "=_EvaluateTrades(NF7,NF9)"
+    "NH1" = "X26"; "NI1" = "30-Oct-2026"; "NJ1" = "2-Nov-2026"
+    "NH2" = "Z26"; "NI2" = "30-Nov-2026"; "NJ2" = "1-Dec-2026"
+    "NH3" = "F27"; "NI3" = "31-Dec-2026"; "NJ3" = "4-Jan-2027"
+    "NH4" = "=_CreateIfercSchedule(NH1:NH3,NI1:NI3,NJ1:NJ3)"
+    "NK1" = "1-Jan-2027"
+    "NK2" = "=_CreateHolidayCalendar(NK1)"
+    "NL1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "NM1" = "LOT"; "NN1" = "2500"; "NO1" = "MMBTU"; "NP1" = "0"; "NQ1" = "0"
+    "NM2" = "MMBTU"; "NN2" = "1"; "NO2" = "MMBTU"; "NP2" = "0"; "NQ2" = "0"
+    "NM3" = "=_CreateContractSpecifications(EI1:EM1,NM1:NQ2)"
+    "NH5" = '=_CreateIndex("WAHA",NH4,NL1,NM3,,"LOT")'
+    "NR2" = "LOT"; "NS2" = "month"; "NT2" = "lastday"; "NU2" = "cleared"; "NV2" = "financial"; "NW2" = "ICE Clear Europe"; "NX2" = "+3bd"; "NY2" = "=NK2"
+    "NR3" = '=_CreateTradeTemplate("future",IJ1:IQ1,NR2:NY2)'
+    "NR5" = "WAH001"; "NS5" = "30-Nov-2026"; "NT5" = "Z26"; "NU5" = "1"; "NV5" = "-0.5"
+    "NR6" = "=_CreateTrades(NH5,IS1:IW1,NR5:NV5,NR3)"
+    "NR8" = "LOT"; "NS8" = "month"; "NT8" = "lastday"; "NU8" = "cleared"; "NV8" = "physical"; "NW8" = "ICE Clear Europe"
+    "NR9" = '=_CreateTradeTemplate("future",IJ1:IO1,NR8:NW8)'
+    "NR11" = "trade_id"; "NS11" = "trade_date"; "NT11" = "contract_code"; "NU11" = "quantity"; "NV11" = "fixed_price"; "NW11" = "schedule_method"
+    "NR12" = "WAH001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "asian"
+    "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_time_lag"; "NX14" = "payment_holiday_calendar"
+    "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+3bd"; "NX15" = "=NK2"
+    "NR16" = '=_CreateTradeTemplate("future",NR14:NX14,NR15:NX15)'
+    "OA1" = "X26"; "OB1" = "-0.4"
+    "OA2" = "Z26"; "OB2" = "-0.2"
+    "OC1" = "1-Dec-2026"
+    "OC2" = "=_CreateValuationDate(OC1,0.5)"
+    "OC3" = "=_CreateCalendar(OC2,NH5)"
+    "OC4" = "=_CreateIfercFixings(OA1,OB1,NH5)"
+    "OC5" = "=_CreateMarketHistory(OC3,OC4)"
+    "OC10" = "-0.3"; "OC11" = "-0.1"
+    "OC6" = '=_CreatePriceVector("WAHA",OC10:OC11)'
+    "OC9" = "=_CreateMarket(OC5,OC6)"
+    "OC7" = "=_PrepareTrades(NR6,OC5)"
+    "OC8" = "=_EvaluateTrades(OC7,OC9)"
+    "OC12" = "-0.25"; "OC13" = "-0.1"
+    "OC14" = '=_CreatePriceVector("WAHA",OC12:OC13)'
+    "OC15" = "=_CreateMarket(OC5,OC14)"
+    "OC16" = "=_EvaluateTrades(OC7,OC15)"
+    "OE1" = "2-Dec-2026"
+    "OE2" = "=_CreateValuationDate(OE1,0.5)"
+    "OE3" = "=_CreateCalendar(OE2,NH5)"
+    "OE4" = "=_CreateIfercFixings(OA1:OA2,OB1:OB2,NH5)"
+    "OE5" = "=_CreateMarketHistory(OE3,OE4)"
+    "OE10" = "-0.1"
+    "OE6" = '=_CreatePriceVector("WAHA",OE10)'
+    "OE9" = "=_CreateMarket(OE5,OE6)"
+    "OE7" = "=_PrepareTrades(NR6,OE5)"
+    "OE8" = "=_EvaluateTrades(OE7,OE9)"
+    "OG1" = "3-Dec-2026"
+    "OG2" = "=_CreateValuationDate(OG1,0.5)"
+    "OG3" = "=_CreateCalendar(OG2,NH5)"
+    "OG4" = "=_CreateIfercFixings(OA1:OA2,OB1:OB2,NH5)"
+    "OG5" = "=_CreateMarketHistory(OG3,OG4)"
+    "OG10" = "-0.1"
+    "OG6" = '=_CreatePriceVector("WAHA",OG10)'
+    "OG9" = "=_CreateMarket(OG5,OG6)"
+    "OG7" = "=_PrepareTrades(NR6,OG5)"
+    "OG8" = "=_EvaluateTrades(OG7,OG9)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"
