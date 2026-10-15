@@ -1,8 +1,9 @@
 """The encoded batch prepared against one market history: which slots have fixed and at what
 settle, which payment groups have settled, what remains live and the exposure to each live
 reference, and the risk that no tick changes, the price sensitivity in the settlement currency,
-the delta in lots of the index's reporting lot by contract and the same lots by observation day,
-calendar month and calendar year, the three views _ReportRisk selects among. One record per
+the delta in lots of the index's reporting lot by contract and the same lots by observation day
+and, since #NN, by the pricing contracts' calendar month and year, the three views _ReportRisk
+selects among. One record per
 history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
 page."""
 
@@ -71,9 +72,11 @@ class PreparedTrades:
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
     half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
     the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
-    days, monthly_lots[m] those summed onto its calendar months and yearly_lots[y] onto its
-    calendar years, the three views _ReportRisk selects among, a bucket's lots zero once its
-    days have fixed and its row kept; every one of them checked finite before the record is
+    days, and since #NN monthly_lots[m] the lot delta by reference summed onto the encoding's
+    contract months and yearly_lots[y] onto its contract years, the month and the year a
+    contract is named for whatever days it is observed on, the three views _ReportRisk selects
+    among, a bucket's lots zero once its contracts have fixed and its row kept; every one of
+    them checked finite before the record is
     made; the result shares them. And since #176, for a bilateral financial batch, unpaid_payments,
     the distinct payment days of the groups not yet settled with each such group's place among
     them and its time fraction, made once here, since the groups settled and the valuation date
@@ -266,15 +269,17 @@ def prepared_trades(
         encoded.day_of_slot, weights=dated_live_lots, minlength=encoded.days.size
     )
     monthly_lots = np.bincount(
-        encoded.month_of_day, weights=daily_lots, minlength=encoded.months.size
+        encoded.contract_month_of_reference,
+        weights=lot_delta,
+        minlength=encoded.contract_months.size,
     )
     yearly_lots = np.bincount(
-        encoded.year_of_month, weights=monthly_lots, minlength=encoded.years.size
+        encoded.contract_year_of_month, weights=monthly_lots, minlength=encoded.contract_years.size
     )
     for label, starts, lots in (
         ("the day", encoded.days, daily_lots),
-        ("the month from", encoded.months, monthly_lots),
-        ("the year from", encoded.years, yearly_lots),
+        ("the contract month from", encoded.contract_months, monthly_lots),
+        ("the contract year from", encoded.contract_years, yearly_lots),
     ):  # the three views, not the rows: a bucket's sum can outrun what its parts did not
         outrun = ~np.isfinite(lots)
         if outrun.any():

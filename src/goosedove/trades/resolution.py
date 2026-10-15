@@ -23,7 +23,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.unit_conversions import UnitConversions
-from goosedove.index_definitions.contract_codes import month_and_year
 from goosedove.index_definitions.date_offsets import shift_days
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
@@ -53,9 +52,11 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     marketing_reserves,
+    month_label,
     named_trade,
     reporting_lot_of,
     resolved_trades,
+    schedule_months,
     trade_schedule_of,
     whole_trade_ids,
 )
@@ -263,6 +264,7 @@ def resolved(
         payment,
         counterparty=fields.labels("counterparty"),
         marketing_reserve=fields.amounts("marketing_reserve"),
+        schedule_month=months,
     )
     return terms, observations, periods.entered
 
@@ -466,34 +468,6 @@ def _the_specification(index: Index, where: str, name: str) -> int:
 # --- the contracts: every schedule code read, each ticket code resolved by month -------------
 
 
-def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int64]:
-    """The month of every code of the schedule, as numpy counts months, one read per code: a
-    code that is no contract code is refused by row, and so are two rows for one month, since a
-    month resolved to two rows would name no contract. The resolution reads them once and
-    resolves the ticket's periods against them."""
-    codes = schedule.codes
-    months = np.empty(len(codes), dtype=np.int64)
-    for i, code in enumerate(codes):
-        try:
-            month, year = month_and_year(code)
-        except ValueError:
-            raise ValueError(
-                f"index schedule row {i + 1} is {code!r}, expected a contract code, "
-                "a month letter and a two-digit year such as F26"
-            ) from None
-        months[i] = (year - 1970) * 12 + month - 1
-    order = np.argsort(months, kind="stable")
-    by_month = months[order]
-    same = np.flatnonzero(by_month[1:] == by_month[:-1])
-    if same.size:
-        a, b = int(order[same[0]]), int(order[same[0] + 1])
-        raise ValueError(
-            f"index schedule rows {a + 1} and {b + 1} are {codes[a]!r} and {codes[b]!r}, "
-            f"both {_month(by_month[same[0]])}, expected one contract per month"
-        )
-    return months
-
-
 def _distinct_texts[T](
     texts: NDArray[Any],
     rows: NDArray[np.intp] | None,
@@ -650,7 +624,7 @@ def _schedule_rows(
         k = int(missing.argmax())
         raise ValueError(
             f"{period_of(int(occurrence[k]))}, expected months the index's schedule has a "
-            f"contract for; it has none for {_month(month[k])}"
+            f"contract for; it has none for {month_label(month[k])}"
         )
     return contract.astype(np.intp)
 
@@ -665,11 +639,6 @@ def month_bounds(
     after = (month + 1).astype("datetime64[M]").astype("datetime64[D]")
     last = cast(NDArray[np.datetime64], after - np.timedelta64(1, "D"))  # a day, not a span
     return first, last
-
-
-def _month(count: object) -> str:
-    """A month as numpy counts them, written as the sheet reads one: 2027-04."""
-    return str(np.datetime64(int(cast(Any, count)), "M"))
 
 
 # --- the payment days of a financial settlement ---------------------------------------------

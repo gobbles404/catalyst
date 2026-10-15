@@ -408,11 +408,11 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
     np.testing.assert_allclose(
         result.discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.months, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2027-01-01", "2029-01-01"))
     np.testing.assert_allclose(
         result.discounted_monthly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.years, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(prep.encoded.contract_years, dates("2027-01-01", "2029-01-01"))
     np.testing.assert_allclose(
         result.discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
@@ -737,7 +737,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (15.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    assert delta.dates is prep.encoded.months
+    assert delta.dates is prep.encoded.contract_months
     assert delta.columns[0] is result.discounted_monthly_lots
     assert delta.labels == ALL_LABELS[1:2]
     assert delta.totals == (pytest.approx(13.5, **CLOSE),)
@@ -770,7 +770,7 @@ def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_array
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (0.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    assert delta.dates is prep.encoded.months and delta.columns[0] is prep.monthly_lots
+    assert delta.dates is prep.encoded.contract_months and delta.columns[0] is prep.monthly_lots
     dv01 = risk_view(result, Risk.DV01, Bucket.YEAR)
     assert dv01.dates.size == 0 and dv01.columns[0].size == 0 and dv01.totals == (0.0,)
     assert dv01.labels == ("cleared USD dv01 [USD per basis point]",)

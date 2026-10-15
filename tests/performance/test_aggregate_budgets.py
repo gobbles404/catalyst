@@ -103,7 +103,9 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
     # aligned once, the four observation axes and the three payment axes; two lot vectors summed
     # onto each observation axis and the DV01 onto each payment axis, eleven reductions; and the
     # three buckets' axes saved, the observed, the paid and their union each.
-    per_source = enc.references.size + enc.days.size + enc.months.size + enc.years.size
+    per_source = (
+        enc.references.size + enc.days.size + enc.contract_months.size + enc.contract_years.size
+    )
     per_source += paid.days.size + paid.months.size + paid.years.size
     coordinates = sum(
         axes.observed.size + axes.paid.size + axes.union.size
@@ -327,8 +329,8 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
     observed = sum(
         s.prepared.encoded.references.size
         + s.prepared.encoded.days.size
-        + s.prepared.encoded.months.size
-        + s.prepared.encoded.years.size
+        + s.prepared.encoded.contract_months.size
+        + s.prepared.encoded.contract_years.size
         for s in (discounted, cleared)
     )
     assert (

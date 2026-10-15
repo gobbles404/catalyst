@@ -3,7 +3,8 @@ ticket of the risk reporting and aggregation series: one or many results, each a
 combined into one immutable record of risk, nothing priced, discounted or converted again.
 
 A result's risk is already saved on it: the nominal lots and the discounted lots by pricing
-reference and by observation day, month and year, with their totals, and for a bilateral batch
+reference, by observation day and since #NN by contract month and year, with their totals, and
+for a bilateral batch
 the DV01 by payment day, month and year with its total, each vector frozen when the batch was
 prepared or valued. The collector reads those vectors and nothing else. It groups the occurrences
 by the index object they are on, the exact object and not its name, a distinct index of the same
@@ -56,8 +57,9 @@ class IndexGroup:
     history and the price vector every occurrence shares, and the occurrences' positions,
     increasing. references is the union of the occurrences' pricing references, rows of the
     index's schedule increasing, with the nominal lots and the discounted lots summed onto them
-    and the two totals, the saved scalars summed; days, months and years are the unions of the
-    occurrences' observation axes with both lot vectors summed onto each. Every array frozen."""
+    and the two totals, the saved scalars summed; days are the union of the occurrences'
+    observation days and months and years, since #NN, the unions of their contract months and
+    contract years, with both lot vectors summed onto each. Every array frozen."""
 
     index: Index
     reporting_lot: ReportingLot
@@ -103,7 +105,8 @@ class RateGroup:
 @dataclass(frozen=True, slots=True)
 class ReportAxes:
     """One bucket's report axes and every group's places on them: observed, the union of the
-    index groups' observation axes, with each group's places; paid, the union of the rate groups'
+    index groups' delta axes, the observation days or since #NN the contract months or years, with
+    each group's places; paid, the union of the rate groups'
     payment axes, with each group's places, no day when no curve values; and union, the two
     together, with every group's places on it. Made once with the collection so that a report of
     one risk or of all three copies saved vectors through saved places."""
@@ -269,7 +272,7 @@ def _index_group(
         counter,
     )
     months, (monthly, discounted_monthly) = _summed(
-        [m.prepared.encoded.months for m in members],
+        [m.prepared.encoded.contract_months for m in members],
         (
             [m.prepared.monthly_lots for m in members],
             [m.discounted_monthly_lots for m in members],
@@ -277,7 +280,7 @@ def _index_group(
         counter,
     )
     years, (yearly, discounted_yearly) = _summed(
-        [m.prepared.encoded.years for m in members],
+        [m.prepared.encoded.contract_years for m in members],
         ([m.prepared.yearly_lots for m in members], [m.discounted_yearly_lots for m in members]),
         counter,
     )
@@ -300,8 +303,8 @@ def _index_group(
             (
                 ("for contract", lambda b: codes[int(references[b])], by_reference),
                 ("on", lambda b: days[b], by_day),
-                ("in the month from", lambda b: months[b], by_month),
-                ("in the year from", lambda b: years[b], by_year),
+                ("in the contract month from", lambda b: months[b], by_month),
+                ("in the contract year from", lambda b: years[b], by_year),
             ),
             in_all,
         )
@@ -369,8 +372,8 @@ def _rate_group(
     where, value = _outrun(
         (
             ("on", lambda b: days[b], by_day),
-            ("in the month from", lambda b: months[b], by_month),
-            ("in the year from", lambda b: years[b], by_year),
+            ("in the payment month from", lambda b: months[b], by_month),
+            ("in the payment year from", lambda b: years[b], by_year),
         ),
         total,
     )
@@ -456,8 +459,8 @@ def _report_axes(
     payment_axes: list[NDArray[np.datetime64]],
     counter: WorkCounter,
 ) -> ReportAxes:
-    """One bucket's report axes: the union of the index groups' observation axes with each
-    group's places, the union of the rate groups' payment axes with each group's places, no day
+    """One bucket's report axes: the union of the index groups' delta axes with each group's
+    places, the union of the rate groups' payment axes with each group's places, no day
     when no curve values, and the union of both with every group's places; every array frozen,
     the coordinates reported to the counter."""
     observed = np.unique(np.concatenate(observation_axes))

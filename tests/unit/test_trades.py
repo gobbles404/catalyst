@@ -37,7 +37,7 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import TradeResults, trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
-from goosedove.trades.resolution import month_bounds, schedule_months
+from goosedove.trades.resolution import month_bounds
 from goosedove.trades.terms import (
     BASES,
     METHODS,
@@ -51,6 +51,7 @@ from goosedove.trades.terms import (
     named_trade,
     one_choice,
     resolved_trades,
+    schedule_months,
     whole_trade_ids,
 )
 
@@ -4412,8 +4413,8 @@ def views(
     result's selector reads them."""
     encoded = prepared.encoded
     days, daily = encoded.days, prepared.daily_lots
-    months, monthly = encoded.months, prepared.monthly_lots
-    years, yearly = encoded.years, prepared.yearly_lots
+    months, monthly = encoded.contract_months, prepared.monthly_lots
+    years, yearly = encoded.contract_years, prepared.yearly_lots
     return (
         [str(d) for d in days],
         [float(x) for x in daily],
@@ -4466,13 +4467,15 @@ def test_the_pen_at_two_days_coalesces_the_slots_and_changes_no_view() -> None:
             assert (result.mark, result.cash) == (pytest.approx(mark), pytest.approx(cash))
 
 
-def test_bucket_membership_follows_the_observation_day_and_not_payment_or_booking() -> None:
+def test_day_buckets_follow_the_observation_and_month_buckets_the_pricing_contract() -> None:
     # The ticket's boundary case on the WTI-like index: 1 LOT a calendar day over 30 December to
     # 5 January, two December pricing days of a lot and two January ones of 2.5, and 3 LOT over
     # 1 and 2 February, 1.5 each; the months paying 5 January, 7 January and 4 February. Daily lots
-    # 1, 1, 2.5, 2.5, 1.5 and 1.5 off G27 then H27, months 2, 5 and 3, years 2 and 8, contracts 7
-    # and 3, every view 10; the December days fix by 1 January and the 4th by the 5th, the axes
-    # standing, and a payment in January moves nothing into January.
+    # 1, 1, 2.5, 2.5, 1.5 and 1.5 off G27 then H27 by observation day; by month, since #NN,
+    # risk-contract-month-bucketing.md, the contracts' own months, February 2027 for G27 and
+    # March for H27, 7 and 3, whatever days they were observed on, and one year of 10; the
+    # December days fix by 1 January and the 4th by the 5th, the axes standing, and a payment
+    # in January moves nothing into January.
     terms = wti_terms(
         periods=(
             ("2026-12-30", "2026-12-31"),
@@ -4496,14 +4499,14 @@ def test_bucket_membership_follows_the_observation_day_and_not_payment_or_bookin
         "2027-02-02",
     ]
     assert [WTI.schedule.codes[int(r)] for r in enc.day_reference] == ["G27"] * 4 + ["H27"] * 2
-    assert [str(m) for m in enc.months] == ["2026-12-01", "2027-01-01", "2027-02-01"]
-    assert [str(y) for y in enc.years] == ["2026-01-01", "2027-01-01"]
-    np.testing.assert_array_equal(enc.month_of_day, [0, 0, 1, 1, 2, 2])
-    np.testing.assert_array_equal(enc.year_of_month, [0, 1, 1])
+    assert [str(m) for m in enc.contract_months] == ["2027-02-01", "2027-03-01"]
+    assert [str(y) for y in enc.contract_years] == ["2027-01-01"]
+    np.testing.assert_array_equal(enc.contract_month_of_reference, [0, 1])
+    np.testing.assert_array_equal(enc.contract_year_of_month, [0, 0])
     for as_of, daily, monthly, yearly, by_contract in (
-        ("2026-12-30", [1, 1, 2.5, 2.5, 1.5, 1.5], [2, 5, 3], [2, 8], [7, 3]),
-        ("2027-01-01", [0, 0, 2.5, 2.5, 1.5, 1.5], [0, 5, 3], [0, 8], [5, 3]),
-        ("2027-01-05", [0, 0, 0, 2.5, 1.5, 1.5], [0, 2.5, 3], [0, 5.5], [2.5, 3]),
+        ("2026-12-30", [1, 1, 2.5, 2.5, 1.5, 1.5], [7, 3], [10], [7, 3]),
+        ("2027-01-01", [0, 0, 2.5, 2.5, 1.5, 1.5], [5, 3], [8], [5, 3]),
+        ("2027-01-05", [0, 0, 0, 2.5, 1.5, 1.5], [2.5, 3], [5.5], [2.5, 3]),
     ):
         result, _ = wti_valued(as_of, (80.0, 81.0), terms)
         got = views(result.prepared)
@@ -4514,12 +4517,15 @@ def test_bucket_membership_follows_the_observation_day_and_not_payment_or_bookin
         assert result.lot_delta_total == pytest.approx(sum(daily))
 
 
-def test_a_lastday_f27_in_december_counts_in_december_and_the_six_day_asian_in_its_month() -> None:
+def test_a_lastday_f27_observed_in_december_counts_in_january_and_the_asian_by_its_contracts() -> (
+    None
+):
     # 3 LOT of F27 under lastday over its own January month observes 21 December and pays the 23rd:
-    # on 18 December its 3 lots stand on the 21st, in December 2026 and in 2026, never in January,
-    # its booked month. The ticket's six-day asian: 0.2 a day, F27 twice then G27, one December
-    # bucket of 1.2 and one 2026 bucket; after the roll the first two days read zero, the rest 0.2,
-    # and the axes stand.
+    # on 18 December its 3 lots stand on the 21st by day and, since #NN, in January 2027 and in
+    # 2027 by month and year, the contract's own, never in December, the month it is observed in.
+    # The ticket's six-day asian: 0.2 a day, F27 twice then G27, so 0.4 in January and 0.8 in
+    # February 2027 and one 2027 bucket of 1.2; after the roll the first two days read zero, the
+    # rest 0.2, January zero, and the axes stand.
     future = wti_terms(
         periods=(JANUARY_BOUNDS,),
         quantities=(3.0,),
@@ -4532,9 +4538,9 @@ def test_a_lastday_f27_in_december_counts_in_december_and_the_six_day_asian_in_i
     assert views(result.prepared) == (
         ["2026-12-21"],
         [3.0],
-        ["2026-12-01"],
+        ["2027-01-01"],
         [3.0],
-        ["2026-01-01"],
+        ["2027-01-01"],
         [3.0],
     )
     live, _ = wti_valued("2026-12-18", (72.0, 75.0))
@@ -4542,16 +4548,19 @@ def test_a_lastday_f27_in_december_counts_in_december_and_the_six_day_asian_in_i
     assert days == list(WTI_WINDOW) and daily == pytest.approx([0.2] * 6)
     references = [WTI.schedule.codes[int(r)] for r in live.prepared.encoded.day_reference]
     assert references == ["F27"] * 2 + ["G27"] * 4
-    assert (months, years) == (["2026-12-01"], ["2026-01-01"])
-    assert monthly == pytest.approx([1.2]) and yearly == pytest.approx([1.2])
+    assert (months, years) == (["2027-01-01", "2027-02-01"], ["2027-01-01"])
+    assert monthly == pytest.approx([0.4, 0.8]) and yearly == pytest.approx([1.2])
     rolled, _ = wti_valued("2026-12-22", (75.0,))
     assert views(rolled.prepared)[0] == list(WTI_WINDOW)
     assert views(rolled.prepared)[1] == pytest.approx([0, 0, 0.2, 0.2, 0.2, 0.2])
+    assert views(rolled.prepared)[2] == months
+    assert views(rolled.prepared)[3] == pytest.approx([0.0, 0.8])
 
 
-def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_month() -> None:
+def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_year() -> None:
     # The same day bought and sold: one slot of nothing, the day kept at zero in every view. Two
-    # days bought and sold: both kept, 1.2 and -1.2 off F27 and G27, the month and the year at zero.
+    # days bought and sold: both kept, 1.2 and -1.2 off F27 and G27, so since #NN the two
+    # contracts' months keep 1.2 and -1.2 and the year nets to zero.
     same = wti_terms(
         periods=(("2026-12-18", "2026-12-18"),) * 2,
         quantities=(1_200.0, -1_200.0),
@@ -4562,9 +4571,9 @@ def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_month(
     assert views(result.prepared) == (
         ["2026-12-18"],
         [0.0],
-        ["2026-12-01"],
+        ["2027-01-01"],
         [0.0],
-        ["2026-01-01"],
+        ["2027-01-01"],
         [0.0],
     )
     apart = wti_terms(
@@ -4574,17 +4583,20 @@ def test_opposite_quantities_net_by_day_keep_their_dates_and_net_again_by_month(
         pays=("2026-12-22", "2026-12-24"),
     )
     result, _ = wti_valued("2026-12-01", (72.0, 75.0), apart)
-    days, daily, _, monthly, _, yearly = views(result.prepared)
+    days, daily, months, monthly, years, yearly = views(result.prepared)
     assert days == ["2026-12-18", "2026-12-22"] and daily == pytest.approx([1.2, -1.2])
-    assert monthly == pytest.approx([0.0]) and yearly == pytest.approx([0.0])
+    assert months == ["2027-01-01", "2027-02-01"] and monthly == pytest.approx([1.2, -1.2])
+    assert years == ["2027-01-01"] and yearly == pytest.approx([0.0])
     np.testing.assert_allclose(result.lot_delta, [1.2, -1.2])
     assert result.lot_delta_total == pytest.approx(0.0)
 
 
-def test_two_decembers_are_two_months_in_two_years() -> None:
+def test_two_decembers_price_off_four_contract_months_in_two_years() -> None:
     # Fifteen monthly contracts from Z26 to G28, each expiring the month before its own: a December
-    # 2026 asian and a December 2027 asian of 2,200 barrels each, 100 a day, are two month buckets
-    # a year apart and two year buckets, 2.2 lots each while live on 1 December 2026.
+    # 2026 asian and a December 2027 asian of 2,200 barrels each, 100 a day, price off F27 then
+    # G27 and off F28 then G28, so since #NN they are four month buckets, January and February of
+    # each year, and two year buckets, 2.2 lots each year while live on 1 December 2026; by day
+    # they are 45 December pricing days.
     letters = "FGHJKMNQUVXZ"
     months = np.arange("2026-12", "2028-03", dtype="datetime64[M]")
     expiries = np.busday_offset(
@@ -4608,17 +4620,21 @@ def test_two_decembers_are_two_months_in_two_years() -> None:
     result, _ = wti_valued("2026-12-01", tuple([70.0] * 14), terms)
     days, daily, months_, monthly, years, yearly = views(result.prepared)
     assert len(days) == 45 and sum(daily) == pytest.approx(4.4)
-    assert months_ == ["2026-12-01", "2027-12-01"] and monthly == pytest.approx([2.2, 2.2])
-    assert years == ["2026-01-01", "2027-01-01"] and yearly == pytest.approx([2.2, 2.2])
+    assert months_ == ["2027-01-01", "2027-02-01", "2028-01-01", "2028-02-01"]
+    assert sum(monthly[:2]) == pytest.approx(2.2) and sum(monthly[2:]) == pytest.approx(2.2)
+    assert all(x > 0 for x in monthly)
+    assert years == ["2027-01-01", "2028-01-01"] and yearly == pytest.approx([2.2, 2.2])
 
 
-def test_a_days_or_a_months_lots_past_the_largest_number_are_refused_by_their_bucket() -> None:
+def test_a_days_lots_past_the_largest_number_are_refused_by_their_day() -> None:
     # Each slot finite, each contract and the batch finite in the order the slots are summed, and
     # a day's own sum past the largest number: on the BTU-lot index, group one, paying the 27th,
     # holds 1e308 lots on 23 November and -1e308 on the 24th, group two, paying the 30th, 1e308 on
     # the 23rd again; the contract sums 1e308, 0 and 1e308 and stays finite, the 23rd sums to
     # infinity and is refused by its day. With the negative lot on the 25th instead, every day is
-    # finite and November sums past the largest number, its two positive days coming first.
+    # finite, and so is the month: since #NN a month bucket is one contract's delta, checked by
+    # its contract, and a year's sum of finite contracts past the largest number is the batch
+    # total's refusal first, the contracts' deltas summing in the same order.
     def tiny(
         periods: tuple[tuple[str, str], ...], quantities: tuple[float, ...], pays: tuple[str, ...]
     ) -> ResolvedTrades:
@@ -4652,12 +4668,11 @@ def test_a_days_or_a_months_lots_past_the_largest_number_are_refused_by_their_bu
         pays,
     )
     enc = encoded(by_month, observed_of(by_month), UNITS, WorkCounter())
-    with pytest.raises(ValueError) as refused:
-        prepared_trades(enc, wti_history("2026-11-20", {}, TINY_LOT), WorkCounter())
-    assert str(refused.value) == (
-        "the month from 2026-11-01 has inf of lot delta in all, expected a finite number of lots "
-        "of BTU (1 BTU); its exposures in lots sum past the largest number"
-    )
+    prep = prepared_trades(enc, wti_history("2026-11-20", {}, TINY_LOT), WorkCounter())
+    assert [str(m) for m in enc.contract_months] == ["2026-12-01"]
+    np.testing.assert_allclose(prep.daily_lots, [1e308, 1e308, -1e308])
+    np.testing.assert_allclose(prep.monthly_lots, [1e308])
+    np.testing.assert_allclose(prep.yearly_lots, [1e308])
 
 
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
@@ -4814,8 +4829,8 @@ def test_an_iferc_future_observes_its_months_index_once_on_its_publication_day()
     np.testing.assert_array_equal(enc.slot_exposure, [2_500.0])
     np.testing.assert_array_equal(enc.references, [1])
     assert [str(d) for d in enc.days] == ["2026-12-01"]
-    assert [str(m) for m in enc.months] == ["2026-12-01"]
-    assert [str(y) for y in enc.years] == ["2026-01-01"]
+    assert [str(m) for m in enc.contract_months] == ["2026-12-01"]
+    assert [str(y) for y in enc.contract_years] == ["2026-01-01"]
     assert counter.freeze().as_dict() == {
         "encoded_components": 1,
         "encoded_groups": 1,

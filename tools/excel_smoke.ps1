@@ -974,10 +974,16 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(MY8,"nominal_delta","day"),10,2)' = "0.2"
     '=INDEX(_ReportRisk(MY8,"delta","day"),2,2)'          = "WTI delta [LOT]"
     '=INDEX(_ReportRisk(MY8,"delta","day"),5,2)'          = "0.2"
-    '=ROWS(_ReportRisk(MY8,"nominal_delta","month"))'     = "5"
-    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),5,1)' = "46357"
-    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),5,2)' = "1.2"
-    '=INDEX(_ReportRisk(MY8,"nominal_delta","year"),5,1)'  = "46023"
+    # Since #NN, risk-contract-month-bucketing.md, the month and year rows follow the pricing
+    # contract: the six-day asian's 0.4 off F27 stands in January 2027 and its 0.8 off G27 in
+    # February, 1.2 in 2027, whatever December days they are observed on; after the roll January
+    # reads zero and February still 0.8.
+    '=ROWS(_ReportRisk(MY8,"nominal_delta","month"))'     = "6"
+    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),5,1)' = "46388"
+    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),5,2)' = "0.4"
+    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),6,1)' = "46419"
+    '=INDEX(_ReportRisk(MY8,"nominal_delta","month"),6,2)' = "0.8"
+    '=INDEX(_ReportRisk(MY8,"nominal_delta","year"),5,1)'  = "46388"
     '=INDEX(_ReportRisk(MY8,"nominal_delta","year"),5,2)'  = "1.2"
     '=COLUMNS(_ReportRisk(MY8,"all","month"))'            = "4"
     '=INDEX(_ReportRisk(MY8,"all","month"),2,4)'          = "cleared USD dv01 [USD per basis point]"
@@ -987,7 +993,8 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(MY8,"dv01","day"),4,2)'           = "0"
     '=INDEX(_ReportRisk(NC8,"nominal_delta","day"),5,2)'   = "0"
     '=INDEX(_ReportRisk(NC8,"nominal_delta","day"),7,2)'   = "0.2"
-    '=INDEX(_ReportRisk(NC8,"nominal_delta","month"),5,2)' = "0.8"
+    '=INDEX(_ReportRisk(NC8,"nominal_delta","month"),5,2)' = "0"
+    '=INDEX(_ReportRisk(NC8,"nominal_delta","month"),6,2)' = "0.8"
     '=ROWS(_ReportRisk(IY16,"nominal_delta","day"))'      = "26"
     '=INDEX(_ReportRisk(IY16,"nominal_delta","day"),5,2)'  = "0"
     '=INDEX(_ReportRisk(IY16,"nominal_delta","day"),6,2)'  = "100"

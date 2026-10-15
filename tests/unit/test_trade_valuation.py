@@ -3306,19 +3306,21 @@ def test_the_risk_report_refuses_a_risk_or_a_bucket_that_is_none_of_its_words(
 def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_none(
     wti: dict[str, Any],
 ) -> None:
-    # The rolling asian's six days at 0.2 a day on 18 December, one December bucket and one 2026
-    # bucket of 1.2; a tick over the same preparation spills the same views; after the roll on the
-    # 22nd the first two days read zero and the axes stand.
+    # The rolling asian's six days at 0.2 a day on 18 December, two days off F27 and four off G27,
+    # so since #NN a January 2027 bucket of 0.4, a February bucket of 0.8 and one 2027 bucket of
+    # 1.2; a tick over the same preparation spills the same views; after the roll on the 22nd the
+    # first two days read zero and the axes stand.
     history, prepared, results = wti_state(wti, "2026-12-18", (72.0, 75.0))
     by_day = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", "day"))
     assert [line[0] for line in by_day[4:]] == [serial(d) for d in WTI_WINDOW]
     assert [line[1] for line in by_day[4:]] == [pytest.approx(0.2)] * 6
     assert spilled(ENTRY["_ReportRisk"](results, "all", "month"))[3:] == [
         ["Total", pytest.approx(1.2), pytest.approx(1.2), 0.0],
-        [serial("2026-12-01"), pytest.approx(1.2), pytest.approx(1.2), 0.0],
+        [serial("2027-01-01"), pytest.approx(0.4), pytest.approx(0.4), 0.0],
+        [serial("2027-02-01"), pytest.approx(0.8), pytest.approx(0.8), 0.0],
     ]
     assert spilled(ENTRY["_ReportRisk"](results, "delta", "year"))[4] == [
-        serial("2026-01-01"),
+        serial("2027-01-01"),
         pytest.approx(1.2),
     ]
     ticked = ENTRY["_EvaluateTrades"](

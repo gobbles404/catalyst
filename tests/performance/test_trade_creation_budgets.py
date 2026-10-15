@@ -304,12 +304,14 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.reshape": 8,  # one more within the groups' unique, since #181
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
-        "ndarray.setflags": 16,  # the kernel's twelve copies, the three selections among them, the
+        "ndarray.setflags": 17,  # the kernel's twelve copies, the three selections among them, the
+        # schedule's months since #NN,
         # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
         "ndarray.sort": 1,  # the methods present, numpy's unique over the components' codes
         "numpy._unique_hash": 1,  # numpy's own look within that unique
-        "numpy.array": 24,  # the four distinct reads' texts and three of their values, the rules
+        "numpy.array": 25,  # the four distinct reads' texts and three of their values, the rules
+        # and the terms' copy of the schedule's months since #NN,
         # kept as text since #181, the coded rows' texts
         # and their spans, the three selections copied into the kernel's record, two of them the
         # dates copied, the mask of the rows that entered a code
@@ -587,7 +589,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "open_days": 1,
         "contract_on": 1,
         "_the_slots": 1,
-        "_the_buckets": 1,  # the day, month and year axes, since #166
+        "_the_day_axis": 1,  # the day axis, since #166
+        "_the_contract_periods": 1,  # the contract month and year axes, since #NN
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
@@ -676,7 +679,7 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
         "ndarray.any": 26,  # and whether any product would outrun the largest number
-        "ndarray.setflags": 17,  # the product frozen
+        "ndarray.setflags": 18,  # the product frozen
         "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
         "ufunc.reduce": 29,
     }
@@ -940,7 +943,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "ndarray.nonzero": 7,  # the components of each of the four methods
         "ndarray.ravel": 8,  # the same, and the last3day days laid out in one column
         "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-        "ndarray.setflags": 17,  # the calday products frozen
+        "ndarray.setflags": 18,  # the calday products frozen
         "ndarray.sum": 1,  # how many asian observations in all
         "numpy._make_extobj": 1,  # the error state set once for the calday products
         "numpy.arange": 5,  # the place of each asian observation within its component

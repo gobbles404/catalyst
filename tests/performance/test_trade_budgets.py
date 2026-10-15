@@ -35,7 +35,7 @@ from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.resolution import month_bounds, schedule_months
+from goosedove.trades.resolution import month_bounds
 from goosedove.trades.terms import (
     BASES,
     METHODS,
@@ -47,6 +47,7 @@ from goosedove.trades.terms import (
     Settlement,
     one_choice,
     resolved_trades,
+    schedule_months,
 )
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
@@ -335,7 +336,8 @@ ENCODING_LEDGER = {
     "open_days": 1,
     "contract_on": 1,
     "_the_slots": 1,
-    "_the_buckets": 1,  # the day, month and year axes, since #166
+    "_the_day_axis": 1,  # the day axis, since #166
+    "_the_contract_periods": 1,  # the contract month and year axes, since #NN
     "_payments_after_observations": 1,
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "UnitConversions.factor": 2,

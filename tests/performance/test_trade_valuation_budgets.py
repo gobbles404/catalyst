@@ -314,13 +314,13 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
     discounted = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
     live = bridge.live_handles()
     views = {
-        "nominal_delta": {"_observation_view": 1},
-        "delta": {"_observation_view": 1},
+        "nominal_delta": {"_delta_view": 1},
+        "delta": {"_delta_view": 1},
         "dv01": {"_payment_view": 1},
     }
     for results, everything in (
-        (cleared, {"_observation_view": 1}),
-        (discounted, {"_observation_view": 1, "_payment_view": 1, "_union_view": 1}),
+        (cleared, {"_delta_view": 1}),
+        (discounted, {"_delta_view": 1, "_payment_view": 1, "_union_view": 1}),
     ):
         for risk, selected in (*views.items(), ("all", everything)):
             for bucket in ("day", "month", "year"):

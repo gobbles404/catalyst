@@ -328,7 +328,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     encoding = prep.encoded
     groups = encoding.group_contract.size
     slots = encoding.slot_group.size
-    buckets = encoding.days.size + encoding.months.size + encoding.years.size
+    buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
     axes = encoding.payment_axes
     assert axes is not None
     paid = axes.days.size + axes.months.size + axes.years.size
@@ -402,8 +402,20 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
     for observed, paid, union, observed_in, paid_in in (
         (enc.days, axes.days, axes.union_days, axes.observed_in_days, axes.paid_in_days),
-        (enc.months, axes.months, axes.union_months, axes.observed_in_months, axes.paid_in_months),
-        (enc.years, axes.years, axes.union_years, axes.observed_in_years, axes.paid_in_years),
+        (
+            enc.contract_months,
+            axes.months,
+            axes.union_months,
+            axes.observed_in_months,
+            axes.paid_in_months,
+        ),
+        (
+            enc.contract_years,
+            axes.years,
+            axes.union_years,
+            axes.observed_in_years,
+            axes.paid_in_years,
+        ),
     ):
         np.testing.assert_array_equal(union, np.union1d(observed, paid))
         np.testing.assert_array_equal(union[observed_in], observed)
@@ -414,7 +426,7 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     # three unions with both kinds' places.
     d, m, y = axes.days.size, axes.months.size, axes.years.size
     unions = axes.union_days.size + axes.union_months.size + axes.union_years.size
-    observed = enc.days.size + enc.months.size + enc.years.size
+    observed = enc.days.size + enc.contract_months.size + enc.contract_years.size
     assert sum(array.nbytes for array in arrays) == 8 * (
         d + payment_date.size + m + d + y + m + unions + observed + d + m + y
     )
@@ -455,7 +467,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
         assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 3}
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
-            "_observation_view": 1,
+            "_delta_view": 1,
             "_payment_view": 1,
             "_union_view": 1,
         }

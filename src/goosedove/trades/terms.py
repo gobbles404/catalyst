@@ -14,11 +14,12 @@ day each component pays. docs/library/trades/kernel.md is the page."""
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final, assert_never, cast
+from typing import Any, Final, assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.index_definitions.contract_codes import month_and_year
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
@@ -131,7 +132,10 @@ class ResolvedTrades:
     the entered quantity times the covered days under calday, formed once here, the one quantity
     the encoding converts and nothing later scales again, and fixed_price[k] the price agreed, in
     the index's quote units. Then payment, the terms a financial settlement pays by and the days
-    they give, and None for a physical one, which pays on no day."""
+    they give, and None for a physical one, which pays on no day. Then schedule_month[i], since
+    #NN, the calendar month of every row of the schedule as numpy counts months from 1970, read
+    once by the resolution against the ticket's codes and kept for the encoding, which gathers it
+    by the pricing references for the delta's month and year buckets."""
 
     instrument: Instrument
     index: Index
@@ -157,6 +161,7 @@ class ResolvedTrades:
     fixed_price: NDArray[np.float64]
     marketing_reserve: NDArray[np.float64] | None
     payment: PaymentTerms | None
+    schedule_month: NDArray[np.int64]
 
     def named(self, component: int) -> str:
         """A component's trade named in a message, by its ID when the ticket gave one and by its
@@ -172,6 +177,40 @@ def named_trade(trade_ids: NDArray[np.int64] | None, row: int) -> str:
     if trade_ids is None:
         return f"trade at row {row + 1}"
     return f"trade {int(trade_ids[row])} at row {row + 1}"
+
+
+def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int64]:
+    """The month of every code of the schedule, as numpy counts months, one read per code: a
+    code that is no contract code is refused by row, and so are two rows for one month, since a
+    month resolved to two rows would name no contract. The resolution reads them once,
+    resolves the ticket's periods against them and hands them to the terms, which keep them for
+    the encoding's contract-month axes since #NN."""
+    codes = schedule.codes
+    months = np.empty(len(codes), dtype=np.int64)
+    for i, code in enumerate(codes):
+        try:
+            month, year = month_and_year(code)
+        except ValueError:
+            raise ValueError(
+                f"index schedule row {i + 1} is {code!r}, expected a contract code, "
+                "a month letter and a two-digit year such as F26"
+            ) from None
+        months[i] = (year - 1970) * 12 + month - 1
+    order = np.argsort(months, kind="stable")
+    by_month = months[order]
+    same = np.flatnonzero(by_month[1:] == by_month[:-1])
+    if same.size:
+        a, b = int(order[same[0]]), int(order[same[0] + 1])
+        raise ValueError(
+            f"index schedule rows {a + 1} and {b + 1} are {codes[a]!r} and {codes[b]!r}, "
+            f"both {month_label(by_month[same[0]])}, expected one contract per month"
+        )
+    return months
+
+
+def month_label(count: object) -> str:
+    """A month as numpy counts them, written as the sheet reads one: 2027-04."""
+    return str(np.datetime64(int(cast(Any, count)), "M"))
 
 
 def resolved_trades(
@@ -194,6 +233,7 @@ def resolved_trades(
     fixed_price: NDArray[np.float64],
     payment: PaymentTerms | None,
     *,
+    schedule_month: NDArray[np.int64] | None = None,
     counterparty: tuple[str, ...] | None = None,
     marketing_reserve: NDArray[np.float64] | None = None,
 ) -> ResolvedTrades:
@@ -234,7 +274,10 @@ def resolved_trades(
     physical fixed_float
     pays on no
     day, and giving it terms would invent a payment the contract does not make. The instrument
-    is kept as the definition the terms stand under, and read for nothing here.
+    is kept as the definition the terms stand under, and read for nothing here. The schedule's
+    months, since #NN, are the resolution's reading of every row's code handed over, or read here
+    once by schedule_months when a Python caller gives none; kept frozen for the encoding's
+    contract-month axes and read for nothing here.
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
@@ -259,6 +302,13 @@ def resolved_trades(
     starts, ends = _frozen_days(start_date), _frozen_days(end_date)
     days = (ends - starts).astype(np.int64) + 1  # made here and owned here: frozen below
     days.setflags(write=False)
+    # The schedule's months, the resolution's reading handed over or read here once; owned here.
+    months = (
+        schedule_months(schedule)
+        if schedule_month is None
+        else np.array(schedule_month, dtype=np.int64)
+    )
+    months.setflags(write=False)
     return ResolvedTrades(
         instrument,
         index,
@@ -284,6 +334,7 @@ def resolved_trades(
         _frozen_numbers(fixed_price),
         None if marketing_reserve is None else _frozen_numbers(marketing_reserve),
         pays,
+        months,
     )
 
 

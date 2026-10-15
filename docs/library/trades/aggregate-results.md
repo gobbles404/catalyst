@@ -53,7 +53,7 @@ Identity is the exact object, never a name: results sharing one index object com
 |---|---|
 | `as_of` | the valuation day every source shares |
 | `sources` | the occurrences in the order given, every one, by reference |
-| `index_groups` | one `IndexGroup` per distinct index object, in first-appearance order: the index, its reporting lot, the history and the price vector its occurrences share, the occurrences' positions, the summed vectors by contract, day, month and year with their axes and the two saved totals |
+| `index_groups` | one `IndexGroup` per distinct index object, in first-appearance order: the index, its reporting lot, the history and the price vector its occurrences share, the occurrences' positions, the summed vectors by contract, by observation day and since #NN by contract month and year with their axes and the two saved totals |
 | `rate_groups` | one `RateGroup` per distinct curve object and currency among the bilateral occurrences, in first-appearance order: the curve, its number by first appearance, the currency, the positions, the DV01 by payment day, month and year with their axes and the saved total |
 | `currencies` | the sources' currencies in first-appearance order, the DV01 columns of nothing a collection valued on no curve reports |
 | `by_day`, `by_month`, `by_year` | `ReportAxes`: the union of the index groups' axes with each group's places, the union of the rate groups' payment axes with each group's places, and the union of both with every group's places on it |
