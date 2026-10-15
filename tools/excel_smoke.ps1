@@ -379,10 +379,32 @@ $formulas = [ordered]@{
     '=util_StartDate("s28")' = "46844"
     '=util_EndDate("f26-z28")' = "47118"
     '=util_EndDate("w28-w29")' = "47573"
-    '=util_StartDate("W8-W9")' = "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_StartDate("W8-W9")' = "#ERROR util_StartDate: ValueError: period is 'W8-W9', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
     "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
     "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
+    # Half-year strips, half-year-strips.md: 1H27 January to June and 2H27 July to December in
+    # either case, H27 March as it was, the two ranges, a leap first half, the balance of a half
+    # from mid-March in QH13, from before it in QH12 and after it in QH7, refused; a zeroth and a
+    # third half, a four-digit year and a reversed range of halves.
+    '=util_StartDate("1h27")' = "46388"
+    '=util_EndDate("1H27")' = "46568"
+    '=util_StartDate("2h27")' = "46569"
+    '=util_EndDate("2H27")' = "46752"
+    '=util_StartDate("H27")' = "46447"
+    '=util_EndDate("h27")' = "46477"
+    '=util_EndDate("1H27-2H27")' = "46752"
+    '=util_StartDate("2H27-1H28")' = "46569"
+    '=util_EndDate("2h27-1h28")' = "46934"
+    '=util_EndDate("1H28")' = "46934"
+    '=util_StartDate("BAL1H27",QH13)' = "46461"
+    '=util_EndDate("bal1h27",QH13)' = "46568"
+    '=util_StartDate("Bal1H27",QH12)' = "46388"
+    '=util_StartDate("BAL1H27",QH7)' = "#ERROR util_StartDate: ValueError: valuation_date is 2027-11-12, after 'BAL1H27' ended on 2027-06-30, expected a valuation day on or before the period's last day"
+    '=util_StartDate("0H27")' = "#ERROR util_StartDate: ValueError: period is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+    '=util_EndDate("3H27")' = "#ERROR util_EndDate: ValueError: period is '3H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+    '=util_StartDate("1H2027")' = "#ERROR util_StartDate: ValueError: period is '1H2027', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+    '=util_EndDate("2H27-1H27")' = "#ERROR util_EndDate: ValueError: period is '2H27-1H27', expected range endpoints in chronological order"
     # The balance of a period, date-helper-inputs.md: one BAL prefix in either case on any label and
     # the valuation-date handle beside it, from QH1:QH12, the balance running from the later of the
     # handle's day and the label's first day to the label's last: the ticket's table on October 2026
@@ -418,7 +440,7 @@ $formulas = [ordered]@{
     '=util_StartDate("BALZ26")' = "#ERROR util_StartDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period"
     '=util_EndDate("balv26",QH4)' = "#ERROR util_EndDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day"
     '=util_StartDate("BALZ26",QH11)' = "#ERROR util_StartDate: ValueError: valuation_date is 2027-01-05, after 'BALZ26' ended on 2026-12-31, expected a valuation day on or before the period's last day"
-    '=util_StartDate("BALBALZ26",QH5)' = "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_StartDate("BALBALZ26",QH5)' = "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=util_StartDate("BALZ26",C2)' = "#ERROR util_StartDate: valuation_date is blank, expected valuation date handle"
     '=util_StartDate("BALZ26",DATE(2026,12,15))' = "#ERROR util_StartDate: valuation_date is number 46371.0, expected valuation date handle"
     '=util_StartDate("BALZ26",E1)' = "#ERROR util_StartDate: valuation_date is text 'x' naming no live object, expected valuation date handle"
@@ -1588,6 +1610,30 @@ $formulas = [ordered]@{
     "=LEFT(_ReportValues(RT8),59)"        = "#ERROR _ReportValues: results is aggregate results handle '"
     "=LEFT(_ReportReserves(RT8),61)"      = "#ERROR _ReportReserves: results is aggregate results handle '"
     '=_ReportRisk(RT8,"gamma","day")'     = "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or all"
+    # The half-year trade, half-year-strips.md: 1h27 in SA17 is six components, F27 through M27, the
+    # entered code kept as typed, each paying two business days after its expiry as the F27-M27
+    # strip in SA18 does; valued, both mark 12 and carry 6 lots, one a day across the six expiries;
+    # a zeroth half refused by the grammar and a second half the schedule has no August for.
+    "=ROWS(util_ReadHandle(SA17))"        = "8"
+    "=INDEX(util_ReadHandle(SA17),3,4)"   = "F27"
+    "=INDEX(util_ReadHandle(SA17),8,4)"   = "M27"
+    "=INDEX(util_ReadHandle(SA17),3,15)"  = "1h27"
+    "=INDEX(util_ReadHandle(SA17),8,15)"  = "1h27"
+    "=INDEX(util_ReadHandle(SA17),3,14)"  = "46416"
+    "=INDEX(util_ReadHandle(SA17),8,14)"  = "46568"
+    "=INDEX(util_ReadHandle(SA18),3,14)"  = "46416"
+    "=INDEX(util_ReadHandle(SA18),8,14)"  = "46568"
+    "=INDEX(util_ReadHandle(SA18),3,15)"  = "F27-M27"
+    "=INDEX(_ReportValues(SA28),3,1)"     = "12"
+    "=INDEX(_ReportValues(SA30),3,1)"     = "12"
+    '=INDEX(_ReportRisk(SA28,"nominal_delta","year"),4,2)' = "6"
+    '=INDEX(_ReportRisk(SA30,"nominal_delta","year"),4,2)' = "6"
+    '=ROWS(_ReportRisk(SA28,"all","day"))' = "10"
+    '=INDEX(_ReportRisk(SA28,"all","day"),5,1)' = "46414"
+    '=INDEX(_ReportRisk(SA28,"all","day"),10,1)' = "46566"
+    '=INDEX(_ReportRisk(SA28,"all","day"),10,2)' = "1"
+    '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"0H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+    '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"2H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '2H27', expected months the index's schedule has a contract for; it has none for 2027-08"
     "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
@@ -2548,6 +2594,7 @@ $cells = [ordered]@{
     "QH10" = "=_CreateValuationDate(DATE(2028,2,29),0)"
     "QH11" = "=_CreateValuationDate(DATE(2027,1,5),0)"
     "QH12" = "=_CreateValuationDate(DATE(2025,12,20),0)"
+    "QH13" = "=_CreateValuationDate(DATE(2027,3,15),0)"
     # The bilateral block: the UNIT index, its payment calendar, a bilateral financial template with a
     # counterparty and 5 of marketing and its cleared twin, the ticket's two rows and the first alone;
     # the three valuation days' histories, markets, preparations and curves.
@@ -2659,6 +2706,50 @@ $cells = [ordered]@{
     "RT8" = "=_AggregateResults(RT3:RT5)"
     "RT9" = "=_AggregateResults(RT1:RV1)"
     "RT10" = "=_AggregateResults(QV24)"
+    # Half-year strips, half-year-strips.md: a one-unit index HALF of nine months, X26 the boundary
+    # and N27 last, a cleared lastday template a lot a month at +2bd on a calendar closing 1 January
+    # 2030; 1h27 and F27-M27 booked at 3 on 1 December 2026, valued on the 15th with every live
+    # contract quoted 5 over thirteen settles of 3 from the day after X26 expired.
+    "SA1" = "X26"; "SB1" = "25-Nov-2026"
+    "SA2" = "Z26"; "SB2" = "29-Dec-2026"
+    "SA3" = "F27"; "SB3" = "27-Jan-2027"
+    "SA4" = "G27"; "SB4" = "24-Feb-2027"
+    "SA5" = "H27"; "SB5" = "29-Mar-2027"
+    "SA6" = "J27"; "SB6" = "28-Apr-2027"
+    "SA7" = "K27"; "SB7" = "26-May-2027"
+    "SA8" = "M27"; "SB8" = "28-Jun-2027"
+    "SA9" = "N27"; "SB9" = "28-Jul-2027"
+    "SC1" = "1-Jan-2030"
+    "SD1" = "name"; "SE1" = "lot_size"; "SF1" = "lot_unit"; "SG1" = "brokerage_rate_per_lot"; "SH1" = "clearing_rate_per_lot"
+    "SD2" = "LOT"; "SE2" = "1"; "SF2" = "MMBTU"; "SG2" = "0"; "SH2" = "0"
+    "SA11" = "=_CreateFuturesSchedule(SA1:SA9,SB1:SB9)"
+    "SA12" = "=_CreateHolidayCalendar(SC1)"
+    "SA13" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
+    "SA14" = "=_CreateContractSpecifications(SD1:SH1,SD2:SH2)"
+    "SA15" = '=_CreateIndex("HALF","Synthetic one-unit index for half-year strips",SA11,SA13,SA14,SA12,"LOT")'
+    "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_time_lag"; "SK4" = "payment_holiday_calendar"
+    "SD5" = "LOT"; "SE5" = "month"; "SF5" = "lastday"; "SG5" = "cleared"; "SH5" = "financial"; "SI5" = "Prototype Clearing"; "SJ5" = "+2bd"; "SK5" = "=SA12"
+    "SA16" = '=_CreateTradeTemplate("fixed_float",SD4:SK4,SD5:SK5)'
+    "SD7" = "trade_id"; "SE7" = "trade_date"; "SF7" = "contract_code"; "SG7" = "quantity"; "SH7" = "fixed_price"
+    "SD8" = "3001"; "SE8" = "1-Dec-2026"; "SF8" = "1h27"; "SG8" = "1"; "SH8" = "3"
+    "SD9" = "3002"; "SE9" = "1-Dec-2026"; "SF9" = "F27-M27"; "SG9" = "1"; "SH9" = "3"
+    "SA17" = "=_CreateTrades(SA15,SD7:SH7,SD8:SH8,SA16)"
+    "SA18" = "=_CreateTrades(SA15,SD7:SH7,SD9:SH9,SA16)"
+    "SA20" = "15-Dec-2026"
+    "SA21" = "=_CreateValuationDate(SA20,0.5)"
+    "SA22" = "=_CreateCalendar(SA21,SA15)"
+    "SM1" = "14-Dec-2026"; "SM2" = "11-Dec-2026"; "SM3" = "10-Dec-2026"; "SM4" = "9-Dec-2026"; "SM5" = "8-Dec-2026"; "SM6" = "7-Dec-2026"; "SM7" = "4-Dec-2026"
+    "SM8" = "3-Dec-2026"; "SM9" = "2-Dec-2026"; "SM10" = "1-Dec-2026"; "SM11" = "30-Nov-2026"; "SM12" = "27-Nov-2026"; "SM13" = "26-Nov-2026"
+    "SN1" = "3"; "SN2" = "3"; "SN3" = "3"; "SN4" = "3"; "SN5" = "3"; "SN6" = "3"; "SN7" = "3"; "SN8" = "3"; "SN9" = "3"; "SN10" = "3"; "SN11" = "3"; "SN12" = "3"; "SN13" = "3"
+    "SA23" = "=_CreateFuturesFixings(SM1:SM13,SN1:SN13,SA15)"
+    "SA24" = "=_CreateMarketHistory(SA22,SA23)"
+    "SO1" = "5"; "SO2" = "5"; "SO3" = "5"; "SO4" = "5"; "SO5" = "5"; "SO6" = "5"; "SO7" = "5"; "SO8" = "5"
+    "SA25" = '=_CreatePriceVector("HALF",SO1:SO8)'
+    "SA26" = "=_CreateMarket(SA24,SA25)"
+    "SA27" = "=_PrepareTrades(SA17,SA24)"
+    "SA28" = "=_EvaluateTrades(SA27,SA26)"
+    "SA29" = "=_PrepareTrades(SA18,SA24)"
+    "SA30" = "=_EvaluateTrades(SA29,SA26)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

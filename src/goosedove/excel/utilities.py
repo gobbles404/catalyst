@@ -758,8 +758,8 @@ def util_FutToDate(
 def util_StartDate(
     period: Annotated[
         str,
-        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
-        "balance, BALZ26, typed or in a cell such as A2.",
+        "One contract or strip label, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28, or "
+        "its balance, BALZ26, typed or in a cell such as A2.",
     ],
     valuation_date: Annotated[
         Handle[ValuationDate] | None,
@@ -777,8 +777,8 @@ def util_StartDate(
 def util_EndDate(
     period: Annotated[
         str,
-        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
-        "balance, BALZ26, typed or in a cell such as A2.",
+        "One contract or strip label, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28, or "
+        "its balance, BALZ26, typed or in a cell such as A2.",
     ],
     valuation_date: Annotated[
         Handle[ValuationDate] | None,

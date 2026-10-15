@@ -1066,3 +1066,42 @@ def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
         "schedule_codes_read": 25,
         "ticket_codes_read": contracts,
     }
+
+
+# --- a half-year strip, half-year-strips.md -------------------------------------------------------
+
+
+def one_code(code: str) -> FieldValues:
+    """One row booking that code, as the seam hands it over."""
+    return FieldValues(
+        FIXED_FLOAT,
+        1,
+        ("trade_date", "contract_code", "quantity", "fixed_price"),
+        {
+            "trade_date": np.array(["2026-09-24"], dtype="datetime64[D]"),
+            "contract_code": (code,),
+            "quantity": np.array([2.0]),
+            "fixed_price": np.array([3.0]),
+        },
+    )
+
+
+def test_a_half_year_does_the_work_of_its_six_month_strip(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    # The half reads its one label where the range reads two; from the months on, the resolution,
+    # the observations and the payment days are the same calls and the same numpy, since #182:
+    # nothing is parsed or expanded again after creation.
+    half, strip, template = one_code("1H27"), one_code("F27-M27"), a_template()
+    for ticket in (half, strip):
+        resolved(GAS, ticket, template, WorkCounter())
+    through_half = call_profile(lambda: resolved(GAS, half, template, WorkCounter()))
+    through_strip = call_profile(lambda: resolved(GAS, strip, template, WorkCounter()))
+    assert through_half.pop("_label_months") == 1
+    assert through_strip.pop("_label_months") == 2
+    assert through_half == through_strip
+    assert numpy_calls(lambda: resolved(GAS, half, template, WorkCounter())) == numpy_calls(
+        lambda: resolved(GAS, strip, template, WorkCounter())
+    )
+    terms, _, _ = resolved(GAS, half, template, WorkCounter())
+    assert terms.contract.size == 6

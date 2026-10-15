@@ -1,8 +1,9 @@
-"""Periods as the desk labels them: a contract month, F26; a quarter, 1Q27; a calendar year,
-CAL28; a winter, W29, November to the March after; a summer, S28, April to October; and a range
-of two labels joined by a hyphen, F26-Z28, from the first day of the left to the last day of the
-right. Each is read for two months, numpy's month unit, its first month and the month after its
-last, from which its first and its last calendar day follow by one conversion each. The balance
+"""Periods as the desk labels them: a contract month, F26; a quarter, 1Q27; since #182 a half-year,
+1H27, January to June, and 2H27, July to December; a calendar year, CAL28; a winter, W29,
+November to the March after; a summer, S28, April to October; and a range of two labels joined
+by a hyphen, F26-Z28, from the first day of the left to the last day of the right. Each is read
+for two months, numpy's month unit, its first month and the month after its last, from which its
+first and its last calendar day follow by one conversion each. The balance
 of any of them, BALZ26, runs from the valuation day the desk supplies, or from the label's first
 day when that is later, to the label's last day, since #173; a period that ended before the
 valuation day is refused. Text and a day in and one date out, no object and no handle here: the
@@ -15,10 +16,14 @@ import numpy as np
 from goosedove.index_definitions.contract_codes import DIGITS, LOWER_LETTERS, MONTH_LETTERS
 
 # The forms a message offers, in the words the pages use.
-FORMS = "a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+FORMS = (
+    "a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
+)
 
-# The months a strip covers: the quarter from its number, the winter from November of its year
-# for five months, the summer from April for seven, the calendar year from January for twelve.
+# The months a strip covers: the quarter from its number, the half-year from January or July for
+# six, the winter from November of its year for five months, the summer from April for seven,
+# the calendar year from January for twelve.
+MONTHS_IN_HALF = 6
 MONTHS_IN_WINTER = 5
 MONTHS_IN_SUMMER = 7
 # The balance-of-period prefix, read once in either case: BALZ26, balcal26, BalX26-Z26.
@@ -117,9 +122,11 @@ def _balance_from(
 
 def _label_months(label: str, period: str) -> tuple[np.datetime64, np.datetime64]:
     """One label's first month and the month after its last: a month letter and two digits, a
-    quarter number, Q and two digits, CAL and two digits, W or S and two digits, the letters in
-    either case and the two digits the year after 2000. Anything else, a space, a one-digit
-    year, a fifth quarter, an empty end of a range or a second hyphen among them, is refused,
+    quarter number, Q and two digits, since #182 a half number, 1 or 2, H and two digits, CAL and
+    two digits, W or S and two digits, the letters in either case and the two digits the year
+    after 2000. H and two digits alone is March, the contract month, as it always was: a half
+    leads with its number as a quarter does. Anything else, a space, a one-digit year, a fifth
+    quarter, a third half, an empty end of a range or a second hyphen among them, is refused,
     naming the whole expression as it arrived."""
     if len(label) < 3 or label[-2] not in DIGITS or label[-1] not in DIGITS:
         raise _malformed(period)
@@ -139,6 +146,9 @@ def _label_months(label: str, period: str) -> tuple[np.datetime64, np.datetime64
     elif len(head) == 2 and head[0] in "1234" and head[1] in "Qq":
         first = np.datetime64(f"{year}-{3 * (int(head[0]) - 1) + 1:02d}", "M")
         return first, first + np.timedelta64(3, "M")
+    elif len(head) == 2 and head[0] in "12" and head[1] in "Hh":
+        first = np.datetime64(f"{year}-{MONTHS_IN_HALF * (int(head[0]) - 1) + 1:02d}", "M")
+        return first, first + np.timedelta64(MONTHS_IN_HALF, "M")
     elif len(head) == 3 and head[0] in "Cc" and head[1] in "Aa" and head[2] in "Ll":
         first = np.datetime64(f"{year}-01", "M")
         return first, first + np.timedelta64(12, "M")

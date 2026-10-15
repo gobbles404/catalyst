@@ -135,8 +135,8 @@ def test_the_two_date_helpers_explain_themselves() -> None:
 
 def test_the_two_period_functions_explain_themselves() -> None:
     line = (
-        "One contract or strip label, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28, or its "
-        "balance, BALZ26, typed or in a cell such as A2."
+        "One contract or strip label, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28, or "
+        "its balance, BALZ26, typed or in a cell such as A2."
     )
     valuation = (
         "For a BAL label, the valuation-date handle whose day the balance starts on, such as B1 "
