@@ -36,7 +36,7 @@ Nothing: the result is complete when it is published.
 |---|---|
 | `tests/unit/test_trade_valuation.py` | the NG example's spill cell for cell, 110,000 USD per USD/MMBTU and a DV01 of zero; -50,000 once Z26 has fixed; the total unchanged by a tick; one trade's -120,000; a blank refused |
 | `tests/performance/test_trade_valuation_budgets.py` | one handle resolved, one row laid out, no kernel call, nothing published; 1,948 bytes |
-| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `workbooks/handles.xlsx` | the chain's delta read through the report on a sheet, from the host, and at the foot of the handles sheet, B1307 and the toy's seven states in M1342 to M1348, 110,000 while both contracts are live, -50,000 once Z26 has fixed, 0 once both have |
+| `tools/excel_smoke.ps1`, the host's `CallTests.cs`, `tools/excel_lifetime.ps1 -Groups valuation`, `workbooks/handles.xlsx` | the chain's delta read through the report on a sheet, from the host, through the lifetime's roll since #155, 2,000 while n26 is live and 0 once it has fixed, #REF! while the market fails, and at the foot of the handles sheet, B1307 and the toy's seven states in M1342 to M1348, 110,000 while both contracts are live, -50,000 once Z26 has fixed, 0 once both have |
 
 ## Not here
 

@@ -47,7 +47,7 @@ The vector carries prices and no contract code, so the market reads its first pr
 | before the roll | Z26 | 70, 71 | Z26 = 70, F27 = 71 |
 | after the roll | F27 | 70, 71 | F27 = 70, G27 = 71 |
 
-If 70 and 71 are still the quotes of Z26 and F27, the second reading is wrong, and nothing here can tell, there being no label to compare. Until #127 the count caught this one case by accident: a vector had to reach the schedule's end, so one left unchanged was a price too many after a roll. A vector that reaches the end still fails that way; one that stops before it does not. That is the price of letting the schedule run past the quotes, accepted with it: keeping the first price on the first required contract is the sheet's to do, as the order of the quotes is. A contract code carried by the vector, and the checks it would allow, are deferred.
+If 70 and 71 are still the quotes of Z26 and F27, the second reading is wrong, and nothing here can tell, there being no label to compare. Until #127 the count caught this one case by accident: a vector had to reach the schedule's end, so one left unchanged was a price too many after a roll. A vector that reaches the end still fails that way; one that stops before it does not. The lifetime's `valuation` group walks the first case on a sheet since #155: a two-price vector left in place as the day moves past n26's expiry is refused, the results fail with the market, and the vector trimmed to the contract that remains rebuilds them. That is the price of letting the schedule run past the quotes, accepted with it: keeping the first price on the first required contract is the sheet's to do, as the order of the quotes is. A contract code carried by the vector, and the checks it would allow, are deferred.
 
 ## Excel help
 

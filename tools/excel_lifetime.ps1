@@ -23,6 +23,13 @@
 #          size; a quantity typed to nothing and back, remaking the batch, the preparation and
 #          the results each time while the template, the history and the market stand. check.ps1
 #          runs this group beside core.
+#   valuation  the batch prepared, evaluated and reported through the transitions a desk
+#          makes: a tick with a second evaluation retaining the old results and reading them
+#          unchanged; the valuation day moved onto n26's expiry and past it with the fixings
+#          extended, the settle fixing and paying the trade; the two-price vector left in
+#          place across the roll refused, the reports showing the failure and no number; the
+#          vector trimmed and the chain rebuilt; the last workbook closed. check.ps1 runs this
+#          group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -31,7 +38,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -648,6 +655,161 @@ $trades = {
     Check "and three more published and released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 23 -and $c.Published -eq 39 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 }
 
+# --- valuation ------------------------------------------------------------------------------------
+# The chain, a financial template and a batch of two NYMEX lots of n26 at 70, as the trades group
+# makes them, prepared in D17, evaluated in D18 and read through the reports: the mark 4,200 at
+# the quote of 72.1, the delta 2,000 and no cash. Beside them, in F10 to F13, a second vector over
+# a copy of the two prices in B10:B11 and a market, results and mark over it, equal calls sharing
+# the live chain's publications; a tick to 73.5 remakes the live vector, market and results and the
+# mark follows, 7,000, while the copy keeps the old three alive and reads 4,200 as it did, nothing
+# released; the copy cleared, the old three go. Then the valuation day moves onto n26's expiry,
+# Monday 22 June, with a settle for every business day from 20 May to Friday the 19th in T and U,
+# under manual calculation so that the day and the fixings change together: the date, the
+# calendar, the fixings, the history, the market, the preparation and the results publish anew,
+# n26 live on its own day at the quote, the mark 7,000 still. Then onto Tuesday 23 June with the
+# 22nd's settle, 72.5: n26 has fixed and, one business day on, paid; the two-price vector left in
+# place is a price too many for the one contract that remains, so the market fails, the results
+# fail as its consumer, the report spilled in D23 shows the failure in the creator's words and the
+# reads through INDEX show #REF!, no number standing; the vector trimmed to q26's price rebuilds
+# them, a cash of 5,000, a mark of 0 and a delta of 0. Last, the workbook closed releases every
+# publication. check.ps1 runs this group beside core.
+
+# A settle for every business day from 20 May 2026 to the last day given, newest first from T1
+# and U1 down, 25 May closed: the last day's settle as given, the rest 71.00, 71.01, ... down the
+# rows; the row of the oldest comes back.
+function Put-Fixings($State, $Sheet, [datetime]$Last, [string]$LastSettle) {
+    $row = 1
+    $k = 0
+    $day = $Last
+    while ($day -ge [datetime]"2026-05-20") {
+        if ($day.DayOfWeek -ne "Saturday" -and $day.DayOfWeek -ne "Sunday" -and $day -ne [datetime]"2026-05-25") {
+            $null = Put $State $Sheet "T$row" $day.ToString("dd-MMM-yyyy", [Globalization.CultureInfo]::InvariantCulture)
+            $null = Put $State $Sheet "U$row" $(if ($k -eq 0) { $LastSettle } else { (71 + ($k - 1) / 100).ToString("0.00", [Globalization.CultureInfo]::InvariantCulture) })
+            $row++
+            $k++
+        }
+        $day = $day.AddDays(-1)
+    }
+    return $row - 1
+}
+
+$valuation = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "C13" "1-Jan-2026"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_time_lag"; Put $state $sheet "R1" "payment_holiday_calendar"
+    Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
+    Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
+    Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
+    Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
+    Put $state $sheet "D14" '=_CreateTradeTemplate("future",K1:R1,K2:R2)'
+    Put $state $sheet "D15" "=_CreateTrades(D5,K4:N4,K5:N5,D14)"
+    Put $state $sheet "D17" "=_PrepareTrades(D15,D9)"
+    Put $state $sheet "D18" "=_EvaluateTrades(D17,D11)"
+    Put $state $sheet "D19" "=INDEX(_ReportValues(D18),3,1)"
+    Put $state $sheet "D20" "=INDEX(_ReportRisk(D18),3,1)"
+    Put $state $sheet "D21" "=INDEX(_ReportValues(D18),3,2)"
+    Put $state $sheet "D22" "=INDEX(util_ReadHandle(D17),3,4)"
+    Put $state $sheet "D23" "=_ReportValues(D18)"
+    $id = Id $state
+    $results = Text $state $sheet "D18"
+    Check "the results' cell shows its handle, named for the index" ($results.StartsWith("${id}:trade_results:WTI NYMEX:")) $results
+    Check "the values report reads the mark, 4,200 at a quote of 72.1" ((Text $state $sheet "D19") -eq "4200") (Text $state $sheet "D19")
+    Check "the risk report reads the delta, 2,000 for two lots" ((Text $state $sheet "D20") -eq "2000") (Text $state $sheet "D20")
+    Check "and no cash, nothing having paid" ((Text $state $sheet "D21") -eq "0") (Text $state $sheet "D21")
+    Check "the preparation shows n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
+    Check "the report spilled shows its first header" ((Text $state $sheet "D23") -eq "cleared_mark") (Text $state $sheet "D23")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) }
+    Check "sixteen creators, sixteen live publications" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
+
+    # A copy of the prices and a second vector, market, results and mark over it: equal calls, so
+    # the live chain's own publications are shared and nothing is published.
+    Put $state $sheet "B10" "72.1"; Put $state $sheet "B11" "72.8"
+    Put $state $sheet "F10" "=_CreatePriceVector(A1,B10:B11)"
+    Put $state $sheet "F11" "=_CreateMarket(D9,F10)"
+    Put $state $sheet "F12" "=_EvaluateTrades(D17,F11)"
+    Put $state $sheet "F13" "=INDEX(_ReportValues(F12),3,1)"
+    Check "a second evaluation over equal prices shares the results' handle" ((Text $state $sheet "F12") -eq $results) (Text $state $sheet "F12")
+    Check "and reads the same mark" ((Text $state $sheet "F13") -eq "4200") (Text $state $sheet "F13")
+    $c = Counts $state $sheet
+    Check "sharing publishes nothing" ($c.Live -eq 16 -and $c.Published -eq 16) $c.Text
+
+    # A tick: the live chain's vector, market and results publish anew and the mark follows; the
+    # copy keeps the old three alive and reads what it read, nothing released, until it is cleared.
+    Put $state $sheet "A10" "73.5"
+    $ticked = Text $state $sheet "D18"
+    Check "a price tick gives the live results a new handle" ($ticked -ne $results -and $ticked.StartsWith("${id}:trade_results:WTI NYMEX:")) $ticked
+    Check "and the live mark follows the quote, 7,000" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
+    Check "the retained results keep their handle" ((Text $state $sheet "F12") -eq $results) (Text $state $sheet "F12")
+    Check "and read the mark they read, 4,200" ((Text $state $sheet "F13") -eq "4200") (Text $state $sheet "F13")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 8) }
+    Check "nineteen live, three more published, nothing released while the copy holds the old three" ($c.Live -eq 19 -and $c.Published -eq 19 -and $c.Released -eq 0) $c.Text
+    Clear-Cell $state $sheet "F13"; Clear-Cell $state $sheet "F12"; Clear-Cell $state $sheet "F11"; Clear-Cell $state $sheet "F10"
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 3 }
+    Check "the copy cleared, the old vector, market and results are released; sixteen live" ($c.Live -eq 16 -and $c.Released -eq 3 -and $c.Published -eq 19 -and $c.Misses -eq 0) $c.Text
+
+    # The valuation day moves onto n26's expiry with the fixings extended to the Friday before,
+    # the two together under manual calculation: n26 is live on its own day, at the quote.
+    $prepared = Text $state $sheet "D17"
+    $history = Text $state $sheet "D9"
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }
+    $last = Put-Fixings $state $sheet ([datetime]"2026-06-19") "71.00"
+    Put $state $sheet "D8" "=_CreateFuturesFixings(T1:T$last,U1:U$last,D5)"
+    Put $state $sheet "A6" "22-Jun-2026"
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
+    Check "the day moved onto the expiry gives the history a new handle" ((Text $state $sheet "D9") -ne $history -and (Text $state $sheet "D9").StartsWith("${id}:market_history:WTI NYMEX:")) (Text $state $sheet "D9")
+    Check "and the preparation a new one" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "n26 is live on its own expiry day, the mark at the quote, 7,000" ((Text $state $sheet "D19") -eq "7000") (Text $state $sheet "D19")
+    Check "the delta 2,000 still" ((Text $state $sheet "D20") -eq "2000") (Text $state $sheet "D20")
+    Check "and n26 unsettled" ((Text $state $sheet "D22") -eq "FALSE") (Text $state $sheet "D22")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 10 }
+    Check "the old date, calendar, fixings, history, market, preparation and results are released; sixteen live, seven more published" ($c.Live -eq 16 -and $c.Released -eq 10 -and $c.Published -eq 26 -and $c.Misses -eq 0) $c.Text
+
+    # The day moves past the expiry with the 22nd's settle: n26 has fixed at 72.5 and paid, and
+    # the two-price vector is a price too many for the one contract left, so the market fails, the
+    # results fail as its consumer and the reports show the failure, no number standing.
+    $prepared = Text $state $sheet "D17"
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }
+    $last = Put-Fixings $state $sheet ([datetime]"2026-06-22") "72.5"
+    Put $state $sheet "D8" "=_CreateFuturesFixings(T1:T$last,U1:U$last,D5)"
+    Put $state $sheet "A6" "23-Jun-2026"
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
+    $refused = "#ERROR _CreateMarket: ValueError: price_vector has 2 prices, expected at most 1, one per contract from 'q26' through 'q26'"
+    Check "the day moved past the expiry gives the preparation a new handle" ((Text $state $sheet "D17") -ne $prepared -and (Text $state $sheet "D17").StartsWith("${id}:prepared_trades:WTI NYMEX:")) (Text $state $sheet "D17")
+    Check "which shows n26 settled" ((Text $state $sheet "D22") -eq "TRUE") (Text $state $sheet "D22")
+    Check "the two-price vector left in place across the roll is refused by the market" ((Text $state $sheet "D11") -eq $refused) (Text $state $sheet "D11")
+    Check "the results fail as the market's consumer" ((Text $state $sheet "D18") -eq "#ERROR _EvaluateTrades: market is the creator's failure, expected market handle: $refused") (Text $state $sheet "D18")
+    Check "the report spilled shows the failure in the creator's words" ((Text $state $sheet "D23") -eq "#ERROR _ReportValues: results is the creator's failure, expected trade results handle: $refused") (Text $state $sheet "D23")
+    Check "the mark read through INDEX shows #REF!, no number" ((Text $state $sheet "D19") -eq "#REF!") (Text $state $sheet "D19")
+    Check "the delta read likewise" ((Text $state $sheet "D20") -eq "#REF!") (Text $state $sheet "D20")
+    Check "and the cash read" ((Text $state $sheet "D21") -eq "#REF!") (Text $state $sheet "D21")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 3) -and $c.Released -ge 17 }
+    Check "the market and the results own nothing: fourteen live, five more published, seven released" ($c.Live -eq 14 -and $c.Released -eq 17 -and $c.Published -eq 31 -and $c.Misses -eq 0) $c.Text
+
+    # The vector trimmed to q26's price: the market and the results rebuild, n26 paid.
+    Put $state $sheet "D10" "=_CreatePriceVector(A1,A11)"
+    Check "the vector trimmed to the contract that remains rebuilds the market" ((Text $state $sheet "D11").StartsWith("${id}:market:WTI NYMEX:")) (Text $state $sheet "D11")
+    Check "and the results" ((Text $state $sheet "D18").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D18")
+    Check "n26 paid: the cash is 5,000, two lots of 2.5 over 70" ((Text $state $sheet "D21") -eq "5000") (Text $state $sheet "D21")
+    Check "the mark is 0" ((Text $state $sheet "D19") -eq "0") (Text $state $sheet "D19")
+    Check "and the delta 0, nothing live" ((Text $state $sheet "D20") -eq "0") (Text $state $sheet "D20")
+    Check "the report spilled shows its header again" ((Text $state $sheet "D23") -eq "cleared_mark") (Text $state $sheet "D23")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) -and $c.Released -ge 18 }
+    Check "sixteen live again, three more published, the old vector released, no misses, no disposal errors" ($c.Live -eq 16 -and $c.Released -eq 18 -and $c.Published -eq 34 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
+    # The last workbook closes: every publication goes, none missed, none failed.
+    Close-Book $state $book
+    $scratch = New-Book $state
+    $watch = Sheet $state $scratch
+    $c = Settle $state $watch { param($c) $c.Live -eq 0 }
+    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 34) $c.Text
+    Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
+}
+
 $quit = {
     param($state)
     $book = New-Book $state
@@ -666,7 +828,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]
