@@ -120,6 +120,7 @@ REJECTED_DEEP = {
     "_numbers": 1,
     "_first_bad": 1,
     "_cell": 1,
+    "_decoded": 1,  # the one look's decoding, shared with the one-pass decoder since #180's review
     "_Rejected.__init__": 1,
     "describe": 1,
 }
@@ -555,6 +556,7 @@ def test_a_mixed_range_names_its_first_bad_cell_the_same_way_whichever_way_it_is
         "_bad_mixed": 1,
         "_first_bad": 1,
         "_cell": 1,
+        "_decoded": 1,
         "_Rejected.__init__": 1,
         "describe": 1,
     }
@@ -641,6 +643,7 @@ def test_a_table_rejected_on_a_cell_names_it_after_one_look_at_its_column(
         "_numbers_of": 1,  # the third column fails here, and the fourth is never reached
         "_bad_cell": 1,
         "_cell": 1,
+        "_decoded": 1,
         "describe": 1,
     }
     assert numpy_calls(lambda: PATH["SumQuantity"](HEADERS, body)) == {

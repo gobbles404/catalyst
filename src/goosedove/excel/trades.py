@@ -2,8 +2,10 @@
 created once and taken last by the trades creator; the trades, a batch of one or many on one
 index, resolved from a template and a ticket and encoded; the batch prepared against one market
 history, as often as the history moves; the prepared batch evaluated against one market, as often
-as the quotes move; and the reports of a result, its values, its risk by time and, since
-#170, its reserves, each handle to handle. docs/library/trades/ holds a page per function.
+as the quotes move; since #180 one or many results collected into one record of saved risk,
+handle to handle; and the reports of a result or a collection, its values, its risk by time
+and, since #170, its reserves, each handle to handle. docs/library/trades/ holds a page per
+function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
 what it shows about that argument as a person types the formula. How to write a line is
@@ -20,6 +22,7 @@ from goosedove.excel.bridge import (
     FieldRow,
     FieldRows,
     Handle,
+    Handles,
     MixedArray,
     TextRow,
     excel_function,
@@ -30,12 +33,12 @@ from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
+from goosedove.trades.aggregation import AggregateResults, aggregate_results
 from goosedove.trades.evaluation import (
     Bucket,
     Risk,
     RiskView,
     TradeResults,
-    risk_view,
     trade_results,
 )
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
@@ -45,6 +48,7 @@ from goosedove.trades.template import TradeTemplate, choice, trade_template
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
 __all__ = [
+    "_AggregateResults",
     "_CreateTradeTemplate",
     "_CreateTrades",
     "_EvaluateTrades",
@@ -143,6 +147,21 @@ def _EvaluateTrades(
 
 
 @excel_function
+def _AggregateResults(
+    result_handles: Annotated[
+        Handles[TradeResults],
+        "The results handles to collect: a cell, a row or a column of cells showing "
+        "_EvaluateTrades's results, such as B2:B5, in the order given, every one counted and a "
+        "repeat counted again.",
+    ],
+) -> Handle[AggregateResults]:
+    """Collects one or many evaluated batches' saved risk into one collection, the lots by index
+    and the DV01 by curve and currency, nothing valued again, and shows its handle, which
+    _ReportRisk takes beside a single result's."""
+    return aggregate_results(result_handles, WorkCounter())
+
+
+@excel_function
 def _ReportValues(
     results: Annotated[
         Handle[TradeResults],
@@ -168,9 +187,9 @@ def _ReportValues(
 @excel_function
 def _ReportRisk(
     results: Annotated[
-        Handle[TradeResults],
-        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
-        "for it.",
+        Handle[TradeResults] | Handle[AggregateResults],
+        "The results handle, one evaluated batch's or a collection's: the cell showing "
+        "_EvaluateTrades's or _AggregateResults's result, such as A12, or a name for it.",
     ],
     risk: Annotated[
         str,
@@ -184,11 +203,10 @@ def _ReportRisk(
         "first day, and the Total is the saved number.",
     ],
 ) -> MixedArray:
-    """Reports one risk of the batch from its results, or all three, by day, calendar month or
-    calendar year: the saved Total first, then one row per date, the deltas on observation days
-    and the DV01 on payment days, as evaluation stored them."""
-    view = risk_view(
-        results,
+    """Reports one risk of a batch or a collection from its results, or all three, by day,
+    calendar month or calendar year: the saved Total first, then one row per date, the deltas on
+    observation days and the DV01 on payment days, as evaluation stored them."""
+    view = results.report(
         choice("risk", risk, Risk, "nominal_delta, delta, dv01 or all"),
         choice("bucket", bucket, Bucket, "day, month or year"),
     )

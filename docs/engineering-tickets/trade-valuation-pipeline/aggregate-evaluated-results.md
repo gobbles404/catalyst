@@ -11,13 +11,15 @@ risk selection and time bucket, and a saved Total above the dated rows. This rep
 10 October proposal for separate aggregate readers, a default day bucket and long tables.
 The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #178 on
 PR #177's path, reviewed clean at `788e5a7`; the second, [aggregate-risk-kernel.md](aggregate-risk-kernel.md),
-the private collector, in #179 above it; the Excel creator and the reader's acceptance of its
-handle are the next ticket's, and release and UAT remain separate.
+the private collector, in #179 above it; the third, [aggregate-risk-excel-integration.md](aggregate-risk-excel-integration.md),
+the Excel creator and the reader's acceptance of its handle, in #180 above that; release and
+UAT remain separate.
 
 The first PR establishes the report on one evaluated batch. The [second ticket](aggregate-risk-kernel.md), built in #179 privately,
 defines the private collector kernel and makes the proposed identity, snapshot and duplicate
-policies explicit for review. A subsequent PR exposes collection and extends that same
-reader to the aggregate handle. These policies are not hidden decisions in the first PR.
+policies explicit for review. The [third ticket](aggregate-risk-excel-integration.md), built in #180,
+exposes collection and extends that same reader to the aggregate handle. These policies are
+not hidden decisions in the first PR.
 
 ## Public shape
 
@@ -251,9 +253,10 @@ Deliver in reviewable slices after bilateral integration/UAT:
    input, compatible risk groups and scalar/vector views, identity/duplicate policies,
    worked examples and work budgets. It reuses the first slice's report-view structure;
    no Excel creator or reader input change occurs in this slice.
-3. **Collection surface and shared reader.** Typed handle range, `_AggregateResults`, the
+3. **Collection surface and shared reader.** The [third ticket](aggregate-risk-excel-integration.md),
+   built in #180 with the seam work inside it: typed handle range, `_AggregateResults`, the
    bounded two-result-kind reader input, wide multi-group headings, debug membership,
-   kept workbook and lifetime coverage. Split the seam work into its own PR if size warrants.
+   kept workbook and lifetime coverage.
 
 Each PR has one purpose. Do not merge all slices just because they share a user-facing arc.
 Keep source economics, payment ownership and existing value/reserve readers unchanged.

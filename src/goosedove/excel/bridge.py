@@ -89,6 +89,12 @@ BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, hande
 # checker it is the class itself, so a function body needs no cast; to registration it is the
 # mark that selects publishing on the way out and resolving on the way in.
 type Handle[T] = T
+# A vector of handles, since #180: a cell, a row or a column of texts, each the handle of a live
+# object of the one kind inside the brackets, handed over as the objects in sheet order, every
+# cell counted and a repeated text its object again. `result_handles: Handles[TradeResults]`;
+# docs/seam/inputs.md decision 44. A handle of one of two kinds is declared as the union of the
+# two forms, `results: Handle[TradeResults] | Handle[AggregateResults]`, decision 45.
+type Handles[T] = tuple[T, ...]
 # A template's one row, or a ticket's rows, of an instrument's fields: a mixed range that a row of
 # text before it heads, bound at the call against the instrument another argument selects, the
 # one parameter whose type is S: `FieldRow[str]` takes the instrument named by the function's text
@@ -400,24 +406,46 @@ def cells_from_buffers(
     return Cells(kinds.reshape(rows, cols).copy(), numbers.reshape(rows, cols).copy(), texts, seen)
 
 
-def _cell(
-    kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
-) -> object:
-    """The value at flat index i of a range's storage, as it arrived."""
-    kind = Kind(int(kinds.flat[i]))
+def _decoded(kind: Kind, number: float, texts: tuple[str, ...], t: int) -> object:
+    """The value of one cell of a range's storage, as it arrived: its kind, its number, and for a
+    text its place among the range's texts."""
     match kind:
         case Kind.NUMBER:
-            return float(numbers.flat[i])
+            return float(number)
         case Kind.TEXT:
-            return texts[int(np.count_nonzero(kinds.ravel()[:i] == TEXT_CODE))]
+            return texts[t]
         case Kind.BOOLEAN:
-            return bool(numbers.flat[i])
+            return bool(number)
         case Kind.BLANK:
             return None
         case Kind.MISSING:
             return MISSING
         case _:
             assert_never(kind)
+
+
+def _cell(
+    kinds: NDArray[np.uint8], numbers: NDArray[np.float64], texts: tuple[str, ...], i: int
+) -> object:
+    """The value at flat index i of a range's storage, as it arrived: one look for the one cell
+    a message names, its text found by counting the texts before it."""
+    flat = kinds.ravel()
+    kind = Kind(int(flat[i]))
+    t = int(np.count_nonzero(flat[:i] == TEXT_CODE)) if kind is Kind.TEXT else 0
+    return _decoded(kind, float(numbers.flat[i]), texts, t)
+
+
+def _values(cells: Cells) -> tuple[object, ...]:
+    """Every cell of a range in sheet order, as it arrived: one pass, each text taken in turn as
+    its cell comes, so a range of n cells is n looks and never n squared, since #180's review."""
+    values: list[object] = []
+    t = 0
+    for code, number in zip(cells.kinds.flat, cells.numbers.flat, strict=True):
+        kind = Kind(int(code))
+        values.append(_decoded(kind, float(number), cells.texts, t))
+        if kind is Kind.TEXT:
+            t += 1
+    return tuple(values)
 
 
 def _first_bad(cells: Cells, bad: NDArray[np.bool_], expected: str) -> _Rejected:
@@ -988,7 +1016,7 @@ def _field_handles(
         if not_text[r]:
             raise _field_bad(body, j, not_text, expected)
         text = cells.texts[int(body.places[r, j])]
-        held.append(_resolve(kind, expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
+        held.append(_resolve((kind,), expected, f"{body.argument} cell ({r + 1}, {j + 1})", text))
     return tuple(held)
 
 
@@ -1417,6 +1445,24 @@ def _is_handle(annotation: object) -> bool:
     return get_origin(annotation) is Handle
 
 
+def _is_handles(annotation: object) -> bool:
+    return get_origin(annotation) is Handles
+
+
+def _handle_kinds(annotation: object) -> tuple[type[object], ...] | None:
+    """The classes inside `Handle[A] | Handle[B]`, two or more handles of named kinds and nothing
+    else, decision 45; None for any other annotation."""
+    if get_origin(annotation) not in (Union, UnionType):
+        return None
+    args = get_args(annotation)
+    if len(args) < 2 or not all(_is_handle(arg) for arg in args):
+        return None
+    kinds = tuple(_handle_kind(arg) for arg in args)
+    if any(kind is None or kind is object for kind in kinds):
+        return None
+    return cast(tuple[type[object], ...], kinds)
+
+
 def _handle_kind(annotation: object) -> type[object] | None:
     """The class inside Handle[...]: any class but the seam's own, or None when it is not one."""
     kind = get_args(annotation)[0]
@@ -1469,18 +1515,24 @@ def _publish(
 # A relayed failure: what a consumer's cell shows when the creator it refers to failed. The
 # creator's own text comes last, whole, so a consumer of that consumer finds it here and relays
 # it unchanged, and a chain of any length shows one text. Quoting the previous text instead
-# compounded its escaping, and Excel cut the creator's words after a dozen relays.
-_RELAY: Final = re.compile(r"#ERROR \w+: \w+ is the creator's failure, expected [^:]+: (.+)", re.S)
+# compounded its escaping, and Excel cut the creator's words after a dozen relays. The name may
+# carry a cell, `result_handles cell (2, 1)`, since #180: a consumer of a failed collection finds
+# the creator's text behind the cell's name and shows it once.
+_RELAY: Final = re.compile(
+    r"#ERROR \w+: \w+(?: cell \(\d+, \d+\))? is the creator's failure, expected [^:]+: (.+)", re.S
+)
 
 
-def _resolve(kind: type[object], expected: str, name: str, value: object) -> object:
+def _resolve(kinds: tuple[type[object], ...], expected: str, name: str, value: object) -> object:
     """The object a handle stands for, or the failure.
 
     The text's own faults come first, through the text rule, so a number, a blank, a missing
     argument or an empty text fail in the seam's usual words. Then a creator's failure relayed
     by a reference to its cell, carried whole; then text naming no live object; then an object
-    of another kind. A declaration of `object` takes any kind, so that last comparison is the
-    one step it skips: whatever the key finds is handed over.
+    of a kind that is none of those declared, one for a handle of one kind, two or more for a
+    handle of one of several, decision 45, the words naming every one. A declaration of
+    `object` takes any kind, so that last comparison is the one step it skips: whatever the key
+    finds is handed over.
     """
     text = _text(value)
     if text.startswith("#ERROR "):
@@ -1492,11 +1544,39 @@ def _resolve(kind: type[object], expected: str, name: str, value: object) -> obj
         raise TypeValidationError(
             f"{name} is text {text!r} naming no live object, expected {expected}"
         )
-    if kind is not object and held.kind is not kind:
+    if object not in kinds and held.kind not in kinds:
         raise TypeValidationError(
             f"{name} is {_words(held.kind)} handle {text!r}, expected {expected}"
         )
     return held.value
+
+
+def _resolve_each(
+    kind: type[object], expected: str, name: str, value: object
+) -> tuple[object, ...]:
+    """The objects a cell, a row or a column of handles stand for, in sheet order, decision 44,
+    since #180: the shape first, one cell, one row or one column, a wider and taller range refused
+    whole; then each cell through the handle's rule under its own coordinates, a blank, a number,
+    a boolean, an empty text, a creator's failure, text naming nothing and a handle of another
+    kind each refused at its cell, in sheet order, left to right along a row and down a column;
+    a missing argument refused as every required argument is. One cell is the one object, and
+    a text repeated is its object again, every cell counted. The cells decoded in one pass and
+    one lookup per cell, nothing sorted, nothing parsed; a creator's failure in a cell is carried
+    whole behind the cell's name, and the relay rule reads through that name, so a consumer of
+    the failed vector shows the creator's text once."""
+    if not isinstance(value, Cells):
+        return (_resolve((kind,), expected, name, value),)
+    rows, cols = value.kinds.shape
+    if rows != 1 and cols != 1:
+        raise _Rejected(None, value, "", f"expected one cell, one row or one column of {expected}s")
+    objects: list[object] = []
+    for i, cell in enumerate(_values(value)):
+        r, c = divmod(i, cols)
+        try:
+            objects.append(_resolve((kind,), expected, f"{name} cell ({r + 1}, {c + 1})", cell))
+        except _Rejected:
+            raise _Rejected((r + 1, c + 1), cell, expected) from None
+    return tuple(objects)
 
 
 # --- registration -----------------------------------------------------------
@@ -1822,17 +1902,42 @@ def _declared(
         if spec.default is not inspect.Parameter.empty:
             raise TypeError(f"{function}: {spec.name} declares a table, which takes no default")
         return "table", _mixed
-    if _is_handle(spec.annotation):
-        kind = _handle_kind(spec.annotation)
-        if kind is None:
-            return None
-        # A handle resolves against the store, which holds nothing at registration.
-        if spec.default is not inspect.Parameter.empty:
-            raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
-        # Handle[object] takes the object behind any handle, so its words name no kind.
-        expected = "a handle" if kind is object else f"{_words(kind)} handle"
-        return expected, partial(_resolve, kind, expected, spec.name)
+    if (
+        _is_handles(spec.annotation)
+        or _handle_kinds(spec.annotation)
+        or _is_handle(spec.annotation)
+    ):
+        return _handle_form(function, spec)
     return _DECLARED.get(spec.annotation)
+
+
+def _handle_form(
+    function: str, spec: inspect.Parameter
+) -> tuple[str, Callable[[object], object]] | None:
+    """The words and the accept rule of a parameter declared around handles: a vector of one kind,
+    decision 44; one of two or more kinds, decision 45; or one kind, or any. A handle resolves
+    against the store, which holds nothing at registration, so none of the three takes a
+    default."""
+    if spec.default is not inspect.Parameter.empty:
+        raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
+    if _is_handles(spec.annotation):
+        kind = _handle_kind(spec.annotation)
+        if kind is None or kind is object:
+            # A vector names the one kind it collects: the seam's own types are no kind, and a
+            # vector of any kind would hand a function objects it could not take together.
+            return None
+        one = f"{_words(kind)} handle"
+        return f"{one}s in a cell, a row or a column", partial(_resolve_each, kind, one, spec.name)
+    kinds = _handle_kinds(spec.annotation)
+    if kinds is not None:
+        expected = f"{' or '.join(_words(kind) for kind in kinds)} handle"
+        return expected, partial(_resolve, kinds, expected, spec.name)
+    kind = _handle_kind(spec.annotation)
+    if kind is None:
+        return None
+    # Handle[object] takes the object behind any handle, so its words name no kind.
+    expected = "a handle" if kind is object else f"{_words(kind)} handle"
+    return expected, partial(_resolve, (kind,), expected, spec.name)
 
 
 def _left_out(annotation: object) -> object | None:

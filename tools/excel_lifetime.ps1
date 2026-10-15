@@ -28,8 +28,11 @@
 #          unchanged; the valuation day moved onto n26's expiry and past it with the fixings
 #          extended, the settle fixing and paying the trade; the two-price vector left in
 #          place across the roll refused, the reports showing the failure and no number; the
-#          vector trimmed and the chain rebuilt; the last workbook closed. check.ps1 runs this
-#          group beside core.
+#          vector trimmed and the chain rebuilt; the bilateral path on a curve of its own; since
+#          #180 a collection of the two results through a tick, a failing input, its recovery,
+#          a factor change, a full recalculation and a held old collection over the handle
+#          texts across a second tick; the last
+#          workbook closed. check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -676,7 +679,16 @@ $trades = {
 # lot of q26 under a template with a counterparty, evaluated on a curve of its own, through the
 # ticket's dependency table, a quote tick, a factor change, a fixing change, the day advanced
 # with the curve left behind, a curve its creator refuses, and a copy holding the old results.
-# Last, the workbook closed releases every publication. check.ps1 runs this group beside core.
+# Then the collection, since #180, aggregate-risk-excel-integration.md: the two results
+# collected through AE1:AE2 in AE4 and read through _ReportRisk, their lots and DV01 together;
+# a quote tick remakes both results and the collection; a cell naming nothing fails the
+# collection visibly and releases it, its reads #REF!, until repaired; a reformat publishes
+# nothing; a factor change remakes the curve, the results and the collection; a full
+# recalculation publishes nothing; a copy over the two handle texts shares the publication and,
+# across a second tick,
+# holds the old collection and its sources at the old DV01 while their handle texts name
+# nothing, released when it is cleared. Last, the workbook closed releases every publication.
+# check.ps1 runs this group beside core.
 
 # A settle for every business day from 20 May 2026 to the last day given, newest first from T1
 # and U1 down, 25 May closed: the last day's settle as given, the rest 71.00, 71.01, ... down the
@@ -943,12 +955,91 @@ $valuation = {
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 45 }
     Check "the copy cleared, the old curve and results are released; twenty-one live, no misses" ($c.Live -eq 21 -and $c.Released -eq 45 -and $c.Published -eq 66 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 
+    # The collection, aggregate-risk-excel-integration.md: the cleared results in D18, n26 paid and
+    # nothing live, and the bilateral results in D30, two lots of q26 at 0.97, referred to in
+    # AE1:AE2 and collected in AE4, one publication; its reports read 2 nominal, 1.94 discounted and
+    # D30's own DV01, the two results' saved totals together, nothing published by a read.
+    Put $state $sheet "AE1" "=D18"; Put $state $sheet "AE2" "=D30"
+    Put $state $sheet "AE4" "=_AggregateResults(AE1:AE2)"
+    Put $state $sheet "AE5" '=INDEX(_ReportRisk(AE4,"nominal_delta","year"),4,2)'
+    Put $state $sheet "AE6" '=INDEX(_ReportRisk(AE4,"delta","year"),4,2)'
+    Put $state $sheet "AE7" '=TEXT(INDEX(_ReportRisk(AE4,"dv01","day"),4,2),"0.000000")'
+    $collection = Text $state $sheet "AE4"
+    Check "the collection's cell shows its handle, of its own kind" ($collection.StartsWith("${id}:aggregate_results:")) $collection
+    Check "its nominal delta is the two results' together, 2" ((Text $state $sheet "AE5") -eq "2") (Text $state $sheet "AE5")
+    Check "its delta 1.94, the bilateral lots at 0.97" ((Text $state $sheet "AE6") -eq "1.94") (Text $state $sheet "AE6")
+    Check "and its DV01 the bilateral results' own" ((Text $state $sheet "AE7") -eq (Text $state $sheet "D34")) ((Text $state $sheet "AE7") + " " + (Text $state $sheet "D34"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 22 }
+    Check "the collection published: twenty-two live, one more published" ($c.Live -eq 22 -and $c.Published -eq 67 -and $c.Released -eq 45) $c.Text
+
+    # A quote tick: the vector, the market, both results and the collection publish anew, the old
+    # five released; the delta reads the same, the lots and the factor unmoved.
+    Put $state $sheet "A11" "73.9"
+    Check "a quote tick gives the collection a new handle" ((Text $state $sheet "AE4") -ne $collection -and (Text $state $sheet "AE4").StartsWith("${id}:aggregate_results:")) (Text $state $sheet "AE4")
+    Check "and its delta reads 1.94 still" ((Text $state $sheet "AE6") -eq "1.94") (Text $state $sheet "AE6")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 22 -and $c.Released -ge 50 }
+    Check "five more published, the old five released" ($c.Live -eq 22 -and $c.Published -eq 72 -and $c.Released -eq 50) $c.Text
+
+    # A cell naming nothing fails the collection visibly and releases it; the reads show #REF!;
+    # the cell restored, the collection publishes anew.
+    Put $state $sheet "AE2" "x"
+    Check "a cell naming nothing fails the collection in the seam's words" ((Text $state $sheet "AE4") -eq "#ERROR _AggregateResults: result_handles cell (2, 1) is text 'x' naming no live object, expected trade results handle") (Text $state $sheet "AE4")
+    Check "and its reads show #REF!, no number" ((Text $state $sheet "AE5") -eq "#REF!") (Text $state $sheet "AE5")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "the failed collection owns nothing: twenty-one live, one released, nothing published" ($c.Live -eq 21 -and $c.Published -eq 72 -and $c.Released -eq 51) $c.Text
+    Put $state $sheet "AE2" "=D30"
+    Check "the cell restored, the collection is live again" ((Text $state $sheet "AE4").StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "AE5") -eq "2") ((Text $state $sheet "AE4") + " " + (Text $state $sheet "AE5"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 22 }
+    Check "one more published" ($c.Live -eq 22 -and $c.Published -eq 73 -and $c.Released -eq 51) $c.Text
+
+    # Another risk and bucket over the same collection reformat it; nothing is published.
+    Put $state $sheet "AE8" '=INDEX(_ReportRisk(AE4,"all","month"),4,3)'
+    Check "a reformat reads the delta by month, 1.94" ((Text $state $sheet "AE8") -eq "1.94") (Text $state $sheet "AE8")
+    $c = Counts $state $sheet
+    Check "and publishes nothing" ($c.Live -eq 22 -and $c.Published -eq 73) $c.Text
+
+    # A factor change: the curve, the bilateral results and the collection publish anew, the old
+    # three released; the collection's delta follows the factor, 1.92 at 0.96.
+    Put $state $sheet "X3" "0.96"
+    Check "a factor change moves the collection's delta, 1.92 at 0.96" ((Text $state $sheet "AE6") -eq "1.92" -and (Text $state $sheet "AE8") -eq "1.92") ((Text $state $sheet "AE6") + " " + (Text $state $sheet "AE8"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 22 -and $c.Released -ge 54 }
+    Check "the old curve, results and collection are released; three more published" ($c.Live -eq 22 -and $c.Published -eq 76 -and $c.Released -eq 54) $c.Text
+
+    # An unchanged recalculation: every creator runs again, none publishes, the collection's text stays.
+    $collection = Text $state $sheet "AE4"
+    Invoke-ExcelCall "full calculation" { $state.Excel.CalculateFull() }
+    Check "a full recalculation keeps the collection's handle" ((Text $state $sheet "AE4") -eq $collection) (Text $state $sheet "AE4")
+    $c = Counts $state $sheet
+    Check "and publishes nothing" ($c.Live -eq 22 -and $c.Published -eq 76 -and $c.Released -eq 54) $c.Text
+
+    # A copy over the two handle texts typed as values shares the live collection's publication.
+    # Across a second tick the live five publish anew and the copy holds the old collection and,
+    # through it, the old results: its reads stand at the old DV01 while the texts it was made
+    # from name nothing; cleared, the old collection is released.
+    $oldDv01 = Text $state $sheet "AE7"
+    Put $state $sheet "AG1" (Text $state $sheet "AE1"); Put $state $sheet "AG2" (Text $state $sheet "AE2")
+    Put $state $sheet "AG4" "=_AggregateResults(AG1:AG2)"
+    Put $state $sheet "AG7" '=TEXT(INDEX(_ReportRisk(AG4,"dv01","day"),4,2),"0.000000")'
+    Check "a collection over the same texts shares the handle" ((Text $state $sheet "AG4") -eq $collection) (Text $state $sheet "AG4")
+    $c = Counts $state $sheet
+    Check "sharing publishes nothing" ($c.Live -eq 22 -and $c.Published -eq 76) $c.Text
+    Put $state $sheet "A11" "74"
+    Check "a second tick moves the live collection" ((Text $state $sheet "AE4") -ne $collection -and (Text $state $sheet "AE7") -ne $oldDv01) ((Text $state $sheet "AE4") + " " + (Text $state $sheet "AE7"))
+    Check "the held collection keeps its handle and reads the old DV01" ((Text $state $sheet "AG4") -eq $collection -and (Text $state $sheet "AG7") -eq $oldDv01) ((Text $state $sheet "AG4") + " " + (Text $state $sheet "AG7"))
+    Put $state $sheet "AG8" "=util_ReadHandle(AG1)"
+    Check "while the text it was made from names nothing" ((Text $state $sheet "AG8") -eq "#ERROR util_ReadHandle: handle is text '$(Text $state $sheet "AG1")' naming no live object, expected a handle") (Text $state $sheet "AG8")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 23 -and $c.Released -ge 58 }
+    Check "twenty-three live, five more published, four released while the copy holds the old collection" ($c.Live -eq 23 -and $c.Published -eq 81 -and $c.Released -eq 58) $c.Text
+    Clear-Cell $state $sheet "AG8"; Clear-Cell $state $sheet "AG7"; Clear-Cell $state $sheet "AG4"
+    $c = Settle $state $sheet { param($c) $c.Live -eq 22 -and $c.Released -ge 59 }
+    Check "the copy cleared, the old collection is released; twenty-two live, no misses" ($c.Live -eq 22 -and $c.Released -eq 59 -and $c.Published -eq 81 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+
     # The last workbook closes: every publication goes, none missed, none failed.
     Close-Book $state $book
     $scratch = New-Book $state
     $watch = Sheet $state $scratch
     $c = Settle $state $watch { param($c) $c.Live -eq 0 }
-    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 66) $c.Text
+    Check "closing the last workbook releases every publication" ($c.Live -eq 0 -and $c.Released -eq 81) $c.Text
     Check "no release missed, no disposal error, none skipped" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 

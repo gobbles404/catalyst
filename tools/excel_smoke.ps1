@@ -929,7 +929,7 @@ $formulas = [ordered]@{
     '=_ReportRisk(MY8,"delta",C2)'          = "#ERROR _ReportRisk: bucket is blank, expected text"
     '=_ReportRisk(MY8,"delta")'             = "#ERROR _ReportRisk: bucket is missing, expected text"
     "=_ReportRisk(MY8)"                     = "#ERROR _ReportRisk: risk is missing, expected text"
-    '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results handle"
+    '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle"
     # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, X26, Z26 and F27
     # last trading 30 October, 30 November and 31 December and published 2 November, 1 December
     # and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU,
@@ -1457,6 +1457,116 @@ $formulas = [ordered]@{
     "=_EvaluateTrades(QV7,QV9,C2)"        = "#ERROR _EvaluateTrades: discount_curve is blank, expected discount curve handle"
     "=_EvaluateTrades(QV7,QV9,1)"         = "#ERROR _EvaluateTrades: discount_curve is number 1.0, expected discount curve handle"
     "=LEFT(_EvaluateTrades(QV7,QV9,QV9),57)" = "#ERROR _EvaluateTrades: discount_curve is market handle '"
+    # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 collected down a column
+    # in RT8 and across a row in RT9, a handle of its own kind; the same reader over it, all three by
+    # month: one UNIT group, 20 nominal and 20.5 discounted, and two curve groups, QV12's 0.0085 as
+    # curve_1 and the curve of ones' -0.01 as curve_2, on the union of the observation month and the
+    # two payment months; by day the three days; the DV01 alone on the two payment days, the deltas
+    # alone on the one observation day or year; QV24 alone a collection as itself, its DV01 the
+    # cleared column of nothing. The readback's three membership rows, one per occurrence, with each
+    # source's own saved totals. The refusals: another kind, a blank, a number, a true array, a blank
+    # cell, the argument left out, in the seam's words; another valuation day and another price
+    # vector in the library's; the value readers refusing the collection, the reader naming its two
+    # kinds, and a risk that is none of the four. A failed evaluation in a cell fails the collection
+    # behind the cell's name with the creator's text whole, and the report and the readback over the
+    # failed collection show that text once, behind one wrapper of their own.
+    '=LEFT(RT8,FIND(":",RT8,FIND(":",RT8)+1))'     = "{pid}:aggregate_results:"
+    '=LEFT(RT9,FIND(":",RT9,FIND(":",RT9)+1))'     = "{pid}:aggregate_results:"
+    '=ROWS(_ReportRisk(RT8,"all","month"))'      = "7"
+    '=COLUMNS(_ReportRisk(RT8,"all","month"))'   = "5"
+    '=INDEX(_ReportRisk(RT8,"all","month"),1,1)' = "as_of"
+    '=INDEX(_ReportRisk(RT8,"all","month"),1,2)' = "46391"
+    '=INDEX(_ReportRisk(RT8,"all","month"),1,5)' = "-"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,2)' = "UNIT nominal_delta [UNIT]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,3)' = "UNIT delta [UNIT]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,4)' = "curve_1 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,5)' = "curve_2 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),3,5)' = "float64"
+    '=INDEX(_ReportRisk(RT8,"all","month"),4,1)' = "Total"
+    '=INDEX(_ReportRisk(RT8,"all","month"),4,2)' = "20"
+    '=INDEX(_ReportRisk(RT8,"all","month"),4,3)' = "20.5"
+    '=INDEX(_ReportRisk(RT8,"all","month"),4,4)' = "0.0085"
+    '=INDEX(_ReportRisk(RT8,"all","month"),4,5)' = "-0.01"
+    '=INDEX(_ReportRisk(RT8,"all","month"),5,1)' = "46388"
+    '=INDEX(_ReportRisk(RT8,"all","month"),5,2)' = "20"
+    '=INDEX(_ReportRisk(RT8,"all","month"),5,3)' = "20.5"
+    '=INDEX(_ReportRisk(RT8,"all","month"),5,4)' = "0"
+    '=INDEX(_ReportRisk(RT8,"all","month"),5,5)' = "0"
+    '=INDEX(_ReportRisk(RT8,"all","month"),6,1)' = "46753"
+    '=INDEX(_ReportRisk(RT8,"all","month"),6,2)' = "0"
+    '=INDEX(_ReportRisk(RT8,"all","month"),6,4)' = "-0.0095"
+    '=INDEX(_ReportRisk(RT8,"all","month"),6,5)' = "-0.01"
+    '=INDEX(_ReportRisk(RT8,"all","month"),7,1)' = "47119"
+    '=INDEX(_ReportRisk(RT8,"all","month"),7,4)' = "0.018"
+    '=INDEX(_ReportRisk(RT8,"all","month"),7,5)' = "0"
+    '=ROWS(_ReportRisk(RT8,"all","day"))'        = "7"
+    '=INDEX(_ReportRisk(RT8,"all","day"),5,1)'   = "46391"
+    '=INDEX(_ReportRisk(RT8,"all","day"),6,1)'   = "46756"
+    '=INDEX(_ReportRisk(RT8,"all","day"),7,1)'   = "47121"
+    '=ROWS(_ReportRisk(RT8,"dv01","day"))'       = "6"
+    '=COLUMNS(_ReportRisk(RT8,"dv01","day"))'    = "3"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),4,2)'  = "0.0085"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),4,3)'  = "-0.01"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),5,1)'  = "46756"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),5,2)'  = "-0.0095"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),5,3)'  = "-0.01"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),6,2)'  = "0.018"
+    '=INDEX(_ReportRisk(RT8,"dv01","day"),6,3)'  = "0"
+    '=ROWS(_ReportRisk(RT8,"nominal_delta","day"))' = "5"
+    '=COLUMNS(_ReportRisk(RT8,"nominal_delta","day"))' = "2"
+    '=INDEX(_ReportRisk(RT8,"nominal_delta","day"),4,2)' = "20"
+    '=INDEX(_ReportRisk(RT8,"nominal_delta","day"),5,1)' = "46391"
+    '=INDEX(_ReportRisk(RT8,"delta","year"),5,1)' = "46388"
+    '=INDEX(_ReportRisk(RT8,"delta","year"),5,2)' = "20.5"
+    '=INDEX(_ReportRisk(RT9,"all","month"),4,3)' = "20.5"
+    '=INDEX(_ReportRisk(RT9,"dv01","day"),4,3)'  = "-0.01"
+    '=ROWS(_ReportRisk(RT10,"dv01","day"))'      = "4"
+    '=INDEX(_ReportRisk(RT10,"dv01","day"),2,2)' = "cleared USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT10,"dv01","day"),4,2)' = "0"
+    '=COLUMNS(_ReportRisk(RT10,"all","day"))'    = "4"
+    '=INDEX(_ReportRisk(RT10,"all","day"),4,2)'  = "10"
+    '=INDEX(_ReportRisk(RT10,"all","day"),5,3)'  = "10"
+    "=ROWS(util_ReadHandle(RT8))"         = "5"
+    "=COLUMNS(util_ReadHandle(RT8))"      = "10"
+    "=INDEX(util_ReadHandle(RT8),1,1)"    = "position"
+    "=INDEX(util_ReadHandle(RT8),1,5)"    = "curve"
+    "=INDEX(util_ReadHandle(RT8),1,10)"   = "as_of"
+    "=INDEX(util_ReadHandle(RT8),2,1)"    = "int64"
+    "=INDEX(util_ReadHandle(RT8),2,10)"   = "datetime64[D]"
+    "=INDEX(util_ReadHandle(RT8),3,1)"    = "1"
+    "=INDEX(util_ReadHandle(RT8),5,1)"    = "3"
+    "=INDEX(util_ReadHandle(RT8),3,2)"    = "UNIT"
+    "=INDEX(util_ReadHandle(RT8),3,3)"    = "UNIT"
+    "=INDEX(util_ReadHandle(RT8),3,4)"    = "bilateral"
+    "=INDEX(util_ReadHandle(RT8),3,5)"    = "curve_1"
+    "=INDEX(util_ReadHandle(RT8),4,5)"    = "curve_2"
+    "=INDEX(util_ReadHandle(RT8),5,4)"    = "cleared"
+    "=INDEX(util_ReadHandle(RT8),5,5)"    = "-"
+    "=INDEX(util_ReadHandle(RT8),3,6)"    = "USD"
+    "=INDEX(util_ReadHandle(RT8),3,7)"    = "0"
+    "=INDEX(util_ReadHandle(RT8),3,8)"    = "0.5"
+    "=INDEX(util_ReadHandle(RT8),3,9)"    = "0.0085"
+    "=INDEX(util_ReadHandle(RT8),4,7)"    = "10"
+    "=INDEX(util_ReadHandle(RT8),4,9)"    = "-0.01"
+    "=INDEX(util_ReadHandle(RT8),5,8)"    = "10"
+    "=INDEX(util_ReadHandle(RT8),5,9)"    = "0"
+    "=INDEX(util_ReadHandle(RT8),3,10)"   = "46391"
+    "=LEFT(_AggregateResults(QJ8),58)"    = "#ERROR _AggregateResults: result_handles is index handle '"
+    "=_AggregateResults(C2)"              = "#ERROR _AggregateResults: result_handles is blank, expected trade results handles in a cell, a row or a column"
+    "=_AggregateResults(1)"               = "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results handles in a cell, a row or a column"
+    "=_AggregateResults(RT3:RU4)"         = "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results handles"
+    "=_AggregateResults(RT3:RT6)"         = "#ERROR _AggregateResults: result_handles cell (4, 1) is blank, expected trade results handle"
+    "=_AggregateResults()"                = "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column"
+    "=_AggregateResults(RW1:RW2)"         = "#ERROR _AggregateResults: ValueError: results 2 is valued on 2027-01-05, expected 2027-01-04, the valuation day of results 1"
+    "=_AggregateResults(RX1:RX2)"         = "#ERROR _AggregateResults: ValueError: results 2 is on index 'UNIT' quoted off another price vector than results 1, expected one price vector for one index"
+    "=LEFT(_AggregateResults(QV7),68)"    = "#ERROR _AggregateResults: result_handles is prepared trades handle '"
+    '=LEFT(_ReportRisk(QV7,"all","day"),55)' = "#ERROR _ReportRisk: results is prepared trades handle '"
+    "=LEFT(_ReportValues(RT8),59)"        = "#ERROR _ReportValues: results is aggregate results handle '"
+    "=LEFT(_ReportReserves(RT8),61)"      = "#ERROR _ReportReserves: results is aggregate results handle '"
+    '=_ReportRisk(RT8,"gamma","day")'     = "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or all"
+    "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -2503,6 +2613,19 @@ $cells = [ordered]@{
     "RQ2" = "4-Jan-2028"; "RR2" = "1"
     "RN12" = "=_CreateDiscountCurve(RQ1:RR1,RQ2:RR2)"
     "RN8" = "=_EvaluateTrades(RN7,RN9,RN12)"
+    # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 referred to across
+    # RT1:RV1 and down RT3:RT5, collected in RT9 and RT8, QV24 alone in RT10; QV8 beside the next
+    # day's RF8 in RW1:RW2 and beside the tick's QV17 in RX1:RX2, two collections the library refuses;
+    # QV8 beside a failed evaluation in RY1:RY2, collected in RY4, the creator's failure carried whole.
+    "RT1" = "=QV8"; "RU1" = "=QV22"; "RV1" = "=QV24"
+    "RT3" = "=QV8"; "RT4" = "=QV22"; "RT5" = "=QV24"
+    "RW1" = "=QV8"; "RW2" = "=RF8"
+    "RX1" = "=QV8"; "RX2" = "=QV17"
+    "RY1" = "=QV8"; "RY2" = "=_EvaluateTrades(QV7,QV9)"
+    "RY4" = "=_AggregateResults(RY1:RY2)"
+    "RT8" = "=_AggregateResults(RT3:RT5)"
+    "RT9" = "=_AggregateResults(RT1:RV1)"
+    "RT10" = "=_AggregateResults(QV24)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

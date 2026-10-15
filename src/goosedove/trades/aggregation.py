@@ -135,6 +135,12 @@ class AggregateResults:
     by_month: ReportAxes
     by_year: ReportAxes
 
+    def report(self, risk: Risk, bucket: Bucket) -> RiskView:
+        """The content of the risk report asked for: aggregate_view's selection of the collection's
+        saved axes, totals and vectors through the saved places, what _ReportRisk formats for a
+        collection as for a result. Selects and copies, and nothing else."""
+        return aggregate_view(self, risk, bucket)
+
 
 def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> AggregateResults:
     """The one way to collect evaluated batches, aggregate-risk-kernel.md: the occurrences
