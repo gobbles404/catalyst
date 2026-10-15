@@ -156,6 +156,12 @@ def mapped(prep: PreparedTrades) -> UnpaidPayments:
 # The mapping's numpy over the cleared preparation's: the flatnonzero over the unsettled groups, the
 # unique over their payment days with its sort, its inverse and the copies those take, the day
 # counts' one conversion, and the four arrays frozen.
+# The display axes' two more searches, since #186: the payment months and years placed from the
+# valuation day's period beside the contract periods the cleared preparation places.
+PAID_DISPLAY_NUMPY = {
+    "ndarray.searchsorted": 2,
+    "ndarray.astype": 4,  # the payment periods' keys and places, two a bucket
+}
 MAPPING_NUMPY = {
     "ndarray.argsort": 1,
     "ndarray.astype": 1,
@@ -190,6 +196,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     prep = prepared_trades(enc, history, counter)
     slots = slots_of(method, contracts)
     assert counter.freeze().as_dict() == {
+        "display_periods": prep.by_month.periods.size + prep.by_year.periods.size,  # since #186
         "fixings_read": slots - live,
         "payment_days_mapped": unpaid,  # one payment day a contract: a day an unpaid group
         "prepared_slots": slots,
@@ -217,14 +224,21 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #186
+        "period_start": 2,
+        "places_from": 4,
+        "rows_through": 4,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "_unpaid_payments": 1,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 3,
+        "WorkCounter.hit": 4,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == {
-        k: PREPARATION_NUMPY.get(k, 0) + MAPPING_NUMPY.get(k, 0)
-        for k in PREPARATION_NUMPY | MAPPING_NUMPY
+        k: PREPARATION_NUMPY.get(k, 0) + MAPPING_NUMPY.get(k, 0) + PAID_DISPLAY_NUMPY.get(k, 0)
+        for k in PREPARATION_NUMPY | MAPPING_NUMPY | PAID_DISPLAY_NUMPY
     }, numpy
     cleared = a_batch(components, contracts) if method is ScheduleMethod.LASTDAY else None
     if cleared is not None:
@@ -284,6 +298,8 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "DiscountCurve.max_date": 1,  # the coverage rule
         "Market.live_prices": 1,
         "_discounted": 1,
+        "early_risk": 2,  # the discounted lots and the DV01 before the start, since #186
+        "early_fact": 4,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
     }
@@ -298,9 +314,12 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
         "ndarray.any": 11,
         "ndarray.astype": 1,
+        "ndarray.nonzero": 4,  # the discounted lots and the DV01 before the start, since #186
+        "ndarray.ravel": 4,
         "ndarray.setflags": 13,
         "ndarray.sum": 4,
         "numpy._make_extobj": 1,
+        "numpy.asanyarray": 4,  # the four looks' views
         "numpy.empty": 1,
         "numpy.zeros": 2,
         "ufunc.reduce": 15,
@@ -328,7 +347,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     encoding = prep.encoded
     groups = encoding.group_contract.size
     slots = encoding.slot_group.size
-    buckets = encoding.days.size + encoding.months.size + encoding.years.size
+    buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
     axes = encoding.payment_axes
     assert axes is not None
     paid = axes.days.size + axes.months.size + axes.years.size
@@ -400,27 +419,21 @@ def test_the_encoding_of_a_bilateral_batch_makes_its_payment_axes_once(
     np.testing.assert_array_equal(axes.months[axes.month_of_day], distinct.astype("datetime64[M]"))
     np.testing.assert_array_equal(axes.years, years)
     np.testing.assert_array_equal(axes.years[axes.year_of_month], months.astype("datetime64[Y]"))
-    for observed, paid, union, observed_in, paid_in in (
-        (enc.days, axes.days, axes.union_days, axes.observed_in_days, axes.paid_in_days),
-        (enc.months, axes.months, axes.union_months, axes.observed_in_months, axes.paid_in_months),
-        (enc.years, axes.years, axes.union_years, axes.observed_in_years, axes.paid_in_years),
-    ):
-        np.testing.assert_array_equal(union, np.union1d(observed, paid))
-        np.testing.assert_array_equal(union[observed_in], observed)
-        np.testing.assert_array_equal(union[paid_in], paid)
+    # The one union, the days': since #186 the month and year displays are the preparation's.
+    np.testing.assert_array_equal(axes.union_days, np.union1d(enc.days, axes.days))
+    np.testing.assert_array_equal(axes.union_days[axes.observed_in_days], enc.days)
+    np.testing.assert_array_equal(axes.union_days[axes.paid_in_days], axes.days)
     arrays = [getattr(axes, field.name) for field in fields(axes)]
     assert all(not array.flags.writeable for array in arrays)
-    # Retained: eight bytes an entry of every array, the three axes with their places and the
-    # three unions with both kinds' places.
+    # Retained: eight bytes an entry of every array, the three axes with their places and the day
+    # union with both kinds' places.
     d, m, y = axes.days.size, axes.months.size, axes.years.size
-    unions = axes.union_days.size + axes.union_months.size + axes.union_years.size
-    observed = enc.days.size + enc.months.size + enc.years.size
     assert sum(array.nbytes for array in arrays) == 8 * (
-        d + payment_date.size + m + d + y + m + unions + observed + d + m + y
+        d + payment_date.size + m + d + y + m + axes.union_days.size + enc.days.size + d
     )
-    # The cleared encoding's functions and, beside them, the axes once and a union a level.
+    # The cleared encoding's functions and, beside them, the axes once and the one union.
     cleared = call_profile(lambda: encoded(terms, observed_of(terms), UNITS, WorkCounter()))
-    assert cleared["_the_payment_axes"] == 1 and cleared["_the_union"] == 3
+    assert cleared["_the_payment_axes"] == 1 and cleared["_the_union"] == 1
     assert cleared["WorkCounter.hit"] == 6
 
 
@@ -439,26 +452,35 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     result = tick(prep, a_market(prep.history), curve_on(as_of))
-    axes = axes_of(prep)
     for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01):
-        for bucket in Bucket:
-            # By reference: no numpy call at all and nothing allocated beyond the record.
-            assert numpy_calls(lambda r=risk, b=bucket: risk_view(result, r, b)) == {}
-            assert least_peak(lambda r=risk, b=bucket: risk_view(result, r, b)) <= SLACK
-    for bucket, union in (
-        (Bucket.DAY, axes.union_days),
-        (Bucket.MONTH, axes.union_months),
-        (Bucket.YEAR, axes.union_years),
-    ):
-        # All three: three zeros over the union, each filled through its saved places; nothing
-        # sorted, nothing summed, nothing unique.
+        # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
+        # month and by year, since #186, one zeros over the display axis filled through the saved
+        # places, eight bytes a row.
+        assert numpy_calls(lambda r=risk: risk_view(result, r, Bucket.DAY)) == {}
+        assert least_peak(lambda r=risk: risk_view(result, r, Bucket.DAY)) <= SLACK
+        for bucket in (Bucket.MONTH, Bucket.YEAR):
+            view = risk_view(result, risk, bucket)
+            assert numpy_calls(lambda r=risk, b=bucket: risk_view(result, r, b)) == {
+                "numpy.zeros": 1
+            }
+            assert least_peak(lambda r=risk, b=bucket: risk_view(result, r, b)) <= (
+                8 * view.dates.size + SLACK
+            )
+    for bucket in Bucket:
+        # All three: three zeros over the axis, each filled through its saved places; nothing
+        # sorted, nothing summed, nothing unique; by month and by year the saved refusals read.
+        view = risk_view(result, Risk.ALL, bucket)
         assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 3}
+        selected = (
+            {"_day_view": 1}
+            if bucket is Bucket.DAY
+            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 3}
+        )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
-            "_observation_view": 1,
-            "_payment_view": 1,
-            "_union_view": 1,
+            **selected,
+            "placed": 3,
         }
         assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
-            24 * union.size + SLACK
+            24 * view.dates.size + SLACK
         )

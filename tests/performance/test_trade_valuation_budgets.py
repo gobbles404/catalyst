@@ -173,8 +173,15 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_PrepareTrades": 1,
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #186
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
         "_publish": 1,
     }
 
@@ -294,6 +301,8 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "DiscountCurve.max_date": 1,
         "Market.live_prices": 1,
         "_discounted": 1,
+        "early_risk": 2,  # since #186
+        "early_fact": 4,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
         "_publish": 1,
@@ -313,16 +322,24 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2, bilateral["template"]), sheet["history"])
     discounted = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
     live = bridge.live_handles()
-    views = {
-        "nominal_delta": {"_observation_view": 1},
-        "delta": {"_observation_view": 1},
-        "dv01": {"_payment_view": 1},
-    }
-    for results, everything in (
-        (cleared, {"_observation_view": 1}),
-        (discounted, {"_observation_view": 1, "_payment_view": 1, "_union_view": 1}),
-    ):
-        for risk, selected in (*views.items(), ("all", everything)):
+
+    def selected(on_curve: bool, risk: str, bucket: str) -> dict[str, int]:
+        # By day, by reference, all three of a bilateral result copied through the day union;
+        # by month and by year, since #186, the display axis, the saved refusals read for every
+        # risk shown and a copy per column, a cleared result's DV01 nothing to copy or refuse.
+        if bucket == "day":
+            copies = {"placed": 3} if risk == "all" and on_curve else {}
+            return {"_day_view": 1, **copies}
+        if risk == "dv01":
+            shown = {"EarlyRisk.refuse": 1, "placed": 1} if on_curve else {}
+            return {"_period_view": 1, "_saved": 1, **shown}
+        if risk == "all":
+            n = 3 if on_curve else 2
+            return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": n, "placed": n}
+        return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 1, "placed": 1}
+
+    for results, on_curve in ((cleared, False), (discounted, True)):
+        for risk in ("nominal_delta", "delta", "dv01", "all"):
             for bucket in ("day", "month", "year"):
                 profile = call_profile(
                     lambda handle=results, risk=risk, bucket=bucket: PATH["_ReportRisk"](
@@ -339,7 +356,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
                     "TradeResults.report": 1,  # the result's own selection, since #180
                     "risk_view": 1,
-                    **selected,
+                    **selected(on_curve, risk, bucket),
                     "_risk_table": 1,
                     "MixedArray.table": 2,  # the valuation day and the dates to serials
                     "_table_column": 2,
@@ -426,7 +443,15 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
         "_summed": 7,
         "_compensated": 11,
         "_outrun": 3,
-        "_report_axes": 3,
+        "_report_axes": 1,
+        "_period_report_axes": 2,
+        "period_start": 2,
+        "places_from": 4,
+        "rows_through": 4,
+        "display_periods": 2,
+        "_early_lots": 2,
+        "early_risk": 3,
+        "early_fact": 6,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 20,
         "_publish": 1,
@@ -435,15 +460,20 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
     # handles and at twenty-four, as test_aggregate_budgets.py pins them; before #180's review a
     # look per text cell counted the texts before it, n squared over the range.
     assert numpy_calls(lambda: PATH["_AggregateResults"](cells)) == {
+        "generic.astype": 2,  # the valuation day to its month and its year, since #186
         "ndarray.any": 11,
-        "ndarray.flatten": 16,
-        "ndarray.searchsorted": 19,
-        "ndarray.setflags": 41,
-        "ndarray.sort": 16,
+        "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
+        "ndarray.flatten": 10,
+        "ndarray.nonzero": 6,  # the looks for risk before the start, three measures by two buckets
+        "ndarray.ravel": 6,
+        "ndarray.searchsorted": 15,
+        "ndarray.setflags": 33,
+        "ndarray.sort": 10,
         "numpy._make_extobj": 11,
-        "numpy._unique_hash": 16,
+        "numpy._unique_hash": 10,
+        "numpy.arange": 2,  # the two display axes
         "numpy.array": 2,
-        "numpy.asanyarray": 32,
+        "numpy.asanyarray": 26,
         "numpy.zeros": 22,
         "ufunc.reduce": 11,
     }
@@ -463,11 +493,13 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
     live = bridge.live_handles()
     # The collection's handle resolved by the two-kind rule, the two words chosen, the collection's
     # own selection with a copy per column, and #178's rectangle; nothing summed, nothing published.
-    for risk, selected in (
-        ("nominal_delta", {"_lots": 1, "_placed": 1}),
-        ("delta", {"_discounted_lots": 1, "_placed": 1}),
-        ("dv01", {"_dv01": 1, "_placed": 1}),
-        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "_placed": 3}),
+    # By month and by year, since #186, the saved facts read: the one index group's for a delta,
+    # the one rate group's for the DV01, all three under all.
+    for risk, selected, refused in (
+        ("nominal_delta", {"_lots": 1, "placed": 1}, 1),
+        ("delta", {"_discounted_lots": 1, "placed": 1}, 1),
+        ("dv01", {"_dv01": 1, "placed": 1}, 1),
+        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "placed": 3}, 3),
     ):
         for bucket in ("day", "month", "year"):
             profile = call_profile(
@@ -484,6 +516,8 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
                 "AggregateResults.report": 1,
                 "aggregate_view": 1,
                 "_axes_of": 1,
+                "_refuse_early": 1,  # since #186; the saved refusals read by month and by year
+                **({} if bucket == "day" else {"_early_of": 1, "EarlyRisk.refuse": refused}),
                 **selected,
                 "_risk_table": 1,
                 "MixedArray.table": 2,

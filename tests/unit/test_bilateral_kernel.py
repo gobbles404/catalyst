@@ -408,11 +408,11 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
     np.testing.assert_allclose(
         result.discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.months, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(prep.encoded.contract_months, dates("2027-01-01", "2029-01-01"))
     np.testing.assert_allclose(
         result.discounted_monthly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    np.testing.assert_array_equal(prep.encoded.years, dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_array_equal(prep.encoded.contract_years, dates("2027-01-01", "2029-01-01"))
     np.testing.assert_allclose(
         result.discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
@@ -504,6 +504,7 @@ def test_the_preparation_maps_the_unpaid_payment_days_once_for_the_ticks() -> No
         counter,
     )
     assert counter.freeze().as_dict() == {
+        "display_periods": 28,
         "fixings_read": 0,
         "payment_days_mapped": 2,
         "prepared_slots": 2,
@@ -615,9 +616,11 @@ def axes_of(prep: PreparedTrades) -> PaymentAxes:
 
 def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> None:
     # Two groups paying a year apart: two payment days in two months of two years, and on the
-    # unions the observation day, its month and its year a third entry before them, every place
-    # saved and every array frozen; the encoding counts the distinct payment days; the cleared
-    # twin and the physical one make no axes at all.
+    # day union the observation day a third entry before them, every place saved and every
+    # array frozen; the encoding counts the distinct payment days; the cleared twin and the
+    # physical one make no axes at all. Since #186 the month and year displays are the
+    # preparation's: from the valuation day's period, the observation's own, through the last
+    # payment period, every saved period placed from the start.
     counter = WorkCounter()
     terms = terms_of()
     axes = encoded(terms, observed_of(terms), UNITS, counter).payment_axes
@@ -632,14 +635,17 @@ def test_the_encoding_makes_the_payment_axes_once_for_a_bilateral_batch() -> Non
     np.testing.assert_array_equal(axes.union_days, dates(AS_OF, A_YEAR, TWO_YEARS))
     np.testing.assert_array_equal(axes.observed_in_days, [0])
     np.testing.assert_array_equal(axes.paid_in_days, [1, 2])
-    firsts = dates("2027-01-01", "2028-01-01", "2029-01-01")
-    np.testing.assert_array_equal(axes.union_months, firsts)
-    np.testing.assert_array_equal(axes.observed_in_months, [0])
-    np.testing.assert_array_equal(axes.paid_in_months, [1, 2])
-    np.testing.assert_array_equal(axes.union_years, firsts)
-    np.testing.assert_array_equal(axes.observed_in_years, [0])
-    np.testing.assert_array_equal(axes.paid_in_years, [1, 2])
     assert all(not getattr(axes, field.name).flags.writeable for field in fields(axes))
+    prep = prepared_on(terms)
+    assert (prep.by_month.delta_rows, prep.by_month.dv01_rows) == (1, 25)
+    np.testing.assert_array_equal(prep.by_month.contract_in, [0])
+    np.testing.assert_array_equal(prep.by_month.paid_in, [12, 24])
+    assert (prep.by_year.delta_rows, prep.by_year.dv01_rows) == (1, 3)
+    np.testing.assert_array_equal(
+        prep.by_year.periods, dates("2027-01-01", "2028-01-01", "2029-01-01")
+    )
+    assert (prep.by_month.contract_from, prep.by_month.paid_from) == (0, 0)
+    assert not prep.by_month.periods.flags.writeable and not prep.by_year.periods.flags.writeable
     for other in (terms_of(route=Route.CLEARED), terms_of(settlement=Settlement.PHYSICAL)):
         counter = WorkCounter()
         assert encoded(other, observed_of(other), UNITS, counter).payment_axes is None
@@ -700,13 +706,12 @@ def test_groups_paying_on_one_day_share_it_and_days_in_one_month_share_the_month
     np.testing.assert_array_equal(axes.months, dates("2027-12-01", "2028-01-01"))
     np.testing.assert_array_equal(axes.years, dates("2027-01-01", "2028-01-01"))
     np.testing.assert_array_equal(axes.year_of_month, [0, 1])
-    np.testing.assert_array_equal(axes.union_years, dates("2027-01-01", "2028-01-01"))
-    np.testing.assert_array_equal(axes.observed_in_years, [0])
-    np.testing.assert_array_equal(axes.paid_in_years, [0, 1])
-    np.testing.assert_array_equal(
-        axes.union_months, dates("2027-01-01", "2027-12-01", "2028-01-01")
-    )
-    np.testing.assert_array_equal(axes.paid_in_months, [1, 2])
+    # The displays, since #186: by year 2027 and 2028, both payment years placed; by month
+    # January 2027 through January 2028, the two payment months the 12th and 13th rows.
+    assert (straddle.by_year.delta_rows, straddle.by_year.dv01_rows) == (1, 2)
+    np.testing.assert_array_equal(straddle.by_year.paid_in, [0, 1])
+    assert (straddle.by_month.delta_rows, straddle.by_month.dv01_rows) == (1, 13)
+    np.testing.assert_array_equal(straddle.by_month.paid_in, [11, 12])
 
 
 def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -> None:
@@ -737,8 +742,12 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (15.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    assert delta.dates is prep.encoded.months
-    assert delta.columns[0] is result.discounted_monthly_lots
+    # Since #186 the month view is dense from the valuation month: January 2027 through
+    # January 2029, F27's lots first and F29's last, nothing between.
+    assert delta.dates.size == 25
+    np.testing.assert_array_equal(delta.dates[[0, 24]], dates("2027-01-01", "2029-01-01"))
+    np.testing.assert_allclose(delta.columns[0][[0, 24]], [9.0, 4.5], **TIGHT)
+    assert not delta.columns[0][1:24].any()
     assert delta.labels == ALL_LABELS[1:2]
     assert delta.totals == (pytest.approx(13.5, **CLOSE),)
     dv01 = risk_view(result, Risk.DV01, Bucket.DAY)
@@ -757,9 +766,9 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     np.testing.assert_allclose(everything.columns[1], [9.0, 4.5, 0.0], **TIGHT)
     np.testing.assert_allclose(everything.columns[2], [0.0, first, second], **TIGHT)
     by_year = risk_view(result, Risk.ALL, Bucket.YEAR)
-    np.testing.assert_array_equal(by_year.dates, dates("2027-01-01", "2029-01-01"))
-    np.testing.assert_allclose(by_year.columns[0], [10.0, 5.0], **TIGHT)
-    np.testing.assert_allclose(by_year.columns[2], [0.0, first + second], **TIGHT)
+    np.testing.assert_array_equal(by_year.dates, dates("2027-01-01", "2028-01-01", "2029-01-01"))
+    np.testing.assert_allclose(by_year.columns[0], [10.0, 0.0, 5.0], **TIGHT)
+    np.testing.assert_allclose(by_year.columns[2], [0.0, 0.0, first + second], **TIGHT)
 
 
 def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_arrays() -> None:
@@ -770,7 +779,8 @@ def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_array
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (0.0,)
     delta = risk_view(result, Risk.DELTA, Bucket.MONTH)
-    assert delta.dates is prep.encoded.months and delta.columns[0] is prep.monthly_lots
+    np.testing.assert_array_equal(delta.dates, prep.encoded.contract_months)
+    np.testing.assert_array_equal(delta.columns[0], prep.monthly_lots)
     dv01 = risk_view(result, Risk.DV01, Bucket.YEAR)
     assert dv01.dates.size == 0 and dv01.columns[0].size == 0 and dv01.totals == (0.0,)
     assert dv01.labels == ("cleared USD dv01 [USD per basis point]",)

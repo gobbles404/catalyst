@@ -172,7 +172,12 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     np.testing.assert_array_equal(agg.by_day.union, dates(AS_OF, A_YEAR, TWO_YEARS))
     np.testing.assert_array_equal(agg.by_day.observed_in_union[0], [0])
     np.testing.assert_array_equal(agg.by_day.paid_in_union[0], [1, 2])
-    np.testing.assert_array_equal(agg.by_month.union, dates(JAN_27, JAN_28, JAN_29))
+    # Since #186 the month axis is dense from the valuation month: January 2027 through January
+    # 2029, the contract month its first row and the two payment months the 13th and the 25th.
+    assert agg.by_month.union.size == 25 and agg.by_month.observed.size == 1
+    np.testing.assert_array_equal(agg.by_month.union[[0, 12, 24]], dates(JAN_27, JAN_28, JAN_29))
+    np.testing.assert_array_equal(agg.by_month.paid_in[0], [12, 24])
+    assert agg.by_month.observed_from == (0,) and agg.by_month.paid_from == (0,)
     # Two occurrences, one group of each kind; the entries of every saved vector aligned once,
     # eight over the index's four axes and six over the curve's three; eleven reductions; the
     # three buckets' axes, six coordinates each.
@@ -181,7 +186,7 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
         "entries_aligned": 14,
         "index_groups": 1,
         "rate_groups": 1,
-        "report_coordinates": 18,
+        "report_coordinates": 64,
         "sources_collected": 2,
     }
 
@@ -241,7 +246,7 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
         "entries_aligned": 25,
         "index_groups": 2,
         "rate_groups": 1,
-        "report_coordinates": 20,
+        "report_coordinates": 66,
         "sources_collected": 4,
     }
 
@@ -443,7 +448,7 @@ def test_curves_group_by_object_and_currency_and_are_numbered_by_first_appearanc
     assert agg.currencies == ("USD", "CENT")
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
     assert view.labels == (CURVE_1, "curve_1 CENT dv01 [CENT per basis point]")
-    np.testing.assert_allclose(view.columns[1], [-0.95, 1.8], **TIGHT)
+    np.testing.assert_allclose(view.columns[1], [0.0, -0.95, 1.8], **TIGHT)  # 2027 to 2029
     assert view.totals[1] == pytest.approx(0.85, **CLOSE)
 
 

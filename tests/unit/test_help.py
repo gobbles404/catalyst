@@ -695,19 +695,21 @@ def test_the_two_reports_explain_themselves() -> None:
         (
             "risk",
             "Which risk: nominal_delta, delta, dv01 or all, exactly so; the deltas in lots of "
-            "the index's reporting specification by observation day, the DV01 in the currency "
-            "per basis point by payment day.",
+            "the index's reporting specification, by observation day or by pricing contract "
+            "month or year, the DV01 in the currency per basis point by payment day, month or "
+            "year.",
         ),
         (
             "bucket",
-            "What to sum by: day, month or year, exactly so; a month or a year is labelled by "
-            "its first day, and the Total is the saved number.",
+            "What to sum by: day, month or year, exactly so; a month or a year is the pricing "
+            "contract's for the deltas and the payment's for the DV01, labelled by its first "
+            "day, and the Total is the saved number.",
         ),
     ]
     assert description == (
-        "Reports one risk of a batch or a collection from its results, or all three, by day, "
-        "calendar month or calendar year: the saved Total first, then one row per date, the "
-        "deltas on observation days and the DV01 on payment days, as evaluation stored them."
+        "Reports one risk of a batch or a collection, or all three, by day, month or year: the "
+        "saved Total first, then a row per period, the deltas by observation day or by pricing "
+        "contract month or year, the DV01 by payment period, as evaluation stored them."
     )
     description, arguments, hidden = SPECS["_AggregateResults"]
     assert not hidden and arguments == [

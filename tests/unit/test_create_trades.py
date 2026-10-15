@@ -2709,8 +2709,8 @@ DECEMBER_PRICING_DAYS = ethane_days("2026-12-01", "2027-01-01")  # the same holi
 def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_year() -> None:
     # Two groups, Z26 paying 4 January and Z26 paying 31 December, 23 slots: the asian's 22 days
     # and the pen's one, 30 December, which the asian observes too; the days axis is December's 22
-    # pricing days once, every one priced by Z26, the month axis 1 December and the year 1 January
-    # 2026, the buckets that stand whatever fixes.
+    # pricing days once, every one priced by Z26, and since #186 the month axis Z26's own month,
+    # 1 December, and the year axis 1 January 2026, the buckets that stand whatever fixes.
     batch, _ = created(MONTHLY, ASIAN_AND_PEN, PEN_ASIAN_TEMPLATE)
     enc = batch.encoded
     assert enc.slot_group.size == 23 and enc.group_contract.size == 2
@@ -2719,10 +2719,10 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
     assert len(DECEMBER_PRICING_DAYS) == 22
     assert [str(d) for d in enc.days] == DECEMBER_PRICING_DAYS
     assert [MONTHLY.schedule.codes[int(r)] for r in enc.day_reference] == ["Z26"] * 22
-    assert [str(m) for m in enc.months] == ["2026-12-01"]
-    assert [str(y) for y in enc.years] == ["2026-01-01"]
-    np.testing.assert_array_equal(enc.month_of_day, [0] * 22)
-    np.testing.assert_array_equal(enc.year_of_month, [0])
+    assert [str(m) for m in enc.contract_months] == ["2026-12-01"]
+    assert [str(y) for y in enc.contract_years] == ["2026-01-01"]
+    np.testing.assert_array_equal(enc.contract_month_of_reference, [0])
+    np.testing.assert_array_equal(enc.contract_year_of_month, [0])
     # The reversed rows give the same axes; with the pen at +2bd both pay 4 January, one group
     # and 22 slots, the axes the same.
     reversed_rows = {key: list(reversed(values)) for key, values in ASIAN_AND_PEN.items()}
@@ -2736,7 +2736,7 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
     )
     assert later.encoded.slot_group.size == 22 and later.encoded.group_contract.size == 1
     np.testing.assert_array_equal(later.encoded.days, enc.days)
-    np.testing.assert_array_equal(later.encoded.months, enc.months)
+    np.testing.assert_array_equal(later.encoded.contract_months, enc.contract_months)
 
 
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
