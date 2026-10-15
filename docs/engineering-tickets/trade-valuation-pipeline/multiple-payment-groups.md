@@ -319,7 +319,7 @@ is the page; [prepare-trades.md](../../library/trades/prepare-trades.md),
   ticks within the one-day batch's ceilings per slot. The batch of 2,500 rows keeps nothing more
   per row, the groups being per group, and its pin stands at 232 a row.
 - **Not in this slice.** No mixed schedule methods, quantity units or quantity bases in one batch,
-  the next slice; no discounting, DV01 convention, mixed route, delivery or margining; bilateral
+  the next slice, built in #163; no discounting, DV01 convention, mixed route, delivery or margining; bilateral
   evaluation still refused; the physical readback unchanged, paying on no day; no report per trade
   or per group; the lifetime example not extended, its one-group chain reading its settled column
   one further right, the smoke, the host and the kept workbook carrying the two-group pair.

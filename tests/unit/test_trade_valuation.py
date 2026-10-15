@@ -765,8 +765,8 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
     )
     assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the penultimate method; a penultimate future is cash settled on the business day "
-        "before its contract's expiry"
+        "with the penultimate method of trade 'PHH-1' at row 1; a penultimate future is cash "
+        "settled on the business day before its contract's expiry"
     )
 
 
@@ -1317,8 +1317,8 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_she
     physical = l3d_template(["2026-01-01"], "physical")
     assert ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], rows(L3D_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the last3day method; a last3day future is cash settled on the average of its last "
-        "three pricing days"
+        "with the last3day method of trade 'A' at row 1; a last3day future is cash settled on the "
+        "average of its last three pricing days"
     )
 
 
@@ -1581,8 +1581,8 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
     physical = asian_template(["2027-01-01"], "physical")
     assert ENTRY["_CreateTrades"](ethane["index"], ethane["headers"], rows(ETHANE_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the asian method; an asian future is cash settled on the average of its month's "
-        "pricing days"
+        "with the asian method of trade 'A' at row 1; an asian future is cash settled on the "
+        "average of its month's pricing days"
     )
 
 
@@ -2015,3 +2015,242 @@ def test_two_payment_days_equal_their_singletons_and_matching_days_compress_on_t
     _, prepared, results = pays_state(pays, "2026-12-07", (80.0,), one_group)
     assert len(spilled(ENTRY["util_ReadHandle"](prepared))) == 5
     assert valued(results) == (pytest.approx(150), 0.0, 0.0)
+
+
+# --- mixed fields in one batch through the seam, mixed-trade-fields.md ----------------------------
+# The ticket's example on the sheet: the MIXED index, USD per GAL, GAL and BBL specifications of one
+# unit each, X26, Z26, F27 and G27 expiring 30 November 2026, 31 December, 29 January 2027 and
+# 26 February, the market closed on 25 December; a template of six fields, the route, the
+# settlement, the trade date, the price of 10, +1bd and a payment calendar closed on 1 January; the
+# ticket's seven columns with each row's unit, basis, method and clearing house. Every settle 11,
+# the projection 12: 256 and 128 on 1 December, 194 and 66 on the 30th, 275 of mark with -62 of cash
+# and 85 on the 31st, 190 unpaid on 1 January, 128 of cash on the 4th.
+MIXED_FIELDS = (
+    "route",
+    "settlement_method",
+    "trade_date",
+    "fixed_price",
+    "payment_time_lag",
+    "payment_holiday_calendar",
+)
+MIXED_HEADERS = (
+    "trade_id",
+    "contract_code",
+    "quantity",
+    "quantity_unit",
+    "quantity_per",
+    "schedule_method",
+    "clearing_house",
+)
+MIXED_A: list[object] = ["A", "Z26", 1.0, "BBL", "month", "lastday", "Clearer A"]
+MIXED_B: list[object] = ["B", "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B"]
+MIXED_C: list[object] = ["C", "Z26", 3.0, "BBL", "month", "last3day", "Clearer A"]
+MIXED_D: list[object] = ["D", "Z26", 22.0, "GAL", "month", "asian", "Clearer B"]
+MIXED_HOLIDAYS = ["2026-12-25"]
+MIXED_DECEMBER = [
+    str(d)
+    for d in np.arange(np.datetime64("2026-12-01"), np.datetime64("2027-01-01"))
+    if np.is_busday(d, holidays=np.array(MIXED_HOLIDAYS, dtype="datetime64[D]"))
+]
+MIXED_SETTLES = {d: 11.0 for d in MIXED_DECEMBER}
+MIXED_QUOTES = (12.0, 13.0, 14.0)
+MIXED_LATER = (13.0, 14.0)
+MIXED_STATES = [
+    ("2026-12-01", MIXED_QUOTES, 256, 0, 128),
+    ("2026-12-30", MIXED_QUOTES, 194, 0, 66),
+    ("2026-12-31", MIXED_QUOTES, 275, -62, 85),
+    ("2027-01-01", MIXED_LATER, 190, -62, 0),
+    ("2027-01-04", MIXED_LATER, 0, 128, 0),
+]
+MIXED_IDS = [
+    "1 Dec, everything live",
+    "30 Dec, the 29th and before fixed",
+    "31 Dec, B paid",
+    "1 Jan, everything fixed, the rest unpaid",
+    "4 Jan, both paid",
+]
+
+
+@pytest.fixture(scope="module")
+def mixed() -> dict[str, Any]:
+    schedule = ENTRY["_CreateFuturesSchedule"](
+        rows(["X26"], ["Z26"], ["F27"], ["G27"]),
+        column([serial(d) for d in ("2026-11-30", "2026-12-31", "2027-01-29", "2027-02-26")]),
+        bridge.MISSING,
+    )
+    holidays = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in MIXED_HOLIDAYS]))
+    conventions = ENTRY["_CreateIndexConventions"]("USD", "GAL", "USD", "VOLUME", "GAL")
+    specifications = ENTRY["_CreateContractSpecifications"](
+        row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"),
+        rows(["GAL", 1.0, "GAL", 0.0, 0.0], ["BBL", 1.0, "BBL", 0.0, 0.0]),
+    )
+    index = str(ENTRY["_CreateIndex"]("MIXED", schedule, conventions, specifications, holidays))
+    payments = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
+    template = ENTRY["_CreateTradeTemplate"](
+        "future",
+        row(*MIXED_FIELDS),
+        row("cleared", "financial", serial("2026-11-30"), 10.0, "+1bd", payments),
+    )
+    headers = row(*MIXED_HEADERS)
+    return {
+        "index": index,
+        "template": template,
+        "headers": headers,
+        "trades": ENTRY["_CreateTrades"](
+            index, headers, rows(MIXED_A, MIXED_B, MIXED_C, MIXED_D), template
+        ),
+    }
+
+
+def mixed_state(
+    mixed: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    trades: object | None = None,
+    settles: dict[str, float] = MIXED_SETTLES,
+) -> tuple[str, str, str]:
+    history = a_history(mixed["index"], "2026-11-30", as_of, MIXED_HOLIDAYS, settles)
+    market = a_market(history, "MIXED", *quotes)
+    prepared = ENTRY["_PrepareTrades"](mixed["trades"] if trades is None else trades, history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.mark.parametrize(("as_of", "quotes", "mark", "cash", "delta"), MIXED_STATES, ids=MIXED_IDS)
+def test_the_mixed_batch_values_on_the_sheet_as_the_ticket_says(
+    mixed: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, prepared, results = mixed_state(mixed, as_of, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per USD/GAL"
+    slots = spilled(ENTRY["util_ReadHandle"](prepared))[2:]
+    assert len(slots) == 23 and [line[0] for line in slots] == ["Z26"] * 23
+    assert [line[2] for line in slots] == [serial("2026-12-31")] + [serial("2027-01-04")] * 22
+    assert [line[4] for line in slots] == [as_of >= "2026-12-31"] + [as_of >= "2027-01-04"] * 22
+    table = spilled(ENTRY["util_ReadHandle"](results))[2:]
+    assert [line[6] for line in table] == [pytest.approx(delta)] * 23
+
+
+def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any]) -> None:
+    # A strip beside the four rows, S the whole of December and January under asian in gallons a
+    # month: its two components show S's choices, not row 1's.
+    strip: list[object] = ["S", "Z26-F27", 5.0, "GAL", "month", "asian", "Clearer B"]
+    handle = ENTRY["_CreateTrades"](
+        mixed["index"],
+        mixed["headers"],
+        rows(MIXED_A, MIXED_B, MIXED_C, MIXED_D, strip),
+        mixed["template"],
+    )
+    batch = spilled(ENTRY["util_ReadHandle"](handle))
+    columns = batch[0]
+
+    def column_of(name: str) -> list[object]:
+        return [line[columns.index(name)] for line in batch[2:]]
+
+    assert column_of("row") == [1.0, 2.0, 3.0, 4.0, 5.0, 5.0]
+    assert column_of("contract_code") == ["Z26", "Z26", "Z26", "Z26", "Z26", "F27"]
+    assert column_of("schedule_method") == [
+        "lastday",
+        "penultimate",
+        "last3day",
+        "asian",
+        "asian",
+        "asian",
+    ]
+    assert column_of("quantity_unit") == ["BBL", "GAL", "BBL", "GAL", "GAL", "GAL"]
+    assert column_of("quantity_per") == ["month", "calday", "month", "month", "month", "month"]
+    assert column_of("clearing_house") == [
+        "Clearer A",
+        "Clearer B",
+        "Clearer A",
+        "Clearer B",
+        "Clearer B",
+        "Clearer B",
+    ]
+    assert column_of("quantity") == [1.0, -2.0, 3.0, 22.0, 5.0, 5.0]
+    assert column_of("component_quantity") == [1.0, -62.0, 3.0, 22.0, 5.0, 5.0]
+    assert column_of("quote_quantity") == [42.0, -62.0, 126.0, 22.0, 5.0, 5.0]
+    assert column_of("payment_time_lag") == ["+1bd"] * 6
+    assert column_of("payment_date") == [
+        serial("2027-01-04"),
+        serial("2026-12-31"),
+        serial("2027-01-04"),
+        serial("2027-01-04"),
+        serial("2027-01-04"),
+        serial("2027-02-01"),
+    ]
+    assert column_of("offset") == [-420.0, 620.0, -1_260.0, -220.0, -50.0, -50.0]
+
+
+def test_a_tick_moves_the_mixed_batch_and_the_old_results_stand(mixed: dict[str, Any]) -> None:
+    history, prepared, results = mixed_state(mixed, "2026-12-30", MIXED_QUOTES)
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "MIXED", 13.0, 13.0, 14.0))
+    assert valued(str(ticked)) == (pytest.approx(260), 0.0, pytest.approx(66))
+    assert valued(results) == (pytest.approx(194), 0.0, pytest.approx(66))
+    _, again, corrected = mixed_state(
+        mixed, "2026-12-30", MIXED_QUOTES, settles={**MIXED_SETTLES, "2026-12-29": 12.0}
+    )
+    assert again != prepared and valued(corrected) == (pytest.approx(237), 0.0, pytest.approx(66))
+
+
+def test_the_mixed_batch_equals_its_singletons_on_the_sheet_and_a_uniform_field_either_way(
+    mixed: dict[str, Any],
+) -> None:
+    def marked(lines: Cells, as_of: str, quotes: tuple[float, ...]) -> tuple[float, float, float]:
+        batch = ENTRY["_CreateTrades"](mixed["index"], mixed["headers"], lines, mixed["template"])
+        return valued(mixed_state(mixed, as_of, quotes, batch)[2])
+
+    for as_of, quotes, mark, cash, delta in MIXED_STATES:
+        alone = [marked(rows(line), as_of, quotes) for line in (MIXED_A, MIXED_B, MIXED_C, MIXED_D)]
+        both = marked(rows(MIXED_A, MIXED_B, MIXED_C, MIXED_D), as_of, quotes)
+        swapped = marked(rows(MIXED_D, MIXED_C, MIXED_B, MIXED_A), as_of, quotes)
+        assert both == swapped == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+        assert both[0] == pytest.approx(sum(one[0] for one in alone))
+        assert both[1] == pytest.approx(sum(one[1] for one in alone))
+    # The method from the template, the ticket without its column, or the ticket's column of one
+    # word: the same batch; and both at once refused as any field is.
+    without = row(*(name for name in MIXED_HEADERS if name != "schedule_method"))
+    lastday_template = ENTRY["_CreateTradeTemplate"](
+        "future",
+        row(*MIXED_FIELDS, "schedule_method"),
+        row(
+            "cleared",
+            "financial",
+            serial("2026-11-30"),
+            10.0,
+            "+1bd",
+            ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])),
+            "lastday",
+        ),
+    )
+    shorter = [[*line[:5], *line[6:]] for line in (MIXED_A, MIXED_B, MIXED_C, MIXED_D)]
+    by_template = ENTRY["_CreateTrades"](mixed["index"], without, rows(*shorter), lastday_template)
+    uniform = [[*line[:5], "lastday", line[6]] for line in (MIXED_A, MIXED_B, MIXED_C, MIXED_D)]
+    by_ticket = ENTRY["_CreateTrades"](
+        mixed["index"], mixed["headers"], rows(*uniform), mixed["template"]
+    )
+    for as_of, quotes, *_ in MIXED_STATES[:3]:
+        assert valued(mixed_state(mixed, as_of, quotes, by_template)[2]) == valued(
+            mixed_state(mixed, as_of, quotes, by_ticket)[2]
+        )
+    assert str(
+        ENTRY["_CreateTrades"](mixed["index"], mixed["headers"], rows(*uniform), lastday_template)
+    ) == (
+        "#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the "
+        "ticket, expected by one of them"
+    )
+    assert str(
+        ENTRY["_CreateTrades"](
+            mixed["index"],
+            mixed["headers"],
+            rows(MIXED_A, ["B", "Z26", -2.0, "ICE", "calday", "penultimate", "Clearer B"]),
+            mixed["template"],
+        )
+    ) == (
+        "#ERROR _CreateTrades: ValueError: quantity_unit row 2 is 'ICE', expected one of the "
+        "index's specifications: 'GAL', 'BBL'"
+    )

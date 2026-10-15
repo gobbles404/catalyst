@@ -1028,8 +1028,10 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
 # months, the rows, the days, the anchors and the payment days of the components, the references
 # and the sort that finds the slots, and the masks over them: measured 509,786 bytes at 2,500 rows
 # on 2026-10-04, 508,917 on 2026-10-06, 530,549 on 2026-10-07 with the covered days, 571,112
-# on 2026-10-08 with the two dates and 569,243 the same day with the payment groups by contract and
-# day, which keep nothing per row, about 228 a row, which 232 a row and twice the slack cover;
+# on 2026-10-08 with the two dates, 569,243 the same day with the payment groups by contract and
+# day, which keep nothing per row, and 668,580 the same day with the three selections per row, the
+# unit, the method and the basis, 24 bytes retained a row and their distinct reads' temporaries,
+# about 267 a row, which 272 a row and twice the slack cover;
 # the ticket's own columns are the seam's views and cost nothing here. The expiries are rolled off
 # the index's two holidays, so
 # that Z26 expires on 24 December and not on the closed 25th, and every call measured is checked,
@@ -1098,4 +1100,4 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
         return batch
 
     peak = least_peak(created)
-    assert peak <= 232 * rows + 2 * SLACK
+    assert peak <= 272 * rows + 2 * SLACK

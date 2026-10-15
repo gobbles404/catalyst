@@ -31,7 +31,7 @@ from goosedove.instruments.definitions import FUTURE, NONE, FieldType, Instrumen
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import CONDITIONS, Trades, resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import QuantityPer, Route, ScheduleMethod, Settlement
+from goosedove.trades.terms import BASES, METHODS, QuantityPer, Route, ScheduleMethod, Settlement
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:
@@ -164,12 +164,12 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
     batch, counter = created()
     terms = batch.resolved
     assert terms.instrument is FUTURE and terms.index is NG and terms.schedule is NG.schedule
-    assert terms.specification == 0
+    np.testing.assert_array_equal(terms.specification, [0] * 5)
     assert (terms.route, terms.settlement) == (Route.CLEARED, Settlement.PHYSICAL)
-    assert (terms.schedule_method, terms.quantity_per) == (
-        ScheduleMethod.LASTDAY,
-        QuantityPer.MONTH,
+    np.testing.assert_array_equal(
+        terms.schedule_method, [METHODS.index(ScheduleMethod.LASTDAY)] * 5
     )
+    np.testing.assert_array_equal(terms.quantity_per, [BASES.index(QuantityPer.MONTH)] * 5)
     assert terms.labels == ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
     assert terms.clearing_house == ("CME Clearing",) * 5  # the template's, for every row
     assert terms.broker is None
@@ -706,8 +706,9 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
         if name not in ("payment_time_lag", "payment_holiday_calendar")
     }
     assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' with the last3day method; a "
-        "last3day future is cash settled on the average of its last three pricing days"
+        "settlement_method is 'physical', expected 'financial' with the last3day method of "
+        "trade 'A' at row 1; a last3day future is cash settled on the average of its last three "
+        "pricing days"
     )
 
 
@@ -825,9 +826,9 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_when_the_batch
         ("VOLUME", "GAL"),
     )
     assert refused(closed, {**ASIAN_TICKET, "contract_code": ["G27", "G27"]}, ASIAN_TEMPLATE) == (
-        "G27 has no pricing day from 2027-02-01 to 2027-02-28, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "G27 of trade 'A' at row 1 has no pricing day from 2027-02-01 to 2027-02-28, expected a "
+        "Monday to Friday of the days it covers the index's market is open on; the asian method "
+        "averages the pricing days a component covers"
     )
 
 
@@ -858,8 +859,8 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
         if name not in ("payment_time_lag", "payment_holiday_calendar")
     }
     assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' with the asian method; an asian "
-        "future is cash settled on the average of its month's pricing days"
+        "settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' "
+        "at row 1; an asian future is cash settled on the average of its month's pricing days"
     )
 
 
@@ -906,7 +907,7 @@ def test_100_a_day_is_3000_in_november_3100_in_december_and_2800_and_2900_in_feb
     assert entered == [100, 100, 100, 100]
     assert quoted == [30_000_000, 31_000_000, 28_000_000, 29_000_000]  # lots of 10,000 MMBtu
     batch, _ = created(LEAP, ticket, CALDAY_TEMPLATE)
-    assert batch.resolved.quantity_per is QuantityPer.CALDAY
+    assert (batch.resolved.quantity_per == BASES.index(QuantityPer.CALDAY)).all()
 
 
 def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_100() -> None:
@@ -1070,9 +1071,9 @@ def test_a_part_of_a_month_observes_its_own_pricing_days_and_pays_after_the_last
     assert shorter.resolved.payment is not None
     assert str(shorter.resolved.payment.date[0]) == "2027-01-04"
     assert refused(ETHANE, dated("2026-12-26", "2026-12-27"), ASIAN_TEMPLATE) == (
-        "Z26 has no pricing day from 2026-12-26 to 2026-12-27, expected a Monday to Friday of the "
-        "days it covers the index's market is open on; the asian method averages the pricing days "
-        "a component covers"
+        "Z26 of trade 'P' at row 1 has no pricing day from 2026-12-26 to 2026-12-27, expected a "
+        "Monday to Friday of the days it covers the index's market is open on; the asian method "
+        "averages the pricing days a component covers"
     )
 
 
@@ -1089,10 +1090,24 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
         assert refused(
             ix, dated("2026-12-15", "2026-12-31", 10), {**template, "schedule_method": method}
         ) == (
-            f"Z26 is covered from 2026-12-15 to 2026-12-31, part of its month, expected the whole "
-            f"month under {method}; the expiry-based methods take the contract's month entire, and "
-            "a part of it prices under asian"
+            "Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its "
+            f"month, expected the whole month under {method}; the expiry-based methods take the "
+            "contract's month entire, and a part of it prices under asian"
         )
+    # Two rows, the second a part of its month: the refusal names the second, not the first.
+    two_rows: dict[str, list[object]] = {
+        "trade_id": ["P", "Q"],
+        "trade_date": ["2026-11-20", "2026-11-20"],
+        "start_date": ["2026-12-01", "2026-12-15"],
+        "end_date": ["2026-12-31", "2026-12-31"],
+        "quantity": [10, 10],
+        "fixed_price": [0.25, 0.25],
+    }
+    assert refused(NG, two_rows, NG_TEMPLATE) == (
+        "Z26 of trade 'Q' at row 2 is covered from 2026-12-15 to 2026-12-31, part of its month, "
+        "expected the whole month under lastday; the expiry-based methods take the contract's "
+        "month entire, and a part of it prices under asian"
+    )
 
 
 def test_the_period_form_is_one_of_two_and_the_dates_run_forward() -> None:
@@ -1177,7 +1192,7 @@ WITHOUT_UNIT = {name: value for name, value in NG_TEMPLATE.items() if name != "q
 
 def quote_quantity(ix: Index, unit: str, quantity: float = 2.0, code: str = "Z26") -> float:
     batch, _ = created(ix, one_row(quantity, code), {**NG_TEMPLATE, "quantity_unit": unit})
-    assert batch.resolved.specification == ix.specifications.names.index(unit)
+    assert batch.resolved.specification.tolist() == [ix.specifications.names.index(unit)]
     return float(batch.encoded.quote_quantity.sum())
 
 
@@ -1194,7 +1209,7 @@ def test_a_template_holds_the_name_and_the_index_asked_at_creation_owns_it() -> 
     template = a_template({**NG_TEMPLATE, "quantity_unit": "ICE PHH"})
     assert template.defaults["quantity_unit"] == "ICE PHH"
     with_both = trades(TWO_LOTS, a_ticket(one_row()), template, UNITS, WorkCounter())
-    assert with_both.resolved.specification == 1
+    assert with_both.resolved.specification.tolist() == [1]
     with pytest.raises(ValueError) as refused:
         trades(NG, a_ticket(one_row()), template, UNITS, WorkCounter())
     assert str(refused.value) == (
@@ -1244,10 +1259,10 @@ def test_lot_is_a_name_like_any_other_accepted_only_where_the_index_defines_it()
     assert quote_quantity(with_lot, "LOT") == 20_000.0
 
 
-def test_the_unit_in_the_ticket_names_its_row_and_must_agree_on_every_row() -> None:
+def test_the_unit_in_the_ticket_names_its_row_and_each_row_counts_its_own() -> None:
     template = {name: value for name, value in NG_TEMPLATE.items() if name != "quantity_unit"}
     batch, _ = created(TWO_LOTS, {**NG_TICKET, "quantity_unit": ["ICE PHH"] * 5}, template)
-    assert batch.resolved.specification == 1
+    np.testing.assert_array_equal(batch.resolved.specification, [1] * 5)
     np.testing.assert_array_equal(
         batch.encoded.quote_quantity, [25_000, -10_000, 17_500, -30_000, 25_000]
     )
@@ -1255,10 +1270,12 @@ def test_the_unit_in_the_ticket_names_its_row_and_must_agree_on_every_row() -> N
         "quantity_unit row 1 is 'ICE NG', expected one of the index's specifications: "
         "'NYMEX NG', 'ICE PHH', 'MMBTU'"
     )
+    # Since #163 a row's unit is its own: NG-002 in ICE PHH lots of 2,500 beside the NYMEX rows.
     mixed: list[object] = ["NYMEX NG", "ICE PHH", "NYMEX NG", "NYMEX NG", "NYMEX NG"]
-    assert refused(TWO_LOTS, {**NG_TICKET, "quantity_unit": mixed}, template) == (
-        "quantity_unit row 2 is 'ICE PHH', expected 'NYMEX NG' as at row 1; "
-        "a batch has one quantity_unit"
+    two, _ = created(TWO_LOTS, {**NG_TICKET, "quantity_unit": mixed}, template)
+    np.testing.assert_array_equal(two.resolved.specification, [0, 1, 0, 0, 0])
+    np.testing.assert_array_equal(
+        two.encoded.quote_quantity, [100_000, -10_000, 70_000, -120_000, 100_000]
     )
 
 
@@ -1385,8 +1402,9 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "penultimate"},
-            "settlement_method is 'physical', expected 'financial' with the penultimate method; a"
-            " penultimate future is cash settled on the business day before its contract's expiry",
+            "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+            "trade 'NG-001' at row 1; a penultimate future is cash settled on the business day "
+            "before its contract's expiry",
         ),
         (
             NG_TICKET,
@@ -2133,9 +2151,10 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
             sheet["template"],
         )
     ) == (
-        "#ERROR _CreateTrades: ValueError: Z26 is covered from 2026-12-15 to 2026-12-31, part "
-        "of its month, expected the whole month under lastday; the expiry-based methods take "
-        "the contract's month entire, and a part of it prices under asian"
+        "#ERROR _CreateTrades: ValueError: Z26 of trade 'NG-001' at row 1 is covered from "
+        "2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; "
+        "the expiry-based methods take the contract's month entire, and a part of it prices "
+        "under asian"
     )
     assert str(
         ENTRY["_CreateTrades"](
@@ -2156,3 +2175,133 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
         "#ERROR _CreateTrades: ValueError: contract_code is supplied with start_date, expected one "
         "period form, a contract_code or start_date with end_date"
     )
+
+
+# --- mixed fields in one batch, mixed-trade-fields.md ---------------------------------------------
+# The ticket's four rows of Z26 at 10 on the MIXED index, USD per GAL, GAL and BBL specifications
+# of one unit each, 42 gallons a barrel: A, 1 BBL a month under lastday; B, -2 GAL a day under
+# penultimate; C, 3 BBL a month under last3day; D, 22 GAL a month under asian; each its own unit,
+# basis, method and clearing house in the ticket, the template holding the rest. The kernel tests
+# hold the same rows resolved by hand; here they come through the creator.
+MIXED = an_index(
+    "MIXED",
+    (("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29"), ("G27", "2027-02-26")),
+    ("2026-12-25",),
+    (("GAL", 1.0, "GAL"), ("BBL", 1.0, "BBL")),
+    ("VOLUME", "GAL"),
+)
+MIXED_TEMPLATE: dict[str, object] = {
+    "route": "cleared",
+    "settlement_method": "financial",
+    "trade_date": day("2026-11-30"),
+    "fixed_price": 10.0,
+    "payment_time_lag": "+1bd",
+    "payment_holiday_calendar": holiday_calendar(dates("2027-01-01")),
+}
+MIXED_TICKET: dict[str, list[object]] = {
+    "trade_id": ["A", "B", "C", "D"],
+    "contract_code": ["Z26"] * 4,
+    "quantity": [1, -2, 3, 22],
+    "quantity_unit": ["BBL", "GAL", "BBL", "GAL"],
+    "quantity_per": ["month", "calday", "month", "month"],
+    "schedule_method": ["lastday", "penultimate", "last3day", "asian"],
+    "clearing_house": ["Clearer A", "Clearer B", "Clearer A", "Clearer B"],
+}
+
+
+def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_number() -> None:
+    batch, counter = created(MIXED, MIXED_TICKET, MIXED_TEMPLATE)
+    terms = batch.resolved
+    np.testing.assert_array_equal(terms.specification, [1, 0, 1, 0])
+    np.testing.assert_array_equal(
+        terms.schedule_method,
+        [METHODS.index(ScheduleMethod(str(m))) for m in MIXED_TICKET["schedule_method"]],
+    )
+    np.testing.assert_array_equal(
+        terms.quantity_per,
+        [BASES.index(QuantityPer(str(b))) for b in MIXED_TICKET["quantity_per"]],
+    )
+    np.testing.assert_array_equal(terms.component_quantity, [1.0, -62.0, 3.0, 22.0])
+    assert terms.clearing_house == ("Clearer A", "Clearer B", "Clearer A", "Clearer B")
+    assert terms.payment is not None
+    np.testing.assert_array_equal(
+        terms.payment.date, dates("2027-01-04", "2026-12-31", "2027-01-04", "2027-01-04")
+    )
+    enc = batch.encoded
+    np.testing.assert_allclose(enc.quote_quantity, [42.0, -62.0, 126.0, 22.0])
+    np.testing.assert_allclose(enc.offset, [-420.0, 620.0, -1_260.0, -220.0])
+    np.testing.assert_array_equal(enc.group_contract, [1, 1])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-31", "2027-01-04"))
+    np.testing.assert_allclose(enc.offset_of_group, [620.0, -1_900.0])
+    np.testing.assert_allclose(enc.slot_exposure, [-62.0] + [1.0] * 19 + [43.0, 43.0, 85.0])
+    assert counter.freeze().as_dict() == {
+        "encoded_components": 4,
+        "encoded_groups": 2,
+        "encoded_observations": 27,
+        "encoded_slots": 23,
+        "resolved_components": 4,
+        "resolved_occurrences": 4,
+        "schedule_codes_read": 4,
+    }
+
+
+def test_a_uniform_field_from_the_template_or_the_ticket_makes_the_same_batch() -> None:
+    # Each of the three fields held by the template, or repeated down a ticket column, gives the
+    # same encoding through the one path; held by both it is refused as any field is.
+    for name, value in (
+        ("schedule_method", "asian"),
+        ("quantity_unit", "GAL"),
+        ("quantity_per", "calday"),
+    ):
+        ticket = {k: v for k, v in MIXED_TICKET.items() if k != name}
+        by_template, _ = created(MIXED, ticket, {**MIXED_TEMPLATE, name: value})
+        by_ticket, _ = created(MIXED, {**ticket, name: [value] * 4}, MIXED_TEMPLATE)
+        np.testing.assert_allclose(
+            by_ticket.encoded.quote_quantity, by_template.encoded.quote_quantity
+        )
+        np.testing.assert_allclose(
+            by_ticket.encoded.slot_exposure, by_template.encoded.slot_exposure
+        )
+        np.testing.assert_array_equal(
+            by_ticket.encoded.payment_date, by_template.encoded.payment_date
+        )
+        assert refused(MIXED, MIXED_TICKET, {**MIXED_TEMPLATE, name: value}) == (
+            f"{name} is supplied by the template and by the ticket, expected by one of them"
+        )
+
+
+def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
+    assert refused(
+        MIXED, {**MIXED_TICKET, "quantity_unit": ["GAL", "ICE", "BBL", "LOT"]}, MIXED_TEMPLATE
+    ) == ("quantity_unit row 2 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'")
+    assert (
+        refused(
+            MIXED,
+            {**MIXED_TICKET, "schedule_method": ["lastday", "Asian", "x", "asian"]},
+            MIXED_TEMPLATE,
+        )
+        == "schedule_method row 2 is 'Asian', expected lastday, penultimate, last3day or asian"
+    )
+    assert refused(
+        MIXED, {**MIXED_TICKET, "quantity_per": ["month", "day", "calday", "x"]}, MIXED_TEMPLATE
+    ) == ("quantity_per row 2 is 'day', expected month or calday")
+    # A physical batch takes lastday rows alone: B is named with its method, the first row that
+    # is not.
+    physical = {
+        "route": "cleared",
+        "settlement_method": "physical",
+        "trade_date": day("2026-11-30"),
+        "fixed_price": 10.0,
+    }
+    assert refused(MIXED, MIXED_TICKET, physical) == (
+        "settlement_method is 'physical', expected 'financial' with the penultimate method of "
+        "trade 'B' at row 2; a penultimate future is cash settled on the business day before its "
+        "contract's expiry"
+    )
+    lastday_rows: dict[str, list[object]] = {
+        **MIXED_TICKET,
+        "schedule_method": ["lastday"] * 4,
+        "quantity_per": ["month", "calday", "month", "calday"],
+    }
+    batch, _ = created(MIXED, lastday_rows, physical)
+    np.testing.assert_array_equal(batch.resolved.component_quantity, [1.0, -62.0, 3.0, 682.0])

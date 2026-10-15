@@ -99,11 +99,13 @@ def encoded(
     each over the components, the groups, the observations and the slots, and the rules of the
     dated axis and of a financial settlement, checked once, the first failure being the message.
 
-    The quote quantity: the component quantity, the count the terms formed by the basis, the
-    entered quantity times its covered days under calday, times the specification's lot size
-    restates a count of the named row in its lot unit, and the unit tables' factor restates that
-    in the conventions' quote quantity unit, both units of the conventions' quantity type, as the
-    index checked when it was made; one multiplication over the array, the sign kept. The
+    The quote quantity: the component quantity, the count the terms formed by its occurrence's
+    basis, the entered quantity times its covered days under calday, times its occurrence's
+    specification's lot size restates a count of that row in its lot unit, and the unit tables'
+    factor restates that in the conventions' quote quantity unit, both units of the conventions'
+    quantity type, as the index checked when it was made, the lot size and the factor formed once
+    per distinct specification the batch selects and gathered onto the components; one
+    multiplication over the array, the sign kept. The
     coefficient: the quote quantity times the factor from the quote currency to the settlement
     currency, USD or CENT to USD or CENT, so that a price in cents times it is an amount in
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
@@ -138,18 +140,23 @@ def encoded(
     contribution to value.
 
     Work: one component per component, one group per payment group, one observation per
-    observation and one slot per slot, reported to the counter.
+    observation and one slot per slot, reported to the counter; one conversion per distinct
+    specification the batch selects.
     """
     index = terms.index
     conventions = index.conventions
     specifications = index.specifications
-    lot_size = float(specifications.lot_sizes[terms.specification])
-    lot_unit = specifications.lot_units[terms.specification]
-    to_quote_unit = units.factor(
-        conventions.quantity_type, lot_unit, conventions.quote_quantity_unit
-    )
+    selection = terms.specification[terms.occurrence]  # each component's specification row
+    to_quote_unit = np.zeros(len(specifications.names))
+    for row in np.unique(selection):  # the distinct selections of the batch, converted once each
+        chosen = int(row)
+        to_quote_unit[chosen] = float(specifications.lot_sizes[chosen]) * units.factor(
+            conventions.quantity_type,
+            specifications.lot_units[chosen],
+            conventions.quote_quantity_unit,
+        )
     to_currency = units.factor(CURRENCY, conventions.quote_currency_unit, conventions.currency_unit)
-    quote_quantity = terms.component_quantity * (lot_size * to_quote_unit)
+    quote_quantity = terms.component_quantity * to_quote_unit[selection]
     coefficient = quote_quantity * to_currency
     offset = -coefficient * terms.fixed_price
     group_contract, payment_date, group_of_component = _the_groups(terms)
