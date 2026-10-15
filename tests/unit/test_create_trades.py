@@ -700,6 +700,157 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
     )
 
 
+# --- the asian method: every pricing day of the month, one payment after the last -------------
+# asian-trades.md: each component observes every Monday to Friday of its contract's calendar
+# month the index's market is open on, an equal share each, and pays its lag after the last of
+# them. The synthetic ethane index: X26 expiring 30 November 2026, Z26 31 December, F27 29
+# January 2027 and G27 26 February, the market closed on 25 December and 1 January, one
+# specification GAL of one gallon; the payment calendar closed on 1 January.
+
+ETHANE_HOLIDAYS = ("2026-12-25", "2027-01-01")
+ETHANE = an_index(
+    "ETHANE",
+    (("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29"), ("G27", "2027-02-26")),
+    ETHANE_HOLIDAYS,
+    (("GAL", 1.0, "GAL"),),
+    ("VOLUME", "GAL"),
+)
+PAY_JAN_1 = holiday_calendar(dates("2027-01-01"))
+ASIAN_TEMPLATE: dict[str, object] = {
+    **NG_TEMPLATE,
+    "quantity_unit": "GAL",
+    "schedule_method": "asian",
+    "settlement_method": "financial",
+    "clearing_house": "Prototype Clearing",
+    "payment_time_lag": "+2bd",
+    "payment_holiday_calendar": PAY_JAN_1,
+}
+ASIAN_TICKET: dict[str, list[object]] = {
+    "trade_id": ["A", "B"],
+    "trade_date": ["2026-11-20", "2026-11-20"],
+    "contract_code": ["Z26", "Z26"],
+    "quantity": [4_400, -2_200],
+    "fixed_price": [0.25, 0.26],
+}
+
+
+def ethane_days(first: str, after: str) -> list[str]:
+    """Every Monday to Friday from the first day to the day before the next, less the ethane
+    market's holidays: the fixture's own arithmetic."""
+    days = np.arange(np.datetime64(first), np.datetime64(after))
+    return [str(d) for d in days[np.is_busday(days, holidays=dates(*ETHANE_HOLIDAYS))]]
+
+
+DECEMBER_DAYS = ethane_days("2026-12-01", "2027-01-01")
+JANUARY_DAYS = ethane_days("2027-01-01", "2027-02-01")
+
+
+def asian_days(
+    ticket: Mapping[str, list[object]] = ASIAN_TICKET,
+    template: Mapping[str, object] = ASIAN_TEMPLATE,
+    ix: Index = ETHANE,
+) -> tuple[list[int], list[str], list[float], list[str]]:
+    """The batch's observations as it retains them, the component and the day of each and its
+    weight, and each component's payment day."""
+    batch, _ = created(ix, ticket, template)
+    assert batch.resolved.payment is not None
+    obs = batch.encoded.observations
+    return (
+        [int(c) for c in obs.component],
+        [str(d) for d in obs.date],
+        [float(w) for w in obs.weight],
+        [str(d) for d in batch.resolved.payment.date],
+    )
+
+
+def test_asian_observes_the_months_pricing_days_and_pays_after_the_last() -> None:
+    components, days, weights, pays = asian_days()
+    assert len(DECEMBER_DAYS) == 22
+    assert components == [0] * 22 + [1] * 22
+    assert days == DECEMBER_DAYS * 2
+    assert weights == pytest.approx([1 / 22] * 44)
+    assert pays == ["2027-01-05", "2027-01-05"]
+
+
+def test_a_payment_calendar_closed_on_the_fourth_moves_the_payment_and_not_the_days() -> None:
+    closed_fourth = {
+        **ASIAN_TEMPLATE,
+        "payment_holiday_calendar": holiday_calendar(dates("2027-01-01", "2027-01-04")),
+    }
+    components, days, weights, pays = asian_days(template=closed_fourth)
+    assert (components, days, weights) == asian_days()[:3]
+    assert pays == ["2027-01-06", "2027-01-06"]
+
+
+def test_an_asian_strip_observes_each_month_on_its_own_days_and_pays_once_per_month() -> None:
+    strip: dict[str, list[object]] = {
+        "trade_id": ["S"],
+        "trade_date": ["2026-11-20"],
+        "contract_code": ["Z26-F27"],
+        "quantity": [2_200],
+        "fixed_price": [0.25],
+    }
+    components, days, weights, pays = asian_days(strip)
+    assert len(JANUARY_DAYS) == 20
+    assert components == [0] * 22 + [1] * 20
+    assert days == DECEMBER_DAYS + JANUARY_DAYS
+    assert weights == pytest.approx([1 / 22] * 22 + [1 / 20] * 20)
+    assert pays == ["2027-01-05", "2027-02-02"]
+    batch, _ = created(ETHANE, strip, ASIAN_TEMPLATE)
+    np.testing.assert_allclose(batch.encoded.offset, [-550.0, -550.0])
+    np.testing.assert_allclose(batch.encoded.slot_exposure, [100.0] * 22 + [110.0] * 20)
+    twice = {name: values * 2 for name, values in strip.items()}
+    assert asian_days(twice)[3] == ["2027-01-05", "2027-02-02"] * 2
+    batch, _ = created(ETHANE, twice, ASIAN_TEMPLATE)
+    np.testing.assert_allclose(batch.encoded.slot_exposure, [200.0] * 22 + [220.0] * 20)
+
+
+def test_a_month_without_a_pricing_day_is_refused_by_its_contract_when_the_batch_is_made() -> None:
+    closed = an_index(
+        "x",
+        (("F27", "2027-01-29"), ("G27", "2027-02-26"), ("H27", "2027-03-31")),
+        tuple(ethane_days("2027-02-01", "2027-03-01")),
+        (("GAL", 1.0, "GAL"),),
+        ("VOLUME", "GAL"),
+    )
+    assert refused(closed, {**ASIAN_TICKET, "contract_code": ["G27", "G27"]}, ASIAN_TEMPLATE) == (
+        "G27 has no pricing day in 2027-02, expected a Monday to Friday of its month the index's "
+        "market is open on; the asian method averages the pricing days of the contract's month"
+    )
+
+
+def test_an_asian_month_another_contract_prices_is_refused_when_the_batch_is_made() -> None:
+    ng_like = an_index(
+        "x",
+        (
+            ("X26", "2026-10-28"),
+            ("Z26", "2026-11-25"),
+            ("F27", "2026-12-29"),
+            ("G27", "2027-01-27"),
+        ),
+        ("2026-11-26", "2026-12-25"),
+        (("GAL", 1.0, "GAL"),),
+        ("VOLUME", "GAL"),
+    )
+    assert refused(ng_like, ASIAN_TICKET, ASIAN_TEMPLATE) == (
+        "trade 'A' at row 1 observes Z26 on 2026-12-01, a day F27 prices; an observation of a "
+        "contract other than the day's pricing contract has no settle in a futures history, not "
+        "supported"
+    )
+
+
+def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
+    physical = {
+        name: value
+        for name, value in ASIAN_TEMPLATE.items()
+        if name not in ("payment_time_lag", "payment_holiday_calendar")
+    }
+    assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
+        "settlement_method is 'physical', expected 'financial' with the asian method; an asian "
+        "future is cash settled on the average of its month's pricing days"
+    )
+
+
 # --- the quantity unit selects the specification ------------------------------------------------
 # quantity-unit-selection.md: the unit is a name among the index's specifications, exactly as the
 # index spells it, and the quantity counts the row it names. A template holds the name and asks
@@ -931,9 +1082,8 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         ),
         (
             NG_TICKET,
-            {**NG_TEMPLATE, "schedule_method": "asian"},
-            "schedule_method is 'asian', expected lastday, penultimate or last3day, the three "
-            "methods built",
+            {**NG_TEMPLATE, "schedule_method": "Asian"},
+            "schedule_method is 'Asian', expected lastday, penultimate, last3day or asian",
         ),
         (
             NG_TICKET,
@@ -1113,11 +1263,10 @@ def test_a_batch_field_the_ticket_supplies_is_named_with_its_row() -> None:
     asian: dict[str, list[object]] = {
         **NG_TICKET,
         "route": ["cleared"] * 5,
-        "schedule_method": ["asian"] * 5,
+        "schedule_method": ["Asian"] * 5,
     }
     assert refused(NG, asian, without) == (
-        "schedule_method row 1 is 'asian', expected lastday, penultimate or last3day, the three "
-        "methods built"
+        "schedule_method row 1 is 'Asian', expected lastday, penultimate, last3day or asian"
     )
     assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "route": "Cleared"}) == (
         "route is 'Cleared', expected cleared or bilateral"
@@ -1134,7 +1283,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
     ticket: dict[str, list[object]] = {
         **NG_TICKET,
         "quantity_unit": ["ICE PHH"] * 5,
-        "schedule_method": ["asian"] * 5,
+        "schedule_method": ["Asian"] * 5,
         "route": ["Cleared"] * 5,
         "settlement_method": ["Physical"] * 5,
         "quantity_per": ["day"] * 5,
@@ -1149,8 +1298,7 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
         (
             "schedule_method",
             "lastday",
-            "schedule_method row 1 is 'asian', expected lastday, penultimate or last3day, the "
-            "three methods built",
+            "schedule_method row 1 is 'Asian', expected lastday, penultimate, last3day or asian",
         ),
         ("route", "cleared", "route row 1 is 'Cleared', expected cleared or bilateral"),
         (

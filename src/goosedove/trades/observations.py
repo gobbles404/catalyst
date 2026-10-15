@@ -1,9 +1,10 @@
 """The observations of a batch: which days' settles price each component, and with what weight.
 A schedule method is a rule from a component to its observations: lastday and penultimate give
 each component one observation with the whole weight, its contract's expiry day and the business
-day before it, and last3day gives it three with a third each, the expiry day and the two business
-days before it. Tests supply observations of their own through the same builder, a daily toy
-among them, without a public method naming them. docs/library/trades/kernel.md is the page."""
+day before it; last3day gives it three with a third each, the expiry day and the two business
+days before it; asian gives it every pricing day of its contract's calendar month, an equal share
+each. Tests supply observations of their own through the same builder, a daily toy among them,
+without a public method naming them. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
 from typing import assert_never
@@ -99,18 +100,28 @@ def observations(
     return Observations(*columns)
 
 
-def observed(method: ScheduleMethod, index: Index, contract: NDArray[np.intp]) -> Observations:
+def observed(
+    method: ScheduleMethod, index: Index, contract: NDArray[np.intp], months: NDArray[np.int64]
+) -> Observations:
     """The observations a schedule method gives a batch's components, each a row of the index's
     futures schedule, the components in order: lastday, the contract's expiry day with the whole
     weight; penultimate, the business day before it, Monday to Friday less the index's holiday
     calendar, with the whole weight, one business-day offset over the components; last3day, the
     expiry day and the two business days before it, a third each, one business-day offset over
-    the components and the three offsets at once, the three days of a component increasing. An
-    expiry the index's market is closed on is refused by its contract under penultimate and
-    last3day, since the days before a closed expiry are not the last days the market priced the
-    contract, and rolling the expiry would change the schedule the desk gave; under lastday the
-    encoding refuses the observation itself. The method is the resolution's to read before any
-    payment is counted, so that a payment day counts from the component's last observation."""
+    the components and the three offsets at once, the three days of a component increasing;
+    asian, every Monday to Friday of the contract's calendar month the index's market is open on,
+    an equal share each, the month the resolution read off the code and hands over here as the
+    schedule's months, numpy's count of months, one per schedule row, so that no code is read
+    again: one business-day count over the components for the days of each month, and one
+    business-day offset over the observations, the first day of the month rolled forward and
+    counted on. An expiry the index's market is closed on is refused by its contract under
+    penultimate and last3day, since the days before a closed expiry are not the last days the
+    market priced the contract, and rolling the expiry would change the schedule the desk gave;
+    under lastday the encoding refuses the observation itself; under asian a closed month's end
+    is simply no observation, and a month with no pricing day at all is refused by its contract.
+    Whether each day prices the component's own contract is the encoding's rule, under every
+    method. The method is the resolution's to read before any payment is counted, so that a
+    payment day counts from the component's last observation."""
     schedule = futures_schedule_of(index)
     expiry = schedule.future_expiry[contract]
     count = contract.size
@@ -145,6 +156,26 @@ def observed(method: ScheduleMethod, index: Index, contract: NDArray[np.intp]) -
                 np.full(count * LAST3DAY_OFFSETS.size, 1 / LAST3DAY_OFFSETS.size),
                 count,
             )
+        case ScheduleMethod.ASIAN:
+            holidays = with_holiday_calendar(index.holiday_calendar)
+            first = months[contract].astype("datetime64[M]").astype("datetime64[D]")
+            after = (months[contract] + 1).astype("datetime64[M]").astype("datetime64[D]")
+            days = np.busday_count(first, after, holidays=holidays.holiday)
+            if (days == 0).any():
+                k = int((days == 0).argmax())
+                month = first[k].astype("datetime64[M]")
+                raise ValueError(
+                    f"{schedule.codes[contract[k]]} has no pricing day in {month}, "
+                    "expected a Monday to Friday of its month the index's market is open on; the "
+                    "asian method averages the pricing days of the contract's month"
+                )
+            total = int(days.sum())
+            component = np.repeat(np.arange(count, dtype=np.intp), days)
+            place = np.arange(total) - np.repeat(np.cumsum(days) - days, days)
+            date = np.busday_offset(
+                np.repeat(first, days), place, roll="forward", holidays=holidays.holiday
+            )
+            return observations(component, date, np.repeat(1.0 / days, days), count)
         case _:
             assert_never(method)
 

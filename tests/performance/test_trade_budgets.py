@@ -21,7 +21,7 @@ from goosedove.globals.valuation_date import valuation_date
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
-from goosedove.index_definitions.index import index
+from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FUTURE
@@ -33,6 +33,7 @@ from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import prepared_trades
+from goosedove.trades.resolution import schedule_months
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
@@ -53,8 +54,9 @@ def dates(*texts: str) -> NDArray[np.datetime64]:
 
 
 def observed_of(terms: ResolvedTrades) -> Observations:
-    """The observations the terms' schedule method gives them, as resolution makes them."""
-    return observed(terms.schedule_method, terms.index, terms.contract)
+    """The observations the terms' schedule method gives them, as resolution makes them, over the
+    schedule's months read once below, outside what the ledgers measure."""
+    return observed(terms.schedule_method, terms.index, terms.contract, SCHEDULE_MONTHS)
 
 
 # A financial index of 25 monthly contracts from October 2026, each expiring on the last
@@ -66,7 +68,11 @@ HOLIDAYS = dates("2026-12-25", "2027-01-01", "2027-12-24")
 EXPIRIES = np.busday_offset(
     MONTHS.astype("datetime64[D]") + np.timedelta64(24, "D"), 0, roll="backward", holidays=HOLIDAYS
 )
-CODES = tuple(f"c{i}" for i in range(EXPIRIES.size))
+LETTERS = "FGHJKMNQUVXZ"
+CODES = tuple(f"{LETTERS[int(m.astype(int)) % 12]}{str(m)[2:4]}" for m in MONTHS)
+# The schedule's months as the resolution reads them, the same under both indexes below, read
+# once here so that no ledger counts the reading.
+SCHEDULE_MONTHS = schedule_months(futures_schedule(CODES, EXPIRIES, None))
 PAYS: NDArray[np.datetime64] = np.array(
     (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D"),
     dtype="datetime64[D]",
@@ -153,11 +159,11 @@ def daily_fixed_slots(components: int, contracts: int, days: int, as_of: str = A
     return int((np.unique(daily_days(components, contracts, days)) < np.datetime64(as_of)).sum())
 
 
-def a_history(as_of: str = AS_OF) -> MarketHistory:
-    cal = calendar(valuation_date(np.datetime64(as_of, "D"), 0.5), GAS)
+def a_history(as_of: str = AS_OF, ix: Index = GAS) -> MarketHistory:
+    cal = calendar(valuation_date(np.datetime64(as_of, "D"), 0.5), ix)
     priced = cal.dates[cal.is_fixed & cal.is_priced]
     settles = 3.0 + (np.arange(priced.size) % 11) / 100
-    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), GAS))
+    return market_history(cal, futures_fixings(priced[::-1].copy(), settles[::-1].copy(), ix))
 
 
 def a_market(history: MarketHistory) -> Market:
@@ -320,6 +326,103 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
+
+
+# The asian method's index: the same months, each contract expiring on its month's last business
+# day, so that every pricing day of a month prices its own contract, and paying two business
+# days after the month's end; the days of each month are the fixture's own arithmetic.
+MONTH_ENDS = np.busday_offset(
+    (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D"),
+    0,
+    roll="backward",
+    holidays=HOLIDAYS,
+)
+ASIAN_PAYS = np.busday_offset(MONTH_ENDS, 2, holidays=HOLIDAYS)
+ASIAN_GAS = index(
+    "gas",
+    futures_schedule(CODES, MONTH_ENDS, None),
+    index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
+    contract_specifications(
+        ("lot",), np.array([10_000.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
+    ),
+    holiday_calendar(HOLIDAYS),
+    UNITS,
+)
+MONTH_DAYS = np.busday_count(
+    MONTHS.astype("datetime64[D]"),
+    (MONTHS + np.timedelta64(1, "M")).astype("datetime64[D]"),
+    holidays=HOLIDAYS,
+)
+
+
+def asian_terms(components: int, contracts: int) -> ResolvedTrades:
+    rows = 1 + np.arange(components, dtype=np.intp) % contracts
+    return resolved_trades(
+        FUTURE,
+        ASIAN_GAS,
+        0,
+        Route.CLEARED,
+        Settlement.FINANCIAL,
+        ScheduleMethod.ASIAN,
+        QuantityPer.MONTH,
+        None,
+        None,
+        None,
+        np.repeat(np.datetime64("2026-09-24", "D"), components),
+        np.arange(components, dtype=np.intp),
+        rows,
+        np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
+        3.0 + (np.arange(components) % 7) / 100,
+        PaymentTerms(np.full(components, 2), (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+    )
+
+
+@pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
+def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_one(
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
+) -> None:
+    # A month of pricing days per component, 21 to 23, into one slot per contract and day: the
+    # observations through the same functions as the pen's but the look at the expiries, the
+    # encoding, the preparation and a tick over them the same functions as a lastday batch's,
+    # and the counts by component, observation, slot and live reference.
+    terms = asian_terms(components, contracts)
+    assert call_profile(lambda: observed_of(terms)) == {
+        "observed": 1,
+        "futures_schedule_of": 1,
+        "with_holiday_calendar": 1,
+        "observations": 1,
+    }
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = a_history(ix=ASIAN_GAS)
+    prep = prepared_trades(enc, history, counter)
+    quoted = a_market(history)
+    trade_results(prep, quoted, counter)
+    counts = counter.freeze().as_dict()
+    rows = 1 + np.arange(components) % contracts
+    assert counts["encoded_components"] == components
+    assert counts["encoded_observations"] == int(MONTH_DAYS[rows].sum())
+    assert (
+        counts["encoded_slots"]
+        == counts["prepared_slots"]
+        == int(MONTH_DAYS[1 : contracts + 1].sum())
+    )
+    assert counts["live_prices_read"] == prep.live_references.size
+    obs = observed_of(terms)
+    assert call_profile(lambda: encoded(terms, obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    assert numpy == PREPARATION_NUMPY, numpy
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)

@@ -39,14 +39,15 @@ class Settlement(Enum):
 
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day; penultimate, the settlement on the business day before it; and last3day,
-    the average of the settlements on the last trading day and the two business days before it,
-    each a third, are the three methods built; asian joins them here when it is built, and
-    until then is refused by name where a ticket names it."""
+    last trading day; penultimate, the settlement on the business day before it; last3day, the
+    average of the settlements on the last trading day and the two business days before it, each
+    a third; and asian, the average of the settlements on every pricing day of the contract's
+    calendar month, an equal share each: the four methods the definition lists, all built."""
 
     LASTDAY = "lastday"
     PENULTIMATE = "penultimate"
     LAST3DAY = "last3day"
+    ASIAN = "asian"
 
 
 class QuantityPer(Enum):
@@ -211,12 +212,25 @@ def _the_batch(index: Index, specification: int) -> FuturesSchedule:
 
 def _the_method(schedule_method: ScheduleMethod, settlement: Settlement) -> None:
     """The method and the settlement together: a penultimate future is cash settled against the
-    settle on the business day before its contract's expiry, and a last3day future against the
-    average of its last three pricing days, so a physical settlement is refused under either;
-    lastday settles either way."""
+    settle on the business day before its contract's expiry, a last3day future against the
+    average of its last three pricing days and an asian future against the average of its
+    month's pricing days, so a physical settlement is refused under each; lastday settles either
+    way."""
     match schedule_method:
         case ScheduleMethod.LASTDAY:
             return
+        case ScheduleMethod.ASIAN:
+            match settlement:
+                case Settlement.FINANCIAL:
+                    return
+                case Settlement.PHYSICAL:
+                    raise ValueError(
+                        "settlement_method is 'physical', expected 'financial' with the asian "
+                        "method; an asian future is cash settled on the average of its month's "
+                        "pricing days"
+                    )
+                case _:
+                    assert_never(settlement)
         case ScheduleMethod.LAST3DAY:
             match settlement:
                 case Settlement.FINANCIAL:

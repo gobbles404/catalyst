@@ -107,9 +107,7 @@ def settlement_of(where: str, text: str) -> Settlement:
 
 
 def schedule_method_of(where: str, text: str) -> ScheduleMethod:
-    return choice(
-        where, text, ScheduleMethod, "lastday, penultimate or last3day, the three methods built"
-    )
+    return choice(where, text, ScheduleMethod, "lastday, penultimate, last3day or asian")
 
 
 def quantity_per_of(where: str, text: str) -> QuantityPer:
