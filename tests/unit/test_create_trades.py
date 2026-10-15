@@ -108,7 +108,7 @@ TOY_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": PAYMENT_CALENDAR,
 }
 NG_TICKET: dict[str, list[object]] = {
-    "trade_id": ["NG-001", "NG-002", "NG-003", "NG-004", "NG-001"],
+    "trade_id": [1001, 1002, 1003, 1004, 1001],
     "trade_date": ["2026-09-24", "2026-09-24", "2026-09-25", "2026-09-25", "2026-09-24"],
     "contract_code": ["Z26", "Z26", "F27", "F27", "Z26"],
     "quantity": [10, -4, 7, -12, 10],
@@ -175,7 +175,7 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         terms.schedule_method, [METHODS.index(ScheduleMethod.LASTDAY)] * 5
     )
     np.testing.assert_array_equal(terms.quantity_per, [BASES.index(QuantityPer.MONTH)] * 5)
-    assert terms.labels == ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
+    np.testing.assert_array_equal(terms.trade_ids, [1001, 1002, 1003, 1004, 1001])
     assert terms.clearing_house == ("CME Clearing",) * 5  # the template's, for every row
     assert terms.broker is None
     np.testing.assert_array_equal(
@@ -228,7 +228,7 @@ def test_codes_resolve_in_either_case_against_a_schedule_in_either_case() -> Non
 
 def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     ticket: dict[str, list[object]] = {
-        "trade_id": ["S1", "S2"],
+        "trade_id": [1, 2],
         "trade_date": ["2026-09-24", "2026-09-24"],
         "contract_code": ["Z26-F27", "f27"],
         "quantity": [3, -1],
@@ -246,7 +246,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     )  # two business days after each expiry, the page's dates, 26 November closed
     np.testing.assert_array_equal(terms.payment.lag_days, [2, 2])  # the terms, per occurrence
     assert terms.payment.calendar == (PAYMENT_CALENDAR, PAYMENT_CALENDAR)
-    assert terms.named(1) == "trade 'S1' at row 1"
+    assert terms.named(1) == "trade 1 at row 1"
     assert counter.freeze()["resolved_components"] == 3
     assert counter.freeze()["resolved_occurrences"] == 2
 
@@ -269,7 +269,7 @@ def test_a_whole_year_strip_resolves_twelve_months_against_a_long_schedule() -> 
     batch, _ = created(
         long,
         {
-            "trade_id": ["Y"],
+            "trade_id": [25],
             "trade_date": ["2026-09-24"],
             "contract_code": ["cal27"],
             "quantity": [2],
@@ -286,7 +286,7 @@ def test_a_whole_year_strip_resolves_twelve_months_against_a_long_schedule() -> 
 def test_a_templates_field_applies_to_every_row_and_a_tickets_varies() -> None:
     batch, _ = created(
         NG,
-        {"trade_id": ["a", "b", "c"], "broker": ["ION", "TP", "ION"]},
+        {"trade_id": [1, 2, 3], "broker": ["ION", "TP", "ION"]},
         {
             **NG_TEMPLATE,
             "trade_date": day("2026-09-24"),
@@ -300,7 +300,7 @@ def test_a_templates_field_applies_to_every_row_and_a_tickets_varies() -> None:
     np.testing.assert_array_equal(terms.contract, [1, 1, 1])
     np.testing.assert_array_equal(terms.quantity, [2, 2, 2])
     assert terms.broker == ("ION", "TP", "ION")
-    assert terms.labels == ("a", "b", "c")
+    np.testing.assert_array_equal(terms.trade_ids, [1, 2, 3])
 
 
 def test_a_batch_field_in_the_ticket_is_taken_when_every_row_agrees() -> None:
@@ -308,7 +308,7 @@ def test_a_batch_field_in_the_ticket_is_taken_when_every_row_agrees() -> None:
     batch, _ = created(NG, {**NG_TICKET, "route": ["cleared"] * 5}, template)
     assert batch.resolved.route is Route.CLEARED
     without_labels, _ = created(NG, {k: v for k, v in NG_TICKET.items() if k != "trade_id"})
-    assert without_labels.resolved.labels is None
+    assert without_labels.resolved.trade_ids is None
     assert without_labels.resolved.named(4) == "trade at row 5"
 
 
@@ -327,7 +327,7 @@ def one_payment_day(expiry: str, holidays: tuple[str, ...], lag: str) -> np.date
     batch, _ = created(
         ix,
         {
-            "trade_id": ["p"],
+            "trade_id": [16],
             "trade_date": ["2026-09-24"],
             "contract_code": ["Z26"],
             "quantity": [1],
@@ -364,7 +364,7 @@ def payment_refusal(lag: str, in_ticket: bool = False) -> str:
         lots=(("TOY", 10_000.0, "MMBTU"),),
     )
     ticket: dict[str, list[object]] = {
-        "trade_id": ["p"],
+        "trade_id": [16],
         "trade_date": ["2026-09-24"],
         "contract_code": ["Z26"],
         "quantity": [1],
@@ -438,7 +438,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     batch, _ = created(
         TOY,
         {
-            "trade_id": ["a", "b"],
+            "trade_id": [1, 2],
             "trade_date": ["2026-09-24", "2026-09-24"],
             "contract_code": ["Z26", "F27"],
             "quantity": [1, 1],
@@ -496,7 +496,7 @@ def pen_days(
     """One lot of each code under the template: each component's observation day and payment day
     as the batch retains them."""
     ticket: dict[str, list[object]] = {
-        "trade_id": [f"p{i}" for i in range(len(codes))],
+        "trade_id": [i + 1 for i in range(len(codes))],
         "trade_date": ["2026-09-24"] * len(codes),
         "contract_code": list(codes),
         "quantity": [1] * len(codes),
@@ -570,7 +570,7 @@ def test_an_expiry_the_market_closes_is_refused_by_its_contract_under_the_pen() 
     assert refused(
         thanksgiving,
         {
-            "trade_id": ["p"],
+            "trade_id": [16],
             "trade_date": ["2026-09-24"],
             "contract_code": ["Z26"],
             "quantity": [1],
@@ -606,7 +606,7 @@ L3D_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": WEEKDAYS,
 }
 L3D_TICKET: dict[str, list[object]] = {
-    "trade_id": ["A", "B"],
+    "trade_id": [1, 2],
     "trade_date": ["2026-11-20", "2026-11-20"],
     "contract_code": ["Z26", "Z26"],
     "quantity": [60, -30],
@@ -652,7 +652,7 @@ def test_a_payment_calendar_closed_on_the_eighth_moves_the_payment_and_not_the_d
 
 def test_a_last3day_strip_observes_each_month_thrice_and_pays_once_per_month() -> None:
     strip: dict[str, list[object]] = {
-        "trade_id": ["S"],
+        "trade_id": [19],
         "trade_date": ["2026-11-20"],
         "contract_code": ["Z26-F27"],
         "quantity": [3],
@@ -698,7 +698,7 @@ def test_an_observation_crossing_the_preceding_contract_is_refused_when_the_batc
         lots=(("UNIT", 1.0, "MMBTU"),),
     )
     assert refused(crossing, L3D_TICKET, L3D_TEMPLATE) == (
-        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
+        "trade 1 at row 1 observes Z26 on 2026-12-02, a day X26 prices; the last3day method "
         "takes the contract's own days, and a futures history holds no settle of Z26 for a day "
         "X26 prices"
     )
@@ -712,7 +712,7 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
     }
     assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' with the last3day method of "
-        "trade 'A' at row 1; a last3day future is cash settled on the average of its last three "
+        "trade 1 at row 1; a last3day future is cash settled on the average of its last three "
         "pricing days"
     )
 
@@ -743,7 +743,7 @@ ASIAN_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": PAY_JAN_1,
 }
 ASIAN_TICKET: dict[str, list[object]] = {
-    "trade_id": ["A", "B"],
+    "trade_id": [1, 2],
     "trade_date": ["2026-11-20", "2026-11-20"],
     "contract_code": ["Z26", "Z26"],
     "quantity": [4_400, -2_200],
@@ -801,7 +801,7 @@ def test_a_payment_calendar_closed_on_the_fourth_moves_the_payment_and_not_the_d
 
 def test_an_asian_strip_observes_each_month_on_its_own_days_and_pays_once_per_month() -> None:
     strip: dict[str, list[object]] = {
-        "trade_id": ["S"],
+        "trade_id": [19],
         "trade_date": ["2026-11-20"],
         "contract_code": ["Z26-F27"],
         "quantity": [2_200],
@@ -831,7 +831,7 @@ def test_a_month_without_a_pricing_day_is_refused_by_its_contract_when_the_batch
         ("VOLUME", "GAL"),
     )
     assert refused(closed, {**ASIAN_TICKET, "contract_code": ["G27", "G27"]}, ASIAN_TEMPLATE) == (
-        "G27 of trade 'A' at row 1 has no pricing day from 2027-02-01 to 2027-02-28, expected a "
+        "G27 of trade 1 at row 1 has no pricing day from 2027-02-01 to 2027-02-28, expected a "
         "Monday to Friday of the days it covers the index's market is open on; the asian method "
         "averages the pricing days a component covers"
     )
@@ -870,7 +870,7 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
         if name not in ("payment_time_lag", "payment_holiday_calendar")
     }
     assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
-        "settlement_method is 'physical', expected 'financial' with the asian method of trade 'A' "
+        "settlement_method is 'physical', expected 'financial' with the asian method of trade 1 "
         "at row 1; an asian future is cash settled on the average of its month's pricing days"
     )
 
@@ -906,7 +906,7 @@ def quantity_columns(
 
 def test_100_a_day_is_3000_in_november_3100_in_december_and_2800_and_2900_in_february() -> None:
     ticket: dict[str, list[object]] = {
-        "trade_id": ["N", "D", "F7", "F8"],
+        "trade_id": [14, 4, 7, 8],
         "trade_date": ["2026-10-06"] * 4,
         "contract_code": ["X26", "Z26", "G27", "G28"],
         "quantity": [100, 100, 100, 100],
@@ -923,7 +923,7 @@ def test_100_a_day_is_3000_in_november_3100_in_december_and_2800_and_2900_in_feb
 
 def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_100() -> None:
     strip: dict[str, list[object]] = {
-        "trade_id": ["S"],
+        "trade_id": [19],
         "trade_date": ["2026-10-06"],
         "contract_code": ["X26-Z26"],
         "quantity": [100],
@@ -933,7 +933,7 @@ def test_a_strip_at_100_a_day_covers_3000_and_3100_and_at_100_a_month_100_and_10
     assert quantity_columns(strip, NG_TEMPLATE)[:2] == ([30, 31], [100, 100])
     # Signed and duplicate rows, and a row kept ready at nothing, keep the arithmetic.
     signed: dict[str, list[object]] = {
-        "trade_id": ["S", "T", "S", "ENTRY"],
+        "trade_id": [19, 20, 19, 1000],
         "trade_date": ["2026-10-06"] * 4,
         "contract_code": ["X26-Z26"] * 4,
         "quantity": [-100, 100, -100, 0],
@@ -994,7 +994,7 @@ def test_the_pricing_and_payment_calendars_move_no_covered_day() -> None:
 # under asian alone and refused under the expiry-based methods; the dates in the spill.
 
 DATED_TICKET: dict[str, list[object]] = {
-    "trade_id": ["P"],
+    "trade_id": [16],
     "trade_date": ["2026-11-20"],
     "start_date": ["2026-11-12"],
     "end_date": ["2026-12-31"],
@@ -1004,7 +1004,7 @@ DATED_TICKET: dict[str, list[object]] = {
 
 
 def dated(
-    start: str, end: str, quantity: float = 2_000, label: str = "P"
+    start: str, end: str, quantity: float = 2_000, label: int = 16
 ) -> dict[str, list[object]]:
     return {
         **DATED_TICKET,
@@ -1049,7 +1049,7 @@ def test_a_period_across_a_month_end_is_two_components_clipped_at_the_ends() -> 
     by_dates, _ = created(ETHANE, dated("2026-12-01", "2026-12-31"), ASIAN_TEMPLATE)
     two: dict[str, list[object]] = {
         **ASIAN_TICKET,
-        "trade_id": ["P", "Q"],
+        "trade_id": [16, 17],
         "quantity": [2_000, 2_000],
     }
     by_code, _ = created(ETHANE, two, ASIAN_TEMPLATE)
@@ -1082,7 +1082,7 @@ def test_a_part_of_a_month_observes_its_own_pricing_days_and_pays_after_the_last
     assert shorter.resolved.payment is not None
     assert str(shorter.resolved.payment.date[0]) == "2027-01-04"
     assert refused(ETHANE, dated("2026-12-26", "2026-12-27"), ASIAN_TEMPLATE) == (
-        "Z26 of trade 'P' at row 1 has no pricing day from 2026-12-26 to 2026-12-27, expected a "
+        "Z26 of trade 16 at row 1 has no pricing day from 2026-12-26 to 2026-12-27, expected a "
         "Monday to Friday of the days it covers the index's market is open on; the asian method "
         "averages the pricing days a component covers"
     )
@@ -1101,13 +1101,13 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
         assert refused(
             ix, dated("2026-12-15", "2026-12-31", 10), {**template, "schedule_method": method}
         ) == (
-            "Z26 of trade 'P' at row 1 is covered from 2026-12-15 to 2026-12-31, part of its "
+            "Z26 of trade 16 at row 1 is covered from 2026-12-15 to 2026-12-31, part of its "
             f"month, expected the whole month under {method}; the expiry-based methods take the "
             "contract's month entire, and a part of it prices under asian"
         )
     # Two rows, the second a part of its month: the refusal names the second, not the first.
     two_rows: dict[str, list[object]] = {
-        "trade_id": ["P", "Q"],
+        "trade_id": [16, 17],
         "trade_date": ["2026-11-20", "2026-11-20"],
         "start_date": ["2026-12-01", "2026-12-15"],
         "end_date": ["2026-12-31", "2026-12-31"],
@@ -1115,7 +1115,7 @@ def test_the_expiry_based_methods_take_whole_months_from_dates_and_refuse_a_part
         "fixed_price": [0.25, 0.25],
     }
     assert refused(NG, two_rows, NG_TEMPLATE) == (
-        "Z26 of trade 'Q' at row 2 is covered from 2026-12-15 to 2026-12-31, part of its month, "
+        "Z26 of trade 17 at row 2 is covered from 2026-12-15 to 2026-12-31, part of its month, "
         "expected the whole month under lastday; the expiry-based methods take the contract's "
         "month entire, and a part of it prices under asian"
     )
@@ -1189,7 +1189,7 @@ def one_row(
 ) -> dict[str, list[object]]:
     """One ticket row; given a unit, the ticket carries the quantity_unit column itself."""
     ticket: dict[str, list[object]] = {
-        "trade_id": ["q"],
+        "trade_id": [17],
         "trade_date": ["2026-09-24"],
         "contract_code": [code],
         "quantity": [quantity],
@@ -1308,7 +1308,7 @@ def test_a_strip_counts_the_selected_unit_in_every_month() -> None:
     for quantity in (0.5, float("nan"), float("inf")):
         assert refused(
             TWO_LOTS, one_row(quantity), {**NG_TEMPLATE, "quantity_unit": "MMBTU"}
-        ).startswith("quantity of trade 'q' at row 1 is ")
+        ).startswith("quantity of trade 17 at row 1 is ")
 
 
 def test_the_old_field_is_unknown_to_the_definition() -> None:
@@ -1322,7 +1322,7 @@ def test_the_old_field_is_unknown_to_the_definition() -> None:
 # any other, the row kept with its label, its code and its amounts of nothing.
 
 ENTRY_TICKET: dict[str, list[object]] = {
-    "trade_id": ["NG-001", "ENTRY-002"],
+    "trade_id": [1001, 1002],
     "trade_date": ["2026-10-06", "2026-10-06"],
     "contract_code": ["Z26", "F27"],
     "quantity": [2, 0],
@@ -1333,7 +1333,7 @@ ENTRY_TICKET: dict[str, list[object]] = {
 def test_a_zero_quantity_in_the_ticket_is_kept_with_its_row() -> None:
     batch, counter = created(NG, ENTRY_TICKET)
     terms = batch.resolved
-    assert terms.labels == ("NG-001", "ENTRY-002")
+    np.testing.assert_array_equal(terms.trade_ids, [1001, 1002])
     np.testing.assert_array_equal(terms.quantity, [2.0, 0.0])
     np.testing.assert_array_equal(terms.contract, [1, 2])
     np.testing.assert_array_equal(batch.encoded.quote_quantity, [20_000.0, 0.0])
@@ -1365,7 +1365,7 @@ def test_a_zero_row_bypasses_no_other_rule() -> None:
         "quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'"
     )
     assert refused(NG, {**ENTRY_TICKET, "quantity": [2, 0.5]}) == (
-        "quantity of trade 'ENTRY-002' at row 2 is 0.5, expected a whole number"
+        "quantity of trade 1002 at row 2 is 0.5, expected a whole number"
     )
 
 
@@ -1414,7 +1414,7 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
             NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "penultimate"},
             "settlement_method is 'physical', expected 'financial' with the penultimate method of "
-            "trade 'NG-001' at row 1; a penultimate future is cash settled on the business day "
+            "trade 1001 at row 1; a penultimate future is cash settled on the business day "
             "before its contract's expiry",
         ),
         (
@@ -1485,7 +1485,7 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             {**NG_TICKET, "quantity": [10, -4, 7.5, -12, 10]},
             NG_TEMPLATE,
-            "quantity of trade 'NG-003' at row 3 is 7.5, expected a whole number",
+            "quantity of trade 1003 at row 3 is 7.5, expected a whole number",
         ),
         (
             NG_TICKET,
@@ -1504,7 +1504,7 @@ def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -
     message = refused(
         TOY,
         {
-            "trade_id": ["S1", "S2"],
+            "trade_id": [1, 2],
             "trade_date": ["2026-09-24", "2026-09-24"],
             "contract_code": ["Z26-F27", "F27"],
             "quantity": [3, 2.5],
@@ -1512,7 +1512,7 @@ def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -
         },
         TOY_TEMPLATE,
     )
-    assert message == "quantity of trade 'S2' at row 2 is 2.5, expected a whole number"
+    assert message == "quantity of trade 2 at row 2 is 2.5, expected a whole number"
 
 
 def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> None:
@@ -1539,7 +1539,7 @@ def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> No
             lots=(("TOY", 10_000.0, "MMBTU"),),
         ),
         {
-            "trade_id": ["R1", "R2", "R3", "R4"],
+            "trade_id": [1, 2, 3, 4],
             "trade_date": ["2026-09-24"] * 4,
             "contract_code": ["J27"] * 4,
             "quantity": [1, 1, 1, 1],
@@ -1824,11 +1824,11 @@ def sheet() -> dict[str, Any]:
         "template": template,
         "headers": row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price"),
         "rows": cells(
-            ["NG-001", 46289.0, "Z26", 10.0, 3.1],
-            ["NG-002", 46289.0, "z26", -4.0, 3.15],
-            ["NG-003", 46290.0, "F27", 7.0, 3.4],
-            ["NG-004", 46290.0, "F27", -12.0, 3.35],
-            ["NG-001", 46289.0, "Z26", 10.0, 3.1],
+            [1001.0, 46289.0, "Z26", 10.0, 3.1],
+            [1002.0, 46289.0, "z26", -4.0, 3.15],
+            [1003.0, 46290.0, "F27", 7.0, 3.4],
+            [1004.0, 46290.0, "F27", -12.0, 3.35],
+            [1001.0, 46289.0, "Z26", 10.0, 3.1],
         ),
     }
 
@@ -1842,7 +1842,7 @@ def test_the_creator_publishes_the_batch_named_for_its_index(sheet: dict[str, An
     batch = CAUGHT.pop()
     np.testing.assert_array_equal(batch.resolved.contract, [1, 1, 2, 2, 1])
     np.testing.assert_array_equal(batch.encoded.slot_exposure, [160_000, -50_000])
-    assert batch.resolved.labels == ("NG-001", "NG-002", "NG-003", "NG-004", "NG-001")
+    np.testing.assert_array_equal(batch.resolved.trade_ids, [1001, 1002, 1003, 1004, 1001])
 
 
 def test_the_creators_refusals_come_in_the_decided_order(sheet: dict[str, Any]) -> None:
@@ -1880,22 +1880,22 @@ def test_the_creators_refusals_come_in_the_decided_order(sheet: dict[str, Any]) 
     ).startswith(
         "#ERROR _CreateTrades: fields cell (1, 1) is text 'Trade_id', expected a field of future: "
     )
-    assert create(ix, headers, cells(["NG-001", 46289.0, "Z26", "ten", 3.1]), template) == (
+    assert create(ix, headers, cells([1001.0, 46289.0, "Z26", "ten", 3.1]), template) == (
         "#ERROR _CreateTrades: trade_rows cell (1, 4) is text 'ten', expected number"
     )
     # Then the library: the overlap, the completion, the codes, the kernel.
     assert create(
-        ix, row(*NG_TICKET, "route"), cells(["a", 46289.0, "Z26", 1.0, 3.0, "cleared"]), template
+        ix, row(*NG_TICKET, "route"), cells([1.0, 46289.0, "Z26", 1.0, 3.0, "cleared"]), template
     ) == (
         "#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, "
         "expected by one of them"
     )
-    assert create(ix, headers, cells(["a", 46289.0, "G27", 1.0, 3.0]), template) == (
+    assert create(ix, headers, cells([1.0, 46289.0, "G27", 1.0, 3.0]), template) == (
         "#ERROR _CreateTrades: ValueError: contract_code row 1 is 'G27', expected months the "
         "index's schedule has a contract for; it has none for 2027-02"
     )
-    assert create(ix, headers, cells(["a", 46289.0, "Z26", 2.5, 3.0]), template) == (
-        "#ERROR _CreateTrades: ValueError: quantity of trade 'a' at row 1 is 2.5, "
+    assert create(ix, headers, cells([1.0, 46289.0, "Z26", 2.5, 3.0]), template) == (
+        "#ERROR _CreateTrades: ValueError: quantity of trade 1 at row 1 is 2.5, "
         "expected a whole number"
     )
 
@@ -1944,7 +1944,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
     ]
     assert table[1] == [
         "int64",
-        "str",
+        "int64",
         "datetime64[D]",
         "str",
         "str",
@@ -1965,7 +1965,7 @@ def test_the_reader_spills_one_row_per_component_with_the_terms_and_the_encoding
     ]
     first = [
         1.0,
-        "NG-001",
+        1001.0,
         46289.0,
         "Z26",
         "lastday",
@@ -2069,12 +2069,12 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
     handle = ENTRY["_CreateTrades"](
         sheet["index"],
         sheet["headers"],
-        cells(["NG-001", 46301.0, "Z26", 2.0, 3.0], ["ENTRY-002", 46301.0, "F27", 0.0, 3.3]),
+        cells([1001.0, 46301.0, "Z26", 2.0, 3.0], [1002.0, 46301.0, "F27", 0.0, 3.3]),
         sheet["template"],
     )
     table = spilled(handle)
     assert len(table) == 4  # two heading rows and both components, the second kept at nothing
-    assert table[3][:4] == [2.0, "ENTRY-002", 46301.0, "F27"]
+    assert table[3][:4] == [2.0, 1002.0, 46301.0, "F27"]
     assert table[3][8] == 0.0 and table[3][12:] == [46388.0, 46418.0, 31.0, 0.0, 0.0, 0.0, 0.0]
     # Zero is a number: the seam's words for anything else stand, and text is never coerced.
     create = ENTRY["_CreateTrades"]
@@ -2088,7 +2088,7 @@ def test_a_row_kept_ready_crosses_the_seam_as_a_number_and_reads_back_at_nothing
             create(
                 sheet["index"],
                 sheet["headers"],
-                cells(["a", 46301.0, "Z26", cell, 3.0]),
+                cells([1.0, 46301.0, "Z26", cell, 3.0]),
                 sheet["template"],
             )
         )
@@ -2153,7 +2153,7 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
         ENTRY["_CreateTrades"](
             sheet["index"],
             headers,
-            cells(["NG-001", 46289.0, 46357.0, 46387.0, 10.0, 3.1]),
+            cells([1001.0, 46289.0, 46357.0, 46387.0, 10.0, 3.1]),
             sheet["template"],
         )
     )
@@ -2164,11 +2164,11 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
         ENTRY["_CreateTrades"](
             sheet["index"],
             headers,
-            cells(["NG-001", 46289.0, 46371.0, 46387.0, 10.0, 3.1]),
+            cells([1001.0, 46289.0, 46371.0, 46387.0, 10.0, 3.1]),
             sheet["template"],
         )
     ) == (
-        "#ERROR _CreateTrades: ValueError: Z26 of trade 'NG-001' at row 1 is covered from "
+        "#ERROR _CreateTrades: ValueError: Z26 of trade 1001 at row 1 is covered from "
         "2026-12-15 to 2026-12-31, part of its month, expected the whole month under lastday; "
         "the expiry-based methods take the contract's month entire, and a part of it prices "
         "under asian"
@@ -2185,7 +2185,7 @@ def test_a_dated_ticket_crosses_the_seam_and_spills_the_days_each_component_cove
                 "quantity",
                 "fixed_price",
             ),
-            cells(["NG-001", 46289.0, "Z26", 46357.0, 46387.0, 10.0, 3.1]),
+            cells([1001.0, 46289.0, "Z26", 46357.0, 46387.0, 10.0, 3.1]),
             sheet["template"],
         )
     ) == (
@@ -2216,7 +2216,7 @@ MIXED_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": holiday_calendar(dates("2027-01-01")),
 }
 MIXED_TICKET: dict[str, list[object]] = {
-    "trade_id": ["A", "B", "C", "D"],
+    "trade_id": [1, 2, 3, 4],
     "contract_code": ["Z26"] * 4,
     "quantity": [1, -2, 3, 22],
     "quantity_unit": ["BBL", "GAL", "BBL", "GAL"],
@@ -2312,7 +2312,7 @@ def test_a_mixed_tickets_refusals_name_the_first_offending_row() -> None:
     }
     assert refused(MIXED, MIXED_TICKET, physical) == (
         "settlement_method is 'physical', expected 'financial' with the penultimate method of "
-        "trade 'B' at row 2; a penultimate future is cash settled on the business day before its "
+        "trade 2 at row 2; a penultimate future is cash settled on the business day before its "
         "contract's expiry"
     )
     lastday_rows: dict[str, list[object]] = {
@@ -2356,7 +2356,7 @@ WTI_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": holiday_calendar(dates(*WTI_HOLIDAYS)),
 }
 WTI_TICKET: dict[str, list[object]] = {
-    "trade_id": ["W"],
+    "trade_id": [23],
     "trade_date": ["2026-11-20"],
     "start_date": ["2026-12-18"],
     "end_date": ["2026-12-28"],
@@ -2390,7 +2390,7 @@ def test_a_code_and_the_whole_months_dates_book_the_same_december_on_the_wti_ind
     by_code, _ = created(
         WTI,
         {
-            "trade_id": ["Z"],
+            "trade_id": [26],
             "trade_date": ["2026-11-20"],
             "contract_code": ["Z26"],
             "quantity": [2_200],
@@ -2402,7 +2402,7 @@ def test_a_code_and_the_whole_months_dates_book_the_same_december_on_the_wti_ind
         WTI,
         {
             **WTI_TICKET,
-            "trade_id": ["Z"],
+            "trade_id": [26],
             "start_date": ["2026-12-01"],
             "end_date": ["2026-12-31"],
             "quantity": [2_200],
@@ -2438,7 +2438,7 @@ PEN_ASIAN_TEMPLATE: dict[str, object] = {
     key: value for key, value in WTI_TEMPLATE.items() if key != "schedule_method"
 } | {"quantity_unit": "LOT", "payment_time_lag": "+1bd"}
 ASIAN_AND_PEN: dict[str, list[object]] = {
-    "trade_id": ["A", "P"],
+    "trade_id": [1, 16],
     "trade_date": ["2026-11-20", "2026-11-20"],
     "contract_code": ["Z26", "Z26"],
     "quantity": [22, 3],
@@ -2520,7 +2520,7 @@ WAHA_TEMPLATE: dict[str, object] = {
     "payment_holiday_calendar": WAHA_PAYS,
 }
 WAHA_TICKET: dict[str, list[object]] = {
-    "trade_id": ["WAH001"],
+    "trade_id": [1001],
     "trade_date": ["2026-11-30"],
     "contract_code": ["Z26"],
     "quantity": [1],
@@ -2602,7 +2602,7 @@ def test_iferc_payment_counts_from_last_trading_on_the_payment_calendar_not_publ
     pair, _ = created(
         WAHA,
         {
-            "trade_id": ["L", "S"],
+            "trade_id": [12, 19],
             "trade_date": ["2026-11-30", "2026-11-30"],
             "contract_code": ["Z26", "Z26"],
             "quantity": [1, -1],
@@ -2633,11 +2633,11 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
         "future is cash settled on its month's published index"
     )
     assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "schedule_method": "asian"}) == (
-        "schedule_method of trade 'WAH001' at row 1 is 'asian', expected 'lastday' on an IFERC "
+        "schedule_method of trade 1001 at row 1 is 'asian', expected 'lastday' on an IFERC "
         "index; an IFERC month has one index, published once"
     )
     two: dict[str, list[object]] = {
-        "trade_id": ["WAH001", "WAH002"],
+        "trade_id": [1001, 1002],
         "trade_date": ["2026-11-30", "2026-11-30"],
         "contract_code": ["Z26", "F27"],
         "quantity": [1, 1],
@@ -2646,7 +2646,7 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     }
     by_row = {key: value for key, value in WAHA_TEMPLATE.items() if key != "schedule_method"}
     assert refused(WAHA, two, by_row) == (
-        "schedule_method of trade 'WAH002' at row 2 is 'penultimate', expected 'lastday' on an "
+        "schedule_method of trade 1002 at row 2 is 'penultimate', expected 'lastday' on an "
         "IFERC index; an IFERC month has one index, published once"
     )
     part: dict[str, list[object]] = {
@@ -2655,7 +2655,7 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
         "end_date": ["2026-12-15"],
     }
     assert refused(WAHA, part, WAHA_TEMPLATE) == (
-        "Z26 of trade 'WAH001' at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
+        "Z26 of trade 1001 at row 1 is covered from 2026-12-01 to 2026-12-15, part of its "
         "month, expected the whole month under lastday; an IFERC month's index is one price for "
         "the whole month"
     )
@@ -2667,4 +2667,103 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     assert refused(bare, WAHA_TICKET, WAHA_TEMPLATE) == (
         "index 'bare' has no reporting_lot, expected one of its specifications named when the "
         "index was made; a batch's delta is reported in lots of it"
+    )
+
+
+# --- numeric trade IDs, numeric-trade-ids.md ------------------------------------------------
+# The ticket's rows: 123456, 123457 and 123456 again, numbers typed as the source system keeps
+# them, the repeat two occurrences; an ID is a whole number of at most 15 digits either side of
+# zero, read once, the template's repeated and the ticket's by row, and changes no number.
+
+ID_TICKET: dict[str, list[object]] = {
+    "trade_id": [123456, 123457, 123456],
+    "trade_date": ["2026-10-09", "2026-10-09", "2026-10-09"],
+    "contract_code": ["Z26", "F27", "Z26"],
+    "quantity": [1, -2, 1],
+    "fixed_price": [3.0, 3.1, 3.0],
+}
+
+
+def test_the_tickets_numeric_ids_are_kept_whole_and_the_repeat_counts_twice() -> None:
+    batch, counter = created(NG, ID_TICKET)
+    terms = batch.resolved
+    assert terms.trade_ids is not None and terms.trade_ids.dtype == np.int64
+    np.testing.assert_array_equal(terms.trade_ids, [123456, 123457, 123456])
+    assert not terms.trade_ids.flags.writeable
+    np.testing.assert_array_equal(terms.occurrence, [0, 1, 2])
+    np.testing.assert_array_equal(batch.encoded.quote_quantity, [10_000, -20_000, 10_000])
+    assert terms.named(2) == "trade 123456 at row 3"
+    assert counter.freeze().as_dict()["resolved_occurrences"] == 3
+    # The IDs change no number: the same rows under other IDs encode the same arrays.
+    other, _ = created(NG, {**ID_TICKET, "trade_id": [7, 8, 9]})
+    np.testing.assert_array_equal(other.encoded.quote_quantity, batch.encoded.quote_quantity)
+    np.testing.assert_array_equal(other.encoded.offset, batch.encoded.offset)
+    np.testing.assert_array_equal(other.encoded.slot_exposure, batch.encoded.slot_exposure)
+    np.testing.assert_array_equal(other.encoded.group_contract, batch.encoded.group_contract)
+
+
+def test_a_whole_id_of_at_most_15_digits_either_side_of_zero_is_kept_exactly() -> None:
+    edge, _ = created(NG, {**ID_TICKET, "trade_id": [999_999_999_999_999, -999_999_999_999_999, 0]})
+    assert edge.resolved.trade_ids is not None
+    assert edge.resolved.trade_ids.tolist() == [999_999_999_999_999, -999_999_999_999_999, 0]
+    whole, _ = created(NG, {**ID_TICKET, "trade_id": [123456.0, 123457.0, 123456.0]})
+    assert whole.resolved.trade_ids is not None
+    assert whole.resolved.trade_ids.tolist() == [123456, 123457, 123456]
+
+
+@pytest.mark.parametrize(
+    ("value", "shown"),
+    [
+        (123456.5, "123456.5"),
+        (1_000_000_000_000_000, "1000000000000000"),
+        (-1_000_000_000_000_000, "-1000000000000000"),
+        (float("nan"), "nan"),
+        (float("inf"), "inf"),
+        (-float("inf"), "-inf"),
+    ],
+    ids=["a fraction", "a sixteenth digit", "a sixteenth digit below zero", "nan", "inf", "-inf"],
+)
+def test_an_id_that_is_not_a_whole_number_of_at_most_15_digits_is_refused_by_its_row(
+    value: float, shown: str
+) -> None:
+    assert refused(NG, {**ID_TICKET, "trade_id": [123456, value, 123456]}) == (
+        f"trade_id row 2 is {shown}, expected a whole number of at most 15 digits"
+    )
+
+
+def test_a_templates_id_is_read_once_and_repeated_on_every_row() -> None:
+    without = {key: value for key, value in ID_TICKET.items() if key != "trade_id"}
+    batch, _ = created(NG, without, {**NG_TEMPLATE, "trade_id": 77})
+    assert batch.resolved.trade_ids is not None
+    assert batch.resolved.trade_ids.tolist() == [77, 77, 77]
+    assert batch.resolved.named(1) == "trade 77 at row 2"
+    with pytest.raises(ValueError) as fraction:
+        a_template({**NG_TEMPLATE, "trade_id": 12.5})
+    assert str(fraction.value) == "trade_id is 12.5, expected a whole number of at most 15 digits"
+    with pytest.raises(ValueError) as long_id:
+        a_template({**NG_TEMPLATE, "trade_id": 1_000_000_000_000_000})
+    assert str(long_id.value) == (
+        "trade_id is 1000000000000000, expected a whole number of at most 15 digits"
+    )
+    assert refused(NG, ID_TICKET, {**NG_TEMPLATE, "trade_id": 123456}) == (
+        "trade_id is supplied by the template and by the ticket, expected by one of them"
+    )
+
+
+def test_a_strips_rows_carry_their_id_and_row_and_a_later_bad_row_is_named_by_its_own() -> None:
+    strip, _ = created(NG, {**ID_TICKET, "contract_code": ["Z26-F27", "F27", "Z26"]})
+    terms = strip.resolved
+    np.testing.assert_array_equal(terms.occurrence, [0, 0, 1, 2])
+    assert terms.trade_ids is not None and terms.trade_ids.tolist() == [123456, 123457, 123456]
+    assert [terms.named(k) for k in range(4)] == [
+        "trade 123456 at row 1",
+        "trade 123456 at row 1",
+        "trade 123457 at row 2",
+        "trade 123456 at row 3",
+    ]
+    assert (
+        refused(
+            NG, {**ID_TICKET, "contract_code": ["Z26-F27", "F27", "Z26"], "quantity": [1, 2.5, 1]}
+        )
+        == "quantity of trade 123457 at row 2 is 2.5, expected a whole number"
     )

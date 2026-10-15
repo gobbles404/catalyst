@@ -58,11 +58,11 @@ NG_TEMPLATE = {
 }
 NG_HEADERS = ("trade_id", "trade_date", "contract_code", "quantity", "fixed_price")
 NG_ROWS: list[list[object]] = [
-    ["NG-001", serial("2026-09-24"), "Z26", 10.0, 3.1],
-    ["NG-002", serial("2026-09-24"), "z26", -4.0, 3.15],
-    ["NG-003", serial("2026-09-25"), "F27", 7.0, 3.4],
-    ["NG-004", serial("2026-09-25"), "F27", -12.0, 3.35],
-    ["NG-001", serial("2026-09-24"), "Z26", 10.0, 3.1],
+    [1001.0, serial("2026-09-24"), "Z26", 10.0, 3.1],
+    [1002.0, serial("2026-09-24"), "z26", -4.0, 3.15],
+    [1003.0, serial("2026-09-25"), "F27", 7.0, 3.4],
+    [1004.0, serial("2026-09-25"), "F27", -12.0, 3.35],
+    [1001.0, serial("2026-09-24"), "Z26", 10.0, 3.1],
 ]
 
 
@@ -533,8 +533,8 @@ def phh() -> dict[str, Any]:
     clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2027-05-31"), serial("2027-08-30")]))
     template = pen_template("ICE PHH", str(clearing))
     headers = row(*NG_HEADERS)
-    long = ["PHH-1", serial("2027-06-01"), "N27", 2.0, 3.0]
-    short = ["PHH-2", serial("2027-06-01"), "n27", -2.0, 3.0]
+    long = [1.0, serial("2027-06-01"), "N27", 2.0, 3.0]
+    short = [2.0, serial("2027-06-01"), "n27", -2.0, 3.0]
     return {
         "index": index,
         "template": template,
@@ -672,9 +672,9 @@ def test_the_short_pen_and_the_long_sum_to_nothing_and_each_equals_itself_alone(
 # of the N27-Q27 strip at 3.00, A again, and C, one lot of q27 sold at 3.05, on the PHH index with
 # U27 after Q27 so that every state has a market.
 STRIP_ROWS: list[list[object]] = [
-    ["A", serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
-    ["A", serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
-    ["C", serial("2027-06-01"), "q27", -1.0, 3.05],
+    [1.0, serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
+    [1.0, serial("2027-06-01"), "N27-Q27", 2.0, 3.0],
+    [3.0, serial("2027-06-01"), "q27", -1.0, 3.05],
 ]
 STRIP_LIFECYCLE: list[
     tuple[str, dict[str, float], tuple[float, ...], int, int, tuple[int, int]]
@@ -824,7 +824,7 @@ def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -
     )
     assert ENTRY["_CreateTrades"](phh["index"], phh["headers"], rows(phh["long"]), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the penultimate method of trade 'PHH-1' at row 1; a penultimate future is cash "
+        "with the penultimate method of trade 1 at row 1; a penultimate future is cash "
         "settled on the business day before its contract's expiry"
     )
 
@@ -845,7 +845,7 @@ def test_the_wti_pen_values_its_thousand_barrel_lots_in_dollars_a_barrel() -> No
     clearing = ENTRY["_CreateHolidayCalendar"](column([serial("2026-12-25"), serial("2026-12-28")]))
     template = pen_template("ICE WTI T", str(clearing))
     trades = ENTRY["_CreateTrades"](
-        index, row(*NG_HEADERS), rows(["T-1", serial("2026-12-01"), "F27", 3.0, 60.0]), template
+        index, row(*NG_HEADERS), rows([1.0, serial("2026-12-01"), "F27", 3.0, 60.0]), template
     )
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert batch[2][batch[0].index("payment_date")] == serial("2026-12-21")
@@ -897,13 +897,13 @@ def test_two_selections_of_one_quantity_value_and_risk_alike() -> None:
         index,
         "Henry Hub NYMEX",
         {**NG_TEMPLATE, "quantity_unit": "ICE PHH"},
-        ["E-1", serial("2026-09-24"), "Z26", 2.0, 3.1],
+        [1.0, serial("2026-09-24"), "Z26", 2.0, 3.1],
     )
     as_units, units_spill = valued_on_24_nov(
         index,
         "Henry Hub NYMEX",
         {**NG_TEMPLATE, "quantity_unit": "MMBTU"},
-        ["E-2", serial("2026-09-24"), "Z26", 5_000.0, 3.1],
+        [2.0, serial("2026-09-24"), "Z26", 5_000.0, 3.1],
     )
     assert as_lots == as_units == (pytest.approx(500.0), 0.0, pytest.approx(0.5))  # NYMEX lots
     unit = lots_spill[0].index("quantity_unit")
@@ -926,7 +926,7 @@ def test_a_cents_index_reads_back_the_quote_quantity_apart_from_the_coefficient(
         "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
     )
     trades = ENTRY["_CreateTrades"](
-        index, row(*NG_HEADERS), rows(["C-1", serial("2026-09-24"), "Z26", 1.0, 300.0]), template
+        index, row(*NG_HEADERS), rows([1.0, serial("2026-09-24"), "Z26", 1.0, 300.0]), template
     )
     spill = spilled(ENTRY["util_ReadHandle"](trades))
     assert spill[2][spill[0].index("quote_quantity")] == 10_000.0
@@ -966,8 +966,8 @@ def test_the_old_field_is_refused_at_the_seam_as_unknown(ng: dict[str, Any]) -> 
 # then the row sold, one lot, through a new batch over the same history and market.
 
 ENTRY_ROWS: list[list[object]] = [
-    ["NG-001", serial("2026-10-06"), "Z26", 2.0, 3.0],
-    ["ENTRY-002", serial("2026-10-06"), "F27", 0.0, 3.3],
+    [1001.0, serial("2026-10-06"), "Z26", 2.0, 3.0],
+    [1002.0, serial("2026-10-06"), "F27", 0.0, 3.3],
 ]
 
 
@@ -994,7 +994,7 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     trades, prepared, results = entry_state(ng, 0.0)
     assert valued(results) == (pytest.approx(2_000), 0.0, pytest.approx(2))
     batch = spilled(ENTRY["util_ReadHandle"](trades))
-    assert [line[1] for line in batch[2:]] == ["NG-001", "ENTRY-002"]  # the row kept, in its place
+    assert [line[1] for line in batch[2:]] == [1001.0, 1002.0]  # the row kept, in its place
     assert batch[3][batch[0].index("quantity")] == 0.0
     assert batch[3][batch[0].index("offset")] == 0.0
     table = spilled(ENTRY["util_ReadHandle"](results))
@@ -1035,7 +1035,7 @@ def test_a_zero_financial_trade_stays_at_nothing_live_fixed_and_paid(toy: dict[s
     trades = ENTRY["_CreateTrades"](
         toy["index"],
         row(*NG_HEADERS),
-        rows(["ENTRY-000", serial("2026-10-06"), "Z26", 0.0, 3.1]),
+        rows([1000.0, serial("2026-10-06"), "Z26", 0.0, 3.1]),
         toy["template"],
     )
     history = ""
@@ -1071,7 +1071,7 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
     )
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert ENTRY["_PrepareTrades"](trades, expired) == (
-        "#ERROR _PrepareTrades: ValueError: trade 'NG-001' at row 1 on Z26 expired 2026-11-25, "
+        "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
         "before valuation date 2026-11-26; a physical future after its expiry is not supported"
     )
     # An all-zero batch is held to the identity rules as any batch is: a history over another
@@ -1149,7 +1149,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert prepare(ng["trades"], expired) == (
-        "#ERROR _PrepareTrades: ValueError: trade 'NG-001' at row 1 on Z26 expired 2026-11-25, "
+        "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
         "before valuation date 2026-11-26; a physical future after its expiry is not supported"
     )
     bilateral = ENTRY["_CreateTradeTemplate"](
@@ -1178,9 +1178,9 @@ L3D_SETTLES = {
     "2026-12-07": 73.0,
     "2026-12-08": 80.0,
 }
-L3D_A: list[object] = ["A", serial("2026-11-20"), "Z26", 60.0, 70.0]
-L3D_B: list[object] = ["B", serial("2026-11-20"), "Z26", -30.0, 72.0]
-L3D_STRIP: list[object] = ["S", serial("2026-11-20"), "Z26-F27", 3.0, 70.0]
+L3D_A: list[object] = [1.0, serial("2026-11-20"), "Z26", 60.0, 70.0]
+L3D_B: list[object] = [2.0, serial("2026-11-20"), "Z26", -30.0, 72.0]
+L3D_STRIP: list[object] = [19.0, serial("2026-11-20"), "Z26-F27", 3.0, 70.0]
 
 
 def l3d_template(payment_holidays: list[str], settlement: str = "financial") -> str:
@@ -1355,7 +1355,7 @@ def test_the_last3day_batch_equals_its_singletons_summed_in_either_order(
     both, reversed_rows = marked(rows(L3D_A, L3D_B)), marked(rows(L3D_B, L3D_A))
     assert both == reversed_rows == (pytest.approx(150), 0.0, pytest.approx(20))
     assert both[0] == pytest.approx(a[0] + b[0]) and both[2] == pytest.approx(a[2] + b[2])
-    zero: list[object] = ["Z", serial("2026-11-20"), "F27", 0.0, 71.0]
+    zero: list[object] = [26.0, serial("2026-11-20"), "F27", 0.0, 71.0]
     kept = ENTRY["_CreateTrades"](
         l3d["index"], l3d["headers"], rows(L3D_A, L3D_B, zero), l3d["template"]
     )
@@ -1372,7 +1372,7 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_she
     physical = l3d_template(["2026-01-01"], "physical")
     assert ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], rows(L3D_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the last3day method of trade 'A' at row 1; a last3day future is cash settled on the "
+        "with the last3day method of trade 1 at row 1; a last3day future is cash settled on the "
         "average of its last three pricing days"
     )
 
@@ -1400,9 +1400,9 @@ def ethane_settles() -> dict[str, float]:
 
 
 ETHANE_SETTLES = ethane_settles()
-ETHANE_A: list[object] = ["A", serial("2026-11-20"), "Z26", 4_400.0, 0.25]
-ETHANE_B: list[object] = ["B", serial("2026-11-20"), "Z26", -2_200.0, 0.26]
-ETHANE_STRIP: list[object] = ["S", serial("2026-11-20"), "Z26-F27", 2_200.0, 0.25]
+ETHANE_A: list[object] = [1.0, serial("2026-11-20"), "Z26", 4_400.0, 0.25]
+ETHANE_B: list[object] = [2.0, serial("2026-11-20"), "Z26", -2_200.0, 0.26]
+ETHANE_STRIP: list[object] = [19.0, serial("2026-11-20"), "Z26-F27", 2_200.0, 0.25]
 LIVE_QUOTES = (0.28, 0.30, 0.32)
 LATER_QUOTES = (0.30, 0.32)
 
@@ -1620,7 +1620,7 @@ def test_the_asian_batch_equals_its_singletons_summed_in_either_order(
     assert (a[0], b[0]) == (pytest.approx(124), pytest.approx(-40))
     assert both == reversed_rows == (pytest.approx(84), 0.0, pytest.approx(2_100))
     assert both[0] == pytest.approx(a[0] + b[0]) and both[2] == pytest.approx(a[2] + b[2])
-    zero: list[object] = ["Z", serial("2026-11-20"), "F27", 0.0, 0.27]
+    zero: list[object] = [26.0, serial("2026-11-20"), "F27", 0.0, 0.27]
     kept = ENTRY["_CreateTrades"](
         ethane["index"], ethane["headers"], rows(ETHANE_A, ETHANE_B, zero), ethane["template"]
     )
@@ -1637,7 +1637,7 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made_on_the_sheet(
     physical = asian_template(["2027-01-01"], "physical")
     assert ENTRY["_CreateTrades"](ethane["index"], ethane["headers"], rows(ETHANE_A), physical) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
-        "with the asian method of trade 'A' at row 1; an asian future is cash settled on the "
+        "with the asian method of trade 1 at row 1; an asian future is cash settled on the "
         "average of its month's pricing days"
     )
 
@@ -1653,13 +1653,13 @@ def test_a_calday_batch_values_as_the_month_batch_of_its_component_quantity(
     by_day = ENTRY["_CreateTrades"](
         ethane["index"],
         ethane["headers"],
-        rows(["C", serial("2026-11-20"), "Z26", 110.0, 0.25]),
+        rows([3.0, serial("2026-11-20"), "Z26", 110.0, 0.25]),
         asian_template(["2027-01-01"], basis="calday"),
     )
     by_month = ENTRY["_CreateTrades"](
         ethane["index"],
         ethane["headers"],
-        rows(["M", serial("2026-11-20"), "Z26", 3_410.0, 0.25]),
+        rows([13.0, serial("2026-11-20"), "Z26", 3_410.0, 0.25]),
         ethane["template"],
     )
     for as_of, quotes, expected in (
@@ -1705,7 +1705,7 @@ PERIOD_STATES = [
 ]
 
 
-def dated_rows(*trades: tuple[str, float, float, float]) -> Cells:
+def dated_rows(*trades: tuple[int, float, float, float]) -> Cells:
     """Rows of the dated ticket: a label, the first and last day as serials and the quantity, each
     at 0.25 and struck on 20 November."""
     return rows(
@@ -1741,18 +1741,18 @@ def booked(ethane: dict[str, Any]) -> dict[str, Any]:
     assert (start, end) == (serial("2026-12-15"), serial("2026-12-31"))
     headers = row(*DATE_HEADERS)
     helped = ENTRY["_CreateTrades"](
-        ethane["index"], headers, dated_rows(("P", start, end, 2_000.0)), ethane["template"]
+        ethane["index"], headers, dated_rows((16, start, end, 2_000.0)), ethane["template"]
     )
     typed = ENTRY["_CreateTrades"](
         ethane["index"],
         headers,
-        dated_rows(("P", serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
+        dated_rows((16, serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
         ethane["template"],
     )
     by_day = ENTRY["_CreateTrades"](
         ethane["index"],
         headers,
-        dated_rows(("P", serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
+        dated_rows((16, serial("2026-12-15"), serial("2026-12-31"), 2_000.0)),
         asian_template(["2027-01-01"], basis="calday"),
     )
     return {"headers": headers, "helped": helped, "typed": typed, "by_day": by_day}
@@ -1867,8 +1867,8 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
     # days, beside P's 50 still in mark, and the preparation reads back the two days.
     headers = booked["headers"]
     first, last = serial("2026-12-01"), serial("2026-12-31")
-    p = ("P", serial("2026-12-15"), last, 2_000.0)
-    q = ("Q", first, last, 2_200.0)
+    p = (16, serial("2026-12-15"), last, 2_000.0)
+    q = (17, first, last, 2_200.0)
     together = ENTRY["_CreateTrades"](
         ethane["index"], headers, dated_rows(p, q), ethane["template"]
     )
@@ -1879,7 +1879,7 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
         ethane["index"], headers, dated_rows(p, q, p), ethane["template"]
     )
     with_zero = ENTRY["_CreateTrades"](
-        ethane["index"], headers, dated_rows(p, q, ("Z", first, last, 0.0)), ethane["template"]
+        ethane["index"], headers, dated_rows(p, q, (26, first, last, 0.0)), ethane["template"]
     )
     _, _, both = period_state(ethane, together, "2026-12-02", LIVE_QUOTES)
     _, _, only_p = period_state(ethane, booked["typed"], "2026-12-02", LIVE_QUOTES)
@@ -1901,7 +1901,7 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
     apart = ENTRY["_CreateTrades"](
         ethane["index"],
         headers,
-        dated_rows(p, ("Q", first, serial("2026-12-30"), 2_200.0)),
+        dated_rows(p, (17, first, serial("2026-12-30"), 2_200.0)),
         ethane["template"],
     )
     batch = spilled(ENTRY["util_ReadHandle"](apart))
@@ -1927,8 +1927,8 @@ def test_two_starts_on_one_contract_share_a_batch_and_two_ends_pay_apart(
 PAYS_FIELDS = (*PEN_FIELDS[:6], "payment_holiday_calendar")
 PAYS_HEADERS = (*NG_HEADERS, "payment_time_lag")
 PAYS_HOLIDAYS = ["2026-01-01"]
-PAYS_A: list[object] = ["A", serial("2026-11-30"), "Z26", 60.0, 70.0, "+1bd"]
-PAYS_B: list[object] = ["B", serial("2026-11-30"), "Z26", -30.0, 72.0, "+3bd"]
+PAYS_A: list[object] = [1.0, serial("2026-11-30"), "Z26", 60.0, 70.0, "+1bd"]
+PAYS_B: list[object] = [2.0, serial("2026-11-30"), "Z26", -30.0, 72.0, "+3bd"]
 PAYS_SETTLES = {"2026-12-02": 71.0, "2026-12-03": 75.0, "2026-12-04": 73.0}
 PAYS_STATES = [
     ("2026-12-02", (74.0, 80.0), 180, 0, 30, [False, False]),
@@ -2114,10 +2114,10 @@ MIXED_HEADERS = (
     "schedule_method",
     "clearing_house",
 )
-MIXED_A: list[object] = ["A", "Z26", 1.0, "BBL", "month", "lastday", "Clearer A"]
-MIXED_B: list[object] = ["B", "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B"]
-MIXED_C: list[object] = ["C", "Z26", 3.0, "BBL", "month", "last3day", "Clearer A"]
-MIXED_D: list[object] = ["D", "Z26", 22.0, "GAL", "month", "asian", "Clearer B"]
+MIXED_A: list[object] = [1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A"]
+MIXED_B: list[object] = [2.0, "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B"]
+MIXED_C: list[object] = [3.0, "Z26", 3.0, "BBL", "month", "last3day", "Clearer A"]
+MIXED_D: list[object] = [4.0, "Z26", 22.0, "GAL", "month", "asian", "Clearer B"]
 MIXED_HOLIDAYS = ["2026-12-25"]
 MIXED_DECEMBER = [
     str(d)
@@ -2212,7 +2212,7 @@ def test_the_mixed_batch_values_on_the_sheet_as_the_ticket_says(
 def test_the_mixed_batch_reads_back_each_rows_own_choices(mixed: dict[str, Any]) -> None:
     # A strip beside the four rows, S the whole of December and January under asian in gallons a
     # month: its two components show S's choices, not row 1's.
-    strip: list[object] = ["S", "Z26-F27", 5.0, "GAL", "month", "asian", "Clearer B"]
+    strip: list[object] = [19.0, "Z26-F27", 5.0, "GAL", "month", "asian", "Clearer B"]
     handle = ENTRY["_CreateTrades"](
         mixed["index"],
         mixed["headers"],
@@ -2321,7 +2321,7 @@ def test_the_mixed_batch_equals_its_singletons_on_the_sheet_and_a_uniform_field_
         ENTRY["_CreateTrades"](
             mixed["index"],
             mixed["headers"],
-            rows(MIXED_A, ["B", "Z26", -2.0, "ICE", "calday", "penultimate", "Clearer B"]),
+            rows(MIXED_A, [2.0, "Z26", -2.0, "ICE", "calday", "penultimate", "Clearer B"]),
             mixed["template"],
         )
     ) == (
@@ -2362,9 +2362,9 @@ ETE_DATED = (
     "schedule_method",
 )
 ETE_ROWS: list[list[object]] = [
-    ["A", serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, "lastday"],
-    ["B", serial("2026-11-20"), "Z26", 1000.0, "BBL", 25.0, "lastday"],
-    ["C", serial("2026-11-20"), "Z26", 42000.0, "GAL", 25.0, "lastday"],
+    [1.0, serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, "lastday"],
+    [2.0, serial("2026-11-20"), "Z26", 1000.0, "BBL", 25.0, "lastday"],
+    [3.0, serial("2026-11-20"), "Z26", 42000.0, "GAL", 25.0, "lastday"],
 ]
 
 
@@ -2499,7 +2499,7 @@ def test_a_partial_asian_period_reports_the_live_half_of_its_lots(ete: dict[str,
             25.0,
             "asian",
         ]
-        for label, q, unit in (("A", 1.0, "LOT"), ("B", 1000.0, "BBL"), ("C", 42000.0, "GAL"))
+        for label, q, unit in ((1, 1.0, "LOT"), (2, 1000.0, "BBL"), (3, 42000.0, "GAL"))
     ]
     _, prepared, results = ete_state(
         ete["index"],
@@ -2552,7 +2552,7 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
     # mark restate in each unit, the lot delta is one throughout, and the index reads back the
     # lot's quantity in the quote unit and its coefficient in the settlement currency.
     index = ete_index(quote, settled)
-    line: list[object] = ["A", serial("2026-11-20"), "Z26", 1.0, "LOT", fixed, "lastday"]
+    line: list[object] = [1.0, serial("2026-11-20"), "Z26", 1.0, "LOT", fixed, "lastday"]
     _, _, results = ete_state(index, ete_template(), [line], "2026-12-02", {}, (live, live))
     assert valued(results) == (pytest.approx(mark), 0.0, pytest.approx(1))
     assert spilled(ENTRY["_ReportValues"](results))[2][2] == settled
@@ -2596,7 +2596,7 @@ def test_the_reporting_lot_is_the_indexs_choice_and_scales_the_lots_alone() -> N
         history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
         market = a_market(history, "Henry Hub NYMEX", 3.20, 3.50)
         for quantity, lots_reported in zip((10_000.0, 2_500.0), expected, strict=True):
-            line: list[object] = ["E", serial("2026-09-24"), "Z26", quantity, 3.1]
+            line: list[object] = [5.0, serial("2026-09-24"), "Z26", quantity, 3.1]
             trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(line), template)
             results = str(
                 ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market)
@@ -2618,10 +2618,10 @@ def test_every_method_fully_live_reports_one_lot_and_a_strip_a_lot_a_month(
     lines: list[list[object]] = [
         [label, serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, method]
         for label, method in (
-            ("L", "lastday"),
-            ("P", "penultimate"),
-            ("T", "last3day"),
-            ("S", "asian"),
+            (12, "lastday"),
+            (16, "penultimate"),
+            (20, "last3day"),
+            (19, "asian"),
         )
     ]
     _, _, results = ete_state(ete["index"], ete["template"], lines, "2026-12-01", {}, (28.0, 29.0))
@@ -2632,7 +2632,7 @@ def test_every_method_fully_live_reports_one_lot_and_a_strip_a_lot_a_month(
         )
         assert valued(alone) == (pytest.approx(1_260), 0.0, pytest.approx(1)), line[0]
     # A lot a month over Z26-F27, F27 at 29: a lot of delta on each contract, two in all.
-    strip: list[object] = ["Z", serial("2026-11-20"), "Z26-F27", 1.0, "LOT", 25.0, "lastday"]
+    strip: list[object] = [26.0, serial("2026-11-20"), "Z26-F27", 1.0, "LOT", 25.0, "lastday"]
     _, _, over_two = ete_state(
         ete["index"], ete["template"], [strip], "2026-12-02", {}, (28.0, 29.0)
     )
@@ -2645,7 +2645,7 @@ def test_every_method_fully_live_reports_one_lot_and_a_strip_a_lot_a_month(
     # Twenty barrels a calendar day over 16 to 20 December, five covered days for three weekday
     # observations: a hundred barrels, a tenth of a lot, whatever the days observed.
     dated: list[object] = [
-        "D",
+        4.0,
         serial("2026-11-20"),
         serial("2026-12-16"),
         serial("2026-12-20"),
@@ -2688,15 +2688,15 @@ def test_lot_deltas_are_signed_fractional_and_add_up_in_any_order(ete: dict[str,
             ete_state(ete["index"], ete["template"], lines, "2026-12-02", {}, (28.0, 29.0))[2]
         )
 
-    sold: list[object] = ["A", serial("2026-11-20"), "Z26", -1.0, "LOT", 25.0, "lastday"]
+    sold: list[object] = [1.0, serial("2026-11-20"), "Z26", -1.0, "LOT", 25.0, "lastday"]
     assert state([sold]) == (pytest.approx(-1_260), 0.0, pytest.approx(-1))
-    one_barrel: list[object] = ["B", serial("2026-11-20"), "Z26", 1.0, "BBL", 25.0, "lastday"]
+    one_barrel: list[object] = [2.0, serial("2026-11-20"), "Z26", 1.0, "BBL", 25.0, "lastday"]
     assert state([one_barrel]) == (pytest.approx(1.26), 0.0, pytest.approx(0.001))
-    kept: list[object] = ["K", serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday"]
+    kept: list[object] = [11.0, serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday"]
     three = (pytest.approx(3_780), 0.0, pytest.approx(3))
     assert state([*ETE_ROWS, kept]) == three and state(ETE_ROWS[::-1]) == three
     assert state([ETE_ROWS[0], ETE_ROWS[0]]) == (pytest.approx(2_520), 0.0, pytest.approx(2))
-    offset: list[object] = ["B", serial("2026-11-20"), "Z26", -1000.0, "BBL", 25.0, "lastday"]
+    offset: list[object] = [2.0, serial("2026-11-20"), "Z26", -1000.0, "BBL", 25.0, "lastday"]
     assert state([ETE_ROWS[0], offset]) == (0.0, 0.0, 0.0)
 
 
@@ -2713,7 +2713,7 @@ WTI_SETTLES = {
     "2026-12-29": 78.0,
 }
 WTI_ROW: list[object] = [
-    "W",
+    23.0,
     serial("2026-11-20"),
     serial("2026-12-18"),
     serial("2026-12-28"),
@@ -2834,7 +2834,7 @@ def test_two_groups_on_one_pricing_day_read_back_apart_by_their_booked_contracts
     template = wti_template("+1bd", None)
     headers = row(*DATE_HEADERS, "schedule_method")
     asian: list[object] = [
-        "A",
+        1.0,
         *WTI_ROW[1:2],
         serial("2026-12-01"),
         serial("2026-12-21"),
@@ -2843,7 +2843,7 @@ def test_two_groups_on_one_pricing_day_read_back_apart_by_their_booked_contracts
         "asian",
     ]
     future: list[object] = [
-        "F",
+        6.0,
         *WTI_ROW[1:2],
         serial("2027-01-01"),
         serial("2027-01-31"),
@@ -2881,14 +2881,14 @@ def test_a_code_entry_and_the_dates_of_the_whole_month_agree_on_the_wti_asian(
     by_code = ENTRY["_CreateTrades"](
         wti["index"],
         row(*NG_HEADERS),
-        rows(["Z", serial("2026-11-20"), "Z26", 2_200.0, 70.0]),
+        rows([26.0, serial("2026-11-20"), "Z26", 2_200.0, 70.0]),
         wti["template"],
     )
     by_dates = ENTRY["_CreateTrades"](
         wti["index"],
         row(*DATE_HEADERS),
         rows(
-            ["Z", serial("2026-11-20"), serial("2026-12-01"), serial("2026-12-31"), 2_200.0, 70.0]
+            [26.0, serial("2026-11-20"), serial("2026-12-01"), serial("2026-12-31"), 2_200.0, 70.0]
         ),
         wti["template"],
     )
@@ -2933,8 +2933,8 @@ def monthly() -> dict[str, Any]:
     )
     template = wti_template("+1bd", None, "LOT")
     headers = row(*NG_HEADERS, "schedule_method")
-    asian: list[object] = ["A", serial("2026-11-20"), "Z26", 22.0, 70.0, "asian"]
-    pen: list[object] = ["P", serial("2026-11-20"), "Z26", 3.0, 70.0, "penultimate"]
+    asian: list[object] = [1.0, serial("2026-11-20"), "Z26", 22.0, 70.0, "asian"]
+    pen: list[object] = [16.0, serial("2026-11-20"), "Z26", 3.0, 70.0, "penultimate"]
     return {
         "index": index,
         "template": template,
@@ -3075,7 +3075,7 @@ WAHA_LOT = "lots of LOT (2500 MMBTU)"
 WAHA_X26 = {"X26": -0.40}  # the earlier month's index, which every December history must hold
 WAHA_Z26 = {"X26": -0.40, "Z26": -0.20}
 WAHA_CORRECTED = {"X26": -0.40, "Z26": -0.10}
-WAHA_ROW: list[object] = ["WAH001", serial("2026-11-30"), "Z26", 1.0, -0.5]
+WAHA_ROW: list[object] = [1001.0, serial("2026-11-30"), "Z26", 1.0, -0.5]
 
 
 def an_iferc_index(
@@ -3257,6 +3257,111 @@ def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made
         rows([*WAHA_ROW, "asian"]),
         template,
     ) == (
-        "#ERROR _CreateTrades: ValueError: schedule_method of trade 'WAH001' at row 1 is 'asian', "
+        "#ERROR _CreateTrades: ValueError: schedule_method of trade 1001 at row 1 is 'asian', "
         "expected 'lastday' on an IFERC index; an IFERC month has one index, published once"
+    )
+
+
+# --- numeric trade IDs on the sheet, numeric-trade-ids.md -----------------------------------
+# The ticket's rows through the registered functions: numbers in, numbers back, the 15 digits
+# exact, the instrument saying number, a template's ID on every row, and the seam's own words for
+# text, a boolean, a blank and empty text before the library's for a fraction or a sixteenth digit.
+ID_ROWS: list[list[object]] = [
+    [123456.0, serial("2026-10-09"), "Z26", 1.0, 3.0],
+    [123457.0, serial("2026-10-09"), "F27", -2.0, 3.1],
+    [123456.0, serial("2026-10-09"), "Z26", 1.0, 3.0],
+]
+
+
+def test_numeric_ids_cross_the_seam_and_read_back_as_numbers(ng: dict[str, Any]) -> None:
+    trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*ID_ROWS), ng["template"])
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    assert table[0][1] == "trade_id" and table[1][1] == "int64"
+    assert [line[1] for line in table[2:]] == [123456.0, 123457.0, 123456.0]
+    assert [line[0] for line in table[2:]] == [1.0, 2.0, 3.0]
+    big = ENTRY["_CreateTrades"](
+        ng["index"],
+        row(*NG_HEADERS),
+        rows(
+            [999_999_999_999_999.0, serial("2026-10-09"), "Z26", 1.0, 3.0],
+            [-999_999_999_999_999.0, serial("2026-10-09"), "F27", 1.0, 3.0],
+            [0.0, serial("2026-10-09"), "Z26", 1.0, 3.0],
+        ),
+        ng["template"],
+    )
+    assert [line[1] for line in spilled(ENTRY["util_ReadHandle"](big))[2:]] == [
+        999_999_999_999_999.0,
+        -999_999_999_999_999.0,
+        0.0,
+    ]
+    shown = spilled(ENTRY["_ShowInstrument"]("future"))
+    assert shown[4][1] == "number" and shown[5][1] == "a whole number of at most 15 digits"
+
+
+def test_a_templates_numeric_id_reads_back_as_a_number_and_reaches_every_row(
+    ng: dict[str, Any],
+) -> None:
+    fields = {**NG_TEMPLATE, "trade_id": 77.0}
+    template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    shown = spilled(ENTRY["util_ReadHandle"](template))
+    at = shown[0].index("trade_id")
+    assert (shown[1][at], shown[2][at]) == ("float64", 77.0)
+    trades = ENTRY["_CreateTrades"](
+        ng["index"], row(*NG_HEADERS[1:]), rows(*[line[1:] for line in ID_ROWS]), template
+    )
+    assert [line[1] for line in spilled(ENTRY["util_ReadHandle"](trades))[2:]] == [77.0] * 3
+    assert ENTRY["_CreateTradeTemplate"](
+        "future", row(*fields), row(*{**fields, "trade_id": 12.5}.values())
+    ) == (
+        "#ERROR _CreateTradeTemplate: ValueError: trade_id is 12.5, expected a whole number of at "
+        "most 15 digits"
+    )
+    assert ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*ID_ROWS), template) == (
+        "#ERROR _CreateTrades: ValueError: trade_id is supplied by the template and by the ticket, "
+        "expected by one of them"
+    )
+
+
+@pytest.mark.parametrize(
+    ("cell", "message"),
+    [
+        (
+            "NG-001",
+            "#ERROR _CreateTrades: trade_rows cell (1, 1) is text 'NG-001', expected number",
+        ),
+        (True, "#ERROR _CreateTrades: trade_rows cell (1, 1) is boolean TRUE, expected number"),
+        (
+            "",
+            "#ERROR _CreateTrades: trade_rows cell (1, 1) is empty text, expected number, nonempty "
+            "text or boolean",
+        ),
+        (
+            None,
+            "#ERROR _CreateTrades: trade_rows cell (1, 1) is blank, expected number, nonempty text "
+            "or boolean",
+        ),
+        (
+            123456.5,
+            "#ERROR _CreateTrades: ValueError: trade_id row 1 is 123456.5, expected a whole "
+            "number of at most 15 digits",
+        ),
+        (
+            1e15,
+            "#ERROR _CreateTrades: ValueError: trade_id row 1 is 1000000000000000, expected a "
+            "whole number of at most 15 digits",
+        ),
+    ],
+    ids=["text", "a boolean", "empty text", "a blank", "a fraction", "a sixteenth digit"],
+)
+def test_an_id_cell_that_is_not_a_whole_number_fails_in_the_seams_or_the_librarys_words(
+    ng: dict[str, Any], cell: object, message: str
+) -> None:
+    assert (
+        ENTRY["_CreateTrades"](
+            ng["index"],
+            row(*NG_HEADERS),
+            rows([cell, serial("2026-10-09"), "Z26", 1.0, 3.0]),
+            ng["template"],
+        )
+        == message
     )

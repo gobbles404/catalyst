@@ -8,7 +8,7 @@ Record observations and decisions here before turning them into implementation t
 | Item | Owner direction | Status |
 |---|---|---|
 | 1. Delta reporting | Report delta in **lots**, using one explicitly designated specification per index, independently of trade entry units. | Implemented in prototype PR #164; fixes reviewed at `414b6e0`; [design ticket](lot-delta-reporting.md) |
-| 2. `trade_id` | Treat it as an **alphanumeric identifier**, rather than a quantity. | Proposed; entry details to confirm |
+| 2. `trade_id` | Accept whole-number IDs of at most 15 digits directly from Excel; retain integers and read back numeric cells. | Owner clarified integer IDs, 9 October; [engineering ticket](numeric-trade-ids.md); built in #168 |
 | 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
 | 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
 | 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Implemented in prototype PR #165; reviewed at `f1f1b91`; [design ticket](calendar-driven-asian-references.md) |
@@ -17,6 +17,7 @@ Record observations and decisions here before turning them into implementation t
 | 8. Reserve consumption | Aggregate booked brokerage, clearing and marketing reserves during evaluation; retain the batch totals in results for a pure reader. Marketing is zero where unsupported. | Agreed direction 9 October; implementation pending; marketing input where supported and detailed amount rules still need definition |
 | 9. Date offsets from text | `util_ShiftDate(date, offset, [holiday_calendar])` with signed `bd`, `cd` and `em` offsets. | Agreed direction 9 October; implementation ticket pending |
 | 10. IFERC trade support | Support cleared financial basis futures on a supplied IFERC basis index; use its monthly publication fixing and count payment lag from last trading. | Requested 9 October; [engineering ticket](iferc-basis-futures.md); built in #167; `lastday` meaning proposed explicitly |
+| 11. Bilateral counterparty | Add a `counterparty` field to the instrument definition when implementing bilateral trades. | Owner reminder, 9 October; included in the [bilateral ticket](bilateral-discounting-and-dv01.md); implementation pending |
 
 ## 1. Delta reporting
 
@@ -43,15 +44,19 @@ it is finalized.
 
 ## 2. Trade identifiers
 
-In the reviewed prototype through #163, `trade_id` already accepts alphanumeric text,
-text containing only digits, and punctuation. A numeric Excel cell is rejected as
-the wrong type; accepting that cell would be a separate surface decision.
+The owner clarified on 9 October that the source system uses numeric IDs, superseding
+the earlier alphanumeric proposal, and confirmed whole numbers of at most 15 digits
+without meaningful leading zeros. Through reviewed prototype #167 at `9117a39`, the
+instrument still requires text for `trade_id` and refuses numeric Excel cells.
 
-The proposed meaning of `trade_id` is an identifier that can contain letters and digits,
-for example `ETE001`. Do not infer a letters-and-digits-only restriction, uniqueness rule
-or automatic numeric-cell conversion from this note. Numeric Excel cells versus text
-identifiers, preservation of leading zeros, and any character restrictions remain to
-be clarified if relevant to UAT.
+The owner also confirmed the field can be a whole integer. The
+[numeric trade IDs ticket](numeric-trade-ids.md) changes this field to numeric entry,
+integer retained identity and numeric readback, using existing seam support. It preserves
+optional omission, template/ticket disjointness, original-row attribution and duplicate
+occurrences. IDs remain attribution rather than an economic grouping or deduplication key.
+The ticket specifies finite whole values within the 15-digit range, without text coercion;
+built in #168, the ticket's [As built](numeric-trade-ids.md#as-built-168) section saying what
+landed.
 
 ## 3. Dates and period labels through the same helpers
 
@@ -335,5 +340,10 @@ recommendation, not a new field or a change already implemented. The ticket incl
 full-month bullets/strips and existing quantity bases; partial months, other IFERC
 schedule methods, Gas Daily trades and bilateral rates are outside this slice.
 
-Built in #167; the ticket's [As built](iferc-basis-futures.md#as-built-167) section says what
-landed and what was not built.
+## 11. Counterparty on bilateral trades
+
+Owner reminder, 9 October: add `counterparty` to the instrument definition as part of
+the bilateral work, available through the normal template/ticket entry and retained
+on the resolved trade. Carry this into the [bilateral implementation ticket](bilateral-discounting-and-dv01.md).
+Requiredness and validation details remain to be specified with that work; this records
+the requested field, not an implemented change.

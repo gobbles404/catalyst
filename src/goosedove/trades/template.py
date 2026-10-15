@@ -28,6 +28,7 @@ from goosedove.trades.terms import (
     Settlement,
     finite_prices,
     whole_quantities,
+    whole_trade_ids,
 )
 
 
@@ -164,6 +165,12 @@ def price_of(where: str, number: float) -> float:
     return number
 
 
+def trade_id_of(where: str, number: float) -> int:
+    """A trade ID by the kernel's rule, a whole number of at most 15 digits, named by its field,
+    since #168: the one integer a template holds, read once here and repeated for every row."""
+    return int(whole_trade_ids(np.array([number]), lambda _: where)[0])
+
+
 def months_of(where: str, text: str) -> tuple[int, int]:
     """The first month of a contract code or strip and the month after its last, as numpy counts
     months, through the period grammar, which reads `Z26`, `z26`, `CAL27` and `Z27-X28` alike;
@@ -177,7 +184,8 @@ def months_of(where: str, text: str) -> tuple[int, int]:
 
 
 # The readers by field name: the text fields whose text means something beyond being text, and
-# the two numbers the kernel has a rule for; the labels and the dates are read by nobody.
+# the three numbers the kernel has a rule for, the trade ID since #168; the two labels and the
+# dates are read by nobody.
 READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
     {
         "contract_code": months_of,
@@ -188,6 +196,6 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "payment_time_lag": business_days_of,
     }
 )
-NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float]]] = MappingProxyType(
-    {"quantity": quantity_of, "fixed_price": price_of}
+NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(
+    {"trade_id": trade_id_of, "quantity": quantity_of, "fixed_price": price_of}
 )
