@@ -49,7 +49,7 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
 | 1 / owner UAT | [Bilateral valuation and risk in Excel](bilateral-excel-integration.md), built in #177, and [unified risk reporting](unified-risk-reporting.md), built in #178 | Use the kept workbook's bilateral block and realistic desk batches: verify cleared and bilateral values, both delta bases, DV01 by payment day, month and year, different payment days, partial fixings and independent quote and curve updates before closing the arc. |
-| 2 / item 12 | The collector of the [risk reporting and aggregation series](aggregate-evaluated-results.md) | After the one-result report: collect compatible evaluated results, then take the collector's handle in the same reader; identity, snapshot and repeated-input policies are proposals to confirm in those tickets. |
+| 2 / item 12 | The Excel creator of the [collector](aggregate-risk-kernel.md), built privately in #179 | `_AggregateResults(result_handles)` and the reader taking its handle: the collector's policies, identity by object, snapshots by object, every occurrence counted and same-name indexes refused, are built and pinned in the library; the sheet's creator, its readback and its lifetime follow. |
 
 Readable index names, reserve totals, date offsets, mixed period entry and BAL helper
 inputs have moved to release testing above. Bilateral is the remaining main arc; its
@@ -459,5 +459,8 @@ The [series specification](aggregate-evaluated-results.md) records this directio
 supersedes the earlier collector-first plan. The [first ticket](unified-risk-reporting.md) is
 built in #178: the single-result report and the saved payment-time DV01, `_ReportDelta` retired
 and the kept callers migrated, the heading and context layout as proposed, with the owner's
-answers of 11 October recorded on the page. The collector and the acceptance of its handle in
-the same reader follow in the series' next tickets, not implemented.
+answers of 11 October recorded on the page. The [second ticket](aggregate-risk-kernel.md) is
+built in #179, privately: the collector combines results by the exact index object, refusing
+distinct indexes of one name, and DV01 by the exact curve object and currency, every
+occurrence counted, nothing priced again, the owner's three clarifications recorded on its
+page. The Excel creator and the reader's acceptance of its handle follow, not implemented.

@@ -2,6 +2,7 @@
 
 [Pipeline overview](README.md) · [First implementation ticket](unified-risk-reporting.md) ·
 [UAT notes](surface-uat-notes.md#12-aggregate-evaluated-results) ·
+[Collector kernel ticket](aggregate-risk-kernel.md) ·
 [Bilateral Excel integration](bilateral-excel-integration.md)
 
 **Status:** Current series specification, 11 October 2026. The owner agreed to one risk
@@ -9,10 +10,11 @@ reader for a single evaluated trade array or a collection of evaluated arrays, a
 risk selection and time bucket, and a saved Total above the dated rows. This replaces the
 10 October proposal for separate aggregate readers, a default day bucket and long tables.
 The first ticket, [unified-risk-reporting.md](unified-risk-reporting.md), is built in #178 on
-PR #177's path, reviewed clean at `788e5a7`; the collection changes below are not implemented
-yet, and release and UAT remain separate.
+PR #177's path, reviewed clean at `788e5a7`; the second, [aggregate-risk-kernel.md](aggregate-risk-kernel.md),
+the private collector, in #179 above it; the Excel creator and the reader's acceptance of its
+handle are the next ticket's, and release and UAT remain separate.
 
-The first PR establishes the report on one evaluated batch. The second ticket, the collector kernel, not yet in this repository,
+The first PR establishes the report on one evaluated batch. The [second ticket](aggregate-risk-kernel.md), built in #179 privately,
 defines the private collector kernel and makes the proposed identity, snapshot and duplicate
 policies explicit for review. A subsequent PR exposes collection and extends that same
 reader to the aggregate handle. These policies are not hidden decisions in the first PR.
@@ -132,7 +134,7 @@ not curve-node or key-rate sensitivity. Fixed-but-unpaid trades may have zero co
 delta and nonzero DV01. No FX conversion, cross-index lot conversion or currency-only
 inference of a common curve is introduced.
 
-Values and reserves are outside the new risk reader. The collector kernel ticket, to follow,
+Values and reserves are outside the new risk reader. The [collector kernel ticket](aggregate-risk-kernel.md)
 retains them only through source-result references; it does not compute their aggregates.
 Grouped value/reserve totals and their reports remain a later extension.
 
@@ -245,7 +247,7 @@ Deliver in reviewable slices after bilateral integration/UAT:
 1. **Unified risk report for one evaluated batch.** The [first ticket](unified-risk-reporting.md)
    defines the required selectors, saved payment-time DV01, Total-first layout, removal
    of `_ReportDelta`, full caller migration and financial/workbook acceptance. No collector.
-2. **Collector kernel.** The second ticket, to follow, specifies typed source
+2. **Collector kernel.** The [second ticket](aggregate-risk-kernel.md), built in #179, specifies typed source
    input, compatible risk groups and scalar/vector views, identity/duplicate policies,
    worked examples and work budgets. It reuses the first slice's report-view structure;
    no Excel creator or reader input change occurs in this slice.
