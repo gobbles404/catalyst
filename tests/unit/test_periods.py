@@ -1,7 +1,8 @@
 """Periods read from their labels: a month, a quarter, a calendar year, a winter, a summer and a
 range of two, their first and last calendar days, the letters in either case, and everything else
-refused naming the whole expression; and the balance of any of them from a reference date, the
-first day the deal covers, held inside the label's own period."""
+refused naming the whole expression; and the balance of any of them from a valuation day, the
+later of that day and the label's first day to the label's last, a period that has ended
+refused."""
 
 import numpy as np
 import pytest
@@ -254,117 +255,150 @@ def test_the_strips_are_their_months_long(year: int, quarter: int) -> None:
 
 
 # --- the balance of a period --------------------------------------------------
-# trade-periods-and-bal.md, slice B: one BAL prefix in either case on any label the grammar reads,
-# and a reference date, the first day the deal covers, which must be a day of the label's own
-# period, either end included; the balance runs from it to the label's last day. An ordinary label
-# reads as before whether or not a reference is given, so one formula serves a column of both.
+# trade-periods-and-bal.md slice B gave the balance a reference date held inside the period;
+# date-helper-inputs.md, since #173, gives it the valuation day: the balance runs from the later
+# of that day and the label's first day to the label's last day, a future period being the whole
+# period, a current one running from the day itself, and a period that ended before the day
+# refused by both readers, naming the label, the day and the end. An ordinary label reads as
+# before whether or not a day is given, so one formula serves a column of both.
 
 
 @pytest.mark.parametrize(
-    ("period", "reference", "first", "last"),
+    ("period", "as_of", "first", "last"),
     [
+        ("balv26", "2026-09-20", "2026-10-01", "2026-10-31"),
+        ("BALV26", "2026-10-12", "2026-10-12", "2026-10-31"),
+        ("BalV26", "2026-10-31", "2026-10-31", "2026-10-31"),
+        ("balf26", "2025-12-20", "2026-01-01", "2026-01-31"),
+        ("balf26", "2026-01-15", "2026-01-15", "2026-01-31"),
+        ("balf26", "2026-01-31", "2026-01-31", "2026-01-31"),
+        ("balx26-z26", "2026-11-12", "2026-11-12", "2026-12-31"),
+        ("balx26-z26", "2026-10-01", "2026-11-01", "2026-12-31"),
+        ("balcal27", "2026-10-12", "2027-01-01", "2027-12-31"),
         ("balx27", "2027-11-12", "2027-11-12", "2027-11-30"),
         ("balcal26", "2026-10-07", "2026-10-07", "2026-12-31"),
-        ("balx26-z26", "2026-11-12", "2026-11-12", "2026-12-31"),
         ("BALZ26", "2026-12-15", "2026-12-15", "2026-12-31"),
         ("Bal1Q27", "2027-02-10", "2027-02-10", "2027-03-31"),
         ("BALW29", "2030-01-01", "2030-01-01", "2030-03-31"),
         ("balS28", "2028-10-31", "2028-10-31", "2028-10-31"),
         ("BALZ26", "2026-12-01", "2026-12-01", "2026-12-31"),
-        ("BALZ26", "2026-12-31", "2026-12-31", "2026-12-31"),
         ("BALZ26", "2026-12-12", "2026-12-12", "2026-12-31"),
         ("BALG28", "2028-02-29", "2028-02-29", "2028-02-29"),
+        ("BALG28", "2028-02-01", "2028-02-01", "2028-02-29"),
+        ("BALG27", "2026-06-30", "2027-02-01", "2027-02-28"),
         ("BALZ26-F27", "2026-12-31", "2026-12-31", "2027-01-31"),
         ("BALW99", "2100-03-15", "2100-03-15", "2100-03-31"),
     ],
     ids=[
-        "the ticket's November balance",
-        "the ticket's balance of a year",
-        "the ticket's balance of a strip",
-        "the ticket's December balance, in capitals",
+        "the ticket's October from September, the whole month",
+        "the ticket's October from the 12th, in capitals",
+        "the ticket's October on its last day, one day, in mixed case",
+        "the ticket's January from December, the whole month",
+        "the ticket's January from the 15th",
+        "the ticket's January on its last day, one day",
+        "the ticket's November-December strip from 12 November",
+        "the same strip from October, the whole strip",
+        "the ticket's calendar year from the October before, the whole year",
+        "slice B's November balance",
+        "slice B's balance of a year",
+        "slice B's December balance, in capitals",
         "a quarter in mixed case",
         "a winter from a day of its second year",
-        "a summer from its last day, one day",
-        "a reference on the first day, the whole month",
-        "a reference on the last day, one day",
+        "a summer on its last day, one day",
+        "December on its first day, the whole month",
         "a Saturday, a day like any other",
         "the leap day, one day",
+        "a leap February from its first day, 29 days",
+        "a February without a leap day, from the summer before",
         "a year-end range from its last December day",
         "the last winter, into the next century",
     ],
 )
-def test_the_balance_of_a_period_runs_from_the_reference_date_to_the_labels_last_day(
-    period: str, reference: str, first: str, last: str
+def test_the_balance_of_a_period_runs_from_the_later_of_the_valuation_day_and_its_first_day(
+    period: str, as_of: str, first: str, last: str
 ) -> None:
-    assert str(start_date(period, day(reference))) == first
-    assert str(end_date(period, day(reference))) == last
-    assert start_date(period, day(reference)).dtype == np.dtype("datetime64[D]")
+    assert str(start_date(period, day(as_of))) == first
+    assert str(end_date(period, day(as_of))) == last
+    assert start_date(period, day(as_of)).dtype == np.dtype("datetime64[D]")
 
 
-def test_an_ordinary_label_reads_the_same_with_a_reference_or_without() -> None:
-    reference = day("2026-12-15")
-    for period in ("Z26", "z26", "1Q27", "CAL28", "W29", "F26-Z28"):
-        assert span(period) == (
-            str(start_date(period, reference)),
-            str(end_date(period, reference)),
-        )
+def test_an_ordinary_label_reads_the_same_with_a_valuation_day_or_without() -> None:
+    as_of = day("2026-12-15")
+    for period in ("Z26", "z26", "1Q27", "CAL28", "W29", "F26-Z28", "F26"):
+        assert span(period) == (str(start_date(period, as_of)), str(end_date(period, as_of)))
     assert balance_of("Z26") is None
     assert balance_of("balz26") == "z26" and balance_of("BALZ26") == "Z26"
     assert balance_of("BAL") == "" and balance_of("BALBALZ26") == "BALZ26"
 
 
+ENDED = "expected a valuation day on or before the period's last day"
+
+
 @pytest.mark.parametrize(
-    ("period", "reference", "message"),
+    ("period", "as_of", "message"),
     [
         (
             "BALZ26",
             None,
-            "reference_date is missing, expected a date with 'BALZ26', the first day the balance "
-            "of a period covers",
+            "valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day "
+            "starts the balance of a period",
         ),
         (
             "balx26-z26",
             None,
-            "reference_date is missing, expected a date with 'balx26-z26', the first day the "
-            "balance of a period covers",
+            "valuation_date is missing, expected a valuation-date handle with 'balx26-z26', whose "
+            "day starts the balance of a period",
         ),
         (
-            "BALZ26",
-            "2026-11-30",
-            "reference_date is 2026-11-30, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31",
+            "balv26",
+            "2026-11-01",
+            f"valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, {ENDED}",
+        ),
+        (
+            "balf26",
+            "2026-02-01",
+            f"valuation_date is 2026-02-01, after 'balf26' ended on 2026-01-31, {ENDED}",
         ),
         (
             "BALZ26",
             "2027-01-01",
-            "reference_date is 2027-01-01, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31",
+            f"valuation_date is 2027-01-01, after 'BALZ26' ended on 2026-12-31, {ENDED}",
         ),
         (
             "balx26-z26",
             "2027-01-05",
-            "reference_date is 2027-01-05, expected a day of 'balx26-z26', 2026-11-01 to "
-            "2026-12-31",
+            f"valuation_date is 2027-01-05, after 'balx26-z26' ended on 2026-12-31, {ENDED}",
         ),
         (
             "BALW29",
-            "2029-10-31",
-            "reference_date is 2029-10-31, expected a day of 'BALW29', 2029-11-01 to 2030-03-31",
+            "2030-04-01",
+            f"valuation_date is 2030-04-01, after 'BALW29' ended on 2030-03-31, {ENDED}",
+        ),
+        (
+            "BALG28",
+            "2028-03-01",
+            f"valuation_date is 2028-03-01, after 'BALG28' ended on 2028-02-29, {ENDED}",
         ),
     ],
     ids=[
-        "no reference for a month",
-        "no reference for a strip",
-        "the day before the month",
-        "the day after the month",
+        "no day for a month",
+        "no day for a strip",
+        "the day after the ticket's October",
+        "the day after the ticket's January",
+        "the day after December",
         "a day after a strip",
-        "the day before a winter",
+        "the day after a winter",
+        "the day after a leap February",
     ],
 )
-def test_a_balance_without_a_reference_or_with_one_outside_its_period_is_refused(
-    period: str, reference: str | None, message: str
+def test_a_balance_without_its_day_or_of_a_period_that_has_ended_is_refused(
+    period: str, as_of: str | None, message: str
 ) -> None:
+    # Both readers refuse, so asking for an end cannot hide a period that has ended, which would
+    # otherwise read as a one-day deal at the month's end.
     for read in (start_date, end_date):
         with pytest.raises(ValueError) as failure:
-            read(period, None if reference is None else day(reference))
+            read(period, None if as_of is None else day(as_of))
         assert str(failure.value) == message
 
 
@@ -399,26 +433,27 @@ def test_the_balance_of_a_reversed_range_is_refused_as_the_range_is() -> None:
         )
 
 
-# Any month of the horizon and any day counted from its first: the balance from that day runs to
-# the month's last day while the day is one of the month's, and is refused once it is past it.
+# Any month of the horizon and any day from forty before its first to forty after: the balance
+# runs from the later of that day and the first to the month's last while the day is on or before
+# the last, the whole month from any earlier day, and is refused once the day is past it.
 @given(
     month=st.integers(0, 11),
     year=st.integers(0, 99),
-    offset=st.integers(0, 31),
+    offset=st.integers(-40, 40),
     lower=st.booleans(),
 )
-def test_the_balance_of_any_month_from_any_of_its_days_ends_with_the_month(
+def test_the_balance_of_any_month_from_any_day_ends_with_the_month_or_is_refused(
     month: int, year: int, offset: int, lower: bool
 ) -> None:
     letter = MONTH_LETTERS[month]
     code = (letter.lower() if lower else letter) + f"{year:02d}"
     label = ("bal" if lower else "BAL") + code
     first, last = start_date(code), end_date(code)
-    reference = first + np.timedelta64(offset, "D")
-    if reference <= last:
-        assert start_date(label, reference) == reference
-        assert end_date(label, reference) == last
+    as_of = first + np.timedelta64(offset, "D")
+    if as_of <= last:
+        assert start_date(label, as_of) == max(as_of, first)
+        assert end_date(label, as_of) == last
     else:
         for read in (start_date, end_date):
-            with pytest.raises(ValueError, match="expected a day of"):
-                read(label, reference)
+            with pytest.raises(ValueError, match="ended on"):
+                read(label, as_of)

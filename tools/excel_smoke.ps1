@@ -383,29 +383,47 @@ $formulas = [ordered]@{
     '=util_EndDate("Z28-F26")' = "#ERROR util_EndDate: ValueError: period is 'Z28-F26', expected range endpoints in chronological order"
     "=util_StartDate(A1)" = "#ERROR util_StartDate: period is number 1.0, expected text"
     "=util_EndDate(C2)" = "#ERROR util_EndDate: period is blank, expected text"
-    # The balance of a period, trade-periods-and-bal.md slice B: one BAL prefix in either case on
-    # any label, the reference date the first day the deal covers, a day of the label's own
-    # period, either end included; a strip's balance, a leap day and a Saturday; an ordinary label
-    # with a reference reads as before; a reference left out, one after the period, a repeated
-    # prefix, the library's words, and a blank, a text and a fraction of a day, the seam's.
-    '=util_StartDate("balx27",DATE(2027,11,12))' = "46703"
-    '=util_EndDate("balx27",DATE(2027,11,12))' = "46721"
-    '=util_StartDate("balcal26",DATE(2026,10,7))' = "46302"
-    '=util_EndDate("balcal26",DATE(2026,10,7))' = "46387"
-    '=util_StartDate("balx26-z26",DATE(2026,11,12))' = "46338"
-    '=util_EndDate("balx26-z26",DATE(2026,11,12))' = "46387"
-    '=util_StartDate("BALZ26",DATE(2026,12,15))' = "46371"
-    '=util_EndDate("BALZ26",DATE(2026,12,15))' = "46387"
-    '=util_StartDate("BALG28",DATE(2028,2,29))' = "46812"
-    '=util_StartDate("BALZ26",DATE(2026,12,12))' = "46368"
-    '=util_StartDate("Z26",DATE(2026,12,15))' = "46357"
-    '=util_EndDate("Z26",DATE(2026,12,15))' = "46387"
-    '=util_StartDate("BALZ26")' = "#ERROR util_StartDate: ValueError: reference_date is missing, expected a date with 'BALZ26', the first day the balance of a period covers"
-    '=util_EndDate("BALZ26",DATE(2027,1,5))' = "#ERROR util_EndDate: ValueError: reference_date is 2027-01-05, expected a day of 'BALZ26', 2026-12-01 to 2026-12-31"
-    '=util_StartDate("BALBALZ26",DATE(2026,12,15))' = "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
-    '=util_StartDate("BALZ26",C2)' = "#ERROR util_StartDate: reference_date is blank, expected date"
-    '=util_StartDate("BALZ26",E1)' = "#ERROR util_StartDate: reference_date is text 'x', expected date"
-    '=util_EndDate("BALZ26",Y2+0.5)' = "#ERROR util_EndDate: reference_date is number 46276.5, expected date"
+    # The balance of a period, date-helper-inputs.md: one BAL prefix in either case on any label and
+    # the valuation-date handle beside it, from QH1:QH12, the balance running from the later of the
+    # handle's day and the label's first day to the label's last: the ticket's table on October 2026
+    # from 20 September, the whole month, from the 12th, that day, and on the 31st, one day, and on
+    # January 2026 from the December before; a strip and a calendar year from the October before;
+    # slice B's labels, a leap day and a Saturday; an ordinary label with a handle reads as before;
+    # a handle left out with a BAL label and a period that ended before the day, the library's
+    # words from either reader; a blank, a raw date, a text, a fraction of a day and a handle of
+    # another kind, the seam's, whatever the label.
+    '=util_StartDate("balv26",QH1)' = "46296"
+    '=util_EndDate("balv26",QH1)' = "46326"
+    '=util_StartDate("BALV26",QH2)' = "46307"
+    '=util_EndDate("BALV26",QH2)' = "46326"
+    '=util_StartDate("BalV26",QH3)' = "46326"
+    '=util_EndDate("BalV26",QH3)' = "46326"
+    '=util_StartDate("balf26",QH12)' = "46023"
+    '=util_EndDate("balf26",QH12)' = "46053"
+    '=util_StartDate("balx26-z26",QH9)' = "46338"
+    '=util_EndDate("balx26-z26",QH9)' = "46387"
+    '=util_StartDate("balcal27",QH2)' = "46388"
+    '=util_EndDate("balcal27",QH2)' = "46752"
+    '=util_StartDate("balx27",QH7)' = "46703"
+    '=util_EndDate("balx27",QH7)' = "46721"
+    '=util_StartDate("balcal26",QH8)' = "46302"
+    '=util_EndDate("balcal26",QH8)' = "46387"
+    '=util_StartDate("BALZ26",QH5)' = "46371"
+    '=util_EndDate("BALZ26",QH5)' = "46387"
+    '=util_StartDate("BALG28",QH10)' = "46812"
+    '=util_StartDate("BALZ26",QH6)' = "46368"
+    '=util_StartDate("Z26",QH5)' = "46357"
+    '=util_EndDate("Z26",QH5)' = "46387"
+    '=util_StartDate("Z26",QH1)' = "46357"
+    '=util_StartDate("BALZ26")' = "#ERROR util_StartDate: ValueError: valuation_date is missing, expected a valuation-date handle with 'BALZ26', whose day starts the balance of a period"
+    '=util_EndDate("balv26",QH4)' = "#ERROR util_EndDate: ValueError: valuation_date is 2026-11-01, after 'balv26' ended on 2026-10-31, expected a valuation day on or before the period's last day"
+    '=util_StartDate("BALZ26",QH11)' = "#ERROR util_StartDate: ValueError: valuation_date is 2027-01-05, after 'BALZ26' ended on 2026-12-31, expected a valuation day on or before the period's last day"
+    '=util_StartDate("BALBALZ26",QH5)' = "#ERROR util_StartDate: ValueError: period is 'BALBALZ26', expected a contract or strip with two-digit years, such as F26, 1Q27, CAL28, W29, S28 or F26-Z28"
+    '=util_StartDate("BALZ26",C2)' = "#ERROR util_StartDate: valuation_date is blank, expected valuation date handle"
+    '=util_StartDate("BALZ26",DATE(2026,12,15))' = "#ERROR util_StartDate: valuation_date is number 46371.0, expected valuation date handle"
+    '=util_StartDate("BALZ26",E1)' = "#ERROR util_StartDate: valuation_date is text 'x' naming no live object, expected valuation date handle"
+    '=util_EndDate("BALZ26",Y2+0.5)' = "#ERROR util_EndDate: valuation_date is number 46276.5, expected valuation date handle"
+    '=LEFT(util_EndDate("Z26",AM1),62)' = "#ERROR util_EndDate: valuation_date is holiday calendar handle"
     # A date shifted by a text offset, date-offset-utility.md: the ticket's table, 9-Oct-2026 and its
     # neighbours in PA3 to PA6, the synthetic calendar in PA2 closing Monday the 12th and nothing
     # else, the serials the cell shows until it is formatted; a closed day counted from without
@@ -1534,15 +1552,17 @@ $cells = [ordered]@{
     # Explicit dates, trade-periods-and-bal.md slice C: a lastday template over the asian fields in
     # IJ11:IQ12; the dated ticket's headers in IS17:IX17, trade_id, trade_date, start_date,
     # end_date, quantity and fixed_price, and two rows, P the balance of Z26 from 15 December, the
-    # two dates from util_StartDate and util_EndDate on BALZ26 with the reference date, 2,000 at
+    # two dates from util_StartDate and util_EndDate on BALZ26 with the valuation-date handle in
+    # IU16, 15 December at midday, since date-helper-inputs.md, 2,000 at
     # 0.25, and Q the whole of December, the dates from the helpers on Z26, 2,200 at 0.25; their
     # batch in IS21 under the asian month template in IJ3, prepared against the 2 December
     # history in IY8 and valued against the market in IY14 in IY21:IY22.
     "IJ11" = "GAL"; "IK11" = "month"; "IL11" = "lastday"; "IM11" = "cleared"; "IN11" = "financial"; "IO11" = "Prototype Clearing"; "IP11" = "+2bd"; "IQ11" = "=IC2"
     "IJ12" = '=_CreateTradeTemplate("future",IJ1:IQ1,IJ11:IQ11)'
     "IS17" = "trade_id"; "IT17" = "trade_date"; "IU17" = "start_date"; "IV17" = "end_date"; "IW17" = "quantity"; "IX17" = "fixed_price"
-    "IS18" = "16"; "IT18" = "20-Nov-2026"; "IU18" = '=util_StartDate("BALZ26",DATE(2026,12,15))'; "IV18" = '=util_EndDate("BALZ26",DATE(2026,12,15))'; "IW18" = "2000"; "IX18" = "0.25"
-    "IS19" = "17"; "IT19" = "20-Nov-2026"; "IU19" = '=util_StartDate("Z26",DATE(2026,12,15))'; "IV19" = '=util_EndDate("Z26",DATE(2026,12,15))'; "IW19" = "2200"; "IX19" = "0.25"
+    "IU16" = "=_CreateValuationDate(DATE(2026,12,15),0.5)"
+    "IS18" = "16"; "IT18" = "20-Nov-2026"; "IU18" = '=util_StartDate("BALZ26",IU16)'; "IV18" = '=util_EndDate("BALZ26",IU16)'; "IW18" = "2000"; "IX18" = "0.25"
+    "IS19" = "17"; "IT19" = "20-Nov-2026"; "IU19" = '=util_StartDate("Z26",IU16)'; "IV19" = '=util_EndDate("Z26",IU16)'; "IW19" = "2200"; "IX19" = "0.25"
     "IS21" = "=_CreateTrades(IA6,IS17:IX17,IS18:IX19,IJ3)"
     "IY21" = "=_PrepareTrades(IS21,IY8)"
     "IY22" = "=_EvaluateTrades(IY21,IY14)"
@@ -2114,6 +2134,23 @@ $cells = [ordered]@{
     "QE13" = "=_CreateMarket(QE7,QE12)"
     "QE14" = "=_PrepareTrades(PV6,QE7)"
     "QE15" = "=_EvaluateTrades(QE14,QE13)"
+    # Valuation-date handles for the balance of a period, date-helper-inputs.md: 20-Sep-2026 before
+    # October, 12-Oct-2026 inside it, 31-Oct-2026 its last day and 1-Nov-2026 after it, 15-Dec-2026
+    # for slice B's December labels and 12-Dec-2026 a Saturday, 12-Nov-2027, 7-Oct-2026, 12-Nov-2026
+    # and 29-Feb-2028 for the other labels, 5-Jan-2027 after December and 20-Dec-2025 before
+    # January; the fraction of the day, 0, 0.5 or 1, read for nothing.
+    "QH1" = "=_CreateValuationDate(DATE(2026,9,20),0)"
+    "QH2" = "=_CreateValuationDate(DATE(2026,10,12),0.5)"
+    "QH3" = "=_CreateValuationDate(DATE(2026,10,31),1)"
+    "QH4" = "=_CreateValuationDate(DATE(2026,11,1),0)"
+    "QH5" = "=_CreateValuationDate(DATE(2026,12,15),0.5)"
+    "QH6" = "=_CreateValuationDate(DATE(2026,12,12),0)"
+    "QH7" = "=_CreateValuationDate(DATE(2027,11,12),0)"
+    "QH8" = "=_CreateValuationDate(DATE(2026,10,7),0)"
+    "QH9" = "=_CreateValuationDate(DATE(2026,11,12),0)"
+    "QH10" = "=_CreateValuationDate(DATE(2028,2,29),0)"
+    "QH11" = "=_CreateValuationDate(DATE(2027,1,5),0)"
+    "QH12" = "=_CreateValuationDate(DATE(2025,12,20),0)"
 }
 
 # --- build the host and tell it where Python is -----------------------------

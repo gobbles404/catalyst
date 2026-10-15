@@ -560,18 +560,20 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
 
 # A period's first or last day makes two months and one day, then pays the seam's way out for a
 # date: measured 1,264 bytes on 2026-10-02 for one month and for the whole century alike, which
-# twice the slack covers; the balance of one, since #160, adds its reference date's check and the
-# second bound, a day; nothing grows with the period, and nothing is published.
+# twice the slack covers; the balance of one, since #160 and from a valuation-date handle since
+# #173, adds the handle's one lookup and the second bound, a day; nothing grows with the period,
+# and nothing is published.
 @pytest.mark.parametrize("name", ["util_StartDate", "util_EndDate"])
 @pytest.mark.parametrize(
-    ("period", "reference"),
-    [("F26", MISSING), ("F00-Z99", MISSING), ("w28-w29", MISSING), ("BALZ26", 46371.0)],
+    ("period", "with_handle"),
+    [("F26", False), ("F00-Z99", False), ("w28-w29", False), ("BALZ26", True)],
 )
 def test_a_periods_day_costs_the_same_for_a_month_and_a_century(
-    name: str, period: str, reference: object
+    name: str, period: str, with_handle: bool
 ) -> None:
+    second = ENTRY["_CreateValuationDate"](46371.0, 0.5) if with_handle else MISSING
     live = bridge.live_handles()
-    assert least_peak(lambda: ENTRY[name](period, reference)) <= 2 * SLACK
+    assert least_peak(lambda: ENTRY[name](period, second)) <= 2 * SLACK
     assert bridge.live_handles() == live
 
 

@@ -380,9 +380,10 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     }
 
 
-# The balance of a period: the reference checked as a number and as a date, the label read under
-# its prefix, and the reference held inside the period, which needs the last day as well as the
-# first, one conversion more than the ordinary reading; nothing grows with the period.
+# The balance of a period, since #173 from a valuation-date handle: the handle's text checked and
+# resolved once, the label read under its prefix, and the day held to the period's end and raised
+# to its first day, which needs the last day as well as the first, one conversion more than the
+# ordinary reading; nothing grows with the period, and nothing is published.
 @pytest.mark.parametrize(
     ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]
 )
@@ -391,7 +392,7 @@ def test_a_shifted_date_costs_the_same_for_one_day_and_for_two_million(
     [("BALZ26", 1), ("BALF26-Z28", 2)],
     ids=["the balance of a month", "the balance of a strip"],
 )
-def test_a_balance_adds_the_references_checks_and_one_conversion(
+def test_a_balance_adds_the_handles_resolution_and_one_conversion(
     call_profile: CallProfile,
     numpy_calls: CallProfile,
     name: str,
@@ -399,27 +400,26 @@ def test_a_balance_adds_the_references_checks_and_one_conversion(
     period: str,
     labels: int,
 ) -> None:
-    reference = 46371.0  # 15 December 2026, a day of either period
-    PATH[name](period, reference)
-    assert call_profile(lambda: PATH[name](period, reference)) == {
+    valuation = PATH["_CreateValuationDate"](46371.0, 0.5)  # 15 December 2026, a day of either
+    PATH[name](period, valuation)
+    assert call_profile(lambda: PATH[name](period, valuation)) == {
         "Registered.run": 1,
         "_arguments": 1,
         "_validate": 2,
-        "_text": 1,
-        "_date": 1,  # the reference, a whole serial inside the calendar
-        "_number": 1,
+        "_text": 2,  # the label, and the handle's text
+        "_resolve": 1,  # the valuation date, one lookup
         name: 1,
         library: 1,
         "balance_of": 1,
         "_period_months": 1,  # the label under the prefix, read once
         "_label_months": labels,
-        "_covered_from": 1,  # the reference held inside the period
+        "_balance_from": 1,  # the day held to the period's end and raised to its first day
         "_date_out": 1,
         "_unit": 1,
         "_serials": 1,
     }
-    assert numpy_calls(lambda: PATH[name](period, reference)) == {
-        "generic.astype": 2,  # the first day and the last, the bounds the reference is held to
+    assert numpy_calls(lambda: PATH[name](period, valuation)) == {
+        "generic.astype": 2,  # the first day and the last, the bounds the day is held to
         "numpy.array": 1,  # the way out's one-day array
         "numpy.datetime_data": 1,  # its unit
         "ndarray.any": 2,  # its two looks

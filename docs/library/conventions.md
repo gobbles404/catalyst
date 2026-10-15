@@ -46,7 +46,7 @@ template and trade construction. Their contracts are recorded in
 [ListInstruments](instruments/list-instruments.md) and
 [ShowInstrument](instruments/show-instrument.md).
 
-The `util_` functions divide in two, by the owner's call in #129: `util_Read*` reads information from an existing library object through its handle, `util_ReadHandle` and `util_ReadPrompt`; every other `util_*` function derives or transforms values, making no object and reading none, and is named for its result or operation, `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_StartDate` and `util_EndDate`.
+The `util_` functions divide in two, by the owner's call in #129: `util_Read*` reads information from an existing library object through its handle, `util_ReadHandle` and `util_ReadPrompt`; every other `util_*` function derives or transforms values, making no object, and is named for its result or operation, `util_NextFut`, `util_FutToCme`, `util_DateToFut`, `util_FutToDate`, `util_StartDate`, `util_EndDate` and `util_ShiftDate`; one of these may read an object the seam resolved for a fact its derivation needs, `util_ShiftDate` a holiday calendar for the closed days since #171 and the two period functions a valuation-date handle for its day since #173, and it stays a derivation, the object's text in and a value out, nothing made and nothing of the object read back.
 
 ## Tables
 

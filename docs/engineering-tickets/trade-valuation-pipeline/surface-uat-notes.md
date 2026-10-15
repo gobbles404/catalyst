@@ -8,7 +8,8 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These eight items are implemented on the prototype stack through **PR #171 at `0803f6f`**.
+These ten items are implemented on the prototype stack through **PR #173**, the last of them
+awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
 these additions. This is an implementation checklist, not confirmation of release contents.
@@ -23,12 +24,16 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 6 / item 6 | [Readable index names](readable-index-names.md) | [#169](https://github.com/gobbles404/goosedove/pull/169), `3c10318`; workbook-selector corrections verified in the #170 review | Supply required `display_name` after `name` in `_CreateIndex`. Inspect the description beside the existing name; price-vector matching and handle labels still use `name`. |
 | 7 / item 8 | [Reserve totals](reserve-totals.md) | [#170](https://github.com/gobbles404/goosedove/pull/170), `716a236`; reviewed clean | `_ReportReserves(results)` reports gross brokerage and clearing costs, zero marketing and currency. The ticket example gives 50 / 20 / 0 / USD, unchanged by a tick, fixing or payment. |
 | 8 / item 9 | [Date-offset utility](date-offset-utility.md) | [#171](https://github.com/gobbles404/goosedove/pull/171), `0803f6f`; both review findings closed | `util_ShiftDate(date, offset, [holiday_calendar])` returns one date. Try signed `bd`, `cd` and `em`, weekend anchors, a supplied holiday calendar and zero offsets. |
+| 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
+| 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
 aggregation; IFERC exercises the distinct monthly fixing and payment dates. Existing
-case-insensitive BAL helpers are already available, using an explicit fixed booking reference.
-They do not yet include the date-passthrough or mixed period-entry requests below.
+case-insensitive BAL helpers are already available, using an explicit raw reference date.
+The valuation-date-handle input and future-period rule specified below are not implemented
+yet. Date passthrough is deferred. Mixed period entry is implemented in PR #172 and can
+consume explicitly supplied helper dates.
 
 Run these through the normal create -> prepare -> evaluate -> report chain. Include one
 live-price tick reusing preparation and one history/as-of refresh replacing it; confirm
@@ -38,14 +43,12 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md): resolve per row, complete dates take precedence | Ready for engineering. True blanks and exact empty text mean absent only in the three period fields. Independent of the BAL-context decision; dates can already be supplied explicitly. |
-| 2 / item 3 | [Date helper inputs](date-helper-inputs.md): accept actual Excel dates alongside period/BAL labels | Revisit before handoff. The owner wants one-argument BAL using valuation context; the library has no implicitly selected valuation date. Align that connection and the rule for a reference before the period. |
-| 3 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. This arc is independent of the date utilities. |
+| 1 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. This arc is independent of the date utilities. |
 
-Readable index names, reserve totals and date offsets have moved to release testing above. The remaining
+Readable index names, reserve totals, date offsets, mixed period entry and the BAL date helpers have moved to release testing above. The remaining
 order favors the smallest specified change first, not code dependencies. Bilateral's
 remaining economic choices still need alignment; marketing reserves follow bilateral.
-These three UAT items remain unimplemented. Detailed decisions and examples follow.
+This UAT item remains unimplemented. Detailed decisions and examples follow.
 
 ## 1. Delta reporting
 
@@ -87,51 +90,54 @@ coercion, including zero and signed IDs.
 
 ## 3. Dates and period labels through the same helpers
 
-Not implemented; revisit before handoff. The [date-helper inputs draft](date-helper-inputs.md)
-and the details below record the earlier explicit-reference proposal. The owner now wants
-one-argument BAL with a start of the later of `as_of` and the period's first day. How that
-helper selects an existing valuation date remains open; work has moved to readable names.
+Implemented in PR #173 on 10 October 2026, awaiting review, with the full gate passing. The
+owner settled the valuation context and booking workflow on 10 October. The
+[BAL date-helper ticket](date-helper-inputs.md) supersedes the earlier raw-reference-date and
+date-passthrough proposal; its As built section records the pinned messages and the workbook rows.
 
-Keep the existing worksheet call shapes:
+Keep the function names and argument order; change the optional second input to the
+existing valuation-date handle:
 
 ```text
-util_StartDate(period, [reference_date]) -> date
-util_EndDate(period, [reference_date])   -> date
+util_StartDate(period, [valuation_date]) -> date
+util_EndDate(period, [valuation_date])   -> date
 ```
 
-Interpret the requested date support as accepting an actual Excel date in the first
-argument and returning that date unchanged from either helper. Period labels keep their
-existing meanings. This widens accepted input types without adding or reordering arguments;
-engineering must provide the seam support rather than assume date-or-text is supported today.
-Do not introduce parsing of date strings such as `10/08/26`.
+BAL requires the handle and reads its `as_of`, ignoring the fraction of the day elapsed.
+There is no implicit global date or clock lookup. Ordinary labels need no handle, and
+retain their full-period meaning; a supplied handle still undergoes normal validation.
 
-| First input | Reference date | Start helper | End helper |
+| Period | Handle `as_of` | Start helper | End helper |
 |---|---|---|---|
-| Excel date 8-Oct-2026 | omitted | 8-Oct-2026 | 8-Oct-2026 |
 | `v26` | omitted | 1-Oct-2026 | 31-Oct-2026 |
-| `balv26` | 8-Oct-2026 | 8-Oct-2026 | 31-Oct-2026 |
-| `BALV26` or `BalV26` | 8-Oct-2026 | 8-Oct-2026 | 31-Oct-2026 |
+| `balv26` | 20-Sep-2026 | 1-Oct-2026 | 31-Oct-2026 |
+| `BALV26` or `BalV26` | 12-Oct-2026 | 12-Oct-2026 | 31-Oct-2026 |
+| `balv26` | 31-Oct-2026 | 31-Oct-2026 | 31-Oct-2026 |
+| `balv26` | 1-Nov-2026 | Error | Error |
+| `balf26` | 1-Feb-2026 | Error | Error |
 
-BAL already works case-insensitively in the prototype. Preserve that behavior and its
-explicit reference requirement. A valid reference supplied with an ordinary label or an
-explicit date does not change the result; supplied arguments still undergo normal validation.
-Keep the helpers deterministic and nonvolatile, with existing missing/blank distinctions.
+Return calendar dates without business-day rolling: start is `max(as_of, period_start)`
+and end is `period_end`. Both helpers fail when `as_of > period_end`, naming the entered
+code, as_of and period end. Do not clamp an expired period to a one-day trade. Preserve
+case-insensitive BAL and existing period grammar, nonvolatile registration and normal
+missing/blank distinctions. Raw dates no longer belong in the second argument.
 
-The helper outputs populate the ticket's `start_date` and `end_date` columns. Today's
-prototype requires omitting `contract_code`; item 4 proposes allowing it alongside them.
-A BAL label can feed both helpers; independently entered start and
-end dates feed their respective helpers. The booking reference stays fixed as market
-`as_of` advances. These formulas do not snapshot a changing reference cell.
+The user types a BAL label, inspects the helper dates, then **pastes both dates as values**
+before booking. Only then may the user clear the source code for visual clarity.
+PR #172 already supports complete dates with either a blank code or retained inactive text.
+Formulas recalculate when the supplied handle changes; booked hardcoded dates stay static.
 
-Acceptance should cover the table, existing BAL refusals, date validation through the seam,
-and one worksheet example containing ordinary labels, BAL labels and explicit dates. This
-is a helper-input extension; the separate ticket-period change is specified below.
+The earlier idea of passing an actual Excel date through the first argument remains
+deferred. It is unnecessary for this workflow: fixed dates go directly into the ticket.
+No automatic snapshot or active BAL-code resolution is added to `_CreateTrades`.
 
 ## 4. Contract codes and dates on one ticket
 
-Agreed and ready for engineering, 10 October 2026; not yet implemented. The
-[engineering ticket](contract-codes-and-dates.md) specifies the entry contract, bounded
-seam change, readback and acceptance.
+Implemented in PR #172 and reviewed clean through `7f14a83` on 10 October 2026, with
+the full gate passing. The separate cleanup commit clears six inherited test-fixture
+typing warnings without changing production code, expected results or performance budgets.
+The [engineering ticket](contract-codes-and-dates.md) specifies the entry contract,
+bounded seam change, readback and acceptance.
 
 The ticket supports all three period columns together. Resolve the period **per
 row**, after combining the template and ticket, without changing `_CreateTrades`' arguments.

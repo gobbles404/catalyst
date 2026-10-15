@@ -3,10 +3,12 @@ CAL28; a winter, W29, November to the March after; a summer, S28, April to Octob
 of two labels joined by a hyphen, F26-Z28, from the first day of the left to the last day of the
 right. Each is read for two months, numpy's month unit, its first month and the month after its
 last, from which its first and its last calendar day follow by one conversion each. The balance
-of any of them, BALZ26, runs from a reference date the desk supplies, the first day the deal
-covers, to the label's last day, the reference held inside the label's own period. Text and a
-date in and one date out, no object and no handle; the letters are read in either case, by the
-owner's decision for these utilities. docs/library/utilities/start-date.md holds the grammar."""
+of any of them, BALZ26, runs from the valuation day the desk supplies, or from the label's first
+day when that is later, to the label's last day, since #173; a period that ended before the
+valuation day is refused. Text and a day in and one date out, no object and no handle here: the
+worksheet functions read the day off a valuation-date handle and pass it in. The letters are read
+in either case, by the owner's decision for these utilities.
+docs/library/utilities/start-date.md holds the grammar."""
 
 import numpy as np
 
@@ -59,56 +61,58 @@ def balance_of(period: str) -> str | None:
     return period[len(BALANCE) :] if period[: len(BALANCE)].upper() == BALANCE else None
 
 
-def start_date(period: str, reference: np.datetime64 | None = None) -> np.datetime64:
+def start_date(period: str, as_of: np.datetime64 | None = None) -> np.datetime64:
     """The first calendar day of the period: the first month's first day, or for the balance of
-    a period the reference date itself, the first day the deal covers, which must lie inside
-    the label's own period, either end included; for an ordinary label a reference given is
-    read for nothing, so one formula serves a column of both."""
+    a period the later of the valuation day and that first day, since #173, the day the deal
+    covers from, a period that has ended refused; for an ordinary label a day given is read for
+    nothing, so one formula serves a column of both."""
     label = balance_of(period)
     if label is None:
         first, _ = period_months(period)
         return first.astype("datetime64[D]")
     first, after = _period_months(label, period)
-    return _covered_from(
-        reference,
+    return _balance_from(
+        as_of,
         first.astype("datetime64[D]"),
         after.astype("datetime64[D]") - np.timedelta64(1, "D"),
         period,
     )
 
 
-def end_date(period: str, reference: np.datetime64 | None = None) -> np.datetime64:
+def end_date(period: str, as_of: np.datetime64 | None = None) -> np.datetime64:
     """The last calendar day of the period, the day before the month after its last begins, so
     a February's own length and a winter's March of the next year, or the next century, fall out
     of numpy's month unit with nothing counted by hand; the balance of a period ends on the same
-    day, its reference held inside the label's period here too, so that asking for an end cannot
-    hide a reference that is no day of it."""
+    day, its valuation day checked here too, so that asking for an end cannot hide a period that
+    has ended or a balance asked for without its day."""
     label = balance_of(period)
     first, after = period_months(period) if label is None else _period_months(label, period)
     last = after.astype("datetime64[D]") - np.timedelta64(1, "D")
     if label is not None:
-        _covered_from(reference, first.astype("datetime64[D]"), last, period)
+        _balance_from(as_of, first.astype("datetime64[D]"), last, period)
     return last
 
 
-def _covered_from(
-    reference: np.datetime64 | None, first: np.datetime64, last: np.datetime64, period: str
+def _balance_from(
+    as_of: np.datetime64 | None, first: np.datetime64, last: np.datetime64, period: str
 ) -> np.datetime64:
-    """The reference date of a balance, the first day the deal covers: given, since the balance of
-    a period starts on no day the label names, and a day of the label's own period, either end
-    included, since a day before it would cover more than the label and a day after it nothing;
-    refused with the period's bounds, never clamped. A Saturday is a day like any other: no
-    business-day rule applies here, the schedule method choosing the pricing days later."""
-    if reference is None:
+    """The first day the balance of a period covers, since #173: the valuation day given, since
+    the balance of a period starts on no day the label names, and the later of it and the
+    label's first day, so a future period is the whole period and a current one runs from the
+    day itself; a period that ended before the valuation day is refused naming the label, the
+    day and the end, never a one-day deal at the month's end. A Saturday is a day like any other:
+    no business-day rule applies here, the schedule method choosing the pricing days later."""
+    if as_of is None:
         raise ValueError(
-            f"reference_date is missing, expected a date with {period!r}, the first day the "
-            "balance of a period covers"
+            f"valuation_date is missing, expected a valuation-date handle with {period!r}, "
+            "whose day starts the balance of a period"
         )
-    if reference < first or reference > last:
+    if as_of > last:
         raise ValueError(
-            f"reference_date is {reference}, expected a day of {period!r}, {first} to {last}"
+            f"valuation_date is {as_of}, after {period!r} ended on {last}, expected a valuation "
+            "day on or before the period's last day"
         )
-    return reference
+    return max(as_of, first)
 
 
 def _label_months(label: str, period: str) -> tuple[np.datetime64, np.datetime64]:
