@@ -165,7 +165,7 @@ payment. Pricing days are Monday-Friday excluding 25 December. Payment days are
 Monday-Friday excluding 1 January 2027. December has 31 calendar days and 22 pricing
 days; Z26 prices every observation used below.
 
-Create the template with instrument `future`. Its shared fields are `route = cleared`,
+Create the template with instrument `fixed_float`. Its shared fields are `route = cleared`,
 `settlement_method = financial`, `trade_date = 2026-11-30`, `fixed_price = 10`,
 `payment_time_lag = +1bd` and the payment-calendar handle. Supply the following ticket
 fields in one call. The two clearing-house labels are deliberately just labels in

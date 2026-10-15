@@ -61,7 +61,7 @@ _ReportRisk(results)
 ```
 
 1. **Instrument definition.** Remove `contract_specification`. Keep `quantity_unit` required
-   and define it as text selecting a specification by name. `_ShowInstrument("future")`
+   and define it as text selecting a specification by name. `_ShowInstrument("fixed_float")`
    keeps its existing transposed layout. Its options/rule describe "names in the supplied
    index's contract specifications"; it cannot enumerate an index's names because it takes
    no index. Remove the fixed `LOT` choice and describe quantity as a count of the selected
@@ -164,7 +164,7 @@ batch feature, or change to settlement, valuation or risk.
 
 ## As built
 
-Built in #145. The `future` has fourteen fields: `contract_specification` is gone and
+Built in #145. The `fixed_float` has fourteen fields: `contract_specification` is gone and
 `quantity_unit` is text whose options are the index's specification names, its rule that it
 selects the lot size and unit from the index given to `_CreateTrades`, exactly as named there;
 `quantity` is a signed whole count of it. `_ShowInstrument` spills seven rows by fifteen

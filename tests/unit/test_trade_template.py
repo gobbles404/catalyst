@@ -1,4 +1,4 @@
-"""The trade template: shared field values under the future's definition, one row of any of its
+"""The trade template: shared field values under the fixed_float's definition, one row of any of its
 fields, each read for the rule intrinsic to its field and nothing required; the template selects
 the instrument for a ticket; the creator on the sheet, its handle and its spill.
 docs/library/trades/trade-template.md is the page."""
@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells, Handle, register
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.instruments.definitions import FUTURE
+from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues, selected
 from goosedove.trades.template import (
     MOST_BUSINESS_DAYS,
@@ -58,7 +58,7 @@ def behind(catcher: str, handle: object) -> object:
 
 def a_template(**fields: object) -> TradeTemplate:
     """A template of those fields, made through the seam so the values arrive typed."""
-    handle = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    handle = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     template = behind("CatchTemplate", handle)
     assert type(template) is TradeTemplate
     return template
@@ -83,7 +83,7 @@ def spilled(handle: object) -> list[list[object]]:
 
 def test_the_page_example_makes_a_template_of_its_two_fields() -> None:
     template = a_template(quantity_unit="NYMEX NG", schedule_method="lastday")
-    assert template.instrument is FUTURE
+    assert template.instrument is FIXED_FLOAT
     assert dict(template.defaults) == {"quantity_unit": "NYMEX NG", "schedule_method": "lastday"}
     assert list(template.defaults) == ["quantity_unit", "schedule_method"]  # the sheet's order
     assert isinstance(template.defaults, MappingProxyType)
@@ -128,7 +128,7 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itsel
 
 
 def test_a_template_selects_its_instrument_for_a_ticket() -> None:
-    assert selected(a_template(route="cleared")) is FUTURE
+    assert selected(a_template(route="cleared")) is FIXED_FLOAT
 
 
 def test_a_templates_numbers_pass_the_kernels_rules_as_a_tickets_do() -> None:
@@ -203,7 +203,7 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
 def test_a_value_against_its_fields_own_rule_is_refused_naming_the_field(
     fields: dict[str, object], message: str
 ) -> None:
-    result = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    result = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     assert result == f"#ERROR _CreateTradeTemplate: ValueError: {message}"
 
 
@@ -216,7 +216,7 @@ def test_the_sheets_calendar_the_lag_is_held_to_is_the_seams() -> None:
 
 
 def test_the_builder_takes_one_row_of_field_values() -> None:
-    two = FieldValues(FUTURE, 2, ("quantity",), {"quantity": np.array([1.0, 2.0])})
+    two = FieldValues(FIXED_FLOAT, 2, ("quantity",), {"quantity": np.array([1.0, 2.0])})
     with pytest.raises(ValueError, match=r"^values has 2 rows, expected one row of field values$"):
         trade_template(two)
 
@@ -225,7 +225,7 @@ def test_the_builder_takes_one_row_of_field_values() -> None:
 
 
 def test_the_creator_publishes_a_template_handle_with_no_index_name() -> None:
-    handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity_unit"), row("NYMEX NG"))
+    handle = ENTRY["_CreateTradeTemplate"]("fixed_float", row("quantity_unit"), row("NYMEX NG"))
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
 
 
@@ -235,24 +235,25 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
         "#ERROR _CreateTradeTemplate: instrument is blank, expected text"
     )
     assert create("Future", row("quantity_unit"), row("lot")) == (
-        "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'future'"
+        "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: "
+        "'fixed_float'"
     )
-    assert str(create("future", row("Quantity_unit"), row("lot"))).startswith(
+    assert str(create("fixed_float", row("Quantity_unit"), row("lot"))).startswith(
         "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'Quantity_unit', "
-        "expected a field of future: trade_id, "
+        "expected a field of fixed_float: trade_id, "
     )
-    assert create("future", row("quantity_unit"), Cells.from_rows([["lots"], ["lots"]])) == (
+    assert create("fixed_float", row("quantity_unit"), Cells.from_rows([["lots"], ["lots"]])) == (
         "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     )
     # Shape before cells: a range one row too tall, its extra row blank, is named for its rows
     # and not for the blank, the seam's rule for every row type.
-    assert create("future", row("quantity_unit"), Cells.from_rows([["lots"], [None]])) == (
+    assert create("fixed_float", row("quantity_unit"), Cells.from_rows([["lots"], [None]])) == (
         "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     )
-    assert create("future", row("quantity_unit"), row(1.0)) == (
+    assert create("fixed_float", row("quantity_unit"), row(1.0)) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text"
     )
-    assert create("future", row("quantity"), row(1.5)) == (
+    assert create("fixed_float", row("quantity"), row(1.5)) == (
         "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number"
     )
 
@@ -260,14 +261,14 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
 def test_the_reader_spills_the_instrument_and_each_default_under_its_field() -> None:
     calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46352.0]]))
     handle = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row("quantity_unit", "quantity", "trade_date", "payment_holiday_calendar"),
         row("LOT", 10.0, 46289.0, calendar),
     )
     assert spilled(handle) == [
         ["instrument", "quantity_unit", "quantity", "trade_date", "payment_holiday_calendar"],
         ["str", "str", "float64", "datetime64[D]", "str"],
-        ["future", "LOT", 10.0, 46289.0, "a holiday calendar"],
+        ["fixed_float", "LOT", 10.0, 46289.0, "a holiday calendar"],
     ]
 
 
@@ -276,7 +277,7 @@ def test_a_zero_quantity_is_held_as_a_row_kept_ready() -> None:
     # the template is then kept ready at nothing; negative zero is a number like any other.
     assert a_template(quantity=0.0).defaults["quantity"] == 0.0
     assert a_template(quantity=-0.0).defaults["quantity"] == 0.0
-    handle = ENTRY["_CreateTradeTemplate"]("future", row("quantity"), row(0.0))
+    handle = ENTRY["_CreateTradeTemplate"]("fixed_float", row("quantity"), row(0.0))
     assert re.fullmatch(rf"{os.getpid()}:trade_template:\d+", str(handle))
 
 
@@ -293,18 +294,20 @@ def test_a_period_cell_left_empty_is_owned_by_the_template_and_supplied_to_no_ro
     full = a_template(quantity_unit="NYMEX NG", schedule_method="lastday")
     assert full.names == tuple(full.defaults)
     create = ENTRY["_CreateTradeTemplate"]
-    assert create("future", row("quantity_unit", "quantity"), row("GAL", None)) == (
+    assert create("fixed_float", row("quantity_unit", "quantity"), row("GAL", None)) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 2) is blank, expected number"
     )
-    assert create("future", row("route"), row("")) == (
+    assert create("fixed_float", row("route"), row("")) == (
         "#ERROR _CreateTradeTemplate: values cell (1, 1) is empty text, expected text"
     )
     # The spill shows the words where the cell held nothing, text under the field's header.
-    handle = create("future", row("contract_code", "start_date", "quantity"), row("", None, 10.0))
+    handle = create(
+        "fixed_float", row("contract_code", "start_date", "quantity"), row("", None, 10.0)
+    )
     assert spilled(handle) == [
         ["instrument", "contract_code", "start_date", "quantity"],
         ["str", "str", "str", "float64"],
-        ["future", "(not supplied)", "(not supplied)", 10.0],
+        ["fixed_float", "(not supplied)", "(not supplied)", 10.0],
     ]
 
 

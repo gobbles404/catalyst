@@ -27,7 +27,7 @@ from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FUTURE
+from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -201,7 +201,7 @@ def terms_of(
     """The page's five rows resolved against an index, or the rows a slice keeps."""
     occurrences = TRADE_DATES[keep].size
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         spec(occurrences),
         route,
@@ -265,7 +265,7 @@ def evaluated(
 def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     lots, pays, lags = LOTS.copy(), TOY_PAYS.copy(), np.full(5, 2)
     terms = resolved_trades(
-        FUTURE, TOY, spec(5), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, TOY, spec(5), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), TRADE_IDS, ("CME Clearing",) * 5,
         None, TRADE_DATES,
         np.arange(5, dtype=np.intp), CONTRACT, lots, *bounds_of(TOY, CONTRACT), FIXED_PRICE,
@@ -292,7 +292,7 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
     assert terms.trade_dates.dtype == np.dtype("datetime64[D]")
     assert terms.named(4) == "trade 1001 at row 5"
     assert terms_of(trade_ids=None).named(2) == "trade at row 3"
-    assert terms.instrument is FUTURE and terms.clearing_house == ("CME Clearing",) * 5
+    assert terms.instrument is FIXED_FLOAT and terms.clearing_house == ("CME Clearing",) * 5
     assert terms.broker is None
 
 
@@ -313,7 +313,7 @@ GAS_DAILY = index(
     [
         (
             {"ix": GAS_DAILY},
-            "index is a Gas Daily index, expected a futures or an IFERC index for a future",
+            "index is a Gas Daily index, expected a futures or an IFERC index for a fixed_float",
         ),
         (
             {"specification": spec(5, 1)},
@@ -426,7 +426,7 @@ GAS_DAILY = index(
 )
 def test_terms_that_cannot_be_resolved_say_why(change: dict[str, Any], message: str) -> None:
     given_terms: dict[str, Any] = {
-        "instrument": FUTURE,
+        "instrument": FIXED_FLOAT,
         "ix": NG,
         "specification": spec(5),
         "route": Route.CLEARED,
@@ -538,7 +538,7 @@ def one_lot_in_cents(
 ) -> tuple[TradeResults, WorkCounter]:
     counter = WorkCounter()
     terms = resolved_trades(
-        FUTURE, CENTS, spec(1), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, CENTS, spec(1), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1), *bounds_of(CENTS, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
@@ -611,7 +611,7 @@ CENT_SETTLED = index(
 
 def test_a_price_in_dollars_settles_in_cents_with_the_unit_naming_both() -> None:
     terms = resolved_trades(
-        FUTURE, CENT_SETTLED, spec(4), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, CENT_SETTLED, spec(4), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1, 2, 3, 4), None, None,
         dates(*["2026-09-24"] * 4),
         rows(0, 1, 2, 2, 3), rows(1, 2, 2, 3, 1), numbers(3, -2, -1, -1, 3),
@@ -725,7 +725,7 @@ def test_a_contract_stays_live_on_its_expiry_day_and_is_expired_the_day_after() 
         prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
     assert str(refused.value) == (
         "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
-        "a physical future after its expiry is not supported"
+        "a physical fixed_float after its expiry is not supported"
     )
 
 
@@ -741,7 +741,7 @@ def test_a_history_over_another_index_is_refused_whatever_its_name() -> None:
 
 def test_a_trade_on_the_schedules_first_contract_is_refused_since_nothing_prices_it() -> None:
     boundary = resolved_trades(
-        FUTURE, NG, spec(1), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, NG, spec(1), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), None, None, None,
         dates("2026-09-24"), rows(0), rows(0), numbers(1),
         *bounds_of(NG, rows(0)), numbers(3.0), None,
@@ -1029,7 +1029,7 @@ def pen_terms(
         else PaymentTerms(np.full(1, 1), (CLEARING_CALENDAR,), dates(pays))
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         PHH,
         spec(1),
         Route.CLEARED,
@@ -1261,7 +1261,7 @@ def strip_terms(order: tuple[tuple[int, tuple[int, ...], float, float], ...]) ->
     n = len(order)
     components = [(i, c, q, p) for i, (_, months, q, p) in enumerate(order) for c in months]
     return resolved_trades(
-        FUTURE, STRIP_INDEX, spec(n), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, STRIP_INDEX, spec(n), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.PENULTIMATE, QuantityPer.MONTH, n),
         ids(*(label for label, _, _, _ in order)), ("ICE Clear Europe",) * n,
         None, np.repeat(day("2027-06-01"), n), rows(*(i for i, _, _, _ in components)),
@@ -1379,7 +1379,7 @@ def daily_terms(
 ) -> ResolvedTrades:
     n = len(lots)
     return resolved_trades(
-        FUTURE, DAILY, spec(n), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, DAILY, spec(n), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), None, None, None,
         np.repeat(day("2026-11-20"), n),
         np.arange(n, dtype=np.intp), np.ones(n, dtype=np.intp), numbers(*lots),
@@ -1586,7 +1586,7 @@ def test_an_observation_of_another_contract_than_the_days_is_refused_as_unsuppor
     # A component on G27 observed on 1 December, a day Z26 prices: the history holds no G27
     # settle for it, so it is refused rather than priced off Z26.
     terms = resolved_trades(
-        FUTURE, DAILY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, DAILY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1), None, None,
         dates("2026-11-20"), rows(0), rows(2), numbers(1),
         *bounds_of(DAILY, rows(2)), numbers(70.0), paying(dates("2027-02-02"), 1),
@@ -1721,7 +1721,7 @@ def test_observations_own_frozen_copies_and_a_seventh_shared_seven_times_is_one(
 
 def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
     return resolved_trades(
-        FUTURE, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1001, 1002), None, None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(*quantities), *bounds_of(NG, rows(1, 2)),
@@ -1732,7 +1732,7 @@ def entry_terms(quantities: tuple[float, float] = (2.0, 0.0)) -> ResolvedTrades:
 def zero_toy_terms() -> ResolvedTrades:
     """One row kept ready on the toy: nothing of Z26 at 3.10, financial, paying 30 November."""
     return resolved_trades(
-        FUTURE, TOY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, TOY, spec(1), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(1000), None, None,
         dates("2026-10-06"), rows(0), rows(1),
         numbers(0.0), *bounds_of(TOY, rows(1)), numbers(3.1), paying(dates("2026-11-30"), 1),
@@ -1813,7 +1813,7 @@ def test_a_row_kept_ready_before_a_held_contract_keeps_its_place_on_the_axis() -
     # stayed right. By hand: one lot of F27 sold at 3.30 against 3.40 is -1,000, and -10,000
     # per dollar on F27 alone.
     first_nothing = resolved_trades(
-        FUTURE, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1002, 1001), None, None,
         dates("2026-10-06", "2026-10-06"),
         rows(0, 1), rows(1, 2), numbers(0.0, -1.0), *bounds_of(NG, rows(1, 2)),
@@ -1845,7 +1845,7 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
     for order in itertools.permutations(given_rows):
         labels, contracts, quantities, prices = zip(*order, strict=True)
         terms = resolved_trades(
-            FUTURE, NG, spec(4), Route.CLEARED, Settlement.PHYSICAL,
+            FIXED_FLOAT, NG, spec(4), Route.CLEARED, Settlement.PHYSICAL,
             *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(*labels), None, None,
             np.repeat(day("2026-10-06"), 4),
             np.arange(4, dtype=np.intp), rows(*contracts), numbers(*quantities),
@@ -1863,7 +1863,7 @@ def test_four_rows_with_two_kept_ready_value_alike_in_every_order() -> None:
 def test_adding_rows_kept_ready_changes_no_number_of_the_batch() -> None:
     whole, _ = evaluated(NG, "2026-11-24", {}, (3.20, 3.50))
     spares = resolved_trades(
-        FUTURE, NG, spec(7), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, NG, spec(7), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 7),
         np.concatenate([TRADE_IDS, ids(2001, 2002)]),
         None, None,
@@ -1901,7 +1901,7 @@ def test_a_zero_row_bypasses_no_rule_of_the_market_the_calendar_or_identity() ->
         prepared_trades(enc, history_on(NG, "2026-11-26", {"Z26": 3.22}), WorkCounter())
     assert str(refused.value) == (
         "trade 1001 at row 1 on Z26 expired 2026-11-25, before valuation date 2026-11-26; "
-        "a physical future after its expiry is not supported"
+        "a physical fixed_float after its expiry is not supported"
     )
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(an_index(), "2026-11-24", {}), WorkCounter())
@@ -1969,7 +1969,7 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
     def valued(selected: list[tuple[int, int, float]]) -> TradeResults:
         n = len(selected)
         terms = resolved_trades(
-            FUTURE, NG, spec(n), Route.CLEARED, Settlement.PHYSICAL,
+            FIXED_FLOAT, NG, spec(n), Route.CLEARED, Settlement.PHYSICAL,
             *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), None, None, None,
             np.repeat(day("2026-09-24"), n),
             np.arange(n, dtype=np.intp), rows(*(c for c, _, _ in selected)),
@@ -2052,7 +2052,7 @@ def l3d_terms(
         else PaymentTerms(np.full(n, 2), (WEEKDAYS,) * n, dates(*(L3D_PAYS[c] for c in contracts)))
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         spec(n),
         Route.CLEARED,
@@ -2357,7 +2357,7 @@ def asian_terms(
         else PaymentTerms(np.full(n, 2), (PAY_JAN_1,) * n, dates(*(pays[c] for c in contracts)))
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         spec(n),
         Route.CLEARED,
@@ -2642,7 +2642,7 @@ def basis_terms(
     on = rows(*contracts)
     occurrences = n if occurrence is None else max(occurrence) + 1
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         spec(occurrences),
         Route.CLEARED,
@@ -2811,7 +2811,7 @@ def period_terms(
     covering the days given and paying on the day given, the dates the resolution would make."""
     n = len(periods)
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ETHANE,
         spec(n),
         Route.CLEARED,
@@ -3029,7 +3029,7 @@ def group_terms(
         else dates(*pays)
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         PAYS,
         spec(n),
         Route.CLEARED,
@@ -3469,7 +3469,7 @@ def mixed_terms(
         )
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         np.array([names.index(entry.unit) for entry in entries], dtype=np.intp),
         Route.CLEARED,
@@ -3912,7 +3912,7 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
     assert tiny.reporting_lot is not None
     assert tiny.reporting_lot.coefficient == pytest.approx(1e-8)
     terms = resolved_trades(
-        FUTURE, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, tiny, spec(1, 1), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 1), ids(8), None, None,
         dates("2026-09-24"), rows(0), rows(1),
         numbers(1e303), *bounds_of(tiny, rows(1)), numbers(300.0), paying(dates("2026-11-30"), 1),
@@ -3936,7 +3936,7 @@ def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract(
     # is already infinite, and the slot rule would speak first. A price of zero keeps the offsets
     # finite; this is the arithmetic's edge, not a trade anyone books.
     terms = resolved_trades(
-        FUTURE, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, NG, spec(2), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(1, 2), None, None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 1),
         numbers(9e303, 9e303), *bounds_of(NG, rows(1, 1)), numbers(0.0, 0.0),
@@ -3958,7 +3958,7 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
     # number; refused for the batch before the record is made, so that the risk report never
     # meets an infinite total. The sum runs with the overflow flag down and the rule judges.
     terms = resolved_trades(
-        FUTURE, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
+        FIXED_FLOAT, TINY_LOT, spec(2, 1), Route.CLEARED, Settlement.FINANCIAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 2), ids(26, 6), None, None,
         dates("2026-09-24", "2026-09-24"), rows(0, 1), rows(1, 2),
         numbers(1e302, 1e302), *bounds_of(TINY_LOT, rows(1, 2)), numbers(300.0, 300.0),
@@ -4054,7 +4054,7 @@ def wti_terms(
         else np.array([BASES.index(b) for b in bases], dtype=np.intp)
     )
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ix,
         spec(n) if units is None else rows(*units),
         Route.CLEARED,
@@ -4737,7 +4737,7 @@ def waha_terms(
         lag = np.full(m, 3) if lags is None else np.array(lags, dtype=np.int64)
         payment = PaymentTerms(lag, (WAHA_PAYS,) * m, pay_days)
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         WAHA,
         spec(m) if units is None else rows(*units),
         Route.CLEARED,
@@ -5157,7 +5157,7 @@ def fee_terms(
     """The example's rows, or others shaped like them, each one Z26 month at 70."""
     n = len(quantities)
     return resolved_trades(
-        FUTURE, ix, rows(*specs), Route.CLEARED, Settlement.PHYSICAL,
+        FIXED_FLOAT, ix, rows(*specs), Route.CLEARED, Settlement.PHYSICAL,
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None, None,
         dates(*["2026-11-20"] * n), np.arange(n, dtype=np.intp), rows(*([1] * n)),
         numbers(*quantities), *bounds_of(ix, rows(*([1] * n))), numbers(*([70.0] * n)), None,
@@ -5225,7 +5225,7 @@ def test_a_calday_strip_reserves_per_barrel_day_and_the_reporting_lot_changes_no
     for lot in ("LOT", "BBL"):
         ix = a_fee_index(reporting_lot=lot, schedule=schedule)
         terms = resolved_trades(
-            FUTURE, ix, rows(1), Route.CLEARED, Settlement.PHYSICAL,
+            FIXED_FLOAT, ix, rows(1), Route.CLEARED, Settlement.PHYSICAL,
             *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1), ids(201), None, None,
             dates("2026-10-20"), rows(0, 0), rows(1, 2), numbers(2.0, 2.0),
             *bounds_of(ix, rows(1, 2)), numbers(70.0, 70.0), None,

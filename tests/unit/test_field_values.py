@@ -13,14 +13,14 @@ from numpy.typing import NDArray
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells, FieldRow, FieldRows, Handle, TextRow, register
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.instruments.definitions import FUTURE, FieldType, Instrument
+from goosedove.instruments.definitions import FIXED_FLOAT, FieldType, Instrument
 from goosedove.instruments.fields import FieldValues, selected
 
 ENTRY = {
     name: bridge.entry(name)
     for name in ("EchoFieldRow", "CountFieldRows", "_CreateHolidayCalendar", "_CreateValuationDate")
 }
-FIELD_NAMES = ", ".join(field.name for field in FUTURE.fields)
+FIELD_NAMES = ", ".join(field.name for field in FIXED_FLOAT.fields)
 
 
 def row(*cells: object) -> Cells:
@@ -62,8 +62,8 @@ def bound(instrument: str, headers: Cells, body: Cells, one_row: bool = True) ->
 
 def test_a_row_of_fields_arrives_typed_by_its_fields_in_the_sheets_order(calendar: str) -> None:
     headers = row("quantity", "payment_holiday_calendar", "trade_date", "schedule_method")
-    values = bound("future", headers, row(10.0, calendar, 46164.0, "lastday"))
-    assert values.instrument is FUTURE and values.rows == 1
+    values = bound("fixed_float", headers, row(10.0, calendar, 46164.0, "lastday"))
+    assert values.instrument is FIXED_FLOAT and values.rows == 1
     assert values.names == ("quantity", "payment_holiday_calendar", "trade_date", "schedule_method")
     np.testing.assert_array_equal(values.numbers("quantity"), [10.0])
     assert values.dates("trade_date").dtype == np.dtype("datetime64[D]")
@@ -77,7 +77,7 @@ def test_a_row_of_fields_arrives_typed_by_its_fields_in_the_sheets_order(calenda
 
 def test_rows_of_fields_arrive_as_columns_one_per_row() -> None:
     values = bound(
-        "future",
+        "fixed_float",
         row("contract_code", "quantity", "fixed_price"),
         rows(["Z26", 10.0, 3.1], ["z26", -4.0, 3.15], ["F27", 7.0, 3.4]),
         one_row=False,
@@ -92,7 +92,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
     headers = row("quantity_unit", "payment_holiday_calendar", "trade_date", "quantity")
     kinds, slots, text = cast(
         tuple[NDArray[np.uint8], NDArray[np.float64], str],
-        ENTRY["EchoFieldRow"]("future", headers, row("lots", calendar, 46164.0, 10.0)),
+        ENTRY["EchoFieldRow"]("fixed_float", headers, row("lots", calendar, 46164.0, 10.0)),
     )
     assert kinds.shape == (2, 4)
     assert text.split("\0") == [
@@ -104,7 +104,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
         "a holiday calendar",
     ]
     assert slots[1, 2] == 46164.0 and slots[1, 3] == 10.0
-    assert ENTRY["CountFieldRows"]("future", row("quantity"), rows([1.0], [2.0], [3.0])) == 3.0
+    assert ENTRY["CountFieldRows"]("fixed_float", row("quantity"), rows([1.0], [2.0], [3.0])) == 3.0
 
 
 # --- what is refused, in the order decided --------------------------------------------------
@@ -114,42 +114,47 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
     ("instrument", "headers", "body", "message"),
     [
         (None, row("quantity"), row(1.0), "instrument is blank, expected text"),
-        ("future", row(1.0), row(1.0), "fields cell (1, 1) is number 1.0, expected text"),
+        ("fixed_float", row(1.0), row(1.0), "fields cell (1, 1) is number 1.0, expected text"),
         (
-            "future",
+            "fixed_float",
             row("quantity"),
             row(None),
             "values cell (1, 1) is blank, expected number",
         ),
-        ("future", row("quantity"), row(""), "values cell (1, 1) is empty text, expected number"),
-        ("future", row("route"), row(""), "values cell (1, 1) is empty text, expected text"),
-        ("future", row("trade_date"), row(None), "values cell (1, 1) is blank, expected date"),
         (
-            "future",
+            "fixed_float",
+            row("quantity"),
+            row(""),
+            "values cell (1, 1) is empty text, expected number",
+        ),
+        ("fixed_float", row("route"), row(""), "values cell (1, 1) is empty text, expected text"),
+        ("fixed_float", row("trade_date"), row(None), "values cell (1, 1) is blank, expected date"),
+        (
+            "fixed_float",
             row("payment_holiday_calendar"),
             row(""),
             "values cell (1, 1) is empty text, expected holiday calendar handle",
         ),
         (
-            "future",
+            "fixed_float",
             row("contract_code"),
             row(bridge.MISSING),
             "values cell (1, 1) is missing, expected text",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity"),
             rows([1.0], [2.0]),
             "values is 2x1 array, expected one row of field values",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity"),
             rows([1.0], [None]),
             "values is 2x1 array, expected one row of field values",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity", "fixed_price"),
             rows([1.0, 3.1], [None, None]),
             "values is 2x2 array, expected one row of field values",
@@ -158,54 +163,56 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "Future",
             row("Quantity"),
             row("ten"),
-            "ValueError: instrument is 'Future', expected one of: 'future'",
+            "ValueError: instrument is 'Future', expected one of: 'fixed_float'",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity"),
             row(1.0, 2.0),
             "fields has 1 headers, expected 2, one per column of values",
         ),
         (
-            "future",
+            "fixed_float",
             row("Quantity"),
             row(1.0),
-            f"fields cell (1, 1) is text 'Quantity', expected a field of future: {FIELD_NAMES}",
+            "fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: "
+            f"{FIELD_NAMES}",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity "),
             row(1.0),
-            f"fields cell (1, 1) is text 'quantity ', expected a field of future: {FIELD_NAMES}",
+            "fields cell (1, 1) is text 'quantity ', expected a field of fixed_float: "
+            f"{FIELD_NAMES}",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity", "quantity"),
             row(1.0, 2.0),
             "fields cell (1, 2) is text 'quantity', already given at cell (1, 1)",
         ),
         (
-            "future",
+            "fixed_float",
             row("quantity"),
             row("ten"),
             "values cell (1, 1) is text 'ten', expected number",
         ),
         (
-            "future",
+            "fixed_float",
             row("trade_date"),
             row(46164.5),
             "values cell (1, 1) is number 46164.5, expected date",
         ),
-        ("future", row("route"), row(1.0), "values cell (1, 1) is number 1.0, expected text"),
+        ("fixed_float", row("route"), row(1.0), "values cell (1, 1) is number 1.0, expected text"),
         (
-            "future",
+            "fixed_float",
             row("payment_holiday_calendar"),
             row("x:holiday_calendar:9"),
             "values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, "
             "expected holiday calendar handle",
         ),
         (
-            "future",
+            "fixed_float",
             row("payment_holiday_calendar"),
             row(46023.0),
             "values cell (1, 1) is number 46023.0, expected holiday calendar handle",
@@ -223,24 +230,29 @@ def test_handles_are_resolved_from_their_own_cells_in_row_order(calendar: str) -
     # checked first and passes; the text is named in its own cell, not as a second handle in a row
     # that is not there.
     out = ENTRY["EchoFieldRow"](
-        "future", row("payment_holiday_calendar", "quantity"), row(calendar, "ten")
+        "fixed_float", row("payment_holiday_calendar", "quantity"), row(calendar, "ten")
     )
     assert out == "#ERROR EchoFieldRow: values cell (1, 2) is text 'ten', expected number"
     # Down a handle column the first bad cell is the one named, whichever way it is bad.
     dead_then_number = rows(["x:holiday_calendar:9"], [1.0])
-    assert ENTRY["CountFieldRows"]("future", row("payment_holiday_calendar"), dead_then_number) == (
+    assert ENTRY["CountFieldRows"](
+        "fixed_float", row("payment_holiday_calendar"), dead_then_number
+    ) == (
         "#ERROR CountFieldRows: rows cell (1, 1) is text 'x:holiday_calendar:9' naming no live "
         "object, expected holiday calendar handle"
     )
     number_then_dead = rows([1.0], ["x:holiday_calendar:9"])
-    assert ENTRY["CountFieldRows"]("future", row("payment_holiday_calendar"), number_then_dead) == (
-        "#ERROR CountFieldRows: rows cell (1, 1) is number 1.0, expected holiday calendar handle"
-    )
+    assert ENTRY["CountFieldRows"](
+        "fixed_float", row("payment_holiday_calendar"), number_then_dead
+    ) == ("#ERROR CountFieldRows: rows cell (1, 1) is number 1.0, expected holiday calendar handle")
     # A text column before the handle column and a text column after it: each handle is found at
     # its own place among the body's texts, and the rows come through.
     good = rows(["cleared", calendar, "lastday"], ["bilateral", calendar, "lastday"])
     values = bound(
-        "future", row("route", "payment_holiday_calendar", "schedule_method"), good, one_row=False
+        "fixed_float",
+        row("route", "payment_holiday_calendar", "schedule_method"),
+        good,
+        one_row=False,
     )
     assert values.texts("route") == ("cleared", "bilateral")
     assert values.texts("schedule_method") == ("lastday", "lastday")
@@ -249,7 +261,7 @@ def test_handles_are_resolved_from_their_own_cells_in_row_order(calendar: str) -
         ["cleared", calendar, "lastday"], ["bilateral", "x:holiday_calendar:9", "lastday"]
     )
     assert ENTRY["CountFieldRows"](
-        "future", row("route", "payment_holiday_calendar", "schedule_method"), mixed_rows
+        "fixed_float", row("route", "payment_holiday_calendar", "schedule_method"), mixed_rows
     ) == (
         "#ERROR CountFieldRows: rows cell (2, 2) is text 'x:holiday_calendar:9' naming no live "
         "object, expected holiday calendar handle"
@@ -259,7 +271,7 @@ def test_handles_are_resolved_from_their_own_cells_in_row_order(calendar: str) -
 def test_a_handle_of_another_kind_in_a_handle_column_is_refused_naming_the_cell() -> None:
     date = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     out = ENTRY["EchoFieldRow"](
-        "future", row("payment_holiday_calendar", "quantity"), row(date, 1.0)
+        "fixed_float", row("payment_holiday_calendar", "quantity"), row(date, 1.0)
     )
     assert out == (
         f"#ERROR EchoFieldRow: values cell (1, 1) is valuation date handle {date!r}, "
@@ -271,18 +283,19 @@ def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
     # A wrong name, a wrong header and a wrong cell together: the name is refused first.
     out = ENTRY["EchoFieldRow"]("Future", row("Quantity"), row("ten"))
     assert (
-        out == "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'future'"
+        out
+        == "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
     )
     # The right name, a wrong width and a wrong header: the width is refused first.
-    out = ENTRY["EchoFieldRow"]("future", row("Quantity"), row(1.0, 2.0))
+    out = ENTRY["EchoFieldRow"]("fixed_float", row("Quantity"), row(1.0, 2.0))
     assert out == "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values"
     # The right width, a wrong header and a wrong cell: the header is refused first.
-    out = str(ENTRY["EchoFieldRow"]("future", row("quantity", "Quantity"), row("ten", "ten")))
+    out = str(ENTRY["EchoFieldRow"]("fixed_float", row("quantity", "Quantity"), row("ten", "ten")))
     assert out.startswith(
         "#ERROR EchoFieldRow: fields cell (1, 2) is text 'Quantity', expected a field"
     )
     # Two wrong cells: the leftmost column's is refused first.
-    out = ENTRY["EchoFieldRow"]("future", row("quantity", "fixed_price"), row("ten", "eleven"))
+    out = ENTRY["EchoFieldRow"]("fixed_float", row("quantity", "fixed_price"), row("ten", "eleven"))
     assert out == "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number"
 
 
@@ -299,7 +312,7 @@ def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
         "route", "contract_code", "start_date", "end_date", "payment_holiday_calendar", "broker"
     )
     values = bound(
-        "future",
+        "fixed_float",
         headers,
         rows(
             ["cleared", "Z26", "", "", calendar, "ION"],
@@ -327,7 +340,7 @@ def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
     # A field without a mask was supplied on every row, as the record says.
     np.testing.assert_array_equal(values.supplied_rows("route"), [True, True, True])
     # One row with nothing in a period cell: the field is present and no row supplied it.
-    one = bound("future", row("contract_code", "quantity"), row("", 10.0))
+    one = bound("fixed_float", row("contract_code", "quantity"), row("", 10.0))
     assert one.names == ("contract_code", "quantity") and one.texts("contract_code") == ()
     np.testing.assert_array_equal(one.supplied_rows("contract_code"), [False])
     np.testing.assert_array_equal(one.numbers("quantity"), [10.0])
@@ -335,28 +348,29 @@ def test_a_blank_or_empty_cell_in_a_period_field_is_a_row_that_supplied_nothing(
 
 def test_a_populated_period_cell_is_held_to_its_type_and_a_blank_elsewhere_is_refused() -> None:
     count = ENTRY["CountFieldRows"]
-    assert count("future", row("contract_code"), rows(["Z26"], [26.0])) == (
+    assert count("fixed_float", row("contract_code"), rows(["Z26"], [26.0])) == (
         "#ERROR CountFieldRows: rows cell (2, 1) is number 26.0, expected text"
     )
-    assert count("future", row("start_date"), rows([46357.0], ["x"])) == (
+    assert count("fixed_float", row("start_date"), rows([46357.0], ["x"])) == (
         "#ERROR CountFieldRows: rows cell (2, 1) is text 'x', expected date"
     )
-    assert count("future", row("end_date"), rows([None], [46387.5])) == (
+    assert count("fixed_float", row("end_date"), rows([None], [46387.5])) == (
         "#ERROR CountFieldRows: rows cell (2, 1) is number 46387.5, expected date"
     )
     # The cells are checked after the headers, since the field a header names says what a cell
     # may hold: a blank under a wrong header is a wrong header, and under quantity a blank.
-    assert str(ENTRY["EchoFieldRow"]("future", row("Quantity"), row(None))).startswith(
-        "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of future"
+    assert str(ENTRY["EchoFieldRow"]("fixed_float", row("Quantity"), row(None))).startswith(
+        "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of "
+        "fixed_float"
     )
-    assert count("future", row("quantity", "contract_code"), rows([1.0, "Z26"], [None, ""])) == (
-        "#ERROR CountFieldRows: rows cell (2, 1) is blank, expected number"
-    )
+    assert count(
+        "fixed_float", row("quantity", "contract_code"), rows([1.0, "Z26"], [None, ""])
+    ) == ("#ERROR CountFieldRows: rows cell (2, 1) is blank, expected number")
     # The echo probe shows the words where a row supplied nothing and the value where it did.
     kinds, slots, text = cast(
         tuple[NDArray[np.uint8], NDArray[np.float64], str],
         ENTRY["EchoFieldRow"](
-            "future", row("contract_code", "start_date", "quantity"), row("", 46357.0, 10.0)
+            "fixed_float", row("contract_code", "start_date", "quantity"), row("", 46357.0, 10.0)
         ),
     )
     assert kinds.shape == (2, 3)
@@ -381,7 +395,7 @@ def toy_selects(selector: Toy) -> Instrument:
 
 def test_a_handle_whose_kind_holds_an_instrument_selects_it() -> None:
     def MakeToy() -> Handle[Toy]:
-        return Toy(FUTURE)
+        return Toy(FIXED_FLOAT)
 
     def ToyRows(fields: TextRow, values: FieldRows[Toy], toy: Handle[Toy]) -> float:
         return float(values.rows) + len(values.names) / 10
@@ -396,7 +410,7 @@ def test_a_handle_whose_kind_holds_an_instrument_selects_it() -> None:
         == 2.2
     )
     assert str(bridge.entry("ToyRows")(row("Quantity"), rows([1.0]), toy)).startswith(
-        "#ERROR ToyRows: fields cell (1, 1) is text 'Quantity', expected a field of future"
+        "#ERROR ToyRows: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float"
     )
     date = ENTRY["_CreateValuationDate"](46276.0, 0.5)
     assert bridge.entry("ToyRows")(row("quantity"), rows([1.0]), date) == (

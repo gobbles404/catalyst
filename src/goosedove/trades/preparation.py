@@ -145,7 +145,7 @@ def prepared_trades(
     day is a month's publication day and its row that month's, found by one search, the first
     month a month like any other. A slot has fixed when the calendar marks its day fixed, which
     is the day after it at the earliest, an observation staying live on its own day as the
-    calendar's rule says. A physical future whose contract has expired, its expiry day marked
+    calendar's rule says. A physical fixed_float whose contract has expired, its expiry day marked
     fixed, is refused, naming the trade, the contract, its expiry and the valuation date:
     delivery is not modeled, and nothing is omitted, zeroed, kept in mark or moved to cash in its
     place; the contract's expiry decides, not an earlier observation's fixing. A fixed slot takes
@@ -192,7 +192,7 @@ def prepared_trades(
                 f"{terms.named(k)} on {codes[int(encoded.group_contract[g])]} expired "
                 f"{expiries[g]}, "
                 f"before valuation date {as_of}; "
-                "a physical future after its expiry is not supported"
+                "a physical fixed_float after its expiry is not supported"
             )
         is_settled = np.zeros(encoded.group_contract.size, dtype=np.bool_)
     else:

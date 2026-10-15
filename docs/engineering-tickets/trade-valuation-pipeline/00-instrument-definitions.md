@@ -1,5 +1,7 @@
 # 0. Library-owned instrument definitions
 
+**Naming, #174:** the instrument this page calls `future` is `fixed_float` since [rename-instrument-fixed-float.md](rename-instrument-fixed-float.md); the design below is kept as written.
+
 [Pipeline overview](README.md) · [Next: trade representation](01-trade-representation.md)
 
 The agreed starting read-only worksheet contracts are documented separately:

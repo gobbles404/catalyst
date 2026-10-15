@@ -1,6 +1,6 @@
 # _ListInstruments
 
-Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md).
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ShowInstrument](show-instrument.md). Its one instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md), the first slice of the bilateral arc, renamed it `fixed_float`; the name and its description changed and nothing else.
 
 Lists the library-defined instrument schemas that can be inspected with
 [_ShowInstrument](show-instrument.md). This is the first read-only surface for the
@@ -22,7 +22,7 @@ It spills a header and one row per inspectable definition, with exactly these tw
 
 | instrument | description |
 |---|---|
-| future | A position tied to a specified reference contract, with explicit settlement terms. |
+| fixed_float | A fixed-for-floating position on a specified reference contract, with explicit observation and settlement terms. |
 
 This is the first catalog, the one row. Another row comes when that instrument's field contract
 is defined and inspectable. Being listed establishes schema availability, not support for
@@ -67,10 +67,10 @@ cash. `basis_swap` and `option` remain out of the first scope. The older names
 aliases to silently accept alongside the eventual identifiers.
 
 Descriptions explain the economic record. They do not set universal evaluation policy:
-the earlier phrase "no discounting" is omitted from `future`. The supported measure and
+the earlier phrase "no discounting" is omitted from `fixed_float`. The supported measure and
 settlement/valuation treatment are specified at their own boundary.
 
-The proposed future family is organized around contract identity. It can later include a
+The `fixed_float` family is organized around contract identity. It can later include a
 supported bilateral lookalike while preserving its actual agreement and cash treatment.
 The generic description does not make every route/settlement combination constructible;
 the [field sketch](../../engineering-tickets/trade-valuation-pipeline/instrument-field-sketch.md)
@@ -84,12 +84,12 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 
 | Case | Kind |
 |---|---|
-| the two headers, the future's row and its description, every cell text | example |
+| the two headers, the fixed_float's row and its description, every cell text | example |
 | every listed name is shown by `_ShowInstrument` | example across the catalog |
 | an empty catalog spills the header alone | example |
 | three reads publish nothing: the store's live handles as they were | example |
 | seven calls across seven functions and the mixed way out's numpy, no trade, market or history among them; a peak of 994 bytes, within twice the slack | budget |
-| the header, `future` and the two counts in a real Excel | Excel smoke |
+| the header, `fixed_float` and the two counts in a real Excel, and `future`, the name until #174, refused as any other word | Excel smoke |
 
 ## Not here
 

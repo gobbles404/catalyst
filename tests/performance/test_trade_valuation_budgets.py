@@ -73,7 +73,7 @@ def sheet() -> dict[str, Any]:
         "payment_holiday_calendar",
     ]
     template = PATH["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         Cells.from_rows([fields]),
         Cells.from_rows(
             [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]

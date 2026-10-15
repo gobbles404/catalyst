@@ -550,7 +550,7 @@ def test_the_catalog_show_explains_itself() -> None:
     assert not hidden
     assert description == "Shows an instrument's fields, requirements, types and rules."
     assert arguments == [
-        ("instrument", "One instrument name from _ListInstruments, such as future."),
+        ("instrument", "One instrument name from _ListInstruments, such as fixed_float."),
     ]
 
 
@@ -562,7 +562,7 @@ def test_the_template_creator_explains_itself() -> None:
         "formulas take as the trade template."
     )
     assert arguments == [
-        ("instrument", "One instrument name from _ListInstruments, such as future."),
+        ("instrument", "One instrument name from _ListInstruments, such as fixed_float."),
         (
             "fields",
             "The field-name cells in one row, such as A1:B1, using names shown by _ShowInstrument.",

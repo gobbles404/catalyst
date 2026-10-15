@@ -257,7 +257,7 @@ particulars.
   'financial' with the last3day method; a last3day future is cash settled on the average of its
   last three pricing days`. The template and the ticket read the method through the one
   `choice` reader, whose words are now `expected lastday, penultimate or last3day, the three
-  methods built`; `asian` is refused by name as before. The `future` definition's rule for
+  methods built`; `asian` is refused by name as before. The `fixed_float` definition's rule for
   `schedule_method` says the three are built, and `_ShowInstrument` shows it.
 - **Nothing else changed.** The encoding, the preparation, the evaluation, the readers and
   the reports are as they were; the three slots of a component are slots like any other, and

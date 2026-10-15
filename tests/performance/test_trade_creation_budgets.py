@@ -23,7 +23,7 @@ from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FUTURE
+from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import resolved, trades
 from goosedove.trades.template import TradeTemplate, trade_template
@@ -124,7 +124,9 @@ TEMPLATE_FIELDS: dict[str, object] = {
 def a_template(method: str = "lastday", basis: str = "month") -> TradeTemplate:
     fields = {**TEMPLATE_FIELDS, "schedule_method": method, "quantity_per": basis}
     return trade_template(
-        FieldValues(FUTURE, 1, tuple(fields), {name: (value,) for name, value in fields.items()})
+        FieldValues(
+            FIXED_FLOAT, 1, tuple(fields), {name: (value,) for name, value in fields.items()}
+        )
     )
 
 
@@ -137,7 +139,7 @@ def a_ticket(rows: int, contracts: int) -> FieldValues:
     """That many single-month rows, as the seam hands them over: dates, codes, lots and prices."""
     on = contract_rows(rows, contracts)
     return FieldValues(
-        FUTURE,
+        FIXED_FLOAT,
         rows,
         ("trade_date", "contract_code", "quantity", "fixed_price"),
         {
@@ -503,7 +505,7 @@ def sheet() -> dict[str, object]:
             "gas", "Sample gas index", schedule, conventions, specifications, holidays, "lot"
         ),
         "template": PATH["_CreateTradeTemplate"](
-            "future", Cells.from_rows([list(TEMPLATE_FIELDS)]), Cells.from_rows([values])
+            "fixed_float", Cells.from_rows([list(TEMPLATE_FIELDS)]), Cells.from_rows([values])
         ),
         "headers": Cells.from_rows([["trade_date", "contract_code", "quantity", "fixed_price"]]),
     }
@@ -588,7 +590,7 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
     )
 
     def call() -> object:
-        return PATH["_CreateTradeTemplate"]("future", headers, values)
+        return PATH["_CreateTradeTemplate"]("fixed_float", headers, values)
 
     assert str(call()).split(":")[1] == "trade_template"
     assert call_profile(call) == {
@@ -671,7 +673,7 @@ def a_dated_ticket(rows: int, contracts: int, from_day: int = 0) -> FieldValues:
     first = MONTHS[on].astype("datetime64[D]") + np.timedelta64(from_day, "D")
     last = (MONTHS[on] + np.timedelta64(1, "M")).astype("datetime64[D]") - np.timedelta64(1, "D")
     return FieldValues(
-        FUTURE,
+        FIXED_FLOAT,
         rows,
         ("trade_date", "start_date", "end_date", "quantity", "fixed_price"),
         {
@@ -824,7 +826,9 @@ def mixed_template() -> TradeTemplate:
         if name not in ("quantity_unit", "quantity_per", "schedule_method")
     }
     return trade_template(
-        FieldValues(FUTURE, 1, tuple(fields), {name: (value,) for name, value in fields.items()})
+        FieldValues(
+            FIXED_FLOAT, 1, tuple(fields), {name: (value,) for name, value in fields.items()}
+        )
     )
 
 
@@ -834,7 +838,7 @@ def a_mixed_ticket(rows: int, contracts: int) -> FieldValues:
     on = contract_rows(rows, contracts)
     lap = np.arange(rows) // contracts
     return FieldValues(
-        FUTURE,
+        FIXED_FLOAT,
         rows,
         (
             "trade_date",

@@ -25,7 +25,7 @@ from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FUTURE
+from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -123,7 +123,7 @@ def some_terms(
 ) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         GAS,
         np.zeros(components, dtype=np.intp),
         Route.CLEARED,
@@ -393,7 +393,7 @@ MONTH_DAYS = np.busday_count(
 def asian_terms(components: int, contracts: int) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ASIAN_GAS,
         np.zeros(components, dtype=np.intp),
         Route.CLEARED,
@@ -674,7 +674,7 @@ def two_day_terms(components: int, contracts: int) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     later = (np.arange(components) // contracts) % 2
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         GAS,
         np.zeros(components, dtype=np.intp),
         Route.CLEARED,
@@ -825,7 +825,7 @@ def mixed_terms(components: int, contracts: int) -> ResolvedTrades:
     pen = method == METHODS.index(ScheduleMethod.PENULTIMATE)
     pays = np.where(pen, np.busday_offset(MONTH_ENDS[rows], 1, holidays=HOLIDAYS), ASIAN_PAYS[rows])
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         MIXED_GAS,
         (np.arange(components) % 2).astype(np.intp),
         Route.CLEARED,
@@ -979,7 +979,7 @@ ROLLING_GAS = index(
 def rolling_terms(components: int, contracts: int) -> ResolvedTrades:
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         ROLLING_GAS,
         np.zeros(components, dtype=np.intp),
         Route.CLEARED,
@@ -1085,7 +1085,7 @@ def iferc_terms(components: int, contracts: int) -> ResolvedTrades:
     varying, cleared and financial, each paying its month's day."""
     rows = np.arange(components, dtype=np.intp) % contracts
     return resolved_trades(
-        FUTURE,
+        FIXED_FLOAT,
         BASIS,
         np.zeros(components, dtype=np.intp),
         Route.CLEARED,

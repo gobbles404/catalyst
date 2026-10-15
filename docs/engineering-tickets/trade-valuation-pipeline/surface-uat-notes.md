@@ -8,7 +8,7 @@ references to the detailed notes below; the pending-work order is a recommendati
 
 ## Implemented and reviewed: release testing
 
-These ten items are implemented on the prototype stack through **PR #173**, the last of them
+These eleven items are implemented on the prototype stack through **PR #174**, the last two
 awaiting review.
 Implementation and review do not imply a merge to main. For the planned **10 October release**,
 confirm the packaged build includes this revision or a reviewed successor before testing
@@ -26,6 +26,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 8 / item 9 | [Date-offset utility](date-offset-utility.md) | [#171](https://github.com/gobbles404/goosedove/pull/171), `0803f6f`; both review findings closed | `util_ShiftDate(date, offset, [holiday_calendar])` returns one date. Try signed `bd`, `cd` and `em`, weekend anchors, a supplied holiday calendar and zero offsets. |
 | 9 / item 4 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | [#172](https://github.com/gobbles404/goosedove/pull/172), `7f14a83`; reviewed clean, inherited test typing warnings cleared | Keep all three period columns. Mix code-only rows with complete date pairs, using blanks and formula-empty cells. Dates win; half a pair fails. Inspect entered codes separately from resolved contracts. The worked batch reports 580 USD and 0.29 lots. |
 | 10 / item 3 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | [#173](https://github.com/gobbles404/goosedove/pull/173), awaiting review | Make a valuation-date handle and enter `balv26` beside it: a current month runs from the handle's day, a future month is whole, an ended month is refused by both helpers naming the label, the day and the end. Paste the two dates as values, book them, then move the handle: the booked trade stands and matches direct entry of the same dates. |
+| 11 / bilateral first slice | [Rename future to fixed_float](rename-instrument-fixed-float.md) | [#174](https://github.com/gobbles404/goosedove/pull/174), awaiting review | `_ListInstruments` lists `fixed_float`; `_ShowInstrument` and `_CreateTradeTemplate` take it and refuse `future` as an unknown name. Every existing example books, values and reports the same numbers under the new name. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -43,9 +44,9 @@ the sheet updates and the saved risk views remain consistent with the scalar rep
 
 | Order / UAT item | Work to hand off | Readiness and reason for this position |
 |---|---|---|
-| 1 / item 11 and the bilateral plan | [Counterparty plus bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Keep `counterparty` in the bilateral field scope. Align curve binding, valuation-date policy, DV01 convention and nominal-versus-discounted risk reporting before implementation. This arc is independent of the date utilities. |
+| 1 / items 11 and 8, and the remaining bilateral plan | [Bilateral representation, discounting and DV01](bilateral-discounting-and-dv01.md) | After the rename: counterparty required for bilateral/absent for cleared; nonnegative manual marketing reserve optional on either route; optional curve argument to evaluation, no extra public preparation step; retain nominal and discounted lot risks plus DV01 and measure added work. Curve-date policy, DV01 convention and reader layout remain open. |
 
-Readable index names, reserve totals, date offsets, mixed period entry and the BAL date helpers have moved to release testing above. The remaining
+Readable index names, reserve totals, date offsets, mixed period entry, the BAL date helpers and the instrument's rename have moved to release testing above. The remaining
 order favors the smallest specified change first, not code dependencies. Bilateral's
 remaining economic choices still need alignment; marketing reserves follow bilateral.
 This UAT item remains unimplemented. Detailed decisions and examples follow.
@@ -400,5 +401,13 @@ Gas Daily trades and bilateral valuation remain outside this slice.
 Owner reminder, 9 October: add `counterparty` to the instrument definition as part of
 the bilateral work, available through the normal template/ticket entry and retained
 on the resolved trade. Carry this into the [bilateral implementation ticket](bilateral-discounting-and-dv01.md).
-Requiredness and validation details remain to be specified with that work; this records
-the requested field, not an implemented change.
+The owner subsequently agreed that counterparty is required for bilateral and absent
+for cleared; this records the agreed field, not an implemented change.
+
+On 10 October the owner agreed to rename the broad `future` instrument to `fixed_float`, with the
+existing cleared and bilateral route choices, built in #174 as the [rename-only first slice](rename-instrument-fixed-float.md),
+not another instrument or pricing path. The
+[consolidated 18-field inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
+preserves the 16 existing fields and adds counterparty and marketing reserve (item 8). Those
+representation choices are now agreed. The current discount curve stays outside static trades and
+enters evaluation as an optional argument beside the market, with no extra public preparation step.

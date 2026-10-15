@@ -104,7 +104,7 @@ Keep one batch path for one or many trades, including duplicate IDs and zero-qua
 ## Acceptance and delivery
 
 - Exercise the example and input table through registered worksheet functions. Pin
-  `_ShowInstrument("future")`'s type and rule, template readback, trade readback and
+  `_ShowInstrument("fixed_float")`'s type and rule, template readback, trade readback and
   numeric output cell kinds. Include a 15-digit round trip and a numeric formula cell.
 - Verify the range boundary on both signs, zero, fractional and nonfinite inputs through
   the applicable public/library boundaries; never cast first and discover overflow later.

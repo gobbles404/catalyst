@@ -37,7 +37,7 @@ def catalog_cells(instruments: tuple[Instrument, ...]) -> MixedArray:
 
 @excel_function
 def _ShowInstrument(
-    instrument: Annotated[str, "One instrument name from _ListInstruments, such as future."],
+    instrument: Annotated[str, "One instrument name from _ListInstruments, such as fixed_float."],
 ) -> MixedArray:
     """Shows an instrument's fields, requirements, types and rules."""
     return schema_cells(definitions.instrument(instrument))

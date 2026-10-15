@@ -55,7 +55,7 @@ PHH uses clearing-organization days. The two calendar meanings must remain ident
 The existing cleared cash bucket remains modeled cumulative settled P&L; margining and bank
 reconciliation stay outside this work.
 
-Use the existing `future` definition and exact field names:
+Use the existing `fixed_float` definition and exact field names:
 
 | Template field | PHH example | WTI example |
 |---|---|---|

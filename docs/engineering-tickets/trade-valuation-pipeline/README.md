@@ -12,6 +12,15 @@ economic meanings govern the work; its explicitly open questions still need deci
 their implementation slices. Internal types and array layouts remain engineering choices.
 Surface any proposed change to an agreed boundary or economic meaning for design discussion.
 
+**Naming update, agreed 10 October, built in #174:** The broad instrument called `future` in the
+prototype is renamed `fixed_float`, keeping the existing cleared/bilateral routes, by the
+[rename-only ticket](rename-instrument-fixed-float.md), the first slice of the bilateral arc.
+The [bilateral representation inventory](bilateral-discounting-and-dv01.md#trade-representation-field-inventory)
+records the agreed fields, new counterparty and nonnegative marketing reserve, and the
+agreed direct curve input at evaluation. Existing pages and examples using `future` migrated
+with the rename; futures index/schedule names remain. New fields and bilateral evaluation
+follow in separate work.
+
 | Material | How engineering should use it |
 |---|---|
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
@@ -19,6 +28,7 @@ Surface any proposed change to an agreed boundary or economic meaning for design
 | [Shift a date by a text offset](date-offset-utility.md) | `util_ShiftDate(date, offset, [holiday_calendar])`: an explicit date plus a signed `bd`, `cd` or `em` count, an optional holiday calendar, one date out and no valuation context; UAT item 9, built in #171 |
 | [Contract codes and dates on one ticket](contract-codes-and-dates.md) | Each row chooses its period, complete dates taking precedence over a code kept as entered text, blank and empty-text absence scoped to the three period fields; UAT item 4, built in #172 |
 | [BAL dates from a valuation-date handle](date-helper-inputs.md) | Explicit handle supplies BAL `as_of`; future periods start at their first day, expired periods fail in both helpers, and users freeze booking dates by pasting values; UAT item 3, built in #173 |
+| [Rename future to fixed_float](rename-instrument-fixed-float.md) | The catalog's one instrument renamed `fixed_float`, the same fields, rules, numbers and work budgets, `future` refused as any other word; the first slice of the bilateral arc, built in #174 |
 | [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
 | [Brokerage and clearing reserve totals](reserve-totals.md) | Static positive cost totals from entry specifications, booked once when a batch is made, carried on its evaluated results and read through `_ReportReserves`, marketing zero until after bilateral; built in #170 |
 | [Readable index names](readable-index-names.md) | A required `display_name` right after `name`, a description kept on the index and shown beside the name in readback, read by nothing else; built in #169 |

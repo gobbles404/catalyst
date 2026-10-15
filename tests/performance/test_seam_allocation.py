@@ -1021,7 +1021,7 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 
 # --- the instrument catalog -------------------------------------------------------------------
 # The list, two text columns of one row, is the way out's arrays and the joined texts: measured
-# 994 bytes on 2026-10-04, which twice the slack covers. The shown future, seven rows by
+# 994 bytes on 2026-10-04, which twice the slack covers. The shown fixed_float, seven rows by
 # seventeen columns since #161, 119 cells of which 103 are text, is laid out one cell at a time
 # and joined for the way out: measured 12,869 bytes on 2026-10-08, about 108 a cell, and 15,041
 # on 2026-10-10, about 126 a cell, when #172 lengthened the three period fields' texts to say what
@@ -1035,7 +1035,7 @@ def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() 
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
     cells = 7 * 17
-    assert least_peak(lambda: ENTRY["_ShowInstrument"]("future")) <= 130 * cells + SLACK
+    assert least_peak(lambda: ENTRY["_ShowInstrument"]("fixed_float")) <= 130 * cells + SLACK
     assert bridge.live_handles() == live
 
 
@@ -1053,14 +1053,14 @@ def test_rows_of_fields_bind_within_one_mask_over_the_rows() -> None:
     headers = Cells.from_rows([["quantity", "fixed_price", "contract_code"]])
     body = Cells.from_rows([[float(i), 3.0 + i / 100, f"c{i}"] for i in range(rows)])
     assert (
-        least_peak(lambda: ENTRY["CountFieldRows"]("future", headers, body))
+        least_peak(lambda: ENTRY["CountFieldRows"]("fixed_float", headers, body))
         <= 60 * rows + 2 * SLACK
     )
     calendar = ENTRY["_CreateHolidayCalendar"](Cells.from_rows([[46023.0]]))
     one = Cells.from_rows([["quantity_unit", "payment_holiday_calendar", "trade_date", "quantity"]])
     row = Cells.from_rows([["lots", calendar, 46164.0, 10.0]])
     live = bridge.live_handles()
-    assert least_peak(lambda: ENTRY["EchoFieldRow"]("future", one, row)) <= 4 * SLACK
+    assert least_peak(lambda: ENTRY["EchoFieldRow"]("fixed_float", one, row)) <= 4 * SLACK
     assert bridge.live_handles() == live
 
 
@@ -1133,8 +1133,10 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     values = Cells.from_rows(
         [["lot", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays]]
     )
-    assert least_peak(lambda: ENTRY["_CreateTradeTemplate"]("future", names, values)) <= 4 * SLACK
-    template = ENTRY["_CreateTradeTemplate"]("future", names, values)
+    assert (
+        least_peak(lambda: ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)) <= 4 * SLACK
+    )
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)
     rows = N // 4
     headers = Cells.from_rows([["trade_date", "contract_code", "quantity", "fixed_price"]])
     body = Cells.from_rows(

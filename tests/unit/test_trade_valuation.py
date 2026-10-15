@@ -142,7 +142,7 @@ def ng() -> dict[str, Any]:
         [("NYMEX NG", 10_000.0)],
     )
     template = ENTRY["_CreateTradeTemplate"](
-        "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
+        "fixed_float", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
     )
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(*NG_ROWS), template)
     history = a_history(index, "2026-10-29", "2026-11-24", holidays, {})
@@ -293,7 +293,7 @@ def toy() -> dict[str, Any]:
         "payment_time_lag": "+2bd",
         "payment_holiday_calendar": calendar,
     }
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(*NG_ROWS), template)
     return {"index": index, "template": template, "trades": trades}
 
@@ -464,13 +464,13 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "payment_holiday_calendar": ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")])),
     }
     beyond = {**fields, "payment_time_lag": "+99999999999999999999bd"}
-    assert ENTRY["_CreateTradeTemplate"]("future", row(*beyond), row(*beyond.values())) == (
+    assert ENTRY["_CreateTradeTemplate"]("fixed_float", row(*beyond), row(*beyond.values())) == (
         "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is "
         "'+99999999999999999999bd', expected at most 2,113,146 business days, the sheet's "
         "calendar from 1900-03-01 to 9999-12-31 end to end"
     )
     far = {**fields, "payment_time_lag": "+2100000bd"}
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*far), row(*far.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*far), row(*far.values()))
     assert ":trade_template:" in str(template)  # a lag the template cannot yet see past
     assert ENTRY["_CreateTrades"](toy["index"], row(*NG_HEADERS), rows(*NG_ROWS), template) == (
         "#ERROR _CreateTrades: ValueError: payment_time_lag is '+2100000bd', counted from "
@@ -478,7 +478,9 @@ def test_a_lag_past_the_sheets_calendar_fails_the_template_or_the_batch_in_the_l
         "sheet can show"
     )
     long_lag = {**fields, "payment_time_lag": "+" + "9" * 4301 + "bd"}
-    shown = str(ENTRY["_CreateTradeTemplate"]("future", row(*long_lag), row(*long_lag.values())))
+    shown = str(
+        ENTRY["_CreateTradeTemplate"]("fixed_float", row(*long_lag), row(*long_lag.values()))
+    )
     assert shown.startswith("#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+9999")
     assert shown.endswith("the sheet's calendar from 1900-03-01 to 9999-12-31 end to end")
 
@@ -526,7 +528,7 @@ PEN_FIELDS = (
 def pen_template(specification: str, clearing: str) -> str:
     return str(
         ENTRY["_CreateTradeTemplate"](
-            "future",
+            "fixed_float",
             row(*PEN_FIELDS),
             row(
                 specification,
@@ -839,7 +841,7 @@ def test_a_series_without_the_pen_days_settle_is_refused_before_any_trade_is_pre
 def test_a_physical_pen_is_refused_when_the_batch_is_made(phh: dict[str, Any]) -> None:
     fields = tuple(name for name in PEN_FIELDS if not name.startswith("payment_"))
     physical = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*fields),
         row("ICE PHH", "month", "penultimate", "cleared", "physical", "ICE Clear Europe"),
     )
@@ -897,7 +899,7 @@ def valued_on_24_nov(
     index: str, name: str, template_fields: dict[str, object], row_: list[object]
 ) -> tuple[tuple[float, float, float], list[list[object]]]:
     template = ENTRY["_CreateTradeTemplate"](
-        "future", row(*template_fields), row(*template_fields.values())
+        "fixed_float", row(*template_fields), row(*template_fields.values())
     )
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(row_), template)
     history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
@@ -944,7 +946,7 @@ def test_a_cents_index_reads_back_the_quote_quantity_apart_from_the_coefficient(
         "cents", NG_CONTRACTS, NG_HOLIDAYS, [("NYMEX NG", 10_000.0)], quoted_in="CENT"
     )
     template = ENTRY["_CreateTradeTemplate"](
-        "future", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
+        "fixed_float", row(*NG_TEMPLATE), row(*NG_TEMPLATE.values())
     )
     trades = ENTRY["_CreateTrades"](
         index, row(*NG_HEADERS), rows([1.0, serial("2026-09-24"), "Z26", 1.0, 300.0]), template
@@ -964,12 +966,14 @@ def test_a_cents_index_reads_back_the_quote_quantity_apart_from_the_coefficient(
 def test_the_old_field_is_refused_at_the_seam_as_unknown(ng: dict[str, Any]) -> None:
     message = str(
         ENTRY["_CreateTradeTemplate"](
-            "future", row("contract_specification", "quantity_unit"), row("NYMEX NG", "NYMEX NG")
+            "fixed_float",
+            row("contract_specification", "quantity_unit"),
+            row("NYMEX NG", "NYMEX NG"),
         )
     )
     assert message.startswith(
         "#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'contract_specification', "
-        "expected a field of future: trade_id, trade_date, contract_code, "
+        "expected a field of fixed_float: trade_id, trade_date, contract_code, "
     )
     assert str(
         ENTRY["_CreateTrades"](
@@ -1093,7 +1097,7 @@ def test_zero_bypasses_neither_coverage_expiry_nor_identity_on_the_sheet(
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert ENTRY["_PrepareTrades"](trades, expired) == (
         "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
-        "before valuation date 2026-11-26; a physical future after its expiry is not supported"
+        "before valuation date 2026-11-26; a physical fixed_float after its expiry is not supported"
     )
     # An all-zero batch is held to the identity rules as any batch is: a history over another
     # index of the same facts and name, and a market over another history of the same index.
@@ -1171,10 +1175,10 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     expired = a_history(ng["index"], "2026-10-29", "2026-11-26", ["2026-11-26", "2026-12-25"], {})
     assert prepare(ng["trades"], expired) == (
         "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on Z26 expired 2026-11-25, "
-        "before valuation date 2026-11-26; a physical future after its expiry is not supported"
+        "before valuation date 2026-11-26; a physical fixed_float after its expiry is not supported"
     )
     bilateral = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method"),
         row("NYMEX NG", "month", "lastday", "bilateral", "physical"),
     )
@@ -1217,7 +1221,9 @@ def l3d_template(payment_holidays: list[str], settlement: str = "financial") -> 
         "+2bd",
         calendar,
     ]
-    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values[: len(fields)])))
+    return str(
+        ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values[: len(fields)]))
+    )
 
 
 @pytest.fixture(scope="module")
@@ -1443,7 +1449,9 @@ def asian_template(
         "+2bd",
         calendar,
     ]
-    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values[: len(fields)])))
+    return str(
+        ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values[: len(fields)]))
+    )
 
 
 @pytest.fixture(scope="module")
@@ -1981,7 +1989,7 @@ def pays() -> dict[str, Any]:
     )
     calendar = ENTRY["_CreateHolidayCalendar"](column([serial("2026-01-01")]))
     template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*PAYS_FIELDS),
         row("UNIT", "month", "last3day", "cleared", "financial", "Prototype Clearing", calendar),
     )
@@ -2198,7 +2206,7 @@ def mixed() -> dict[str, Any]:
     )
     payments = ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")]))
     template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*MIXED_FIELDS),
         row("cleared", "financial", serial("2026-11-30"), 10.0, "+1bd", payments),
     )
@@ -2326,7 +2334,7 @@ def test_the_mixed_batch_equals_its_singletons_on_the_sheet_and_a_uniform_field_
     # word: the same batch; and both at once refused as any field is.
     without = row(*(name for name in MIXED_HEADERS if name != "schedule_method"))
     lastday_template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*MIXED_FIELDS, "schedule_method"),
         row(
             "cleared",
@@ -2451,7 +2459,7 @@ def ete_template(basis: str | None = "month") -> str:
     values: list[object] = [basis, "cleared", "financial", "ETE Clearing", "+1bd", payments]
     if basis is None:
         fields, values = fields[1:], values[1:]
-    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values)))
+    return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
 
 
 @pytest.fixture(scope="module")
@@ -2664,7 +2672,7 @@ def test_the_reporting_lot_is_the_indexs_choice_and_scales_the_lots_alone() -> N
         index, _ = an_index(
             "Henry Hub NYMEX", NG_CONTRACTS, NG_HOLIDAYS, lots, reporting_lot=reporting_lot
         )
-        template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+        template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
         history = a_history(index, "2026-10-29", "2026-11-24", NG_HOLIDAYS, {})
         market = a_market(history, "Henry Hub NYMEX", 3.20, 3.50)
         for quantity, lots_reported in zip((10_000.0, 2_500.0), expected, strict=True):
@@ -2801,7 +2809,7 @@ def wti_template(lag: str = "+2bd", method: str | None = "asian", unit: str = "B
     fields = [f for f in PEN_FIELDS if method is not None or f != "schedule_method"]
     values: list[object] = [unit, "month", method, "cleared", "financial", "Prototype Clearing"]
     values = [v for v in values if v is not None] + [lag, calendar]
-    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values)))
+    return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
 
 
 @pytest.fixture(scope="module")
@@ -2926,7 +2934,7 @@ def test_two_groups_on_one_pricing_day_read_back_apart_by_their_booked_contracts
     pair = ENTRY["_CreateTrades"](wti["index"], headers, rows(asian, future), template)
     _, _, both = wti_state(wti, "2026-12-01", (72.0, 75.0), pair)
     slots = spilled(ENTRY["util_ReadHandle"](both))[2:]
-    assert len(slots) == 16  # the asian's fifteen days and the future's one
+    assert len(slots) == 16  # the asian's fifteen days and the lastday's one
     assert slots[14][:4] == ["F27", "Z26", serial("2026-12-21"), serial("2026-12-22")]
     assert slots[15][:4] == ["F27", "F27", serial("2026-12-21"), serial("2026-12-22")]
     assert valued(both) == (pytest.approx(5_000), 0.0, pytest.approx(2.5))
@@ -3198,7 +3206,7 @@ def waha() -> dict[str, Any]:
         "payment_time_lag": "+3bd",
         "payment_holiday_calendar": pays,
     }
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     trades = ENTRY["_CreateTrades"](index, row(*NG_HEADERS), rows(WAHA_ROW), template)
     return {"index": index, "pays": pays, "fields": fields, "template": template, "trades": trades}
 
@@ -3316,13 +3324,13 @@ def test_an_iferc_batch_that_is_not_a_financial_lastday_one_is_refused_when_made
         },
         "settlement_method": "physical",
     }
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*physical), row(*physical.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*physical), row(*physical.values()))
     assert ENTRY["_CreateTrades"](waha["index"], row(*NG_HEADERS), rows(WAHA_ROW), template) == (
         "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
         "on an IFERC index; an IFERC basis future is cash settled on its month's published index"
     )
     by_row = {key: value for key, value in waha["fields"].items() if key != "schedule_method"}
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*by_row), row(*by_row.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*by_row), row(*by_row.values()))
     assert ENTRY["_CreateTrades"](
         waha["index"],
         row(*NG_HEADERS, "schedule_method"),
@@ -3366,7 +3374,7 @@ def test_numeric_ids_cross_the_seam_and_read_back_as_numbers(ng: dict[str, Any])
         -999_999_999_999_999.0,
         0.0,
     ]
-    shown = spilled(ENTRY["_ShowInstrument"]("future"))
+    shown = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
     assert shown[4][1] == "number" and shown[5][1] == "a whole number of at most 15 digits"
 
 
@@ -3374,7 +3382,7 @@ def test_a_templates_numeric_id_reads_back_as_a_number_and_reaches_every_row(
     ng: dict[str, Any],
 ) -> None:
     fields = {**NG_TEMPLATE, "trade_id": 77.0}
-    template = ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*fields.values()))
+    template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
     shown = spilled(ENTRY["util_ReadHandle"](template))
     at = shown[0].index("trade_id")
     assert (shown[1][at], shown[2][at]) == ("float64", 77.0)
@@ -3383,7 +3391,7 @@ def test_a_templates_numeric_id_reads_back_as_a_number_and_reaches_every_row(
     )
     assert [line[1] for line in spilled(ENTRY["util_ReadHandle"](trades))[2:]] == [77.0] * 3
     assert ENTRY["_CreateTradeTemplate"](
-        "future", row(*fields), row(*{**fields, "trade_id": 12.5}.values())
+        "fixed_float", row(*fields), row(*{**fields, "trade_id": 12.5}.values())
     ) == (
         "#ERROR _CreateTradeTemplate: ValueError: trade_id is 12.5, expected a whole number of at "
         "most 15 digits"
@@ -3685,7 +3693,7 @@ def bbl() -> dict[str, Any]:
         reporting_lot="LOT",
     )
     template = ENTRY["_CreateTradeTemplate"](
-        "future",
+        "fixed_float",
         row(*[name for name in PEN_FIELDS if name != "quantity_per"]),
         row("BBL", "asian", "cleared", "financial", "Prototype Clearing", "+1bd", calendar),
     )

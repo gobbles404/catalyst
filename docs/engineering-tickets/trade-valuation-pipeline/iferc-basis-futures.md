@@ -11,7 +11,7 @@ focused PR. This ticket does not decide how the prototype lands or is later rebu
 
 ## Outcome
 
-Book and value a cleared, financially settled `future` on an IFERC index through the
+Book and value a cleared, financially settled `fixed_float` on an IFERC index through the
 existing template, trade, preparation, evaluation and reporting functions. The first
 examples are ICE Waha and Houston Ship Channel basis futures.
 
@@ -60,7 +60,7 @@ _ReportRisk(results)
 _ReportDelta(results, [bucket = "day"])
 ```
 
-Example shared template values, under instrument `future`:
+Example shared template values, under instrument `fixed_float`:
 
 | Field | Value |
 |---|---|
