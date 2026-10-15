@@ -15,7 +15,8 @@ Surface any proposed change to an agreed boundary or economic meaning for design
 | Material | How engineering should use it |
 |---|---|
 | This packet and its linked function specifications | Current pipeline, field policy, responsibilities and acceptance targets |
-| [Trade surface UAT notes](surface-uat-notes.md) | Running observations and owner decisions from Excel UAT, including delta in lots, trade identifiers, date-helper inputs and ticket period precedence |
+| [Trade surface UAT notes](surface-uat-notes.md) | Running observations and owner decisions from Excel UAT, including delta in lots, trade identifiers, date-helper inputs, ticket period precedence, readable index names and results readback ordering |
+| [Delta by day, month and year](daily-risk-vector.md) | Saved lot-delta vectors aggregated by observation time across payment groups; `_ReportDelta` selects the reporting bucket, with unchanged valuation ownership; built in #166 |
 | [Calendar driven Asian pricing references](calendar-driven-asian-references.md) | Generic daily reference resolution from the index schedule/calendar, separating averaging month and payment ownership from the futures supplying prices; built in #165 |
 | [Lot-delta reporting](lot-delta-reporting.md) | Engineering ticket for delta in an explicitly designated index-specific lot, preserving monetary valuation coefficients |
 | [Bilateral discounting and DV01](bilateral-discounting-and-dv01.md) | Planning ticket after the mixed-fields prototype: payment-level discounting, rate preparation, risk conventions and acceptance examples; open choices are marked |

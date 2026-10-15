@@ -2414,3 +2414,64 @@ def test_a_code_and_the_whole_months_dates_book_the_same_december_on_the_wti_ind
         assert batch.resolved.payment is not None
         assert [str(d) for d in batch.resolved.payment.date] == ["2027-01-05"]
     np.testing.assert_array_equal(by_code.encoded.slot_date, by_dates.encoded.slot_date)
+
+
+# --- delta by day, month and year, daily-risk-vector.md ------------------------------------------
+# The ticket's month-aligned index: X26 expiring 30 November bounds the calendar, Z26 expires
+# 31 December and F27 29 January, closed on 25 December and New Year's Day, dollars a barrel, a
+# barrel and a thousand-barrel LOT the specifications, the LOT reported; a template that leaves the
+# method to the rows, cleared and financial at +1bd on the same calendar; 22 LOT of a December
+# asian and 3 LOT of a Z26 penultimate, both at 70.
+MONTHLY = an_index(
+    "monthly",
+    (("X26", "2026-11-30"), ("Z26", "2026-12-31"), ("F27", "2027-01-29")),
+    WTI_HOLIDAYS,
+    (("BBL", 1.0, "BBL"), ("LOT", 1_000.0, "BBL")),
+    ("VOLUME", "BBL"),
+    "LOT",
+)
+PEN_ASIAN_TEMPLATE: dict[str, object] = {
+    key: value for key, value in WTI_TEMPLATE.items() if key != "schedule_method"
+} | {"quantity_unit": "LOT", "payment_time_lag": "+1bd"}
+ASIAN_AND_PEN: dict[str, list[object]] = {
+    "trade_id": ["A", "P"],
+    "trade_date": ["2026-11-20", "2026-11-20"],
+    "contract_code": ["Z26", "Z26"],
+    "quantity": [22, 3],
+    "fixed_price": [70.0, 70.0],
+    "schedule_method": ["asian", "penultimate"],
+}
+DECEMBER_PRICING_DAYS = ethane_days("2026-12-01", "2027-01-01")  # the same holidays
+
+
+def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_year() -> None:
+    # Two groups, Z26 paying 4 January and Z26 paying 31 December, 23 slots: the asian's 22 days
+    # and the pen's one, 30 December, which the asian observes too; the days axis is December's 22
+    # pricing days once, every one priced by Z26, the month axis 1 December and the year 1 January
+    # 2026, the buckets that stand whatever fixes.
+    batch, _ = created(MONTHLY, ASIAN_AND_PEN, PEN_ASIAN_TEMPLATE)
+    enc = batch.encoded
+    assert enc.slot_group.size == 23 and enc.group_contract.size == 2
+    assert batch.resolved.payment is not None
+    assert [str(d) for d in batch.resolved.payment.date] == ["2027-01-04", "2026-12-31"]
+    assert len(DECEMBER_PRICING_DAYS) == 22
+    assert [str(d) for d in enc.days] == DECEMBER_PRICING_DAYS
+    assert [MONTHLY.schedule.codes[int(r)] for r in enc.day_reference] == ["Z26"] * 22
+    assert [str(m) for m in enc.months] == ["2026-12-01"]
+    assert [str(y) for y in enc.years] == ["2026-01-01"]
+    np.testing.assert_array_equal(enc.month_of_day, [0] * 22)
+    np.testing.assert_array_equal(enc.year_of_month, [0])
+    # The reversed rows give the same axes; with the pen at +2bd both pay 4 January, one group
+    # and 22 slots, the axes the same.
+    reversed_rows = {key: list(reversed(values)) for key, values in ASIAN_AND_PEN.items()}
+    turned, _ = created(MONTHLY, reversed_rows, PEN_ASIAN_TEMPLATE)
+    np.testing.assert_array_equal(turned.encoded.days, enc.days)
+    np.testing.assert_array_equal(turned.encoded.day_of_slot, enc.day_of_slot)
+    later, _ = created(
+        MONTHLY,
+        {**ASIAN_AND_PEN, "payment_time_lag": ["+1bd", "+2bd"]},
+        {key: value for key, value in PEN_ASIAN_TEMPLATE.items() if key != "payment_time_lag"},
+    )
+    assert later.encoded.slot_group.size == 22 and later.encoded.group_contract.size == 1
+    np.testing.assert_array_equal(later.encoded.days, enc.days)
+    np.testing.assert_array_equal(later.encoded.months, enc.months)

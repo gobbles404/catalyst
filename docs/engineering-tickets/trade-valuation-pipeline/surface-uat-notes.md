@@ -12,6 +12,8 @@ Record observations and decisions here before turning them into implementation t
 | 3. Start/end date helper inputs | Keep the worksheet arguments unchanged; allow dates as well as period labels to feed the trade's date fields. Preserve case-insensitive BAL entry. | Requested; date passthrough interpretation below; BAL labels already supported |
 | 4. Ticket period fields | Allow `contract_code`, `start_date` and `end_date` together; complete dates take precedence over the code. | Requested UX; proposed row-level rules below |
 | 5. Asian pricing references | Average the daily nearby reference supplied by the index schedule/calendar; it need not match the booked month. | Agreed; [engineering ticket](calendar-driven-asian-references.md) drafted |
+| 6. Readable index names | Keep the existing short `name` and add a human-readable `display_name` on the index. | Agreed direction; implementation ticket pending |
+| 7. Delta by observation time | Retain day, month and year lot-delta vectors across methods and payment groups; select the bucket in `_ReportDelta`. | Agreed, updated 9 October; [engineering ticket](daily-risk-vector.md) revised; quarters excluded |
 
 ## 1. Delta reporting
 
@@ -161,3 +163,65 @@ both sides and on expiry day, separate forward prices and deltas, partial fixing
 and cash, and mixed batches with existing futures and month-aligned Asians. Readback must
 distinguish the booked period from its pricing references. No signature change is indicated
 by this research; this note records the extension, not an implemented fix.
+
+## 6. Human-readable index names
+
+Retain the index's existing `name` as the short label used by the current market and
+price-vector matching. Add a separate `display_name` supplied when creating the index,
+stored on the index and exposed alongside `name` through `util_ReadHandle`.
+
+| `name` | Illustrative `display_name` |
+|---|---|
+| `WTI` | West Texas Intermediate crude oil - NYMEX |
+| `NG` | Henry Hub natural gas - NYMEX |
+
+Readers or selectors can present both together so a user unfamiliar with another desk's
+shorthand can identify the market. This is descriptive metadata; pricing and binding
+continue to use the existing identifiers and object references. Do not infer conventions
+or product behavior from the display text, or rename the existing `name` field as part of
+this addition. Exact argument placement and whether the new value is required remain for
+the implementation ticket; no creator signature has changed in this note.
+
+## 7. Observation dates appear out of order in the results readback
+
+Corroborated on PR #165 head `f1f1b916` through `_CreateTrades`, `_PrepareTrades`,
+`_EvaluateTrades` and `util_ReadHandle`. The result readback preserves the encoded slot
+order: booked contract in schedule order, then payment date, then observation date within
+that payment group. `schedule_method` is not a sort key. Different methods often resolve
+different payment dates, which can make the displayed order look method-driven.
+
+Synthetic reproduction: Z26 expires 31 December 2026; the pricing/payment calendar closes
+25 December and 1 January as well as weekends. Book a 22-BBL December Asian and a 3-BBL
+penultimate, both with `+1bd`. The pen observes 30 December and pays 31 December; the Asian
+observes the month's 22 pricing days and pays 4 January 2027. The readback begins:
+
+| Observation date | Payment date | Source in this example | Live exposure in BBL |
+|---|---|---|---:|
+| 30-Dec-2026 | 31-Dec-2026 | Penultimate | 3 |
+| 1-Dec-2026 | 4-Jan-2027 | Asian | 1 |
+| 2-Dec-2026 | 4-Jan-2027 | Asian | 1 |
+
+The source labels above explain the example; the compressed result does not contain a
+method column. Reversing the ticket rows leaves the spill identical. Giving the pen a
+`+2bd` lag makes both trades pay 4 January, creates one payment group, and produces 22
+chronologically ordered observation rows; the 30 December exposure is then 4 BBL.
+
+This corroborates the displayed ordering, not a valuation or risk error. The owner clarified
+the desired view: one observation date with its net live delta, irrespective of source
+method or payment group. An Asian contribution of 1 lot and a pen contribution of 3 lots
+on one day should appear as 4 lots on that day. Sorting the existing rows alone is insufficient.
+
+Agreed direction, refined 9 October: retain the daily vector and its calendar-month and
+calendar-year aggregates at preparation, carry all three into results, and select the
+saved view with `_ReportDelta(results, [bucket = "day"])`. Allowed buckets are `day`,
+`month` and `year`; quarters are excluded. Sum each slot's own live lots, never the
+repeated contract-total columns from the debug spill. The reader selects and formats
+saved values, without numerical aggregation or reading the debug table.
+
+Buckets follow observation dates, independently of payment dates, booked months and
+pricing-contract labels. Preserve references on the daily axis and payment ownership
+for valuation/cash. Keep zero entries as dates fix and the axes stable for the batch.
+This is reporting aggregation; there is no new index-level or valuation-parameter
+resolution setting. The [revised ticket](daily-risk-vector.md) retains the existing
+aggregate reports and raw debug layout, and replaces its earlier daily-only reader
+proposal. This note and ticket specify the next change; they do not implement it.

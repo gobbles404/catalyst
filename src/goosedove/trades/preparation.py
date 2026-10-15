@@ -1,10 +1,14 @@
 """The encoded batch prepared against one market history: which slots have fixed and at what
 settle, which payment groups have settled, what remains live and the exposure to each live
-reference, and the risk that no tick changes, the price sensitivity in the settlement currency
-and the delta in lots of the index's reporting lot. One record per history; a tick reads it and
-makes nothing of it again. docs/library/trades/kernel.md is the page."""
+reference, and the risk that no tick changes, the price sensitivity in the settlement currency,
+the delta in lots of the index's reporting lot by contract and the same lots by observation day,
+calendar month and calendar year, the three views _ReportDelta selects among. One record per
+history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
+page."""
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import assert_never
 
 import numpy as np
 from numpy.typing import NDArray
@@ -45,8 +49,12 @@ class PreparedTrades:
     currency the mark moves for a move of one unit of quote price in that contract; lot_delta[r],
     the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
-    half of whose observation weight has fixed a half; and lot_delta_total, their sum, checked
-    finite before the record is made; the result shares them."""
+    half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
+    the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
+    days, monthly_lots[m] those summed onto its calendar months and yearly_lots[y] onto its
+    calendar years, the three views _ReportDelta selects among, a bucket's lots zero once its
+    days have fixed and its row kept; every one of them checked finite before the record is
+    made; the result shares them."""
 
     encoded: Encoded
     history: MarketHistory
@@ -64,6 +72,35 @@ class PreparedTrades:
     price_sensitivity: NDArray[np.float64]
     lot_delta: NDArray[np.float64]
     lot_delta_total: float
+    daily_lots: NDArray[np.float64]
+    monthly_lots: NDArray[np.float64]
+    yearly_lots: NDArray[np.float64]
+
+
+class Bucket(Enum):
+    """What a delta report sums the live lots by: the observation day, the calendar month it
+    falls in or the calendar year, _ReportDelta's three choices, a quarter none of them."""
+
+    DAY = "day"
+    MONTH = "month"
+    YEAR = "year"
+
+
+def bucketed(
+    prepared: PreparedTrades, bucket: Bucket
+) -> tuple[NDArray[np.datetime64], NDArray[np.float64]]:
+    """One of the three retained views by reference, its bucket starts and its lots, the
+    encoding's axis and the preparation's vector: nothing summed, sorted or converted here."""
+    encoded = prepared.encoded
+    match bucket:
+        case Bucket.DAY:
+            return encoded.days, prepared.daily_lots
+        case Bucket.MONTH:
+            return encoded.months, prepared.monthly_lots
+        case Bucket.YEAR:
+            return encoded.years, prepared.yearly_lots
+        case _:
+            assert_never(bucket)
 
 
 def prepared_trades(
@@ -180,6 +217,27 @@ def prepared_trades(
             f"the batch has {lot_delta_total!r} of lot delta in all, expected a finite number of "
             f"{words}; the contracts' deltas, each finite, sum past the largest number"
         )
+    daily_lots = np.bincount(
+        encoded.day_of_slot, weights=dated_live_lots, minlength=encoded.days.size
+    )
+    monthly_lots = np.bincount(
+        encoded.month_of_day, weights=daily_lots, minlength=encoded.months.size
+    )
+    yearly_lots = np.bincount(
+        encoded.year_of_month, weights=monthly_lots, minlength=encoded.years.size
+    )
+    for label, starts, lots in (
+        ("the day", encoded.days, daily_lots),
+        ("the month from", encoded.months, monthly_lots),
+        ("the year from", encoded.years, yearly_lots),
+    ):  # the three views, not the rows: a bucket's sum can outrun what its parts did not
+        outrun = ~np.isfinite(lots)
+        if outrun.any():
+            b = int(outrun.argmax())
+            raise ValueError(
+                f"{label} {starts[b]} has {float(lots[b])!r} of lot delta in all, expected a "
+                f"finite number of {words}; its exposures in lots sum past the largest number"
+            )
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
@@ -193,7 +251,7 @@ def prepared_trades(
         live_references,
         reference_of_live_slot,
     )
-    for array in (*arrays, price_sensitivity, lot_delta):
+    for array in (*arrays, price_sensitivity, lot_delta, daily_lots, monthly_lots, yearly_lots):
         array.setflags(write=False)
     return PreparedTrades(
         encoded,
@@ -205,4 +263,7 @@ def prepared_trades(
         price_sensitivity,
         lot_delta,
         lot_delta_total,
+        daily_lots,
+        monthly_lots,
+        yearly_lots,
     )

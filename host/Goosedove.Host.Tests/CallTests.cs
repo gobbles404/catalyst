@@ -1682,6 +1682,86 @@ namespace Goosedove.Host.Tests
             Assert.Equal(5200.0, (double)paid[2, 1], 6);
         }
 
+        // Delta by day, month and year, daily-risk-vector.md: the month-aligned index of X26, Z26 and
+        // F27 expiring 30 November, 31 December and 29 January, 46356, 46387 and 46416, closed on
+        // 25 December and New Year's Day, dollars a barrel, a barrel and a thousand-barrel LOT, the LOT
+        // reported; a template leaving the method to the rows, cleared and financial at +1bd; A, 22 LOT
+        // of a December asian, and P, 3 LOT of a Z26 penultimate, both at 70, every settle and the
+        // quote 75. On 1 December, 46357, every day live: the day view 22 rows, a lot each and 4 on
+        // the 30th, 46386, the month view one row from 1 December of 25 and the year view one row from
+        // 1 January 2026, 46023, of 25, the selector left out the day view; 125,000 of mark. On the
+        // 31st, 46387, the 30th's row at zero and the 31st's at 1, the month at 1; 110,000 of mark and
+        // 15,000 of cash. A bucket that is none of the three refused by name.
+        [Fact]
+        public void a_batch_reports_its_delta_by_day_month_and_year_from_the_same_results()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46356.0, 46387.0, 46416.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", Column(46381.0, 46388.0));
+            var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
+            var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "MONTHLY", schedule, conventions, specifications, holidays, "LOT");
+            var fields = Row("quantity_unit", "quantity_per", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "future", fields, Row("LOT", "month", "cleared", "financial", "Prototype Clearing", "+1bd", holidays));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "schedule_method");
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { "A", 46346.0, "Z26", 22.0, 70.0, "asian" }, { "P", 46346.0, "Z26", 3.0, 70.0, "penultimate" } }, template);
+            double[] days = { 46386.0, 46385.0, 46384.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0, 46371.0, 46370.0, 46367.0, 46366.0, 46365.0, 46364.0, 46363.0, 46360.0, 46359.0, 46358.0, 46357.0, 46356.0 };
+            object[,] From(int first)
+            {
+                var column = new object[days.Length - first, 1];
+                for (var i = first; i < days.Length; i++) column[i - first, 0] = days[i];
+                return column;
+            }
+            object[,] Settles(int first)
+            {
+                var column = new object[days.Length - first, 1];
+                for (var i = first; i < days.Length; i++) column[i - first, 0] = 75.0;
+                return column;
+            }
+            string Results(double asOf, int first)
+            {
+                var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", asOf, 0.5), index);
+                var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", From(first), Settles(first), index));
+                var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "MONTHLY", Column(75.0)));
+                return (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market);
+            }
+            var first = Results(46357.0, 21);
+            Assert.Equal(125000.0, (double)((object[,])Seam.Call("_ReportValues", first))[2, 0], 6);
+            Assert.Equal(25.0, (double)((object[,])Seam.Call("_ReportRisk", first))[2, 0], 6);
+            var byDay = (object[,])Seam.Call("_ReportDelta", first, ExcelMissing.Value);
+            Assert.Equal(24, byDay.GetLength(0));
+            Assert.Equal(4, byDay.GetLength(1));
+            Assert.Equal("bucket_start", byDay[0, 0]);
+            Assert.Equal("delta", byDay[0, 1]);
+            Assert.Equal("delta_unit", byDay[0, 2]);
+            Assert.Equal("as_of", byDay[0, 3]);
+            Assert.Equal(46357.0, byDay[2, 0]);
+            Assert.Equal(1.0, (double)byDay[2, 1], 6);
+            Assert.Equal("lots of LOT (1000 BBL)", byDay[2, 2]);
+            Assert.Equal(46357.0, byDay[2, 3]);
+            Assert.Equal(46386.0, byDay[22, 0]);
+            Assert.Equal(4.0, (double)byDay[22, 1], 6);
+            Assert.Equal(46387.0, byDay[23, 0]);
+            Assert.Equal(1.0, (double)byDay[23, 1], 6);
+            var chosen = (object[,])Seam.Call("_ReportDelta", first, "day");
+            Assert.Equal(byDay, chosen);
+            var byMonth = (object[,])Seam.Call("_ReportDelta", first, "month");
+            Assert.Equal(3, byMonth.GetLength(0));
+            Assert.Equal(46357.0, byMonth[2, 0]);
+            Assert.Equal(25.0, (double)byMonth[2, 1], 6);
+            var byYear = (object[,])Seam.Call("_ReportDelta", first, "year");
+            Assert.Equal(46023.0, byYear[2, 0]);
+            Assert.Equal(25.0, (double)byYear[2, 1], 6);
+            Assert.Equal("#ERROR _ReportDelta: ValueError: bucket is 'quarter', expected day, month or year", Seam.Call("_ReportDelta", first, "quarter"));
+            var last = Results(46387.0, 0);
+            var values = (object[,])Seam.Call("_ReportValues", last);
+            Assert.Equal(110000.0, (double)values[2, 0], 6);
+            Assert.Equal(15000.0, (double)values[2, 1], 6);
+            var lastDays = (object[,])Seam.Call("_ReportDelta", last, ExcelMissing.Value);
+            Assert.Equal(0.0, (double)lastDays[22, 1], 6);
+            Assert.Equal(1.0, (double)lastDays[23, 1], 6);
+            Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportDelta", last, "month"))[2, 1], 6);
+        }
+
         [Fact]
         public void a_grid_in_gives_one_number_per_row_out()
         {

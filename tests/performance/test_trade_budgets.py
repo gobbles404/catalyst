@@ -233,7 +233,7 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
 # fixed rows, the bincounts' reductions and the sums, the frozen arrays; a closed day is the
 # encoding's to refuse, so no look here.
 PREPARATION_NUMPY = {
-    "ndarray.any": 3,  # the slot before the calendar, and the lots and the lot delta finite
+    "ndarray.any": 6,  # the boundary slot; the lots, the lot delta and the three views finite
     "ndarray.argsort": 1,
     "ndarray.astype": 1,
     "ndarray.cumsum": 1,
@@ -242,13 +242,13 @@ PREPARATION_NUMPY = {
     "ndarray.ravel": 1,
     "ndarray.reshape": 1,
     "ndarray.searchsorted": 1,
-    "ndarray.setflags": 10,  # the eight, and the two lot arrays frozen since the lot delta
+    "ndarray.setflags": 13,  # the eight, the two lot arrays since the lot delta, the three views
     "ndarray.sum": 4,
     "numpy._make_extobj": 1,  # the error state set once, the overflow the fourth rule's to catch
     "numpy.asanyarray": 3,
     "numpy.zeros": 1,
     "numpy.empty": 2,
-    "ufunc.reduce": 7,  # the three looks among them
+    "ufunc.reduce": 10,  # the six looks among them
 }
 
 
@@ -331,6 +331,7 @@ ENCODING_LEDGER = {
     "open_days": 1,
     "contract_on": 1,
     "_the_slots": 1,
+    "_the_buckets": 1,  # the day, month and year axes, since #166
     "_payments_after_observations": 1,
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
