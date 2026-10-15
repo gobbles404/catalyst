@@ -16,6 +16,7 @@ beside the nominal vectors the preparation shares; a cleared batch takes no curv
 docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import assert_never, cast
 
 import numpy as np
@@ -409,3 +410,32 @@ def _discounted(
         dv01_by_group,
         payment_factor,
     )
+
+
+class Bucket(Enum):
+    """What a delta report sums the lots by: the observation day, the calendar month it falls in
+    or the calendar year, _ReportDelta's three choices, a quarter none of them."""
+
+    DAY = "day"
+    MONTH = "month"
+    YEAR = "year"
+
+
+def bucketed(
+    results: TradeResults, bucket: Bucket
+) -> tuple[NDArray[np.datetime64], NDArray[np.float64], NDArray[np.float64]]:
+    """One of the three retained views by reference: its bucket starts, the encoding's axis; the
+    nominal lots in it, the preparation's vector; and since #177 the discounted lots, the result's
+    own, a cleared result's the nominal array itself. Nothing is summed, sorted or converted
+    here."""
+    prepared = results.prepared
+    encoded = prepared.encoded
+    match bucket:
+        case Bucket.DAY:
+            return encoded.days, prepared.daily_lots, results.discounted_daily_lots
+        case Bucket.MONTH:
+            return encoded.months, prepared.monthly_lots, results.discounted_monthly_lots
+        case Bucket.YEAR:
+            return encoded.years, prepared.yearly_lots, results.discounted_yearly_lots
+        case _:
+            assert_never(bucket)

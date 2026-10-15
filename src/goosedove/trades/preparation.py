@@ -7,7 +7,6 @@ history; a tick reads it and makes nothing of it again. docs/library/trades/kern
 page."""
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import assert_never, cast
 
 import numpy as np
@@ -101,32 +100,6 @@ class PreparedTrades:
     monthly_lots: NDArray[np.float64]
     yearly_lots: NDArray[np.float64]
     unpaid_payments: UnpaidPayments | None
-
-
-class Bucket(Enum):
-    """What a delta report sums the live lots by: the observation day, the calendar month it
-    falls in or the calendar year, _ReportDelta's three choices, a quarter none of them."""
-
-    DAY = "day"
-    MONTH = "month"
-    YEAR = "year"
-
-
-def bucketed(
-    prepared: PreparedTrades, bucket: Bucket
-) -> tuple[NDArray[np.datetime64], NDArray[np.float64]]:
-    """One of the three retained views by reference, its bucket starts and its lots, the
-    encoding's axis and the preparation's vector: nothing summed, sorted or converted here."""
-    encoded = prepared.encoded
-    match bucket:
-        case Bucket.DAY:
-            return encoded.days, prepared.daily_lots
-        case Bucket.MONTH:
-            return encoded.months, prepared.monthly_lots
-        case Bucket.YEAR:
-            return encoded.years, prepared.yearly_lots
-        case _:
-            assert_never(bucket)
 
 
 def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:

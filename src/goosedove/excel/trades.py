@@ -23,13 +23,14 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
+from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
-from goosedove.trades.evaluation import TradeResults, trade_results
-from goosedove.trades.preparation import Bucket, PreparedTrades, bucketed, prepared_trades
+from goosedove.trades.evaluation import Bucket, TradeResults, bucketed, trade_results
+from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import Trades, trades
 from goosedove.trades.template import TradeTemplate, choice, trade_template
 
@@ -121,11 +122,17 @@ def _EvaluateTrades(
         "The market handle over the history the trades were prepared against: the cell showing "
         "_CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
     ],
+    discount_curve: Annotated[
+        Handle[DiscountCurve] | None,
+        "The discount-curve handle for a bilateral batch: the cell showing _CreateDiscountCurve's "
+        "result, such as I13, or a name for it, starting on the valuation day and covering every "
+        "unpaid payment day; left out for a cleared batch.",
+    ] = None,
 ) -> Handle[TradeResults]:
-    """Evaluates prepared trades against one market, the live observations at their contracts'
-    quotes and the fixed at their settles, into the batch's mark, cash and delta, and shows its
-    handle, the text the two reports take as the results."""
-    return trade_results(prepared, market, WorkCounter())
+    """Evaluates prepared trades against one market, live observations at their quotes and fixed
+    at their settles, a bilateral batch's payments discounted on the curve, into mark, cash, delta
+    and DV01, and shows the results' handle, which the reports take."""
+    return trade_results(prepared, market, WorkCounter(), discount_curve)
 
 
 @excel_function
@@ -159,15 +166,16 @@ def _ReportRisk(
         "for it.",
     ],
 ) -> MixedArray:
-    """Reports the batch's risk from its results: the total delta in lots of the index's reporting
-    specification, with that unit, the DV01 and the valuation day, as evaluation stored them, and
-    the DV01's unit, the currency per basis point."""
+    """Reports the batch's risk from its results: the nominal and the discounted delta in lots of
+    the index's reporting specification, with that unit, the DV01 with its unit, the currency per
+    basis point, and the valuation day, as evaluation stored them."""
     return MixedArray.table(
         [
-            ("delta_total", "delta_unit", "dv01", "dv01_unit", "as_of"),
-            ("float64", "str", "float64", "str", "datetime64[D]"),
+            ("nominal_delta", "delta", "delta_unit", "dv01", "dv01_unit", "as_of"),
+            ("float64", "float64", "str", "float64", "str", "datetime64[D]"),
         ],
         np.array([results.lot_delta_total]),
+        np.array([results.discounted_lot_delta_total]),
         (results.lot_unit,),
         np.array([results.dv01]),
         (f"{results.currency} per basis point",),
@@ -187,18 +195,19 @@ def _ReportDelta(
     ] = "day",
 ) -> MixedArray:
     """Reports the batch's delta by observation time from its results: one row per day, calendar
-    month or calendar year the batch observes in, the lots still to price summed into it, with the
-    lot unit and the valuation day, as the preparation stored them."""
-    starts, lots = bucketed(
-        results.prepared, choice("bucket", bucket, Bucket, "day, month or year")
+    month or calendar year the batch observes in, its nominal and discounted lots still to price,
+    with the lot unit and the valuation day, as the results store them."""
+    starts, nominal, discounted = bucketed(
+        results, choice("bucket", bucket, Bucket, "day, month or year")
     )
     return MixedArray.table(
         [
-            ("bucket_start", "delta", "delta_unit", "as_of"),
-            ("datetime64[D]", "float64", "str", "datetime64[D]"),
+            ("bucket_start", "nominal_delta", "delta", "delta_unit", "as_of"),
+            ("datetime64[D]", "float64", "float64", "str", "datetime64[D]"),
         ],
         starts,
-        lots,
+        nominal,
+        discounted,
         (results.lot_unit,) * starts.size,
         np.full(starts.size, results.as_of, dtype="datetime64[D]"),
     )
