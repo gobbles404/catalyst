@@ -810,9 +810,9 @@ def test_the_first_and_last_days_of_a_period_come_out_as_dates() -> None:
         ("w28-w29", "2028-11-01", "2030-03-31"),
         ("W99", "2099-11-01", "2100-03-31"),
     ):
-        assert bridge.call("util_StartDate", [period]) == serial(first)
-        assert bridge.call("util_EndDate", [period]) == serial(last)
-    assert isinstance(bridge.call("util_EndDate", ["G28"]), float)
+        assert bridge.call("util_StartDate", [period, MISSING]) == serial(first)
+        assert bridge.call("util_EndDate", [period, MISSING]) == serial(last)
+    assert isinstance(bridge.call("util_EndDate", ["G28", MISSING]), float)
 
 
 # A label that is no form, and a range the wrong way round: the library's words through the seam,
@@ -823,11 +823,11 @@ def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_s
     )
     for name in ("util_StartDate", "util_EndDate"):
         for period in ("W8-W9", "Q1 27", "F26-", "F2026"):
-            assert bridge.call(name, [period]) == (
+            assert bridge.call(name, [period, MISSING]) == (
                 f"#ERROR {name}: ValueError: period is {period!r}, expected {forms}"
             )
         for period in ("Z28-F26", "CAL28-F28"):
-            assert bridge.call(name, [period]) == (
+            assert bridge.call(name, [period, MISSING]) == (
                 f"#ERROR {name}: ValueError: period is {period!r}, "
                 "expected range endpoints in chronological order"
             )
@@ -838,7 +838,45 @@ def test_a_malformed_or_reversed_period_is_refused_by_both_readers_through_the_s
             (46023.0, "is number 46023.0"),
             (Cells.from_rows([["F26"], ["G26"]]), "is 2x1 array"),
         ):
-            assert bridge.call(name, [wrong]) == f"#ERROR {name}: period {what}, expected text"
+            assert bridge.call(name, [wrong, MISSING]) == (
+                f"#ERROR {name}: period {what}, expected text"
+            )
+
+
+# The balance of a period: the reference date as a serial beside the label, the first day it
+# gives and the last day the label's; an ordinary label with a reference reads as before. Left
+# out, the library's words; a blank, a text, a fraction of a day and a range, the seam's, the same
+# whichever label stands beside them.
+def test_the_balance_of_a_period_takes_its_reference_date_through_the_seam() -> None:
+    for period, reference, first, last in (
+        ("balx27", "2027-11-12", "2027-11-12", "2027-11-30"),
+        ("balcal26", "2026-10-07", "2026-10-07", "2026-12-31"),
+        ("balx26-z26", "2026-11-12", "2026-11-12", "2026-12-31"),
+        ("BALZ26", "2026-12-15", "2026-12-15", "2026-12-31"),
+        ("BALG28", "2028-02-29", "2028-02-29", "2028-02-29"),
+        ("Z26", "2026-12-15", "2026-12-01", "2026-12-31"),
+    ):
+        assert bridge.call("util_StartDate", [period, serial(reference)]) == serial(first)
+        assert bridge.call("util_EndDate", [period, serial(reference)]) == serial(last)
+    for name in ("util_StartDate", "util_EndDate"):
+        assert bridge.call(name, ["BALZ26", MISSING]) == (
+            f"#ERROR {name}: ValueError: reference_date is missing, expected a date with "
+            "'BALZ26', the first day the balance of a period covers"
+        )
+        assert bridge.call(name, ["BALZ26", serial("2027-01-05")]) == (
+            f"#ERROR {name}: ValueError: reference_date is 2027-01-05, expected a day of "
+            "'BALZ26', 2026-12-01 to 2026-12-31"
+        )
+        for wrong, what in (
+            (None, "is blank"),
+            ("x", "is text 'x'"),
+            (46371.5, "is number 46371.5"),
+            (Cells.from_rows([[46371.0], [46372.0]]), "is 2x1 array"),
+        ):
+            for period in ("BALZ26", "Z26"):
+                assert bridge.call(name, [period, wrong]) == (
+                    f"#ERROR {name}: reference_date {what}, expected date"
+                )
 
 
 # --- what does not resolve fails in the seam's words, and spills nothing -------

@@ -272,11 +272,12 @@ def test_the_first_day_of_a_code_is_text_in_one_date_made_and_a_date_out(
     }
 
 
-# A period's first or last day: the text rule, the function, the library's reading of the whole
-# expression, one label read or two, the day from the month in one conversion, and the seam's way
-# out for a date. Eleven calls across eleven functions for one label, twelve for a range, the
-# label's reading twice; one numpy conversion of the library's and the way out's six, whether
-# the period is one month or the whole century.
+# A period's first or last day: the text rule and the left-out reference's, one check each, the
+# function, the library's one look for a BAL prefix and its reading of the whole expression, one
+# label read or two, the day from the month in one conversion, and the seam's way out for a date.
+# Fourteen calls across thirteen functions for one label, fifteen for a range, the label's reading
+# twice; one numpy conversion of the library's and the way out's six, whether the period is one
+# month or the whole century.
 @pytest.mark.parametrize(
     ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]
 )
@@ -291,22 +292,71 @@ def test_a_periods_day_is_text_in_one_reading_and_a_date_out(
     period: str,
     labels: int,
 ) -> None:
-    PATH[name](period)
-    assert call_profile(lambda: PATH[name](period)) == {
+    PATH[name](period, bridge.MISSING)
+    assert call_profile(lambda: PATH[name](period, bridge.MISSING)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 1,
+        "_validate": 2,  # the label and the left-out reference
         "_text": 1,
         name: 1,
         library: 1,
+        "balance_of": 1,  # no BAL prefix
         "period_months": 1,
+        "_period_months": 1,
         "_label_months": labels,
         "_date_out": 1,
         "_unit": 1,
         "_serials": 1,
     }
-    assert numpy_calls(lambda: PATH[name](period)) == {
+    assert numpy_calls(lambda: PATH[name](period, bridge.MISSING)) == {
         "generic.astype": 1,  # the month to its first day
+        "numpy.array": 1,  # the way out's one-day array
+        "numpy.datetime_data": 1,  # its unit
+        "ndarray.any": 2,  # its two looks
+        "ufunc.reduce": 2,
+    }
+
+
+# The balance of a period: the reference checked as a number and as a date, the label read under
+# its prefix, and the reference held inside the period, which needs the last day as well as the
+# first, one conversion more than the ordinary reading; nothing grows with the period.
+@pytest.mark.parametrize(
+    ("name", "library"), [("util_StartDate", "start_date"), ("util_EndDate", "end_date")]
+)
+@pytest.mark.parametrize(
+    ("period", "labels"),
+    [("BALZ26", 1), ("BALF26-Z28", 2)],
+    ids=["the balance of a month", "the balance of a strip"],
+)
+def test_a_balance_adds_the_references_checks_and_one_conversion(
+    call_profile: CallProfile,
+    numpy_calls: CallProfile,
+    name: str,
+    library: str,
+    period: str,
+    labels: int,
+) -> None:
+    reference = 46371.0  # 15 December 2026, a day of either period
+    PATH[name](period, reference)
+    assert call_profile(lambda: PATH[name](period, reference)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 2,
+        "_text": 1,
+        "_date": 1,  # the reference, a whole serial inside the calendar
+        "_number": 1,
+        name: 1,
+        library: 1,
+        "balance_of": 1,
+        "_period_months": 1,  # the label under the prefix, read once
+        "_label_months": labels,
+        "_covered_from": 1,  # the reference held inside the period
+        "_date_out": 1,
+        "_unit": 1,
+        "_serials": 1,
+    }
+    assert numpy_calls(lambda: PATH[name](period, reference)) == {
+        "generic.astype": 2,  # the first day and the last, the bounds the reference is held to
         "numpy.array": 1,  # the way out's one-day array
         "numpy.datetime_data": 1,  # its unit
         "ndarray.any": 2,  # its two looks

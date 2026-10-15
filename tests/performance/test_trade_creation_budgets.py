@@ -191,6 +191,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_each_distinct": 2,  # the codes, then the lags
         "months_of": distinct,
         "period_months": distinct,
+        "_period_months": distinct,  # the reading under it, shared with the balance of a period
         "_label_months": distinct,
         "_Fields.where": distinct + 6,  # and once each for the lag and the five batch fields
         "business_days_of": 1,  # one distinct lag
