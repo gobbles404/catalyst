@@ -41,7 +41,7 @@ Each supplied value is read once for the rule intrinsic to its field, in the she
 
 | Field | Rule | Refused as |
 |---|---|---|
-| `schedule_method` | `lastday` and `penultimate`, the two methods built; `asian` and `last3day` fail by name until they are | `schedule_method is 'asian', expected lastday or penultimate, the two methods built` |
+| `schedule_method` | `lastday`, `penultimate` and `last3day`, the three methods built; `asian` fails by name until it is | `schedule_method is 'asian', expected lastday, penultimate or last3day, the three methods built` |
 | `route` | `cleared` or `bilateral`, exactly | `route is 'Cleared', expected cleared or bilateral` |
 | `settlement_method` | `physical` or `financial` | `settlement_method is 'cash', expected physical or financial` |
 | `quantity_unit` | any nonempty text, held as typed: it names one of the index's specifications, and the template has no index to ask, so `_CreateTrades` checks the name against the index it is given | nothing here; `quantity_unit is 'ICE PHH', expected one of the index's specifications: 'NYMEX NG'` at `_CreateTrades` |

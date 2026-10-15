@@ -1837,3 +1837,274 @@ def test_any_batch_equals_its_singletons_summed_with_its_delta_on_its_own_contra
     turned = valued(trades[::-1])
     assert turned.mark == pytest.approx(whole.mark, abs=1e-6) and turned.codes() == axis
     np.testing.assert_allclose(turned.delta, whole.delta)
+
+
+# --- the last3day method: three equally weighted observations, one payment --------------------
+# last3day-trades.md's synthetic example: an index quoted in USD per MMBTU and settling in USD,
+# one specification UNIT of one MMBTU, X26 expiring 30 November 2026, Z26 7 December and F27
+# 7 January 2027, the market closed on 4 December; the payment calendar open every weekday. Two
+# trades of Z26, A 60 at 70 and B -30 at 72, pay two business days after the last observation,
+# 9 December. By hand: each component's quantity is shared over 2, 3 and 7 December, 20 and -10
+# a day, 10 a day compressed, and the fixed leg is -60 * 70 + 30 * 72 = -2,040, once; live at 74
+# the mark is -2,040 + 30 * 74 = 180 and the delta 30; 2 December fixed at 71, 150 and 20; 2 and
+# 3 December at 71 and 75, 160 and 10, on the 4th and still on the 7th, the last observation live
+# on its own day; all three fixed, the 7th at 73, 150 unpaid on the 8th; paid on the 9th, 150 of
+# cash and no mark. The quotes are Z26's and F27's while Z26 is live, F27's alone after.
+
+SYN = an_index(
+    "SYN",
+    (("X26", "2026-11-30"), ("Z26", "2026-12-07"), ("F27", "2027-01-07")),
+    ("2026-12-04",),
+    lot=("UNIT", 1.0, "MMBTU"),
+)
+WEEKDAYS = holiday_calendar(dates("2026-01-01"))  # a payment calendar closing no day of the example
+SYN_SETTLES = {
+    "2026-12-01": 70.0,
+    "2026-12-02": 71.0,
+    "2026-12-03": 75.0,
+    "2026-12-07": 73.0,
+    "2026-12-08": 80.0,
+}
+L3D_DAYS = dates("2026-12-02", "2026-12-03", "2026-12-07")
+L3D_PAYS = {1: "2026-12-09", 2: "2027-01-11"}  # two weekdays after each contract's last observation
+
+
+def l3d_terms(
+    quantities: tuple[float, ...] = (60.0, -30.0),
+    prices: tuple[float, ...] = (70.0, 72.0),
+    contracts: tuple[int, ...] = (1, 1),
+    settlement: Settlement = Settlement.FINANCIAL,
+    ix: Index = SYN,
+) -> ResolvedTrades:
+    """Trades on the synthetic index under last3day, A and B of Z26 unless said, each paying two
+    weekdays after its contract's last observation, the dates the resolution would make."""
+    n = len(quantities)
+    payment = (
+        None
+        if settlement is Settlement.PHYSICAL
+        else PaymentTerms(np.full(n, 2), (WEEKDAYS,) * n, dates(*(L3D_PAYS[c] for c in contracts)))
+    )
+    return resolved_trades(
+        FUTURE,
+        ix,
+        0,
+        Route.CLEARED,
+        settlement,
+        ScheduleMethod.LAST3DAY,
+        QuantityPer.MONTH,
+        tuple("AB"[k] if k < 2 else f"T{k + 1}" for k in range(n)),
+        ("Prototype Clearing",) * n,
+        None,
+        dates(*(["2026-11-20"] * n)),
+        np.arange(n, dtype=np.intp),
+        rows(*contracts),
+        numbers(*quantities),
+        numbers(*prices),
+        payment,
+    )
+
+
+def l3d_evaluated(
+    as_of: str,
+    quotes: tuple[float, ...],
+    terms: ResolvedTrades | None = None,
+    settles: dict[str, float] = SYN_SETTLES,
+) -> tuple[TradeResults, WorkCounter]:
+    counter = WorkCounter()
+    terms = l3d_terms() if terms is None else terms
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = history_by_day(SYN, as_of, settles)
+    prep = prepared_trades(enc, history, counter)
+    return trade_results(prep, quoted(history, *quotes), counter), counter
+
+
+def test_last3day_observes_the_expiry_and_the_two_business_days_before_it() -> None:
+    obs = observed(ScheduleMethod.LAST3DAY, SYN, rows(1, 2))
+    np.testing.assert_array_equal(obs.component, [0, 0, 0, 1, 1, 1])
+    np.testing.assert_array_equal(
+        obs.date,
+        dates("2026-12-02", "2026-12-03", "2026-12-07", "2027-01-05", "2027-01-06", "2027-01-07"),
+    )
+    np.testing.assert_allclose(obs.weight, [1 / 3] * 6)
+    # Z26's days step over the closed Friday the 4th; lastday and penultimate are as they were.
+    np.testing.assert_array_equal(observed(ScheduleMethod.LASTDAY, SYN, rows(1)).date, L3D_DAYS[2:])
+    np.testing.assert_array_equal(
+        observed(ScheduleMethod.PENULTIMATE, SYN, rows(1)).date, L3D_DAYS[1:2]
+    )
+
+
+def test_an_expiry_the_market_closes_is_refused_under_last3day_rather_than_rolled() -> None:
+    closed = an_index(
+        "x",
+        (("X26", "2026-11-30"), ("Z26", "2026-12-04"), ("F27", "2027-01-07")),
+        ("2026-12-04",),
+        lot=("UNIT", 1.0, "MMBTU"),
+    )
+    with pytest.raises(ValueError) as refused:
+        observed(ScheduleMethod.LAST3DAY, closed, rows(1))
+    assert str(refused.value) == (
+        "Z26 expires on 2026-12-04, a day the index's market is closed; the last3day method takes "
+        "an expiry the market prices and the two business days before it"
+    )
+
+
+def test_an_observation_crossing_the_preceding_contracts_window_is_refused() -> None:
+    # X26 expiring on 3 December prices the 2nd and the 3rd: Z26's first two days are another
+    # contract's, and no settle of Z26 exists for them, so the batch is refused and nothing
+    # substituted.
+    crossing = an_index(
+        "x",
+        (("X26", "2026-12-03"), ("Z26", "2026-12-07"), ("F27", "2027-01-07")),
+        ("2026-12-04",),
+        lot=("UNIT", 1.0, "MMBTU"),
+    )
+    terms = l3d_terms(ix=crossing)
+    with pytest.raises(ValueError) as refused:
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    assert str(refused.value) == (
+        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; an observation of a "
+        "contract other than the day's pricing contract has no settle in a futures history, not "
+        "supported"
+    )
+
+
+def test_a_physical_last3day_future_is_refused_by_the_kernel() -> None:
+    with pytest.raises(ValueError) as refused:
+        l3d_terms(settlement=Settlement.PHYSICAL)
+    assert str(refused.value) == (
+        "settlement_method is 'physical', expected 'financial' with the last3day method; a "
+        "last3day future is cash settled on the average of its last three pricing days"
+    )
+
+
+def test_the_last3day_batch_encodes_three_slots_of_ten_and_one_fixed_leg() -> None:
+    terms = l3d_terms()
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    np.testing.assert_array_equal(enc.slot_date, L3D_DAYS)
+    np.testing.assert_array_equal(enc.slot_reference, [1, 1, 1])  # Z26 prices its own three days
+    np.testing.assert_allclose(enc.slot_exposure, [10.0, 10.0, 10.0])  # 20 and -10 a day
+    np.testing.assert_array_equal(enc.offset, [-4_200.0, 2_160.0])  # the fixed leg, once each
+    np.testing.assert_array_equal(enc.offset_of_group, [-2_040.0])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09"))
+    np.testing.assert_array_equal(enc.references, [1])
+    assert enc.named_slot(0) == "trade 'A' at row 1 observes Z26 on 2026-12-02"
+    counts = counter.freeze().as_dict()
+    assert (
+        counts["encoded_components"],
+        counts["encoded_observations"],
+        counts["encoded_slots"],
+    ) == (
+        2,
+        6,
+        3,
+    )
+
+
+# The page's six states and the hand answers, with the quotes read per live reference, one while
+# Z26 is live and none after, and the settles read, one per fixed slot.
+L3D_LIFECYCLE: list[tuple[str, tuple[float, ...], int, int, int, int, int]] = [
+    ("2026-12-02", (74.0, 80.0), 180, 0, 30, 1, 0),
+    ("2026-12-03", (74.0, 80.0), 150, 0, 20, 1, 1),
+    ("2026-12-04", (74.0, 80.0), 160, 0, 10, 1, 2),
+    ("2026-12-07", (74.0, 80.0), 160, 0, 10, 1, 2),
+    ("2026-12-08", (80.0,), 150, 0, 0, 0, 3),
+    ("2026-12-09", (80.0,), 0, 150, 0, 0, 3),
+]
+L3D_IDS = [
+    "2 Dec, all three live",
+    "3 Dec, the 2nd fixed",
+    "4 Dec, the 2nd and 3rd fixed",
+    "7 Dec, the last live on its own day",
+    "8 Dec, all three fixed, unpaid",
+    "9 Dec, paid",
+]
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "delta", "live_reads", "fixings_read"),
+    L3D_LIFECYCLE,
+    ids=L3D_IDS,
+)
+def test_the_last3day_batch_marks_fixes_and_pays_as_the_page_says(
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+    live_reads: int,
+    fixings_read: int,
+) -> None:
+    result, counter = l3d_evaluated(as_of, quotes)
+    assert result.mark == pytest.approx(mark)
+    assert result.cash == pytest.approx(cash)
+    assert result.delta_total == pytest.approx(delta)
+    np.testing.assert_allclose(result.delta, [delta])  # Z26, the one contract on the axis
+    assert result.codes() == ("Z26",)
+    assert result.dv01 == 0.0
+    counts = counter.freeze().as_dict()
+    assert (counts["live_prices_read"], counts["fixings_read"], counts["kernel"]) == (
+        live_reads,
+        fixings_read,
+        1,
+    )
+    assert counts["prepared_slots"] == 3
+
+
+def test_a_tick_moves_the_live_last3day_slots_and_a_corrected_fixing_takes_a_new_history() -> None:
+    terms = l3d_terms()
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_by_day(SYN, "2026-12-03", SYN_SETTLES)
+    prep = prepared_trades(enc, history, WorkCounter())
+    assert trade_results(prep, quoted(history, 74.0, 80.0), WorkCounter()).mark == pytest.approx(
+        150
+    )
+    ticked = trade_results(prep, quoted(history, 75.0, 80.0), WorkCounter())
+    assert (ticked.mark, ticked.delta_total) == (pytest.approx(170), pytest.approx(20))
+    corrected = history_by_day(SYN, "2026-12-03", {**SYN_SETTLES, "2026-12-02": 72.0})
+    with pytest.raises(ValueError) as refused:
+        trade_results(prep, quoted(corrected, 74.0, 80.0), WorkCounter())
+    assert str(refused.value) == (
+        "market is over another history of index 'SYN', expected the one the trades were prepared "
+        "against"
+    )
+    again = prepared_trades(enc, corrected, WorkCounter())
+    assert trade_results(again, quoted(corrected, 74.0, 80.0), WorkCounter()).mark == pytest.approx(
+        160
+    )
+
+
+def test_the_last3day_batch_equals_its_singletons_summed_whatever_the_order() -> None:
+    both, _ = l3d_evaluated("2026-12-03", (74.0, 80.0))
+    a, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), l3d_terms((60.0,), (70.0,), (1,)))
+    b, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), l3d_terms((-30.0,), (72.0,), (1,)))
+    reversed_rows, _ = l3d_evaluated(
+        "2026-12-03", (74.0, 80.0), l3d_terms((-30.0, 60.0), (72.0, 70.0), (1, 1))
+    )
+    twice, _ = l3d_evaluated(
+        "2026-12-03", (74.0, 80.0), l3d_terms((60.0, -30.0, 60.0), (70.0, 72.0, 70.0), (1, 1, 1))
+    )
+    assert (a.mark, b.mark) == (pytest.approx(180), pytest.approx(-30))  # 1,420 + 2,960 - 4,200
+    assert both.mark == pytest.approx(a.mark + b.mark) == pytest.approx(150)
+    assert reversed_rows.mark == pytest.approx(both.mark)
+    assert reversed_rows.delta_total == pytest.approx(both.delta_total) == pytest.approx(20)
+    assert twice.mark == pytest.approx(both.mark + a.mark)
+    assert twice.delta_total == pytest.approx(both.delta_total + a.delta_total)
+
+
+def test_a_zero_quantity_row_keeps_its_three_slots_and_its_contract_at_nothing() -> None:
+    # A row kept ready on F27 adds F27's three days to the axis at no exposure and changes no
+    # number of A and B; one on Z26 adds nothing at all, its days being theirs.
+    with_f27 = l3d_terms((60.0, -30.0, 0.0), (70.0, 72.0, 71.0), (1, 1, 2))
+    enc = encoded(with_f27, observed_of(with_f27), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.slot_group, [0, 0, 0, 1, 1, 1])
+    np.testing.assert_allclose(enc.slot_exposure, [10.0, 10.0, 10.0, 0.0, 0.0, 0.0])
+    np.testing.assert_array_equal(enc.payment_date, dates("2026-12-09", "2027-01-11"))
+    result, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), with_f27)
+    assert (result.mark, result.cash) == (pytest.approx(150), 0.0)
+    np.testing.assert_allclose(result.delta, [20.0, 0.0])
+    assert result.codes() == ("Z26", "F27")
+    with_zero_z26 = l3d_terms((60.0, -30.0, 0.0), (70.0, 72.0, 71.0), (1, 1, 1))
+    same, _ = l3d_evaluated("2026-12-03", (74.0, 80.0), with_zero_z26)
+    assert (same.mark, same.delta_total) == (pytest.approx(150), pytest.approx(20))
+    assert same.prepared.encoded.slot_group.size == 3

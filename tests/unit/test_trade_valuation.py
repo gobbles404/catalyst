@@ -1099,3 +1099,215 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "#ERROR _EvaluateTrades: ValueError: route is bilateral, expected cleared; bilateral "
         "valuation needs discount factors and a DV01 convention, not built yet"
     )
+
+
+# --- the last3day method on the sheet ---------------------------------------------------------
+# last3day-trades.md's synthetic example through the entries: the index SYN, quoted in USD per
+# MMBTU with one specification UNIT of one MMBTU, X26 expiring 30 November 2026, Z26 7 December
+# and F27 7 January 2027, the market closed on 4 December; the template last3day, cleared,
+# financial, paying two weekdays after the last observation; A 60 of Z26 at 70 and B -30 at 72.
+
+L3D_HOLIDAYS = ["2026-12-04"]
+L3D_SETTLES = {
+    "2026-12-01": 70.0,
+    "2026-12-02": 71.0,
+    "2026-12-03": 75.0,
+    "2026-12-07": 73.0,
+    "2026-12-08": 80.0,
+}
+L3D_A: list[object] = ["A", serial("2026-11-20"), "Z26", 60.0, 70.0]
+L3D_B: list[object] = ["B", serial("2026-11-20"), "Z26", -30.0, 72.0]
+L3D_STRIP: list[object] = ["S", serial("2026-11-20"), "Z26-F27", 3.0, 70.0]
+
+
+def l3d_template(payment_holidays: list[str], settlement: str = "financial") -> str:
+    fields = PEN_FIELDS if settlement == "financial" else PEN_FIELDS[:6]
+    calendar = ENTRY["_CreateHolidayCalendar"](column([serial(d) for d in payment_holidays]))
+    values: list[object] = [
+        "UNIT",
+        "month",
+        "last3day",
+        "cleared",
+        settlement,
+        "Prototype Clearing",
+        "+2bd",
+        calendar,
+    ]
+    return str(ENTRY["_CreateTradeTemplate"]("future", row(*fields), row(*values[: len(fields)])))
+
+
+@pytest.fixture(scope="module")
+def l3d() -> dict[str, Any]:
+    index, _ = an_index(
+        "SYN",
+        [("X26", "2026-11-30"), ("Z26", "2026-12-07"), ("F27", "2027-01-07")],
+        L3D_HOLIDAYS,
+        [("UNIT", 1.0)],
+    )
+    template = l3d_template(["2026-01-01"])
+    headers = row(*NG_HEADERS)
+    return {
+        "index": index,
+        "template": template,
+        "headers": headers,
+        "trades": ENTRY["_CreateTrades"](index, headers, rows(L3D_A, L3D_B), template),
+    }
+
+
+def l3d_state(
+    l3d: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    trades: object | None = None,
+    settles: dict[str, float] = L3D_SETTLES,
+) -> tuple[str, str, str]:
+    """One state: the history valued that day over the page's series, the market quoting from
+    the prompt contract on, the batch prepared and evaluated; the three handles."""
+    history = a_history(l3d["index"], "2026-12-01", as_of, L3D_HOLIDAYS, settles)
+    market = a_market(history, "SYN", *quotes)
+    prepared = ENTRY["_PrepareTrades"](l3d["trades"] if trades is None else trades, history)
+    return history, str(prepared), str(ENTRY["_EvaluateTrades"](prepared, market))
+
+
+@pytest.mark.parametrize(
+    ("as_of", "quotes", "mark", "cash", "delta"),
+    [
+        ("2026-12-02", (74.0, 80.0), 180, 0, 30),
+        ("2026-12-03", (74.0, 80.0), 150, 0, 20),
+        ("2026-12-04", (74.0, 80.0), 160, 0, 10),
+        ("2026-12-07", (74.0, 80.0), 160, 0, 10),
+        ("2026-12-08", (80.0,), 150, 0, 0),
+        ("2026-12-09", (80.0,), 0, 150, 0),
+    ],
+    ids=[
+        "2 Dec, all three live",
+        "3 Dec, the 2nd fixed",
+        "4 Dec, the 2nd and 3rd fixed",
+        "7 Dec, the last live on its own day",
+        "8 Dec, all three fixed, unpaid",
+        "9 Dec, paid",
+    ],
+)
+def test_the_last3day_batch_values_on_the_sheet_as_the_page_says(
+    l3d: dict[str, Any],
+    as_of: str,
+    quotes: tuple[float, ...],
+    mark: float,
+    cash: float,
+    delta: float,
+) -> None:
+    _, _, results = l3d_state(l3d, as_of, quotes)
+    assert valued(results) == (pytest.approx(mark), pytest.approx(cash), pytest.approx(delta))
+    assert spilled(ENTRY["_ReportValues"](results))[2][2:] == ["USD", serial(as_of)]
+    assert spilled(ENTRY["_ReportRisk"](results))[2][1] == "USD per USD/MMBTU"
+    slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+    assert [line[0] for line in slots] == ["Z26"] * 3
+    assert [line[5] for line in slots] == [pytest.approx(delta)] * 3  # the contract's delta
+    live = [line[3] for line in slots]
+    assert sum(1 for exposure in live if exposure != 0) * 10 == delta
+
+
+def test_the_last3day_days_and_payment_read_back_from_the_batch_and_the_preparation(
+    l3d: dict[str, Any],
+) -> None:
+    batch = spilled(ENTRY["util_ReadHandle"](l3d["trades"]))
+    columns = batch[0]
+    assert [line[columns.index("payment_date")] for line in batch[2:]] == [serial("2026-12-09")] * 2
+    assert [line[columns.index("quote_quantity")] for line in batch[2:]] == [60.0, -30.0]
+    assert [line[columns.index("offset")] for line in batch[2:]] == [-4_200.0, 2_160.0]
+    _, prepared, _ = l3d_state(l3d, "2026-12-04", (74.0, 80.0))
+    assert spilled(ENTRY["util_ReadHandle"](prepared))[2:] == [
+        ["Z26", serial("2026-12-02"), True, False, 0.0],
+        ["Z26", serial("2026-12-03"), True, False, 0.0],
+        ["Z26", serial("2026-12-07"), False, False, 10.0],
+    ]
+    _, paid, _ = l3d_state(l3d, "2026-12-09", (80.0,))
+    assert [line[2:4] for line in spilled(ENTRY["util_ReadHandle"](paid))[2:]] == [[True, True]] * 3
+
+
+def test_a_tick_moves_the_live_last3day_slots_and_the_old_results_stand(
+    l3d: dict[str, Any],
+) -> None:
+    history, prepared, results = l3d_state(l3d, "2026-12-03", (74.0, 80.0))
+    ticked = ENTRY["_EvaluateTrades"](prepared, a_market(history, "SYN", 75.0, 80.0))
+    assert valued(str(ticked)) == (pytest.approx(170), 0.0, pytest.approx(20))
+    assert valued(results) == (pytest.approx(150), 0.0, pytest.approx(20))
+
+
+def test_a_corrected_last3day_fixing_takes_a_new_history_and_a_new_preparation(
+    l3d: dict[str, Any],
+) -> None:
+    _, prepared, _ = l3d_state(l3d, "2026-12-03", (74.0, 80.0))
+    corrected = a_history(
+        l3d["index"], "2026-12-01", "2026-12-03", L3D_HOLIDAYS, {**L3D_SETTLES, "2026-12-02": 72.0}
+    )
+    market = a_market(corrected, "SYN", 74.0, 80.0)
+    assert ENTRY["_EvaluateTrades"](prepared, market) == (
+        "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'SYN', "
+        "expected the one the trades were prepared against"
+    )
+    again = ENTRY["_PrepareTrades"](l3d["trades"], corrected)
+    assert valued(str(ENTRY["_EvaluateTrades"](again, market))) == (
+        pytest.approx(160),
+        0.0,
+        pytest.approx(20),
+    )
+
+
+def test_a_last3day_strip_marks_42_with_a_delta_of_3_on_each_month_and_its_duplicate_twice(
+    l3d: dict[str, Any],
+) -> None:
+    for lines, mark, delta in ((rows(L3D_STRIP), 42, 3.0), (rows(L3D_STRIP, L3D_STRIP), 84, 6.0)):
+        strip = ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], lines, l3d["template"])
+        batch = spilled(ENTRY["util_ReadHandle"](strip))
+        columns = batch[0]
+        months = [line[columns.index("contract_code")] for line in batch[2:]]
+        pays = [line[columns.index("payment_date")] for line in batch[2:]]
+        assert months == ["Z26", "F27"] * (len(months) // 2)
+        assert pays == [serial("2026-12-09"), serial("2027-01-11")] * (len(months) // 2)
+        _, _, results = l3d_state(l3d, "2026-12-02", (74.0, 80.0), strip)
+        assert valued(results) == (pytest.approx(mark), 0.0, pytest.approx(2 * delta))
+        slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+        assert [(line[0], line[1]) for line in slots] == [
+            ("Z26", serial("2026-12-02")),
+            ("Z26", serial("2026-12-03")),
+            ("Z26", serial("2026-12-07")),
+            ("F27", serial("2027-01-05")),
+            ("F27", serial("2027-01-06")),
+            ("F27", serial("2027-01-07")),
+        ]
+        assert [line[5] for line in slots] == [pytest.approx(delta)] * 6  # the month's delta
+        assert [line[3] for line in slots] == [pytest.approx(delta / 3)] * 6  # a third a day
+
+
+def test_the_last3day_batch_equals_its_singletons_summed_in_either_order(
+    l3d: dict[str, Any],
+) -> None:
+    def marked(lines: Cells) -> tuple[float, float, float]:
+        batch = ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], lines, l3d["template"])
+        return valued(l3d_state(l3d, "2026-12-03", (74.0, 80.0), batch)[2])
+
+    a, b = marked(rows(L3D_A)), marked(rows(L3D_B))
+    both, reversed_rows = marked(rows(L3D_A, L3D_B)), marked(rows(L3D_B, L3D_A))
+    assert both == reversed_rows == (pytest.approx(150), 0.0, pytest.approx(20))
+    assert both[0] == pytest.approx(a[0] + b[0]) and both[2] == pytest.approx(a[2] + b[2])
+    zero: list[object] = ["Z", serial("2026-11-20"), "F27", 0.0, 71.0]
+    kept = ENTRY["_CreateTrades"](
+        l3d["index"], l3d["headers"], rows(L3D_A, L3D_B, zero), l3d["template"]
+    )
+    _, _, results = l3d_state(l3d, "2026-12-03", (74.0, 80.0), kept)
+    assert valued(results) == (pytest.approx(150), 0.0, pytest.approx(20))
+    slots = spilled(ENTRY["util_ReadHandle"](results))[2:]
+    assert [line[0] for line in slots] == ["Z26"] * 3 + ["F27"] * 3
+    assert [line[5] for line in slots] == [pytest.approx(20)] * 3 + [0.0] * 3
+
+
+def test_a_physical_last3day_future_is_refused_when_the_batch_is_made_on_the_sheet(
+    l3d: dict[str, Any],
+) -> None:
+    physical = l3d_template(["2026-01-01"], "physical")
+    assert ENTRY["_CreateTrades"](l3d["index"], l3d["headers"], rows(L3D_A), physical) == (
+        "#ERROR _CreateTrades: ValueError: settlement_method is 'physical', expected 'financial' "
+        "with the last3day method; a last3day future is cash settled on the average of its last "
+        "three pricing days"
+    )

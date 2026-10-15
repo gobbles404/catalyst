@@ -100,7 +100,7 @@ _ReportRisk(results)
    `penultimate`. The current payment resolver reads `schedule.future_expiry` directly and
    changes to read the observations. A pen produces one observation of weight 1 for each
    monthly component. Its referenced NYMEX contract and month stay unchanged. Strips resolve
-   each month separately. This is the payment rule for the two methods built; a later method,
+   each month separately. This is the payment rule for the methods built, last3day since #157 counting from the last of its three days; a later method,
    Asian or bilateral, states its own payment convention on its own page and inherits nothing
    from this one.
 3. **Retain the explanation without a copy.** The underlying schedule by reference, the
@@ -236,7 +236,7 @@ Python caller is held to the rule as the sheet is. Preparation, evaluation, the 
 readers are untouched: the pen's slot is its pen day, its reference the contract pricing that
 day, its own, and its fixing the history's settle of that day; the underlying's final settle
 is another day's fixing and changes nothing of it. The definition's rule for
-`schedule_method` says lastday and penultimate are built, and `_ShowInstrument` shows it.
+`schedule_method` said lastday and penultimate are built, and `_ShowInstrument` showed it; since #157 last3day joins them.
 
 Pinned: the exchange cases of the table, Z26, M27 and N27 for PHH and F27 for WTI T, each day
 the derivation gives; the three synthetic calendar cases and a `lastday` regression on the same

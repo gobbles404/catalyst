@@ -131,6 +131,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_conditions": 1,
         "observed": 1,  # the method's observations, made here so that payment counts from them
         "observations": 1,
+        "_last_days": 1,  # each component's last observation, the day its payment counts from
         "futures_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
         "_the_schedule_months": 1,
         "month_and_year": 25,
@@ -199,10 +200,11 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.repeat": 1,
         "ndarray.reshape": 4,
         "ndarray.round": 1,
+        "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
         "ndarray.setflags": 10,  # the kernel's frozen copies and the observations' three
         "numpy.array": 14,
         "numpy.asanyarray": 8,
-        "numpy.arange": 4,
+        "numpy.arange": 5,  # one of them the components counted off for the anchor search
         "numpy.empty": 10,
         "numpy.fromiter": 1,
         "numpy.normalize_axis_index": 1,
@@ -247,12 +249,57 @@ def test_the_penultimate_method_adds_one_look_at_the_expiries_and_nothing_per_ro
     }
     assert call_profile(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_ledger(contracts),
+        "_with_expiries_priced": 1,
         "with_holiday_calendar": 1,
         "open_days": 1,
     }
     assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
         **resolution_numpy(contracts),
         "ndarray.any": 13,  # whether any expiry is closed
+        "ufunc.reduce": 16,
+    }
+
+
+@pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
+def test_the_last3day_method_gives_three_days_per_component_and_one_payment_after_the_last(
+    call_profile: CallProfile, numpy_calls: CallProfile, rows: int, contracts: int
+) -> None:
+    # Three observations per component, the expiry and the two business days before it, a third
+    # each: the same one look at the expiries as the pen's, one business-day offset over the
+    # components and the three offsets at once, and the payment counted from the last of each
+    # component's days, the expiry, so the payment days are lastday's. Nothing runs per row, and
+    # the counts the batch reports are the components', not the observations'.
+    ticket, template = a_ticket(rows, contracts), a_template("last3day")
+    counter = WorkCounter()
+    terms, observations = resolved(GAS, ticket, template, counter)
+    assert terms.payment is not None
+    expiries = EXPIRIES[terms.contract]
+    np.testing.assert_array_equal(
+        observations.date,
+        np.busday_offset(expiries[:, None], [[-2, -1, 0]], holidays=HOLIDAYS).ravel(),
+    )
+    np.testing.assert_array_equal(observations.component, np.repeat(np.arange(rows), 3))
+    np.testing.assert_allclose(observations.weight, np.full(3 * rows, 1 / 3))
+    np.testing.assert_array_equal(
+        terms.payment.date, np.busday_offset(expiries, 2, holidays=HOLIDAYS)
+    )
+    assert counter.freeze().as_dict() == {
+        "resolved_components": rows,
+        "resolved_occurrences": rows,
+        "schedule_codes_read": 25,
+    }
+    assert call_profile(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
+        **resolution_ledger(contracts),
+        "_with_expiries_priced": 1,
+        "with_holiday_calendar": 1,
+        "open_days": 1,
+    }
+    assert numpy_calls(lambda: resolved(GAS, ticket, template, WorkCounter())) == {
+        **resolution_numpy(contracts),
+        "ndarray.any": 13,  # whether any expiry is closed
+        "ndarray.repeat": 2,  # each component three times, for its three observations
+        "ndarray.ravel": 2,  # the three days of each component laid out in one column
+        "numpy.asarray": 1,  # the three offsets, taken as an array by the business-day offset
         "ufunc.reduce": 16,
     }
 

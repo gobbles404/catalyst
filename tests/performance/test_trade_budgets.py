@@ -269,15 +269,25 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     # The penultimate method reads the holiday calendar and looks once at the expiries; the
     # encoding over its observations runs the same functions as over lastday's.
     pen = some_terms(components, contracts, ScheduleMethod.PENULTIMATE)
-    assert call_profile(lambda: observed_of(pen)) == {
+    with_expiries = {
         "observed": 1,
         "futures_schedule_of": 1,
+        "_with_expiries_priced": 1,
         "with_holiday_calendar": 1,
         "open_days": 1,
         "observations": 1,
     }
+    assert call_profile(lambda: observed_of(pen)) == with_expiries
     pen_obs = observed_of(pen)
     assert call_profile(lambda: encoded(pen, pen_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
+    # last3day makes three observations per component with the same functions as the pen, one
+    # offset over the components and the three offsets at once; the encoding over them runs the
+    # same functions again, three times the observations and slots through the same calls.
+    three = some_terms(components, contracts, ScheduleMethod.LAST3DAY)
+    assert call_profile(lambda: observed_of(three)) == with_expiries
+    three_obs = observed_of(three)
+    assert three_obs.component.size == 3 * components
+    assert call_profile(lambda: encoded(three, three_obs, UNITS, WorkCounter())) == ENCODING_LEDGER
 
 
 # The encoding's functions, each once: the two calendar rules read once over every observation,
@@ -310,6 +320,42 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
+
+
+@pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
+def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastday_one(
+    call_profile: CallProfile, numpy_calls: CallProfile, components: int, contracts: int
+) -> None:
+    # Three slots per contract where lastday has one: the preparation runs the same functions
+    # and numpy calls over them, and a tick reads one quote per live reference and runs nothing
+    # of the steps before, no schedule generated, no fixed leg made, no fixing folded again.
+    terms = some_terms(components, contracts, ScheduleMethod.LAST3DAY)
+    counter = WorkCounter()
+    enc = encoded(terms, observed_of(terms), UNITS, counter)
+    history = a_history()
+    prep = prepared_trades(enc, history, counter)
+    quoted = a_market(history)
+    trade_results(prep, quoted, counter)
+    counts = counter.freeze().as_dict()
+    assert (counts["encoded_components"], counts["encoded_observations"]) == (
+        components,
+        3 * components,
+    )
+    assert counts["encoded_slots"] == counts["prepared_slots"] == 3 * contracts
+    assert counts["live_prices_read"] == prep.live_references.size  # one a live reference
+    assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
+        "prepared_trades": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
+    numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
+    assert numpy == PREPARATION_NUMPY, numpy
+    assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
+        "trade_results": 1,
+        "Market.live_prices": 1,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 2,
+    }
 
 
 # --- many observations on one contract: the daily batch -----------------------------------

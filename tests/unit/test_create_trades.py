@@ -567,6 +567,139 @@ def test_an_expiry_the_market_closes_is_refused_by_its_contract_under_the_pen() 
     )
 
 
+# --- the last3day method: three observations, one payment after the last ----------------------
+# last3day-trades.md: each component observes its contract's expiry and the two business days
+# before it, a third each, and pays its lag after the last of them. The synthetic index: X26
+# expiring 30 November 2026, Z26 7 December, F27 7 January 2027, the market closed on 4 December,
+# one specification UNIT of one MMBTU; the payment calendar open every weekday.
+
+SYN = an_index(
+    "SYN",
+    contracts=(("X26", "2026-11-30"), ("Z26", "2026-12-07"), ("F27", "2027-01-07")),
+    holidays=("2026-12-04",),
+    lots=(("UNIT", 1.0, "MMBTU"),),
+)
+WEEKDAYS = holiday_calendar(dates("2026-01-01"))
+L3D_TEMPLATE: dict[str, object] = {
+    **NG_TEMPLATE,
+    "quantity_unit": "UNIT",
+    "schedule_method": "last3day",
+    "settlement_method": "financial",
+    "clearing_house": "Prototype Clearing",
+    "payment_time_lag": "+2bd",
+    "payment_holiday_calendar": WEEKDAYS,
+}
+L3D_TICKET: dict[str, list[object]] = {
+    "trade_id": ["A", "B"],
+    "trade_date": ["2026-11-20", "2026-11-20"],
+    "contract_code": ["Z26", "Z26"],
+    "quantity": [60, -30],
+    "fixed_price": [70.0, 72.0],
+}
+
+
+def l3d_days(
+    ticket: Mapping[str, list[object]] = L3D_TICKET,
+    template: Mapping[str, object] = L3D_TEMPLATE,
+    ix: Index = SYN,
+) -> tuple[list[int], list[str], list[float], list[str]]:
+    """The batch's observations as it retains them, the component and the day of each and its
+    weight, and each component's payment day."""
+    batch, _ = created(ix, ticket, template)
+    assert batch.resolved.payment is not None
+    obs = batch.encoded.observations
+    return (
+        [int(c) for c in obs.component],
+        [str(d) for d in obs.date],
+        [float(w) for w in obs.weight],
+        [str(d) for d in batch.resolved.payment.date],
+    )
+
+
+def test_last3day_observes_the_expiry_and_the_two_days_before_and_pays_after_the_last() -> None:
+    components, days, weights, pays = l3d_days()
+    assert components == [0, 0, 0, 1, 1, 1]
+    assert days == ["2026-12-02", "2026-12-03", "2026-12-07"] * 2
+    assert weights == pytest.approx([1 / 3] * 6)
+    assert pays == ["2026-12-09", "2026-12-09"]
+
+
+def test_a_payment_calendar_closed_on_the_eighth_moves_the_payment_and_not_the_days() -> None:
+    closed_eighth = {
+        **L3D_TEMPLATE,
+        "payment_holiday_calendar": holiday_calendar(dates("2026-12-08")),
+    }
+    components, days, weights, pays = l3d_days(template=closed_eighth)
+    assert (components, days, weights) == l3d_days()[:3]
+    assert pays == ["2026-12-10", "2026-12-10"]
+
+
+def test_a_last3day_strip_observes_each_month_thrice_and_pays_once_per_month() -> None:
+    strip: dict[str, list[object]] = {
+        "trade_id": ["S"],
+        "trade_date": ["2026-11-20"],
+        "contract_code": ["Z26-F27"],
+        "quantity": [3],
+        "fixed_price": [70.0],
+    }
+    components, days, weights, pays = l3d_days(strip)
+    assert components == [0, 0, 0, 1, 1, 1]
+    assert days == [
+        "2026-12-02",
+        "2026-12-03",
+        "2026-12-07",
+        "2027-01-05",
+        "2027-01-06",
+        "2027-01-07",
+    ]
+    assert weights == pytest.approx([1 / 3] * 6)
+    assert pays == ["2026-12-09", "2027-01-11"]
+    twice = {name: values * 2 for name, values in strip.items()}
+    assert l3d_days(twice)[3] == ["2026-12-09", "2027-01-11"] * 2
+    batch, _ = created(SYN, twice, L3D_TEMPLATE)
+    np.testing.assert_array_equal(batch.encoded.offset, [-210.0] * 4)
+    np.testing.assert_allclose(batch.encoded.slot_exposure, [2.0] * 6)
+
+
+def test_an_expiry_the_market_closes_is_refused_by_its_contract_under_last3day() -> None:
+    closed = an_index(
+        "x",
+        contracts=(("X26", "2026-11-30"), ("Z26", "2026-12-04"), ("F27", "2027-01-07")),
+        holidays=("2026-12-04",),
+        lots=(("UNIT", 1.0, "MMBTU"),),
+    )
+    assert refused(closed, L3D_TICKET, L3D_TEMPLATE) == (
+        "Z26 expires on 2026-12-04, a day the index's market is closed; the last3day method takes "
+        "an expiry the market prices and the two business days before it"
+    )
+
+
+def test_an_observation_crossing_the_preceding_contract_is_refused_when_the_batch_is_made() -> None:
+    crossing = an_index(
+        "x",
+        contracts=(("X26", "2026-12-03"), ("Z26", "2026-12-07"), ("F27", "2027-01-07")),
+        holidays=("2026-12-04",),
+        lots=(("UNIT", 1.0, "MMBTU"),),
+    )
+    assert refused(crossing, L3D_TICKET, L3D_TEMPLATE) == (
+        "trade 'A' at row 1 observes Z26 on 2026-12-02, a day X26 prices; an observation of a "
+        "contract other than the day's pricing contract has no settle in a futures history, not "
+        "supported"
+    )
+
+
+def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
+    physical = {
+        name: value
+        for name, value in L3D_TEMPLATE.items()
+        if name not in ("payment_time_lag", "payment_holiday_calendar")
+    }
+    assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
+        "settlement_method is 'physical', expected 'financial' with the last3day method; a "
+        "last3day future is cash settled on the average of its last three pricing days"
+    )
+
+
 # --- the quantity unit selects the specification ------------------------------------------------
 # quantity-unit-selection.md: the unit is a name among the index's specifications, exactly as the
 # index spells it, and the quantity counts the row it names. A template holds the name and asks
@@ -799,7 +932,8 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "schedule_method": "asian"},
-            "schedule_method is 'asian', expected lastday or penultimate, the two methods built",
+            "schedule_method is 'asian', expected lastday, penultimate or last3day, the three "
+            "methods built",
         ),
         (
             NG_TICKET,
@@ -982,7 +1116,8 @@ def test_a_batch_field_the_ticket_supplies_is_named_with_its_row() -> None:
         "schedule_method": ["asian"] * 5,
     }
     assert refused(NG, asian, without) == (
-        "schedule_method row 1 is 'asian', expected lastday or penultimate, the two methods built"
+        "schedule_method row 1 is 'asian', expected lastday, penultimate or last3day, the three "
+        "methods built"
     )
     assert refused(NG, NG_TICKET, {**NG_TEMPLATE, "route": "Cleared"}) == (
         "route is 'Cleared', expected cleared or bilateral"
@@ -1014,8 +1149,8 @@ def test_the_batch_fields_are_read_in_the_pages_order_the_unit_first() -> None:
         (
             "schedule_method",
             "lastday",
-            "schedule_method row 1 is 'asian', expected lastday or penultimate, the two methods "
-            "built",
+            "schedule_method row 1 is 'asian', expected lastday, penultimate or last3day, the "
+            "three methods built",
         ),
         ("route", "cleared", "route row 1 is 'Cleared', expected cleared or bilateral"),
         (

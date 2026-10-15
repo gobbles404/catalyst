@@ -39,12 +39,14 @@ class Settlement(Enum):
 
 class ScheduleMethod(Enum):
     """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day, and penultimate, the settlement on the business day before it, are the two
-    methods built; asian and last3day join them here when they are built, and until then are
-    refused by name where a ticket names them."""
+    last trading day; penultimate, the settlement on the business day before it; and last3day,
+    the average of the settlements on the last trading day and the two business days before it,
+    each a third, are the three methods built; asian joins them here when it is built, and
+    until then is refused by name where a ticket names it."""
 
     LASTDAY = "lastday"
     PENULTIMATE = "penultimate"
+    LAST3DAY = "last3day"
 
 
 class QuantityPer(Enum):
@@ -209,11 +211,24 @@ def _the_batch(index: Index, specification: int) -> FuturesSchedule:
 
 def _the_method(schedule_method: ScheduleMethod, settlement: Settlement) -> None:
     """The method and the settlement together: a penultimate future is cash settled against the
-    settle on the business day before its contract's expiry, so a physical settlement is refused;
+    settle on the business day before its contract's expiry, and a last3day future against the
+    average of its last three pricing days, so a physical settlement is refused under either;
     lastday settles either way."""
     match schedule_method:
         case ScheduleMethod.LASTDAY:
             return
+        case ScheduleMethod.LAST3DAY:
+            match settlement:
+                case Settlement.FINANCIAL:
+                    return
+                case Settlement.PHYSICAL:
+                    raise ValueError(
+                        "settlement_method is 'physical', expected 'financial' with the last3day "
+                        "method; a last3day future is cash settled on the average of its last "
+                        "three pricing days"
+                    )
+                case _:
+                    assert_never(settlement)
         case ScheduleMethod.PENULTIMATE:
             match settlement:
                 case Settlement.FINANCIAL:

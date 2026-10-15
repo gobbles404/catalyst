@@ -1,9 +1,9 @@
 """The observations of a batch: which days' settles price each component, and with what weight.
-A schedule method is a rule from a component to its observations; the two built, lastday and
-penultimate, give each component one observation with the whole weight, its contract's expiry day
-and the business day before it. Tests supply observations of their own through the same builder,
-a daily toy among them, without a public method naming them. docs/library/trades/kernel.md is the
-page."""
+A schedule method is a rule from a component to its observations: lastday and penultimate give
+each component one observation with the whole weight, its contract's expiry day and the business
+day before it, and last3day gives it three with a third each, the expiry day and the two business
+days before it. Tests supply observations of their own through the same builder, a daily toy
+among them, without a public method naming them. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
 from typing import assert_never
@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import open_days
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.trades.terms import ScheduleMethod, futures_schedule_of
@@ -19,6 +21,9 @@ from goosedove.trades.terms import ScheduleMethod, futures_schedule_of
 # How far the weights of a component may miss one, a few units in the last place: 1/3 three
 # times is one exactly, 1/7 seven times is not.
 WEIGHT_TOLERANCE = 1e-9
+# The last3day method's days, as business-day offsets from the expiry: the two before it and
+# the expiry itself, increasing.
+LAST3DAY_OFFSETS = np.array([-2, -1, 0])
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,31 +101,69 @@ def observations(
 
 def observed(method: ScheduleMethod, index: Index, contract: NDArray[np.intp]) -> Observations:
     """The observations a schedule method gives a batch's components, each a row of the index's
-    futures schedule, one per component with the whole weight, the components in order: lastday,
-    the contract's expiry day; penultimate, the business day before it, Monday to Friday less the
-    index's holiday calendar, one business-day offset over the components. An expiry the index's
-    market is closed on is refused by its contract under penultimate, since the day before a
-    closed expiry is not the last day the market priced the contract, and rolling the expiry
-    would change the schedule the desk gave; under lastday the encoding refuses the observation
-    itself. The method is the resolution's to read before any payment is counted, so that a
-    payment day counts from the component's observation day."""
+    futures schedule, the components in order: lastday, the contract's expiry day with the whole
+    weight; penultimate, the business day before it, Monday to Friday less the index's holiday
+    calendar, with the whole weight, one business-day offset over the components; last3day, the
+    expiry day and the two business days before it, a third each, one business-day offset over
+    the components and the three offsets at once, the three days of a component increasing. An
+    expiry the index's market is closed on is refused by its contract under penultimate and
+    last3day, since the days before a closed expiry are not the last days the market priced the
+    contract, and rolling the expiry would change the schedule the desk gave; under lastday the
+    encoding refuses the observation itself. The method is the resolution's to read before any
+    payment is counted, so that a payment day counts from the component's last observation."""
     schedule = futures_schedule_of(index)
     expiry = schedule.future_expiry[contract]
     count = contract.size
     match method:
         case ScheduleMethod.LASTDAY:
-            date = expiry
+            return observations(np.arange(count, dtype=np.intp), expiry, np.ones(count), count)
         case ScheduleMethod.PENULTIMATE:
-            holidays = with_holiday_calendar(index.holiday_calendar)
-            closed = ~open_days(holidays, expiry)
-            if closed.any():
-                k = int(closed.argmax())
-                raise ValueError(
-                    f"{schedule.codes[contract[k]]} expires on {expiry[k]}, a day the index's "
-                    "market is closed; the penultimate method takes the business day before an "
-                    "expiry the market prices"
-                )
+            holidays = _with_expiries_priced(
+                index,
+                schedule,
+                contract,
+                expiry,
+                "the penultimate method takes the business day before an expiry the market prices",
+            )
             date = np.busday_offset(expiry, -1, roll="raise", holidays=holidays.holiday)
+            return observations(np.arange(count, dtype=np.intp), date, np.ones(count), count)
+        case ScheduleMethod.LAST3DAY:
+            holidays = _with_expiries_priced(
+                index,
+                schedule,
+                contract,
+                expiry,
+                "the last3day method takes an expiry the market prices and the two business days "
+                "before it",
+            )
+            days = np.busday_offset(
+                expiry[:, None], LAST3DAY_OFFSETS[None, :], roll="raise", holidays=holidays.holiday
+            )
+            return observations(
+                np.repeat(np.arange(count, dtype=np.intp), LAST3DAY_OFFSETS.size),
+                days.ravel(),
+                np.full(count * LAST3DAY_OFFSETS.size, 1 / LAST3DAY_OFFSETS.size),
+                count,
+            )
         case _:
             assert_never(method)
-    return observations(np.arange(count, dtype=np.intp), date, np.ones(count), count)
+
+
+def _with_expiries_priced(
+    index: Index,
+    schedule: FuturesSchedule,
+    contract: NDArray[np.intp],
+    expiry: NDArray[np.datetime64],
+    rule: str,
+) -> HolidayCalendar:
+    """The index's holiday calendar, once every expiry given is a day its market prices; the
+    first that is not is refused by its contract, with the method's rule as the reason."""
+    holidays = with_holiday_calendar(index.holiday_calendar)
+    closed = ~open_days(holidays, expiry)
+    if closed.any():
+        k = int(closed.argmax())
+        raise ValueError(
+            f"{schedule.codes[contract[k]]} expires on {expiry[k]}, a day the index's market is "
+            f"closed; {rule}"
+        )
+    return holidays

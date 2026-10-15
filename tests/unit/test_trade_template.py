@@ -153,11 +153,13 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
     [
         (
             {"schedule_method": "asian"},
-            "schedule_method is 'asian', expected lastday or penultimate, the two methods built",
+            "schedule_method is 'asian', expected lastday, penultimate or last3day, the three "
+            "methods built",
         ),
         (
             {"schedule_method": "Lastday"},
-            "schedule_method is 'Lastday', expected lastday or penultimate, the two methods built",
+            "schedule_method is 'Lastday', expected lastday, penultimate or last3day, the three "
+            "methods built",
         ),
         ({"route": "Cleared"}, "route is 'Cleared', expected cleared or bilateral"),
         (
@@ -191,7 +193,8 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ),
         (
             {"quantity_unit": "NYMEX NG", "route": "cleared", "schedule_method": "pen"},
-            "schedule_method is 'pen', expected lastday or penultimate, the two methods built",
+            "schedule_method is 'pen', expected lastday, penultimate or last3day, the three "
+            "methods built",
         ),
         ({"quantity": 1.5}, "quantity is 1.5, expected a whole number"),
         ({"quantity": -2.5}, "quantity is -2.5, expected a whole number"),
