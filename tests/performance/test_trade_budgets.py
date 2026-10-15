@@ -34,7 +34,7 @@ from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
-from goosedove.trades.preparation import prepared_trades
+from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import month_bounds
 from goosedove.trades.terms import (
     BASES,
@@ -216,8 +216,12 @@ def test_the_preparation_reports_its_slots_and_one_settle_read_per_fixed_slot(
     components: int, contracts: int, fixed: int
 ) -> None:
     counter = WorkCounter()
-    prepared_trades(a_batch(components, contracts), a_history(), counter)
-    assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": contracts}
+    prep = prepared_trades(a_batch(components, contracts), a_history(), counter)
+    assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
+        "fixings_read": fixed,
+        "prepared_slots": contracts,
+    }
 
 
 @pytest.mark.parametrize(("components", "contracts", "live"), [(5, 2, 0), (2_000, 24, 20)], ids=IDS)
@@ -237,20 +241,34 @@ def test_a_tick_reports_one_kernel_call_and_one_quote_per_live_reference(
 # calendar begins, the unique over the live references with its sort, the search of the history's
 # fixed rows, the bincounts' reductions and the sums, the frozen arrays; a closed day is the
 # encoding's to refuse, so no look here.
+
+
+def display_periods(prep: PreparedTrades) -> int:
+    """The periods of the two display axes the preparation made, since #NN: the valuation day's
+    month and year through the last contract's, two for the five-trade fixtures and twenty-two
+    for two thousand trades over two years."""
+    return prep.by_month.periods.size + prep.by_year.periods.size
+
+
 PREPARATION_NUMPY = {
+    "generic.astype": 2,  # the valuation day to its month and its year, since #NN
     "ndarray.any": 6,  # the boundary slot; the lots, the lot delta and the three views finite
     "ndarray.argsort": 1,
-    "ndarray.astype": 1,
+    "ndarray.astype": 7,  # the slot rows, and since #NN the two display axes' keys, periods and
+    # first days, three a bucket
     "ndarray.cumsum": 1,
     "ndarray.flatten": 1,
-    "ndarray.nonzero": 1,
-    "ndarray.ravel": 1,
+    "ndarray.nonzero": 3,  # the live slots, and since #NN the two looks for lots before the start
+    "ndarray.ravel": 3,
     "ndarray.reshape": 1,
-    "ndarray.searchsorted": 1,
-    "ndarray.setflags": 13,  # the eight, the two lot arrays since the lot delta, the three views
+    "ndarray.searchsorted": 3,  # the fixed rows, and since #NN the contract periods' places, one
+    # a bucket
+    "ndarray.setflags": 19,  # the eight, the two lot arrays since the lot delta, the three views,
+    # and since #NN the two display axes' three arrays each
     "ndarray.sum": 4,
     "numpy._make_extobj": 1,  # the error state set once, the overflow the fourth rule's to catch
-    "numpy.asanyarray": 3,
+    "numpy.arange": 2,  # the display periods, since #NN
+    "numpy.asanyarray": 5,
     "numpy.zeros": 1,
     "numpy.empty": 2,
     "ufunc.reduce": 10,  # the six looks among them
@@ -356,8 +374,15 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
@@ -452,8 +477,15 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
@@ -489,8 +521,15 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
@@ -549,7 +588,11 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
     counter = WorkCounter()
     prep = prepared_trades(enc, history, counter)
     slots, fixed = contracts * days, daily_fixed_slots(components, contracts, days)
-    assert counter.freeze().as_dict() == {"fixings_read": fixed, "prepared_slots": slots}
+    assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
+        "fixings_read": fixed,
+        "prepared_slots": slots,
+    }
     assert prep.live_slot.size == slots - fixed
     assert (
         prep.dated_live_exposure.nbytes == 8 * slots
@@ -588,8 +631,15 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
     prep = prepared_trades(enc, history, WorkCounter())
@@ -643,8 +693,15 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
     prep = prepared_trades(enc, history, WorkCounter())
@@ -721,6 +778,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     quoted = a_market(history)
     trade_results(prep, quoted, counter)
     assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
         "encoded_components": components,
         "encoded_groups": 2 * contracts,
         "encoded_observations": components,
@@ -737,8 +795,15 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
     assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
@@ -903,6 +968,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     lap = (np.arange(components) // contracts) % 4
     observations_by_method = np.array([1, 1, 3, 0])[lap] + np.where(lap == 3, MONTH_DAYS[rows], 0)
     assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
         "encoded_components": components,
         "encoded_groups": 2 * contracts,
         "encoded_observations": int(observations_by_method.sum()),
@@ -917,8 +983,15 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     assert numpy_calls(lambda: prepared_trades(enc, history, WorkCounter())) == PREPARATION_NUMPY
     assert call_profile(lambda: trade_results(prep, quoted, WorkCounter())) == {
@@ -1041,8 +1114,15 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == PREPARATION_NUMPY, numpy
@@ -1139,7 +1219,7 @@ IFERC_ENCODING_LEDGER = {
 IFERC_PREPARATION_NUMPY = {
     **PREPARATION_NUMPY,
     "ndarray.any": 5,
-    "ndarray.searchsorted": 2,
+    "ndarray.searchsorted": 4,
     "ufunc.reduce": 9,
 }
 
@@ -1169,6 +1249,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     quoted = iferc_market(history)
     trade_results(prep, quoted, counter)
     assert counter.freeze().as_dict() == {
+        "display_periods": display_periods(prep),
         "encoded_components": components,
         "encoded_groups": contracts,
         "encoded_observations": components,
@@ -1186,8 +1267,15 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "period_axis": 2,  # the month and the year displays, since #NN
+        "period_start": 2,
+        "places_from": 2,
+        "rows_through": 2,
+        "display_periods": 2,
+        "early_risk": 1,
+        "early_fact": 2,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 2,
+        "WorkCounter.hit": 3,
     }
     numpy = numpy_calls(lambda: prepared_trades(enc, history, WorkCounter()))
     assert numpy == IFERC_PREPARATION_NUMPY, numpy

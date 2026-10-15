@@ -188,13 +188,16 @@ def test_the_sources_value_as_the_ticket_says(sheet: dict[str, Any]) -> None:
 def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[str, Any]) -> None:
     # B2:B3 as a column: one handle of the new kind, no index name in it; all three by month under
     # the HNG labels and curve_1, the Total 20, 19.5 and -0.0095 over January 2027's lots and
-    # January 2028's DV01.
+    # January 2028's DV01, the eleven months between at zero since #NN, the spill running from
+    # the valuation month to the last payment month.
     agg = collected(sheet["b2"], sheet["b3"])
     assert re.fullmatch(rf"{os.getpid()}:aggregate_results:\d+", agg)
+    between = [serial(f"2027-{m:02d}-01") for m in range(2, 13)]
     assert report(agg, "all", "month") == [
         *risk_head(AS_OF, HNG_NOMINAL, HNG_DELTA, CURVE_DV01),
         ["Total", 20.0, pytest.approx(19.5), pytest.approx(-0.0095)],
         [serial(JAN_27), 20.0, pytest.approx(19.5), 0.0],
+        *[[m, 0.0, 0.0, 0.0] for m in between],
         [serial(JAN_28), 0.0, 0.0, pytest.approx(-0.0095)],
     ]
     assert report(agg, "delta", "day") == [
@@ -209,14 +212,17 @@ def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[st
 
 
 def test_the_four_sources_spill_the_tickets_table(sheet: dict[str, Any]) -> None:
-    # B2:B5: HNG's pair of columns, WTI's pair and the one curve's DV01; by month one row of lots
-    # and one of rate risk, by day HNG on the 4th, WTI on the 5th and the rate on 4 January 2028;
-    # a delta report omits the payment row and a DV01 report the observation rows.
+    # B2:B5: HNG's pair of columns, WTI's pair and the one curve's DV01; by month the lots in
+    # January 2027 and the rate risk in January 2028 with the months between at zero, by day HNG
+    # on the 4th, WTI on the 5th and the rate on 4 January 2028; a delta report stops at the
+    # contract month and a DV01 report runs from the valuation month to the payment month.
     agg = collected(*(sheet[k] for k in ("b2", "b3", "b4", "b5")))
+    between = [serial(f"2027-{m:02d}-01") for m in range(2, 13)]
     assert report(agg, "all", "month") == [
         *risk_head(AS_OF, HNG_NOMINAL, HNG_DELTA, WTI_NOMINAL, WTI_DELTA, CURVE_DV01),
         ["Total", 20.0, pytest.approx(19.5), 6.0, pytest.approx(5.8), pytest.approx(-0.0114)],
         [serial(JAN_27), 20.0, pytest.approx(19.5), 6.0, pytest.approx(5.8), 0.0],
+        *[[m, 0.0, 0.0, 0.0, 0.0, 0.0] for m in between],
         [serial(JAN_28), 0.0, 0.0, 0.0, 0.0, pytest.approx(-0.0114)],
     ]
     by_day = report(agg, "all", "day")
@@ -234,6 +240,8 @@ def test_the_four_sources_spill_the_tickets_table(sheet: dict[str, Any]) -> None
     ]
     assert report(agg, "dv01", "month")[3:] == [
         ["Total", pytest.approx(-0.0114)],
+        [serial(JAN_27), 0.0],
+        *[[m, 0.0] for m in between],
         [serial(JAN_28), pytest.approx(-0.0114)],
     ]
     for risk, bucket in (

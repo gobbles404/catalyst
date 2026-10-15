@@ -714,7 +714,11 @@ def test_before_either_expiry_both_contracts_are_live_and_nothing_is_set() -> No
     np.testing.assert_array_equal(prep.reference_of_live_slot, [0, 1])
     np.testing.assert_array_equal(prep.dated_live_exposure, [160_000, -50_000])
     assert (prep.offset_unsettled, prep.set_unsettled, prep.cash) == (-330_000, 0.0, 0.0)
-    assert counter.freeze().as_dict() == {"fixings_read": 0, "prepared_slots": 2}
+    assert counter.freeze().as_dict() == {
+        "display_periods": 5,
+        "fixings_read": 0,
+        "prepared_slots": 2,
+    }
     for array in (prep.is_fixed, prep.is_settled, prep.set_amount, prep.dated_live_exposure):
         assert not array.flags.writeable
 
@@ -798,6 +802,7 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
         "encoded_observations": 5,
         "encoded_slots": 2,
         "reserved_components": 5,
+        "display_periods": 5,
         "fixings_read": 0,
         "kernel": 1,
         "live_prices_read": 2,

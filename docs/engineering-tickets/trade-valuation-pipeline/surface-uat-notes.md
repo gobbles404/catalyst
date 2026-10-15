@@ -35,6 +35,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 17 / item 9 | [Compound date offsets](compound-date-offsets.md) | [#181](https://github.com/gobbles404/goosedove/pull/181), awaiting review | Type a chain such as `+3em+25cd-1bd+1bd` into `util_ShiftDate` and into a template's or a ticket's `payment_time_lag`; read the payment day beside the rule as written in `util_ReadHandle`. The order is the rule: `-1bd+1bd` keeps an open day and moves a closed one; a chain ending in `cd` or `em` may land on a closed day, and a rule paying on or before the last observation is refused as before. |
 | 18 / item 15 | [Half-year strip labels](half-year-strips.md) | [#182](https://github.com/gobbles404/goosedove/pull/182), awaiting review | Book `1h27` or `2H27` in `contract_code` on an index whose schedule has the six months and read back six components with the code as typed; compare with `F27-M27` and six monthly rows, the same values and risk; try `H27`, which is March, `0H27`, which is refused, and `util_StartDate("BAL1H27", B1)` with a valuation-date handle inside the half. |
 | 19 / item 16 | [Combine holiday calendars](combine-holiday-calendars.md) | [#183](https://github.com/gobbles404/goosedove/pull/183), awaiting review | Create two calendars and combine them with `_CombineHolidayCalendars(B2:B3)`; read the result back and see each day once in order; shift 9 October 2026 by `+1bd` on the combination and on each source; point a template's `payment_holiday_calendar` at the combination and read the trade's payment day back; change a source's day and watch the combination and the payment day follow. |
+| 20 / item 17 | [Risk reporting by pricing contract month](risk-contract-month-bucketing.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | Hold +10 X26 and +5 Z26 of an NG-like index on 14 October 2026 and read `_ReportRisk(results,"nominal_delta","month")`: October 0, November 10, December 5 under a Total of 15, the day view 10 on the 28th and 5 on the 25th; an October ethane asian in October; the same window on NG split November and December by the contract pricing each day; roll the valuation date and watch the start move; try a schedule that keeps a September contract live into October and read the refusal. The kept workbook's block from row 2639 shows the three cases: the hand example, the roll to November and the refusal. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -504,3 +505,23 @@ UAT: a holiday in either source excludes that day, overlapping holidays count
 once, repeated/reordered inputs produce the same dates, and changing a source
 updates dependent payment dates while held snapshots remain unchanged. Counting
 on one calendar then rolling on another is outside this ticket.
+
+## 17. Risk buckets by pricing contract month
+
+Owner agreement, 14 October: monthly delta should follow the pricing contract's
+month. November NG belongs in November even though it expires in October;
+October ethane Asian exposure belongs in October when V26 supplies its price.
+A rolling Asian splits between its pricing contracts. The period spill should
+start with the calendar month containing the result's as_of, so 14 October starts
+at October even if that row is zero.
+
+The [focused ticket](risk-contract-month-bucketing.md) separates attribution and
+display into two commits, built in #NN; UAT is pending. It specifies month/year
+contract buckets, preserves the daily observation view and payment-date DV01, and
+applies to single and collected results.
+
+UAT: November NG shown in November, October ethane in October, an Asian across a
+roll split correctly, October as the initial zero row where appropriate, and
+unchanged scalar totals, discounting and DV01. Check year boundaries, mixed-index
+collections and held results across an as_of change. Earlier nonzero risk must
+never be silently removed by the new display start.

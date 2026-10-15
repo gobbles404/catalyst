@@ -38,8 +38,25 @@ from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.display_axes import (
+    EarlyRisk,
+    Unit,
+    display_periods,
+    early_risk,
+    period_start,
+    places_from,
+    rows_through,
+)
 from goosedove.trades.encoding import PaymentAxes
-from goosedove.trades.evaluation import NO_DAYS, NOTHING, Bucket, Risk, RiskView, TradeResults
+from goosedove.trades.evaluation import (
+    NO_DAYS,
+    NOTHING,
+    Bucket,
+    Risk,
+    RiskView,
+    TradeResults,
+    placed,
+)
 
 SOURCES_COLLECTED = "sources_collected"  # occurrences, every one, a repeated result counted again
 INDEX_GROUPS = "index_groups"  # one per distinct index object among the occurrences
@@ -104,11 +121,17 @@ class RateGroup:
 
 @dataclass(frozen=True, slots=True)
 class ReportAxes:
-    """One bucket's report axes and every group's places on them: observed, the union of the
-    index groups' delta axes, the observation days or since #NN the contract months or years, with
-    each group's places; paid, the union of the rate groups'
-    payment axes, with each group's places, no day when no curve values; and union, the two
-    together, with every group's places on it. Made once with the collection so that a report of
+    """One bucket's report axes and every group's places on them. By day: observed, the union of
+    the index groups' observation days, with each group's places; paid, the union of the rate
+    groups' payment days, with each group's places, no day when no curve values; and union, the
+    two together, with every group's places on it; observed_from and paid_from zero, every saved
+    entry placed. By month or by year, since #NN, risk-contract-month-bucketing.md: one display
+    axis of consecutive periods from the valuation day's, observed its first rows through the
+    last contract period of any index group, paid its rows through the last payment period of
+    any rate group, no day when no curve values, and union the rows through the later; each
+    group's places counted from the start, the same on every prefix, and observed_from and
+    paid_from each group's first saved period on or after the start, the periods before it left
+    out, their risk zero or the report refused. Made once with the collection so that a report of
     one risk or of all three copies saved vectors through saved places."""
 
     observed: NDArray[np.datetime64]
@@ -118,6 +141,8 @@ class ReportAxes:
     union: NDArray[np.datetime64]
     observed_in_union: tuple[NDArray[np.intp], ...]
     paid_in_union: tuple[NDArray[np.intp], ...]
+    observed_from: tuple[int, ...]
+    paid_from: tuple[int, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,8 +151,13 @@ class AggregateResults:
     order given, every one and by reference, so that a held collection keeps its sources
     readable; the index groups and the rate groups in first-appearance order; the currencies of
     the sources in first-appearance order, the DV01 columns of nothing a collection with no curve
-    reports; and the report axes by day, by month and by year. Nothing here is a copy of a
-    source's preparation, market or curve, and nothing is written after it is made."""
+    reports; and the report axes by day, by month and by year. Since #NN early_nominal and
+    early_delta, one EarlyRisk per index group, and early_dv01, one per rate group: the facts
+    refusing a month or a year report whose summed risk stands in a period before the valuation
+    day's, or none, found here so that a report words them with the measure asked for and scans
+    nothing. Nothing here
+    is a copy of a source's preparation, market or curve, and nothing is written after it is
+    made."""
 
     as_of: np.datetime64
     sources: tuple[TradeResults, ...]
@@ -137,6 +167,9 @@ class AggregateResults:
     by_day: ReportAxes
     by_month: ReportAxes
     by_year: ReportAxes
+    early_nominal: tuple[EarlyRisk, ...]
+    early_delta: tuple[EarlyRisk, ...]
+    early_dv01: tuple[EarlyRisk, ...]
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
         """The content of the risk report asked for: aggregate_view's selection of the collection's
@@ -176,13 +209,85 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
         ]
     )
     by_day = _report_axes([g.days for g in index_groups], [r.days for r in rate_groups], counter)
-    by_month = _report_axes(
-        [g.months for g in index_groups], [r.months for r in rate_groups], counter
+    by_month = _period_report_axes(
+        as_of, [g.months for g in index_groups], [r.months for r in rate_groups], "M", counter
     )
-    by_year = _report_axes([g.years for g in index_groups], [r.years for r in rate_groups], counter)
+    by_year = _period_report_axes(
+        as_of, [g.years for g in index_groups], [r.years for r in rate_groups], "Y", counter
+    )
     currencies = tuple(dict.fromkeys([source.currency for source in results]))
+    # Since #NN the facts refusing a month or a year report of a group's risk standing before
+    # the valuation day's period, found once here against the display axes and worded by the
+    # reader with the measure asked for.
+    early_nominal = tuple(
+        [
+            _early_lots(g, g.monthly_lots, g.yearly_lots, m, y, as_of)
+            for g, m, y in zip(
+                index_groups, by_month.observed_from, by_year.observed_from, strict=True
+            )
+        ]
+    )
+    early_delta = tuple(
+        [
+            _early_lots(g, g.discounted_monthly_lots, g.discounted_yearly_lots, m, y, as_of)
+            for g, m, y in zip(
+                index_groups, by_month.observed_from, by_year.observed_from, strict=True
+            )
+        ]
+    )
+    early_dv01 = tuple(
+        [
+            early_risk(
+                f"curve_{r.number} {r.currency}",
+                "payment",
+                as_of,
+                f"{r.currency} per basis point",
+                r.months,
+                r.dv01_by_month,
+                m,
+                r.years,
+                r.dv01_by_year,
+                y,
+            )
+            for r, m, y in zip(rate_groups, by_month.paid_from, by_year.paid_from, strict=True)
+        ]
+    )
     return AggregateResults(
-        as_of, results, index_groups, rate_groups, currencies, by_day, by_month, by_year
+        as_of,
+        results,
+        index_groups,
+        rate_groups,
+        currencies,
+        by_day,
+        by_month,
+        by_year,
+        early_nominal,
+        early_delta,
+        early_dv01,
+    )
+
+
+def _early_lots(
+    group: IndexGroup,
+    monthly: NDArray[np.float64],
+    yearly: NDArray[np.float64],
+    month_from: int,
+    year_from: int,
+    as_of: np.datetime64,
+) -> EarlyRisk:
+    """An index group's refusals of one vector by month and by year, or none, the facts naming its
+    index and its reporting lot."""
+    return early_risk(
+        f"index {group.index.name!r}",
+        "contract",
+        as_of,
+        group.reporting_lot.words,
+        group.months,
+        monthly,
+        month_from,
+        group.years,
+        yearly,
+        year_from,
     )
 
 
@@ -481,7 +586,58 @@ def _report_axes(
     ):
         array.setflags(write=False)
     counter.hit(REPORT_COORDINATES, int(observed.size + paid.size + union.size))
-    return ReportAxes(observed, observed_in, paid, paid_in, union, observed_in_union, paid_in_union)
+    return ReportAxes(
+        observed,
+        observed_in,
+        paid,
+        paid_in,
+        union,
+        observed_in_union,
+        paid_in_union,
+        (0,) * len(observation_axes),
+        (0,) * len(payment_axes),
+    )
+
+
+def _period_report_axes(
+    as_of: np.datetime64,
+    contract_axes: list[NDArray[np.datetime64]],
+    payment_axes: list[NDArray[np.datetime64]],
+    unit: Unit,
+    counter: WorkCounter,
+) -> ReportAxes:
+    """One bucket's report axes by month or by year, since #NN: the display periods from the
+    valuation day's through the farthest saved period of any group, the index groups' rows through
+    their last contract period and the rate groups' through their last payment period, no day
+    when no curve values; each group's places counted from the start and its first saved period
+    on or after it, one search a group; every array frozen, the coordinates reported to the
+    counter."""
+    start = period_start(as_of, unit)
+    observed_places = [places_from(axis, start, unit) for axis in contract_axes]
+    paid_places = [places_from(axis, start, unit) for axis in payment_axes]
+    delta_rows = max([rows_through(p) for _, p in observed_places])
+    dv01_rows = max([rows_through(p) for _, p in paid_places], default=0)
+    periods = display_periods(start, max(delta_rows, dv01_rows))
+    periods.setflags(write=False)  # before the views below, which take the flag as made
+    observed = periods[:delta_rows]
+    paid = periods[:dv01_rows] if payment_axes else NO_DAYS
+    union = periods[: max(delta_rows, dv01_rows)]
+    observed_in = tuple([p for _, p in observed_places])
+    paid_in = tuple([p for _, p in paid_places])
+    for array in (*observed_in, *paid_in):
+        array.setflags(write=False)
+    counter.hit(REPORT_COORDINATES, int(observed.size + paid.size + union.size))
+    return ReportAxes(
+        observed,
+        observed_in,
+        paid,
+        paid_in,
+        union,
+        observed_in,
+        paid_in,
+        tuple([f for f, _ in observed_places]),
+        tuple([f for f, _ in paid_places]),
+    )
 
 
 def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> RiskView:
@@ -499,6 +655,7 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
     axes = _axes_of(aggregate, bucket)
     groups = aggregate.index_groups
     rates = aggregate.rate_groups
+    _refuse_early(aggregate, risk, bucket)
     nominal = tuple([f"{g.index.name} nominal_delta [{g.reporting_lot.name}]" for g in groups])
     delta = tuple([f"{g.index.name} delta [{g.reporting_lot.name}]" for g in groups])
     dv01 = tuple(
@@ -509,8 +666,10 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
         case Risk.NOMINAL_DELTA:
             columns = tuple(
                 [
-                    _placed(axes.observed.size, places, _lots(g, bucket))
-                    for g, places in zip(groups, axes.observed_in, strict=True)
+                    placed(axes.observed.size, places, _lots(g, bucket)[start:])
+                    for g, places, start in zip(
+                        groups, axes.observed_in, axes.observed_from, strict=True
+                    )
                 ]
             )
             totals = tuple([g.lot_delta_total for g in groups])
@@ -518,8 +677,10 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
         case Risk.DELTA:
             columns = tuple(
                 [
-                    _placed(axes.observed.size, places, _discounted_lots(g, bucket))
-                    for g, places in zip(groups, axes.observed_in, strict=True)
+                    placed(axes.observed.size, places, _discounted_lots(g, bucket)[start:])
+                    for g, places, start in zip(
+                        groups, axes.observed_in, axes.observed_from, strict=True
+                    )
                 ]
             )
             totals = tuple([g.discounted_lot_delta_total for g in groups])
@@ -531,33 +692,35 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
                 return RiskView(axes.paid, cleared, (0.0,) * len(cleared), nothing)
             columns = tuple(
                 [
-                    _placed(axes.paid.size, places, _dv01(r, bucket))
-                    for r, places in zip(rates, axes.paid_in, strict=True)
+                    placed(axes.paid.size, places, _dv01(r, bucket)[start:])
+                    for r, places, start in zip(rates, axes.paid_in, axes.paid_from, strict=True)
                 ]
             )
             return RiskView(axes.paid, dv01, tuple([r.dv01 for r in rates]), columns)
         case Risk.ALL:
             labels: list[str] = []
             totals_all: list[float] = []
-            placed: list[NDArray[np.float64]] = []
-            for g, label_n, label_d, places in zip(
-                groups, nominal, delta, axes.observed_in_union, strict=True
+            every: list[NDArray[np.float64]] = []
+            for g, label_n, label_d, places, start in zip(
+                groups, nominal, delta, axes.observed_in_union, axes.observed_from, strict=True
             ):
                 labels.extend((label_n, label_d))
                 totals_all.extend((g.lot_delta_total, g.discounted_lot_delta_total))
-                placed.append(_placed(axes.union.size, places, _lots(g, bucket)))
-                placed.append(_placed(axes.union.size, places, _discounted_lots(g, bucket)))
+                every.append(placed(axes.union.size, places, _lots(g, bucket)[start:]))
+                every.append(placed(axes.union.size, places, _discounted_lots(g, bucket)[start:]))
             if rates:
-                for r, label, places in zip(rates, dv01, axes.paid_in_union, strict=True):
+                for r, label, places, start in zip(
+                    rates, dv01, axes.paid_in_union, axes.paid_from, strict=True
+                ):
                     labels.append(label)
                     totals_all.append(r.dv01)
-                    placed.append(_placed(axes.union.size, places, _dv01(r, bucket)))
+                    every.append(placed(axes.union.size, places, _dv01(r, bucket)[start:]))
             else:
                 for label in cleared:
                     labels.append(label)
                     totals_all.append(0.0)
-                    placed.append(np.zeros(axes.union.size))
-            return RiskView(axes.union, tuple(labels), tuple(totals_all), tuple(placed))
+                    every.append(np.zeros(axes.union.size))
+            return RiskView(axes.union, tuple(labels), tuple(totals_all), tuple(every))
         case _:
             assert_never(risk)
 
@@ -610,10 +773,39 @@ def _dv01(group: RateGroup, bucket: Bucket) -> NDArray[np.float64]:
             assert_never(bucket)
 
 
-def _placed(
-    size: int, places: NDArray[np.intp], vector: NDArray[np.float64]
-) -> NDArray[np.float64]:
-    """A saved vector copied onto a report axis through its saved places, zero elsewhere."""
-    column = np.zeros(size)
-    column[places] = vector
-    return column
+def _refuse_early(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> None:
+    """Raises the refusal prepared for a month or a year report whose selected groups hold risk
+    before the valuation day's period, since #NN, worded with the measure asked for; a day report
+    is never refused."""
+    match bucket:
+        case Bucket.DAY:
+            return
+        case Bucket.MONTH:
+            unit: Unit = "M"
+        case Bucket.YEAR:
+            unit = "Y"
+        case _:
+            assert_never(bucket)
+    for measure, group_facts in _early_of(aggregate, risk):
+        for early in group_facts:
+            early.refuse(measure, unit)
+
+
+def _early_of(
+    aggregate: AggregateResults, risk: Risk
+) -> tuple[tuple[str, tuple[EarlyRisk, ...]], ...]:
+    """The saved facts a report of the risk reads, each with the measure it is worded as."""
+    nominal = ("nominal delta", aggregate.early_nominal)
+    delta = ("delta", aggregate.early_delta)
+    dv01 = ("DV01", aggregate.early_dv01)
+    match risk:
+        case Risk.NOMINAL_DELTA:
+            return (nominal,)
+        case Risk.DELTA:
+            return (delta,)
+        case Risk.DV01:
+            return (dv01,)
+        case Risk.ALL:
+            return (nominal, delta, dv01)
+        case _:
+            assert_never(risk)

@@ -18,12 +18,14 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
+from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
 from goosedove.trades.encoding import Encoded
 from goosedove.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
 FIXINGS_READ = "fixings_read"  # settles read off the history, one per fixed slot
 PAYMENT_DAYS_MAPPED = "payment_days_mapped"  # distinct unpaid payment days, bilateral, since #176
+DISPLAY_PERIODS = "display_periods"  # periods of the month and year display axes made, since #NN
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +83,14 @@ class PreparedTrades:
     the distinct payment days of the groups not yet settled with each such group's place among
     them and its time fraction, made once here, since the groups settled and the valuation date
     change only when a batch is prepared again, so that a tick gathers the curve's factors and
-    sorts nothing; None for a cleared batch and for a physical one."""
+    sorts nothing; None for a cleared batch and for a physical one. And since #NN,
+    risk-contract-month-bucketing.md, by_month and by_year, the display axes of the month and
+    the year reports, PeriodAxis, consecutive periods from the valuation day's through the
+    farthest contract or payment period with every saved period's place, made here since the
+    valuation day is the history's; and early_nominal, the facts refusing a month or a year
+    report whose nominal lots stand in a period before the start, or none, which a reader words
+    with the measure asked for and raises, scanning nothing; a cleared result's delta, the same
+    lots, is refused from the same facts."""
 
     encoded: Encoded
     history: MarketHistory
@@ -103,6 +112,9 @@ class PreparedTrades:
     monthly_lots: NDArray[np.float64]
     yearly_lots: NDArray[np.float64]
     unpaid_payments: UnpaidPayments | None
+    by_month: PeriodAxis
+    by_year: PeriodAxis
+    early_nominal: EarlyRisk
 
 
 def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
@@ -191,7 +203,8 @@ def prepared_trades(
     once, _unpaid_payments, for the ticks to gather the curve's factors by.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
-    counter; nothing per component, nothing per observation, nothing per day of the calendar.
+    counter, and since #NN the periods of the two display axes made; nothing per component,
+    nothing per observation, nothing per day of the calendar.
     """
     terms = encoded.terms
     calendar = history.calendar
@@ -294,6 +307,26 @@ def prepared_trades(
             f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
             "settled groups' offsets and set amounts sum past the largest number"
         )
+    # Since #NN the month and year displays start at the valuation day's period: the axes made
+    # once here, two searches a bucket, and the nominal lots before the start checked zero.
+    paid = encoded.payment_axes
+    by_month = period_axis(
+        as_of, encoded.contract_months, None if paid is None else paid.months, "M"
+    )
+    by_year = period_axis(as_of, encoded.contract_years, None if paid is None else paid.years, "Y")
+    early_nominal = early_risk(
+        f"index {terms.index.name!r}",
+        "contract",
+        as_of,
+        words,
+        encoded.contract_months,
+        monthly_lots,
+        by_month.contract_from,
+        encoded.contract_years,
+        yearly_lots,
+        by_year.contract_from,
+    )
+    counter.hit(DISPLAY_PERIODS, int(by_month.periods.size + by_year.periods.size))
     unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
@@ -329,4 +362,7 @@ def prepared_trades(
         monthly_lots,
         yearly_lots,
         unpaid_payments,
+        by_month,
+        by_year,
+        early_nominal,
     )

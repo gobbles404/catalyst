@@ -11,7 +11,10 @@ what was built and what was not. The first reporting/aggregation slice, not an e
 the bilateral integration PR; the owner's answers of 11 October are recorded there. Since #NN
 the month and year buckets of the deltas follow the pricing contract's month and year,
 [risk-contract-month-bucketing.md](risk-contract-month-bucketing.md), which supersedes this
-page's observation-month buckets; the day view and the DV01's payment axes stand.
+page's observation-month buckets and, for the month and year displays, its rule that every
+past zero row is kept: those displays run from the valuation day's period through the last
+period held, the periods between at zero, and a saved risk before the start is refused rather
+than hidden; the day view and the DV01's payment axes stand.
 
 **PR title:** `feat(excel): report selected risk vectors with totals first`
 

@@ -163,7 +163,15 @@ def test_a_collection_runs_the_same_functions_at_any_size(
         "_summed": 7,
         "_compensated": 11,
         "_outrun": 3,
-        "_report_axes": 3,
+        "_report_axes": 1,  # by day; since #NN the month and year axes are the display's
+        "_period_report_axes": 2,
+        "period_start": 2,
+        "places_from": 4,
+        "rows_through": 4,
+        "display_periods": 2,
+        "_early_lots": 2,
+        "early_risk": 3,
+        "early_fact": 6,
         "WorkCounter.hit": 20,
     }
     # Sixteen uniques, the seven unions of saved axes, the six report axes and the three unions of
@@ -173,15 +181,20 @@ def test_a_collection_runs_the_same_functions_at_any_size(
     # and at twenty-four: a pass adds each occurrence's entries at once, so more occurrences are
     # more steps of the same arithmetic and not more of these calls.
     assert numpy_calls(lambda: aggregate_results(sources, WorkCounter())) == {
+        "generic.astype": 2,  # the valuation day to its month and its year, since #NN
         "ndarray.any": 11,
-        "ndarray.flatten": 16,
-        "ndarray.searchsorted": 19,
-        "ndarray.setflags": 41,
-        "ndarray.sort": 16,
+        "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
+        "ndarray.flatten": 10,
+        "ndarray.nonzero": 6,  # the looks for risk before the start, three measures by two buckets
+        "ndarray.ravel": 6,
+        "ndarray.searchsorted": 15,
+        "ndarray.setflags": 33,
+        "ndarray.sort": 10,
         "numpy._make_extobj": 11,
-        "numpy._unique_hash": 16,
+        "numpy._unique_hash": 10,
+        "numpy.arange": 2,  # the two display axes
         "numpy.array": 2,
-        "numpy.asanyarray": 32,
+        "numpy.asanyarray": 26,
         "numpy.zeros": 22,
         "ufunc.reduce": 11,
     }
@@ -220,11 +233,14 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
     g, r = agg.index_groups[0], agg.rate_groups[0]
     d, m, y, refs = g.days.size, g.months.size, g.years.size, g.references.size
     p, pm, py = r.days.size, r.months.size, r.years.size
+    # The report axes' bytes as the helper counts them: each axis, each group's places twice,
+    # once per union they place onto; by month and by year, since #NN, the display's rows.
     axes = 0
-    for bucket, (o, q) in zip(
-        (agg.by_day, agg.by_month, agg.by_year), ((d, p), (m, pm), (y, py)), strict=True
-    ):
-        axes += 3 * o + 3 * q + bucket.union.size
+    for bucket in (agg.by_day, agg.by_month, agg.by_year):
+        axes += bucket.observed.size + bucket.paid.size + bucket.union.size
+        axes += 2 * sum(places.size for places in bucket.observed_in)
+        axes += 2 * sum(places.size for places in bucket.paid_in)
+    assert (d, p, m, pm, y, py) == (d, p, m, pm, y, py)  # the saved axes' sizes, read above
     assert (
         retained
         == 8 * (count + 3 * refs + 3 * d + 3 * m + 3 * y)
@@ -250,21 +266,26 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
     unpaid: int,
 ) -> None:
     agg = aggregate_results(valued_sources(method, components, contracts, as_of, 2), WorkCounter())
-    for risk, columns, chosen in (
-        (Risk.NOMINAL_DELTA, 1, "_lots"),
-        (Risk.DELTA, 1, "_discounted_lots"),
-        (Risk.DV01, 1, "_dv01"),
+    index_groups, rate_groups = len(agg.index_groups), len(agg.rate_groups)
+    for risk, columns, chosen, refused in (
+        (Risk.NOMINAL_DELTA, 1, "_lots", index_groups),
+        (Risk.DELTA, 1, "_discounted_lots", index_groups),
+        (Risk.DV01, 1, "_dv01", rate_groups),
     ):
         for bucket in Bucket:
-            # One column of zeros over the axis, the saved vector copied through its places.
+            # One column of zeros over the axis, the saved vector copied through its places; by
+            # month and by year, since #NN, every selected group's saved facts read.
             assert numpy_calls(lambda r=risk, b=bucket: aggregate_view(agg, r, b)) == {
                 "numpy.zeros": columns
             }
+            early = {} if bucket is Bucket.DAY else {"_early_of": 1, "EarlyRisk.refuse": refused}
             assert call_profile(lambda r=risk, b=bucket: aggregate_view(agg, r, b)) == {
                 "aggregate_view": 1,
                 "_axes_of": 1,
+                "_refuse_early": 1,
+                **early,
                 chosen: 1,
-                "_placed": 1,
+                "placed": 1,
             }
             view = aggregate_view(agg, risk, bucket)
             assert (
@@ -274,18 +295,27 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
     for bucket in Bucket:
         # All three: three columns over the union, each through its own places.
         assert numpy_calls(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {"numpy.zeros": 3}
+        early = (
+            {}
+            if bucket is Bucket.DAY
+            else {"_early_of": 1, "EarlyRisk.refuse": 2 * index_groups + rate_groups}
+        )
         assert call_profile(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {
             "aggregate_view": 1,
             "_axes_of": 1,
+            "_refuse_early": 1,
+            **early,
             "_lots": 1,
             "_discounted_lots": 1,
             "_dv01": 1,
-            "_placed": 3,
+            "placed": 3,
         }
         view = aggregate_view(agg, Risk.ALL, bucket)
+        # Three columns of eight bytes a row, and the lists of labels, totals, columns and places
+        # beside them, within two slacks.
         assert (
             least_peak(lambda b=bucket: aggregate_view(agg, Risk.ALL, b))
-            <= 24 * view.dates.size + SLACK
+            <= 24 * view.dates.size + 2 * SLACK
         )
 
 
@@ -346,5 +376,5 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
         numpy_calls(lambda: aggregate_results([discounted, cleared], WorkCounter()))[
             "ndarray.setflags"
         ]
-        == 41
+        == 33
     )

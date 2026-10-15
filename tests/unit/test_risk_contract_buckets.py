@@ -136,8 +136,9 @@ def dated(results: str, risk: str, bucket: str) -> list[list[object]]:
 def test_november_ng_risk_stands_in_november_though_its_contract_observes_in_october() -> None:
     # +10 lots of X26 observing 28 October and +5 of Z26 observing 25 November, both live on
     # 14 October 2026: by day 10 on the 28th and 5 on the 25th; by month, since the contracts' own
-    # months decide, 10 in November and 5 in December and no October row; by year 15 in 2026; the
-    # Total 15 on every view. Once X26's observation fixes, its November row is kept at zero.
+    # months decide, 10 in November and 5 in December under an October row of zero, the
+    # valuation month the spill starts at; by year 15 in 2026; the Total 15 on every view. Once
+    # X26's observation fixes, its November row is kept at zero.
     index, calendar = an_ng()
     template = a_template(calendar)
     trades = booked(
@@ -152,6 +153,7 @@ def test_november_ng_risk_stands_in_november_though_its_contract_observes_in_oct
     assert report(results, "nominal_delta", "month") == [
         *risk_head(AS_OF, "NG2 nominal_delta [LOT]"),
         ["Total", 15.0],
+        [serial("2026-10-01"), 0.0],
         [serial("2026-11-01"), 10.0],
         [serial("2026-12-01"), 5.0],
     ]
@@ -170,6 +172,7 @@ def test_november_ng_risk_stands_in_november_though_its_contract_observes_in_oct
     fixed = evaluated(trades, index, "NG2", "2026-09-29", "2026-10-29", (3.3, 3.4))
     assert report(fixed, "nominal_delta", "month")[3:] == [
         ["Total", 5.0],
+        [serial("2026-10-01"), 0.0],
         [serial("2026-11-01"), 0.0],
         [serial("2026-12-01"), 5.0],
     ]
@@ -209,8 +212,9 @@ def test_an_october_ethane_asian_stands_in_october_when_v26_supplies_its_price()
 def test_an_october_ng_asian_splits_between_the_contracts_pricing_its_days() -> None:
     # The same 22-weekday window booked as V26 on the NG-like index, where X26 prices through
     # 28 October and Z26 from the 29th: on 14 October eleven live days reference X26 and two Z26,
-    # so the month view is November 11 and December 2, the Total 13, and the booked code's October
-    # holds nothing. On 29 October, every X26 day fixed, November is zero and December still 2.
+    # so the month view is November 11 and December 2 under an October row of zero, the Total 13,
+    # the booked code's October holding nothing. On 29 October, every X26 day fixed, November is
+    # zero and December still 2.
     index, calendar = an_ng()
     trades = booked(
         index, a_template(calendar, method="asian"), [[4.0, serial("2026-10-01"), "V26", 22.0, 3.0]]
@@ -218,6 +222,7 @@ def test_an_october_ng_asian_splits_between_the_contracts_pricing_its_days() -> 
     results = evaluated(trades, index, "NG2", "2026-09-29", AS_OF, (3.2, 3.3, 3.4))
     assert report(results, "nominal_delta", "month")[3:] == [
         ["Total", 13.0],
+        [serial("2026-10-01"), 0.0],
         [serial("2026-11-01"), 11.0],
         [serial("2026-12-01"), 2.0],
     ]
@@ -225,6 +230,7 @@ def test_an_october_ng_asian_splits_between_the_contracts_pricing_its_days() -> 
     rolled = evaluated(trades, index, "NG2", "2026-09-29", "2026-10-29", (3.3, 3.4))
     assert report(rolled, "nominal_delta", "month")[3:] == [
         ["Total", 2.0],
+        [serial("2026-10-01"), 0.0],
         [serial("2026-11-01"), 0.0],
         [serial("2026-12-01"), 2.0],
     ]
@@ -236,14 +242,22 @@ def test_an_october_ng_asian_splits_between_the_contracts_pricing_its_days() -> 
 
 def test_a_december_observation_of_f27_reports_in_january_2027_and_in_2027() -> None:
     # One lot of F27 under lastday observes 29 December 2026: the day view keeps that day, the
-    # month view shows January 2027 and the year view 2027, the contract's year and not the
-    # observation's.
+    # month view shows January 2027 under three zero months from October, and the year view 2027
+    # under a zero 2026, the contract's year and not the observation's.
     index, calendar = an_ng()
     trades = booked(index, a_template(calendar), [[5.0, serial("2026-10-01"), "F27", 1.0, 3.0]])
     results = evaluated(trades, index, "NG2", "2026-09-29", AS_OF, (3.2, 3.3, 3.4))
     assert dated(results, "nominal_delta", "day") == [[serial("2026-12-29"), 1.0]]
-    assert dated(results, "nominal_delta", "month") == [[serial("2027-01-01"), 1.0]]
-    assert dated(results, "nominal_delta", "year") == [[serial("2027-01-01"), 1.0]]
+    assert dated(results, "nominal_delta", "month") == [
+        [serial("2026-10-01"), 0.0],
+        [serial("2026-11-01"), 0.0],
+        [serial("2026-12-01"), 0.0],
+        [serial("2027-01-01"), 1.0],
+    ]
+    assert dated(results, "nominal_delta", "year") == [
+        [serial("2026-01-01"), 0.0],
+        [serial("2027-01-01"), 1.0],
+    ]
 
 
 # --- discounting and collection
@@ -268,10 +282,12 @@ def test_discounting_and_collection_keep_the_contract_month_and_the_payment_mont
         collection = str(ENTRY["_AggregateResults"](stacked(cleared_results, bilateral_results)))
         assert report(collection, "nominal_delta", "month")[3:] == [
             ["Total", 20.0],
+            [serial("2026-10-01"), 0.0],
             [serial("2026-11-01"), 20.0],
         ]
         assert report(collection, "delta", "month")[3:] == [
             ["Total", pytest.approx(delta)],
+            [serial("2026-10-01"), 0.0],
             [serial("2026-11-01"), pytest.approx(delta)],
         ]
         everything = report(collection, "all", "month")
@@ -368,3 +384,105 @@ def test_ng_and_ethane_collect_under_their_own_columns_on_one_month_axis() -> No
         [serial("2026-12-01"), 0.0, 10.0],
     ]
     assert dated(collection, "nominal_delta", "year") == [[serial("2026-01-01"), 15.0, 13.0]]
+
+
+# --- the display start and the refusal of older risk ------------------------------------------
+
+
+def test_the_period_spill_starts_at_the_valuation_month_and_refuses_older_live_risk() -> None:
+    # On an index whose U26 keeps trading to 15 October 2026, three lots of U26 are live on
+    # 14 October in a contract month before the valuation month: the day view shows them on the
+    # 15th, the year view in 2026, and the month view is refused in words naming the index, the
+    # month, the lots and the valuation day rather than shown from October with September gone;
+    # a report of all three is refused the same way. Once U26 has fixed, on the 16th, the month
+    # view starts at October with zero and shows no September row, and the refusal is gone. A
+    # contract year before the valuation year is refused by the year view the same way.
+    index, calendar = an_index(
+        "NG3",
+        [("Q26", "2026-08-27"), ("U26", "2026-10-15"), ("X26", "2026-10-28")],
+        NO_HOLIDAYS,
+        [("LOT", 1.0)],
+    )
+    trades = booked(index, a_template(calendar), [[8.0, serial("2026-10-01"), "U26", 3.0, 3.0]])
+    results = evaluated(trades, index, "NG3", "2026-08-28", AS_OF, (3.2, 3.3))
+    assert dated(results, "nominal_delta", "day") == [[serial("2026-10-15"), 3.0]]
+    assert dated(results, "nominal_delta", "year") == [[serial("2026-01-01"), 3.0]]
+    refused = (
+        "#ERROR _ReportRisk: ValueError: the nominal delta of index 'NG3' in the contract "
+        "month from 2026-09-01 is 3.0 lots of LOT (1 MMBTU), before the report's first month, "
+        "2026-10-01, the month of as_of 2026-10-14; the day view shows where it stands"
+    )
+    assert ENTRY["_ReportRisk"](results, "nominal_delta", "month") == refused
+    assert ENTRY["_ReportRisk"](results, "all", "month") == refused
+    assert ENTRY["_ReportRisk"](results, "delta", "month") == refused.replace(
+        "nominal delta", "delta"
+    )
+    fixed = evaluated(trades, index, "NG3", "2026-08-28", "2026-10-16", (3.3,))
+    assert report(fixed, "nominal_delta", "month")[3:] == [
+        ["Total", 0.0],
+        [serial("2026-10-01"), 0.0],
+    ]
+    # A collection of the refused result is refused the same way, its index named.
+    collection = str(ENTRY["_AggregateResults"](stacked(results)))
+    assert ENTRY["_ReportRisk"](collection, "nominal_delta", "month") == refused
+    assert dated(collection, "nominal_delta", "day") == [[serial("2026-10-15"), 3.0]]
+    # The year: Z26, a December 2026 contract, still trading on 5 January 2027, its expiry the 11th.
+    index, calendar = an_index(
+        "NG4",
+        [("X26", "2026-10-28"), ("Z26", "2027-01-11"), ("F27", "2027-01-27")],
+        NO_HOLIDAYS,
+        [("LOT", 1.0)],
+    )
+    trades = booked(index, a_template(calendar), [[9.0, serial("2026-11-02"), "Z26", 2.0, 3.0]])
+    results = evaluated(trades, index, "NG4", "2026-10-29", "2027-01-05", (3.2, 3.3))
+    assert ENTRY["_ReportRisk"](results, "nominal_delta", "month") == (
+        "#ERROR _ReportRisk: ValueError: the nominal delta of index 'NG4' in the contract "
+        "month from 2026-12-01 is 2.0 lots of LOT (1 MMBTU), before the report's first month, "
+        "2027-01-01, the month of as_of 2027-01-05; the day view shows where it stands"
+    )
+    assert ENTRY["_ReportRisk"](results, "nominal_delta", "year") == (
+        "#ERROR _ReportRisk: ValueError: the nominal delta of index 'NG4' in the contract "
+        "year from 2026-01-01 is 2.0 lots of LOT (1 MMBTU), before the report's first year, "
+        "2027-01-01, the year of as_of 2027-01-05; the day view shows where it stands"
+    )
+    assert dated(results, "nominal_delta", "day") == [[serial("2027-01-11"), 2.0]]
+
+
+def test_an_all_fixed_result_shows_the_valuation_period_alone_and_a_later_payment_extends_all() -> (
+    None
+):
+    # Every contract fixed: the month view is the valuation month at zero and nothing else; a
+    # bilateral result whose payment falls later extends all three through the payment month
+    # while the delta alone stops at the last contract month.
+    index, calendar = an_ng()
+    trades = booked(index, a_template(calendar), [[1.0, serial("2026-10-01"), "X26", 10.0, 3.0]])
+    fixed = evaluated(trades, index, "NG2", "2026-09-29", "2026-12-01", (3.4,))
+    assert report(fixed, "nominal_delta", "month")[3:] == [
+        ["Total", 0.0],
+        [serial("2026-12-01"), 0.0],
+    ]
+    assert report(fixed, "nominal_delta", "year")[3:] == [
+        ["Total", 0.0],
+        [serial("2026-01-01"), 0.0],
+    ]
+    bilateral = booked(
+        index,
+        a_template(calendar, route="bilateral", lag="+15bd", counterparty="ACME Trading"),
+        [[2.0, serial("2026-10-01"), "X26", 10.0, 3.0]],
+    )
+    history = a_history(index, "2026-09-29", AS_OF, NO_HOLIDAYS, {})
+    market = a_market(history, "NG2", 3.2, 3.3, 3.4)
+    curve = unit_curve((AS_OF, 1.0), ("2026-11-18", 0.95))
+    results = valued_on(bilateral, history, market, curve)
+    assert [line[0] for line in dated(results, "delta", "month")] == [
+        serial("2026-10-01"),
+        serial("2026-11-01"),
+    ]
+    assert [line[0] for line in dated(results, "dv01", "month")] == [
+        serial("2026-10-01"),
+        serial("2026-11-01"),
+    ]
+    assert [line[0] for line in dated(results, "all", "month")] == [
+        serial("2026-10-01"),
+        serial("2026-11-01"),
+    ]
