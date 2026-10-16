@@ -151,6 +151,7 @@ namespace Goosedove.Host.Tests
             column[cells - 1, 0] = "x";
             var expected = RangeIn(cells);
             expected["text_cells"] = 1;
+            expected["texts_checked"] = 1;  // the one text looked at for NUL, since #NN
             expected["objects_built"] = 4;  // and the text
             Same(expected, Counted("#ERROR SumArray: values cell (10000, 1) is text 'x', expected number", "SumArray", column));
         }
@@ -167,6 +168,7 @@ namespace Goosedove.Host.Tests
             Same(RangeIn(cells), Counted((double)cells, "CountArray", Column(cells)));
             var expected = RangeIn(cells);
             expected["text_cells"] = MixedTexts(cells);
+            expected["texts_checked"] = MixedTexts(cells);  // each text once, since #NN
             expected["objects_built"] = 4;  // and the text, joined once for the whole range
             Same(expected, Counted((double)cells, "CountMixed", Mixed(cells)));
         }
@@ -187,6 +189,7 @@ namespace Goosedove.Host.Tests
                 ["objects_built"] = 8,
                 ["cells_scanned"] = 4 + 4L * rows,
                 ["text_cells"] = 4 + rows,
+                ["texts_checked"] = 4 + rows,
             }, Counted(Total(rows), "SumQuantity", Headers(), Trades(rows)));
         }
 
@@ -225,6 +228,35 @@ namespace Goosedove.Host.Tests
             {
                 ["cells_scanned"] = 5,       // nothing is built or allocated: the buffers are kept
             }, Counted(ExcelError.ExcelErrorNA, "SumArray", column));
+        }
+
+        // Since #NN, reject-nul-input-text.md: a text holding NUL (U+0000) stops the scan as an
+        // Excel error does, where the pass reaches it. The cells up to it are visited and each text
+        // reached is looked at once, the refused one included; nothing is built, allocated or
+        // carried across, no trip is made, and the kept buffers serve the next call as before.
+        [Fact]
+        public void a_nul_in_a_text_cell_stops_the_scan_before_the_trip()
+        {
+            var column = Column(10000);
+            column[2, 0] = "n2";
+            column[4, 0] = "n\u00004";
+            Same(new Dictionary<string, long>
+            {
+                ["cells_scanned"] = 5,
+                ["text_cells"] = 1,      // the text before it, collected
+                ["texts_checked"] = 2,   // both texts reached, the refused one included
+            }, Counted("#ERROR host: SumArray argument 1 cell (5, 1) is text holding NUL (U+0000), expected text without it", "SumArray", column));
+            Same(RangeIn(10000), Counted(10000.0, "SumArray", Column(10000)));
+        }
+
+        // A scalar text is checked at the same boundary: one look, no object built and no trip.
+        [Fact]
+        public void a_nul_in_a_scalar_text_is_one_check_and_no_trip()
+        {
+            Same(new Dictionary<string, long>
+            {
+                ["texts_checked"] = 1,
+            }, Counted("#ERROR host: _ShowInstrument argument 1 is text holding NUL (U+0000), expected text without it", "_ShowInstrument", "fixed\u0000float"));
         }
 
         // Counted() compares the result with Assert.Equal, which a fresh double[,] never satisfies;
@@ -295,6 +327,7 @@ namespace Goosedove.Host.Tests
         {
             var expected = RangeIn(cells);
             expected["text_cells"] = MixedTexts(cells);
+            expected["texts_checked"] = MixedTexts(cells);
             expected["objects_built"] = 4;  // and the text, joined once for the whole range
             expected["buffers_allocated"] = 1;
             expected["buffer_bytes"] = 8L * cells;

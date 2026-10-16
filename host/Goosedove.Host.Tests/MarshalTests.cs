@@ -14,7 +14,7 @@ namespace Goosedove.Host.Tests
             using (Py.GIL())
             {
                 object error;
-                var item = Marshal.ToPython(value, out error);
+                var item = Marshal.ToPython(value, "Fn", 1, out error);
                 Assert.Null(error);
                 try
                 {
@@ -35,7 +35,7 @@ namespace Goosedove.Host.Tests
             using (Py.GIL())
             {
                 object error;
-                using (var cells = Marshal.ToPython(grid, out error))
+                using (var cells = Marshal.ToPython(grid, "Fn", 1, out error))
                 {
                     Assert.Null(error);
                     using (var attribute = cells.GetAttr(name))
@@ -59,7 +59,7 @@ namespace Goosedove.Host.Tests
             using (Py.GIL())
             {
                 object error;
-                Assert.Null(Marshal.ToPython(ExcelError.ExcelErrorNA, out error));
+                Assert.Null(Marshal.ToPython(ExcelError.ExcelErrorNA, "Fn", 1, out error));
                 Assert.Equal(ExcelError.ExcelErrorNA, error);
             }
         }
@@ -71,7 +71,7 @@ namespace Goosedove.Host.Tests
             using (Py.GIL())
             {
                 object error;
-                Assert.Null(Marshal.ToPython(grid, out error));
+                Assert.Null(Marshal.ToPython(grid, "Fn", 1, out error));
                 Assert.Equal(ExcelError.ExcelErrorDiv0, error);
             }
         }
@@ -113,7 +113,7 @@ namespace Goosedove.Host.Tests
             using (Py.GIL())
             {
                 object error;
-                var first = Marshal.ToPython(ExcelMissing.Value, out error);
+                var first = Marshal.ToPython(ExcelMissing.Value, "Fn", 1, out error);
                 Assert.Same(Bridge.Missing, first);
                 Marshal.Release(first);
                 Assert.Equal("missing", Described(ExcelMissing.Value));

@@ -15,6 +15,8 @@ namespace Goosedove.Host
     ///                      when the buffers grow
     ///   cells_scanned      cells visited by the range loop, the Excel error that stopped it included
     ///   text_cells         text cells collected in that loop
+    ///   texts_checked      texts looked at for NUL (U+0000), each once as it is reached, a scalar
+    ///                      argument or a range's cell, the refused one included, since #NN
     ///   buffers_allocated  managed arrays made: for a range in only when the kept buffers grow,
     ///                      and for an array out, of doubles or of mixed cells
     ///   buffer_bytes       their payload bytes
