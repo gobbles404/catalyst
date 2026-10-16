@@ -540,7 +540,7 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),3,2)'  = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),3,3)'  = "TRUE"
     '=INDEX(_ShowInstrument("fixed_float"),1,5)'  = "start_date"
-    # Since #NN, reject-nul-input-text.md: the two characters backslash and zero are ordinary text, refused
+    # Since #189, reject-nul-input-text.md: the two characters backslash and zero are ordinary text, refused
     # here by the seam as the name of no instrument. A genuine U+0000 the harness cannot deliver: CHAR(0) is
     # #VALUE! and a text typed through COM is cut at the NUL, so the host's refusal of one is the host tests' alone.
     '=_ShowInstrument("fixed\0float")'  = '#ERROR _ShowInstrument: ValueError: instrument is ''fixed\\0float'', expected one of: ''fixed_float'''

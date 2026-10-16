@@ -241,7 +241,7 @@ namespace Goosedove.Host
                         {
                             // An Excel error in any argument is the result, unchanged. Excel's own
                             // functions do the same, and it keeps an error from pricing as a blank.
-                            // Since #NN a text holding NUL is the result too, the host's own refusal,
+                            // Since #189 a text holding NUL is the result too, the host's own refusal,
                             // found in the same left-to-right pass and never sent across.
                             object inputError;
                             pyArgs[i] = Marshal.ToPython(args[i], prepared.Name, i + 1, out inputError, work);
@@ -290,7 +290,7 @@ namespace Goosedove.Host
     {
         /// <summary>
         /// One argument as Python sees it, or null with what refuses it: the Excel error it holds,
-        /// unchanged, or since #NN the host's own text for a text holding NUL (U+0000), the
+        /// unchanged, or since #189 the host's own text for a text holding NUL (U+0000), the
         /// character that separates a range's texts on their way across, named by the function
         /// and the argument's one-based position. Release it with Release.
         /// </summary>
@@ -325,7 +325,7 @@ namespace Goosedove.Host
             return value == null || value is ExcelEmpty ? PyObject.None : value.ToPython();
         }
 
-        // The host's refusal of a text holding NUL (U+0000), since #NN: the function, the argument's
+        // The host's refusal of a text holding NUL (U+0000), since #189: the function, the argument's
         // one-based position and, inside a range, the cell's one-based row and column within the
         // range supplied; never the text itself, which would put the character in the message.
         internal static string NulRefusal(string function, int position, int row, int column)
@@ -404,7 +404,7 @@ namespace Goosedove.Host
         }
 
         // One pass over the cells, in sheet order, into the kept buffers. An Excel error
-        // anywhere is returned and nothing is built, and since #NN so is a text holding NUL, the
+        // anywhere is returned and nothing is built, and since #189 so is a text holding NUL, the
         // separator of the texts below, refused where the pass reaches it. Every other range ships the same way: one
         // kind code per cell, one number per cell (NaN where there is none), the text cells
         // joined with NUL, and one bit per kind that occurred, so the seam learns "all numbers"

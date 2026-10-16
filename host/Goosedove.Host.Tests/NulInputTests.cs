@@ -4,7 +4,7 @@ using Xunit;
 namespace Goosedove.Host.Tests
 {
     /// <summary>
-    /// Since #NN, reject-nul-input-text.md: a text holding NUL (U+0000) is refused by the host
+    /// Since #189, reject-nul-input-text.md: a text holding NUL (U+0000) is refused by the host
     /// where its pass reaches it, before anything crosses into Python. The host packs a range's
     /// texts into one string separated by NUL, so a NUL inside a cell would split into two cells
     /// on the other side and move text into another field; the ticket's example put a broker's

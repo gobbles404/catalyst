@@ -38,7 +38,7 @@ Every measurement drives the probes in `src/goosedove/excel/probes.py`: hidden w
 | `objects_built` | Python objects the host made: each scalar; a range's rows, columns and summary of kinds, its text when it has any, and the two buffer addresses when the buffers grow |
 | `cells_scanned` | cells visited by the scan, the Excel error that stopped it included |
 | `text_cells` | text cells collected in that scan |
-| `texts_checked` | texts looked at for NUL (U+0000), each once as it is reached, a scalar argument or a range's cell, the refused one included, since #NN |
+| `texts_checked` | texts looked at for NUL (U+0000), each once as it is reached, a scalar argument or a range's cell, the refused one included, since #189 |
 | `buffers_allocated`, `buffer_bytes` | managed arrays made, and their payload bytes: for a range in only when the kept buffers grow to a larger range than any before, and for an array out, of doubles or of mixed cells |
 | `result_copies`, `result_cells` | copies made of an array of doubles on its way to Excel, and the cells of any array out |
 | `result_texts`, `result_boxes` | on the mixed road out, the text cells, one string each, and the number cells, one box each |

@@ -151,7 +151,7 @@ namespace Goosedove.Host.Tests
             column[cells - 1, 0] = "x";
             var expected = RangeIn(cells);
             expected["text_cells"] = 1;
-            expected["texts_checked"] = 1;  // the one text looked at for NUL, since #NN
+            expected["texts_checked"] = 1;  // the one text looked at for NUL, since #189
             expected["objects_built"] = 4;  // and the text
             Same(expected, Counted("#ERROR SumArray: values cell (10000, 1) is text 'x', expected number", "SumArray", column));
         }
@@ -168,7 +168,7 @@ namespace Goosedove.Host.Tests
             Same(RangeIn(cells), Counted((double)cells, "CountArray", Column(cells)));
             var expected = RangeIn(cells);
             expected["text_cells"] = MixedTexts(cells);
-            expected["texts_checked"] = MixedTexts(cells);  // each text once, since #NN
+            expected["texts_checked"] = MixedTexts(cells);  // each text once, since #189
             expected["objects_built"] = 4;  // and the text, joined once for the whole range
             Same(expected, Counted((double)cells, "CountMixed", Mixed(cells)));
         }
@@ -230,7 +230,7 @@ namespace Goosedove.Host.Tests
             }, Counted(ExcelError.ExcelErrorNA, "SumArray", column));
         }
 
-        // Since #NN, reject-nul-input-text.md: a text holding NUL (U+0000) stops the scan as an
+        // Since #189, reject-nul-input-text.md: a text holding NUL (U+0000) stops the scan as an
         // Excel error does, where the pass reaches it. The cells up to it are visited and each text
         // reached is looked at once, the refused one included; nothing is built, allocated or
         // carried across, no trip is made, and the kept buffers serve the next call as before.

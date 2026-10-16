@@ -2,8 +2,8 @@
 
 [Pipeline ticket index](trade-valuation-pipeline/README.md) · [Separate numerical fix](trade-valuation-pipeline/reject-nonfinite-trade-arithmetic.md)
 
-**Status:** Built in #NN on `claude/reject-nul-input` from `main` at `4a8d873`, 16 October 2026; the
-[As built](#as-built-nn) section at the end says what was built and what was not.
+**Status:** Built in #189 on `claude/reject-nul-input` from `main` at `4a8d873`, 16 October 2026; the
+[As built](#as-built-189) section at the end says what was built and what was not.
 **Scope:** One focused fix PR from current main. No worksheet signature or transport
 format change. Suggested title: `fix(excel): reject NUL characters in input text`.
 Independent of the numerical and fee-applicability PRs; merge separately.
@@ -110,7 +110,7 @@ Run the full repository gate (`.\check.ps1`). Done means the shifting-fields exa
 cannot publish, scalar and range behavior agree, valid inputs retain their contents,
 and a failed call leaves subsequent calls and handle ownership correct.
 
-## As built (#NN)
+## As built (#189)
 
 Built on `claude/reject-nul-input` from `main`, one pull request, the number stamped after.
 
