@@ -278,7 +278,8 @@ def display_periods(prep: PreparedTrades) -> int:
 
 PREPARATION_NUMPY = {
     "generic.astype": 2,  # the valuation day to its month and its year, since #186
-    "ndarray.any": 6,  # the boundary slot; the lots, the lot delta and the three views finite
+    "ndarray.any": 9,  # the boundary slot; since #NN the set amounts by slot and by group and the
+    # sensitivity by contract finite; the lots, the lot delta and the three views finite
     "ndarray.argsort": 1,
     "ndarray.astype": 7,  # the slot rows, and since #186 the two display axes' keys, periods and
     # first days, three a bucket
@@ -292,12 +293,13 @@ PREPARATION_NUMPY = {
     "ndarray.setflags": 19,  # the eight, the two lot arrays since the lot delta, the three views,
     # and since #186 the two display axes' three arrays each
     "ndarray.sum": 4,
-    "numpy._make_extobj": 1,  # the error state set once, the overflow the fourth rule's to catch
+    "numpy._make_extobj": 4,  # the error state set for the set amounts, the sensitivity, the lots
+    # and the unsettled totals, since #NN, the overflow the fourth rule's to catch
     "numpy.arange": 2,  # the display periods, since #186
     "numpy.asanyarray": 5,
     "numpy.zeros": 1,
     "numpy.empty": 2,
-    "ufunc.reduce": 10,  # the six looks among them
+    "ufunc.reduce": 13,  # the nine looks among them
 }
 
 
@@ -319,10 +321,11 @@ def test_a_tick_runs_evaluation_alone_and_nothing_of_the_steps_before(
     # references asked for, with its reduction, the sum of the dated contributions, and the
     # contributions frozen.
     assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
-        "ndarray.any": 1,
+        "ndarray.any": 2,  # the market's coverage, and since #NN the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
-        "ufunc.reduce": 2,
+        "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
+        "ufunc.reduce": 3,
     }
 
 
@@ -401,6 +404,9 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -504,6 +510,9 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -548,6 +557,9 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -658,6 +670,9 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -720,6 +735,9 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -740,10 +758,11 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
         "WorkCounter.hit": 2,
     }
     assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
-        "ndarray.any": 1,
+        "ndarray.any": 2,  # the market's coverage, and since #NN the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
-        "ufunc.reduce": 2,
+        "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
+        "ufunc.reduce": 3,
     }
 
 
@@ -822,6 +841,9 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1010,6 +1032,9 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1141,6 +1166,9 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1245,9 +1273,9 @@ IFERC_ENCODING_LEDGER = {
 # the publication days instead of counted off the calendar's first day.
 IFERC_PREPARATION_NUMPY = {
     **PREPARATION_NUMPY,
-    "ndarray.any": 5,
+    "ndarray.any": 8,
     "ndarray.searchsorted": 4,
-    "ufunc.reduce": 9,
+    "ufunc.reduce": 12,
 }
 
 
@@ -1294,6 +1322,9 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
@@ -1313,10 +1344,11 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "WorkCounter.hit": 2,
     }
     assert numpy_calls(lambda: trade_results(prep, quoted, WorkCounter())) == {
-        "ndarray.any": 1,
+        "ndarray.any": 2,  # the market's coverage, and since #NN the live contributions finite
         "ndarray.setflags": 1,
         "ndarray.sum": 1,
-        "ufunc.reduce": 2,
+        "numpy._make_extobj": 1,  # the error state set for the live contributions and their sum
+        "ufunc.reduce": 3,
     }
 
 
@@ -1333,6 +1365,9 @@ def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -
     assert big_peak <= small_peak + 230 * 22 + SLACK
     quoted = iferc_market(history)
     big_prep = prepared_trades(big, history, WorkCounter())
-    assert least_peak(lambda: trade_results(big_prep, quoted, WorkCounter())) <= 24 * 24 + SLACK
+    # Since #NN the finite check keeps two boolean temporaries over the live slots for a moment.
+    assert (
+        least_peak(lambda: trade_results(big_prep, quoted, WorkCounter())) <= 24 * 24 + SLACK + 256
+    )
     small_prep = prepared_trades(small, history, WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK

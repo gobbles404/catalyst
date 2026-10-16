@@ -224,6 +224,9 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #NN the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 4,
@@ -312,13 +315,13 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     # rest; and the new arrays frozen, thirteen of them. The same with no slot live: the sums are
     # over every slot and never over none.
     assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
-        "ndarray.any": 11,
+        "ndarray.any": 12,  # since #NN the live contributions finite before the groups sum them
         "ndarray.astype": 1,
         "ndarray.nonzero": 4,  # the discounted lots and the DV01 before the start, since #186
         "ndarray.ravel": 4,
         "ndarray.setflags": 13,
-        "ndarray.sum": 4,
-        "numpy._make_extobj": 1,
+        "ndarray.sum": 3,  # the global live sum is the cleared route's alone since #NN
+        "numpy._make_extobj": 2,  # the contributions' flags and the discounting's, since #NN
         "numpy.asanyarray": 4,  # the four looks' views
         "numpy.empty": 1,
         "numpy.zeros": 2,

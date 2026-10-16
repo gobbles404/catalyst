@@ -2373,5 +2373,34 @@ namespace Goosedove.Host.Tests
             Assert.Equal(7.0, array[1, 0]);
             Assert.Equal(11.0, array[2, 0]);
         }
+
+        // Since #NN, reject-nonfinite-trade-arithmetic.md: a row of 1e308 lots of 10,000 MMBTU is a
+        // quote quantity past the largest number; the creator refuses it by the trade and the
+        // operation and publishes nothing, the store's live count standing, and a row of ten lots
+        // then creates through the ordinary path and releases.
+        [Fact]
+        public void a_batch_past_the_largest_number_publishes_nothing_and_a_corrected_one_creates()
+        {
+            var schedule = Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27"), Column(46323.0, 46351.0, 46385.0), ExcelMissing.Value);
+            var holidays = Seam.Call("_CreateHolidayCalendar", Column(46352.0, 46381.0));
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "NYMEX NG", 10000.0, "MMBTU", 0.0, 0.0 } });
+            var ng = (string)Seam.Call("_CreateIndex", "Henry Hub NYMEX", "Henry Hub NYMEX index", schedule, conventions, specifications, holidays, "NYMEX NG");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "cleared", "physical", "CME Clearing"));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
+            var publisher = Bridge.PreparePublisher("_CreateTrades");
+            var (live, _) = Bridge.LiveHandles();
+            var refused = Bridge.Publish(publisher, ng, headers, Row(1001.0, 46289.0, "Z26", 1e308, 3.1), template);
+            Assert.False(refused.Owned);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: trade 1001 at row 1 has inf of quote quantity, expected a finite number of MMBTU; its count times its specification's size in the quote unit outruns the largest number", refused.Value);
+            Assert.Equal(live, Bridge.LiveHandles().Live);
+            var made = Bridge.Publish(publisher, ng, headers, Row(1001.0, 46289.0, "Z26", 10.0, 3.1), template);
+            Assert.True(made.Owned);
+            Assert.StartsWith(Pid + ":trades:Henry Hub NYMEX:", (string)made.Value);
+            Assert.Equal(live + 1, Bridge.LiveHandles().Live);
+            Assert.Equal(Release.Released, Bridge.Release((string)made.Value));
+            Assert.Equal(live, Bridge.LiveHandles().Live);
+        }
     }
 }

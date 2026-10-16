@@ -8,6 +8,7 @@ refused, the daily toy's four states and the offsetting dates, and nothing redon
 
 import itertools
 import re
+import warnings
 from typing import Any, NamedTuple, cast
 
 import numpy as np
@@ -3943,9 +3944,10 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
 def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract() -> None:
     # The aggregate: two rows of Z26 paying on two days, so two slots, each 9e303 lots of 10,000
     # MMBTU, 9e307 MMBTU, finite as an exposure and as lots, 9e303 each, and their sum past the
-    # largest number as the contract's sensitivity and so as its lot delta; the sum is bincount's,
-    # which raises no flag, so the rule looks at the vector and refuses by the contract before
-    # anything is published. Paying on one day, the two rows would share a slot whose exposure
+    # largest number as the contract's sensitivity, where since #NN the rule refuses it by the
+    # contract before any lot is counted; the sum is bincount's, which raises no flag, so the rule
+    # looks at the vector before anything is published. Paying on one day, the two rows would
+    # share a slot whose exposure
     # is already infinite, and the slot rule would speak first. A price of zero keeps the offsets
     # finite; this is the arithmetic's edge, not a trade anyone books.
     terms = resolved_trades(
@@ -3960,8 +3962,8 @@ def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract(
     with pytest.raises(ValueError) as refused:
         prepared_trades(enc, history_on(NG, "2026-11-24", {}), WorkCounter())
     assert str(refused.value) == (
-        "Z26 has inf of lot delta, expected a finite number of lots of NYMEX NG (10000 MMBTU); "
-        "the exposure in lots outruns the largest number"
+        "Z26 has inf of price sensitivity, expected a finite amount of USD per USD/MMBTU; its live "
+        "exposures, each finite, sum past the largest number"
     )
 
 
@@ -3985,6 +3987,220 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
         "the batch has inf of lot delta in all, expected a finite number of lots of BTU (1 BTU); "
         "the contracts' deltas, each finite, sum past the largest number"
     )
+
+
+# --- nonfinite arithmetic, reject-nonfinite-trade-arithmetic.md -----------------------------------
+# Finite inputs can multiply or sum past the largest number. Since #NN each stage refuses the first
+# number it makes that is not finite, by its operation and its trade, slot, group, contract or the
+# batch, before any record is made; the arithmetic runs with numpy's flags down, and warnings are
+# errors here, so the refusal is the whole outcome. Quantities whole and finite as entered: the
+# arithmetic's edges, not trades anyone books.
+# ONE: a lot of one MMBTU, so the quote quantity is the count and the coefficient the count in
+# dollars; the toy's four contracts and calendars, G27 live whenever Z26 and F27 have fixed.
+ONE = an_index(
+    "one lot",
+    (("X26", "2026-10-28"), ("Z26", "2026-11-25"), ("F27", "2026-12-29"), ("G27", "2027-01-27")),
+    ("2026-11-26", "2026-12-25", "2027-01-01"),
+    lot=("ONE", 1.0, "MMBTU"),
+)
+TWO = an_index("two lot", lot=("TWO", 2.0, "MMBTU"))  # a lot of two: the count doubles
+BOTH = (1, 2)  # Z26 and F27
+MID_JANUARY = ("2027-01-15", "2027-01-15")  # a payment day after both have fixed
+
+
+def extreme_terms(
+    ix: Index,
+    quantities: tuple[float, ...],
+    prices: tuple[float, ...],
+    contracts: tuple[int, ...] | None = None,
+    pays: tuple[str, ...] | None = None,
+    method: ScheduleMethod = ScheduleMethod.LASTDAY,
+    settlement: Settlement = Settlement.FINANCIAL,
+) -> ResolvedTrades:
+    """One component per quantity on that index, Z26 unless a schedule row is given, paying on
+    30 November unless a day is given; cleared, and financial under lastday unless said
+    otherwise."""
+    n = len(quantities)
+    contract = rows(*(contracts or (1,) * n))
+    payment = (
+        None
+        if settlement is Settlement.PHYSICAL
+        else paying(dates(*(pays or ("2026-11-30",) * n)), n)
+    )
+    return resolved_trades(
+        FIXED_FLOAT, ix, spec(n), Route.CLEARED, settlement,
+        *picks(method, QuantityPer.MONTH, n), ids(*range(1, n + 1)), None, None,
+        dates(*["2026-09-24"] * n), np.arange(n, dtype=np.intp), contract,
+        numbers(*quantities), *bounds_of(ix, contract), numbers(*prices), payment,
+    )  # fmt: skip
+
+
+def encoding_refused(terms: ResolvedTrades) -> str:
+    """The encoding's refusal of those terms, no warning let through."""
+    with warnings.catch_warnings(), pytest.raises(ValueError) as refused:
+        warnings.simplefilter("error")
+        encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    return str(refused.value)
+
+
+def preparation_refused(terms: ResolvedTrades, history: MarketHistory) -> str:
+    """The preparation's refusal of those terms against that history, no warning let through."""
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    with warnings.catch_warnings(), pytest.raises(ValueError) as refused:
+        warnings.simplefilter("error")
+        prepared_trades(enc, history, WorkCounter())
+    return str(refused.value)
+
+
+def evaluation_refused(terms: ResolvedTrades, quotes: tuple[float, ...]) -> str:
+    """The tick's refusal of those terms prepared on 24 November, every contract live, at those
+    quotes of Z26, F27 and G27, no warning let through."""
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_on(terms.index, "2026-11-24", {})
+    prep = prepared_trades(enc, history, WorkCounter())
+    with warnings.catch_warnings(), pytest.raises(ValueError) as refused:
+        warnings.simplefilter("error")
+        trade_results(prep, quoted(history, *quotes), WorkCounter())
+    return str(refused.value)
+
+
+def test_creation_refuses_a_product_or_sum_past_the_largest_number_where_it_is_made() -> None:
+    # The ticket's first four cases in the order the encoding makes its numbers. 1e308 lots of
+    # two: the quote quantity, before any coefficient is made.
+    assert encoding_refused(extreme_terms(TWO, (1e308,), (0.0,))) == (
+        "trade 1 at row 1 has inf of quote quantity, expected a finite number of MMBTU; its count "
+        "times its specification's size in the quote unit outruns the largest number"
+    )
+    # 1e304 lots of 10,000 MMBTU settled in cents, a hundred a dollar: 1e308 MMBTU, finite, and a
+    # coefficient past it.
+    assert encoding_refused(extreme_terms(CENT_SETTLED, (1e304,), (0.0,))) == (
+        "trade 1 at row 1 has inf of coefficient, expected a finite amount of CENT per USD/MMBTU; "
+        "its quote quantity times the currency factor outruns the largest number"
+    )
+    # A coefficient of two at a fixed price of 1e308: the fixed leg, past it on the negative side.
+    assert encoding_refused(extreme_terms(ONE, (2.0,), (1e308,))) == (
+        "trade 1 at row 1 has -inf of fixed leg, expected a finite amount of USD; its coefficient "
+        "times its fixed price outruns the largest number"
+    )
+    # Two fixed legs of -1e308 in one payment group: the group, by its contract and its payment
+    # day, never one of its trades; a physical group by its contract alone.
+    assert encoding_refused(extreme_terms(ONE, (1.0, 1.0), (1e308, 1e308))) == (
+        "the fixed leg of Z26 paying on 2026-11-30 is -inf, expected a finite amount of USD; its "
+        "components' fixed legs, each finite, sum past the largest number"
+    )
+    assert encoding_refused(
+        extreme_terms(ONE, (1.0, 1.0), (1e308, 1e308), settlement=Settlement.PHYSICAL)
+    ) == (
+        "the fixed leg of Z26 is -inf, expected a finite amount of USD; its components' fixed "
+        "legs, each finite, sum past the largest number"
+    )
+    # Two coefficients of 1e308 observing one day coalesce into a slot past it: the slot, by its
+    # first trade, its day and the contract pricing it; and so with a third of -1e308 behind them,
+    # which would net the three to 1e308, since the sum made is the sum kept.
+    slot = (
+        "trade 1 at row 1 on 2026-11-25, a day Z26 prices, has inf of exposure, expected a finite "
+        "amount of USD per USD/MMBTU; its observations' coefficients times their weights sum past "
+        "the largest number"
+    )
+    assert encoding_refused(extreme_terms(ONE, (1e308, 1e308), (0.0, 0.0))) == slot
+    assert encoding_refused(extreme_terms(ONE, (1e308, 1e308, -1e308), (0.0, 0.0, 0.0))) == slot
+    # Large and finite stands: two halves make 1e308 exactly, and the record holds it.
+    terms = extreme_terms(ONE, (5e307, 5e307), (0.0, 0.0))
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_array_equal(enc.coefficient, [5e307, 5e307])
+    np.testing.assert_array_equal(enc.slot_exposure, [1e308])
+
+
+def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_number() -> None:
+    # An exposure of two fixed at 1e308: the slot, by its trade, its day, the contract pricing it
+    # and the settle.
+    assert preparation_refused(
+        extreme_terms(ONE, (2.0,), (0.0,)), history_on(ONE, "2026-11-27", {"Z26": 1e308})
+    ) == (
+        "trade 1 at row 1 on 2026-11-25, a day Z26 prices, fixed at 1e+308, has inf of set amount, "
+        "expected a finite amount of USD; its exposure times the settle outruns the largest number"
+    )
+    # 1e308 under last3day: three slots of a third each fixed at 3.00, 1e308 of set amount each,
+    # finite, and their sum past it: the group, by its contract and its payment day.
+    assert preparation_refused(
+        extreme_terms(ONE, (1e308,), (0.0,), method=ScheduleMethod.LAST3DAY),
+        history_on(ONE, "2026-11-27", {}),
+    ) == (
+        "the set amount of Z26 paying on 2026-11-30 is inf, expected a finite amount of USD; its "
+        "fixed slots' set amounts, each finite, sum past the largest number"
+    )
+    # Z26 and F27 fixed and unpaid on 30 December, 1e308 of each: set at 1.00, the unsettled set
+    # amounts in all; bought at 1.00 and set at 0.50, the unsettled fixed legs in all, negative.
+    assert preparation_refused(
+        extreme_terms(ONE, (1e308, 1e308), (0.0, 0.0), BOTH, MID_JANUARY),
+        history_on(ONE, "2026-12-30", {"Z26": 1.0, "F27": 1.0}),
+    ) == (
+        "the batch has inf of unsettled set amount in all, expected a finite amount of USD; the "
+        "unsettled groups' set amounts, each finite, sum past the largest number"
+    )
+    assert preparation_refused(
+        extreme_terms(ONE, (1e308, 1e308), (1.0, 1.0), BOTH, MID_JANUARY),
+        history_on(ONE, "2026-12-30", {"Z26": 0.5, "F27": 0.5}),
+    ) == (
+        "the batch has -inf of unsettled fixed leg in all, expected a finite amount of USD; the "
+        "unsettled groups' fixed legs, each finite, sum past the largest number"
+    )
+    # Large and finite stands: two halves set at 1.00 are 1e308 of unsettled set amount.
+    terms = extreme_terms(ONE, (5e307, 5e307), (0.0, 0.0), BOTH, MID_JANUARY)
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_on(ONE, "2026-12-30", {"Z26": 1.0, "F27": 1.0})
+    prep = prepared_trades(enc, history, WorkCounter())
+    assert prep.set_unsettled == 1e308 and prep.offset_unsettled == 0.0
+
+
+def test_the_tick_refuses_a_contribution_live_amount_or_mark_past_the_largest_number() -> None:
+    # An exposure of two quoted at 1e308: the live slot, by its trade, its day, the contract
+    # pricing it and the quote, before either route sums anything.
+    assert evaluation_refused(extreme_terms(ONE, (2.0,), (0.0,)), (1e308, 3.0, 3.0)) == (
+        "trade 1 at row 1 on 2026-11-25, a day Z26 prices, quoted at 1e+308, has inf of live "
+        "contribution, expected a finite amount of USD; its exposure times the quote outruns the "
+        "largest number"
+    )
+    # Z26 and F27, 5e307 of each quoted at 2.00: 1e308 of contribution each and 5e307 of lot delta
+    # each, finite, and the contributions' sum past it, the cleared live amount, the route's one
+    # reduction; and so with G27 at -5e307 behind them, which would net the three to 1e308, since
+    # the sum made is the sum kept.
+    live = (
+        "the batch has inf of live amount in all, expected a finite amount of USD; the live slots' "
+        "contributions, each finite, sum past the largest number"
+    )
+    december = ("2026-11-30", "2026-12-31")
+    assert (
+        evaluation_refused(
+            extreme_terms(ONE, (5e307, 5e307), (0.0, 0.0), BOTH, december), (2.0, 2.0, 2.0)
+        )
+        == live
+    )
+    assert (
+        evaluation_refused(
+            extreme_terms(
+                ONE, (5e307, 5e307, -5e307), (0.0, 0.0, 0.0), (1, 2, 3), (*december, "2027-01-29")
+            ),
+            (2.0, 2.0, 2.0),
+        )
+        == live
+    )
+    # The review's reproduced case: one MMBTU bought at -1e308 is a fixed leg of 1e308; quoted at
+    # 1e308 the live amount is another 1e308, each finite, and Python adds the two past the
+    # largest number without a word: the cleared mark, refused for the batch.
+    assert evaluation_refused(extreme_terms(ONE, (1.0,), (-1e308,)), (1e308, 3.0, 3.0)) == (
+        "the batch has inf of mark in all, expected a finite amount of USD; its unsettled fixed "
+        "legs, set amounts and live amount, each finite, sum past the largest number"
+    )
+    # Large and finite stands through every stage: 1e300 bought at 1e7 and quoted at 1.5e7 is a
+    # live amount of 1.5e307 and a mark of 5e306.
+    terms = extreme_terms(ONE, (1e300,), (1e7,))
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    history = history_on(ONE, "2026-11-24", {})
+    prep = prepared_trades(enc, history, WorkCounter())
+    result = trade_results(prep, quoted(history, 1.5e7, 3.0, 3.0), WorkCounter())
+    assert result.dated_live_contribution[0] == pytest.approx(1.5e307)
+    assert result.mark == pytest.approx(5e306)
 
 
 # --- calendar-driven asian references ----------------------------------------------------------

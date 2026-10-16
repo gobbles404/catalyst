@@ -199,6 +199,17 @@ def encoded(
     added twice, and two paying on different days are two groups, each to move from mark to cash
     on its own day; the grouping is by the day itself, whatever lag and calendar made it.
 
+    Since #NN, reject-nonfinite-trade-arithmetic.md, each of these numbers is finite before it
+    enters the record or feeds the next stage, the arithmetic running with numpy's flags down
+    and the rules judging in this order: a specification's lot size times its factor to the
+    quote unit, then each component's quote quantity, its coefficient and its fixed leg, named
+    by the trade and the operation, then each group's fixed leg, a sum blamed on the group by
+    its contract and payment day and never on one of its trades, and then each slot's exposure,
+    named by its first trade, its day and the contract pricing it; a weight is at most one, so a
+    finite coefficient's weighted exposure is finite and only the slot's sum can outrun. The
+    first that is not finite is refused, whatever a later netting might have made of it, since
+    the record would hold what cannot be represented.
+
     The slots: each observation's day is one the index's market is open on, Monday to Friday
     less the index's holidays, by the calendar's own rule, else refused, since no settle exists
     for a closed day or ever will, and a live observation on one would take a quote now and fail
@@ -249,29 +260,99 @@ def encoded(
     conventions = index.conventions
     specifications = index.specifications
     selection = terms.specification[terms.occurrence]  # each component's specification row
+    currency = conventions.currency_unit
+    quote_unit = conventions.quote_quantity_unit
+    per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
     to_quote_unit = np.zeros(len(specifications.names))
-    for row in np.unique(selection):  # the distinct selections of the batch, converted once each
-        chosen = int(row)
-        to_quote_unit[chosen] = float(specifications.lot_sizes[chosen]) * units.factor(
-            conventions.quantity_type,
-            specifications.lot_units[chosen],
-            conventions.quote_quantity_unit,
+    # The arithmetic runs with numpy's flags down and the rules judge, since #NN: each number
+    # made here is finite before it enters the record or feeds the next stage, else the first
+    # that is not is refused by its operation and its trade, group or slot.
+    with np.errstate(over="ignore", invalid="ignore"):
+        for row in np.unique(
+            selection
+        ):  # the distinct selections of the batch, converted once each
+            chosen = int(row)
+            to_quote_unit[chosen] = float(specifications.lot_sizes[chosen]) * units.factor(
+                conventions.quantity_type,
+                specifications.lot_units[chosen],
+                conventions.quote_quantity_unit,
+            )
+            if not np.isfinite(to_quote_unit[chosen]):
+                raise ValueError(
+                    f"specification {specifications.names[chosen]!r} is {to_quote_unit[chosen]!r} "
+                    f"{quote_unit} a lot, expected a finite number; its lot size times the factor "
+                    f"from {specifications.lot_units[chosen]} to {quote_unit} outruns the largest "
+                    "number"
+                )
+        to_currency = units.factor(
+            CURRENCY, conventions.quote_currency_unit, conventions.currency_unit
         )
-    to_currency = units.factor(CURRENCY, conventions.quote_currency_unit, conventions.currency_unit)
-    quote_quantity = terms.component_quantity * to_quote_unit[selection]
-    coefficient = quote_quantity * to_currency
-    offset = -coefficient * terms.fixed_price
+        quote_quantity = terms.component_quantity * to_quote_unit[selection]
+        coefficient = quote_quantity * to_currency
+        offset = -coefficient * terms.fixed_price
+    for values, what, unit, why in (
+        (
+            quote_quantity,
+            "quote quantity",
+            f"number of {quote_unit}",
+            "its count times its specification's size in the quote unit outruns the largest number",
+        ),
+        (
+            coefficient,
+            "coefficient",
+            f"amount of {per_price}",
+            "its quote quantity times the currency factor outruns the largest number",
+        ),
+        (
+            offset,
+            "fixed leg",
+            f"amount of {currency}",
+            "its coefficient times its fixed price outruns the largest number",
+        ),
+    ):  # the three products, each checked where it is made and named by its operation
+        outrun = ~np.isfinite(values)
+        if outrun.any():
+            k = int(outrun.argmax())
+            raise ValueError(
+                f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
+                f"{why}"
+            )
     group_contract, payment_date, group_of_component = _the_groups(terms)
-    offset_of_group = np.bincount(group_of_component, weights=offset, minlength=group_contract.size)
+    with np.errstate(over="ignore", invalid="ignore"):
+        offset_of_group = np.bincount(
+            group_of_component, weights=offset, minlength=group_contract.size
+        )
+    outrun = ~np.isfinite(offset_of_group)
+    if outrun.any():
+        g = int(outrun.argmax())
+        group = group_words(terms.schedule.codes, group_contract, payment_date, g)
+        raise ValueError(
+            f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
+            f"of {currency}; its components' fixed legs, each finite, sum past the largest number"
+        )
     reference = _the_references(terms, observations)
     slot_of_observation, slot_group, slot_date, slot_reference = _the_slots(
         group_of_component[observations.component], observations.date, reference
     )
-    slot_exposure = np.bincount(
-        slot_of_observation,
-        weights=coefficient[observations.component] * observations.weight,
-        minlength=slot_group.size,
-    )
+    with np.errstate(over="ignore", invalid="ignore"):
+        # A weight is at most one, so a finite coefficient's weighted exposure is finite; the
+        # slot's sum of them is what can outrun, and is what the record keeps.
+        slot_exposure = np.bincount(
+            slot_of_observation,
+            weights=coefficient[observations.component] * observations.weight,
+            minlength=slot_group.size,
+        )
+    outrun = ~np.isfinite(slot_exposure)
+    if outrun.any():
+        s = int(outrun.argmax())
+        j = int((slot_of_observation == s).argmax())  # its first observation
+        code = terms.schedule.codes[int(slot_reference[s])]
+        raise ValueError(
+            f"{terms.named(int(observations.component[j]))} on {slot_date[s]}, a day {code} "
+            f"prices, has {float(slot_exposure[s])!r} of exposure, expected a finite amount of "
+            f"{per_price}; its observations' coefficients times their weights sum past the "
+            "largest number"
+        )
     references, reference_of_slot = np.unique(slot_reference, return_inverse=True)
     days = _the_day_axis(slot_date, slot_reference)
     periods = _the_contract_periods(terms.schedule_month[references])
@@ -311,6 +392,20 @@ def encoded(
     return Encoded(
         terms, observations, *arrays[:6], payment_date, *arrays[6:], reserved, payment_axes
     )
+
+
+def group_words(
+    codes: tuple[str, ...],
+    group_contract: NDArray[np.intp],
+    payment_date: NDArray[np.datetime64] | None,
+    g: int,
+) -> str:
+    """A payment group named in a message, since #NN: its contract and, under a financial
+    settlement, the day it pays, `F27 paying on 2027-01-04`; a physical group its contract alone,
+    since it pays on no day. A sum over a group is blamed on the group, never on one of its
+    trades."""
+    code = codes[int(group_contract[g])]
+    return code if payment_date is None else f"{code} paying on {payment_date[g]}"
 
 
 def _the_groups(

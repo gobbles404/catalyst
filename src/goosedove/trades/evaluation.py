@@ -202,9 +202,13 @@ def trade_results(
 
     The market answers the quotes of the live references in the batch's order, one per distinct
     contract, and refuses a contract past its coverage by name, as it does for every reader; the
-    quotes are gathered onto the live slots, each slot's exposure times its reference's quote is
-    its contribution, and the live amount is their sum. For a cleared batch the mark is the
-    unsettled offsets and set amounts plus the live amount, the cash the preparation's, the
+    quotes are gathered onto the live slots, and each slot's exposure times its reference's quote
+    is its contribution, finite or refused by its slot and its quote since #NN,
+    reject-nonfinite-trade-arithmetic.md, before either route sums it. For a cleared batch the
+    live amount is the contributions' sum, the one reduction this route makes, and the mark is
+    the unsettled offsets and set amounts plus the live amount, each finite or refused for the
+    batch, since two finite floats add past the largest number without a word; the cash is the
+    preparation's, the
     sensitivity, the lot delta and its total the preparation's, shared, the discounted vectors
     those same arrays, since nothing discounts, DV01 zero and no group vector kept. A bilateral
     batch is _discounted's. The reserves are the encoding's, by reference, summed when the batch
@@ -233,23 +237,56 @@ def trade_results(
         case _:
             assert_never(terms.route)
     quotes = market.live_prices(prepared.live_references)
-    dated_live_contribution = (
-        prepared.dated_live_exposure[prepared.live_slot] * quotes[prepared.reference_of_live_slot]
-    )
-    live = float(dated_live_contribution.sum())
+    conventions = terms.index.conventions
+    currency = conventions.currency_unit
+    # The arithmetic runs with numpy's flags down and the rules judge, since #NN: each live
+    # slot's contribution is finite before either route sums it, else the first that is not is
+    # refused by its slot and its quote.
+    with np.errstate(over="ignore", invalid="ignore"):
+        dated_live_contribution = (
+            prepared.dated_live_exposure[prepared.live_slot]
+            * quotes[prepared.reference_of_live_slot]
+        )
+        outrun = ~np.isfinite(dated_live_contribution)
+        if outrun.any():
+            i = int(outrun.argmax())
+            quote = float(quotes[int(prepared.reference_of_live_slot[i])])
+            raise ValueError(
+                f"{prepared.encoded.named_slot(int(prepared.live_slot[i]))}, quoted at {quote!r}, "
+                f"has {float(dated_live_contribution[i])!r} of live contribution, expected a "
+                f"finite amount of {currency}; its exposure times the quote outruns the largest "
+                "number"
+            )
+        # The cleared route's one reduction, the live contributions summed, under the same
+        # flags; the bilateral route sums them by payment group in _discounted instead.
+        live = float(dated_live_contribution.sum()) if curve is None else 0.0
     counter.hit(KERNEL)
     counter.hit(LIVE_PRICES_READ, int(prepared.live_references.size))
     dated_live_contribution.setflags(write=False)
     if curve is not None:
         return _discounted(prepared, market, curve, dated_live_contribution, counter)
-    conventions = terms.index.conventions
+    # The cleared mark: the live amount, then the unsettled fixed legs and set amounts added,
+    # each finite or refused for the batch; Python adds two finite floats past the largest
+    # number without a word, so the rule looks.
+    if not np.isfinite(live):
+        raise ValueError(
+            f"the batch has {live!r} of live amount in all, expected a finite amount of "
+            f"{currency}; the live slots' contributions, each finite, sum past the largest number"
+        )
+    mark = prepared.offset_unsettled + prepared.set_unsettled + live
+    if not np.isfinite(mark):
+        raise ValueError(
+            f"the batch has {mark!r} of mark in all, expected a finite amount of {currency}; its "
+            "unsettled fixed legs, set amounts and live amount, each finite, sum past the largest "
+            "number"
+        )
     return TradeResults(
         prepared,
         market,
         terms.route,
-        conventions.currency_unit,
+        currency,
         prepared.history.calendar.valuation_date.as_of,
-        prepared.offset_unsettled + prepared.set_unsettled + live,
+        mark,
         prepared.cash,
         dated_live_contribution,
         prepared.encoded.references,
