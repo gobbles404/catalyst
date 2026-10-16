@@ -160,7 +160,7 @@ namespace Goosedove.Host
                         for (var i = 0; i < args.Length; i++)
                         {
                             object inputError;
-                            pyArgs[i] = Marshal.ToPython(args[i], out inputError);
+                            pyArgs[i] = Marshal.ToPython(args[i], prepared.Name, i + 1, out inputError);
                             if (inputError != null)
                             {
                                 return new Outcome(inputError, false);
@@ -241,8 +241,10 @@ namespace Goosedove.Host
                         {
                             // An Excel error in any argument is the result, unchanged. Excel's own
                             // functions do the same, and it keeps an error from pricing as a blank.
+                            // Since #189 a text holding NUL is the result too, the host's own refusal,
+                            // found in the same left-to-right pass and never sent across.
                             object inputError;
-                            pyArgs[i] = Marshal.ToPython(args[i], out inputError, work);
+                            pyArgs[i] = Marshal.ToPython(args[i], prepared.Name, i + 1, out inputError, work);
                             if (inputError != null)
                             {
                                 return inputError;
@@ -286,8 +288,13 @@ namespace Goosedove.Host
     /// <summary>Excel-DNA values to Python and back: blanks to None, omitted arguments to MISSING, every range to one table of cells; a result read by its type, never asked about.</summary>
     internal static class Marshal
     {
-        /// <summary>One argument as Python sees it, or null with the Excel error it holds. Release it with Release.</summary>
-        public static PyObject ToPython(object value, out object error, WorkCounter work = null)
+        /// <summary>
+        /// One argument as Python sees it, or null with what refuses it: the Excel error it holds,
+        /// unchanged, or since #189 the host's own text for a text holding NUL (U+0000), the
+        /// character that separates a range's texts on their way across, named by the function
+        /// and the argument's one-based position. Release it with Release.
+        /// </summary>
+        public static PyObject ToPython(object value, string function, int position, out object error, WorkCounter work = null)
         {
             error = null;
             if (value is ExcelError)
@@ -297,14 +304,34 @@ namespace Goosedove.Host
             }
             if (value is object[,] rect)
             {
-                return Range(rect, out error, work);
+                return Range(rect, function, position, out error, work);
             }
             if (value is ExcelMissing)
             {
                 return Bridge.Missing;  // held since start: never built, never released
             }
+            if (value is string text)
+            {
+                // A scalar text is checked at the same boundary as a range's cells, so the rule
+                // does not depend on the shape the text arrives in.
+                work?.Hit("texts_checked");
+                if (text.IndexOf('\0') >= 0)
+                {
+                    error = NulRefusal(function, position, 0, 0);
+                    return null;
+                }
+            }
             work?.Hit("objects_built");
             return value == null || value is ExcelEmpty ? PyObject.None : value.ToPython();
+        }
+
+        // The host's refusal of a text holding NUL (U+0000), since #189: the function, the argument's
+        // one-based position and, inside a range, the cell's one-based row and column within the
+        // range supplied; never the text itself, which would put the character in the message.
+        internal static string NulRefusal(string function, int position, int row, int column)
+        {
+            var where = row == 0 ? "" : " cell (" + row + ", " + column + ")";
+            return "#ERROR host: " + function + " argument " + position + where + " is text holding NUL (U+0000), expected text without it";
         }
 
         /// <summary>Lets go of whatever ToPython returned: a built value is disposed, the shared MISSING and a null stay.</summary>
@@ -377,12 +404,13 @@ namespace Goosedove.Host
         }
 
         // One pass over the cells, in sheet order, into the kept buffers. An Excel error
-        // anywhere is returned and nothing is built. Every other range ships the same way: one
+        // anywhere is returned and nothing is built, and since #189 so is a text holding NUL, the
+        // separator of the texts below, refused where the pass reaches it. Every other range ships the same way: one
         // kind code per cell, one number per cell (NaN where there is none), the text cells
         // joined with NUL, and one bit per kind that occurred, so the seam learns "all numbers"
         // from this pass and takes no look of its own. Python copies the buffers before it
         // returns, so the next range may overwrite them.
-        private static PyObject Range(object[,] rect, out object error, WorkCounter work)
+        private static PyObject Range(object[,] rect, string function, int position, out object error, WorkCounter work)
         {
             error = null;
             int rows = rect.GetLength(0), cols = rect.GetLength(1);
@@ -413,6 +441,17 @@ namespace Goosedove.Host
                     }
                     else if (cell is string s)
                     {
+                        // Each text reached is looked at once, the refused one included: joined,
+                        // a text holding NUL would split into two cells on the other side and
+                        // move text into another field, so it stops the scan as an error does.
+                        work?.Hit("texts_checked");
+                        if (s.IndexOf('\0') >= 0)
+                        {
+                            work?.Hit("cells_scanned", i + 1);
+                            work?.Hit("text_cells", texts.Count);
+                            error = NulRefusal(function, position, r + 1, c + 1);
+                            return null;
+                        }
                         kinds[i] = Text;
                         numbers[i] = double.NaN;
                         texts.Add(s);

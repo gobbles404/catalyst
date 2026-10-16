@@ -69,9 +69,9 @@ namespace Goosedove.Host.Measure
                 using (Py.GIL())
                 {
                     measurements.Run("way in", "alone", n, 0,
-                        () => { object error; Marshal.Release(Marshal.ToPython(column, out error)); return error; },
+                        () => { object error; Marshal.Release(Marshal.ToPython(column, "SumArray", 1, out error)); return error; },
                         Equal(null),
-                        () => { var work = new WorkCounter(); object error; Marshal.Release(Marshal.ToPython(column, out error, work)); return work.Freeze(); });
+                        () => { var work = new WorkCounter(); object error; Marshal.Release(Marshal.ToPython(column, "SumArray", 1, out error, work)); return work.Freeze(); });
 
                     // The way out alone: an array Python already holds, read into double[,].
                     using (var pyRows = new PyInt(n))
@@ -89,7 +89,7 @@ namespace Goosedove.Host.Measure
                     // The way out alone on the mixed road: the tuple Python already holds for the mixed
                     // column, laid out cell by cell into the array Excel receives.
                     object mixedError;
-                    var pyMixed = Marshal.ToPython(mixed, out mixedError);
+                    var pyMixed = Marshal.ToPython(mixed, "EchoMixed", 1, out mixedError);
                     try
                     {
                         using (var record = echoMixedPath.Entry.Invoke(pyMixed))
