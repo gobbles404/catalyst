@@ -321,7 +321,7 @@ def test_a_templates_field_applies_to_every_row_and_a_tickets_varies() -> None:
 
 
 def test_a_broker_of_none_in_any_case_is_a_screen_trade_and_the_text_stands() -> None:
-    # Since #NN, reserve-fee-applicability.md: the terms say which rows name a broker, the text
+    # Since #188, reserve-fee-applicability.md: the terms say which rows name a broker, the text
     # none in any case naming none, and keep every text as typed for the readback; a batch without
     # the field names none.
     template = {

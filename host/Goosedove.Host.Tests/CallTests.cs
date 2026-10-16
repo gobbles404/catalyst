@@ -2100,7 +2100,7 @@ namespace Goosedove.Host.Tests
         // and G27 expiring 46356, 46387, 46416 and 46444, closed 46381 and 46388, dollars a gallon,
         // LOT a thousand barrels at 10 and 4 a lot, BBL a barrel at 0.01 and 0.004, GAL free; 101 to
         // 104 booked 46346, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT of Z26 at 0.25, financial at +2bd on a
-        // calendar closed 46388, brokered by ION since #NN. On 46358 at 0.28: 1,260 of mark, a lot, and 50 of brokerage, 20 of
+        // calendar closed 46388, brokered by ION since #188. On 46358 at 0.28: 1,260 of mark, a lot, and 50 of brokerage, 20 of
         // clearing and none of marketing in USD, the report's one row and the results readback's
         // first, the batch's readback without a reserve column; a tick to 0.31 marks 2,520 and
         // reserves the same. A rate of 1e308 a lot: two lots refused by row, one lot each of two rows
@@ -2115,7 +2115,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 10.0, 4.0 }, { "BBL", 1.0, "BBL", 0.01, 0.004 }, { "GAL", 1.0, "GAL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, holidays, "LOT");
             var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
-            // Since #NN, reserve-fee-applicability.md, the template names ION as broker: brokerage charges the rows
+            // Since #188, reserve-fee-applicability.md, the template names ION as broker: brokerage charges the rows
             // naming a broker and clearing the cleared route, so the 50 below stands and the readback gains a column.
             var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_time_lag", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays));
@@ -2206,7 +2206,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(28.0, (double)templatedReserves[2, 2], 9);
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", templated))[2, 0], 6);
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", templated, "nominal_delta", "year"))[3, 1], 6);
-            // Since #NN, reserve-fee-applicability.md: the same rows under a cleared template naming no broker book no
+            // Since #188, reserve-fee-applicability.md: the same rows under a cleared template naming no broker book no
             // brokerage and the same 20 of clearing; a broker column mixing ION and None, none and NONE charges the
             // ION row alone, 20, every text read back as typed; a broker from both the template and the ticket is refused.
             var direct = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));

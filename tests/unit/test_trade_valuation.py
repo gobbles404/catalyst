@@ -2602,7 +2602,7 @@ def ete_index(
 
 def ete_template(basis: str | None = "month", broker: str | None = None) -> str:
     """A financial template paying one business day after the last observation on a calendar
-    closed on New Year's Day, the basis in it unless None leaves it to the ticket, and since #NN
+    closed on New Year's Day, the basis in it unless None leaves it to the ticket, and since #188
     naming the broker given, the fee examples' ION, so that they still charge brokerage."""
     payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])))
     fields = ["quantity_per", *ETE_FIELDS, "payment_holiday_calendar"]
@@ -4844,7 +4844,7 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
 
 
 # --- fee applicability, reserve-fee-applicability.md ---------------------------------------------
-# Since #NN brokerage charges the trades naming a broker and clearing the cleared route, the rates
+# Since #188 brokerage charges the trades naming a broker and clearing the cleared route, the rates
 # the selected specification's: the ticket's four batches, one +10 LOT trade each on the RESERVES
 # index, LOT at 10 and 4 a lot, valued on 2 December 2026, the bilateral ones on a curve of ones.
 

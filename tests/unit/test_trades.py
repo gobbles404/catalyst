@@ -5187,7 +5187,7 @@ def fee_terms(
     brokers: tuple[str, ...] | None = None,
     clearing_house: tuple[str, ...] | None = None,
 ) -> ResolvedTrades:
-    """The example's rows, or others shaped like them, each one Z26 month at 70; since #NN cleared
+    """The example's rows, or others shaped like them, each one Z26 month at 70; since #188 cleared
     and brokered by ION throughout unless the route, one broker text for every row, a tuple per
     row or None says otherwise."""
     n = len(quantities)
@@ -5314,7 +5314,7 @@ def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -
 
 
 # --- fee applicability, reserve-fee-applicability.md ---------------------------------------------
-# Since #NN brokerage charges the rows naming a broker and clearing the cleared route; the rates
+# Since #188 brokerage charges the rows naming a broker and clearing the cleared route; the rates
 # are the selected specification's, and no label's spelling selects anything.
 
 

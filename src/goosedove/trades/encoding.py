@@ -11,7 +11,7 @@ expiry-based methods and whichever the calendar gives under asian, and the summe
 every settle or quote of that date multiplies. Per pricing reference, since #186, the contract's
 calendar month and year, the axes a delta report by month or by year sums onto. And the
 reserves, since #170, the brokerage the brokered rows' components incur and the clearing every
-component incurs on a cleared route, charged where the booking says so since #NN, summed for the
+component incurs on a cleared route, charged where the booking says so since #188, summed for the
 batch.
 Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
@@ -117,7 +117,7 @@ class Encoded:
     moves nothing.
 
     Then reserves, since #170, the batch's booked brokerage and clearing, each charged component's
-    count of its specification times the specification's rate per lot, summed, since #NN the
+    count of its specification times the specification's rate per lot, summed, since #188 the
     brokered rows' components charged brokerage and every component clearing on a cleared route
     and none on a bilateral one, since #175 the
     marketing reserve the rows booked, summed once per row, and their currency, the Reserves
@@ -235,7 +235,7 @@ def encoded(
     pay. The fees of the specification are read once, since #170, for the reserves, each
     charged component's count times its specification's rate per lot and the batch's two sums,
     brokerage over the brokered rows' components and clearing over every component of a cleared
-    batch since #NN,
+    batch since #188,
     and since #175 the rows' marketing reserves summed once each, kept beside the encoding and
     never a contribution to value,
     docs/library/trades/report-reserves.md.

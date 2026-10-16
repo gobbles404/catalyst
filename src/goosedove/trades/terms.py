@@ -118,7 +118,7 @@ class ResolvedTrades:
     whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
     organization, counterparty[i] since #175 the counterparty it faces and broker[i] its broker,
     the IDs an array and the three labels tuples, each None as a whole when the field was not
-    given, each kept as given and read for nothing but a message's words and, since #NN, the
+    given, each kept as given and read for nothing but a message's words and, since #188, the
     broker's text for brokered[i], whether the row names a broker and so charges brokerage:
     False for every row when the field was not given and where the row's text is none in any
     case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
@@ -281,7 +281,7 @@ def resolved_trades(
     is kept as the definition the terms stand under, and read for nothing here. The schedule's
     months, since #186, are the resolution's reading of every row's code handed over, or read here
     once by schedule_months when a Python caller gives none; kept frozen for the encoding's
-    contract-month axes and read for nothing here. The brokered rows, since #NN, are read here
+    contract-month axes and read for nothing here. The brokered rows, since #188, are read here
     once from the broker texts, none in any case meaning a screen trade, and kept frozen for the
     reserves, which charge brokerage on their components alone.
     """
@@ -480,11 +480,11 @@ def _the_method(
             assert_never(settlement)
 
 
-UNBROKERED = "none"  # a broker text, in any case, naming no broker: a screen trade, since #NN
+UNBROKERED = "none"  # a broker text, in any case, naming no broker: a screen trade, since #188
 
 
 def _the_brokered(broker: tuple[str, ...] | None, occurrences: int) -> NDArray[np.bool_]:
-    """Which occurrences name a broker, since #NN: none of them when the field was not given, and
+    """Which occurrences name a broker, since #188: none of them when the field was not given, and
     each whose text is other than none, in any case, when it was; the texts themselves stand as
     given. Frozen."""
     if broker is None:

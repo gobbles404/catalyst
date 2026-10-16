@@ -84,7 +84,7 @@ built on a futures index, any other word refused by name, and on an IFERC index 
 `lastday` alone, the month's index on its publication day,
 [iferc-basis-futures.md](../../engineering-tickets/trade-valuation-pipeline/iferc-basis-futures.md). `route` is `cleared` or `bilateral`: a cleared batch values undiscounted, takes no curve and
 incurs the clearing reserve, a bilateral one is valued on the discount curve `_EvaluateTrades`
-requires since #177 and incurs none, since #NN,
+requires since #177 and incurs none, since #188,
 [reserve-fee-applicability.md](../../engineering-tickets/trade-valuation-pipeline/reserve-fee-applicability.md). `settlement_method` is
 `physical`, which pays on no day and supplies no payment field, or `financial`, which requires
 `payment_time_lag` and `payment_holiday_calendar`, the lag counted strictly after each
@@ -93,8 +93,8 @@ IFERC index since #167 the month's last trading date, the index printing later. 
 and refused with a bilateral one, the organization's name kept as typed, selecting no rate and
 exempting no fee; `counterparty` since #175 the reverse, required with a bilateral
 route and refused with a cleared one, a label kept per row; and `broker` names the broker whose
-presence charges the brokerage reserve since #NN, `none` in any case naming none for a screen
-trade. The labels are read for nothing else but the readback. Since #NN the descriptions of these
+presence charges the brokerage reserve since #188, `none` in any case naming none for a screen
+trade. The labels are read for nothing else but the readback. Since #188 the descriptions of these
 four fields say what each controls, which the sheet reads in the grid above. `fixed_price` is the agreed price in the
 index's quote units, `trade_id` the source system's deal number since #168, a whole number of at
 most 15 digits read back as a number, duplicates kept as separate trades,

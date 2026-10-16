@@ -208,7 +208,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
         "encoded_groups": contracts,  # one payment day per contract: one group each
         "encoded_observations": components,  # lastday: one per component
         "encoded_slots": contracts,  # one per contract, on its expiry day
-        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #NN
+        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
     }
 
 
@@ -216,7 +216,7 @@ def test_the_encoding_reports_its_components_its_observations_and_its_slots(
 def test_each_fee_charged_is_one_pass_over_its_components_and_an_uncharged_one_is_nothing(
     call_profile: CallProfile, components: int, contracts: int
 ) -> None:
-    # Since #NN, reserve-fee-applicability.md: the cleared, unbrokered batch charges clearing
+    # Since #188, reserve-fee-applicability.md: the cleared, unbrokered batch charges clearing
     # alone, one pass and one count per component; brokered throughout it charges both fees, two
     # passes and two counts; bilateral without a broker it charges nothing, no pass and a count of
     # zero. The same functions at five components and at two thousand.
@@ -384,7 +384,7 @@ ENCODING_LEDGER = {
     "_the_contract_periods": 1,  # the contract month and year axes, since #186
     "_payments_after_observations": 1,
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
-    "_charged": 1,  # clearing, the one fee a cleared, unbrokered batch charges, since #NN
+    "_charged": 1,  # clearing, the one fee a cleared, unbrokered batch charges, since #188
     "UnitConversions.factor": 2,
     "UnitConversions.category": 2,
     "WorkCounter.__init__": 1,
@@ -593,7 +593,7 @@ def test_a_daily_batch_is_summed_into_one_slot_per_contract_and_day(
         "encoded_groups": contracts,
         "encoded_observations": components * days,
         "encoded_slots": slots,
-        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #NN
+        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
     }
     assert enc.slot_group.size == slots and enc.references.size == contracts
     np.testing.assert_array_equal(enc.slot_reference, enc.group_contract[enc.slot_group])
@@ -810,7 +810,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
         "encoded_groups": 2 * contracts,
         "encoded_observations": components,
         "encoded_slots": 2 * contracts,  # each contract's expiry day once per group
-        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #NN
+        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
         "prepared_slots": 2 * contracts,
         "fixings_read": 2 * fixed,  # one settle read per fixed slot, two slots a fixed day
         "kernel": 1,
@@ -1000,7 +1000,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "encoded_groups": 2 * contracts,
         "encoded_observations": int(observations_by_method.sum()),
         "encoded_slots": mixed_slots(contracts),
-        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #NN
+        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
         "prepared_slots": mixed_slots(contracts),
         "fixings_read": fixings,
         "kernel": 1,
@@ -1281,7 +1281,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
         "encoded_groups": contracts,
         "encoded_observations": components,
         "encoded_slots": contracts,
-        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #NN
+        "reserved_fee_components": components,  # clearing alone: cleared, no broker, since #188
         "prepared_slots": contracts,
         "fixings_read": fixed,
         "kernel": 1,

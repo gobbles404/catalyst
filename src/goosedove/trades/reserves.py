@@ -1,6 +1,6 @@
 """The batch's booked reserves: the brokerage the brokered rows' components incur and, on a cleared
 route, the clearing every component incurs, each a component's count of its specification times
-that specification's rate per lot, summed for the batch once, when the batch is made, since #NN
+that specification's rate per lot, summed for the batch once, when the batch is made, since #188
 charged only where the booking says so, reserve-fee-applicability.md; since #175 the marketing
 reserve each row booked, summed once per row, zero when no row booked one; and the currency they
 are in. Static booked amounts in the settlement currency: a fixing, a payment, a tick or a roll of
@@ -16,7 +16,7 @@ from numpy.typing import NDArray
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.terms import ResolvedTrades, Route
 
-# Components charged a fee, once per fee they incur, since #NN: the brokered rows' components for
+# Components charged a fee, once per fee they incur, since #188: the brokered rows' components for
 # brokerage and every component for clearing on a cleared route, so nothing for a bilateral batch
 # without a broker, one per component with one fee and two with both.
 RESERVED_FEE_COMPONENTS = "reserved_fee_components"
@@ -26,7 +26,7 @@ RESERVED_OCCURRENCES = "reserved_occurrences"  # rows whose marketing reserve wa
 @dataclass(frozen=True, slots=True)
 class Reserves:
     """The batch's three totals and their currency. brokerage is the sum over the components of the
-    rows naming a broker, since #NN, of each component's count of its specification, the quantity
+    rows naming a broker, since #188, of each component's count of its specification, the quantity
     its basis gave it taken without its sign, times the specification's brokerage rate per lot; a
     row whose broker field was not given, or whose text is none in any case, a screen trade,
     charges nothing. clearing is the same sum over every component with the specification's
@@ -48,7 +48,7 @@ class Reserves:
 
 
 def reserves(terms: ResolvedTrades, counter: WorkCounter) -> Reserves:
-    """The one way to make Reserves: each fee charged where the booking says so, since #NN, the
+    """The one way to make Reserves: each fee charged where the booking says so, since #188, the
     amounts of each in one pass over the components it charges, then two rules per fee charged,
     brokerage before clearing, checked once, the first failure being the message.
 

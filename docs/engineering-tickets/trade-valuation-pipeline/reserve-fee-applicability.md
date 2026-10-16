@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [UAT item 18](surface-uat-notes.md#18-brokerage-and-clearing-applicability) · [Original reserve totals](reserve-totals.md)
 
-**Status:** Built in #NN on `claude/reserve-fee-applicability` from `main` at `738b862`, 16 October
-2026, two commits as asked; the [As built](#as-built-nn) section at the end says what was built
+**Status:** Built in #188 on `claude/reserve-fee-applicability` from `main` at `738b862`, 16 October
+2026, two commits as asked; the [As built](#as-built-188) section at the end says what was built
 and what was not.
 **Scope:** One focused PR from current main, with two ordered commits: fee applicability,
 then the related instrument-description cleanup. No new fields, signatures or readers.
@@ -165,7 +165,7 @@ layout or numerical behavior. It is not a wider documentation reorganization.
 No new fee-switch fields, broker-specific rates, clearing-fee exemptions, reserve
 discounting, fee payment lifecycle or changes to route validation are included.
 
-## As built (#NN)
+## As built (#188)
 
 Built on `claude/reserve-fee-applicability` from `main`, one pull request of two commits and the
 number stamped after.

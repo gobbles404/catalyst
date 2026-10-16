@@ -1084,7 +1084,7 @@ $formulas = [ordered]@{
     '=_CreateTradeTemplate("fixed_float",OJ10:OP10,OJ14:OP14)' = "#ERROR _CreateTradeTemplate: ValueError: trade_id is 12.5, expected a whole number of at most 15 digits"
     # Reserve totals, reserve-totals.md: the worked example in OR1:OW30, four Z26 rows on the
     # ethane schedule with the ticket's rates, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT, under a cleared
-    # template naming ION as broker since #NN, booking 50 of
+    # template naming ION as broker since #188, booking 50 of
     # brokerage and 20 of clearing in USD when the batch is made; _ReportReserves on the 2 December
     # results in OR23 spills the three totals and the currency, the results readback shows them
     # once, on the first slot row, and a dash on every later row of the ethane asian's 22 in IY16;
@@ -1151,7 +1151,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR47),3,3)"    = "28"
     "=INDEX(_ReportValues(OR47),3,1)"      = "1260"
     '=INDEX(_ReportRisk(OR47,"nominal_delta","year"),4,2)'        = "1"
-    # Since #NN, reserve-fee-applicability.md: brokerage charges the rows naming a broker and
+    # Since #188, reserve-fee-applicability.md: brokerage charges the rows naming a broker and
     # clearing the cleared route, the rates the selected specification's. The same four rows under
     # the cleared template without a broker in OR64 book no brokerage and the same 20 of clearing
     # in OR67, the mark and the lot as before; the broker column mixing ION, None, none and NONE in
@@ -2365,7 +2365,7 @@ $cells = [ordered]@{
     "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_time_lag"; "OW61" = "payment_holiday_calendar"
     "OR62" = "month"; "OS62" = "lastday"; "OT62" = "bilateral"; "OU62" = "financial"; "OV62" = "+2bd"; "OW62" = "=IC2"
     "OR60" = '=_CreateTradeTemplate("fixed_float",OR61:OW61,OR62:OW62)'
-    # Since #NN, reserve-fee-applicability.md: the cleared template without a broker over the same
+    # Since #188, reserve-fee-applicability.md: the cleared template without a broker over the same
     # cells less OY, its batch of the four rows prepared and valued on 2 December in OR64:OR67, and
     # a ticket with a broker column mixing ION, None, none and NONE under it in OR69:OX73, its
     # batch prepared and valued in OR74:OR76.
