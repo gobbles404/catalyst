@@ -127,31 +127,37 @@ FIXED_FLOAT = Instrument(
         ),
         Field(
             "route",
-            "The actual trade's clearing arrangement",
+            "The route the trade clears or settles by, cleared or bilateral",
             True,
             NONE,
             FieldType.CODE,
             "cleared, bilateral",
-            "Must be supported for the traded product; bilateral valuation waits on rates",
+            "Decides the clearing reserve: a cleared trade incurs the selected specification's "
+            "clearing rate and a bilateral one none; a cleared batch values undiscounted and takes "
+            "no discount curve, a bilateral one is valued on the curve _EvaluateTrades requires",
         ),
         Field(
             "settlement_method",
-            "Descriptive final-settlement form of the actual trade",
+            "How the trade finally settles, by physical delivery or a financial payment",
             True,
             NONE,
             FieldType.CODE,
             "physical, financial",
-            "A fact of the trade; a physical fixed_float past its expiry is refused, a financial "
-            "one pays on its payment day",
+            "Selects behavior, validation and payment terms, not a label: a financial batch "
+            "requires payment_time_lag and payment_holiday_calendar and pays on its payment day; a "
+            "physical one pays on no day, takes lastday rows alone, is refused past its expiry and "
+            "refused on the bilateral route; the delivery itself is outside the model",
         ),
         Field(
             "clearing_house",
-            "The clearing organization for this trade",
+            "The clearing organization a cleared trade clears through",
             False,
             "route = cleared",
             FieldType.TEXT,
             "no fixed list",
-            "A label kept as typed; nothing is inferred from it",
+            "Identifies the organization, kept as typed: required with route = cleared and refused "
+            "with bilateral; it selects no rate and exempts no fee, the route alone deciding the "
+            "clearing reserve",
         ),
         Field(
             "counterparty",
@@ -165,12 +171,14 @@ FIXED_FLOAT = Instrument(
         ),
         Field(
             "broker",
-            "The broker recorded for the deal",
+            "The broker named for the deal, or none for a screen trade",
             False,
             NONE,
             FieldType.TEXT,
             "no fixed list",
-            "Attribution; no fee or clearing role inferred from the label",
+            "A named broker enables the brokerage reserve for that trade at the selected "
+            "specification's rate; omit the field, or enter none in any case, for no brokerage; a "
+            "ticket column may mix names and none; the name selects no rate",
         ),
         Field(
             "quantity",
