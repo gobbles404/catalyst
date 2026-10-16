@@ -16,10 +16,11 @@ from numpy.typing import NDArray
 from goosedove.calendar.calendar import Calendar
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
+from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
-from goosedove.trades.encoding import Encoded
+from goosedove.trades.encoding import Encoded, group_words
 from goosedove.trades.terms import Route
 
 PREPARED_SLOTS = "prepared_slots"  # slots placed on the calendar and told live from fixed
@@ -164,6 +165,93 @@ def _unpaid_payments(
     return UnpaidPayments(days, groups, day_of_group, tau)
 
 
+def _the_set_amounts(
+    encoded: Encoded,
+    is_fixed: NDArray[np.bool_],
+    settles: NDArray[np.float64],
+    currency: str,
+) -> NDArray[np.float64]:
+    """Each group's set amount: each fixed slot's, its exposure times its settle, summed by group,
+    one bincount; since #190 each finite before anything is made of it, the arithmetic
+    running with numpy's flags down, else the first slot that is not is refused by its trade, its
+    day and its settle, and then the first group by its contract and payment day, a sum blamed on
+    the group and never on one of its trades."""
+    with np.errstate(over="ignore", invalid="ignore"):
+        set_of_slot = np.zeros(is_fixed.size)
+        set_of_slot[is_fixed] = encoded.slot_exposure[is_fixed] * settles
+        set_amount = np.bincount(
+            encoded.slot_group, weights=set_of_slot, minlength=encoded.group_contract.size
+        )
+    outrun = ~np.isfinite(set_of_slot)
+    if outrun.any():
+        s = int(outrun.argmax())
+        settle = float(settles[int(np.count_nonzero(is_fixed[:s]))])  # the fixed slots before it
+        raise ValueError(
+            f"{encoded.named_slot(s)}, fixed at {settle!r}, has {float(set_of_slot[s])!r} of set "
+            f"amount, expected a finite amount of {currency}; its exposure times the settle "
+            "outruns the largest number"
+        )
+    outrun = ~np.isfinite(set_amount)
+    if outrun.any():
+        g = int(outrun.argmax())
+        group = group_words(
+            encoded.terms.schedule.codes, encoded.group_contract, encoded.payment_date, g
+        )
+        raise ValueError(
+            f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "
+            f"{currency}; its fixed slots' set amounts, each finite, sum past the largest number"
+        )
+    return set_amount
+
+
+def _the_sensitivity(
+    encoded: Encoded, dated_live_exposure: NDArray[np.float64], conventions: IndexConventions
+) -> NDArray[np.float64]:
+    """The price sensitivity by reference, the live exposure summed over the batch's whole axis,
+    one bincount, zero where every slot of a reference has fixed; since #190 finite by contract,
+    the sum running with numpy's flags down, else the first that is not is refused by its
+    contract."""
+    with np.errstate(over="ignore", invalid="ignore"):
+        price_sensitivity = np.bincount(
+            encoded.reference_of_slot,
+            weights=dated_live_exposure,
+            minlength=encoded.references.size,
+        )
+    outrun = ~np.isfinite(price_sensitivity)
+    if outrun.any():
+        r = int(outrun.argmax())
+        raise ValueError(
+            f"{encoded.terms.schedule.codes[int(encoded.references[r])]} has "
+            f"{float(price_sensitivity[r])!r} of price sensitivity, expected a finite amount of "
+            f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
+            f"{conventions.quote_quantity_unit}; its live exposures, each finite, sum past the "
+            "largest number"
+        )
+    return price_sensitivity
+
+
+def _the_unsettled_totals(
+    encoded: Encoded, set_amount: NDArray[np.float64], unsettled: NDArray[np.bool_], currency: str
+) -> tuple[float, float]:
+    """The two totals a tick adds to the live amount for the mark, kept for both routes: the
+    unsettled groups' fixed legs and their set amounts, each sum finite since #190, the arithmetic
+    running with numpy's flags down, else refused for the batch by its total."""
+    with np.errstate(over="ignore", invalid="ignore"):
+        offset_unsettled = float(encoded.offset_of_group[unsettled].sum())
+        set_unsettled = float(set_amount[unsettled].sum())
+    for label, total, parts in (
+        ("unsettled fixed leg", offset_unsettled, "fixed legs"),
+        ("unsettled set amount", set_unsettled, "set amounts"),
+    ):
+        if not np.isfinite(total):
+            raise ValueError(
+                f"the batch has {total!r} of {label} in all, expected a finite amount of "
+                f"{currency}; the unsettled groups' {parts}, each finite, sum past the largest "
+                "number"
+            )
+    return offset_unsettled, set_unsettled
+
+
 def prepared_trades(
     encoded: Encoded, history: MarketHistory, counter: WorkCounter
 ) -> PreparedTrades:
@@ -193,13 +281,19 @@ def prepared_trades(
     everything has fixed, and that sensitivity and the live exposure of each slot divided by the
     reporting lot's coefficient, the conversion the index resolved once, so that the delta is
     counted in lots of the index's reporting specification whatever words the rows were entered
-    in, and no specification is looked up and nothing is converted here or on a tick. Every live
-    lot, every lot delta, their total and the cash are finite, else the first that is not is
-    refused by its slot, its contract or the batch, the fourth rule: a lot small enough, a BTU
-    against quantities in the trillions of MMBTU, divides a finite exposure past the largest
-    number once it is counted in lots, two contracts' finite deltas sum past it, or, since #176,
-    the settled groups' offsets and set amounts do, and nothing is published that a reader would
-    then fail on. For a bilateral financial batch the unpaid groups' payment days are mapped here
+    in, and no specification is looked up and nothing is converted here or on a tick. Every
+    number made here is finite, else the first that is not is refused by its operation, the
+    fourth rule, the arithmetic running with numpy's flags down and the rules judging in this
+    order since #190, reject-nonfinite-trade-arithmetic.md: each fixed slot's set amount, its
+    exposure times its settle, named by the slot and the settle; each group's set amount, a sum
+    blamed on the group by its contract and payment day; each contract's price sensitivity, its
+    live exposures summed; then the live lots, the lot deltas and their total, since #164, where
+    a lot small enough, a BTU against quantities in the trillions of MMBTU, divides a finite
+    exposure past the largest number once it is counted in lots; the lots by day, month and
+    year; the cash, since #176, the settled groups' offsets and set amounts; and the unsettled
+    fixed legs and set amounts in all, the two totals a tick adds to the live amount. Nothing
+    is published that a reader would then fail on. For a bilateral financial batch the unpaid
+    groups' payment days are mapped here
     once, _unpaid_payments, for the ticks to gather the curve's factors by.
 
     Work: one slot prepared per slot and one settle read per fixed slot, reported to the
@@ -238,22 +332,23 @@ def prepared_trades(
         is_settled = (unfixed == 0) & (encoded.payment_date <= as_of)
     fixed_rows = slot_rows[is_fixed]
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
-    set_of_slot = np.zeros(is_fixed.size)
-    set_of_slot[is_fixed] = encoded.slot_exposure[is_fixed] * settles
-    set_amount = np.bincount(
-        encoded.slot_group, weights=set_of_slot, minlength=encoded.group_contract.size
-    )
+    conventions = terms.index.conventions
+    currency = conventions.currency_unit
+    # Since #190 each number made here is finite before the record is made, the arithmetic
+    # running with numpy's flags down and the rules judging, else the first that is not is
+    # refused by its operation and its slot, group, contract or the batch.
+    set_amount = _the_set_amounts(encoded, is_fixed, settles, currency)
     is_live = ~is_fixed
     dated_live_exposure = np.where(is_live, encoded.slot_exposure, 0.0)
     live_slot = np.flatnonzero(is_live)
     live_references, reference_of_live_slot = np.unique(
         encoded.slot_reference[live_slot], return_inverse=True
     )
-    price_sensitivity = np.bincount(
-        encoded.reference_of_slot, weights=dated_live_exposure, minlength=encoded.references.size
-    )
     lot = terms.reporting_lot
-    with np.errstate(over="ignore"):  # finite legs may outrun the largest number; the rules judge
+    price_sensitivity = _the_sensitivity(encoded, dated_live_exposure, conventions)
+    # Finite legs may outrun the largest number, each way at once; the overflow and the invalid
+    # flags stay down and the rules judge, a sum of opposite infinities among them.
+    with np.errstate(over="ignore", invalid="ignore"):
         dated_live_lots = dated_live_exposure / lot.coefficient
         lot_delta = price_sensitivity / lot.coefficient
         lot_delta_total = float(lot_delta.sum())
@@ -302,11 +397,14 @@ def prepared_trades(
                 f"finite number of {words}; its exposures in lots sum past the largest number"
             )
     if not np.isfinite(cash):
-        currency = terms.index.conventions.currency_unit
         raise ValueError(
             f"the batch has {cash!r} of cash in all, expected a finite amount of {currency}; the "
             "settled groups' offsets and set amounts sum past the largest number"
         )
+    unsettled = ~is_settled
+    offset_unsettled, set_unsettled = _the_unsettled_totals(
+        encoded, set_amount, unsettled, currency
+    )
     # Since #186 the month and year displays start at the valuation day's period: the axes made
     # once here, two searches a bucket, and the nominal lots before the start checked zero.
     paid = encoded.payment_axes
@@ -327,7 +425,6 @@ def prepared_trades(
         by_year.contract_from,
     )
     counter.hit(DISPLAY_PERIODS, int(by_month.periods.size + by_year.periods.size))
-    unsettled = ~is_settled
     counter.hit(PREPARED_SLOTS, int(is_fixed.size))
     counter.hit(FIXINGS_READ, int(fixed_rows.size))
     # A cleared batch discounts nothing and runs nothing more here; its ledgers stand.
@@ -352,8 +449,8 @@ def prepared_trades(
         encoded,
         history,
         *arrays,
-        float(encoded.offset_of_group[unsettled].sum()),
-        float(set_amount[unsettled].sum()),
+        offset_unsettled,
+        set_unsettled,
         cash,
         price_sensitivity,
         lot_delta,

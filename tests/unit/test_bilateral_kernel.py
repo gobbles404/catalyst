@@ -595,6 +595,23 @@ def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_cont
     )
 
 
+def test_a_contribution_past_the_largest_number_is_refused_before_either_route_sums() -> None:
+    # Since #190, reject-nonfinite-trade-arithmetic.md: two barrels quoted at the largest number
+    # are a contribution past it, refused by the slot and its quote before the groups or the
+    # cleared sum see it, bilateral and cleared alike, with no mark or DV01 made; the group rule
+    # above stands for the sums the groups then make.
+    for route in (Route.BILATERAL, Route.CLEARED):
+        prep = prepared_on(terms_of((2.0,), (A_YEAR,), (261,), route=route, fixed=0.0))
+        curve = curve_of((AS_OF, 1.0), (A_YEAR, 1.0)) if route is Route.BILATERAL else None
+        with pytest.raises(ValueError) as refused:
+            valued(prep, (LARGEST, 50.0), curve)
+        assert str(refused.value) == (
+            "trade 1001 at row 1 on 2027-01-04, a day F27 prices, quoted at "
+            "1.7976931348623157e+308, has inf of live contribution, expected a finite amount of "
+            "USD; its exposure times the quote outruns the largest number"
+        )
+
+
 # --- the payment-time axes and the risk views, unified-risk-reporting.md --------------------------
 # The DV01 by payment day, month and year, summed onto axes the encoding makes once for a bilateral
 # batch, and the one way a report reads a risk: by reference where the axis is the risk's own and

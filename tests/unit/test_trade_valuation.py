@@ -4959,3 +4959,49 @@ def test_a_blank_broker_and_a_broker_in_both_template_and_ticket_are_still_refus
         "#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, "
         "expected by one of them"
     )
+
+
+# --- nonfinite arithmetic, reject-nonfinite-trade-arithmetic.md -----------------------------------
+# Since #190 each creator refuses a number past the largest number where it is made, in the kernel's
+# words after its own name, and publishes nothing; the ordinary inputs then take the ordinary path.
+
+
+def test_a_number_past_the_largest_number_fails_each_creator_and_publishes_nothing(
+    ng: dict[str, Any], toy: dict[str, Any]
+) -> None:
+    # Creation: a row of 1e308 lots of 10,000 MMBTU is a quote quantity past the largest number,
+    # refused by the trade and the operation, the live count standing.
+    live = bridge.live_handles()
+    huge: list[list[object]] = [[1001.0, serial("2026-09-24"), "Z26", 1e308, 3.1]]
+    assert ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*huge), ng["template"]) == (
+        "#ERROR _CreateTrades: ValueError: trade 1001 at row 1 has inf of quote quantity, expected "
+        "a finite number of MMBTU; its count times its specification's size in the quote unit "
+        "outruns the largest number"
+    )
+    assert bridge.live_handles() == live
+    # Preparation: the toy's five rows against a history whose Z26 settle is 1e308, its three Z26
+    # rows one slot of 160,000 MMBTU, refused by the slot and the settle.
+    spiked = a_history(
+        toy["index"], "2026-10-29", "2026-11-27", TOY_HOLIDAYS, {"2026-11-25": 1e308}
+    )
+    live = bridge.live_handles()
+    assert ENTRY["_PrepareTrades"](toy["trades"], spiked) == (
+        "#ERROR _PrepareTrades: ValueError: trade 1001 at row 1 on 2026-11-25, a day Z26 prices, "
+        "fixed at 1e+308, has inf of set amount, expected a finite amount of USD; its exposure "
+        "times the settle outruns the largest number"
+    )
+    assert bridge.live_handles() == live
+    # Evaluation: the NG example's preparation against a market quoting Z26 at 1e308, refused by
+    # the slot and the quote.
+    spiked_market = a_market(ng["history"], "Henry Hub NYMEX", 1e308, 3.50)
+    live = bridge.live_handles()
+    assert ENTRY["_EvaluateTrades"](ng["prepared"], spiked_market, bridge.MISSING) == (
+        "#ERROR _EvaluateTrades: ValueError: trade 1001 at row 1 on 2026-11-25, a day Z26 prices, "
+        "quoted at 1e+308, has inf of live contribution, expected a finite amount of USD; its "
+        "exposure times the quote outruns the largest number"
+    )
+    assert bridge.live_handles() == live
+    # The ordinary market recovers through the ordinary path: the example's mark as it was.
+    results = str(ENTRY["_EvaluateTrades"](ng["prepared"], ng["market"], bridge.MISSING))
+    assert valued(results)[0] == 7_000.0
+    assert bridge.live_handles()[0] == live[0] + 1

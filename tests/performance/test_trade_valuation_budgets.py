@@ -173,6 +173,9 @@ def test_preparing_resolves_two_handles_and_runs_the_kernels_preparation_alone(
         "_PrepareTrades": 1,
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
+        "_the_sensitivity": 1,  # the sensitivity by contract, finite
+        "_the_unsettled_totals": 1,  # the two unsettled totals, finite
         "period_axis": 2,  # the month and the year displays, since #186
         "period_start": 2,
         "places_from": 2,
