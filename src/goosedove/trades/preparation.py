@@ -346,7 +346,9 @@ def prepared_trades(
     )
     lot = terms.reporting_lot
     price_sensitivity = _the_sensitivity(encoded, dated_live_exposure, conventions)
-    with np.errstate(over="ignore"):  # finite legs may outrun the largest number; the rules judge
+    # Finite legs may outrun the largest number, each way at once; the overflow and the invalid
+    # flags stay down and the rules judge, a sum of opposite infinities among them.
+    with np.errstate(over="ignore", invalid="ignore"):
         dated_live_lots = dated_live_exposure / lot.coefficient
         lot_delta = price_sensitivity / lot.coefficient
         lot_delta_total = float(lot_delta.sum())

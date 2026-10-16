@@ -150,7 +150,10 @@ the contract before any lot is counted, `Z26 has inf of price sensitivity, expec
 of USD per USD/MMBTU; its live exposures, each finite, sum past the largest number`, where the
 lot-delta rule of #164 spoke one step later. `_the_unsettled_totals`: the unsettled fixed legs and
 set amounts summed for both routes and refused for the batch by the total. The lot, bucket and cash
-rules of #164, #166 and #176 stand as they were.
+rules of #164, #166 and #176 stand as they were; after review, their block keeps the invalid
+flag down beside the overflow flag, so two paid groups past the largest number each way are
+refused as cash, `the batch has nan of cash in all, ...`, and two contracts' lot deltas past it
+each way by the first contract, no warning escaping either.
 
 **The evaluation, `trades/evaluation.py`.** Each live slot's contribution is checked before either
 route sums it, refused by the slot and its quote, `trade 1 at row 1 on 2026-11-25, a day Z26 prices,

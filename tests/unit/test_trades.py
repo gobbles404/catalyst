@@ -3989,6 +3989,30 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
     )
 
 
+def test_opposing_lot_deltas_past_the_largest_number_are_refused_by_the_first_contract() -> None:
+    # The review of #190: two slots of 1e302 MMBTU on Z26, paying on two days, 1e308 lots each and
+    # finite, and two of -1e302 on F27 likewise; each contract's delta is past the largest number,
+    # one each way, and their total is no number at all. The sum runs with the overflow and the
+    # invalid flags down, so no warning escapes, and the first contract is refused as before.
+    terms = resolved_trades(
+        FIXED_FLOAT, TINY_LOT, spec(4, 1), Route.CLEARED, Settlement.FINANCIAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 4), ids(1, 2, 3, 4), None, None,
+        dates(*["2026-09-24"] * 4), np.arange(4, dtype=np.intp), rows(1, 1, 2, 2),
+        numbers(1e302, 1e302, -1e302, -1e302), *bounds_of(TINY_LOT, rows(1, 1, 2, 2)),
+        numbers(300.0, 300.0, 300.0, 300.0),
+        paying(dates("2026-11-30", "2026-12-01", "2026-12-31", "2027-01-04"), 4),
+    )  # fmt: skip
+    enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
+    np.testing.assert_allclose(enc.slot_exposure, [1e300, 1e300, -1e300, -1e300])  # finite each
+    with warnings.catch_warnings(), pytest.raises(ValueError) as refused:
+        warnings.simplefilter("error")
+        prepared_trades(enc, history_on(TINY_LOT, "2026-11-24", {}), WorkCounter())
+    assert str(refused.value) == (
+        "Z26 has inf of lot delta, expected a finite number of lots of BTU (1 BTU); the exposure "
+        "in lots outruns the largest number"
+    )
+
+
 # --- nonfinite arithmetic, reject-nonfinite-trade-arithmetic.md -----------------------------------
 # Finite inputs can multiply or sum past the largest number. Since #190 each stage refuses the first
 # number it makes that is not finite, by its operation and its trade, slot, group, contract or the
@@ -4151,6 +4175,20 @@ def test_preparation_refuses_a_set_amount_or_unsettled_total_past_the_largest_nu
     history = history_on(ONE, "2026-12-30", {"Z26": 1.0, "F27": 1.0})
     prep = prepared_trades(enc, history, WorkCounter())
     assert prep.set_unsettled == 1e308 and prep.offset_unsettled == 0.0
+
+
+def test_paid_groups_past_the_largest_number_each_way_are_refused_as_cash() -> None:
+    # The review of #190: 1e308 bought at -1.00 and set at 1.00 is a paid group of 2e308, past the
+    # largest number, and -1e308 likewise a group of -2e308; the cash sums the two infinities to no
+    # number at all, which the rule refuses, the overflow and the invalid flags both down so that
+    # numpy's warning never speaks before it.
+    assert preparation_refused(
+        extreme_terms(ONE, (1e308, -1e308), (-1.0, -1.0), BOTH, ("2026-11-30", "2026-12-31")),
+        history_on(ONE, "2027-01-04", {"Z26": 1.0, "F27": 1.0}),
+    ) == (
+        "the batch has nan of cash in all, expected a finite amount of USD; the settled groups' "
+        "offsets and set amounts sum past the largest number"
+    )
 
 
 def test_the_tick_refuses_a_contribution_live_amount_or_mark_past_the_largest_number() -> None:
