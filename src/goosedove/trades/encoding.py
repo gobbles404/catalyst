@@ -199,7 +199,7 @@ def encoded(
     added twice, and two paying on different days are two groups, each to move from mark to cash
     on its own day; the grouping is by the day itself, whatever lag and calendar made it.
 
-    Since #NN, reject-nonfinite-trade-arithmetic.md, each of these numbers is finite before it
+    Since #190, reject-nonfinite-trade-arithmetic.md, each of these numbers is finite before it
     enters the record or feeds the next stage, the arithmetic running with numpy's flags down
     and the rules judging in this order: a specification's lot size times its factor to the
     quote unit, then each component's quote quantity, its coefficient and its fixed leg, named
@@ -264,7 +264,7 @@ def encoded(
     quote_unit = conventions.quote_quantity_unit
     per_price = f"{currency} per {conventions.quote_currency_unit}/{quote_unit}"
     to_quote_unit = np.zeros(len(specifications.names))
-    # The arithmetic runs with numpy's flags down and the rules judge, since #NN: each number
+    # The arithmetic runs with numpy's flags down and the rules judge, since #190: each number
     # made here is finite before it enters the record or feeds the next stage, else the first
     # that is not is refused by its operation and its trade, group or slot.
     with np.errstate(over="ignore", invalid="ignore"):
@@ -400,7 +400,7 @@ def group_words(
     payment_date: NDArray[np.datetime64] | None,
     g: int,
 ) -> str:
-    """A payment group named in a message, since #NN: its contract and, under a financial
+    """A payment group named in a message, since #190: its contract and, under a financial
     settlement, the day it pays, `F27 paying on 2027-01-04`; a physical group its contract alone,
     since it pays on no day. A sum over a group is blamed on the group, never on one of its
     trades."""

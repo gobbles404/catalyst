@@ -3944,7 +3944,7 @@ def test_a_live_lot_that_outruns_the_largest_number_is_refused_at_preparation() 
 def test_a_lot_delta_that_outruns_the_largest_number_is_refused_by_its_contract() -> None:
     # The aggregate: two rows of Z26 paying on two days, so two slots, each 9e303 lots of 10,000
     # MMBTU, 9e307 MMBTU, finite as an exposure and as lots, 9e303 each, and their sum past the
-    # largest number as the contract's sensitivity, where since #NN the rule refuses it by the
+    # largest number as the contract's sensitivity, where since #190 the rule refuses it by the
     # contract before any lot is counted; the sum is bincount's, which raises no flag, so the rule
     # looks at the vector before anything is published. Paying on one day, the two rows would
     # share a slot whose exposure
@@ -3990,7 +3990,7 @@ def test_a_lot_delta_total_that_outruns_the_largest_number_is_refused_for_the_ba
 
 
 # --- nonfinite arithmetic, reject-nonfinite-trade-arithmetic.md -----------------------------------
-# Finite inputs can multiply or sum past the largest number. Since #NN each stage refuses the first
+# Finite inputs can multiply or sum past the largest number. Since #190 each stage refuses the first
 # number it makes that is not finite, by its operation and its trade, slot, group, contract or the
 # batch, before any record is made; the arithmetic runs with numpy's flags down, and warnings are
 # errors here, so the refusal is the whole outcome. Quantities whole and finite as entered: the

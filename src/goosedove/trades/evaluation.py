@@ -203,7 +203,7 @@ def trade_results(
     The market answers the quotes of the live references in the batch's order, one per distinct
     contract, and refuses a contract past its coverage by name, as it does for every reader; the
     quotes are gathered onto the live slots, and each slot's exposure times its reference's quote
-    is its contribution, finite or refused by its slot and its quote since #NN,
+    is its contribution, finite or refused by its slot and its quote since #190,
     reject-nonfinite-trade-arithmetic.md, before either route sums it. For a cleared batch the
     live amount is the contributions' sum, the one reduction this route makes, and the mark is
     the unsettled offsets and set amounts plus the live amount, each finite or refused for the
@@ -239,7 +239,7 @@ def trade_results(
     quotes = market.live_prices(prepared.live_references)
     conventions = terms.index.conventions
     currency = conventions.currency_unit
-    # The arithmetic runs with numpy's flags down and the rules judge, since #NN: each live
+    # The arithmetic runs with numpy's flags down and the rules judge, since #190: each live
     # slot's contribution is finite before either route sums it, else the first that is not is
     # refused by its slot and its quote.
     with np.errstate(over="ignore", invalid="ignore"):

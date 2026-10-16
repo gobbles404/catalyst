@@ -2374,7 +2374,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(11.0, array[2, 0]);
         }
 
-        // Since #NN, reject-nonfinite-trade-arithmetic.md: a row of 1e308 lots of 10,000 MMBTU is a
+        // Since #190, reject-nonfinite-trade-arithmetic.md: a row of 1e308 lots of 10,000 MMBTU is a
         // quote quantity past the largest number; the creator refuses it by the trade and the
         // operation and publishes nothing, the store's live count standing, and a row of ten lots
         // then creates through the ordinary path and releases.

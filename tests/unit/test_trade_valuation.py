@@ -4962,7 +4962,7 @@ def test_a_blank_broker_and_a_broker_in_both_template_and_ticket_are_still_refus
 
 
 # --- nonfinite arithmetic, reject-nonfinite-trade-arithmetic.md -----------------------------------
-# Since #NN each creator refuses a number past the largest number where it is made, in the kernel's
+# Since #190 each creator refuses a number past the largest number where it is made, in the kernel's
 # words after its own name, and publishes nothing; the ordinary inputs then take the ordinary path.
 
 

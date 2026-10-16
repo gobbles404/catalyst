@@ -172,7 +172,7 @@ def _the_set_amounts(
     currency: str,
 ) -> NDArray[np.float64]:
     """Each group's set amount: each fixed slot's, its exposure times its settle, summed by group,
-    one bincount; since #NN each finite before anything is made of it, the arithmetic
+    one bincount; since #190 each finite before anything is made of it, the arithmetic
     running with numpy's flags down, else the first slot that is not is refused by its trade, its
     day and its settle, and then the first group by its contract and payment day, a sum blamed on
     the group and never on one of its trades."""
@@ -208,7 +208,7 @@ def _the_sensitivity(
     encoded: Encoded, dated_live_exposure: NDArray[np.float64], conventions: IndexConventions
 ) -> NDArray[np.float64]:
     """The price sensitivity by reference, the live exposure summed over the batch's whole axis,
-    one bincount, zero where every slot of a reference has fixed; since #NN finite by contract,
+    one bincount, zero where every slot of a reference has fixed; since #190 finite by contract,
     the sum running with numpy's flags down, else the first that is not is refused by its
     contract."""
     with np.errstate(over="ignore", invalid="ignore"):
@@ -234,7 +234,7 @@ def _the_unsettled_totals(
     encoded: Encoded, set_amount: NDArray[np.float64], unsettled: NDArray[np.bool_], currency: str
 ) -> tuple[float, float]:
     """The two totals a tick adds to the live amount for the mark, kept for both routes: the
-    unsettled groups' fixed legs and their set amounts, each sum finite since #NN, the arithmetic
+    unsettled groups' fixed legs and their set amounts, each sum finite since #190, the arithmetic
     running with numpy's flags down, else refused for the batch by its total."""
     with np.errstate(over="ignore", invalid="ignore"):
         offset_unsettled = float(encoded.offset_of_group[unsettled].sum())
@@ -284,7 +284,7 @@ def prepared_trades(
     in, and no specification is looked up and nothing is converted here or on a tick. Every
     number made here is finite, else the first that is not is refused by its operation, the
     fourth rule, the arithmetic running with numpy's flags down and the rules judging in this
-    order since #NN, reject-nonfinite-trade-arithmetic.md: each fixed slot's set amount, its
+    order since #190, reject-nonfinite-trade-arithmetic.md: each fixed slot's set amount, its
     exposure times its settle, named by the slot and the settle; each group's set amount, a sum
     blamed on the group by its contract and payment day; each contract's price sensitivity, its
     live exposures summed; then the live lots, the lot deltas and their total, since #164, where
@@ -334,7 +334,7 @@ def prepared_trades(
     settles = history.fixing_prices[np.searchsorted(history.fixed_rows, fixed_rows)]
     conventions = terms.index.conventions
     currency = conventions.currency_unit
-    # Since #NN each number made here is finite before the record is made, the arithmetic
+    # Since #190 each number made here is finite before the record is made, the arithmetic
     # running with numpy's flags down and the rules judging, else the first that is not is
     # refused by its operation and its slot, group, contract or the batch.
     set_amount = _the_set_amounts(encoded, is_fixed, settles, currency)

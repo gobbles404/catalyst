@@ -1129,7 +1129,7 @@ $formulas = [ordered]@{
     '=_ReportReserves("x:trade_results:9")' = "#ERROR _ReportReserves: results is text 'x:trade_results:9' naming no live object, expected trade results handle"
     "=_CreateTrades(OR27,OR10:OW10,OR28:OW28,OR9)" = "#ERROR _CreateTrades: ValueError: brokerage reserve of trade 101 at row 1 is inf, expected a finite amount of USD; 2.0 of 'LOT' at 9e+307 a lot"
     "=_CreateTrades(OR27,OR10:OW10,OR29:OW30,OR9)" = "#ERROR _CreateTrades: ValueError: the batch has inf of brokerage reserve in all, expected a finite amount of USD; the components' reserves, each finite, sum past the largest number"
-    # Since #NN, reject-nonfinite-trade-arithmetic.md: 9E+307 LOT of Z26 is a quote quantity past
+    # Since #190, reject-nonfinite-trade-arithmetic.md: 9E+307 LOT of Z26 is a quote quantity past
     # the largest number, refused when the batch is made, by the trade and the operation, before
     # any handle is published.
     "=_CreateTrades(OR27,OR10:OW10,OR78:OW78,OR64)" = "#ERROR _CreateTrades: ValueError: trade 101 at row 1 has inf of quote quantity, expected a finite number of GAL; its count times its specification's size in the quote unit outruns the largest number"
@@ -2389,7 +2389,7 @@ $cells = [ordered]@{
     "OR74" = "=_CreateTrades(OR5,OR69:OX69,OR70:OX73,OR64)"
     "OR75" = "=_PrepareTrades(OR74,OR19)"
     "OR76" = "=_EvaluateTrades(OR75,OR21)"
-    # Since #NN, reject-nonfinite-trade-arithmetic.md: a row of 9E+307 LOT of Z26, 42,000 gallons a
+    # Since #190, reject-nonfinite-trade-arithmetic.md: a row of 9E+307 LOT of Z26, 42,000 gallons a
     # lot, for the no-broker template over the HUGE index, whose clearing rate is zero, so that no
     # reserve speaks before the quote quantity.
     "OR78" = "101"; "OS78" = "20-Nov-2026"; "OT78" = "Z26"; "OU78" = "9E+307"; "OV78" = "LOT"; "OW78" = "0.25"

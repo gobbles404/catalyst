@@ -596,7 +596,7 @@ def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_cont
 
 
 def test_a_contribution_past_the_largest_number_is_refused_before_either_route_sums() -> None:
-    # Since #NN, reject-nonfinite-trade-arithmetic.md: two barrels quoted at the largest number
+    # Since #190, reject-nonfinite-trade-arithmetic.md: two barrels quoted at the largest number
     # are a contribution past it, refused by the slot and its quote before the groups or the
     # cleared sum see it, bilateral and cleared alike, with no mark or DV01 made; the group rule
     # above stands for the sums the groups then make.

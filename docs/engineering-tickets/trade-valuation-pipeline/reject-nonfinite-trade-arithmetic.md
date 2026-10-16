@@ -2,8 +2,8 @@
 
 [Pipeline overview](README.md) · [Separate text transport fix](../reject-nul-input-text.md)
 
-**Status:** Built in #NN on `claude/reject-nonfinite-arithmetic` from `main` at `bb4a72f`, 16
-October 2026, one commit; the [As built](#as-built-nn) section at the end says what was built and
+**Status:** Built in #190 on `claude/reject-nonfinite-arithmetic` from `main` at `bb4a72f`, 16
+October 2026, one commit; the [As built](#as-built-190) section at the end says what was built and
 what was not.
 **Delivery:** One focused PR from current main, independent of the fee-applicability
 and text-transport fixes. Preserve financial formulas and worksheet signatures.
@@ -125,7 +125,7 @@ large finite controls and ordinary cleared/bilateral examples still pass; diagno
 work budgets and lifecycle recovery are pinned; the full gate passes. Deliver this PR
 on its own so the numerical fix can be reviewed and merged independently.
 
-## As built (#NN)
+## As built (#190)
 
 Built on `claude/reject-nonfinite-arithmetic` from `main` at `bb4a72f`, one pull request of one
 commit and the number stamped after.
