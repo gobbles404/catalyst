@@ -168,7 +168,7 @@ def test_creation_reports_its_rows_its_components_and_every_schedule_code(
         "encoded_slots": contracts,
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
-        "reserved_components": rows,
+        "reserved_fee_components": rows,  # clearing alone: cleared and unbrokered, since #188
         "resolved_components": rows,
         "resolved_occurrences": rows,
         "schedule_codes_read": 25,
@@ -247,6 +247,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_selections": 1,  # each occurrence's unit, method and basis in range
         "_the_method": 1,
         "_the_occurrences": 1,
+        "_the_brokered": 1,  # which rows name a broker, since #188
         "_the_components": 1,
         "whole_quantities": 1,
         "finite_prices": 1,
@@ -304,7 +305,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         "ndarray.reshape": 8,  # one more within the groups' unique, since #181
         "ndarray.round": 1,
         "ndarray.searchsorted": 1,  # each component's last observation, its payment's anchor
-        "ndarray.setflags": 17,  # the kernel's twelve copies, the three selections among them, the
+        "ndarray.setflags": 18,  # the kernel's twelve copies, the three selections among them, the
         # schedule's months since #186,
         # rule kept as text since #181 and frozen by no one,
         # the observations' three, the rows that entered a code
@@ -324,7 +325,7 @@ def resolution_numpy(contracts: int) -> dict[str, int]:
         # stray day of the shift and of the resolution, and the groups' unique
         "numpy.fromiter": 1,
         "numpy.normalize_axis_index": 1,
-        "numpy.zeros": 2,  # the two dates supplied by no row
+        "numpy.zeros": 3,  # the two dates supplied by no row; since #188 the rows of no broker
         "ufunc.reduce": 27,  # one per look
     }
 
@@ -595,6 +596,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
+        "_charged": 1,  # clearing, the one fee a cleared, unbrokered template charges, since #188
         "_publish": 1,
     }
     expected = {**resolution_ledger(contracts), **WHOLE_MONTHS, **seam, "WorkCounter.hit": 11}
@@ -679,7 +681,7 @@ def test_the_calday_basis_counts_the_days_once_over_the_schedule_and_multiplies_
         **resolution_numpy(contracts),
         **WHOLE_MONTHS_NUMPY,
         "ndarray.any": 26,  # and whether any product would outrun the largest number
-        "ndarray.setflags": 18,  # the product frozen
+        "ndarray.setflags": 19,  # the product frozen, the brokered rows since #188
         "numpy._make_extobj": 1,  # the error state set once, the overflow this rule's to catch
         "ufunc.reduce": 29,
     }
@@ -748,7 +750,7 @@ def dated_numpy(contracts: int) -> dict[str, int]:
     return {
         **numpy,
         "numpy.empty": 26,  # the codes' empty values, no dates' empty values
-        "numpy.zeros": 1,
+        "numpy.zeros": 2,  # the rows of no broker since #188
     }
 
 
@@ -943,7 +945,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "ndarray.nonzero": 7,  # the components of each of the four methods
         "ndarray.ravel": 8,  # the same, and the last3day days laid out in one column
         "ndarray.repeat": 6,  # last3day's components, asian's four repeats
-        "ndarray.setflags": 18,  # the calday products frozen
+        "ndarray.setflags": 19,  # the calday products frozen, the brokered rows since #188
         "ndarray.sum": 1,  # how many asian observations in all
         "numpy._make_extobj": 1,  # the error state set once for the calday products
         "numpy.arange": 5,  # the place of each asian observation within its component
@@ -1062,7 +1064,7 @@ def test_a_marketing_column_sums_once_per_row_and_the_counter_says_so(
         "encoded_slots": contracts,
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar
         "payment_shifts": 1,
-        "reserved_components": rows,
+        "reserved_fee_components": rows,  # clearing alone: cleared and unbrokered, since #188
         "reserved_occurrences": rows,  # the rows' amounts summed once each, since #175
         "resolved_components": rows,
         "resolved_occurrences": rows,

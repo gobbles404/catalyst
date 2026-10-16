@@ -483,7 +483,7 @@ def test_the_ng_rows_encode_as_the_page_says() -> None:
         "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
-        "reserved_components": 5,
+        "reserved_fee_components": 5,
     }
     for array in (
         enc.quote_quantity,
@@ -801,7 +801,7 @@ def test_the_five_ng_rows_mark_7000_then_8600_on_the_tick() -> None:
         "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
-        "reserved_components": 5,
+        "reserved_fee_components": 5,
         "display_periods": 5,
         "fixings_read": 0,
         "kernel": 1,
@@ -1463,7 +1463,7 @@ def test_the_daily_toy_encodes_three_slots_off_one_contract_for_two_components()
         "encoded_groups": 1,
         "encoded_observations": 6,
         "encoded_slots": 3,
-        "reserved_components": 2,
+        "reserved_fee_components": 2,
     }
 
 
@@ -1789,7 +1789,7 @@ def test_a_zero_row_encodes_zero_amounts_and_keeps_its_contract_and_slot() -> No
         "encoded_groups": 2,
         "encoded_observations": 2,
         "encoded_slots": 2,
-        "reserved_components": 2,
+        "reserved_fee_components": 2,
     }
 
 
@@ -3102,7 +3102,7 @@ def test_two_payment_days_on_one_contract_encode_as_two_groups_off_one_reference
         "encoded_groups": 2,
         "encoded_observations": 6,
         "encoded_slots": 6,
-        "reserved_components": 2,
+        "reserved_fee_components": 2,
     }
     # Six slots where one payment day has three: the growth is the payment ownership, eight bytes
     # a slot in each slot column and a day per group, no calendar widened and no history copied.
@@ -3573,7 +3573,7 @@ def test_the_mixed_rows_encode_as_the_ticket_says() -> None:
         "encoded_groups": 2,
         "encoded_observations": 27,
         "encoded_slots": 23,
-        "reserved_components": 4,
+        "reserved_fee_components": 4,
     }
 
 
@@ -4841,7 +4841,7 @@ def test_an_iferc_future_observes_its_months_index_once_on_its_publication_day()
         "encoded_groups": 1,
         "encoded_observations": 1,
         "encoded_slots": 1,
-        "reserved_components": 1,
+        "reserved_fee_components": 1,
     }
 
 
@@ -5182,12 +5182,20 @@ def fee_terms(
     quantities: tuple[float, ...] = (2.0, -2.0, 1000.0, 0.0),
     specs: tuple[int, ...] = (0, 0, 1, 0),
     trade_ids: tuple[int, ...] = (101, 102, 103, 104),
+    route: Route = Route.CLEARED,
+    broker: str | None = "ION",
+    brokers: tuple[str, ...] | None = None,
+    clearing_house: tuple[str, ...] | None = None,
 ) -> ResolvedTrades:
-    """The example's rows, or others shaped like them, each one Z26 month at 70."""
+    """The example's rows, or others shaped like them, each one Z26 month at 70; since #188 cleared
+    and brokered by ION throughout unless the route, one broker text for every row, a tuple per
+    row or None says otherwise."""
     n = len(quantities)
+    named = brokers if brokers is not None else None if broker is None else (broker,) * n
     return resolved_trades(
-        FIXED_FLOAT, ix, rows(*specs), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None, None,
+        FIXED_FLOAT, ix, rows(*specs), route, Settlement.PHYSICAL,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids),
+        clearing_house, named,
         dates(*["2026-11-20"] * n), np.arange(n, dtype=np.intp), rows(*([1] * n)),
         numbers(*quantities), *bounds_of(ix, rows(*([1] * n))), numbers(*([70.0] * n)), None,
     )  # fmt: skip
@@ -5206,7 +5214,7 @@ def test_the_tickets_four_trades_reserve_fifty_and_twenty_dollars() -> None:
     booked = enc.reserves
     assert (booked.brokerage, booked.clearing, booked.marketing) == (50.0, 20.0, 0.0)
     assert booked.currency == "USD"
-    assert counter.freeze()["reserved_components"] == 4
+    assert counter.freeze()["reserved_fee_components"] == 8  # four brokered, four cleared
     # The results carry the encoding's record itself, summed once and never again, and the value
     # is the free index's: the two LOT rows net, the barrels mark half a dollar on a thousand.
     history = history_on(ix, "2026-11-24", {})
@@ -5218,7 +5226,7 @@ def test_the_tickets_four_trades_reserve_fifty_and_twenty_dollars() -> None:
     plain = encoded(fee_terms(free), observed_of(fee_terms(free)), UNITS, WorkCounter())
     np.testing.assert_array_equal(plain.offset, enc.offset)
     assert (plain.reserves.brokerage, plain.reserves.clearing) == (0.0, 0.0)
-    assert counter.freeze()["reserved_components"] == 4  # nothing reserved again downstream
+    assert counter.freeze()["reserved_fee_components"] == 8  # nothing reserved again downstream
 
 
 def test_singletons_sum_to_the_batch_and_order_and_duplicates_count() -> None:
@@ -5255,7 +5263,7 @@ def test_a_calday_strip_reserves_per_barrel_day_and_the_reporting_lot_changes_no
         ix = a_fee_index(reporting_lot=lot, schedule=schedule)
         terms = resolved_trades(
             FIXED_FLOAT, ix, rows(1), Route.CLEARED, Settlement.PHYSICAL,
-            *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1), ids(201), None, None,
+            *picks(ScheduleMethod.LASTDAY, QuantityPer.CALDAY, 1), ids(201), None, ("ION",),
             dates("2026-10-20"), rows(0, 0), rows(1, 2), numbers(2.0, 2.0),
             *bounds_of(ix, rows(1, 2)), numbers(70.0, 70.0), None,
         )  # fmt: skip
@@ -5305,6 +5313,98 @@ def test_reserves_that_sum_past_the_largest_number_are_refused_for_the_batch() -
 # #175. The amounts are per occurrence and the sum runs over them, never the components.
 
 
+# --- fee applicability, reserve-fee-applicability.md ---------------------------------------------
+# Since #188 brokerage charges the rows naming a broker and clearing the cleared route; the rates
+# are the selected specification's, and no label's spelling selects anything.
+
+
+def booked(
+    ix: Index,
+    route: Route,
+    broker: str | None,
+    quantities: tuple[float, ...] = (10.0,),
+    brokers: tuple[str, ...] | None = None,
+) -> tuple[tuple[float, float], int]:
+    """The brokerage and clearing a batch of those LOT rows books on that route with that broker,
+    and the fee components the counter reports."""
+    n = len(quantities)
+    terms = fee_terms(
+        ix,
+        quantities,
+        (0,) * n,
+        tuple(range(1, n + 1)),
+        route=route,
+        broker=broker,
+        brokers=brokers,
+    )
+    counter = WorkCounter()
+    reserved = encoded(terms, observed_of(terms), UNITS, counter).reserves
+    return (reserved.brokerage, reserved.clearing), counter.freeze()["reserved_fee_components"]
+
+
+def test_brokerage_charges_the_brokered_rows_and_clearing_the_cleared_route() -> None:
+    # The ticket's four batches, one +10 LOT trade each, LOT at 10 and 4 a lot: nothing on a
+    # bilateral trade without a broker, 100 of brokerage with one and never any clearing; 40 of
+    # clearing on a cleared trade with no broker and 100 of brokerage beside it with one. The
+    # counter says which fees charged: none, one component each, or both.
+    ix = a_fee_index()
+    assert booked(ix, Route.BILATERAL, None) == ((0.0, 0.0), 0)
+    assert booked(ix, Route.BILATERAL, "ION") == ((100.0, 0.0), 1)
+    assert booked(ix, Route.CLEARED, None) == ((0.0, 40.0), 1)
+    assert booked(ix, Route.CLEARED, "ION") == ((100.0, 40.0), 2)
+    # A sell charges the same, and two opposite rows net to no exposure and reserve twice.
+    assert booked(ix, Route.CLEARED, "ION", (-10.0,)) == ((100.0, 40.0), 2)
+    assert booked(ix, Route.CLEARED, "ION", (10.0, -10.0)) == ((200.0, 80.0), 4)
+    # The text none, in any case, is a screen trade: no broker, whatever the route.
+    for token in ("None", "none", "NONE", "nOnE"):
+        assert booked(ix, Route.BILATERAL, token) == ((0.0, 0.0), 0)
+        assert booked(ix, Route.CLEARED, token) == ((0.0, 40.0), 1)
+    # A column may mix a broker and none: the brokered row alone charges brokerage, every row
+    # clearing on the cleared route, the counter the brokered components and then the cleared.
+    assert booked(ix, Route.CLEARED, None, (10.0, 10.0), ("ION", "None")) == ((100.0, 80.0), 3)
+    assert booked(ix, Route.BILATERAL, None, (10.0, 10.0), ("ION", "None")) == ((100.0, 0.0), 1)
+    # The labels' spelling selects nothing: another broker, another clearing house, the same.
+    assert booked(ix, Route.CLEARED, "GFI") == booked(ix, Route.CLEARED, "ION")
+    housed = fee_terms(ix, (10.0,), (0,), (1,), clearing_house=("ICE Clear Europe",))
+    rehoused = fee_terms(ix, (10.0,), (0,), (1,), clearing_house=("CME Clearing",))
+    assert reserves_of(housed) == reserves_of(rehoused) == (100.0, 40.0)
+
+
+def test_the_terms_say_which_rows_are_brokered_and_keep_the_texts_as_typed() -> None:
+    ix = a_fee_index()
+    mixed = fee_terms(ix, (2.0, 2.0, 2.0), (0, 0, 0), (1, 2, 3), brokers=("ION", "None", "none"))
+    np.testing.assert_array_equal(mixed.brokered, [True, False, False])
+    assert mixed.broker == ("ION", "None", "none") and not mixed.brokered.flags.writeable
+    unbrokered = fee_terms(ix, broker=None)
+    assert unbrokered.broker is None
+    np.testing.assert_array_equal(unbrokered.brokered, [False, False, False, False])
+
+
+def test_a_rate_a_fee_does_not_charge_is_never_read() -> None:
+    # The specifications let a NaN or an infinite rate pass; a fee that charges nothing never reads
+    # it and a fee that charges refuses it, a zero quantity included. In a mixed column the
+    # unbrokered row's NaN is never read and the brokered row's is refused, named by its own row.
+    nan_brokerage = a_fee_index(brokerage=(np.nan, np.nan))
+    assert reserves_of(fee_terms(nan_brokerage, broker=None)) == (0.0, 20.0)
+    assert reserves_of(fee_terms(nan_brokerage, broker="none")) == (0.0, 20.0)
+    with pytest.raises(ValueError) as refused:
+        reserves_of(
+            fee_terms(nan_brokerage, (2.0, 2.0), (0, 0), (101, 102), brokers=("none", "ION"))
+        )
+    assert str(refused.value) == (
+        "brokerage reserve of trade 102 at row 2 is nan, expected a finite amount of USD; "
+        "2.0 of 'LOT' at nan a lot"
+    )
+    infinite_clearing = a_fee_index(clearing=(np.inf, np.inf))
+    assert reserves_of(fee_terms(infinite_clearing, route=Route.BILATERAL)) == (50.0, 0.0)
+    with pytest.raises(ValueError) as refused:
+        reserves_of(fee_terms(infinite_clearing, (0.0,), (0,), (104,)))
+    assert str(refused.value) == (
+        "clearing reserve of trade 104 at row 1 is nan, expected a finite amount of USD; "
+        "0.0 of 'LOT' at inf a lot"
+    )
+
+
 def marketed_terms(
     ix: Index,
     amounts: tuple[float, ...] | None,
@@ -5316,7 +5416,8 @@ def marketed_terms(
     n = len(trade_ids)
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), Route.CLEARED, Settlement.PHYSICAL,
-        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None, None,
+        *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, n), ids(*trade_ids), None,
+        ("ION",) * n,
         dates(*["2026-09-24"] * n), rows(*occurrence), rows(*contract), numbers(*quantities),
         *bounds_of(ix, rows(*contract)), numbers(*([70.0] * len(contract))), None,
         marketing_reserve=None if amounts is None else numbers(*amounts),
@@ -5333,7 +5434,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row() -> None:
     assert (booked.brokerage, booked.clearing, booked.marketing) == (60.0, 24.0, 65.0)
     assert booked.currency == "USD"
     assert counter.freeze()["reserved_occurrences"] == 4  # the rows, not the five components
-    assert counter.freeze()["reserved_components"] == 5
+    assert counter.freeze()["reserved_fee_components"] == 10  # five brokered, five cleared
     # The duplicate row counts again, a template's one amount books once per row, and no field at
     # all books nought and sums nothing.
     twice = marketed_terms(

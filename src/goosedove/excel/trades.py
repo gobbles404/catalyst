@@ -258,9 +258,9 @@ def _ReportReserves(
         "for it.",
     ],
 ) -> MixedArray:
-    """Reports the batch's reserves from its results, as creation stored them: brokerage and
-    clearing, each trade's quantity without its sign times its specification's rates per lot,
-    summed; marketing, the rows' amounts summed once each; and their currency."""
+    """Reports the batch's booked reserves from its results: brokerage on the trades naming a
+    broker and clearing on a cleared route, each trade's unsigned quantity times its
+    specification's rate per lot, summed; marketing summed once a row; and the currency."""
     reserves = results.reserves
     return MixedArray.table(
         [

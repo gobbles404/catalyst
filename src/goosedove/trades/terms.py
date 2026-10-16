@@ -118,7 +118,10 @@ class ResolvedTrades:
     whole number of at most 15 digits held as an int64 since #168, clearing_house[i] its clearing
     organization, counterparty[i] since #175 the counterparty it faces and broker[i] its broker,
     the IDs an array and the three labels tuples, each None as a whole when the field was not
-    given, each kept as given and read for nothing but a message's words; marketing_reserve[i]
+    given, each kept as given and read for nothing but a message's words and, since #188, the
+    broker's text for brokered[i], whether the row names a broker and so charges brokerage:
+    False for every row when the field was not given and where the row's text is none in any
+    case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
     since #175 the marketing cost the row booked once, a finite amount of zero or more in the
     settlement currency, None as a whole when neither the template nor the ticket supplied it,
     read by the reserves alone. Per
@@ -150,6 +153,7 @@ class ResolvedTrades:
     clearing_house: tuple[str, ...] | None
     counterparty: tuple[str, ...] | None
     broker: tuple[str, ...] | None
+    brokered: NDArray[np.bool_]
     trade_dates: NDArray[np.datetime64]
     occurrence: NDArray[np.intp]
     contract: NDArray[np.intp]
@@ -277,7 +281,9 @@ def resolved_trades(
     is kept as the definition the terms stand under, and read for nothing here. The schedule's
     months, since #186, are the resolution's reading of every row's code handed over, or read here
     once by schedule_months when a Python caller gives none; kept frozen for the encoding's
-    contract-month axes and read for nothing here.
+    contract-month axes and read for nothing here. The brokered rows, since #188, are read here
+    once from the broker texts, none in any case meaning a screen trade, and kept frozen for the
+    reserves, which charge brokerage on their components alone.
     """
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
@@ -309,6 +315,7 @@ def resolved_trades(
         else np.array(schedule_month, dtype=np.int64)
     )
     months.setflags(write=False)
+    brokered = _the_brokered(broker, occurrences)
     return ResolvedTrades(
         instrument,
         index,
@@ -323,6 +330,7 @@ def resolved_trades(
         clearing_house,
         counterparty,
         broker,
+        brokered,
         _frozen_days(trade_dates),
         _frozen_rows(occurrence),
         _frozen_rows(contract),
@@ -470,6 +478,21 @@ def _the_method(
                     assert_never(method)
         case _:
             assert_never(settlement)
+
+
+UNBROKERED = "none"  # a broker text, in any case, naming no broker: a screen trade, since #188
+
+
+def _the_brokered(broker: tuple[str, ...] | None, occurrences: int) -> NDArray[np.bool_]:
+    """Which occurrences name a broker, since #188: none of them when the field was not given, and
+    each whose text is other than none, in any case, when it was; the texts themselves stand as
+    given. Frozen."""
+    if broker is None:
+        brokered = np.zeros(occurrences, dtype=np.bool_)
+    else:
+        brokered = np.array([text.lower() != UNBROKERED for text in broker], dtype=np.bool_)
+    brokered.setflags(write=False)
+    return brokered
 
 
 def _the_occurrences(

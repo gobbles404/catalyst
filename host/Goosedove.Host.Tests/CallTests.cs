@@ -2100,7 +2100,7 @@ namespace Goosedove.Host.Tests
         // and G27 expiring 46356, 46387, 46416 and 46444, closed 46381 and 46388, dollars a gallon,
         // LOT a thousand barrels at 10 and 4 a lot, BBL a barrel at 0.01 and 0.004, GAL free; 101 to
         // 104 booked 46346, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT of Z26 at 0.25, financial at +2bd on a
-        // calendar closed 46388. On 46358 at 0.28: 1,260 of mark, a lot, and 50 of brokerage, 20 of
+        // calendar closed 46388, brokered by ION since #188. On 46358 at 0.28: 1,260 of mark, a lot, and 50 of brokerage, 20 of
         // clearing and none of marketing in USD, the report's one row and the results readback's
         // first, the batch's readback without a reserve column; a tick to 0.31 marks 2,520 and
         // reserves the same. A rate of 1e308 a lot: two lots refused by row, one lot each of two rows
@@ -2115,24 +2115,28 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", headings, new object[,] { { "LOT", 1000.0, "BBL", 10.0, 4.0 }, { "BBL", 1.0, "BBL", 0.01, 0.004 }, { "GAL", 1.0, "GAL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "RESERVES", "Ethane with the reserve ticket rates", schedule, conventions, specifications, holidays, "LOT");
             var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
-            var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
+            // Since #188, reserve-fee-applicability.md, the template names ION as broker: brokerage charges the rows
+            // naming a broker and clearing the cleared route, so the 50 below stands and the readback gains a column.
+            var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_time_lag", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price");
             var rows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", -2.0, "LOT", 0.25 }, { 103.0, 46346.0, "Z26", 1000.0, "BBL", 0.25 }, { 104.0, 46346.0, "Z26", 0.0, "LOT", 0.25 } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
             Assert.StartsWith(Pid + ":trades:RESERVES:", trades);
             var batch = (object[,])Seam.Call("util_ReadHandle", trades);
-            Assert.Equal(22, batch.GetLength(1));
-            Assert.Equal("offset", batch[0, 21]);
+            Assert.Equal(23, batch.GetLength(1));
+            Assert.Equal("broker", batch[0, 8]);
+            Assert.Equal("ION", batch[2, 8]);
+            Assert.Equal("offset", batch[0, 22]);
             // Since #181, compound-date-offsets.md: a payment rule of several instructions reads as the date
             // utility's offset does and is kept as written beside the day it made: Z26's 31 December 2026 to its
             // month's end, the same day, and the business day after, past New Year's Day closed, Monday 4 January.
-            var chained = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+0em+1bd", pays));
+            var chained = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+0em+1bd", pays));
             var ruled = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, headers, rows, chained));
-            Assert.Equal("payment_time_lag", ruled[0, 12]);
-            Assert.Equal("payment_date", ruled[0, 13]);
-            Assert.Equal("+0em+1bd", ruled[2, 12]);
-            Assert.Equal(46391.0, ruled[2, 13]);
+            Assert.Equal("payment_time_lag", ruled[0, 13]);
+            Assert.Equal("payment_date", ruled[0, 14]);
+            Assert.Equal("+0em+1bd", ruled[2, 13]);
+            Assert.Equal(46391.0, ruled[2, 14]);
             var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46358.0, 0.5), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, (string)Seam.Call("_CreateFuturesFixings", Column(46357.0, 46356.0), Column(0.24, 0.28), index));
             var prepared = (string)Seam.Call("_PrepareTrades", trades, history);
@@ -2180,14 +2184,14 @@ namespace Goosedove.Host.Tests
             var marketedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0 } };
             var marketed = (string)Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, template);
             var marketedTable = (object[,])Seam.Call("util_ReadHandle", marketed);
-            Assert.Equal(23, marketedTable.GetLength(1));
-            Assert.Equal("marketing_reserve", marketedTable[0, 14]);
-            Assert.Equal("entered_contract_code", marketedTable[0, 15]);
-            Assert.Equal(15.0, (double)marketedTable[2, 14], 9);
-            Assert.Equal(25.0, (double)marketedTable[4, 14], 9);
-            Assert.Equal(25.0, (double)marketedTable[5, 14], 9);
+            Assert.Equal(24, marketedTable.GetLength(1));
+            Assert.Equal("marketing_reserve", marketedTable[0, 15]);
+            Assert.Equal("entered_contract_code", marketedTable[0, 16]);
+            Assert.Equal(15.0, (double)marketedTable[2, 15], 9);
+            Assert.Equal(25.0, (double)marketedTable[4, 15], 9);
+            Assert.Equal(25.0, (double)marketedTable[5, 15], 9);
             Assert.Equal("F27", marketedTable[5, 3]);
-            Assert.Equal(5.0, (double)marketedTable[6, 14], 9);
+            Assert.Equal(5.0, (double)marketedTable[6, 15], 9);
             string Market() => (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "RESERVES", Column(0.28, 0.30, 0.32)));
             var marketedReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", marketed, history), Market(), ExcelMissing.Value));
             Assert.Equal(60.0, (double)marketedReserves[2, 0], 9);
@@ -2195,13 +2199,31 @@ namespace Goosedove.Host.Tests
             Assert.Equal(65.0, (double)marketedReserves[2, 2], 9);
             Assert.Equal("USD", marketedReserves[2, 3]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTrades", index, marketedHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -5.0 } }, template));
-            var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar", "marketing_reserve"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays, 7.0));
+            var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_time_lag", "payment_holiday_calendar", "marketing_reserve"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
             var templated = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, seven), history), Market(), ExcelMissing.Value);
             var templatedReserves = (object[,])Seam.Call("_ReportReserves", templated);
             Assert.Equal(50.0, (double)templatedReserves[2, 0], 9);
             Assert.Equal(28.0, (double)templatedReserves[2, 2], 9);
             Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", templated))[2, 0], 6);
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", templated, "nominal_delta", "year"))[3, 1], 6);
+            // Since #188, reserve-fee-applicability.md: the same rows under a cleared template naming no broker book no
+            // brokerage and the same 20 of clearing; a broker column mixing ION and None, none and NONE charges the
+            // ION row alone, 20, every text read back as typed; a broker from both the template and the ticket is refused.
+            var direct = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
+            var directReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, direct), history), Market(), ExcelMissing.Value));
+            Assert.Equal(0.0, (double)directReserves[2, 0], 9);
+            Assert.Equal(20.0, (double)directReserves[2, 1], 9);
+            var brokeredHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "broker");
+            var brokeredRows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ION" }, { 102.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "None" }, { 103.0, 46346.0, "Z26", 1000.0, "BBL", 0.25, "none" }, { 104.0, 46346.0, "Z26", 0.0, "LOT", 0.25, "NONE" } };
+            var mixed = (string)Seam.Call("_CreateTrades", index, brokeredHeaders, brokeredRows, direct);
+            var mixedReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", mixed, history), Market(), ExcelMissing.Value));
+            Assert.Equal(20.0, (double)mixedReserves[2, 0], 9);
+            Assert.Equal(20.0, (double)mixedReserves[2, 1], 9);
+            var mixedTable = (object[,])Seam.Call("util_ReadHandle", mixed);
+            Assert.Equal("broker", mixedTable[0, 8]);
+            Assert.Equal("None", mixedTable[3, 8]);
+            Assert.Equal("NONE", mixedTable[5, 8]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, brokeredHeaders, brokeredRows, template));
             Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
             var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));

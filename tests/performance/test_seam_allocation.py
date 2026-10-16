@@ -1039,14 +1039,16 @@ def test_a_futures_calendar_keeps_its_four_columns_and_release_frees_them() -> N
 # a blank cell and a code beside dates mean. The peak follows the length of the texts, the rule
 # texts above all, which #146 lengthened, #158 and #159 kept short and the two period fields add
 # two columns of; a text cell costs its string and its place in the joined text, so the pin says
-# so, 130 a cell and the slack, where 110 a cell and the slack covered the texts before #172, and
+# so, 155 a cell and the slack since #188, which lengthened the rules of route, settlement_method,
+# clearing_house and broker to say what each controls, 19,979 bytes measured on 2026-10-16, about
+# 150 a cell, where 130 a cell and the slack covered the texts from #172, 110 a cell before it, and
 # a hundred a cell and the slack covered fifteen columns, 11,411 bytes measured on 2026-10-07.
 # Neither publishes.
 def test_the_instrument_catalog_spills_within_its_cells_and_publishes_nothing() -> None:
     live = bridge.live_handles()
     assert least_peak(lambda: ENTRY["_ListInstruments"]()) <= 2 * SLACK
     cells = 7 * 19
-    assert least_peak(lambda: ENTRY["_ShowInstrument"]("fixed_float")) <= 130 * cells + SLACK
+    assert least_peak(lambda: ENTRY["_ShowInstrument"]("fixed_float")) <= 155 * cells + SLACK
     assert bridge.live_handles() == live
 
 

@@ -4,6 +4,8 @@
 
 **Since #175:** `marketing_reserve` is a field of the `fixed_float`, booked once per ticket row, [booking-fields-and-marketing-reserve.md](booking-fields-and-marketing-reserve.md); the zero marketing below is this slice as built.
 
+**Since #188:** brokerage charges the trades naming a broker and clearing the cleared route, [reserve-fee-applicability.md](reserve-fee-applicability.md); the 50 and 20 below assume a broker on every row, which the examples now name.
+
 **Status:** Built in #170 on the prototype stack above #169, the page as a ticket; the
 [As built](#as-built-170) section at the end says what was built and what was not. Ready
 for engineering, 9 October 2026. Inspected baseline: prototype PR #168 at `d1633d7`. One
