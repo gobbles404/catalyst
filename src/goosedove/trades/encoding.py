@@ -10,7 +10,9 @@ pricing that date, derived by the calendar's rule and retained, the group's own 
 expiry-based methods and whichever the calendar gives under asian, and the summed exposure
 every settle or quote of that date multiplies. Per pricing reference, since #186, the contract's
 calendar month and year, the axes a delta report by month or by year sums onto. And the
-reserves, the brokerage and the clearing each component incurs, summed for the batch, since #170.
+reserves, since #170, the brokerage the brokered rows' components incur and the clearing every
+component incurs on a cleared route, charged where the booking says so since #NN, summed for the
+batch.
 Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
@@ -114,8 +116,10 @@ class Encoded:
     the batch prices off, and nothing else: no period without a reference, and a payment day
     moves nothing.
 
-    Then reserves, since #170, the batch's booked brokerage and clearing, each component's
-    count of its specification times the specification's rate per lot, summed, since #175 the
+    Then reserves, since #170, the batch's booked brokerage and clearing, each charged component's
+    count of its specification times the specification's rate per lot, summed, since #NN the
+    brokered rows' components charged brokerage and every component clearing on a cleared route
+    and none on a bilateral one, since #175 the
     marketing reserve the rows booked, summed once per row, and their currency, the Reserves
     record, static for the batch and entering no number
     here; _ReportReserves spills the totals and the results readback shows them once.
@@ -229,15 +233,17 @@ def encoded(
     For a financial settlement, each group pays after its last observation, else its contract and
     its two days are named, since a payment before the last settle exists would have nothing to
     pay. The fees of the specification are read once, since #170, for the reserves, each
-    component's count times its specification's two rates per lot and the batch's two sums,
+    charged component's count times its specification's rate per lot and the batch's two sums,
+    brokerage over the brokered rows' components and clearing over every component of a cleared
+    batch since #NN,
     and since #175 the rows' marketing reserves summed once each, kept beside the encoding and
     never a contribution to value,
     docs/library/trades/report-reserves.md.
 
     Work: one component per component, one group per payment group, one observation per
     observation and one slot per slot, reported to the counter; one conversion per distinct
-    specification the batch selects; the reserves once over the components; and, for a
-    bilateral batch, one payment day per distinct payment day, the axes made once.
+    specification the batch selects; the reserves once over the components each fee charges; and,
+    for a bilateral batch, one payment day per distinct payment day, the axes made once.
     """
     index = terms.index
     conventions = index.conventions

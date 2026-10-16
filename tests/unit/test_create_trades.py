@@ -224,7 +224,7 @@ def test_the_ng_rows_resolve_to_the_terms_the_kernel_tests_supply() -> None:
         "encoded_groups": 2,
         "encoded_observations": 5,
         "encoded_slots": 2,
-        "reserved_components": 5,
+        "reserved_fee_components": 5,
         "resolved_components": 5,
         "resolved_occurrences": 5,
         "schedule_codes_read": 3,
@@ -316,7 +316,27 @@ def test_a_templates_field_applies_to_every_row_and_a_tickets_varies() -> None:
     np.testing.assert_array_equal(terms.contract, [1, 1, 1])
     np.testing.assert_array_equal(terms.quantity, [2, 2, 2])
     assert terms.broker == ("ION", "TP", "ION")
+    np.testing.assert_array_equal(terms.brokered, [True, True, True])
     np.testing.assert_array_equal(terms.trade_ids, [1, 2, 3])
+
+
+def test_a_broker_of_none_in_any_case_is_a_screen_trade_and_the_text_stands() -> None:
+    # Since #NN, reserve-fee-applicability.md: the terms say which rows name a broker, the text
+    # none in any case naming none, and keep every text as typed for the readback; a batch without
+    # the field names none.
+    template = {
+        **NG_TEMPLATE,
+        "trade_date": day("2026-09-24"),
+        "contract_code": "z26",
+        "quantity": 2.0,
+        "fixed_price": 3.0,
+    }
+    batch, _ = created(NG, {"trade_id": [1, 2, 3], "broker": ["ION", "None", "none"]}, template)
+    assert batch.resolved.broker == ("ION", "None", "none")
+    np.testing.assert_array_equal(batch.resolved.brokered, [True, False, False])
+    unbrokered, _ = created(NG, {"trade_id": [1, 2, 3]}, template)
+    assert unbrokered.resolved.broker is None
+    np.testing.assert_array_equal(unbrokered.resolved.brokered, [False, False, False])
 
 
 def test_a_batch_field_in_the_ticket_is_taken_when_every_row_agrees() -> None:
@@ -2512,7 +2532,7 @@ def test_a_mixed_ticket_resolves_each_row_to_its_own_choices_and_encodes_to_the_
         "encoded_slots": 23,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "reserved_components": 4,
+        "reserved_fee_components": 4,
         "resolved_components": 4,
         "resolved_occurrences": 4,
         "schedule_codes_read": 4,
@@ -2824,7 +2844,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
         "encoded_slots": 1,
         "payment_rules_read": 1,
         "payment_shifts": 1,
-        "reserved_components": 1,
+        "reserved_fee_components": 1,
         "resolved_components": 1,
         "resolved_occurrences": 1,
         "schedule_codes_read": 3,

@@ -1083,7 +1083,8 @@ $formulas = [ordered]@{
     "=_CreateTrades(EB1,EW4:FA4,OJ3:ON4,EW3)" = "#ERROR _CreateTrades: ValueError: trade_id row 2 is 123456.5, expected a whole number of at most 15 digits"
     '=_CreateTradeTemplate("fixed_float",OJ10:OP10,OJ14:OP14)' = "#ERROR _CreateTradeTemplate: ValueError: trade_id is 12.5, expected a whole number of at most 15 digits"
     # Reserve totals, reserve-totals.md: the worked example in OR1:OW30, four Z26 rows on the
-    # ethane schedule with the ticket's rates, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT, booking 50 of
+    # ethane schedule with the ticket's rates, 2 LOT, -2 LOT, 1,000 BBL and 0 LOT, under a cleared
+    # template naming ION as broker since #NN, booking 50 of
     # brokerage and 20 of clearing in USD when the batch is made; _ReportReserves on the 2 December
     # results in OR23 spills the three totals and the currency, the results readback shows them
     # once, on the first slot row, and a dash on every later row of the ethane asian's 22 in IY16;
@@ -1112,7 +1113,9 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(OR23),3,19)"   = "50"
     "=INDEX(util_ReadHandle(OR23),3,20)"   = "20"
     "=INDEX(util_ReadHandle(OR23),3,22)"   = "USD"
-    "=COLUMNS(util_ReadHandle(OR16))"      = "22"
+    "=COLUMNS(util_ReadHandle(OR16))"      = "23"
+    "=INDEX(util_ReadHandle(OR16),1,9)"    = "broker"
+    "=INDEX(util_ReadHandle(OR16),3,9)"    = "ION"
     "=INDEX(_ReportReserves(IY16),3,1)"    = "0"
     "=INDEX(util_ReadHandle(IY16),3,19)"   = "0"
     "=INDEX(util_ReadHandle(IY16),3,22)"   = "USD"
@@ -1135,22 +1138,39 @@ $formulas = [ordered]@{
     "=INDEX(_ReportReserves(OR39),3,2)"    = "24"
     "=INDEX(_ReportReserves(OR39),3,3)"    = "65"
     "=INDEX(_ReportReserves(OR39),3,4)"    = "USD"
-    "=COLUMNS(util_ReadHandle(OR37))"      = "23"
-    "=INDEX(util_ReadHandle(OR37),1,15)"   = "marketing_reserve"
-    "=INDEX(util_ReadHandle(OR37),2,15)"   = "float64"
-    "=INDEX(util_ReadHandle(OR37),3,15)"   = "15"
-    "=INDEX(util_ReadHandle(OR37),5,15)"   = "25"
-    "=INDEX(util_ReadHandle(OR37),6,15)"   = "25"
+    "=COLUMNS(util_ReadHandle(OR37))"      = "24"
+    "=INDEX(util_ReadHandle(OR37),1,16)"   = "marketing_reserve"
+    "=INDEX(util_ReadHandle(OR37),2,16)"   = "float64"
+    "=INDEX(util_ReadHandle(OR37),3,16)"   = "15"
+    "=INDEX(util_ReadHandle(OR37),5,16)"   = "25"
+    "=INDEX(util_ReadHandle(OR37),6,16)"   = "25"
     "=INDEX(util_ReadHandle(OR37),6,4)"    = "F27"
-    "=INDEX(util_ReadHandle(OR37),7,15)"   = "5"
-    "=INDEX(util_ReadHandle(OR37),1,16)"   = "entered_contract_code"
+    "=INDEX(util_ReadHandle(OR37),7,16)"   = "5"
+    "=INDEX(util_ReadHandle(OR37),1,17)"   = "entered_contract_code"
     "=INDEX(_ReportReserves(OR47),3,1)"    = "50"
     "=INDEX(_ReportReserves(OR47),3,3)"    = "28"
     "=INDEX(_ReportValues(OR47),3,1)"      = "1260"
     '=INDEX(_ReportRisk(OR47,"nominal_delta","year"),4,2)'        = "1"
+    # Since #NN, reserve-fee-applicability.md: brokerage charges the rows naming a broker and
+    # clearing the cleared route, the rates the selected specification's. The same four rows under
+    # the cleared template without a broker in OR64 book no brokerage and the same 20 of clearing
+    # in OR67, the mark and the lot as before; the broker column mixing ION, None, none and NONE in
+    # OR69:OX73 charges the ION row alone, 20, in OR76, every text read back as typed; a broker from
+    # both the template and the ticket is refused.
+    "=INDEX(_ReportReserves(OR67),3,1)"    = "0"
+    "=INDEX(_ReportReserves(OR67),3,2)"    = "20"
+    "=INDEX(_ReportValues(OR67),3,1)"      = "1260"
+    "=COLUMNS(util_ReadHandle(OR65))"      = "22"
+    "=INDEX(_ReportReserves(OR76),3,1)"    = "20"
+    "=INDEX(_ReportReserves(OR76),3,2)"    = "20"
+    "=INDEX(util_ReadHandle(OR74),1,9)"    = "broker"
+    "=INDEX(util_ReadHandle(OR74),3,9)"    = "ION"
+    "=INDEX(util_ReadHandle(OR74),4,9)"    = "None"
+    "=INDEX(util_ReadHandle(OR74),6,9)"    = "NONE"
+    "=_CreateTrades(OR5,OR69:OX69,OR70:OX73,OR9)" = "#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, expected by one of them"
     "=INDEX(util_ReadHandle(OR44),1,9)"    = "marketing_reserve"
     "=INDEX(util_ReadHandle(OR44),3,9)"    = "7"
-    "=INDEX(util_ReadHandle(OR45),3,15)"   = "7"
+    "=INDEX(util_ReadHandle(OR45),3,16)"   = "7"
     "=_CreateTrades(OR5,OR32:OX32,OR40:OX40,OR9)" = "#ERROR _CreateTrades: ValueError: marketing_reserve row 1 is -5.0, expected a finite amount of zero or more"
     '=_CreateTradeTemplate("fixed_float",{"marketing_reserve"},{-5})' = "#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more"
     "=_CreateTrades(OR5,OR32:OX32,OR33:OX36,OR44)" = "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them"
@@ -2290,9 +2310,9 @@ $cells = [ordered]@{
     "OR3" = "GAL"; "OS3" = "1"; "OT3" = "GAL"; "OU3" = "0"; "OV3" = "0"
     "OR4" = "=_CreateContractSpecifications(EI1:EM1,OR1:OV3)"
     "OR5" = '=_CreateIndex("RESERVES","Ethane with the reserve ticket rates",IA5,ID1,OR4,IC1,"LOT")'
-    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_time_lag"; "OX7" = "payment_holiday_calendar"
-    "OR8" = "month"; "OS8" = "lastday"; "OT8" = "cleared"; "OU8" = "financial"; "OV8" = "Prototype Clearing"; "OW8" = "+2bd"; "OX8" = "=IC2"
-    "OR9" = '=_CreateTradeTemplate("fixed_float",OR7:OX7,OR8:OX8)'
+    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_time_lag"; "OX7" = "payment_holiday_calendar"; "OY7" = "broker"
+    "OR8" = "month"; "OS8" = "lastday"; "OT8" = "cleared"; "OU8" = "financial"; "OV8" = "Prototype Clearing"; "OW8" = "+2bd"; "OX8" = "=IC2"; "OY8" = "ION"
+    "OR9" = '=_CreateTradeTemplate("fixed_float",OR7:OY7,OR8:OY8)'
     "OR10" = "trade_id"; "OS10" = "trade_date"; "OT10" = "contract_code"; "OU10" = "quantity"; "OV10" = "quantity_unit"; "OW10" = "fixed_price"
     "OR11" = "101"; "OS11" = "20-Nov-2026"; "OT11" = "Z26"; "OU11" = "2"; "OV11" = "LOT"; "OW11" = "0.25"
     "OR12" = "102"; "OS12" = "20-Nov-2026"; "OT12" = "Z26"; "OU12" = "-2"; "OV12" = "LOT"; "OW12" = "0.25"
@@ -2327,9 +2347,9 @@ $cells = [ordered]@{
     "OR38" = "=_PrepareTrades(OR37,OR19)"
     "OR39" = "=_EvaluateTrades(OR38,OR21)"
     "OR40" = "1002"; "OS40" = "20-Nov-2026"; "OT40" = "Z26"; "OU40" = "-2"; "OV40" = "LOT"; "OW40" = "0.25"; "OX40" = "-5"
-    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_time_lag"; "OX42" = "payment_holiday_calendar"; "OY42" = "marketing_reserve"
-    "OR43" = "month"; "OS43" = "lastday"; "OT43" = "cleared"; "OU43" = "financial"; "OV43" = "Prototype Clearing"; "OW43" = "+2bd"; "OX43" = "=IC2"; "OY43" = "7"
-    "OR44" = '=_CreateTradeTemplate("fixed_float",OR42:OY42,OR43:OY43)'
+    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_time_lag"; "OX42" = "payment_holiday_calendar"; "OY42" = "marketing_reserve"; "OZ42" = "broker"
+    "OR43" = "month"; "OS43" = "lastday"; "OT43" = "cleared"; "OU43" = "financial"; "OV43" = "Prototype Clearing"; "OW43" = "+2bd"; "OX43" = "=IC2"; "OY43" = "7"; "OZ43" = "ION"
+    "OR44" = '=_CreateTradeTemplate("fixed_float",OR42:OZ42,OR43:OZ43)'
     "OR45" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR44)"
     "OR46" = "=_PrepareTrades(OR45,OR19)"
     "OR47" = "=_EvaluateTrades(OR46,OR21)"
@@ -2345,6 +2365,22 @@ $cells = [ordered]@{
     "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_time_lag"; "OW61" = "payment_holiday_calendar"
     "OR62" = "month"; "OS62" = "lastday"; "OT62" = "bilateral"; "OU62" = "financial"; "OV62" = "+2bd"; "OW62" = "=IC2"
     "OR60" = '=_CreateTradeTemplate("fixed_float",OR61:OW61,OR62:OW62)'
+    # Since #NN, reserve-fee-applicability.md: the cleared template without a broker over the same
+    # cells less OY, its batch of the four rows prepared and valued on 2 December in OR64:OR67, and
+    # a ticket with a broker column mixing ION, None, none and NONE under it in OR69:OX73, its
+    # batch prepared and valued in OR74:OR76.
+    "OR64" = '=_CreateTradeTemplate("fixed_float",OR7:OX7,OR8:OX8)'
+    "OR65" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR64)"
+    "OR66" = "=_PrepareTrades(OR65,OR19)"
+    "OR67" = "=_EvaluateTrades(OR66,OR21)"
+    "OR69" = "trade_id"; "OS69" = "trade_date"; "OT69" = "contract_code"; "OU69" = "quantity"; "OV69" = "quantity_unit"; "OW69" = "fixed_price"; "OX69" = "broker"
+    "OR70" = "101"; "OS70" = "20-Nov-2026"; "OT70" = "Z26"; "OU70" = "2"; "OV70" = "LOT"; "OW70" = "0.25"; "OX70" = "ION"
+    "OR71" = "102"; "OS71" = "20-Nov-2026"; "OT71" = "Z26"; "OU71" = "-2"; "OV71" = "LOT"; "OW71" = "0.25"; "OX71" = "None"
+    "OR72" = "103"; "OS72" = "20-Nov-2026"; "OT72" = "Z26"; "OU72" = "1000"; "OV72" = "BBL"; "OW72" = "0.25"; "OX72" = "none"
+    "OR73" = "104"; "OS73" = "20-Nov-2026"; "OT73" = "Z26"; "OU73" = "0"; "OV73" = "LOT"; "OW73" = "0.25"; "OX73" = "NONE"
+    "OR74" = "=_CreateTrades(OR5,OR69:OX69,OR70:OX73,OR64)"
+    "OR75" = "=_PrepareTrades(OR74,OR19)"
+    "OR76" = "=_EvaluateTrades(OR75,OR21)"
     # A curve's anchors: three dates over eleven days and their factors, a pair whose dates run
     # backwards, and the creator cell over the anchors, under the curve's headers at Y1:Z1.
     "AU2" = "11-Sep-2026"; "AV2" = "1"

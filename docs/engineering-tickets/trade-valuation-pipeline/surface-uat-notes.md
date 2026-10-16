@@ -36,6 +36,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 18 / item 15 | [Half-year strip labels](half-year-strips.md) | [#182](https://github.com/gobbles404/goosedove/pull/182), awaiting review | Book `1h27` or `2H27` in `contract_code` on an index whose schedule has the six months and read back six components with the code as typed; compare with `F27-M27` and six monthly rows, the same values and risk; try `H27`, which is March, `0H27`, which is refused, and `util_StartDate("BAL1H27", B1)` with a valuation-date handle inside the half. |
 | 19 / item 16 | [Combine holiday calendars](combine-holiday-calendars.md) | [#183](https://github.com/gobbles404/goosedove/pull/183), awaiting review | Create two calendars and combine them with `_CombineHolidayCalendars(B2:B3)`; read the result back and see each day once in order; shift 9 October 2026 by `+1bd` on the combination and on each source; point a template's `payment_holiday_calendar` at the combination and read the trade's payment day back; change a source's day and watch the combination and the payment day follow. |
 | 20 / item 17 | [Risk reporting by pricing contract month](risk-contract-month-bucketing.md) | [#186](https://github.com/gobbles404/goosedove/pull/186), awaiting review | Hold +10 X26 and +5 Z26 of an NG-like index on 14 October 2026 and read `_ReportRisk(results,"nominal_delta","month")`: October 0, November 10, December 5 under a Total of 15, the day view 10 on the 28th and 5 on the 25th; an October ethane asian in October; the same window on NG split November and December by the contract pricing each day; roll the valuation date and watch the start move; try a schedule that keeps a September contract live into October and read the refusal. The kept workbook's block from row 2639 shows the three cases: the hand example, the roll to November and the refusal. |
+| 21 / item 18 | [Brokerage and clearing applicability](reserve-fee-applicability.md) | [#NN](https://github.com/gobbles404/goosedove/pull/NN), awaiting review | On a specification charging 10 brokerage and 4 clearing per LOT, book one +10 LOT month four ways and read `_ReportReserves`: bilateral direct 0/0, bilateral brokered 100/0, cleared direct 0/40, cleared brokered 100/40; type `None`, `none` or `NONE` as the broker and see no brokerage; mix `ION` and `None` in a ticket column; move the broker between template and ticket; sell instead of buy; read the kept workbook's block from row 2722. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -525,3 +526,25 @@ roll split correctly, October as the initial zero row where appropriate, and
 unchanged scalar totals, discounting and DV01. Check year boundaries, mixed-index
 collections and held results across an as_of change. Earlier nonzero risk must
 never be silently removed by the new display start.
+
+## 18. Brokerage and clearing applicability
+
+Owner agreement, 15 October: specification rates alone must not incur fees. Apply
+brokerage only when the trade names a broker, the text `none` in any case naming none,
+so a screen trade can say so; apply clearing only on the cleared route. Bilateral direct
+trades reserve neither; bilateral brokered trades reserve brokerage only. Cleared trades
+retain their required clearing house and reserve brokerage only if a broker is named.
+
+The [focused ticket](reserve-fee-applicability.md) is built in #NN as one PR with two
+commits: fee applicability first, then the related instrument descriptions used in the
+template/ticket workflow. UAT is pending. A template's broker applies to every row and a
+ticket column may mix named brokers and `none`; existing blank-cell, duplicate-field and
+route rules remain. Specification rates and quantity sizing remain the same, as do marketing
+reserves and all valuation/risk calculations.
+
+UAT: on a specification charging 10 brokerage and 4 clearing per LOT, a 10 LOT one-month
+batch reports brokerage/clearing of 0/0 for bilateral direct, 100/0 for bilateral brokered,
+0/40 for cleared direct and 100/40 for cleared brokered; two +10 LOT rows with `ION` and
+`None` report 100/80 cleared and 100/0 bilateral. Check template/ticket parity, equal
+costs for buys and sells, and unchanged totals through quote, curve and history updates of
+the same created batch.

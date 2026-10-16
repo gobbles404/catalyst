@@ -2600,12 +2600,17 @@ def ete_index(
     return str(made)
 
 
-def ete_template(basis: str | None = "month") -> str:
+def ete_template(basis: str | None = "month", broker: str | None = None) -> str:
     """A financial template paying one business day after the last observation on a calendar
-    closed on New Year's Day, the basis in it unless None leaves it to the ticket."""
+    closed on New Year's Day, the basis in it unless None leaves it to the ticket, and since #NN
+    naming the broker given, the fee examples' ION, so that they still charge brokerage."""
     payments = str(ENTRY["_CreateHolidayCalendar"](column([serial("2027-01-01")])))
     fields = ["quantity_per", *ETE_FIELDS, "payment_holiday_calendar"]
     values: list[object] = [basis, "cleared", "financial", "ETE Clearing", "+1bd", payments]
+    if broker is not None:
+        k = fields.index("clearing_house") + 1
+        fields.insert(k, "broker")
+        values.insert(k, broker)
     if basis is None:
         fields, values = fields[1:], values[1:]
     return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
@@ -3684,7 +3689,7 @@ RESERVE_HEADERS = ["brokerage_reserve", "clearing_reserve", "marketing_reserve",
 
 @pytest.fixture(scope="module")
 def fees() -> dict[str, Any]:
-    return {"index": ete_index(fees=RESERVE_FEES), "template": ete_template()}
+    return {"index": ete_index(fees=RESERVE_FEES), "template": ete_template(broker="ION")}
 
 
 def reserved(results: str) -> list[list[object]]:
@@ -3772,11 +3777,13 @@ def test_recreating_the_batch_with_other_quantities_or_rates_books_other_reserve
     )
     assert reserved(results)[2] == [100.0, 40.0, 0.0, "USD"]
     dearer = ete_index(fees={"LOT": (12.0, 5.0), "BBL": (0.02, 0.005)})
-    _, _, results = ete_state(dearer, ete_template(), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
+    _, _, results = ete_state(
+        dearer, ete_template(broker="ION"), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
+    )
     assert reserved(results)[2] == [68.0, 25.0, 0.0, "USD"]  # 24 + 24 + 20 and 10 + 10 + 5
     by_barrel = ete_index(reporting_lot="BBL", fees=RESERVE_FEES)
     _, _, results = ete_state(
-        by_barrel, ete_template(), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
+        by_barrel, ete_template(broker="ION"), RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0)
     )
     assert reserved(results) == RESERVE_SPILL
     assert valued(results)[2] == pytest.approx(1_000.0)  # the lot changed, the reserves did not
@@ -3792,7 +3799,7 @@ def test_a_calday_strip_and_a_partial_asian_month_reserve_on_their_counts(
         [201.0, serial("2026-10-20"), "Z26-F27", 2.0, "BBL", 25.0, "lastday"]
     ]
     _, _, results = ete_state(
-        fees["index"], ete_template("calday"), strip, "2026-12-02", {}, (28.0, 29.0)
+        fees["index"], ete_template("calday", "ION"), strip, "2026-12-02", {}, (28.0, 29.0)
     )
     assert reserved(results)[2] == [pytest.approx(1.24), pytest.approx(0.496), 0.0, "USD"]
     partial: list[list[object]] = [
@@ -3818,7 +3825,7 @@ def test_reserves_past_the_largest_number_publish_no_batch() -> None:
     # lot each sum past it: the batch is refused at creation, naming the category and the row,
     # and nothing is published.
     huge = ete_index(fees={"LOT": (1e308, 0.0)})
-    template = ete_template()
+    template = ete_template(broker="ION")
     two = [[101.0, serial("2026-11-20"), "Z26", 2.0, "LOT", 25.0, "lastday"]]
     ones = [
         [101.0, serial("2026-11-20"), "Z26", 1.0, "LOT", 25.0, "lastday"],
@@ -4159,8 +4166,8 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     )
     assert reserved(doubled)[2] == [80.0, 32.0, 80.0, "USD"]
     seven = a_template_of(
-        ("quantity_per", *ETE_FIELDS, "marketing_reserve"),
-        ("month", "cleared", "financial", "ETE Clearing", "+1bd", 7.0),
+        ("quantity_per", *ETE_FIELDS, "broker", "marketing_reserve"),
+        ("month", "cleared", "financial", "ETE Clearing", "+1bd", "ION", 7.0),
     )
     _, _, templated = ete_state(fees["index"], seven, RESERVE_ROWS, "2026-12-02", {}, (28.0, 29.0))
     assert reserved(templated)[2] == [50.0, 20.0, 28.0, "USD"]
@@ -4198,8 +4205,8 @@ def test_a_marketing_reserve_is_refused_by_its_row_its_cell_or_its_template(
         "amount of zero or more"
     )
     seven = a_template_of(
-        ("quantity_per", *ETE_FIELDS, "marketing_reserve"),
-        ("month", "cleared", "financial", "ETE Clearing", "+1bd", 7.0),
+        ("quantity_per", *ETE_FIELDS, "broker", "marketing_reserve"),
+        ("month", "cleared", "financial", "ETE Clearing", "+1bd", "ION", 7.0),
     )
     assert create(index, row(*MARKETING_HEADERS), rows(*MARKETING_ROWS), seven) == (
         "#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by "
@@ -4834,3 +4841,121 @@ def test_a_half_year_values_as_its_six_months_do() -> None:
         line[exposure] for line in strip_table[2:]
     ]
     assert spilled(ENTRY["util_ReadHandle"](half)) == spilled(ENTRY["util_ReadHandle"](strip))
+
+
+# --- fee applicability, reserve-fee-applicability.md ---------------------------------------------
+# Since #NN brokerage charges the trades naming a broker and clearing the cleared route, the rates
+# the selected specification's: the ticket's four batches, one +10 LOT trade each on the RESERVES
+# index, LOT at 10 and 4 a lot, valued on 2 December 2026, the bilateral ones on a curve of ones.
+
+TEN_LOTS: list[list[object]] = [[1.0, serial("2026-11-20"), "Z26", 10.0, "LOT", 25.0, "lastday"]]
+FEE_CURVE = (("2026-12-02", 1.0), ("2027-01-29", 1.0))
+
+
+def fee_template(route: str, broker: str | None = None) -> str:
+    """A financial template on that route, a clearing house with the cleared one and a counterparty
+    with the bilateral, naming the broker when one is given, paying one business day after."""
+    cleared = route == "cleared"
+    fields = [
+        "quantity_per",
+        "route",
+        "settlement_method",
+        "clearing_house" if cleared else "counterparty",
+        "payment_time_lag",
+    ]
+    values: list[object] = [
+        "month",
+        route,
+        "financial",
+        "ETE Clearing" if cleared else "ACME Trading",
+        "+1bd",
+    ]
+    if broker is not None:
+        fields.insert(4, "broker")
+        values.insert(4, broker)
+    return a_template_of(tuple(fields), tuple(values))
+
+
+def fee_state(
+    index: str,
+    template: str,
+    lines: list[list[object]],
+    bilateral: bool,
+    headers: tuple[str, ...] = ETE_HEADERS,
+) -> tuple[str, str]:
+    """The batch made and valued on 2 December 2026 at 28 and 29, a bilateral one on the curve of
+    ones: the trades and the results handles."""
+    trades = ENTRY["_CreateTrades"](index, row(*headers), rows(*lines), template)
+    assert not str(trades).startswith("#ERROR"), trades
+    history = a_history(index, "2026-11-30", "2026-12-02", ETE_HOLIDAYS, {})
+    prepared = str(ENTRY["_PrepareTrades"](str(trades), history))
+    curve = unit_curve(*FEE_CURVE) if bilateral else bridge.MISSING
+    results = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", 28.0, 29.0), curve)
+    assert not str(results).startswith("#ERROR"), results
+    return str(trades), str(results)
+
+
+def test_each_fee_is_charged_where_the_booking_says_so_through_the_seam(
+    fees: dict[str, Any],
+) -> None:
+    index = fees["index"]
+
+    def booked(
+        route: str,
+        broker: str | None,
+        lines: list[list[object]] = TEN_LOTS,
+        headers: tuple[str, ...] = ETE_HEADERS,
+    ) -> list[object]:
+        template = fee_template(route, broker)
+        _, results = fee_state(index, template, lines, route == "bilateral", headers)
+        return reserved(results)[2]
+
+    assert booked("bilateral", None) == [0.0, 0.0, 0.0, "USD"]
+    assert booked("bilateral", "ION") == [100.0, 0.0, 0.0, "USD"]
+    assert booked("cleared", None) == [0.0, 40.0, 0.0, "USD"]
+    assert booked("cleared", "ION") == [100.0, 40.0, 0.0, "USD"]
+    for token in ("None", "none", "NONE"):
+        assert booked("bilateral", token) == [0.0, 0.0, 0.0, "USD"]
+        assert booked("cleared", token) == [0.0, 40.0, 0.0, "USD"]
+    sold: list[list[object]] = [[1.0, serial("2026-11-20"), "Z26", -10.0, "LOT", 25.0, "lastday"]]
+    assert booked("cleared", "ION", sold) == [100.0, 40.0, 0.0, "USD"]
+    assert booked("cleared", "ION", [*TEN_LOTS, *sold]) == [200.0, 80.0, 0.0, "USD"]
+    # The broker in the ticket's column instead: the same; a column mixing a broker and none
+    # charges the brokered row alone, every row clearing on the cleared route.
+    with_broker = (*ETE_HEADERS, "broker")
+    brokered: list[list[object]] = [[*TEN_LOTS[0], "ION"]]
+    assert booked("cleared", None, brokered, with_broker) == [100.0, 40.0, 0.0, "USD"]
+    mixed: list[list[object]] = [
+        [*TEN_LOTS[0], "ION"],
+        [2.0, serial("2026-11-20"), "Z26", 10.0, "LOT", 25.0, "lastday", "None"],
+    ]
+    assert booked("cleared", None, mixed, with_broker) == [100.0, 80.0, 0.0, "USD"]
+    assert booked("bilateral", None, mixed, with_broker) == [100.0, 0.0, 0.0, "USD"]
+    # The texts stand as typed in the readback, and neither value nor risk moves with the broker.
+    trades, results = fee_state(index, fee_template("cleared"), mixed, False, with_broker)
+    table = spilled(ENTRY["util_ReadHandle"](trades))
+    j = table[0].index("broker")
+    assert [line[j] for line in table[2:]] == ["ION", "None"]
+    _, direct = fee_state(index, fee_template("cleared"), [line[:-1] for line in mixed], False)
+    assert valued(results) == valued(direct)
+    assert spilled(ENTRY["_ReportRisk"](results, "all", "day")) == spilled(
+        ENTRY["_ReportRisk"](direct, "all", "day")
+    )
+
+
+def test_a_blank_broker_and_a_broker_in_both_template_and_ticket_are_still_refused(
+    fees: dict[str, Any],
+) -> None:
+    index = fees["index"]
+    headers = (*ETE_HEADERS, "broker")
+    blank = ENTRY["_CreateTrades"](
+        index, row(*headers), rows([*TEN_LOTS[0], None]), fee_template("cleared")
+    )
+    assert blank == "#ERROR _CreateTrades: trade_rows cell (1, 8) is blank, expected text"
+    both = ENTRY["_CreateTrades"](
+        index, row(*headers), rows([*TEN_LOTS[0], "None"]), fee_template("cleared", "ION")
+    )
+    assert both == (
+        "#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, "
+        "expected by one of them"
+    )
