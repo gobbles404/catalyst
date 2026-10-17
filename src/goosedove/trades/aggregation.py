@@ -48,7 +48,7 @@ from goosedove.trades.display_axes import (
     rows_through,
 )
 from goosedove.trades.encoding import PaymentAxes
-from goosedove.trades.evaluation import (
+from goosedove.trades.results import (
     NO_DAYS,
     NOTHING,
     Bucket,

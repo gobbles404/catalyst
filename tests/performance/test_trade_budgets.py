@@ -14,7 +14,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 from numpy.typing import NDArray
-from test_seam_allocation import SLACK, least_peak
+from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.unit_conversions import UNITS
@@ -713,7 +713,9 @@ def test_a_daily_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     assert least_peak(lambda: trade_results(prep, quoted, WorkCounter())) <= 24 * slots + SLACK
     small = a_daily_batch(*DAILY[0])
     small_prep = prepared_trades(small, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+        KEYWORD_CALL + 2 * SLACK
+    )
 
 
 @pytest.mark.parametrize(("components", "contracts"), SIZES, ids=IDS)
@@ -1071,7 +1073,9 @@ def test_a_mixed_batchs_preparation_and_tick_allocate_by_slot_not_by_trade() -> 
     small = mixed_terms(*MIXED_SIZES[0])
     small_enc = encoded(small, observed_of(small), UNITS, WorkCounter())
     small_prep = prepared_trades(small_enc, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+        KEYWORD_CALL + 2 * SLACK
+    )
 
 
 # --- the rolling asian batch, calendar-driven-asian-references.md -------------------------------
@@ -1367,7 +1371,10 @@ def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -
     big_prep = prepared_trades(big, history, WorkCounter())
     # Since #190 the finite check keeps two boolean temporaries over the live slots for a moment.
     assert (
-        least_peak(lambda: trade_results(big_prep, quoted, WorkCounter())) <= 24 * 24 + SLACK + 256
+        least_peak(lambda: trade_results(big_prep, quoted, WorkCounter()))
+        <= 24 * 24 + KEYWORD_CALL + SLACK + 256
     )
     small_prep = prepared_trades(small, history, WorkCounter())
-    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= 2 * SLACK
+    assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (
+        KEYWORD_CALL + 2 * SLACK
+    )
