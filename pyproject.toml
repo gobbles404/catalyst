@@ -38,6 +38,7 @@ max-complexity = 12
 
 [tool.pyright]
 include = ["src", "tests", "tools"]
+extraPaths = ["src", "tools"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportUnnecessaryIsInstance = "error"
@@ -51,4 +52,5 @@ reportUnknownArgumentType = "warning"
 [tool.pytest.ini_options]
 addopts = "-q -ra --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["tools"]
 filterwarnings = ["error"]

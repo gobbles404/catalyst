@@ -227,7 +227,7 @@ dotnet test host\Goosedove.Host.Tests -c Release  # the host's tests, no Excel n
 .\tools\excel_lifetime.ps1                          # every lifetime group, before merging ownership changes
 ```
 
-`uv run pytest -n auto` already runs the pins; the fifth line is for when they are what you are working on. The host's tests start Python themselves, finding the project's own with `uv run python`, so they need no config file and no Excel. Never add `# type: ignore` or `# noqa` to get a step green; fix the code. And after pulling:
+`uv run pytest -n auto` already runs the pins, and the documentation link check of section 11; the fifth line is for when the pins are what you are working on. The host's tests start Python themselves, finding the project's own with `uv run python`, so they need no config file and no Excel. Never add `# type: ignore` or `# noqa` to get a step green; fix the code. And after pulling:
 
 ```powershell
 uv sync --locked
@@ -274,6 +274,7 @@ uv sync --locked
 | the smoke test in a hidden Excel, Excel by hand, the build and the config it writes | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/host_build.ps1` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
+| the documentation link check, section 11, and its exceptions | `tools/check_doc_links.py`, `tools/doc_link_exceptions.toml` when one exists, `tests/test_doc_links.py` |
 | what CI runs | `.github/workflows/ci.yml` |
 | the rules, the tenets, and the general learnings | `AGENTS.md`, `PRINCIPLES.md`, [golden-rules.md](../golden-rules.md) |
 
@@ -295,3 +296,11 @@ One owner per fact. A page says what the code does today, and for anything else 
 | a proposed behaviour or an open decision | its ticket under `docs/engineering-tickets/`, marked as proposed; a ticket that has been built is the plan as it was, and the pages above say what is |
 
 Keep the contracts precise through any cleanup: units, accepted inputs, financial meaning, the order of refusals and intentional limitations stay as they are. When the code, a test and a page disagree, record the disagreement for its own decision; do not pick one by editing the other two.
+
+## 11. Checking the links
+
+`uv run python tools/check_doc_links.py` follows every local link in the repository's Markdown and says which no longer resolve; `tests/test_doc_links.py` runs the same check, so `.\check.ps1` and CI fail on a broken reference before it ships. It sees the working tree of the Git-indexed files: `git ls-files` says which files exist and their text is read from disk, so an edit saved but not committed counts, a staged new page counts, and a page that exists only untracked, in another checkout or in an open pull request is a missing target until it is added here.
+
+What it checks: inline links and images; reference links through their definitions; the fragment of a Markdown target against the headings as GitHub names them, `## 10. What each page owns` being `#10-what-each-page-owns` and a repeated heading `-1`, `-2`, and the explicit `<a id>` anchors, which may not repeat or shadow a heading; a path's spelling against Git's, case included; percent-encoded paths, `<...>` destinations holding spaces and a query string, which changes nothing; a directory, valid when it holds a tracked file. It does not fetch external links, read a source line or a PDF page named after a `#`, or look inside code blocks, inline code and HTML comments, where a link is an example. It also holds the decision numbers in the Decided sections of [inputs.md](inputs.md) and [outputs.md](outputs.md) unique, the convention that two rules numbered 43 once broke; a new rule takes a named section, as [NUL in input text](inputs.md#nul-in-input-text) does.
+
+Each line of its output names the source file, its line, the reason and the destination as written, with the resolved path after an arrow when it differs: `docs/seam/host.md:60: unknown fragment: inputs.md#old-input-rule`. Fix the reference: retarget it, or remove the link and keep the words. A frozen historical page that must keep a link to a path that no longer exists may carry an exception in `tools/doc_link_exceptions.toml`, one `[[exception]]` with `source`, `destination` exactly as written and `reason`; an exception that matches no failure is itself a failure, so the file never outlives what it excuses. There are none today.
