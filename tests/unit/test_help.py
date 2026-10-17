@@ -184,6 +184,33 @@ def test_the_date_shift_explains_itself() -> None:
     ]
 
 
+def test_the_interpolation_explains_itself() -> None:
+    description, arguments, hidden = SPECS["util_InterpolateContracts"]
+    assert not hidden
+    assert description == (
+        "Infers every monthly contract from the first anchor's month through the last's, each "
+        "with the index's futures expiry and the price on the straight line between its anchors "
+        "weighted by calendar days, and spills contract_code, future_expiry and price."
+    )
+    assert arguments == [
+        (
+            "index",
+            "The index handle: the cell showing _CreateIndex's result, such as B9, or a name for "
+            "it; a futures index, whose schedule has a futures expiry per contract.",
+        ),
+        (
+            "anchor_contracts",
+            "A column of at least two contract months in increasing order, each a code such as "
+            "F26 or the month as CME spells it, 202601, as text, without a header, such as A2:A3.",
+        ),
+        (
+            "anchor_prices",
+            "A column of one price per anchor, in the same rows and the index's quote convention, "
+            "without a header, such as B2:B3.",
+        ),
+    ]
+
+
 def test_the_futures_schedule_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateFuturesSchedule"]
     assert not hidden

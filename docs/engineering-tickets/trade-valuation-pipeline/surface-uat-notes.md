@@ -38,6 +38,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 20 / item 17 | [Risk reporting by pricing contract month](risk-contract-month-bucketing.md) | [#186](https://github.com/gobbles404/goosedove/pull/186), awaiting review | Hold +10 X26 and +5 Z26 of an NG-like index on 14 October 2026 and read `_ReportRisk(results,"nominal_delta","month")`: October 0, November 10, December 5 under a Total of 15, the day view 10 on the 28th and 5 on the 25th; an October ethane asian in October; the same window on NG split November and December by the contract pricing each day; roll the valuation date and watch the start move; try a schedule that keeps a September contract live into October and read the refusal. The kept workbook's block from row 2639 shows the three cases: the hand example, the roll to November and the refusal. |
 | 22 / cross-gamma | [Cross gamma of commodity delta to one discount curve](single-curve-cross-gamma.md) | [#197](https://github.com/gobbles404/goosedove/pull/197), awaiting review | Evaluate a bilateral batch on a curve and read `_ReportRisk(results,"cross_gamma","month")`: the Total in lots per basis point over the contract's months, negative for lots bought and paid for later; `all` ends with the column; tick the quote and watch it stand, move a factor and watch it move; collect a cleared and a bilateral batch of one index and read the cleared pair's zero column beside the curve's; read `contract_cross_gamma` and `cross_gamma_unit` at the end of `util_ReadHandle` on the results. The kept workbook's block from row 2767 holds the ticket's example with its quote and curve moves. |
 | 21 / item 18 | [Brokerage and clearing applicability](reserve-fee-applicability.md) | [#188](https://github.com/gobbles404/goosedove/pull/188), awaiting review | On a specification charging 10 brokerage and 4 clearing per LOT, book one +10 LOT month four ways and read `_ReportReserves`: bilateral direct 0/0, bilateral brokered 100/0, cleared direct 0/40, cleared brokered 100/40; type `None`, `none` or `NONE` as the broker and see no brokerage; mix `ION` and `None` in a ticket column; move the broker between template and ticket; sell instead of buy; read the kept workbook's block from row 2722. |
+| 23 / item 21 | [Linear interpolation of contract prices](interpolate-contract-prices.md) | [#198](https://github.com/gobbles404/goosedove/pull/198), awaiting review | Point `util_InterpolateContracts` at an index handle, a column of two or more contract months as codes or as CME spells them, `202704`, typed as text, and a column of their prices: the spill names every month from the first anchor's through the last's with its futures expiry and its price on the line between the anchors by calendar days, the ticket's `J27` at 70 and `M27` at 76 putting `K27` at 72.949, 29 of 59 days along. Feed the price column to `_CreatePriceVector` from the market's prompt; move an anchor price or a schedule expiry and watch the spill, the market and the mark follow; type the anchors out of order, twice, or as numbers and read the refusals. The kept workbook's block from row 2812 holds the example with its two moves and the same mark on the prices typed by hand. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -568,3 +569,33 @@ years out at 0.90, both observing G27 on 1 February 2027 and quoted 72, the cros
 -0.00005 of 5 lots of delta, -0.00095 and +0.0009 by trade; quoted 73 it stands while the NPV
 and the DV01 move; at 0.96 and 0.92 it is -0.00004 under the same 5 lots of delta. Check the
 widened `all`, the cleared zero column in a mixed collection, and the two readback columns.
+
+## 20. Ticket and reference-data hygiene
+
+Owner steer, 17 October: revisit consistent counterparty and broker identities, entry
+guards and possible future CTRM interoperability around the quoting arc. This is separate
+from cross-gamma and has no implementation ticket yet. The entry mechanism remains open;
+dropdowns have not been selected. No reference-data registry or trade-validation change is
+part of item 19.
+
+## 21. Linear interpolation of contract prices
+
+Owner agreement, 17 October: a focused interpolation utility before multiple discount curves
+within a trade array, independent of the cross-gamma work. The
+[focused ticket](interpolate-contract-prices.md) is built in #198 as one feature PR;
+[interpolate-contracts.md](../../library/utilities/interpolate-contracts.md) owns the function.
+
+`util_InterpolateContracts(index, anchor_contracts, anchor_prices)` takes outright month
+codes or the months as CME spells them, as text, and infers every monthly contract from the
+first anchor's through the last's, inclusive. The weights are the calendar days between the
+index's scheduled futures expiries. The spill is `contract_code`, `future_expiry` and `price`
+in contract-month order. A month the schedule lacks, or has twice, is refused. The sheet
+selects the price rows the existing price-vector creator takes, from the market's prompt; no
+valuation-date dependency, extrapolation, seasonal model or new market handle.
+
+UAT: the CL-style expiry-weighted example, `K27` at 72.949 between `J27` at 70 and `M27` at 76;
+December to December giving thirteen monthly rows; a code and its CME text the same month; an
+anchor's own price exact; the contract, date and price paired in view; a missing month refused;
+and the price column feeding an ordinary vector and market through an anchor-price move and an
+expiry move, with the same mark on the same prices typed by hand. The kept workbook's block
+from row 2812 holds the example.

@@ -23,6 +23,7 @@ import pytest
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import MISSING, Cells
+from goosedove.index_definitions.contract_codes import code_of_month
 
 # Each function's prepared path, fetched once as the host does at registration.
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
@@ -1184,3 +1185,30 @@ def test_a_combination_keeps_its_distinct_days_and_release_frees_them() -> None:
     )
     kept = retained_numpy_bytes(lambda: ENTRY["_CombineHolidayCalendars"](sources))
     assert kept == (dates * DAY_BYTES, 0)
+
+
+# An interpolation pays the library's own peak, test_interpolation_budgets.py, about 21 bytes a
+# schedule row and 59 a month generated beyond some six slacks of small objects, and about a
+# hundred bytes more for the seam, since the three columns go out as they are: measured 6,520
+# bytes for three months and 12,801 for a hundred and twenty on 2026-10-17, each on a schedule
+# of as many rows, and 102,290 for twelve hundred; nothing is published.
+@pytest.mark.parametrize("contracts", [3, 120])
+def test_an_interpolation_costs_its_months_and_publishes_nothing(contracts: int) -> None:
+    first = np.datetime64("2027-01", "M")
+    months = np.arange(first, first + np.timedelta64(contracts, "M"), dtype="datetime64[M]")
+    codes = [[code_of_month(m.astype("datetime64[D]"))] for m in months]
+    # Each expiring on the 20th of the month before, as the sheet sends dates: serials, days
+    # since Excel's day zero, 25,569 days before numpy's.
+    days = (months - np.timedelta64(1, "M")).astype("datetime64[D]").astype(np.int64) + 19
+    serials = [[float(day + 25569)] for day in days.tolist()]
+    index = an_index(
+        ENTRY["_CreateFuturesSchedule"](Cells.from_rows(codes), Cells.from_rows(serials), MISSING),
+        ENTRY["_CreateHolidayCalendar"](holiday_column(1)),
+    )
+    anchors = Cells.from_rows([codes[0], codes[-1]])
+    prices = Cells.from_rows([[60.0], [72.0]])
+    live = bridge.live_handles()
+    assert least_peak(lambda: ENTRY["util_InterpolateContracts"](index, anchors, prices)) <= (
+        88 * contracts + 8 * SLACK
+    )
+    assert bridge.live_handles() == live

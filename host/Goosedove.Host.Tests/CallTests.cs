@@ -146,6 +146,9 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_FutToCme", new object[] { "F2026" }, "#ERROR util_FutToCme: ValueError: contract is 'F2026', expected a month letter and a two-digit year, such as F26" };
             yield return new object[] { "util_FutToCme", new object[] { "" }, "#ERROR util_FutToCme: contract is empty text, expected text" };
             yield return new object[] { "util_FutToCme", new object[] { ExcelMissing.Value }, "#ERROR util_FutToCme: contract is missing, expected text" };
+            // Contract prices interpolated between anchors: the index handle first, missing or naming no live object, in the seam's words; the live index and the library's rules are in the fact below.
+            yield return new object[] { "util_InterpolateContracts", new object[] { ExcelMissing.Value, Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is missing, expected index handle" };
+            yield return new object[] { "util_InterpolateContracts", new object[] { "x", Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is text 'x' naming no live object, expected index handle" };
             // The two date helpers: a day in and the code of its month out, in capitals; a code in and the first day of its month out, a serial. A day outside the years two digits name and a strip fail in the library's words, a serial with a time, text and a blank in the seam's.
             yield return new object[] { "util_DateToFut", new object[] { 46161.0 }, "K26" };
             yield return new object[] { "util_DateToFut", new object[] { 46387.0 }, "Z26" };
@@ -389,6 +392,40 @@ namespace Goosedove.Host.Tests
             Assert.Equal(2, plain.GetLength(1));
             Assert.Equal("future_expiry", plain[0, 1]);
             Assert.Equal(46161.0, plain[2, 1]);
+        }
+
+        // Contract prices interpolated between anchors, interpolate-contract-prices.md: the ticket's
+        // CL-style index, J27, K27 and M27 expiring 22 March, 20 April and 20 May 2027, quoted 70 in
+        // April as CME spells it and 76 in June by code, spills the three months under two heading
+        // rows, their expiries as serials and May 29 of 59 days along. Anchors out of order and a
+        // schedule missing a month are refused in the library's words, a numeric month in the seam's.
+        [Fact]
+        public void contract_prices_are_interpolated_between_anchors_on_the_index_schedule()
+        {
+            var holidays = Seam.Call("_CreateHolidayCalendar", Column(47484.0));
+            var index = Index(Seam.Call("_CreateFuturesSchedule", Column("J27", "K27", "M27"), Column(46468.0, 46497.0, 46527.0), ExcelMissing.Value), holidays, "CL");
+            var spill = (object[,])Seam.Call("util_InterpolateContracts", index, Column("202704", "M27"), Column(70.0, 76.0));
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("contract_code", spill[0, 0]);
+            Assert.Equal("future_expiry", spill[0, 1]);
+            Assert.Equal("price", spill[0, 2]);
+            Assert.Equal("str", spill[1, 0]);
+            Assert.Equal("datetime64[D]", spill[1, 1]);
+            Assert.Equal("float64", spill[1, 2]);
+            Assert.Equal("J27", spill[2, 0]);
+            Assert.Equal("K27", spill[3, 0]);
+            Assert.Equal("M27", spill[4, 0]);
+            Assert.Equal(46468.0, spill[2, 1]);
+            Assert.Equal(46497.0, spill[3, 1]);
+            Assert.Equal(46527.0, spill[4, 1]);
+            Assert.Equal(70.0, spill[2, 2]);
+            Assert.Equal(72.94915254237289, (double)spill[3, 2], 12);
+            Assert.Equal(76.0, spill[4, 2]);
+            Assert.Equal("#ERROR util_InterpolateContracts: ValueError: anchor_contracts row 2 is 'J27', 2027-04, expected a month after row 1's 'M27', 2027-06", Seam.Call("util_InterpolateContracts", index, Column("M27", "J27"), Column(76.0, 70.0)));
+            Assert.Equal("#ERROR util_InterpolateContracts: anchor_contracts cell (1, 1) is number 202704.0, expected text", Seam.Call("util_InterpolateContracts", index, Column(202704.0, 202706.0), Column(70.0, 76.0)));
+            var gapped = Index(Seam.Call("_CreateFuturesSchedule", Column("J27", "M27"), Column(46468.0, 46527.0), ExcelMissing.Value), holidays, "GAP");
+            Assert.Equal("#ERROR util_InterpolateContracts: ValueError: the index's schedule has no contract for 2027-05, K27, expected every month from 2027-04 to 2027-06, the anchors' range", Seam.Call("util_InterpolateContracts", gapped, Column("J27", "M27"), Column(70.0, 76.0)));
         }
 
         // A row of the fixed_float's fields bound against the instrument named: the holiday calendar cell
