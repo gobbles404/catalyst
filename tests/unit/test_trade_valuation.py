@@ -133,6 +133,9 @@ NG_NOMINAL = "Henry Hub NYMEX nominal_delta [NYMEX NG]"
 NG_DELTA = "Henry Hub NYMEX delta [NYMEX NG]"
 CLEARED_DV01 = "cleared USD dv01 [USD per basis point]"
 CURVE_DV01 = "curve_1 USD dv01 [USD per basis point]"
+NG_CROSS = "Henry Hub NYMEX cleared cross_gamma [NYMEX NG per basis point]"
+NG_PER_BP = "lots of NYMEX NG (10000 MMBTU) per basis point"
+UNIT_CROSS = "UNIT curve_1 cross_gamma [UNIT per basis point]"
 
 
 def risk_head(as_of: str, *labels: str) -> list[list[object]]:
@@ -216,8 +219,8 @@ def test_the_risk_report_spills_the_selected_risk_with_its_total_first(
     ]
     everything = spilled(ENTRY["_ReportRisk"](results, "all", "month"))
     by_month = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", "month"))
-    assert everything[:3] == risk_head("2026-11-24", NG_NOMINAL, NG_DELTA, CLEARED_DV01)
-    assert everything[3:] == [[*line, line[1], 0.0] for line in by_month[3:]]
+    assert everything[:3] == risk_head("2026-11-24", NG_NOMINAL, NG_DELTA, CLEARED_DV01, NG_CROSS)
+    assert everything[3:] == [[*line, line[1], 0.0, 0.0] for line in by_month[3:]]
     assert by_header(results, "lot_unit")[0] == "lots of NYMEX NG (10000 MMBTU)"
 
 
@@ -260,12 +263,14 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
             "clearing_reserve",
             "marketing_reserve",
             "currency",
+            "contract_cross_gamma",
+            "cross_gamma_unit",
         ],
         ["str", "str", "datetime64[D]", "bool"]
         + ["float64"] * 7
         + ["str", "str"]
         + ["float64"] * 7
-        + ["str"],
+        + ["str", "float64", "str"],
     ]
     assert table[2][:6] == ["Z26", "Z26", serial("2026-11-25"), False, 160_000.0, 16.0]
     # The contract's risk four ways, the discounted twins the nominal arrays for a cleared
@@ -280,8 +285,13 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         0.0,
         0.0,
         "USD",
+        0.0,  # since #197 the contract's cross-gamma, nothing for a cleared batch, and its unit
+        NG_PER_BP,
     ]
-    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8
+    assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8 + [
+        0.0,
+        NG_PER_BP,
+    ]
     assert table[3][4:6] == [160_000.0 * -5 / 16, -5.0]
     assert table[3][6:11] == [pytest.approx(-175_000.0), -50_000.0, -50_000.0, -5.0, -5.0]
 
@@ -374,6 +384,7 @@ Z26_FIRST = {"2026-11-25": 3.22}
 Z26 = {"2026-11-25": 3.23}
 BOTH = {"2026-11-25": 3.23, "2026-12-29": 3.45}
 TOY_UNITS = ["USD per USD/MMBTU", "lots of TOY (10000 MMBTU)"]  # on every results row
+TOY_PER_BP = "lots of TOY (10000 MMBTU) per basis point"  # since #197, on every results row
 
 
 # The page's seven states, with its total P&L column typed from the page beside the mark and
@@ -480,8 +491,20 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         -5.0,
     ]
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[2] == [*z26, True, *([0.0] * 7), *TOY_UNITS, *["-"] * 4, 0.0, 0.0, 0.0, "USD"]
-    assert table[3][-4:] == ["-"] * 4
+    assert table[2] == [
+        *z26,
+        True,
+        *([0.0] * 7),
+        *TOY_UNITS,
+        *["-"] * 4,
+        0.0,
+        0.0,
+        0.0,
+        "USD",
+        0.0,
+        TOY_PER_BP,
+    ]
+    assert table[3][-6:-2] == ["-"] * 4
     assert table[3][:7] == [
         "F27",
         "F27",
@@ -505,11 +528,12 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 4
-        + [0.0, 0.0, 0.0, "USD"],
+        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
         + [0.0] * 7
         + TOY_UNITS
-        + ["-"] * 8,
+        + ["-"] * 8
+        + [0.0, TOY_PER_BP],
     ]
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
@@ -1121,7 +1145,12 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     assert table[2][:5] == ["Z26", "Z26", serial("2026-11-25"), False, 20_000.0]
     assert table[2][7] == 20_000.0 and table[2][9] == 2.0  # the contract's, and in lots
     units = ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"]
-    assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 7 + units + ["-"] * 8
+    assert table[3] == ["F27", "F27", serial("2026-12-29"), False] + [0.0] * 7 + units + [
+        "-"
+    ] * 8 + [
+        0.0,
+        NG_PER_BP,
+    ]
     sold_trades, sold_prepared, sold = entry_state(ng, -1.0)
     assert sold_trades != trades and sold_prepared != prepared and sold != results
     assert valued(sold) == (pytest.approx(1_000), 0.0, pytest.approx(1))  # a lot sold
@@ -1141,8 +1170,8 @@ def test_an_all_zero_batch_is_a_batch_like_any_other_reporting_nothing(ng: dict[
     results = ENTRY["_EvaluateTrades"](prepared, ng["market"], bridge.MISSING)
     assert spilled(ENTRY["_ReportValues"](results))[2] == [0.0, 0.0, "USD", serial("2026-11-24")]
     assert spilled(ENTRY["_ReportRisk"](results, "all", "year"))[:4] == [
-        *risk_head("2026-11-24", NG_NOMINAL, NG_DELTA, CLEARED_DV01),
-        ["Total", 0.0, 0.0, 0.0],
+        *risk_head("2026-11-24", NG_NOMINAL, NG_DELTA, CLEARED_DV01, NG_CROSS),
+        ["Total", 0.0, 0.0, 0.0, 0.0],
     ]
     assert by_header(results, "lot_unit")[0] == "lots of NYMEX NG (10000 MMBTU)"
     assert len(spilled(ENTRY["util_ReadHandle"](trades))) == 4  # both rows kept
@@ -2220,10 +2249,12 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "clearing_reserve",
         "marketing_reserve",
         "currency",
+        "contract_cross_gamma",
+        "cross_gamma_unit",
     ]
     assert [line[3] for line in table[2:]] == [line[3] for line in slots[2:]]
-    assert table[2][-4:] == [0.0, 0.0, 0.0, "USD"]
-    assert [line[-4:] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
+    assert table[2][-6:-2] == [0.0, 0.0, 0.0, "USD"]
+    assert [line[-6:-2] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
     assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 6  # the contract's
 
 
@@ -2680,6 +2711,8 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "clearing_reserve",
         "marketing_reserve",
         "currency",
+        "contract_cross_gamma",
+        "cross_gamma_unit",
     ]
     assert table[2][5:] == [
         pytest.approx(420.0),
@@ -2696,6 +2729,8 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         0.0,
         0.0,
         "USD",
+        0.0,
+        "lots of LOT (1000 BBL) per basis point",
     ]
 
 
@@ -2721,6 +2756,8 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         0.0,
         0.0,
         "USD",
+        0.0,
+        "lots of LOT (1000 BBL) per basis point",
     ]
 
 
@@ -2827,6 +2864,8 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
         0.0,
         0.0,
         settled,  # the reserves' currency, the settlement currency
+        0.0,
+        "lots of LOT (1000 BBL) per basis point",
     ]
 
 
@@ -3172,6 +3211,7 @@ DECEMBER_PRICING_DAYS = [
 SEVENTY_FIVE = {d: 75.0 for d in DECEMBER_PRICING_DAYS}
 MONTHLY_NOMINAL = "MONTHLY nominal_delta [LOT]"
 MONTHLY_DELTA = "MONTHLY delta [LOT]"
+MONTHLY_CROSS = "MONTHLY cleared cross_gamma [LOT per basis point]"
 LOT_UNIT = "lots of LOT (1000 BBL)"
 
 
@@ -3247,9 +3287,9 @@ def test_the_delta_reports_by_day_month_and_year_on_the_sheet_as_the_ticket_says
         month = "2026-12-01" if in_december else "2027-01-01"
         year = "2026-01-01" if in_december else "2027-01-01"
         assert spilled(ENTRY["_ReportRisk"](results, "all", "month")) == [
-            *risk_head(as_of, MONTHLY_NOMINAL, MONTHLY_DELTA, CLEARED_DV01),
-            ["Total", pytest.approx(live), pytest.approx(live), 0.0],
-            [serial(month), pytest.approx(live), pytest.approx(live), 0.0],
+            *risk_head(as_of, MONTHLY_NOMINAL, MONTHLY_DELTA, CLEARED_DV01, MONTHLY_CROSS),
+            ["Total", pytest.approx(live), pytest.approx(live), 0.0, 0.0],
+            [serial(month), pytest.approx(live), pytest.approx(live), 0.0, 0.0],
         ]
         assert spilled(ENTRY["_ReportRisk"](results, "delta", "year"))[3:] == [
             ["Total", pytest.approx(live)],
@@ -3269,7 +3309,7 @@ def test_the_risk_report_refuses_a_risk_or_a_bucket_that_is_none_of_its_words(
     # type, a blank or a left-out selector refused, no default; then the library's, a word that is
     # none of the four or of the three, exactly so, no case folded and no space trimmed.
     _, prepared, results = monthly_state(monthly, "2026-12-01")
-    risks = "expected nominal_delta, delta, dv01 or all"
+    risks = "expected nominal_delta, delta, dv01, cross_gamma or all"
     buckets = "expected day, month or year"
     assert ENTRY["_ReportRisk"](results, "gamma", "quarter") == (
         f"#ERROR _ReportRisk: ValueError: risk is 'gamma', {risks}"
@@ -3326,10 +3366,10 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
     assert [line[0] for line in by_day[4:]] == [serial(d) for d in WTI_WINDOW]
     assert [line[1] for line in by_day[4:]] == [pytest.approx(0.2)] * 6
     assert spilled(ENTRY["_ReportRisk"](results, "all", "month"))[3:] == [
-        ["Total", pytest.approx(1.2), pytest.approx(1.2), 0.0],
-        [serial("2026-12-01"), 0.0, 0.0, 0.0],
-        [serial("2027-01-01"), pytest.approx(0.4), pytest.approx(0.4), 0.0],
-        [serial("2027-02-01"), pytest.approx(0.8), pytest.approx(0.8), 0.0],
+        ["Total", pytest.approx(1.2), pytest.approx(1.2), 0.0, 0.0],
+        [serial("2026-12-01"), 0.0, 0.0, 0.0, 0.0],
+        [serial("2027-01-01"), pytest.approx(0.4), pytest.approx(0.4), 0.0, 0.0],
+        [serial("2027-02-01"), pytest.approx(0.8), pytest.approx(0.8), 0.0, 0.0],
     ]
     assert spilled(ENTRY["_ReportRisk"](results, "delta", "year"))[4:] == [
         [serial("2026-01-01"), 0.0],
@@ -3364,6 +3404,7 @@ WAHA_MONTHS = [
 WAHA_LOT = "lots of LOT (2500 MMBTU)"
 WAHA_NOMINAL = "WAHA nominal_delta [LOT]"
 WAHA_DELTA = "WAHA delta [LOT]"
+WAHA_CROSS = "WAHA cleared cross_gamma [LOT per basis point]"
 WAHA_X26 = {"X26": -0.40}  # the earlier month's index, which every December history must hold
 WAHA_Z26 = {"X26": -0.40, "Z26": -0.20}
 WAHA_CORRECTED = {"X26": -0.40, "Z26": -0.10}
@@ -3492,10 +3533,10 @@ def test_the_waha_basis_future_values_on_the_sheet_as_the_ticket_says(
         float(live),
     ]
     everything = spilled(ENTRY["_ReportRisk"](results, "all", "day"))
-    assert everything[:3] == risk_head(as_of, WAHA_NOMINAL, WAHA_DELTA, CLEARED_DV01)
+    assert everything[:3] == risk_head(as_of, WAHA_NOMINAL, WAHA_DELTA, CLEARED_DV01, WAHA_CROSS)
     assert everything[3:] == [
-        ["Total", pytest.approx(live), pytest.approx(live), 0.0],
-        [serial("2026-12-01"), pytest.approx(live), pytest.approx(live), 0.0],
+        ["Total", pytest.approx(live), pytest.approx(live), 0.0, 0.0],
+        [serial("2026-12-01"), pytest.approx(live), pytest.approx(live), 0.0, 0.0],
     ]
     assert by_header(results, "lot_unit")[0] == WAHA_LOT
     by_month = spilled(ENTRY["_ReportRisk"](results, "nominal_delta", "month"))[4:]
@@ -3529,8 +3570,8 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     assert valued(ticked) == (pytest.approx(625), 0, pytest.approx(1))
     assert valued(results) == (pytest.approx(500), 0, pytest.approx(1))
     risk = spilled(ENTRY["_ReportRisk"](results, "all", "day"))
-    assert risk[1] == ["period", WAHA_NOMINAL, WAHA_DELTA, CLEARED_DV01]
-    assert risk[3] == ["Total", 1, 1, 0.0]
+    assert risk[1] == ["period", WAHA_NOMINAL, WAHA_DELTA, CLEARED_DV01, WAHA_CROSS]
+    assert risk[3] == ["Total", 1, 1, 0.0, 0.0]
     assert by_header(results, "lot_unit")[0] == WAHA_LOT
 
 
@@ -3706,9 +3747,9 @@ def test_the_tickets_four_rows_report_fifty_and_twenty_dollars_of_reserves(
     # The results readback shows the four once, on its one slot row here; the batch's readback
     # carries no reserve, the owner's choice of the evaluated results as the place to read them.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[0][-4:] == RESERVE_HEADERS
-    assert table[1][-4:] == ["float64", "float64", "float64", "str"]
-    assert len(table) == 3 and table[2][-4:] == [50.0, 20.0, 0.0, "USD"]
+    assert table[0][-6:-2] == RESERVE_HEADERS  # since #197 the cross-gamma's two columns follow
+    assert table[1][-6:-2] == ["float64", "float64", "float64", "str"]
+    assert len(table) == 3 and table[2][-6:-2] == [50.0, 20.0, 0.0, "USD"]
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert not any("reserve" in str(header) for header in batch[0])
     # Value and risk are the free rows': the two LOT rows net, the barrels mark three cents on
@@ -3731,8 +3772,8 @@ def test_the_pricing_days_change_no_reserve_and_the_readback_shows_it_once(
     assert reserved(results) == RESERVE_SPILL
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert len(table) == 2 + slots
-    assert table[2][-4:] == [50.0, 20.0, 0.0, "USD"]
-    assert [line[-4:] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
+    assert table[2][-6:-2] == [50.0, 20.0, 0.0, "USD"]
+    assert [line[-6:-2] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
 
 
 def test_one_batch_keeps_its_reserves_through_ticks_fixings_corrections_and_payment(
@@ -3971,10 +4012,10 @@ def test_the_three_rows_of_the_ticket_value_as_the_page_says_and_sum_their_singl
     assert [line[4] for line in slots] == [False] * 29  # every observation live
     results = ENTRY["_EvaluateTrades"](prepared, bbl["market"], bridge.MISSING)
     by_month = spilled(ENTRY["_ReportRisk"](results, "all", "month"))
-    assert by_month[0] == ["as_of", serial("2026-10-01"), "-", "-"]
+    assert by_month[0] == ["as_of", serial("2026-10-01"), "-", "-", "-"]
     assert by_month[3:] == [
-        ["Total", pytest.approx(0.29), pytest.approx(0.29), 0.0],
-        [serial("2026-10-01"), pytest.approx(0.29), pytest.approx(0.29), 0.0],
+        ["Total", pytest.approx(0.29), pytest.approx(0.29), 0.0, 0.0],
+        [serial("2026-10-01"), pytest.approx(0.29), pytest.approx(0.29), 0.0, 0.0],
     ]
     assert by_header(results, "lot_unit")[0] == "lots of LOT (1000 BBL)"
     # Each row alone values as the page says, and the batch is their sum.
@@ -4144,7 +4185,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1003.0, 1003.0, 1004.0]
     assert [line[i] for line in table[2:]] == [15.0, 20.0, 25.0, 25.0, 5.0]
     readback = spilled(ENTRY["util_ReadHandle"](results))
-    assert readback[2][-4:] == [60.0, 24.0, 65.0, "USD"]
+    assert readback[2][-6:-2] == [60.0, 24.0, 65.0, "USD"]
     # The same rows without the column: the same value and risk, nought of marketing.
     plain_rows = [line[:-1] for line in MARKETING_ROWS]
     plain_trades, _, plain = ete_state(
@@ -4315,6 +4356,8 @@ RESULT_COLUMNS = [
     "clearing_reserve",
     "marketing_reserve",
     "currency",
+    "contract_cross_gamma",
+    "cross_gamma_unit",
 ]
 
 
@@ -4413,18 +4456,28 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
     ]
     assert len(months) == 25
     everything = spilled(ENTRY["_ReportRisk"](results, "all", "month"))
+    # Since #197 the cross-gamma's column after the DV01's: -0.00095 + 0.0018, each group's
+    # lots at its own time, on the contract's month and in the Total.
     assert everything[:4] == [
-        ["as_of", serial(UNIT_AS_OF), "-", "-"],
-        ["period", UNIT_NOMINAL, UNIT_DELTA, CURVE_DV01],
-        ["str | datetime64[D]", "float64", "float64", "float64"],
-        ["Total", 0.0, pytest.approx(0.5), pytest.approx(0.0085)],
+        ["as_of", serial(UNIT_AS_OF), "-", "-", "-"],
+        ["period", UNIT_NOMINAL, UNIT_DELTA, CURVE_DV01, UNIT_CROSS],
+        ["str | datetime64[D]", "float64", "float64", "float64", "float64"],
+        ["Total", 0.0, pytest.approx(0.5), pytest.approx(0.0085), pytest.approx(0.00085)],
     ]
     assert [line[0] for line in everything[4:]] == months
-    assert everything[4] == [serial("2027-01-01"), 0.0, pytest.approx(0.5), 0.0]
-    assert everything[16] == [serial("2028-01-01"), 0.0, 0.0, pytest.approx(-0.0095)]
-    assert everything[28] == [serial("2029-01-01"), 0.0, 0.0, pytest.approx(0.018)]
+    assert everything[4] == [
+        serial("2027-01-01"),
+        0.0,
+        pytest.approx(0.5),
+        0.0,
+        pytest.approx(0.00085),
+    ]
+    assert everything[16] == [serial("2028-01-01"), 0.0, 0.0, pytest.approx(-0.0095), 0.0]
+    assert everything[28] == [serial("2029-01-01"), 0.0, 0.0, pytest.approx(0.018), 0.0]
     assert all(
-        line[1:] == [0.0, 0.0, 0.0] for k, line in enumerate(everything[4:]) if k not in (0, 12, 24)
+        line[1:] == [0.0, 0.0, 0.0, 0.0]
+        for k, line in enumerate(everything[4:])
+        if k not in (0, 12, 24)
     )
     # One risk at a time keeps its own axis: the deltas the one observation day, month or year,
     # the DV01 the two payment days, months or years, the Totals the same numbers.
@@ -4461,16 +4514,16 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         [serial("2029-01-01"), pytest.approx(0.018)],
     ]
     assert spilled(ENTRY["_ReportRisk"](results, "all", "day"))[4:] == [
-        [serial(UNIT_AS_OF), 0.0, pytest.approx(0.5), 0.0],
-        [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0095)],
-        [serial(TWO_YEARS_OUT), 0.0, 0.0, pytest.approx(0.018)],
+        [serial(UNIT_AS_OF), 0.0, pytest.approx(0.5), 0.0, pytest.approx(0.00085)],
+        [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0095), 0.0],
+        [serial(TWO_YEARS_OUT), 0.0, 0.0, pytest.approx(0.018), 0.0],
     ]
     assert spilled(ENTRY["_ReportReserves"](results))[2] == [0.0, 0.0, 10.0, "USD"]
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert table[0] == RESULT_COLUMNS
     assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
         "float64"
-    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str"]
+    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str"]
     assert [line[:5] for line in table[2:]] == [
         ["F27", "F27", serial(UNIT_AS_OF), serial(A_YEAR_OUT), False],
         ["F27", "F27", serial(UNIT_AS_OF), serial(TWO_YEARS_OUT), False],
@@ -4489,6 +4542,8 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         0.0,
         10.0,
         "USD",
+        pytest.approx(0.00085),  # since #197 the contract's cross-gamma, on both its rows
+        "lots of UNIT (1 BBL) per basis point",
     ]
     assert table[3][12:] == [
         "USD per USD/BBL",
@@ -4498,6 +4553,8 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         pytest.approx(-90.0),
         pytest.approx(0.018),
         *["-"] * 4,
+        pytest.approx(0.00085),
+        "lots of UNIT (1 BBL) per basis point",
     ]
     # A tick to 81 over the same preparation and curve: 5.5 and 0.00935, the lots as they were,
     # the old results standing; a replacement curve at 0.96 and 0.92 over the same preparation
@@ -4553,9 +4610,9 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
     assert risk_of(fixed)[1:] == (0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0))
     # Fixed and unpaid: the observation day stands with no lots, the payment day holds the DV01.
     assert spilled(ENTRY["_ReportRisk"](fixed, "all", "day"))[3:] == [
-        ["Total", 0.0, 0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0)],
-        [serial(UNIT_AS_OF), 0.0, 0.0, 0.0],
-        [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0)],
+        ["Total", 0.0, 0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0), 0.0],
+        [serial(UNIT_AS_OF), 0.0, 0.0, 0.0, 0.0],
+        [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0), 0.0],
     ]
     at_99 = ENTRY["_EvaluateTrades"](
         prepared, market, unit_curve(("2027-01-05", 1.0), (A_YEAR_OUT, 0.99))

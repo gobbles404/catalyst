@@ -23,20 +23,40 @@ from test_bilateral_kernel import (
     LARGEST,
     PAY_DAYS,
     TIGHT,
+    UNIT,
     curve_of,
     given,
     prepared_on,
     terms_of,
     valued,
 )
-from test_trades import an_index, bounds_of, dates, ids, numbers, picks, rows, spec
+from test_trades import (
+    an_index,
+    bounds_of,
+    dates,
+    history_on,
+    ids,
+    numbers,
+    observed_of,
+    picks,
+    quoted,
+    rows,
+    spec,
+)
 
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
+from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
-from goosedove.trades.preparation import PreparedTrades
-from goosedove.trades.results import TradeResults
+from goosedove.market.market import Market
+from goosedove.market.market_history import MarketHistory
+from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
+from goosedove.trades.encoding import encoded
+from goosedove.trades.evaluation import trade_results
+from goosedove.trades.preparation import PreparedTrades, prepared_trades
+from goosedove.trades.results import TradeResults, risk_view
+from goosedove.trades.risk_report import Bucket, Risk, RiskView
 from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.terms import (
     PaymentTerms,
@@ -62,6 +82,15 @@ LAGS = ("+337cd", "+702cd")  # from the observation day, 1 February 2027, in cal
 CURVE = curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90))
 QUOTES = (72.0, 50.0)  # G27 and F29
 PER_BP = "lots of LOT (1 BBL) per basis point"
+HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
+HNG_CROSS_2 = "HNG curve_2 cross_gamma [LOT per basis point]"
+HNG_CLEARED = "HNG cleared cross_gamma [LOT per basis point]"
+HNG_LABELS = (
+    "HNG nominal_delta [LOT]",
+    "HNG delta [LOT]",
+    "curve_1 USD dv01 [USD per basis point]",
+    HNG_CROSS,
+)
 
 
 def trades_on(
@@ -547,5 +576,310 @@ def test_a_cross_gamma_bucket_past_the_largest_number_is_refused_by_its_contract
     assert str(refused.value) == (
         "the contract year from 2027-01-01 has -inf of cross-gamma in all, expected a finite "
         "number of lots of EIGHT (1 BBL) per basis point; its slots' cross-gammas sum past the "
+        "largest number"
+    )
+
+
+# --- the views ------------------------------------------------------------------------------------
+
+
+def test_the_views_select_the_cross_gamma_by_reference_and_all_four_place_it_with_the_delta() -> (
+    None
+):
+    # By day the saved vector itself on the observation days under the index, the curve's group
+    # and the lot per basis point, the saved total above; by month the ticket's spill, January
+    # 2027 at zero, the valuation month, and February's -0.00005, the contract's month; by year
+    # 2027. All four by month run through January 2029, the last payment month, the cross-gamma
+    # on February's row beside the deltas' and the DV01s on the payment months; by day on the
+    # union of the observation day and the two payment days, zero where only a payment stands.
+    prep = ticket_batch()
+    result = valued(prep, QUOTES, CURVE)
+    by_day = risk_view(result, Risk.CROSS_GAMMA, Bucket.DAY)
+    assert by_day.dates is prep.encoded.days and by_day.columns[0] is result.cross_gamma_by_day
+    assert by_day.labels == (HNG_CROSS,)
+    assert by_day.totals == (pytest.approx(-0.00005, **CLOSE),)
+    by_month = risk_view(result, Risk.CROSS_GAMMA, Bucket.MONTH)
+    np.testing.assert_array_equal(by_month.dates, dates("2027-01-01", "2027-02-01"))
+    np.testing.assert_allclose(by_month.columns[0], [0.0, -0.00005], **TIGHT)
+    by_year = risk_view(result, Risk.CROSS_GAMMA, Bucket.YEAR)
+    np.testing.assert_array_equal(by_year.dates, dates("2027-01-01"))
+    np.testing.assert_allclose(by_year.columns[0], [-0.00005], **TIGHT)
+    everything = risk_view(result, Risk.ALL, Bucket.MONTH)
+    assert everything.labels == HNG_LABELS
+    assert everything.totals == (
+        5.0,
+        pytest.approx(5.0, **CLOSE),
+        pytest.approx(-0.0037, **CLOSE),
+        pytest.approx(-0.00005, **CLOSE),
+    )
+    assert everything.dates.size == 25
+    np.testing.assert_allclose(everything.columns[3][:2], [0.0, -0.00005], **TIGHT)
+    assert not everything.columns[3][2:].any()
+    np.testing.assert_allclose(everything.columns[2][[12, 24]], [-0.0019, -0.0018], **TIGHT)
+    all_days = risk_view(result, Risk.ALL, Bucket.DAY)
+    np.testing.assert_array_equal(all_days.dates, dates("2027-02-01", *PAYS))
+    np.testing.assert_allclose(all_days.columns[3], [-0.00005, 0.0, 0.0], **TIGHT)
+    np.testing.assert_allclose(all_days.columns[1], [5.0, 0.0, 0.0], **TIGHT)
+
+
+def test_a_cleared_result_reports_the_known_zero_under_its_cleared_label() -> None:
+    # Cross-gamma alone: a Total of nothing and zeros on the observation days, or on the delta's
+    # rows by month and by year, under the cleared label; all four append the column of zeros.
+    prep = prepared_on(terms_of(route=Route.CLEARED))
+    result = valued(prep, (80.0, 50.0), None)
+    label = "UNIT cleared cross_gamma [UNIT per basis point]"
+    by_day = risk_view(result, Risk.CROSS_GAMMA, Bucket.DAY)
+    assert by_day.dates is prep.encoded.days and by_day.labels == (label,)
+    assert by_day.totals == (0.0,)
+    np.testing.assert_array_equal(by_day.columns[0], [0.0])
+    by_month = risk_view(result, Risk.CROSS_GAMMA, Bucket.MONTH)
+    np.testing.assert_array_equal(by_month.dates, dates("2027-01-01"))
+    np.testing.assert_array_equal(by_month.columns[0], [0.0])
+    everything = risk_view(result, Risk.ALL, Bucket.YEAR)
+    assert everything.labels[3] == label and everything.totals[3] == 0.0
+    np.testing.assert_array_equal(everything.columns[3], [0.0])
+
+
+def test_a_month_report_of_cross_gamma_before_the_valuation_month_is_refused() -> None:
+    # The September contract live on 14 October: the month view refused in the facts' words
+    # naming the measure, all four by month in the nominal delta's, the first read; the year
+    # view shows 2026, the valuation year.
+    ng3 = an_index(
+        "NG3",
+        (("Q26", "2026-08-27"), ("U26", "2026-10-15"), ("X26", "2026-10-28")),
+        ("2030-01-01",),
+        ("USD", "BBL"),
+        ("VOLUME", "BBL"),
+        ("LOT", 1.0, "BBL"),
+    )
+    prep = prepared_on(
+        trades_on(ng3, (3.0,), (3.0,), ("2027-10-14",), ("+364cd",), as_of=OCTOBER), OCTOBER
+    )
+    result = valued(prep, (3.2, 3.3), curve_of((OCTOBER, 1.0), ("2027-10-14", 0.95)))
+    head = "the cross-gamma of index 'NG3' in the contract month from 2026-09-01 is -0.00028"
+    tail = (
+        f"{PER_BP}, before the report's first month, 2026-10-01, the month of as_of 2026-10-14; "
+        "the day view shows where it stands"
+    )
+    with pytest.raises(ValueError) as refused:
+        risk_view(result, Risk.CROSS_GAMMA, Bucket.MONTH)
+    assert str(refused.value).startswith(head) and str(refused.value).endswith(tail)
+    with pytest.raises(ValueError) as first:
+        risk_view(result, Risk.ALL, Bucket.MONTH)  # all four: the nominal delta's words first
+    assert str(first.value).startswith(
+        "the nominal delta of index 'NG3' in the contract month from 2026-09-01 is 3.0 "
+    )
+    by_year = risk_view(result, Risk.CROSS_GAMMA, Bucket.YEAR)
+    np.testing.assert_array_equal(by_year.dates, dates("2026-01-01"))
+    np.testing.assert_allclose(by_year.columns[0], [-0.000285], **TIGHT)
+
+
+# --- collections ----------------------------------------------------------------------------------
+
+HNG_HISTORY = history_on(HNG, AS_OF, {})
+HNG_MARKET = quoted(HNG_HISTORY, *QUOTES)
+# A second one-barrel index on the same day, its G27 observed the day after HNG's.
+WTI = an_index(
+    "WTI",
+    (("Z26", "2026-12-31"), ("G27", "2027-02-02"), ("F29", "2029-01-05")),
+    ("2027-12-27",),
+    ("USD", "BBL"),
+    ("VOLUME", "BBL"),
+    ("LOT", 1.0, "BBL"),
+)
+WTI_HISTORY = history_on(WTI, AS_OF, {})
+WTI_MARKET = quoted(WTI_HISTORY, 55.0, 50.0)
+
+
+def valued_on(
+    terms: ResolvedTrades, history: MarketHistory, market: Market, curve: DiscountCurve | None
+) -> TradeResults:
+    """The terms prepared against that history and valued on that market, the objects shared by
+    every source that is to collect."""
+    prep = prepared_trades(
+        encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+    )
+    return trade_results(prep, market, WorkCounter(), curve)
+
+
+def hng_source(
+    quantity: float, fixed: float, pay: str, lag: str, curve: DiscountCurve | None = CURVE
+) -> TradeResults:
+    route = Route.CLEARED if curve is None else Route.BILATERAL
+    return valued_on(
+        trades_on(HNG, (quantity,), (fixed,), (pay,), (lag,), route=route),
+        HNG_HISTORY,
+        HNG_MARKET,
+        curve,
+    )
+
+
+def collected(*sources: TradeResults) -> AggregateResults:
+    return aggregate_results(list(sources), WorkCounter())
+
+
+def column_of(view: RiskView, label: str) -> tuple[float, np.ndarray]:
+    j = view.labels.index(label)
+    return view.totals[j], view.columns[j]
+
+
+def test_sources_on_one_index_and_one_curve_combine_and_the_collection_is_their_sum() -> None:
+    # A and B as two results on one curve: one cross group, curve_1, the pair's -0.00005 on the
+    # one contract, day, month and year, the saved totals summed; the group's axes the delta's;
+    # a repeat counts again and the order of the cells changes nothing.
+    a = hng_source(10.0, 70.0, PAYS[0], LAGS[0])
+    b = hng_source(-5.0, 74.0, PAYS[1], LAGS[1])
+    counter = WorkCounter()
+    agg = aggregate_results([a, b], counter)
+    (group,) = agg.cross_groups
+    assert group.index is HNG and group.curve is CURVE and group.number == 1
+    np.testing.assert_array_equal(group.occurrences, [0, 1])
+    np.testing.assert_array_equal(group.references, [1])
+    np.testing.assert_allclose(group.cross_gamma, [-0.00005], **TIGHT)
+    assert group.cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+    np.testing.assert_array_equal(group.days, dates("2027-02-01"))
+    np.testing.assert_allclose(group.cross_gamma_by_day, [-0.00005], **TIGHT)
+    np.testing.assert_array_equal(group.months, dates("2027-02-01"))
+    np.testing.assert_array_equal(group.years, dates("2027-01-01"))
+    np.testing.assert_allclose(group.cross_gamma_by_year, [-0.00005], **TIGHT)
+    assert counter.freeze().as_dict() == {
+        # The lots twice onto four axes, the DV01 onto three and the cross-gamma onto four.
+        "aggregate_reductions": 15,
+        "cross_groups": 1,
+        "entries_aligned": 22,  # two sources' four delta axes, three payment axes, four again
+        "index_groups": 1,
+        "rate_groups": 1,
+        "report_coordinates": 65,  # the three buckets' observed, paid and union axes
+        "sources_collected": 2,
+    }
+    view = aggregate_view(agg, Risk.CROSS_GAMMA, Bucket.MONTH)
+    assert view.labels == (HNG_CROSS,)
+    np.testing.assert_array_equal(view.dates, dates("2027-01-01", "2027-02-01"))
+    np.testing.assert_allclose(view.columns[0], [0.0, -0.00005], **TIGHT)
+    everything = aggregate_view(agg, Risk.ALL, Bucket.DAY)
+    assert everything.labels == HNG_LABELS
+    np.testing.assert_allclose(everything.columns[3], [-0.00005, 0.0, 0.0], **TIGHT)
+    for again in (collected(a, b, a), collected(b, a)):
+        (group,) = again.cross_groups
+        assert group.number == 1
+    assert collected(a, b, a).cross_groups[0].cross_gamma_total == pytest.approx(
+        -0.00095 * 2 + 0.0009, **CLOSE
+    )
+    assert collected(b, a).cross_groups[0].cross_gamma_total == pytest.approx(-0.00005, **CLOSE)
+
+
+def test_one_source_collected_reports_as_itself() -> None:
+    a = hng_source(10.0, 70.0, PAYS[0], LAGS[0])
+    agg = collected(a)
+    for risk in (Risk.CROSS_GAMMA, Risk.ALL):
+        for bucket in Bucket:
+            alone, own = aggregate_view(agg, risk, bucket), risk_view(a, risk, bucket)
+            assert alone.labels == own.labels
+            assert alone.totals == pytest.approx(own.totals, **CLOSE)
+            np.testing.assert_array_equal(alone.dates, own.dates)
+            for mine, theirs in zip(alone.columns, own.columns, strict=True):
+                np.testing.assert_allclose(mine, theirs, **TIGHT)
+
+
+def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> None:
+    # A on CURVE and B on a curve equal in every value but another object: two groups under
+    # curve_1 and curve_2, the rate groups' numbers, -0.00095 and +0.0009 apart and never netted;
+    # HNG and WTI on one curve: two groups, one per index, the lots never summed; a cleared HNG
+    # beside a bilateral one: the cleared pair's known zero shown as its own column of zeros,
+    # under the cleared label, even in the mixed collection.
+    a = hng_source(10.0, 70.0, PAYS[0], LAGS[0])
+    other = curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90))
+    b_other = hng_source(-5.0, 74.0, PAYS[1], LAGS[1], other)
+    agg = collected(a, b_other)
+    assert [(c.curve, c.number) for c in agg.cross_groups] == [(CURVE, 1), (other, 2)]
+    assert [r.number for r in agg.rate_groups] == [1, 2]
+    view = aggregate_view(agg, Risk.CROSS_GAMMA, Bucket.DAY)
+    assert view.labels == (HNG_CROSS, HNG_CROSS_2)
+    assert view.totals == (pytest.approx(-0.00095, **CLOSE), pytest.approx(0.0009, **CLOSE))
+    assert len(aggregate_view(agg, Risk.ALL, Bucket.YEAR).labels) == 6
+    wti = valued_on(
+        trades_on(WTI, (1.0,), (50.0,), (PAYS[0],), ("+336cd",)), WTI_HISTORY, WTI_MARKET, CURVE
+    )
+    assert wti.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
+    both = collected(a, wti)
+    assert [(c.index, c.number) for c in both.cross_groups] == [(HNG, 1), (WTI, 1)]
+    view = aggregate_view(both, Risk.CROSS_GAMMA, Bucket.DAY)
+    np.testing.assert_array_equal(view.dates, dates("2027-02-01", "2027-02-02"))
+    assert view.labels == (HNG_CROSS, "WTI curve_1 cross_gamma [LOT per basis point]")
+    np.testing.assert_allclose(view.columns[0], [-0.00095, 0.0], **TIGHT)
+    np.testing.assert_allclose(view.columns[1], [0.0, -0.000095], **TIGHT)
+    cleared = hng_source(10.0, 70.0, PAYS[0], LAGS[0], None)
+    mixed = collected(cleared, a)
+    assert [(c.curve, c.number) for c in mixed.cross_groups] == [(None, None), (CURVE, 1)]
+    zero = mixed.cross_groups[0]
+    assert zero.cross_gamma_total == 0.0 and zero.days.size == 0 and zero.references.size == 0
+    assert zero.cross_gamma.size == 0 and zero.months.size == 0 and zero.years.size == 0
+    view = aggregate_view(mixed, Risk.CROSS_GAMMA, Bucket.MONTH)
+    assert view.labels == (HNG_CLEARED, HNG_CROSS) and view.totals[0] == 0.0
+    np.testing.assert_array_equal(view.columns[0], [0.0, 0.0])
+    np.testing.assert_allclose(view.columns[1], [0.0, -0.00095], **TIGHT)
+    everything = aggregate_view(mixed, Risk.ALL, Bucket.DAY)
+    assert everything.labels[-2:] == (HNG_CLEARED, HNG_CROSS)
+    np.testing.assert_array_equal(everything.columns[-2], [0.0, 0.0])
+    only_cleared = collected(cleared)
+    view = aggregate_view(only_cleared, Risk.ALL, Bucket.YEAR)
+    assert view.labels[-1] == HNG_CLEARED and view.totals[-1] == 0.0
+    np.testing.assert_array_equal(view.columns[-1], [0.0])
+
+
+def test_cancellation_within_a_cross_group_follows_the_weighting_and_never_crosses_groups() -> None:
+    # +18 a year out and -19 two years out at 70, quoted 80, as two sources on one curve: 17.1
+    # and -17.1 of discounted lots, nothing in all, and +0.00171 of cross-gamma within the group;
+    # the same two on two curves of one value: -0.00171 and +0.00342 under curve_1 and curve_2,
+    # each its own column and total.
+    a = valued_on(
+        trades_on(HNG, (18.0,), (70.0,), PAYS[:1], LAGS[:1]),
+        HNG_HISTORY,
+        quoted(HNG_HISTORY, 80.0, 50.0),
+        CURVE,
+    )
+    b = valued_on(
+        trades_on(HNG, (-19.0,), (70.0,), PAYS[1:], LAGS[1:]),
+        HNG_HISTORY,
+        quoted(HNG_HISTORY, 80.0, 50.0),
+        CURVE,
+    )
+    with pytest.raises(ValueError):
+        collected(a, b)  # two price vectors for one index: the ticket's compatibility rule
+    hot = quoted(HNG_HISTORY, 80.0, 50.0)
+    a = valued_on(trades_on(HNG, (18.0,), (70.0,), PAYS[:1], LAGS[:1]), HNG_HISTORY, hot, CURVE)
+    b = valued_on(trades_on(HNG, (-19.0,), (70.0,), PAYS[1:], LAGS[1:]), HNG_HISTORY, hot, CURVE)
+    agg = collected(a, b)
+    (group,) = agg.index_groups
+    assert group.discounted_lot_delta_total == pytest.approx(0.0, **CLOSE)
+    (cross,) = agg.cross_groups
+    assert cross.cross_gamma_total == pytest.approx(0.00171, **CLOSE)
+    other = curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90))
+    b_other = valued_on(
+        trades_on(HNG, (-19.0,), (70.0,), PAYS[1:], LAGS[1:]), HNG_HISTORY, hot, other
+    )
+    apart = aggregate_view(collected(a, b_other), Risk.CROSS_GAMMA, Bucket.YEAR)
+    assert apart.labels == (HNG_CROSS, HNG_CROSS_2)
+    assert apart.totals == (pytest.approx(-0.00171, **CLOSE), pytest.approx(0.00342, **CLOSE))
+
+
+def test_a_cross_group_summing_past_the_largest_number_is_refused_by_its_contract() -> None:
+    # Bought and sold by turns at 0.9 of the largest number on UNIT's F27, every price 1, the
+    # bought lots paying in the year 4890 and the sold ones the next day, as separate results
+    # collected eight times over: the index group's lots alternate and stay finite, the cross
+    # group's -0.258 of the largest number a bought result sums past it at the fourth, refused
+    # by the index, the curve and the contract.
+    far, near = "4890-01-04", "2027-01-05"
+    history = history_on(UNIT, AS_OF, {})
+    market = quoted(history, 1.0, 1.0)
+    curve = curve_of((AS_OF, 1.0), (far, 0.999))
+    big = 0.9 * LARGEST
+    bought = valued_on(terms_of((big,), (far,), (1,), fixed=1.0), history, market, curve)
+    sold = valued_on(terms_of((-big,), (near,), (1,), fixed=1.0), history, market, curve)
+    with pytest.raises(ValueError) as refused:
+        collected(*([bought, sold] * 4))
+    assert str(refused.value) == (
+        "the cross-gamma of index 'UNIT' on curve_1 for contract F27 is -inf, expected a finite "
+        "number of lots of UNIT (1 BBL) per basis point; the results' cross-gammas sum past the "
         "largest number"
     )

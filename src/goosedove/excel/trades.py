@@ -151,9 +151,9 @@ def _AggregateResults(
         "repeat counted again.",
     ],
 ) -> Handle[AggregateResults]:
-    """Collects one or many evaluated batches' saved risk into one collection, the lots by index
-    and the DV01 by curve and currency, nothing valued again, and shows its handle, which
-    _ReportRisk takes beside a single result's."""
+    """Collects evaluated batches' saved risk into one collection, the lots by index, the DV01 by
+    curve and currency and the cross-gamma by index and curve, nothing valued again, and shows
+    its handle, which _ReportRisk takes beside a single result's."""
     return aggregate_results(result_handles, WorkCounter())
 
 
@@ -189,9 +189,9 @@ def _ReportRisk(
     ],
     risk: Annotated[
         str,
-        "Which risk: nominal_delta, delta, dv01 or all, exactly so; the deltas in lots of the "
-        "index's reporting specification, by observation day or by pricing contract month or "
-        "year, the DV01 in the currency per basis point by payment day, month or year.",
+        "Which risk: nominal_delta, delta, dv01, cross_gamma or all, exactly so; the deltas and "
+        "the cross_gamma in lots of the reporting specification by observation day or contract "
+        "month or year, the DV01 in the currency per basis point by payment period.",
     ],
     bucket: Annotated[
         str,
@@ -200,11 +200,11 @@ def _ReportRisk(
         "and the Total is the saved number.",
     ],
 ) -> MixedArray:
-    """Reports one risk of a batch or a collection, or all three, by day, month or year: the saved
-    Total first, then a row per period, the deltas by observation day or by pricing contract
-    month or year, the DV01 by payment period, as evaluation stored them."""
+    """Reports one risk of a batch or a collection, or all four, by day, month or year: the saved
+    Total first, then a row per period, the deltas and the cross-gamma by observation day or
+    contract period, the DV01 by payment period, as evaluation stored them."""
     view = results.report(
-        choice("risk", risk, Risk, "nominal_delta, delta, dv01 or all"),
+        choice("risk", risk, Risk, "nominal_delta, delta, dv01, cross_gamma or all"),
         choice("bucket", bucket, Bucket, "day, month or year"),
     )
     return _risk_table(results.as_of, view)

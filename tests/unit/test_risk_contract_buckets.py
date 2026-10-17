@@ -167,7 +167,7 @@ def test_november_ng_risk_stands_in_november_though_its_contract_observes_in_oct
     # month view no longer reproduces; every view keeps the saved Total.
     for bucket in ("day", "month", "year"):
         table = report(results, "all", bucket)
-        assert table[3] == ["Total", 15.0, 15.0, 0.0]
+        assert table[3] == ["Total", 15.0, 15.0, 0.0, 0.0]
         assert sum(cast(float, line[1]) for line in table[4:]) == 15.0
     fixed = evaluated(trades, index, "NG2", "2026-09-29", "2026-10-29", (3.3, 3.4))
     assert report(fixed, "nominal_delta", "month")[3:] == [
@@ -291,17 +291,23 @@ def test_discounting_and_collection_keep_the_contract_month_and_the_payment_mont
             [serial("2026-11-01"), pytest.approx(delta)],
         ]
         everything = report(collection, "all", "month")
+        # Since #197 the cross-gamma of the two pairs, the cleared one nothing and the bilateral
+        # one its 10 lots at the factor times sixteen days over 365 per basis point, on the
+        # contract's November as the delta is and not on the payment's October.
+        cross = -0.0001 * 16 / 365 * (delta - 10.0)
         assert everything[1] == [
             "period",
             "NG2 nominal_delta [LOT]",
             "NG2 delta [LOT]",
             "curve_1 USD dv01 [USD per basis point]",
+            "NG2 cleared cross_gamma [LOT per basis point]",
+            "NG2 curve_1 cross_gamma [LOT per basis point]",
         ]
         dv01 = cast(float, everything[3][3])
         assert dv01 != 0.0
         assert everything[4:] == [
-            [serial("2026-10-01"), 0.0, 0.0, pytest.approx(dv01)],
-            [serial("2026-11-01"), 20.0, pytest.approx(delta), 0.0],
+            [serial("2026-10-01"), 0.0, 0.0, pytest.approx(dv01), 0.0, 0.0],
+            [serial("2026-11-01"), 20.0, pytest.approx(delta), 0.0, 0.0, pytest.approx(cross)],
         ]
         assert dated(collection, "dv01", "month") == [[serial("2026-10-01"), pytest.approx(dv01)]]
     two_groups = booked(

@@ -474,7 +474,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     result = tick(prep, a_market(prep.history), curve_on(as_of))
-    for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01):
+    for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01, Risk.CROSS_GAMMA):
         # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
         # month and by year, since #186, one zeros over the display axis filled through the saved
         # places, eight bytes a row.
@@ -489,22 +489,24 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
                 8 * view.dates.size + SLACK
             )
     for bucket in Bucket:
-        # All three: three zeros over the axis, each filled through its saved places; nothing
-        # sorted, nothing summed, nothing unique; by month and by year the saved refusals read.
+        # All four, since #197: four zeros over the axis, each filled through its saved places;
+        # nothing sorted, nothing summed, nothing unique; by month and by year the saved
+        # refusals read.
         view = risk_view(result, Risk.ALL, bucket)
-        assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 3}
+        assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 4}
         selected = (
             {"_day_view": 1}
             if bucket is Bucket.DAY
-            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 3}
+            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 4}
         )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
             "delta_labels": 1,  # the headings, spelled once in risk_report.py for both paths
             "dv01_label": 1,
+            "cross_gamma_label": 1,
             **selected,
-            "placed": 3,
+            "placed": 4,
         }
         assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
-            24 * view.dates.size + SLACK
+            32 * view.dates.size + SLACK
         )

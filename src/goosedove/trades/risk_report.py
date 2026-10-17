@@ -1,5 +1,6 @@
 """The words a risk report shares between a single result and a collection, and the placing of a
-saved vector onto a report's axis. Risk and Bucket are _ReportRisk's two selectors; RiskView is
+saved vector onto a report's axis. Risk and Bucket are _ReportRisk's two selectors, the
+cross-gamma among the risks since #197; RiskView is
 the content a report formats, dates, labels, saved totals and columns, temporary and never saved;
 NO_DAYS and NOTHING are the empty axis and column a report without a dated row shows; placed
 copies a saved vector through its saved places onto an axis, zero elsewhere. results.py selects a
@@ -29,12 +30,13 @@ class Bucket(Enum):
 
 class Risk(Enum):
     """What a risk report shows, since #178: the nominal delta, the delta weighted by the route's
-    valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
-    summary none of them."""
+    valuation treatment, the DV01, since #197 the cross-gamma, the delta's sensitivity to the
+    rates, or all four on one axis, _ReportRisk's five choices; a summary none of them."""
 
     NOMINAL_DELTA = "nominal_delta"
     DELTA = "delta"
     DV01 = "dv01"
+    CROSS_GAMMA = "cross_gamma"
     ALL = "all"
 
 
@@ -43,7 +45,8 @@ class RiskView:
     """One risk report's content, since #178, selected by reference and placed through saved
     places: dates, the bucket starts, increasing, observation days under the deltas, payment days
     under the DV01 and their union under all; labels, one heading per risk column, the index's
-    name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
+    name and its reporting lot's for a delta, the curve's group and the currency for a DV01, the
+    index, the group and the lot per basis point for a cross-gamma;
     totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
     vector itself where the axis is its own and a copy placed on the shared axis under all, zero
     where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
@@ -85,3 +88,12 @@ def dv01_label(group: str, currency: str) -> str:
     among a collection's curves or `cleared` where no curve values, in the group's currency:
     `curve_1 USD dv01 [USD per basis point]`. Which group and which currency are the caller's."""
     return f"{group} {currency} dv01 [{currency} per basis point]"
+
+
+def cross_gamma_label(index: Index, group: str, reporting_lot: ReportingLot) -> str:
+    """The cross-gamma column's heading, since #197: the index's short name as the desk typed it,
+    the group its caller named, `curve_1` by first appearance among a collection's curves or
+    `cleared` where no curve values, the risk and the reporting lot's name per basis point in
+    brackets, `HNG curve_1 cross_gamma [LOT per basis point]`, read off the records and nothing
+    resolved or converted here. Which group is the caller's."""
+    return f"{index.name} {group} cross_gamma [{reporting_lot.name} per basis point]"

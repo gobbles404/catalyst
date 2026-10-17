@@ -40,6 +40,11 @@ AS_OF = UNIT_AS_OF
 JAN_27, JAN_28 = "2027-01-01", "2028-01-01"
 HNG_NOMINAL, HNG_DELTA = "HNG nominal_delta [LOT]", "HNG delta [LOT]"
 WTI_NOMINAL, WTI_DELTA = "WTI nominal_delta [LOT]", "WTI delta [LOT]"
+HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
+HNG_CLEARED_CROSS = "HNG cleared cross_gamma [LOT per basis point]"
+WTI_CROSS = "WTI curve_1 cross_gamma [LOT per basis point]"
+WTI_CLEARED_CROSS = "WTI cleared cross_gamma [LOT per basis point]"
+PER_BP = "lots of LOT (1 BBL) per basis point"
 READBACK_HEADERS = [
     "position",
     "index",
@@ -51,6 +56,8 @@ READBACK_HEADERS = [
     "delta",
     "dv01",
     "as_of",
+    "cross_gamma",
+    "cross_gamma_unit",
 ]
 READBACK_TYPES = [
     "int64",
@@ -63,6 +70,8 @@ READBACK_TYPES = [
     "float64",
     "float64",
     "datetime64[D]",
+    "float64",
+    "str",
 ]
 
 
@@ -174,15 +183,20 @@ def report(results: object, risk: str, bucket: str) -> list[list[object]]:
 
 
 def test_the_sources_value_as_the_ticket_says(sheet: dict[str, Any]) -> None:
-    for key, nominal, delta, dv01 in (
-        ("b2", 10.0, 10.0, 0.0),
-        ("b3", 10.0, 9.5, -0.0095),
-        ("b4", 2.0, 2.0, 0.0),
-        ("b5", 4.0, 3.8, -0.0019),
+    for key, nominal, delta, dv01, cross in (
+        ("b2", 10.0, 10.0, 0.0, 0.0),
+        ("b3", 10.0, 9.5, -0.0095, -0.00095),
+        ("b4", 2.0, 2.0, 0.0, 0.0),
+        ("b5", 4.0, 3.8, -0.0019, -0.00038),
     ):
         total = report(sheet[key], "all", "year")[3]
         assert total[0] == "Total"
-        assert total[1:] == [pytest.approx(nominal), pytest.approx(delta), pytest.approx(dv01)]
+        assert total[1:] == [
+            pytest.approx(nominal),
+            pytest.approx(delta),
+            pytest.approx(dv01),
+            pytest.approx(cross),
+        ]
 
 
 def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[str, Any]) -> None:
@@ -194,11 +208,11 @@ def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[st
     assert re.fullmatch(rf"{os.getpid()}:aggregate_results:\d+", agg)
     between = [serial(f"2027-{m:02d}-01") for m in range(2, 13)]
     assert report(agg, "all", "month") == [
-        *risk_head(AS_OF, HNG_NOMINAL, HNG_DELTA, CURVE_DV01),
-        ["Total", 20.0, pytest.approx(19.5), pytest.approx(-0.0095)],
-        [serial(JAN_27), 20.0, pytest.approx(19.5), 0.0],
-        *[[m, 0.0, 0.0, 0.0] for m in between],
-        [serial(JAN_28), 0.0, 0.0, pytest.approx(-0.0095)],
+        *risk_head(AS_OF, HNG_NOMINAL, HNG_DELTA, CURVE_DV01, HNG_CLEARED_CROSS, HNG_CROSS),
+        ["Total", 20.0, pytest.approx(19.5), pytest.approx(-0.0095), 0.0, pytest.approx(-0.00095)],
+        [serial(JAN_27), 20.0, pytest.approx(19.5), 0.0, 0.0, pytest.approx(-0.00095)],
+        *[[m, 0.0, 0.0, 0.0, 0.0, 0.0] for m in between],
+        [serial(JAN_28), 0.0, 0.0, pytest.approx(-0.0095), 0.0, 0.0],
     ]
     assert report(agg, "delta", "day") == [
         *risk_head(AS_OF, HNG_DELTA),
@@ -218,12 +232,32 @@ def test_the_four_sources_spill_the_tickets_table(sheet: dict[str, Any]) -> None
     # contract month and a DV01 report runs from the valuation month to the payment month.
     agg = collected(*(sheet[k] for k in ("b2", "b3", "b4", "b5")))
     between = [serial(f"2027-{m:02d}-01") for m in range(2, 13)]
+    crosses = [0.0, pytest.approx(-0.00095), 0.0, pytest.approx(-0.00038)]  # since #197
     assert report(agg, "all", "month") == [
-        *risk_head(AS_OF, HNG_NOMINAL, HNG_DELTA, WTI_NOMINAL, WTI_DELTA, CURVE_DV01),
-        ["Total", 20.0, pytest.approx(19.5), 6.0, pytest.approx(5.8), pytest.approx(-0.0114)],
-        [serial(JAN_27), 20.0, pytest.approx(19.5), 6.0, pytest.approx(5.8), 0.0],
-        *[[m, 0.0, 0.0, 0.0, 0.0, 0.0] for m in between],
-        [serial(JAN_28), 0.0, 0.0, 0.0, 0.0, pytest.approx(-0.0114)],
+        *risk_head(
+            AS_OF,
+            HNG_NOMINAL,
+            HNG_DELTA,
+            WTI_NOMINAL,
+            WTI_DELTA,
+            CURVE_DV01,
+            HNG_CLEARED_CROSS,
+            HNG_CROSS,
+            WTI_CLEARED_CROSS,
+            WTI_CROSS,
+        ),
+        [
+            "Total",
+            20.0,
+            pytest.approx(19.5),
+            6.0,
+            pytest.approx(5.8),
+            pytest.approx(-0.0114),
+            *crosses,
+        ],
+        [serial(JAN_27), 20.0, pytest.approx(19.5), 6.0, pytest.approx(5.8), 0.0, *crosses],
+        *[[m, *[0.0] * 9] for m in between],
+        [serial(JAN_28), 0.0, 0.0, 0.0, 0.0, pytest.approx(-0.0114), *[0.0] * 4],
     ]
     by_day = report(agg, "all", "day")
     assert [line[0] for line in by_day[4:]] == [
@@ -231,9 +265,9 @@ def test_the_four_sources_spill_the_tickets_table(sheet: dict[str, Any]) -> None
         serial("2027-01-05"),
         serial(A_YEAR_OUT),
     ]
-    assert by_day[4][1:] == [20.0, pytest.approx(19.5), 0.0, 0.0, 0.0]
-    assert by_day[5][1:] == [0.0, 0.0, 6.0, pytest.approx(5.8), 0.0]
-    assert by_day[6][1:] == [0.0, 0.0, 0.0, 0.0, pytest.approx(-0.0114)]
+    assert by_day[4][1:] == [20.0, pytest.approx(19.5), 0.0, 0.0, 0.0, 0.0, crosses[1], 0.0, 0.0]
+    assert by_day[5][1:] == [0.0, 0.0, 6.0, pytest.approx(5.8), 0.0, 0.0, 0.0, 0.0, crosses[3]]
+    assert by_day[6][1:] == [0.0, 0.0, 0.0, 0.0, pytest.approx(-0.0114), *[0.0] * 4]
     assert [line[0] for line in report(agg, "nominal_delta", "day")[4:]] == [
         serial(AS_OF),
         serial("2027-01-05"),
@@ -275,6 +309,8 @@ def test_a_row_a_cell_and_a_repeat_collect_as_the_ticket_says(sheet: dict[str, A
         30.0,
         pytest.approx(29.5),
         pytest.approx(-0.0095),
+        0.0,
+        pytest.approx(-0.00095),
     ]
 
 
@@ -285,7 +321,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
     table = spilled(ENTRY["util_ReadHandle"](collected(b2, b3, b4, b5)))
     assert table[:2] == [READBACK_HEADERS, READBACK_TYPES]
     assert table[2:] == [
-        [1.0, "HNG", "LOT", "cleared", "-", "USD", 10.0, 10.0, 0.0, serial(AS_OF)],
+        [1.0, "HNG", "LOT", "cleared", "-", "USD", 10.0, 10.0, 0.0, serial(AS_OF), 0.0, PER_BP],
         [
             2.0,
             "HNG",
@@ -297,8 +333,10 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             pytest.approx(9.5),
             pytest.approx(-0.0095),
             serial(AS_OF),
+            pytest.approx(-0.00095),
+            PER_BP,
         ],
-        [3.0, "WTI", "LOT", "cleared", "-", "USD", 2.0, 2.0, 0.0, serial(AS_OF)],
+        [3.0, "WTI", "LOT", "cleared", "-", "USD", 2.0, 2.0, 0.0, serial(AS_OF), 0.0, PER_BP],
         [
             4.0,
             "WTI",
@@ -310,6 +348,8 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             pytest.approx(3.8),
             pytest.approx(-0.0019),
             serial(AS_OF),
+            pytest.approx(-0.00038),
+            PER_BP,
         ],
     ]
     repeated = spilled(ENTRY["util_ReadHandle"](collected(b2, b3, b2)))
@@ -324,7 +364,16 @@ def test_a_collection_with_no_curve_reports_a_dv01_of_nothing(sheet: dict[str, A
     agg = collected(sheet["b2"], sheet["b4"])
     assert report(agg, "dv01", "day") == [*risk_head(AS_OF, CLEARED_DV01), ["Total", 0.0]]
     everything = report(agg, "all", "day")
-    assert everything[1] == ["period", HNG_NOMINAL, HNG_DELTA, WTI_NOMINAL, WTI_DELTA, CLEARED_DV01]
+    assert everything[1] == [
+        "period",
+        HNG_NOMINAL,
+        HNG_DELTA,
+        WTI_NOMINAL,
+        WTI_DELTA,
+        CLEARED_DV01,
+        HNG_CLEARED_CROSS,
+        WTI_CLEARED_CROSS,
+    ]
     assert [line[5] for line in everything[3:]] == [0.0, 0.0, 0.0]
 
 
@@ -344,6 +393,10 @@ def test_a_quote_or_a_curve_moved_through_the_cells_flows_into_the_collection(
         6.0,
         pytest.approx(5.8),
         pytest.approx(-0.01235),
+        0.0,
+        pytest.approx(-0.00095),
+        0.0,
+        pytest.approx(-0.00038),
     ]
     steeper = unit_curve((AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.90))
     b3_other = valued(sheet, "hng", 1002, 10.0, 70.0, "+261bd", "bilateral", steeper)
@@ -355,6 +408,10 @@ def test_a_quote_or_a_curve_moved_through_the_cells_flows_into_the_collection(
         6.0,
         pytest.approx(5.84),
         pytest.approx(-0.01152),
+        0.0,
+        pytest.approx(-0.00096),
+        0.0,
+        pytest.approx(-0.000384),
     ]
 
 
@@ -562,6 +619,6 @@ def test_the_reader_takes_either_kind_and_the_other_reports_take_one(sheet: dict
         "results handle"
     )
     assert ENTRY["_ReportRisk"](agg, "gamma", "day") == (
-        "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or "
-        "all"
+        "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01, "
+        "cross_gamma or all"
     )

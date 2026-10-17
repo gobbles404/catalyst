@@ -76,9 +76,31 @@ def retained_bytes(agg: AggregateResults) -> int:
                 r.dv01_by_year,
             )
         )
+    for c in agg.cross_groups:
+        total += sum(
+            a.nbytes
+            for a in (
+                c.occurrences,
+                c.references,
+                c.cross_gamma,
+                c.days,
+                c.cross_gamma_by_day,
+                c.months,
+                c.cross_gamma_by_month,
+                c.years,
+                c.cross_gamma_by_year,
+            )
+        )
     for axes in (agg.by_day, agg.by_month, agg.by_year):
         total += axes.observed.nbytes + axes.paid.nbytes + axes.union.nbytes
-        for places in (axes.observed_in, axes.paid_in, axes.observed_in_union, axes.paid_in_union):
+        for places in (
+            axes.observed_in,
+            axes.paid_in,
+            axes.observed_in_union,
+            axes.paid_in_union,
+            axes.cross_in,
+            axes.cross_in_union,
+        ):
             total += sum(a.nbytes for a in places)
     return total
 
@@ -101,20 +123,23 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
     agg = aggregate_results(sources, counter)
     enc = sources[0].prepared.encoded
     paid = payment_axes(sources[0])
-    # Every occurrence counted; one group of each kind; every saved entry of every occurrence
-    # aligned once, the four observation axes and the three payment axes; two lot vectors summed
-    # onto each observation axis and the DV01 onto each payment axis, eleven reductions; and the
-    # three buckets' axes saved, the observed, the paid and their union each.
-    per_source = (
+    # Every occurrence counted; one group of each kind, since #197 the cross group among them;
+    # every saved entry of every occurrence aligned once per vector summed over its axis, the
+    # four observation axes twice, for the lots and for the cross-gamma, and the three payment
+    # axes; two lot vectors summed onto each observation axis, the DV01 onto each payment axis
+    # and the cross-gamma onto each observation axis, fifteen reductions; and the three buckets'
+    # axes saved, the observed, the paid and their union each.
+    delta_axes = (
         enc.references.size + enc.days.size + enc.contract_months.size + enc.contract_years.size
     )
-    per_source += paid.days.size + paid.months.size + paid.years.size
+    per_source = 2 * delta_axes + paid.days.size + paid.months.size + paid.years.size
     coordinates = sum(
         axes.observed.size + axes.paid.size + axes.union.size
         for axes in (agg.by_day, agg.by_month, agg.by_year)
     )
     assert counter.freeze().as_dict() == {
-        "aggregate_reductions": 11,
+        "aggregate_reductions": 15,
+        "cross_groups": 1,
         "entries_aligned": count * per_source,
         "index_groups": 1,
         "rate_groups": 1,
@@ -152,65 +177,72 @@ def test_a_collection_runs_the_same_functions_at_any_size(
 ) -> None:
     sources = valued_sources(method, components, contracts, as_of, count)
     counter = WorkCounter()
-    # The membership and the two groupings, one index group and one rate group summed over seven
-    # axes by eleven compensated passes, three looks for a sum past the largest number and the
-    # three buckets' axes; twenty counts; nothing of the kernel, the market, the curve or the
-    # preparation is called.
+    # The membership and the three groupings, one index group, one rate group and since #197 one
+    # cross group summed over eleven axes by fifteen compensated passes, four looks for a sum
+    # past the largest number and the three buckets' axes with the cross group's places;
+    # twenty-nine counts; nothing of the kernel, the market, the curve or the preparation is
+    # called.
     assert call_profile(lambda: aggregate_results(sources, counter)) == {
         "aggregate_results": 1,
         "_grouped_by_index": 1,
+        "_curve_numbers": 1,
         "_grouped_by_curve": 1,
+        "_grouped_by_index_and_curve": 1,
         "_index_group": 1,
         "_rate_group": 1,
-        "_summed": 7,
-        "_compensated": 11,
-        "_outrun": 3,
+        "_cross_group": 1,
+        "_summed": 11,
+        "_compensated": 15,
+        "_outrun": 4,
         "_report_axes": 1,  # by day; since #186 the month and year axes are the display's
         "_period_report_axes": 2,
         "period_start": 2,
-        "places_from": 4,
+        "places_from": 6,
         "rows_through": 4,
         "display_periods": 2,
         "_early_lots": 2,
-        "early_risk": 3,
-        "early_fact": 6,
-        "WorkCounter.hit": 20,
+        "early_risk": 4,
+        "early_fact": 8,
+        "WorkCounter.hit": 29,
     }
-    # Sixteen uniques, the seven unions of saved axes, the six report axes and the three unions of
-    # both, each a flatten, a sort and a hash; nineteen searches for places; eleven compensated
-    # passes, each two zeros and the flags set down once; the looks for a sum past the largest
-    # number, eleven; the two position arrays; and forty-one arrays frozen. The same at one source
-    # and at twenty-four: a pass adds each occurrence's entries at once, so more occurrences are
-    # more steps of the same arithmetic and not more of these calls.
+    # Fourteen uniques, the eleven unions of saved axes, the cross group's four among them since
+    # #197, the day report axes and their union, each a flatten, a sort and a hash; twenty-three
+    # searches for places; fifteen compensated passes, each two zeros and the flags set down once;
+    # the looks for a sum past the largest number, fifteen; the three position arrays; and
+    # forty-six arrays frozen. The same at one source and at twenty-four: a pass adds each
+    # occurrence's entries at once, so more occurrences are more steps of the same arithmetic and
+    # not more of these calls.
     assert numpy_calls(lambda: aggregate_results(sources, WorkCounter())) == {
         "generic.astype": 2,  # the valuation day to its month and its year, since #186
-        "ndarray.any": 11,
-        "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
-        "ndarray.flatten": 10,
-        "ndarray.nonzero": 6,  # the looks for risk before the start, three measures by two buckets
-        "ndarray.ravel": 6,
-        "ndarray.searchsorted": 15,
-        "ndarray.setflags": 33,
-        "ndarray.sort": 10,
-        "numpy._make_extobj": 11,
-        "numpy._unique_hash": 10,
+        "ndarray.any": 15,  # since #197 the cross group's four looks for a sum past the largest
+        "ndarray.astype": 14,  # the display axes' keys, periods and first days
+        "ndarray.flatten": 14,  # since #197 the cross group's four unions among the uniques
+        "ndarray.nonzero": 8,  # the looks for risk before the start, four measures, two buckets
+        "ndarray.ravel": 8,
+        "ndarray.searchsorted": 23,  # since #197 eight more, the cross group's places
+        "ndarray.setflags": 46,  # since #197 thirteen more, the cross group's arrays and places
+        "ndarray.sort": 14,
+        "numpy._make_extobj": 15,
+        "numpy._unique_hash": 14,
         "numpy.arange": 2,  # the two display axes
-        "numpy.array": 2,
-        "numpy.asanyarray": 26,
-        "numpy.zeros": 22,
-        "ufunc.reduce": 11,
+        "numpy.array": 3,  # the three groups' positions
+        "numpy.asanyarray": 36,
+        "numpy.zeros": 30,  # fifteen compensated passes, two each
+        "ufunc.reduce": 15,
     }
 
 
 # The peak follows the entries stacked: the largest union made is the observation days', every
 # source's day axis concatenated with its places and the sort's copies, and the compensated pass's
 # running sum, low part and one occurrence's step beside them, five arrays of eight bytes an entry
-# in all, over the bytes retained and within twelve slacks of the records, lists and small arrays.
-# Measured 2026-10-11 with the compensated reduction: 8,776 bytes for one five-trade lastday
-# source, 9,880 for two and 12,721 for twenty-four; 55,839 for one asian source of 2,000 trades
-# over 519 days, 64,607 for two and 251,943 for twenty-four, whose stacked days are 12,456. The
-# retained bytes are exactly the new arrays', 560 for the one lastday source and 33,224 for the one
-# asian, the sources' own vectors shared by reference and never copied.
+# in all, over the bytes retained and within sixteen slacks of the records, lists and small
+# arrays, the cross group's since #197 among them. Measured 2026-10-17 with the cross group:
+# 10,280 bytes for one five-trade lastday source, 11,881 for two and 15,658 for twenty-four;
+# 69,279 for one asian source of 2,000 trades over 519 days, 79,087 for two and 266,855 for
+# twenty-four, whose stacked days are 12,456; against 8,776, 9,880, 12,721, 55,839, 64,607 and
+# 251,943 on 2026-10-11 with the compensated reduction. The retained bytes are exactly the new
+# arrays', 592 for the one lastday source and 50,752 for the one asian, the sources' own vectors
+# shared by reference and never copied.
 @pytest.mark.parametrize(
     ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
 )
@@ -230,7 +262,7 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
     stacked = sum(s.prepared.encoded.days.size for s in sources)
     assert (
         least_peak(lambda: aggregate_results(sources, WorkCounter()))
-        <= 40 * stacked + retained + 12 * SLACK
+        <= 40 * stacked + retained + 16 * SLACK
     )
     g, r = agg.index_groups[0], agg.rate_groups[0]
     d, m, y, refs = g.days.size, g.months.size, g.years.size, g.references.size
@@ -242,11 +274,15 @@ def test_a_collection_allocates_by_the_entries_stacked_and_retains_its_vectors(
         axes += bucket.observed.size + bucket.paid.size + bucket.union.size
         axes += 2 * sum(places.size for places in bucket.observed_in)
         axes += 2 * sum(places.size for places in bucket.paid_in)
+        axes += 2 * sum(places.size for places in bucket.cross_in)
     assert (d, p, m, pm, y, py) == (d, p, m, pm, y, py)  # the saved axes' sizes, read above
+    # Since #197 the cross group's positions, its four axes and its four vectors beside them,
+    # the same axes as the index group's, every source being on the one curve.
     assert (
         retained
         == 8 * (count + 3 * refs + 3 * d + 3 * m + 3 * y)
         + 8 * (count + 2 * p + 2 * pm + 2 * py)
+        + 8 * (count + 2 * refs + 2 * d + 2 * m + 2 * y)
         + 8 * axes
     )
     for source in sources:
@@ -269,10 +305,12 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
 ) -> None:
     agg = aggregate_results(valued_sources(method, components, contracts, as_of, 2), WorkCounter())
     index_groups, rate_groups = len(agg.index_groups), len(agg.rate_groups)
+    cross_groups = len(agg.cross_groups)
     for risk, columns, chosen, refused in (
         (Risk.NOMINAL_DELTA, 1, "_lots", index_groups),
         (Risk.DELTA, 1, "_discounted_lots", index_groups),
         (Risk.DV01, 1, "_dv01", rate_groups),
+        (Risk.CROSS_GAMMA, 1, "_cross_gamma", cross_groups),
     ):
         for bucket in Bucket:
             # One column of zeros over the axis, the saved vector copied through its places; by
@@ -285,6 +323,7 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
                 "aggregate_view": 1,
                 "delta_labels": index_groups,  # the headings, spelled once in risk_report.py
                 "dv01_label": rate_groups + len(agg.currencies),
+                "cross_gamma_label": cross_groups,
                 "_axes_of": 1,
                 "_refuse_early": 1,
                 **early,
@@ -297,31 +336,36 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
                 <= 8 * view.dates.size + SLACK
             )
     for bucket in Bucket:
-        # All three: three columns over the union, each through its own places.
-        assert numpy_calls(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {"numpy.zeros": 3}
+        # All four, since #197: four columns over the union, each through its own places.
+        assert numpy_calls(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {"numpy.zeros": 4}
         early = (
             {}
             if bucket is Bucket.DAY
-            else {"_early_of": 1, "EarlyRisk.refuse": 2 * index_groups + rate_groups}
+            else {
+                "_early_of": 1,
+                "EarlyRisk.refuse": 2 * index_groups + rate_groups + cross_groups,
+            }
         )
         assert call_profile(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {
             "aggregate_view": 1,
             "delta_labels": index_groups,
             "dv01_label": rate_groups + len(agg.currencies),
+            "cross_gamma_label": cross_groups,
             "_axes_of": 1,
             "_refuse_early": 1,
             **early,
             "_lots": 1,
             "_discounted_lots": 1,
             "_dv01": 1,
-            "placed": 3,
+            "_cross_gamma": 1,
+            "placed": 4,
         }
         view = aggregate_view(agg, Risk.ALL, bucket)
-        # Three columns of eight bytes a row, and the lists of labels, totals, columns and places
+        # Four columns of eight bytes a row, and the lists of labels, totals, columns and places
         # beside them, within two slacks.
         assert (
             least_peak(lambda b=bucket: aggregate_view(agg, Risk.ALL, b))
-            <= 24 * view.dates.size + 2 * SLACK
+            <= 32 * view.dates.size + 2 * SLACK
         )
 
 
@@ -339,8 +383,10 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
     unpaid: int,
 ) -> None:
     # The cleared batch of the same index on the same history and market beside the bilateral one:
-    # one index group of two occurrences, one rate group of one, the cleared source's observation
-    # entries aligned and no payment entry of its own; the same functions and numpy calls.
+    # one index group of two occurrences, one rate group of one and since #197 two cross groups,
+    # the bilateral pair summed over its four delta axes again and the cleared pair the known
+    # zero, nothing aligned; the cleared source's observation entries aligned and no payment
+    # entry of its own; the same functions and numpy calls.
     terms = bilateral_terms(components, contracts, method)
     assert terms.index is GAS
     history = a_history(as_of=as_of, ix=GAS)
@@ -369,18 +415,26 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
         + s.prepared.encoded.contract_years.size
         for s in (discounted, cleared)
     )
+    bilateral_delta_axes = (
+        discounted.prepared.encoded.references.size
+        + discounted.prepared.encoded.days.size
+        + discounted.prepared.encoded.contract_months.size
+        + discounted.prepared.encoded.contract_years.size
+    )
     assert (
         counter.freeze().as_dict()["entries_aligned"]
-        == observed + paid.days.size + paid.months.size + paid.years.size
+        == observed + paid.days.size + paid.months.size + paid.years.size + bilateral_delta_axes
     )
     assert counter.freeze().as_dict()["rate_groups"] == 1
+    assert counter.freeze().as_dict()["cross_groups"] == 2
+    assert [c.number for c in agg.cross_groups] == [1, None]
     assert (
         call_profile(lambda: aggregate_results([discounted, cleared], WorkCounter()))["_summed"]
-        == 7
+        == 11
     )
     assert (
         numpy_calls(lambda: aggregate_results([discounted, cleared], WorkCounter()))[
             "ndarray.setflags"
         ]
-        == 33
+        == 51  # since #197 the bilateral pair's thirteen more and the cleared pair's five
     )
