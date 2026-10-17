@@ -26,8 +26,9 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import resolved, trades
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import BASES, METHODS, QuantityPer, ScheduleMethod
+from goosedove.trades.terms import BASES, QuantityPer
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]
 SIZES = [(5, 2), (2_000, 24)]

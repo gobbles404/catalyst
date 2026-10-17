@@ -35,8 +35,9 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.resolution import CONDITIONS, PERIOD_FIELDS, Trades, resolved, trades
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import TradeTemplate, trade_template
-from goosedove.trades.terms import BASES, METHODS, QuantityPer, Route, ScheduleMethod, Settlement
+from goosedove.trades.terms import BASES, QuantityPer, Route, Settlement
 
 
 def dates(*texts: str) -> NDArray[np.datetime64]:

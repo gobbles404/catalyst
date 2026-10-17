@@ -50,13 +50,13 @@ from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import trades
 from goosedove.trades.results import TradeResults, risk_view
 from goosedove.trades.risk_report import Bucket, Risk
+from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.template import trade_template
 from goosedove.trades.terms import (
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
-    ScheduleMethod,
     Settlement,
     resolved_trades,
 )

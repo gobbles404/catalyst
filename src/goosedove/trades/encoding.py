@@ -31,7 +31,8 @@ from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
-from goosedove.trades.terms import METHODS, ResolvedTrades, Route, ScheduleMethod
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
+from goosedove.trades.terms import ResolvedTrades, Route
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked

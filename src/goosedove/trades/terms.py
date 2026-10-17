@@ -26,6 +26,7 @@ from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 
 
 class Route(Enum):
@@ -42,22 +43,6 @@ class Settlement(Enum):
     FINANCIAL = "financial"
 
 
-class ScheduleMethod(Enum):
-    """Which observations set a contract's final price. lastday, the settlement on the contract's
-    last trading day, or on an IFERC index the month's index on its publication day, the one
-    method an IFERC index takes since #167; penultimate, the settlement on the business day before
-    the last trading day; last3day, the average of the settlements on the last trading day and the
-    two business days before it, each a third; and asian, the average of the settles on every
-    pricing day the component covers, its contract's calendar month or the booked part of it, each
-    day's settle the contract the index's calendar prices that day with, which need not be the
-    component's own, an equal share each: the four methods the definition lists, all built."""
-
-    LASTDAY = "lastday"
-    PENULTIMATE = "penultimate"
-    LAST3DAY = "last3day"
-    ASIAN = "asian"
-
-
 class QuantityPer(Enum):
     """What the entered quantity is per. month: the quantity stands in every contract month the
     trade covers, a partial month's as much as a whole one's, never prorated. calday: the
@@ -69,15 +54,13 @@ class QuantityPer(Enum):
     CALDAY = "calday"
 
 
-# The members of the two choices in the definition's order, and their names as the sheet spells
-# them: a selection holds each occurrence's choice as its position here, so that the kernel
-# gathers and compares positions and never texts, and a reader turns a position back into its
-# name.
-METHODS: Final = tuple(ScheduleMethod)
+# The members of the basis choice in the definition's order, and their names as the sheet
+# spells them: a selection holds each occurrence's choice as its position here, so that the
+# kernel gathers and compares positions and never texts, and a reader turns a position back
+# into its name. The schedule methods' members and names are schedule_methods.py's, the same
+# way.
 BASES: Final = tuple(QuantityPer)
-METHOD_NAMES: Final = np.array([member.value for member in METHODS], dtype=object)
 BASIS_NAMES: Final = np.array([member.value for member in BASES], dtype=object)
-METHOD_NAMES.setflags(write=False)
 BASIS_NAMES.setflags(write=False)
 
 

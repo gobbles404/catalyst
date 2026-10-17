@@ -23,7 +23,8 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import with_holiday_calendar
-from goosedove.trades.terms import METHODS, ScheduleMethod, trade_schedule_of
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
+from goosedove.trades.terms import trade_schedule_of
 
 # How far the weights of a component may miss one, a few units in the last place: 1/3 three
 # times is one exactly, 1/7 seven times is not.

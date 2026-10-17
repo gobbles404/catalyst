@@ -40,14 +40,13 @@ from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import month_bounds
 from goosedove.trades.results import TradeResults
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.terms import (
     BASES,
-    METHODS,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
-    ScheduleMethod,
     Settlement,
     marketing_reserves,
     named_trade,

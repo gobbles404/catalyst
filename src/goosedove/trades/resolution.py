@@ -35,6 +35,7 @@ from goosedove.instruments.definitions import FIXED_FLOAT, FieldType
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.observations import Observations, observed
+from goosedove.trades.schedule_methods import METHODS
 from goosedove.trades.template import (
     TradeTemplate,
     months_of,
@@ -46,7 +47,6 @@ from goosedove.trades.template import (
 )
 from goosedove.trades.terms import (
     BASES,
-    METHODS,
     PaymentTerms,
     ResolvedTrades,
     Route,

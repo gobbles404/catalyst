@@ -51,8 +51,9 @@ from goosedove.trades.encoding import Encoded
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
 from goosedove.trades.results import TradeResults
+from goosedove.trades.schedule_methods import METHOD_NAMES
 from goosedove.trades.template import TradeTemplate
-from goosedove.trades.terms import BASIS_NAMES, METHOD_NAMES
+from goosedove.trades.terms import BASIS_NAMES
 
 
 @singledispatch
