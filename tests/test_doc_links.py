@@ -9,8 +9,6 @@ from pathlib import Path
 import check_doc_links as checker
 from check_doc_links import check, slug
 
-MISSING = "missing tracked target"
-
 
 def repository(root: Path, files: dict[str, str]) -> None:
     subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
@@ -37,8 +35,9 @@ def test_existing_files_directories_images_and_root_paths_pass(tmp_path: Path) -
     repository(
         tmp_path,
         {
-            "README.md": "[a](docs/a.md) [dir](docs/) [root](/docs/a.md) ![i](docs/img/p.png)",
-            "docs/a.md": "# A\n\n[up](../README.md) [self](a.md) [dot](./a.md)",
+            "README.md": "[a](docs/a.md) [dir](docs/) [root](/docs/a.md) "
+            "![i](docs/img/p.png) [r](/)",
+            "docs/a.md": "# A\n\n[up](../README.md) [self](a.md) [dot](./a.md) [top](/)",
             "docs/img/p.png": "not really a png",
         },
     )
@@ -62,12 +61,30 @@ def test_fragments_follow_github_anchors(tmp_path: Path) -> None:
     ]
 
 
+def test_formatting_leaves_the_anchor_and_a_literal_underscore_stays(tmp_path: Path) -> None:
+    repository(
+        tmp_path,
+        {
+            "a.md": "# A _helpful_ section\n\n## The `fixed_float` and **bold**\n\n"
+            "[ok](#a-helpful-section) [bad](#a-_helpful_-section) [u](#the-fixed_float-and-bold)",
+        },
+    )
+    assert failures(tmp_path) == ["a.md:5: unknown fragment: #a-_helpful_-section"]
+
+
+def test_generated_anchors_stay_unique(tmp_path: Path) -> None:
+    repository(
+        tmp_path,
+        {"a.md": "# Foo\n\n# Foo\n\n# Foo-1\n\n[a](#foo) [b](#foo-1) [c](#foo-1-1) [d](#foo-2)"},
+    )
+    assert failures(tmp_path) == ["a.md:7: unknown fragment: #foo-2"]
+
+
 def test_slug_matches_github() -> None:
     assert slug("10. What each page owns") == "10-what-each-page-owns"
     assert slug("NUL in input text") == "nul-in-input-text"
     assert slug("As built, #163") == "as-built-163"
-    assert slug("a_b and `c` (d)") == "a_b-and-c-d"
-    assert slug("See [inputs](inputs.md) first") == "see-inputs-first"
+    assert slug("a_b and c (d)") == "a_b-and-c-d"
 
 
 def test_reference_links_and_explicit_anchors(tmp_path: Path) -> None:
@@ -75,8 +92,9 @@ def test_reference_links_and_explicit_anchors(tmp_path: Path) -> None:
         tmp_path,
         {
             "a.md": "[full][one] [collapsed][] [one] [not a link] [bad][two]\n\n"
-            "[one]: b.md#here\n[collapsed]: b.md\n[two]: nowhere.md\n",
-            "b.md": '<a id="here"></a>\n\n# Top\n\n<a name="here"></a>\n\n<a id="top"></a>\n',
+            "[one]: b.md#here\n[collapsed]: b.md\n[two]:\n  nowhere.md\n",
+            "b.md": '<a class="anchor" id="here"></a>\n\n# Top\n\n'
+            '<a name="here"></a>\n\n<a href="x" id="top"></a>\n',
         },
     )
     assert failures(tmp_path) == [
@@ -84,6 +102,11 @@ def test_reference_links_and_explicit_anchors(tmp_path: Path) -> None:
         "b.md:5: duplicate explicit anchor 'here' (first at line 1): here",
         "b.md:7: explicit anchor 'top' collides with a heading's anchor (line 3): top",
     ]
+
+
+def test_a_link_wrapped_over_two_lines_is_still_a_link(tmp_path: Path) -> None:
+    repository(tmp_path, {"a.md": "Some words, then a [link](\nmissing.md) and more.\n"})
+    assert failures(tmp_path) == ["a.md:1: missing tracked target: missing.md"]
 
 
 def test_missing_renamed_and_wrongly_cased_targets_fail(tmp_path: Path) -> None:
@@ -106,13 +129,24 @@ def test_an_untracked_target_counts_once_it_is_added(tmp_path: Path) -> None:
 
 
 def test_the_working_tree_text_is_read_never_a_stale_blob(tmp_path: Path) -> None:
-    repository(tmp_path, {"a.md": "[x](b.md#old-name) [y](c.md)", "b.md": "# Old name", "c.md": ""})
+    repository(
+        tmp_path,
+        {
+            "a.md": "[x](b.md#old-name) [y](c.md) [d](sub/)",
+            "b.md": "# Old name",
+            "c.md": "",
+            "sub/s.md": "",
+        },
+    )
     assert failures(tmp_path) == []
     put(tmp_path, {"b.md": "# New name"})
     (tmp_path / "c.md").unlink()
+    (tmp_path / "sub" / "s.md").unlink()
+    (tmp_path / "sub").rmdir()
     assert failures(tmp_path) == [
         "a.md:1: unknown fragment: b.md#old-name",
         "a.md:1: tracked target is deleted in the working tree: c.md",
+        "a.md:1: tracked directory is deleted in the working tree: sub/",
     ]
 
 
@@ -135,14 +169,17 @@ def test_code_comments_and_external_links_are_not_checked(tmp_path: Path) -> Non
         {
             "a.md": "```\n[x](gone.md)\n# In code\n```\n\n"
             "    [y](gone.md)\n\n"
-            "`[z](gone.md)` and <!-- [w](gone.md)\n# Commented --> text\n"
+            "> ```\n> [q](gone.md)\n> ```\n\n"
+            "`[z](gone.md)` and text\n"
+            "<!-- [w](gone.md)\n```\n# Commented -->\n"
             "[ext](https://example.invalid/missing) [mail](mailto:x@y.z) <https://a.b/c>\n"
-            "[k](#in-code) [c](#commented)",
+            "[k](#in-code) [c](#commented) [real](gone.md)",
         },
     )
     assert failures(tmp_path) == [
-        "a.md:11: unknown fragment: #commented",
-        "a.md:11: unknown fragment: #in-code",
+        "a.md:17: unknown fragment: #commented",
+        "a.md:17: unknown fragment: #in-code",
+        "a.md:17: missing tracked target: gone.md",
     ]
 
 
@@ -160,7 +197,10 @@ def test_machine_specific_paths_are_not_repository_links(tmp_path: Path) -> None
 
 
 def test_decision_numbers_are_unique_in_the_two_decided_sections(tmp_path: Path) -> None:
-    decided = "## Decided\n\n1. One.\n2. Two.\n2. Two again.\n\n## Steps\n\n1. a\n1. b\n"
+    decided = (
+        "## Decided\n\n1. One.\n2. Two.\n2. Two again.\n\n```\n2. in code\n```\n\n"
+        "## Steps\n\n1. a\n1. b\n"
+    )
     repository(
         tmp_path,
         {

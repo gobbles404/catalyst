@@ -6,6 +6,11 @@ tree of the Git-indexed files: `git ls-files` says which files exist, and their 
 disk, so an edit saved but not committed is seen, a staged new file counts, and a file that exists
 only untracked, ignored or in another checkout is a missing target. Section 11 of
 docs/seam/working.md says what is checked, what the diagnostics mean and how an exception is made.
+
+markdown-it-py, a development dependency, reads each page as GitHub does: it says which lines are
+code, HTML or comment and which are prose, splits prose into paragraphs, headings and table cells,
+and gives a heading's words without their formatting. The links themselves are read from the
+page's own text, so a diagnostic quotes a destination as it was written.
 """
 
 import argparse
@@ -18,26 +23,26 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
+from markdown_it import MarkdownIt
+from markdown_it.token import Token
+
 ROOT = Path(__file__).resolve().parents[1]
 EXCEPTIONS_FILE = PurePosixPath("tools/doc_link_exceptions.toml")
 DECISION_SECTIONS = (PurePosixPath("docs/seam/inputs.md"), PurePosixPath("docs/seam/outputs.md"))
+MARKDOWN = MarkdownIt("commonmark").enable("table")
+BLOCKS_WITHOUT_LINKS = frozenset({"fence", "code_block", "html_block"})
 
-FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-ATX_HEADING = re.compile(r"^ {0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$")
-SETEXT_UNDERLINE = re.compile(r"^ {0,3}(=+|-+)[ \t]*$")
-LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
-INLINE_CODE = re.compile(r"(`+)(.+?)\1")
+INLINE_CODE = re.compile(r"(`+)(.+?)\1", re.DOTALL)
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-EXPLICIT_ANCHOR = re.compile(r"""<a\s+(?:id|name)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
-DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*(<[^>]*>|\S+)")
+EXPLICIT_ANCHOR = re.compile(r"""<a\b[^>]*?\b(?:id|name)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*(?:\n[ \t]*)?(<[^>]*>|\S+)", re.MULTILINE)
 LINK_TEXT = r"(?:[^\[\]]|\[[^\[\]]*\])*"
 INLINE_LINK = re.compile(
-    r"!?\[" + LINK_TEXT + r"\]\((<[^>]*>|(?:[^()\s]|\([^()\s]*\))*)"
-    r"(?:[ \t]+(?:\"[^\"]*\"|'[^']*'|\([^)]*\)))?[ \t]*\)"
+    r"!?\[" + LINK_TEXT + r"\]\(\s*(<[^>]*>|(?:[^()\s]|\([^()\s]*\))*)"
+    r"(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^)]*\)))?\s*\)"
 )
 REFERENCE_LINK = re.compile(r"!?\[(" + LINK_TEXT + r")\]\[([^\]]*)\]")
 SHORTCUT_LINK = re.compile(r"(?<![\]!])\[([^\[\]]+)\](?![\[(:])")
-MARKDOWN_LINK_IN_HEADING = re.compile(r"!?\[([^\]]*)\](?:\([^)]*\)|\[[^\]]*\])")
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:")
 DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
 DECISION_ITEM = re.compile(r"^(\d+)\.\s")
@@ -80,6 +85,17 @@ class Exception_:
     reason: str
 
 
+@dataclass(frozen=True, slots=True)
+class Prose:
+    """A page as markdown-it reads it: each run of prose with the line it starts on, each
+    heading's words, each HTML block, and the lines that are code or HTML and hold no link."""
+
+    runs: tuple[tuple[int, str], ...]
+    headings: tuple[tuple[int, str], ...]
+    html: tuple[tuple[int, str], ...]
+    silent_lines: frozenset[int]
+
+
 def tracked_files(root: Path) -> tuple[str, ...]:
     """The Git index's files as posix paths, one subprocess for the whole scan."""
     listing = subprocess.run(
@@ -88,98 +104,94 @@ def tracked_files(root: Path) -> tuple[str, ...]:
     return tuple(name for name in listing.stdout.split("\0") if name)
 
 
-def active_text(lines: list[str]) -> list[str]:
-    """The lines with code fences, indented code and HTML comments blanked out, line numbers
-    kept, so nothing inside them is read as a link, a heading or an anchor. Inline code stays,
-    since a heading's anchor includes its words; the link and anchor readers blank it themselves."""
-    out: list[str] = []
-    fence: tuple[str, int] | None = None
-    indented = False
-    previous_blank = True
-    previous_text = ""
-    for line in lines:
-        blank = not line.strip()
-        if fence is not None:
-            closing = FENCE.match(line)
-            if closing and closing.group(1)[0] == fence[0] and len(closing.group(1)) >= fence[1]:
-                fence = None
-            out.append("")
-            continue
-        opening = FENCE.match(line)
-        if opening:
-            fence = (opening.group(1)[0], len(opening.group(1)))
-            out.append("")
-            continue
-        is_indented = line.startswith("    ") or line.startswith("\t")
-        if indented and (is_indented or blank):
-            out.append("")
-            continue
-        indented = is_indented and previous_blank and not LIST_ITEM.match(previous_text)
-        if indented:
-            out.append("")
-            continue
-        out.append(line)
-        previous_blank = blank
-        if not blank:
-            previous_text = line
-    joined = "\n".join(out)
-    joined = HTML_COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), joined)
-    return joined.split("\n")
+def plain_text(children: list[Token] | None) -> str:
+    """A heading's words as GitHub anchors them: text and code kept, formatting dropped, a line
+    break a space, an image its alt text."""
+    parts: list[str] = []
+    for child in children or ():
+        if child.type in ("text", "code_inline", "image"):
+            parts.append(child.content)
+        elif child.type in ("softbreak", "hardbreak"):
+            parts.append(" ")
+    return "".join(parts)
 
 
-def without_inline_code(line: str) -> str:
-    return INLINE_CODE.sub(lambda m: " " * len(m.group(0)), line)
+def read_prose(text: str) -> Prose:
+    runs: list[tuple[int, str]] = []
+    headings: list[tuple[int, str]] = []
+    html: list[tuple[int, str]] = []
+    silent: set[int] = set()
+    previous = ""
+    for token in MARKDOWN.parse(text):
+        first = token.map[0] + 1 if token.map else 0
+        if token.type in BLOCKS_WITHOUT_LINKS and token.map:
+            silent.update(range(token.map[0] + 1, token.map[1] + 1))
+            if token.type == "html_block":
+                html.append((first, token.content))
+        elif token.type == "inline":
+            runs.append((first, token.content))
+            if previous == "heading_open":
+                headings.append((first, plain_text(token.children)))
+        previous = token.type
+    return Prose(tuple(runs), tuple(headings), tuple(html), frozenset(silent))
 
 
 def slug(heading: str) -> str:
-    """A heading's anchor as GitHub makes it: links reduced to their text, lowercase, punctuation
-    and symbols dropped but hyphens and underscores, spaces to hyphens."""
-    text = MARKDOWN_LINK_IN_HEADING.sub(r"\1", heading).strip().lower()
+    """A heading's anchor as GitHub makes it: lowercase, punctuation and symbols dropped but
+    hyphens and underscores, spaces to hyphens."""
+    text = heading.strip().lower()
     kept = (ch for ch in text if ch in "-_" or not unicodedata.category(ch).startswith(("P", "S")))
     return "".join(kept).replace(" ", "-")
 
 
-def heading_texts(lines: list[str]) -> list[tuple[int, str]]:
-    """Every ATX and setext heading of the active text, with its line number."""
-    found: list[tuple[int, str]] = []
-    for number, line in enumerate(lines, start=1):
-        atx = ATX_HEADING.match(line)
-        if atx:
-            found.append((number, atx.group(1)))
-            continue
-        if number < 2 or not SETEXT_UNDERLINE.match(line):
-            continue
-        above = lines[number - 2].strip()
-        if above and above[0] not in "|#>-*+" and not LIST_ITEM.match(above):
-            found.append((number - 1, above))
-    return found
-
-
-def anchors_of(path: str, lines: list[str]) -> tuple[frozenset[str], tuple[Diagnostic, ...]]:
-    """The anchors a page offers: each heading's slug, a repeated one suffixed as GitHub suffixes
-    it, and the explicit `<a id>` anchors, which may not repeat or shadow a heading's."""
+def heading_anchors(headings: tuple[tuple[int, str], ...]) -> dict[str, int]:
+    """Each heading's anchor, a repeated one suffixed as GitHub suffixes it: the second `Foo` is
+    `foo-1`, and a later `Foo-1` is `foo-1-1`, since every anchor stays unique."""
     anchors: dict[str, int] = {}
-    seen: dict[str, int] = {}
-    for number, text in heading_texts(lines):
-        base = slug(text)
-        count = seen.get(base, 0)
-        seen[base] = count + 1
-        anchors[base if count == 0 else f"{base}-{count}"] = number
+    occurrences: dict[str, int] = {}
+    for line, text in headings:
+        original = slug(text)
+        anchor = original
+        while anchor in occurrences:
+            occurrences[original] += 1
+            anchor = f"{original}-{occurrences[original]}"
+        occurrences[anchor] = 0
+        anchors[anchor] = line
+    return anchors
+
+
+def blank(pattern: re.Pattern[str], text: str) -> str:
+    """The text with every match replaced by spaces, newlines kept, so positions still count."""
+    return pattern.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
+
+def line_of(start: int, text: str, position: int) -> int:
+    return start + text.count("\n", 0, position)
+
+
+def anchors_of(path: str, prose: Prose) -> tuple[frozenset[str], tuple[Diagnostic, ...]]:
+    """The anchors a page offers: the headings' and the explicit `<a id>` ones, which may not
+    repeat or shadow a heading's."""
+    anchors = heading_anchors(prose.headings)
     from_headings = frozenset(anchors)
     faults: list[Diagnostic] = []
-    for number, line in enumerate(lines, start=1):
-        for name in EXPLICIT_ANCHOR.findall(without_inline_code(line)):
+    sources = [(line, blank(HTML_COMMENT, blank(INLINE_CODE, run))) for line, run in prose.runs]
+    sources += [(line, blank(HTML_COMMENT, block)) for line, block in prose.html]
+    for start, text in sources:
+        for match in EXPLICIT_ANCHOR.finditer(text):
+            name = match.group(1)
+            line = line_of(start, text, match.start())
             if name in from_headings:
                 heading = anchors[name]
                 reason = (
                     f"explicit anchor '{name}' collides with a heading's anchor (line {heading})"
                 )
-                faults.append(Diagnostic(path, number, name, reason))
+                faults.append(Diagnostic(path, line, name, reason))
             elif name in anchors:
                 reason = f"duplicate explicit anchor '{name}' (first at line {anchors[name]})"
-                faults.append(Diagnostic(path, number, name, reason))
+                faults.append(Diagnostic(path, line, name, reason))
             else:
-                anchors[name] = number
+                anchors[name] = line
     return frozenset(anchors), tuple(faults)
 
 
@@ -193,35 +205,38 @@ def strip_brackets(destination: str) -> str:
     return destination
 
 
-def links_of(lines: list[str]) -> tuple[Link, ...]:
+def definitions_of(text: str, silent: frozenset[int]) -> dict[str, tuple[str, int]]:
+    """Reference definitions by label, the destination on the same line or the next, outside
+    code and HTML; the first definition of a label wins, as it does for GitHub."""
+    found: dict[str, tuple[str, int]] = {}
+    for match in DEFINITION.finditer(text):
+        line = line_of(1, text, match.start())
+        if line not in silent:
+            found.setdefault(normalized(match.group(1)), (strip_brackets(match.group(2)), line))
+    return found
+
+
+def links_of(prose: Prose, definitions: dict[str, tuple[str, int]]) -> tuple[Link, ...]:
     """Inline links and images, then reference links through their definitions: full, collapsed
     and the shortcut form, which counts only when a definition exists."""
-    plain = [without_inline_code(line) for line in lines]
-    definitions: dict[str, tuple[str, int]] = {}
-    for number, line in enumerate(plain, start=1):
-        definition = DEFINITION.match(line)
-        if definition:
-            definitions.setdefault(
-                normalized(definition.group(1)), (strip_brackets(definition.group(2)), number)
-            )
     links: list[Link] = []
-    for number, line in enumerate(plain, start=1):
-        if DEFINITION.match(line):
-            continue
-        for match in INLINE_LINK.finditer(line):
-            links.append(Link(number, strip_brackets(match.group(1))))
-        rest = INLINE_LINK.sub(lambda m: " " * len(m.group(0)), line)
-        for match in REFERENCE_LINK.finditer(rest):
+    for start, run in prose.runs:
+        text = blank(HTML_COMMENT, blank(INLINE_CODE, run))
+        for match in INLINE_LINK.finditer(text):
+            line = line_of(start, text, match.start())
+            links.append(Link(line, strip_brackets(match.group(1))))
+        text = blank(INLINE_LINK, text)
+        for match in REFERENCE_LINK.finditer(text):
             label = normalized(match.group(2) or match.group(1))
             if label in definitions:
                 destination, defined = definitions[label]
-                links.append(Link(number, destination, defined))
-        rest = REFERENCE_LINK.sub(lambda m: " " * len(m.group(0)), rest)
-        for match in SHORTCUT_LINK.finditer(rest):
+                links.append(Link(line_of(start, text, match.start()), destination, defined))
+        text = blank(REFERENCE_LINK, text)
+        for match in SHORTCUT_LINK.finditer(text):
             label = normalized(match.group(1))
             if label in definitions:
                 destination, defined = definitions[label]
-                links.append(Link(number, destination, defined))
+                links.append(Link(line_of(start, text, match.start()), destination, defined))
     return tuple(links)
 
 
@@ -230,9 +245,10 @@ def read_page(root: Path, path: str) -> Page | None:
     file = root / path
     if not file.is_file():
         return None
-    lines = active_text(file.read_text(encoding="utf-8").split("\n"))
-    anchors, faults = anchors_of(path, lines)
-    return Page(path, links_of(lines), anchors, faults)
+    text = file.read_text(encoding="utf-8")
+    prose = read_prose(text)
+    anchors, faults = anchors_of(path, prose)
+    return Page(path, links_of(prose, definitions_of(text, prose.silent_lines)), anchors, faults)
 
 
 def split_destination(destination: str) -> tuple[str, str]:
@@ -244,7 +260,8 @@ def split_destination(destination: str) -> tuple[str, str]:
 
 
 def resolve(source: str, path: str) -> str | None:
-    """The repository-relative posix path a link names, or None when it escapes the repository."""
+    """The repository-relative posix path a link names, the root being the empty path, or None
+    when it escapes the repository."""
     base = PurePosixPath(source).parent
     raw = PurePosixPath(path)
     parts: list[str] = []
@@ -284,8 +301,8 @@ class Checker:
             name: read_page(root, name) for name in self.files if name.endswith(".md")
         }
 
-    def is_directory(self, path: str) -> bool:
-        prefix = path + "/"
+    def is_tracked_directory(self, path: str) -> bool:
+        prefix = path + "/" if path else ""
         return any(name.startswith(prefix) for name in self.files)
 
     def check_link(self, page: Page, link: Link) -> Diagnostic | None:
@@ -307,13 +324,16 @@ class Checker:
             if (self.root / target).is_file():
                 return self.check_fragment(page, link, self.pages.get(target), fragment, target)
             return self.fault(page, link, "tracked target is deleted in the working tree", target)
-        if self.is_directory(target):
+        if self.is_tracked_directory(target):
             if fragment:
                 return self.fault(page, link, "fragment on a directory", target)
-            return None
-        on_disk = (self.root / target).exists()
+            if (self.root / target).is_dir():
+                return None
+            return self.fault(
+                page, link, "tracked directory is deleted in the working tree", target
+            )
         reason = "missing tracked target"
-        if on_disk:
+        if (self.root / target).exists():
             reason += " (exists on disk but is not tracked by git)"
         return self.fault(page, link, reason, target)
 
@@ -337,20 +357,23 @@ class Checker:
         if link.definition_line is not None:
             reason += f" (definition at line {link.definition_line})"
         destination = link.destination
-        if target is not None and target != link.destination.partition("#")[0].rstrip("/"):
-            destination += f" -> {target}"
+        written = link.destination.partition("#")[0].rstrip("/")
+        if target is not None and target != written:
+            destination += f" -> {target or '/'}"
         return Diagnostic(page.path, link.line, destination, reason)
 
     def decision_numbers(self, path: str) -> list[Diagnostic]:
         """The top-level decision numbers of the page's Decided section are unique."""
-        page = self.pages.get(path)
-        if page is None:
+        if self.pages.get(path) is None:
             return []
-        lines = active_text((self.root / path).read_text(encoding="utf-8").split("\n"))
+        text = (self.root / path).read_text(encoding="utf-8")
+        silent = read_prose(text).silent_lines
         faults: list[Diagnostic] = []
         first: dict[str, int] = {}
         inside = False
-        for number, line in enumerate(lines, start=1):
+        for number, line in enumerate(text.split("\n"), start=1):
+            if number in silent:
+                continue
             if line.startswith("## "):
                 inside = line.strip() == "## Decided"
                 continue
