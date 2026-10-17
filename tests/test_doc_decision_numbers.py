@@ -15,13 +15,13 @@ MARKDOWN = MarkdownIt("commonmark")
 def decision_items(text: str) -> list[tuple[int, str]]:
     """The line and the written number of each top-level ordered item inside the Decided section,
     as the parser reads them: a nested item, a number in code or a comment, and a numbered step
-    under another heading are not decisions."""
+    under another heading are not decisions, and only a top-level heading ends the section."""
     tokens = MARKDOWN.parse(text)
     items: list[tuple[int, str]] = []
     inside = False
     top_level_list = False
     for index, token in enumerate(tokens):
-        if token.type == "heading_open" and token.tag == "h2":
+        if token.type == "heading_open" and token.tag == "h2" and token.level == 0:
             inside = tokens[index + 1].content.strip() == "Decided"
         elif token.type == "ordered_list_open" and token.level == 0:
             top_level_list = True
@@ -48,6 +48,11 @@ def test_the_two_pages_have_unique_decision_numbers() -> None:
         text = (ROOT / page).read_text(encoding="utf-8")
         assert decision_items(text), page
         assert duplicates(text) == [], page
+
+
+def test_a_heading_inside_a_decision_does_not_end_the_section() -> None:
+    text = "## Decided\n\n43. First.\n\n    ## Example\n\n    text\n\n43. Second.\n"
+    assert duplicates(text) == ["decision 43 at lines 3 and 9"]
 
 
 def test_a_duplicate_is_reported_with_both_lines() -> None:
