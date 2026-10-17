@@ -12,8 +12,11 @@ batch takes a discount curve: its live contributions summed onto the payment gro
 group's amount discounted on the curve's factor for its payment day, the mark their sum, DV01 the
 analytic sensitivity of that mark to a rise of one basis point, and the lots each live slot holds
 weighted by its group's factor, summed onto the references and the days and, by reference since
-#186, onto the contract months and years, beside the nominal vectors the preparation shares; a
-cleared batch takes no curve and is as it was. The record this makes, TradeResults, and the
+#186, onto the contract months and years, beside the nominal vectors the preparation shares,
+and since #197 the cross-gamma, each live slot's discounted lots times -0.0001 times its
+group's time fraction, the sensitivity of the discounted lots to a rise of one basis point in
+the rates, summed onto the same four axes with its total; a cleared batch takes no curve and
+is as it was. The record this makes, TradeResults, and the
 selection of its saved views are results.py's; this module calculates and nothing else.
 docs/library/trades/kernel.md is the page."""
 
@@ -25,7 +28,7 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
-from goosedove.trades.display_axes import NONE_EARLY, early_risk
+from goosedove.trades.display_axes import NONE_EARLY, EarlyRisk, early_risk
 from goosedove.trades.encoding import PaymentAxes
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments
 from goosedove.trades.results import TradeResults
@@ -35,8 +38,9 @@ LIVE_PRICES_READ = "live_prices_read"  # quotes read off the market, one per liv
 # The bilateral path's counts, since #176: factors read off the curve, one per distinct unpaid
 # payment day; unpaid groups discounted, each with its time fraction and its DV01; live slots
 # weighted by their group's factor; and the reductions, of the discounted lots onto the
-# references, the days, the months and the years and, since #178, of the groups' DV01s onto the
-# payment days, their months and their years.
+# references, the days, the months and the years, since #178 of the groups' DV01s onto the
+# payment days, their months and their years, and since #197 of the slots' cross-gammas onto
+# the references, the days, the months and the years.
 PAYMENT_FACTORS_READ = "payment_factors_read"
 GROUPS_VALUED = "groups_valued"
 SLOTS_DISCOUNTED = "slots_discounted"
@@ -182,6 +186,14 @@ def trade_results(
         dv01_by_year=None,
         early_delta=prepared.early_nominal,  # the same lots: worded as the delta when asked for
         early_dv01=NONE_EARLY,
+        # Since #197: nothing discounts, so no rate moves the lots, the known zero held as
+        # None and no buffer, as the DV01's axes are.
+        cross_gamma=None,
+        cross_gamma_total=0.0,
+        cross_gamma_by_day=None,
+        cross_gamma_by_month=None,
+        cross_gamma_by_year=None,
+        early_cross_gamma=NONE_EARLY,
     )
 
 
@@ -251,10 +263,11 @@ def _discounted(
     by its group, the batch, its contract or its bucket. Since #178 the groups' DV01s are summed
     too, onto the payment days, their months and their years, the axes the encoding made once, a
     paid group's nothing on its day, and each of the three views is finite or the first period
-    that is not is refused.
+    that is not is refused. Since #197 the cross-gamma is _cross_gamma's, made from the
+    discounted lots after every rule above and under its own.
 
     Work: one factor per distinct unpaid payment day, one group per unpaid group, one slot per
-    slot and seven reductions, reported to the counter; nothing per component or observation,
+    slot and eleven reductions, reported to the counter; nothing per component or observation,
     nothing of the nominal risk done again, and no day sorted.
     """
     encoded = prepared.encoded
@@ -379,6 +392,10 @@ def _discounted(
                 f"amount of {currency} per basis point; its groups' DV01s sum past the largest "
                 "number"
             )
+    # Since #197 the cross-gamma, after every rule above and under its own.
+    cross_gamma, cross_by_day, cross_by_month, cross_by_year, cross_total, early_cross = (
+        _cross_gamma(prepared, pays, discounted_lots, words, as_of)
+    )
     # Since #186 the facts refusing a month or a year report of the discounted lots or the DV01
     # standing before the valuation day's period, found once here against the preparation's
     # display axes.
@@ -409,7 +426,7 @@ def _discounted(
     counter.hit(PAYMENT_FACTORS_READ, int(pays.days.size))
     counter.hit(GROUPS_VALUED, int(pays.groups.size))
     counter.hit(SLOTS_DISCOUNTED, int(encoded.slot_group.size))
-    counter.hit(RISK_REDUCTIONS, 7)
+    counter.hit(RISK_REDUCTIONS, 11)
     for array in (
         amount,
         npv,
@@ -461,4 +478,108 @@ def _discounted(
         dv01_by_year=dv01_by_year,
         early_delta=early_delta,
         early_dv01=early_dv01,
+        # Since #197: the cross-gamma on the four commodity axes and its total, _cross_gamma's.
+        cross_gamma=cross_gamma,
+        cross_gamma_total=cross_total,
+        cross_gamma_by_day=cross_by_day,
+        cross_gamma_by_month=cross_by_month,
+        cross_gamma_by_year=cross_by_year,
+        early_cross_gamma=early_cross,
     )
+
+
+def _cross_gamma(
+    prepared: PreparedTrades,
+    pays: UnpaidPayments,
+    discounted_lots: NDArray[np.float64],
+    words: str,
+    as_of: np.datetime64,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    float,
+    EarlyRisk,
+]:
+    """The cross-gamma, since #197, single-curve-cross-gamma.md: by reference, by day, by contract
+    month, by contract year and in all, and the facts refusing a month or a year report of it
+    standing before the valuation day's period. Each unpaid group's weight is -0.0001 times its
+    time fraction, its factor's derivative over the factor for a rise of one basis point in the
+    continuously compounded zero rates, the convention the DV01 moves by; a paid group's weight
+    is nothing and its factor is read for nothing. The weight is gathered onto the slots as the
+    factor was and multiplied into the discounted lots, each payment's own time applied before
+    any sum, since two slots of one contract and one day may pay years apart, a fixed slot's lots
+    nothing; then the slots are summed onto the references and the days and by reference onto
+    the contract months and years, exactly as the discounted lots are, the payment supplying the
+    time and never the axis, one path whether any slot is live. The arithmetic runs with numpy's
+    flags down and the rules judge: the vector by reference, the three views and the total are
+    finite, else the first that is not is refused by its contract, its bucket or the batch; the
+    four arrays are frozen.
+
+    Work: one weight per group, one product per slot and four reductions, counted by the caller;
+    nothing sorted, no factor and no day read again.
+    """
+    encoded = prepared.encoded
+    terms = encoded.terms
+    codes = terms.schedule.codes
+    with np.errstate(over="ignore", invalid="ignore"):  # the rules below are the judge
+        weight = np.zeros(encoded.group_contract.size)
+        weight[pays.groups] = -0.0001 * pays.tau
+        by_slot = discounted_lots * weight[encoded.slot_group]
+        by_reference = np.bincount(
+            encoded.reference_of_slot, weights=by_slot, minlength=encoded.references.size
+        )
+        by_day = np.bincount(encoded.day_of_slot, weights=by_slot, minlength=encoded.days.size)
+        by_month = np.bincount(
+            encoded.contract_month_of_reference,
+            weights=by_reference,
+            minlength=encoded.contract_months.size,
+        )
+        by_year = np.bincount(
+            encoded.contract_year_of_month,
+            weights=by_month,
+            minlength=encoded.contract_years.size,
+        )
+        total = float(by_reference.sum())
+    per_bp = f"{words} per basis point"
+    outrun = ~np.isfinite(by_reference)
+    if outrun.any():
+        r = int(outrun.argmax())
+        raise ValueError(
+            f"{codes[int(encoded.references[r])]} has {float(by_reference[r])!r} of cross-gamma, "
+            f"expected a finite number of {per_bp}; its discounted lots, each weighted by its "
+            "payment's time, sum past the largest number"
+        )
+    for label, starts, values in (
+        ("the day", encoded.days, by_day),
+        ("the contract month from", encoded.contract_months, by_month),
+        ("the contract year from", encoded.contract_years, by_year),
+    ):  # the views before the total: a bucket's sum can outrun what its parts did not
+        outrun = ~np.isfinite(values)
+        if outrun.any():
+            b = int(outrun.argmax())
+            raise ValueError(
+                f"{label} {starts[b]} has {float(values[b])!r} of cross-gamma in all, expected a "
+                f"finite number of {per_bp}; its slots' cross-gammas sum past the largest number"
+            )
+    if not np.isfinite(total):
+        raise ValueError(
+            f"the batch has {total!r} of cross-gamma in all, expected a finite number of "
+            f"{per_bp}; the contracts' cross-gammas, each finite, sum past the largest number"
+        )
+    early = early_risk(
+        f"index {terms.index.name!r}",
+        "contract",
+        as_of,
+        per_bp,
+        encoded.contract_months,
+        by_month,
+        prepared.by_month.contract_from,
+        encoded.contract_years,
+        by_year,
+        prepared.by_year.contract_from,
+    )
+    for array in (by_reference, by_day, by_month, by_year):
+        array.setflags(write=False)
+    return by_reference, by_day, by_month, by_year, total, early

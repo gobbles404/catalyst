@@ -201,7 +201,7 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
         "kernel": 1,
         "live_prices_read": 1,
         "payment_factors_read": 2,
-        "risk_reductions": 7,
+        "risk_reductions": 11,
         "slots_discounted": 2,
     }
     # The same preparation under a tick to 81: 110 and -110, 5.5 of NPV, 0.00935 of DV01, the lots
@@ -317,7 +317,7 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
             "kernel": 1,
             "live_prices_read": 0,
             "payment_factors_read": 0,
-            "risk_reductions": 7,
+            "risk_reductions": 11,
             "slots_discounted": 1,
         }
 
@@ -426,7 +426,7 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
         "kernel": 1,
         "live_prices_read": 2,
         "payment_factors_read": 3,
-        "risk_reductions": 7,
+        "risk_reductions": 11,
         "slots_discounted": 3,
     }
 

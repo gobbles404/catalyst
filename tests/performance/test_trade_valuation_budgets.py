@@ -304,8 +304,9 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "DiscountCurve.max_date": 1,
         "Market.live_prices": 1,
         "_discounted": 1,
-        "early_risk": 2,  # since #186
-        "early_fact": 4,
+        "_cross_gamma": 1,  # since #197, after every rule of the discounted path
+        "early_risk": 3,  # since #186, and the cross-gamma's since #197
+        "early_fact": 6,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
         "_publish": 1,
@@ -376,9 +377,11 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
 # Measured 2026-10-11 at 2,500 trades over 24 slots: a bilateral tick 5,901 bytes against the
 # cleared tick's 1,490, the curve's handle, the groups' amounts, factors, NPVs and DV01s, the
 # discounted lots by reference, day, month and year and, since #178, the DV01 by payment day,
-# month and year, 5,093 before them; the risk report of all three by day 6,263 bytes, 48 rows
-# under the Total, the 24 observation days and the 24 payment days in four columns, the three
-# vectors placed on the union, against the cleared batch's 3,591, within seven slacks.
+# month and year, 5,093 before them, and 8,257 on 2026-10-17 since #197, the cross-gamma's
+# weight by group, its vector by slot and its four saved views, within nine slacks; the risk
+# report of all three by day 6,263 bytes, 48 rows under the Total, the 24 observation days and
+# the 24 payment days in four columns, the three vectors placed on the union, against the
+# cleared batch's 3,591, within seven slacks.
 def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     sheet: dict[str, Any], bilateral: dict[str, Any]
 ) -> None:
@@ -387,7 +390,7 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     )
     assert (
         least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"]))
-        <= 8 * SLACK
+        <= 9 * SLACK
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
     assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 7 * SLACK

@@ -78,7 +78,19 @@ class TradeResults:
     refusing a month or a year report whose discounted lots or DV01 stand in a period before the
     valuation day's, or none, a cleared result's delta the preparation's nominal facts, its lots
     being the same, and its DV01 none; a reader words them with the measure asked for and
-    scans nothing."""
+    scans nothing.
+
+    Since #197, single-curve-cross-gamma.md, the cross-gamma: cross_gamma[r] is the
+    sensitivity of contract r's discounted lot delta to a rise of one basis point in the curve's
+    continuously compounded zero rates, each live slot's discounted lots times -0.0001 times its
+    payment's time fraction, summed; in lot_unit per basis point, negative for lots bought and
+    paid for later; cross_gamma_total their sum; and cross_gamma_by_day, _by_month and
+    _by_year the same slots summed onto the observation days and, by reference, onto the
+    contract months and years, the discounted lots' own axes, since the payment supplies the
+    time and not the axis. None, a known zero and no buffer, for a cleared batch, whose lots
+    nothing discounts, with a total of 0.0, as the DV01's dated axes are held; a bilateral
+    batch paid in full holds its zeros. early_cross_gamma, the facts refusing a month or a
+    year report of it standing before the valuation day's period, none for a cleared batch."""
 
     prepared: PreparedTrades
     market: Market
@@ -112,6 +124,12 @@ class TradeResults:
     dv01_by_year: NDArray[np.float64] | None
     early_delta: EarlyRisk
     early_dv01: EarlyRisk
+    cross_gamma: NDArray[np.float64] | None
+    cross_gamma_total: float
+    cross_gamma_by_day: NDArray[np.float64] | None
+    cross_gamma_by_month: NDArray[np.float64] | None
+    cross_gamma_by_year: NDArray[np.float64] | None
+    early_cross_gamma: EarlyRisk
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
         """The content of the risk report asked for, since #180: risk_view's selection of this
