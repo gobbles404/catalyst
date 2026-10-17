@@ -26,14 +26,16 @@ Code: `src/goosedove/trades/`, one module per responsibility. `template.py` read
 
 ## What is made again when something changes
 
-The record each step keeps, and what makes a new one. The guarantees are the owning pages'; this table only puts them side by side.
+Every handle on the sheet is made from the handles its formula names, so a change runs down the chain of formulas that take it. This table follows that chain; the guarantees are the owning pages', and the table only puts them side by side.
 
-| You change | What is made again | What stands |
+| You change | What is made again, in order | What stands |
 |---|---|---|
-| a ticket row, the template, or a definition the batch uses | the batch, and then its preparation and results | the index and the market |
-| a fixing arrives or is corrected, or the valuation date rolls | the history, then the preparation, then the results | the batch: [prepare-trades.md](library/trades/prepare-trades.md) makes a new preparation whole, and [evaluate-trades.md](library/trades/evaluate-trades.md) refuses a market over another history rather than preparing again |
-| a quote moves, the tick | the results alone: the live slots gathered and multiplied, the whole batch, and for a bilateral batch the discount factors read again per payment day | the preparation and the encoding, which the tick does nothing of, [evaluate-trades.md](library/trades/evaluate-trades.md) |
-| the discount curve | the results, over the same preparation | the same |
+| a quote, the tick | the price vector, the market, the results, and any collection holding them | the calendar, the history, the batch and its preparation: the tick gathers the live slots and multiplies, the whole batch, and for a bilateral batch reads the discount factors again per payment day, but does nothing of the preparation or the encoding, [evaluate-trades.md](library/trades/evaluate-trades.md) |
+| a fixing arrives or is corrected | the fixings, the history, the market, the preparation, the results, the collection | the calendar, the price vector and the batch: [prepare-trades.md](library/trades/prepare-trades.md) makes a new preparation whole, and [evaluate-trades.md](library/trades/evaluate-trades.md) refuses a market over another history rather than preparing again |
+| the valuation date | the calendar, then the history, the market, the preparation, the results, the collection, and a bilateral batch's curve, which must start on the new day | the index, the fixings and the batch; the price vector too, though a date that rolls past an expiry needs the vector moved with it, [evaluate-trades.md](library/trades/evaluate-trades.md) |
+| the discount curve | the results and the collection, over the same preparation | everything else |
+| a ticket row, or the template | the batch, its preparation, the results, the collection | the index, the calendar, the history and the market |
+| an index definition: the schedule, the conventions, the specifications or the holiday calendar | the index, and everything built on it: the calendar, the fixings, the history, the market, the batch, the preparation, the results, the collection | the template, which names no index, the valuation date, the price vector, which names the index by its text, and the curve |
 | a report's selector, `risk` or `bucket` | nothing: the readers select among saved vectors, [report-risk.md](library/trades/report-risk.md) | everything |
 | the set of results collected | the collection: saved vectors summed by index and by curve, [aggregate-results.md](library/trades/aggregate-results.md) | every result in it |
 
@@ -41,7 +43,13 @@ A recalculation with the same arguments makes nothing: the seam shares the live 
 
 ## Three kinds of date
 
-A trade carries three dates that must not be confused. The observation date is the day a price is taken: a `lastday` trade observes its contract's expiry day, an `asian` trade every pricing day of its month. The pricing contract is the contract whose price prices that day, by the calendar's rule; it is the booked contract under the expiry-based methods and, under `asian`, whichever contract the calendar gives, so a December booked as Z26 may price off F27. The payment date is the day a payment group pays, counted from the group's last observation by the trade's payment rule. The deltas are reported by observation day or by the pricing contract's month or year; the DV01 by payment day, month or year. The owners are [kernel.md](library/trades/kernel.md) for the slots and groups and [report-risk.md](library/trades/report-risk.md) for the axes.
+A trade carries three dates that must not be confused, and two of them differ by the kind of index.
+
+- **The observation date** is the day a price is taken. On a futures index a `lastday` trade observes its contract's expiry day, a `penultimate` trade the business day before it, a `last3day` trade the expiry and the two business days before it, and an `asian` trade every pricing day of the days it covers. On an IFERC index a trade observes the day the month's index is published, under `lastday`, the one method such an index takes.
+- **The pricing contract** is the contract whose price prices that day, by the calendar's rule: the booked contract under the expiry-based methods and, under `asian`, whichever contract the calendar gives, so a December booked as Z26 may price off F27.
+- **The payment date** is the day a payment group pays, the trade's payment rule counted from an anchor that differs by index. On a futures index the anchor is the group's last observation day. On an IFERC index it is the month's last trading date, which comes before the publication day the trade observes, so an IFERC payment is counted from a day the trade never observes.
+
+The deltas are reported by observation day or by the pricing contract's month or year; the DV01 by payment day, month or year. The owners are [create-trades.md](library/trades/create-trades.md) for the anchors, [kernel.md](library/trades/kernel.md) for the slots and groups and [report-risk.md](library/trades/report-risk.md) for the axes.
 
 ## Where the code is
 

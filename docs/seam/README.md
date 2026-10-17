@@ -86,11 +86,12 @@ The rule behind all of it: work is counted, and the counts are tests; time is a 
 
 Every page here moves with the code it describes, and nothing about the seam is written anywhere else. Which page owns which fact, across the repository, is [working.md](working.md#10-what-each-page-owns).
 
-- A new declared type moves [inputs.md](inputs.md), [outputs.md](outputs.md) if it can be returned, and the two tables in [bridge.md](bridge.md).
-- A change to the host moves [host.md](host.md), the steps in [walk.md](walk.md), and the pins in `HostWorkBudgets.cs`.
-- A change to the bridge moves [bridge.md](bridge.md) and the Python pins.
-- A new probe moves `probes.py`, the three runners, the smoke test, the pins, and the probe tables in [measuring.md](measuring.md) and [bridge.md](bridge.md).
-- A new baseline replaces [baseline.md](baseline.md) whole, with its CSVs and a new paired-rows file, and adds a row to the timeline and the two-baselines table in [history.md](history.md).
-- Anything tried and declined, or found and parked, goes in [history.md](history.md), so it is not proposed again from memory.
+Each fact has one owner, the table in [working.md §10](working.md#10-what-each-page-owns), and a change edits the owners it changed:
+
+- what a declared type accepts and refuses: [inputs.md](inputs.md); what a result may be: [outputs.md](outputs.md); the rule behind each and what the function receives: [bridge.md](bridge.md)'s two tables, which link to the contract rather than repeat it.
+- what the host does, in order: [walk.md](walk.md); how each part of it works: [host.md](host.md); what it counts: the pins in `HostWorkBudgets.cs`. How the bridge works: [bridge.md](bridge.md); what it counts: the Python pins.
+- a probe: `probes.py`, the three runners, the smoke test, the pins, and its knob and what it proves in the probe tables of [measuring.md](measuring.md) and [bridge.md](bridge.md); the tables are the list, and no page counts them.
+- the numbers at a revision: [baseline.md](baseline.md) whole, with its CSVs and a paired-rows file, and the baselines table in [history.md](history.md).
+- anything tried and declined, found and parked, or decided for a reason worth keeping: [history.md](history.md), so it is not proposed again from memory.
 
 A seam change states its counts before and after in the pull request, under the template's six headings: What, Counts, Tenets, Conflicts, Checked in Excel, Not done. When a rule and a tenet conflict, the tenet decides; the pull request names the tenet under Tenets and the fork under Conflicts. The tenets are in [PRINCIPLES.md](../../PRINCIPLES.md), the general learnings in [golden-rules.md](../golden-rules.md), the rules in `AGENTS.md`, and the setup in the repository's [README.md](../../README.md).

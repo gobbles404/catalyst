@@ -111,29 +111,29 @@ The way in is type validation, before the function runs; the way out is the conv
 
 ## The declared input types
 
-A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Nine of the range and date types are named labels: `Date` on a numpy day, the number, date and boolean ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it. The rules and decisions are in [inputs.md](inputs.md); this table is the mechanism. Two declarations are not labels: a table's schema is a class of its own, whose columns name their column types, as the section on tables says; and a handle is the seam's alias `Handle` around a class the library defines, as the section on handles says.
+A scalar is one value on its own: a number, text, a boolean, a blank cell, or a missing argument; in `=Times(5, )` the 5 is a scalar and the second argument is missing. An array is many values laid out in rows and columns, as numpy holds them. The bridge sees every range as `Cells`, described in the next section, which holds its arrays. A view is another name for the same memory, and a copy is new memory holding the same values. Flat means one-dimensional: a single run of values with no rows and columns. Nine of the range and date types are named labels: `Date` on a numpy day, the number, date and boolean ranges on numpy arrays, and the text ranges on tuples, so the seam can tell one shape of numbers from another; the label says what shape is expected and how a result is laid out. Each declared input type has one accept rule, and this table names it and what the function receives. What each type accepts and refuses, the words of its messages and the decisions behind them are [inputs.md](inputs.md#declared-types)'s; this table is the mechanism and repeats none of that. Two declarations are not labels: a table's schema is a class of its own, whose columns name their column types, as the section on tables says; and a handle is the seam's alias `Handle` around a class the library defines, as the section on handles says.
 
-| Declared | Words of the sheet | Accept rule | Hands the function |
-|---|---|---|---|
-| `float` | number | `_number` | a float |
-| `int` | whole number | `_whole` | a Python int |
-| `str` | text | `_text` | the text |
-| `bool` | boolean | `_boolean` | the boolean |
-| `Date` | date | `_date` | a numpy day |
-| `NumberArray` | array of numbers | `_numbers` | the range's numbers array, in the sheet's shape |
-| `NumberColumn` | column of numbers | `_column` | a flat view of the one column |
-| `NumberRow` | row of numbers | `_row` | a flat view of the one row |
-| `DateColumn` | column of dates | `_date_column` | a flat array of numpy days |
-| `DateRow` | row of dates | `_date_row` | a flat array of numpy days |
-| `TextColumn` | column of text | `_text_column` | the host's tuple of texts, as it is |
-| `TextRow` | row of text | `_text_row` | the host's tuple of texts, as it is |
-| `BooleanColumn` | column of booleans | `_boolean_column` | a flat array of booleans, converted from the 1.0 and 0.0 the host wrote |
-| `MixedArray` | mixed array | `_mixed` | a record holding the range's own kinds, numbers and texts; for a hidden probe, and as the body under a table's schema |
-| a subclass of `Table` | table | `_mixed`, then `_refine` | the schema's record, one typed column per header |
-| `FieldRow[S]`, `FieldRows[S]` | one row of field values, rows of field values | `_field_row` or `_mixed`, then `_bind_fields` against the instrument `selected` by the parameter of type `S` | a `FieldValues`, the instrument and each typed column by field name, a handle column resolved to its objects |
-| `Handle[Kind]` | the kind's words, then handle: `discount curve handle`; `a handle` for `Handle[object]`, any kind | `_resolve` | the object the handle stands for |
-| `Handles[Kind]`, since #180 | the kind's words, then handles in a cell, a row or a column: `trade results handles in a cell, a row or a column` | `_resolve_each`: the shape, then `_resolve` on each cell in sheet order | a tuple of the objects, every cell |
-| `Handle[A] \| Handle[B]`, since #180 | both kinds' words, then handle: `trade results or aggregate results handle` | `_resolve` over the two kinds | the object the handle stands for, of either kind |
+| Declared | Accept rule | Hands the function |
+|---|---|---|
+| `float` | `_number` | a float |
+| `int` | `_whole` | a Python int |
+| `str` | `_text` | the text |
+| `bool` | `_boolean` | the boolean |
+| `Date` | `_date` | a numpy day |
+| `NumberArray` | `_numbers` | the range's numbers array, in the sheet's shape |
+| `NumberColumn` | `_column` | a flat view of the one column |
+| `NumberRow` | `_row` | a flat view of the one row |
+| `DateColumn` | `_date_column` | a flat array of numpy days |
+| `DateRow` | `_date_row` | a flat array of numpy days |
+| `TextColumn` | `_text_column` | the host's tuple of texts, as it is |
+| `TextRow` | `_text_row` | the host's tuple of texts, as it is |
+| `BooleanColumn` | `_boolean_column` | a flat array of booleans, converted from the 1.0 and 0.0 the host wrote |
+| `MixedArray` | `_mixed` | a record holding the range's own kinds, numbers and texts; for a hidden probe, and as the body under a table's schema |
+| a subclass of `Table` | `_mixed`, then `_refine` | the schema's record, one typed column per header |
+| `FieldRow[S]`, `FieldRows[S]` | `_field_row` or `_mixed`, then `_bind_fields` against the instrument `selected` by the parameter of type `S` | a `FieldValues`, the instrument and each typed column by field name, a handle column resolved to its objects |
+| `Handle[Kind]` | `_resolve` | the object the handle stands for |
+| `Handles[Kind]` | `_resolve_each`: the shape, then `_resolve` on each cell in sheet order | a tuple of the objects, every cell |
+| `Handle[A] \| Handle[B]` | `_resolve` over the two kinds | the object the handle stands for, of either kind |
 
 The scalar accept rules match exactly. A Python bool is an int, so the number rule rejects a bool before it accepts an int or float, as [inputs.md](inputs.md) rule 1 requires. Whole means no fraction and within 2^53 either side, the largest whole number a cell holds exactly and the line the way out holds, so whatever a creator keeps can be read back ([inputs.md](inputs.md) decision 41); `tests/unit/test_type_validation.py` pins that every whole number from −2^53 to 2^53 passes and that 1E16, whole and beyond, fails as `x is number 1e+16, beyond what a cell holds exactly`, the way out's words, since `expected whole number` would be false. A date is a whole serial inside the calendar. What a serial and the calendar are, and why serial 60 is rejected, is [inputs.md](inputs.md) rule 6 and decision 13; here the date rule checks a number, then no fraction, then the calendar, in that order, the three tests the range rule makes over every cell, and never the whole-number rule's bound: a serial of 1E19 is not a date, and says so, rather than beyond what a cell holds.
 
@@ -248,22 +248,22 @@ A creator's call is observed, since #114: the host hands Excel-DNA the function'
 
 ## The result rules
 
-The result rule for a declared return type converts what the function returned into one of the five things the host can show: a number, text, a boolean, an array of numbers, or a rectangle of numbers, text and booleans; for a handle it keeps the object and sends its text. The rules and decisions, and the full list of what fails, are [outputs.md](outputs.md)'s; this table is the mechanism, with the shortest phrase for what each rule rejects.
+The result rule for a declared return type converts what the function returned into one of the five things the host can show: a number, text, a boolean, an array of numbers, or a rectangle of numbers, text and booleans; for a handle it keeps the object and sends its text. What each rule refuses, and the decisions behind it, are [outputs.md](outputs.md#result-validation)'s; this table is the mechanism, the rule and what it sends.
 
-| Declared | Result rule | Rejects | Sends |
-|---|---|---|---|
-| `float` | `_number_out` | not a number; not finite; a whole number beyond 2^53 | a float |
-| `int` | `_whole_out` | the same, a fraction, and any number beyond 2^53 | a float, since the sheet has one kind of number |
-| `str` | `_text_out` | not text; empty; too long | the text |
-| `bool` | `_boolean_out` | not True or False | the boolean |
-| `Date` | `_date_out` | not a numpy day inside the calendar | the serial, as a float |
-| `NumberArray` | `_array_out` | not a plain two-dimensional array of such numbers; empty | the array, as one unbroken run of 8-byte numbers |
-| `NumberColumn` | `_column_out` | not a plain one-dimensional array of such numbers; empty | reshaped to N by 1 |
-| `NumberRow` | `_row_out` | the same | reshaped to 1 by N |
-| `DateColumn` | `_date_column_out` | not a one-dimensional array of such days; empty | serials, N by 1 |
-| `DateRow` | `_date_row_out` | the same | serials, 1 by N |
-| `Handle[Kind]` | `_publish` | not an object of exactly that class; nothing | the handle, text, after keeping the object |
-| `MixedArray` | `_mixed_out` | not the record; no cells; a cell holding no value; a number that is not finite; a boolean slot that is not 0 or 1; a text with a NUL, or too long | the kinds, the numbers and the texts joined with NUL, a tuple read by position |
+| Declared | Result rule | Sends |
+|---|---|---|
+| `float` | `_number_out` | a float |
+| `int` | `_whole_out` | a float, since the sheet has one kind of number |
+| `str` | `_text_out` | the text |
+| `bool` | `_boolean_out` | the boolean |
+| `Date` | `_date_out` | the serial, as a float |
+| `NumberArray` | `_array_out` | the array, as one unbroken run of 8-byte numbers |
+| `NumberColumn` | `_column_out` | reshaped to N by 1 |
+| `NumberRow` | `_row_out` | reshaped to 1 by N |
+| `DateColumn` | `_date_column_out` | serials, N by 1 |
+| `DateRow` | `_date_row_out` | serials, 1 by N |
+| `Handle[Kind]` | `_publish` | the handle, text, after keeping the object |
+| `MixedArray` | `_mixed_out` | the kinds, the numbers and the texts joined with NUL, a tuple read by position |
 
 The mixed road is the mirror of the way in. The rule checks the record as the way in checks a range: the earliest cell holding no value, a blank, a missing or an empty text, is named as INDEX counts, then a number cell must be finite and a boolean slot 0 or 1, no text may hold a NUL, since NUL separates the texts on their way across, and every text is at most what a cell holds, checked on the joined text in one encode and split per text, in one look over the units, only when the total runs past the limit. What the host receives is what it sent: the kinds, one byte per cell, the numbers, eight per cell, and the texts joined, and it lays the array out cell by cell, because Excel takes an array one tagged value per cell and there is no block of mixed cells to copy in one move; [host.md](host.md#the-way-out) says what that costs. `MixedArray.table` builds a record for the way out from rows of headings over columns of one kind each, a tuple of texts, an array of numbers, of numpy days, which go out as serials, or of booleans, filling the kinds and the slots a column at a time and gathering the texts in sheet order, so no function writes kinds by hand; the one table it cannot build, a column that holds a number on one row and a word on another, the market history's `fixing_price` since #84 and the market's `price` since #86, one helper in `utilities.py` composes from the record's three fields, the calendar's table widened by one column. It checks each column before it is copied into the slots, where the copy would hide what the rule could no longer see: only a plain one-dimensional array is taken, so a masked array is refused as the array results refuse it, and a column of whole numbers is checked against 2^53 either side, naming the cell, as the array results check before their conversion; a day outside the calendar fails there as a date result fails, naming the cell.
 
