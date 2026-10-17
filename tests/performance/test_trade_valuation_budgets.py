@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from test_seam_allocation import SLACK, least_peak
+from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 
 from goosedove.excel import bridge
 from goosedove.excel.bridge import Cells
@@ -262,7 +262,7 @@ def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str
     prepared = PATH["_PrepareTrades"](trades, sheet["history"])
     assert (
         least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING))
-        <= 2 * SLACK
+        <= KEYWORD_CALL + 2 * SLACK
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     assert least_peak(lambda: PATH["_ReportValues"](results)) <= 2 * SLACK

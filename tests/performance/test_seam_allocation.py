@@ -28,6 +28,10 @@ from goosedove.excel.bridge import MISSING, Cells
 ENTRY = {name: bridge.entry(name) for name, *_ in bridge.function_specs()}
 
 N = 10_000
+# The dictionary a keyword call into a class builds for its __init__ and a positional call does
+# not: the 32 names of a TradeResults, measured 2026-10-17 in isolation and through the seam,
+# the price of building the record by field name, paid once per evaluation whatever the batch.
+KEYWORD_CALL = 776
 SLACK = 1024  # bytes of small objects a call may make on top of its per-cell temporaries
 
 

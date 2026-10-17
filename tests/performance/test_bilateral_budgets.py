@@ -18,7 +18,7 @@ from dataclasses import fields
 import numpy as np
 import pytest
 from numpy.typing import NDArray
-from test_seam_allocation import SLACK, least_peak
+from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 from test_trade_budgets import (
     AS_OF,
     ASIAN_GAS,
@@ -358,7 +358,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     quoted = a_market(prep.history)
     curve = curve_on(as_of)
     assert least_peak(lambda: tick(prep, quoted, curve)) <= (
-        128 * groups + 16 * slots + 32 * live + 8 * (buckets + paid) + 4 * SLACK
+        128 * groups + 16 * slots + 32 * live + 8 * (buckets + paid) + KEYWORD_CALL + 4 * SLACK
     )
     result = tick(prep, quoted, curve)
     new: tuple[NDArray[np.float64] | None, ...] = (

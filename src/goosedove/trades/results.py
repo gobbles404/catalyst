@@ -65,7 +65,7 @@ NO_DAYS.setflags(write=False)
 NOTHING.setflags(write=False)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TradeResults:
     """The preparation and the market, by reference, and the snapshot they make, read-only. The
     route and the currency name what the numbers are: for a cleared batch, mark is the
