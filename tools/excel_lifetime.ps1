@@ -910,12 +910,14 @@ $valuation = {
     Put $state $sheet "D33" '=INDEX(_ReportRisk(D30,"delta","year"),4,2)'
     Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30,"dv01","day"),4,2),"0.000000")'
     Put $state $sheet "D35" "=INDEX(_ReportValues(D30),1,1)"
+    Put $state $sheet "D36" '=TEXT(INDEX(_ReportRisk(D30,"cross_gamma","year"),4,2),"0.0000000")'
     $bilateral = Text $state $sheet "D30"
     Check "the bilateral results' cell shows its handle, named for the index" ($bilateral.StartsWith("${id}:trade_results:WTI NYMEX:")) $bilateral
     Check "the values report labels the route, bilateral_mark" ((Text $state $sheet "D35") -eq "bilateral_mark") (Text $state $sheet "D35")
     Check "the mark is 5,544, two lots of 2.8 over 70 at 0.99" ((Text $state $sheet "D31") -eq "5544") (Text $state $sheet "D31")
     Check "the nominal delta 2 and the delta 1.98" ((Text $state $sheet "D32") -eq "2" -and (Text $state $sheet "D33") -eq "1.98") ((Text $state $sheet "D32") + " " + (Text $state $sheet "D33"))
     Check "the DV01 -0.045567, thirty days of 5,544 a basis point" ((Text $state $sheet "D34") -eq "-0.045567") (Text $state $sheet "D34")
+    Check "and since #197 the cross-gamma -0.0000163, thirty days of 1.98 lots a basis point" ((Text $state $sheet "D36") -eq "-0.0000163") (Text $state $sheet "D36")
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
     Check "the template, the batch, the preparation, the curve and the results published: twenty-one live" ($c.Live -eq 21 -and $c.Published -eq 39 -and $c.Released -eq 18) $c.Text
 
@@ -938,6 +940,7 @@ $valuation = {
     Put $state $sheet "X3" "0.98"
     Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D29")
     Check "and the results a new one, 7,448 at 0.98" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
+    Check "the cross-gamma follows the factor, -0.0000161 at 0.98" ((Text $state $sheet "D36") -eq "-0.0000161") (Text $state $sheet "D36")
     Check "the market and the preparation stand" ((Text $state $sheet "D11") -eq $market -and (Text $state $sheet "D28") -eq $prepared) ((Text $state $sheet "D11") + " " + (Text $state $sheet "D28"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 24 }
     Check "the old curve and results are released; two more published" ($c.Live -eq 21 -and $c.Published -eq 45 -and $c.Released -eq 24) $c.Text
@@ -973,6 +976,7 @@ $valuation = {
     Put $state $sheet "W2" "24-Jun-2026"
     Check "the curve moved onto the day rebuilds the results" ((Text $state $sheet "D30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "D30")
     Check "at 7,448 still, the payment day's factor 0.98" ((Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
+    Check "and the cross-gamma a day nearer, -0.0000156 at 29 days" ((Text $state $sheet "D36") -eq "-0.0000156") (Text $state $sheet "D36")
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 41 }
     Check "the old curve released; the curve and the results published anew" ($c.Live -eq 21 -and $c.Published -eq 62 -and $c.Released -eq 41) $c.Text
 
@@ -1000,6 +1004,7 @@ $valuation = {
     Put $state $sheet "F29" "=_CreateDiscountCurve(AB1:AC1,AB2:AC4)"
     Put $state $sheet "F30" "=_EvaluateTrades(D28,D11,F29)"
     Put $state $sheet "F31" "=INDEX(_ReportValues(F30),3,1)"
+    Put $state $sheet "F32" '=TEXT(INDEX(_ReportRisk(F30,"cross_gamma","year"),4,2),"0.0000000")'
     $curve = Text $state $sheet "D29"
     $bilateral = Text $state $sheet "D30"
     Check "an equal curve shares the handle" ((Text $state $sheet "F29") -eq $curve) (Text $state $sheet "F29")
@@ -1010,9 +1015,10 @@ $valuation = {
     Check "the live curve and results move, 7,372 at 0.97" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7372") (Text $state $sheet "D31")
     Check "the held results keep their handle and their curve" ((Text $state $sheet "F30") -eq $bilateral -and (Text $state $sheet "F29") -eq $curve) ((Text $state $sheet "F30") + " " + (Text $state $sheet "F29"))
     Check "and read the mark they read, 7,448" ((Text $state $sheet "F31") -eq "7448") (Text $state $sheet "F31")
+    Check "and the cross-gamma they read, -0.0000156, while the live results read -0.0000154 at 0.97" ((Text $state $sheet "F32") -eq "-0.0000156" -and (Text $state $sheet "D36") -eq "-0.0000154") ((Text $state $sheet "F32") + " " + (Text $state $sheet "D36"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 23 }
     Check "twenty-three live, two more published, nothing released while the copy holds the old two" ($c.Live -eq 23 -and $c.Published -eq 66 -and $c.Released -eq 43) $c.Text
-    Clear-Cell $state $sheet "F31"; Clear-Cell $state $sheet "F30"; Clear-Cell $state $sheet "F29"
+    Clear-Cell $state $sheet "F32"; Clear-Cell $state $sheet "F31"; Clear-Cell $state $sheet "F30"; Clear-Cell $state $sheet "F29"
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 45 }
     Check "the copy cleared, the old curve and results are released; twenty-one live, no misses" ($c.Live -eq 21 -and $c.Released -eq 45 -and $c.Published -eq 66 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
 

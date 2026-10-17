@@ -549,7 +549,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46168.0, values[2, 3]);
             var risk = (object[,])Seam.Call("_ReportRisk", results, "all", "year");
             Assert.Equal(5, risk.GetLength(0));
-            Assert.Equal(4, risk.GetLength(1));
+            Assert.Equal(5, risk.GetLength(1));  // since #197 the cross-gamma's column last
+            Assert.Equal("sample cleared cross_gamma [NYMEX NG per basis point]", risk[1, 4]);
+            Assert.Equal(0.0, risk[3, 4]);
+            Assert.Equal(0.0, risk[4, 4]);
             Assert.Equal("as_of", risk[0, 0]);
             Assert.Equal(46168.0, risk[0, 1]);
             Assert.Equal("-", risk[0, 3]);
@@ -568,6 +571,14 @@ namespace Goosedove.Host.Tests
             var dv01 = (object[,])Seam.Call("_ReportRisk", results, "dv01", "day");
             Assert.Equal(4, dv01.GetLength(0));  // cleared: a Total of nothing over no dated row
             Assert.Equal(0.0, dv01[3, 1]);
+            // Since #197 the cross-gamma alone: a cleared batch's known zero on the delta's rows.
+            var cross = (object[,])Seam.Call("_ReportRisk", results, "cross_gamma", "year");
+            Assert.Equal(5, cross.GetLength(0));
+            Assert.Equal(2, cross.GetLength(1));
+            Assert.Equal("sample cleared cross_gamma [NYMEX NG per basis point]", cross[1, 1]);
+            Assert.Equal(0.0, cross[3, 1]);
+            Assert.Equal(46023.0, cross[4, 0]);
+            Assert.Equal(0.0, cross[4, 1]);
             var slots = (object[,])Seam.Call("util_ReadHandle", prepared);
             Assert.Equal(4, slots.GetLength(0));
             Assert.Equal("live_coefficient", slots[0, 5]);
@@ -601,6 +612,11 @@ namespace Goosedove.Host.Tests
             Assert.Equal("group_dv01", contributions[0, 16]);
             Assert.Equal("-", contributions[2, 13]);  // a cleared batch retains no payment facts
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
+            Assert.Equal(23, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, last
+            Assert.Equal("contract_cross_gamma", contributions[0, 21]);
+            Assert.Equal("cross_gamma_unit", contributions[0, 22]);
+            Assert.Equal(0.0, contributions[2, 21]);
+            Assert.Equal("lots of NYMEX NG (10000 MMBTU) per basis point", contributions[2, 22]);
             var ticked = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.20, 72.80)));
             var later = (string)Seam.Call("_EvaluateTrades", prepared, ticked, ExcelMissing.Value);
             Assert.NotEqual(results, later);
@@ -617,7 +633,9 @@ namespace Goosedove.Host.Tests
             Assert.StartsWith(Pid + ":aggregate_results:", collection);
             var doubled = (object[,])Seam.Call("_ReportRisk", collection, "all", "year");
             Assert.Equal(5, doubled.GetLength(0));
-            Assert.Equal(4, doubled.GetLength(1));
+            Assert.Equal(5, doubled.GetLength(1));  // since #197 the one cleared pair's column of nothing
+            Assert.Equal("sample cleared cross_gamma [NYMEX NG per basis point]", doubled[1, 4]);
+            Assert.Equal(0.0, doubled[3, 4]);
             Assert.Equal(46168.0, doubled[0, 1]);
             Assert.Equal("sample nominal_delta [NYMEX NG]", doubled[1, 1]);
             Assert.Equal("sample delta [NYMEX NG]", doubled[1, 2]);
@@ -637,7 +655,11 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1.0, ((object[,])Seam.Call("_ReportRisk", alone, "nominal_delta", "year"))[3, 1]);
             var members = (object[,])Seam.Call("util_ReadHandle", collection);
             Assert.Equal(4, members.GetLength(0));
-            Assert.Equal(10, members.GetLength(1));
+            Assert.Equal(12, members.GetLength(1));  // since #197 each source's cross-gamma and its unit
+            Assert.Equal("cross_gamma", members[0, 10]);
+            Assert.Equal("cross_gamma_unit", members[0, 11]);
+            Assert.Equal(0.0, members[2, 10]);
+            Assert.Equal("lots of NYMEX NG (10000 MMBTU) per basis point", members[3, 11]);
             Assert.Equal("position", members[0, 0]);
             Assert.Equal("curve", members[0, 4]);
             Assert.Equal("as_of", members[0, 9]);
@@ -1050,7 +1072,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(22, contributions.GetLength(1));
+            Assert.Equal(24, contributions.GetLength(1));  // since #197 two columns more, last
             Assert.Equal("contract_lot_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
@@ -1993,7 +2015,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1.0, (double)delta[4, 1], 6);  // the discounted lots the nominal, cleared
             var everything = (object[,])Seam.Call("_ReportRisk", first, "all", "month");
             Assert.Equal(5, everything.GetLength(0));
-            Assert.Equal(4, everything.GetLength(1));
+            Assert.Equal(5, everything.GetLength(1));  // since #197
+            Assert.Equal("MONTHLY cleared cross_gamma [LOT per basis point]", everything[1, 4]);
             Assert.Equal("cleared USD dv01 [USD per basis point]", everything[1, 3]);
             Assert.Equal(46357.0, everything[4, 0]);
             Assert.Equal(25.0, (double)everything[4, 1], 6);
@@ -2003,7 +2026,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46023.0, byYear[4, 0]);
             Assert.Equal(25.0, (double)byYear[4, 1], 6);
             Assert.Equal("#ERROR _ReportRisk: ValueError: bucket is 'quarter', expected day, month or year", Seam.Call("_ReportRisk", first, "nominal_delta", "quarter"));
-            Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01 or all", Seam.Call("_ReportRisk", first, "gamma", "day"));
+            Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01, cross_gamma or all", Seam.Call("_ReportRisk", first, "gamma", "day"));
             Assert.Equal("#ERROR _ReportRisk: bucket is missing, expected text", Seam.Call("_ReportRisk", first, "delta", ExcelMissing.Value));
             var last = Results(46387.0, 0);
             var values = (object[,])Seam.Call("_ReportValues", last);
@@ -2160,7 +2183,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("USD", reserves[2, 3]);
             var table = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(3, table.GetLength(0));
-            Assert.Equal(22, table.GetLength(1));
+            Assert.Equal(24, table.GetLength(1));  // since #197 the two cross-gamma columns, last
             Assert.Equal("brokerage_reserve", table[0, 18]);
             Assert.Equal("currency", table[0, 21]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
@@ -2233,6 +2256,27 @@ namespace Goosedove.Host.Tests
             Assert.Equal("counterparty", facedTable[0, 7]);
             Assert.Equal("ACME Trading", facedTable[2, 7]);
             Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), ExcelMissing.Value));
+            // Since #197, single-curve-cross-gamma.md: the faced batch valued on a curve of 0.99 on its payment day, two business days past its 31 December expiry with New Year's Day closed,
+            // 5 January 2027, 34 days out: a lot of Z26 net, 0.99 discounted, and -0.0001 times 33 over 365 times 0.99
+            // of cross-gamma on the contract's 2026 under the curve's label; all four five wide; the readback's
+            // last two columns the contract's cross-gamma on every row and its unit.
+            var facedCurve = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.99 } });
+            var facedResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurve);
+            var facedCross = (object[,])Seam.Call("_ReportRisk", facedResults, "cross_gamma", "year");
+            Assert.Equal(5, facedCross.GetLength(0));
+            Assert.Equal("RESERVES curve_1 cross_gamma [LOT per basis point]", facedCross[1, 1]);
+            Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedCross[3, 1], 12);
+            Assert.Equal(46023.0, facedCross[4, 0]);
+            Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedCross[4, 1], 12);
+            var facedAll = (object[,])Seam.Call("_ReportRisk", facedResults, "all", "month");
+            Assert.Equal(5, facedAll.GetLength(1));
+            Assert.Equal("RESERVES curve_1 cross_gamma [LOT per basis point]", facedAll[1, 4]);
+            Assert.Equal(0.99, (double)facedAll[3, 2], 12);
+            var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
+            Assert.Equal(24, facedReadback.GetLength(1));
+            Assert.Equal("contract_cross_gamma", facedReadback[0, 22]);
+            Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 22], 12);
+            Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 23]);
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
             var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
             var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "+2bd", pays));

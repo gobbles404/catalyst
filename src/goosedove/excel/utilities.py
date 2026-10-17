@@ -509,8 +509,9 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     """The collection's membership, since #180, one row per occurrence in the order given, a
     repeat a row again: its position counted from one as the sheet counts, its index's name and
     reporting lot, its route, the collection's number for its curve or a dash for a cleared
-    source, its currency, its own saved nominal delta, delta and DV01, and the day every source
-    shares. The collection's totals and vectors are _ReportRisk's to show; no handle text, since a
+    source, its currency, its own saved nominal delta, delta and DV01, the day every source
+    shares and, since #197, its own saved cross-gamma total with its unit, lots per basis point.
+    The collection's totals and vectors are _ReportRisk's to show; no handle text, since a
     source's cell may have been released while the collection holds the object."""
     sources = obj.sources
     curve = np.full(len(sources), "-", dtype=object)
@@ -530,6 +531,8 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                 "delta",
                 "dv01",
                 "as_of",
+                "cross_gamma",
+                "cross_gamma_unit",
             ),
             (
                 "int64",
@@ -542,6 +545,8 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                 "float64",
                 "float64",
                 "datetime64[D]",
+                "float64",
+                "str",
             ),
         ],
         np.arange(1, len(sources) + 1, dtype=np.int64),
@@ -554,6 +559,8 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
         np.array([source.discounted_lot_delta_total for source in sources]),
         np.array([source.dv01 for source in sources]),
         np.full(len(sources), obj.as_of, dtype="datetime64[D]"),
+        np.array([source.cross_gamma_total for source in sources]),
+        tuple([f"{source.lot_unit} per basis point" for source in sources]),
     )
 
 
@@ -574,7 +581,11 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # on each of its slots would read as each slot's and sum twice; a cleared result retains none
     # of the four and shows a dash on every row. Then, since #170, the batch's reserves, once: the
     # three totals and their currency on the first slot row, as _ReportReserves spills them, and a
-    # dash on every later row, since they are the batch's booked amounts and no slot's.
+    # dash on every later row, since they are the batch's booked amounts and no slot's. Then,
+    # since #197, the contract's cross-gamma on every slot, read by the slot's reference as the
+    # contract's four risks are and so the same number on every slot of one contract, repeated
+    # context and no slot's own risk, a cleared result's zero, and its unit, lots per basis
+    # point, on every row; appended last so that no column before them moves.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
@@ -616,74 +627,93 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     first[np.unique(group, return_index=True)[1]] = True  # each group's first slot row
     once = np.zeros(slots, dtype=np.bool_)
     once[0] = True  # the batch's own facts, on the first row
+    every = np.ones(slots, dtype=np.bool_)
     if obj.payment_factor is None:
         # A cleared result: nothing retained for the four, a dash on every row.
         none, nothing = np.zeros(slots, dtype=np.bool_), np.empty(0)
-        payments = [(name, nothing, none) for name in PAYMENT_COLUMNS]
+        payments = [_numbers_on(name, nothing, none) for name in PAYMENT_COLUMNS]
     else:
-        every = np.ones(slots, dtype=np.bool_)
         held = (obj.payment_amount, obj.npv_by_group, obj.dv01_by_group)
         payments = [
-            (PAYMENT_COLUMNS[0], obj.payment_factor[group], every),
+            _numbers_on(PAYMENT_COLUMNS[0], obj.payment_factor[group], every),
             *(
-                (name, cast(NDArray[np.float64], vector)[group[first]], first)
+                _numbers_on(name, cast(NDArray[np.float64], vector)[group[first]], first)
                 for name, vector in zip(PAYMENT_COLUMNS[1:], held, strict=True)
             ),  # the three are retained together with the factors
         ]
     reserves = obj.reserves
-    return _with_once(
+    currency = np.full(slots, "-", dtype=object)
+    currency[0] = reserves.currency
+    cross = np.zeros(slots) if obj.cross_gamma is None else obj.cross_gamma[reference]
+    per_bp = np.full(slots, f"{obj.lot_unit} per basis point", dtype=object)
+    return _widened(
         table,
         [
             *payments,
-            ("brokerage_reserve", np.array([reserves.brokerage]), once),
-            ("clearing_reserve", np.array([reserves.clearing]), once),
-            ("marketing_reserve", np.array([reserves.marketing]), once),
+            _numbers_on("brokerage_reserve", np.array([reserves.brokerage]), once),
+            _numbers_on("clearing_reserve", np.array([reserves.clearing]), once),
+            _numbers_on("marketing_reserve", np.array([reserves.marketing]), once),
+            _words_on("currency", currency),
+            _numbers_on("contract_cross_gamma", cross, every),
+            _words_on("cross_gamma_unit", per_bp),
         ],
-        ("currency", reserves.currency),
     )
 
 
 PAYMENT_COLUMNS = ("payment_factor", "payment_amount", "group_npv", "group_dv01")
 
+# A column a plain table cannot hold, written by kind: its name, its type word, and per body row
+# its kind, its number and its word, a number on the rows that hold one and a dash on the rest,
+# or a word on every row.
+Added = tuple[str, str, NDArray[np.uint8], NDArray[np.float64], NDArray[np.object_]]
 
-def _with_once(
-    base: MixedArray,
-    numbers: list[tuple[str, NDArray[np.float64], NDArray[np.bool_]]],
-    text: tuple[str, str],
-) -> MixedArray:
+
+def _numbers_on(name: str, held: NDArray[np.float64], holds: NDArray[np.bool_]) -> Added:
+    """A float64 column holding a number on the rows that hold one, in row order, and a dash on
+    the rest: every row, no row or the first row of each group, as the caller's mask says."""
+    kinds = np.where(holds, NUMBER_CODE, TEXT_CODE).astype(np.uint8)
+    slots = np.full(holds.size, np.nan)
+    slots[holds] = held
+    return name, "float64", kinds, slots, np.full(holds.size, "-", dtype=object)
+
+
+def _words_on(name: str, words: NDArray[np.object_]) -> Added:
+    """A str column holding the caller's word on every row, a dash where it gives none."""
+    kinds = np.full(words.size, TEXT_CODE, dtype=np.uint8)
+    return name, "str", kinds, np.full(words.size, np.nan), words
+
+
+def _widened(base: MixedArray, added: list[Added]) -> MixedArray:
     """A results table widened by columns a plain table cannot hold: a number on some rows and a
     dash on the rest, the batch's reserves on the first row as _ReportReserves spills them and a
     payment group's amount on the first row of its slots, since a column holding a number on one
-    row and a word on the others is not one the table builder takes. Each is written by kind, as
-    the market's price column is: its kinds, its slots and its texts placed among the base's in
-    sheet order, every body row of the base holding the same number of texts, one per text
-    column. numbers gives each column's name, the numbers it holds in row order and which rows
-    hold one, typed float64 as a column of numbers is; text gives the one text column's name and
-    the word on the first row, a dash below it. Nothing is summed or looked up; every result has
-    a first row, a batch observing at least once."""
+    row and a word on the others is not one the table builder takes; or a word on every row, the
+    currency once and a dash below it, a unit on every row. Each is written by kind, as the
+    market's price column is: its kinds, its slots and its texts placed among the base's in sheet
+    order, every body row of the base holding the same number of texts, one per text column, and
+    the type row saying what each column is whatever its rows hold. Nothing is summed or looked
+    up; every result has a first row, a batch observing at least once."""
     rows, width = base.shape
     body = rows - 2
-    added = len(numbers) + 1
-    kinds = np.full((rows, width + added), TEXT_CODE, dtype=np.uint8)
+    extra = len(added)
+    kinds = np.full((rows, width + extra), TEXT_CODE, dtype=np.uint8)
     kinds[:, :width] = base.kinds
-    slots = np.full((rows, width + added), np.nan)
+    slots = np.full((rows, width + extra), np.nan)
     slots[:, :width] = base.numeric_slots
     per_row = (len(base.texts) - 2 * width) // body
-    words = np.full((body, per_row + added), "-", dtype=object)
+    words = np.full((body, per_row + extra), "-", dtype=object)
     words[:, :per_row] = np.array(base.texts[2 * width :], dtype=object).reshape(body, per_row)
-    placed = np.ones((body, per_row + added), dtype=np.bool_)
-    for j, (_, held, holds) in enumerate(numbers):
-        kinds[2:, width + j][holds] = NUMBER_CODE
-        slots[2:, width + j][holds] = held
-        placed[:, per_row + j] = ~holds
-    words[0, per_row + added - 1] = text[1]
+    placed = np.ones((body, per_row + extra), dtype=np.bool_)
+    for j, (_, _, column_kinds, column_slots, column_words) in enumerate(added):
+        kinds[2:, width + j] = column_kinds
+        slots[2:, width + j] = column_slots
+        words[:, per_row + j] = column_words
+        placed[:, per_row + j] = column_kinds == TEXT_CODE
     headings = (
         *base.texts[:width],
-        *(name for name, _, _ in numbers),
-        text[0],
+        *(name for name, *_ in added),
         *base.texts[width : 2 * width],
-        *("float64",) * len(numbers),
-        "str",
+        *(kind for _, kind, *_ in added),
     )
     return MixedArray(kinds, slots, (*headings, *words[placed]))
 

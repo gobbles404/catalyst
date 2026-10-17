@@ -273,8 +273,9 @@ def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
         "live_prices_read": prep.live_references.size,  # one quote a live contract
         "payment_factors_read": unpaid,  # one payment day a contract: a factor an unpaid group
         # The lots onto the references, the days, the months and the years; the DV01s onto the
-        # payment days, their months and their years.
-        "risk_reductions": 7,
+        # payment days, their months and their years; since #197 the cross-gammas onto the
+        # references, the days, the months and the years.
+        "risk_reductions": 11,
         "slots_discounted": slots_of(method, contracts),  # every slot, a fixed one by nothing
     }
 
@@ -302,45 +303,52 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "DiscountCurve.max_date": 1,  # the coverage rule
         "Market.live_prices": 1,
         "_discounted": 1,
-        "early_risk": 2,  # the discounted lots and the DV01 before the start, since #186
-        "early_fact": 4,
+        "_cross_gamma": 1,  # since #197, after every rule of the discounted path
+        "early_risk": 3,  # the discounted lots, the DV01 and the cross-gamma before the start
+        "early_fact": 6,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
     }
     # No sort, no unique, no count: the days are the preparation's. The positions of the unpaid
-    # days on the curve, the one conversion; the error state set once, the rules the judge; the
-    # ones over the groups and the two zeros, the NPVs and the DV01s; the sums of the live
-    # amount, the NPVs, the DV01s and the discounted lots; the looks that hold the coverage, the
-    # amounts, the discounted lots by reference, the sensitivity, the three views of the lots and
-    # the three of the DV01 finite, with the market's own; the bincounts' reductions among the
-    # rest; and the new arrays frozen, thirteen of them. The same with no slot live: the sums are
-    # over every slot and never over none.
+    # days on the curve, the one conversion; the error state set once for the discounting and,
+    # since #197, once for the cross-gamma, the rules the judge; the ones over the groups and the
+    # three zeros, the NPVs, the DV01s and the cross-gamma's weights; the sums of the live amount,
+    # the NPVs, the DV01s, the discounted lots and the cross-gamma; the looks that hold the
+    # coverage, the amounts, the discounted lots by reference, the sensitivity, the three views of
+    # the lots, the three of the DV01 and, since #197, the cross-gamma by reference and its three
+    # views finite, with the market's own; the bincounts' reductions among the rest; and the new
+    # arrays frozen, seventeen of them. The same with no slot live: the sums are over every slot
+    # and never over none.
     assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
-        "ndarray.any": 12,  # since #190 the live contributions finite before the groups sum them
+        "ndarray.any": 16,  # since #190 the live contributions finite before the groups sum them
         "ndarray.astype": 1,
-        "ndarray.nonzero": 4,  # the discounted lots and the DV01 before the start, since #186
-        "ndarray.ravel": 4,
-        "ndarray.setflags": 13,
-        "ndarray.sum": 3,  # the global live sum is the cleared route's alone since #190
-        "numpy._make_extobj": 2,  # the contributions' flags and the discounting's, since #190
-        "numpy.asanyarray": 4,  # the four looks' views
+        "ndarray.nonzero": 6,  # the lots, the DV01 and the cross-gamma before the start
+        "ndarray.ravel": 6,
+        "ndarray.setflags": 17,
+        "ndarray.sum": 4,  # the global live sum is the cleared route's alone since #190
+        "numpy._make_extobj": 3,  # the contributions' flags, the discounting's, the cross-gamma's
+        "numpy.asanyarray": 6,  # the six looks' views
         "numpy.empty": 1,
-        "numpy.zeros": 2,
-        "ufunc.reduce": 15,
+        "numpy.zeros": 3,
+        "ufunc.reduce": 20,
     }
 
 
 # The peak follows the payment groups, the slots, the live slots and the time buckets: a dozen
-# arrays over the groups; the factor gathered onto every slot and the slot's lots, 16 bytes a slot;
-# the cleared tick's quote and contribution on a live slot and the bilateral path's live groups, 32
-# a live slot; the three views over the days, the months and the years; and, since #178, the three
-# DV01 views over the payment days, their months and their years; within four slacks.
-# Measured 3,440 bytes for two groups and no live slot, 5,909 for twenty-four groups and twenty
-# live slots, 4,105 for two asian groups over 43 days, 22,744 for twenty-four over 519 days with 429
-# live and 15,139 for the fully paid strip of 497 days, on 2026-10-11 with the three DV01 views,
-# against 2,992, 5,093, 3,648, 22,808 and 15,203 the day before and 1,210, 1,418, 1,210, 10,960
-# and 1,210 for the cleared tick of the same batches. The retained arrays are exactly the new
-# vectors' bytes, floats every one, the fully paid strip's as well.
+# arrays over the groups; the factor gathered onto every slot and the slot's lots, 16 bytes a slot,
+# and since #197 the cross-gamma's weight gathered onto every slot and the slot's cross-gamma,
+# 16 more; the cleared tick's quote and contribution on a live slot and the bilateral path's live
+# groups, 32 a live slot; the three views over the days, the months and the years and, since
+# #178, the three DV01 views over the payment days, their months and their years, and since
+# #197 the cross-gamma by reference and its three views, eight bytes a reference and a bucket
+# more; within five slacks, the cross-gamma's helper adding its arrays' headers and the result's
+# facts. Measured 5,233 bytes for two groups and no live slot, 8,265 for twenty-four groups and
+# twenty live slots, 6,226 for two asian groups over 43 days, 33,584 for twenty-four over 519 days
+# with 429 live and 25,166 for the fully paid strip of 497 days, on 2026-10-17 with the
+# cross-gamma, against 3,440, 5,909, 4,105, 22,744 and 15,139 on 2026-10-11 with the three DV01
+# views and 1,210, 1,418, 1,210, 10,960 and 1,210 for the cleared tick of the same batches. The
+# retained arrays are exactly the new vectors' bytes, floats every one, the fully paid strip's
+# as well.
 @pytest.mark.parametrize(
     ("method", "components", "contracts", "as_of", "live", "unpaid"), CASES, ids=IDS
 )
@@ -351,6 +359,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     encoding = prep.encoded
     groups = encoding.group_contract.size
     slots = encoding.slot_group.size
+    refs = encoding.references.size
     buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
     axes = encoding.payment_axes
     assert axes is not None
@@ -358,7 +367,12 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     quoted = a_market(prep.history)
     curve = curve_on(as_of)
     assert least_peak(lambda: tick(prep, quoted, curve)) <= (
-        128 * groups + 16 * slots + 32 * live + 8 * (buckets + paid) + KEYWORD_CALL + 4 * SLACK
+        128 * groups
+        + 32 * slots
+        + 32 * live
+        + 8 * (refs + 2 * buckets + paid)
+        + KEYWORD_CALL
+        + 5 * SLACK
     )
     result = tick(prep, quoted, curve)
     new: tuple[NDArray[np.float64] | None, ...] = (
@@ -374,9 +388,13 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
         result.dv01_by_day,
         result.dv01_by_month,
         result.dv01_by_year,
+        result.cross_gamma,
+        result.cross_gamma_by_day,
+        result.cross_gamma_by_month,
+        result.cross_gamma_by_year,
     )
     retained = sum(0 if array is None else array.nbytes for array in new)
-    assert retained == 8 * (2 * encoding.references.size + buckets + paid + 4 * groups)
+    assert retained == 8 * (3 * refs + 2 * buckets + paid + 4 * groups)
     assert all(array is None or array.dtype == np.float64 for array in new)
     # The nominal vectors are the preparation's, by reference, not copies.
     assert result.lot_delta is prep.lot_delta and result.price_sensitivity is prep.price_sensitivity
@@ -456,7 +474,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     result = tick(prep, a_market(prep.history), curve_on(as_of))
-    for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01):
+    for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01, Risk.CROSS_GAMMA):
         # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
         # month and by year, since #186, one zeros over the display axis filled through the saved
         # places, eight bytes a row.
@@ -471,22 +489,24 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
                 8 * view.dates.size + SLACK
             )
     for bucket in Bucket:
-        # All three: three zeros over the axis, each filled through its saved places; nothing
-        # sorted, nothing summed, nothing unique; by month and by year the saved refusals read.
+        # All four, since #197: four zeros over the axis, each filled through its saved places;
+        # nothing sorted, nothing summed, nothing unique; by month and by year the saved
+        # refusals read.
         view = risk_view(result, Risk.ALL, bucket)
-        assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 3}
+        assert numpy_calls(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {"numpy.zeros": 4}
         selected = (
             {"_day_view": 1}
             if bucket is Bucket.DAY
-            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 3}
+            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 4}
         )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
             "delta_labels": 1,  # the headings, spelled once in risk_report.py for both paths
             "dv01_label": 1,
+            "cross_gamma_label": 1,
             **selected,
-            "placed": 3,
+            "placed": 4,
         }
         assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
-            24 * view.dates.size + SLACK
+            32 * view.dates.size + SLACK
         )

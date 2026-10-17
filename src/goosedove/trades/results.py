@@ -26,6 +26,7 @@ from goosedove.trades.risk_report import (
     Period,
     Risk,
     RiskView,
+    cross_gamma_label,
     delta_labels,
     dv01_label,
     placed,
@@ -78,7 +79,19 @@ class TradeResults:
     refusing a month or a year report whose discounted lots or DV01 stand in a period before the
     valuation day's, or none, a cleared result's delta the preparation's nominal facts, its lots
     being the same, and its DV01 none; a reader words them with the measure asked for and
-    scans nothing."""
+    scans nothing.
+
+    Since #197, single-curve-cross-gamma.md, the cross-gamma: cross_gamma[r] is the
+    sensitivity of contract r's discounted lot delta to a rise of one basis point in the curve's
+    continuously compounded zero rates, each live slot's discounted lots times -0.0001 times its
+    payment's time fraction, summed; in lot_unit per basis point, negative for lots bought and
+    paid for later; cross_gamma_total their sum; and cross_gamma_by_day, _by_month and
+    _by_year the same slots summed onto the observation days and, by reference, onto the
+    contract months and years, the discounted lots' own axes, since the payment supplies the
+    time and not the axis. None, a known zero and no buffer, for a cleared batch, whose lots
+    nothing discounts, with a total of 0.0, as the DV01's dated axes are held; a bilateral
+    batch paid in full holds its zeros. early_cross_gamma, the facts refusing a month or a
+    year report of it standing before the valuation day's period, none for a cleared batch."""
 
     prepared: PreparedTrades
     market: Market
@@ -112,6 +125,12 @@ class TradeResults:
     dv01_by_year: NDArray[np.float64] | None
     early_delta: EarlyRisk
     early_dv01: EarlyRisk
+    cross_gamma: NDArray[np.float64] | None
+    cross_gamma_total: float
+    cross_gamma_by_day: NDArray[np.float64] | None
+    cross_gamma_by_month: NDArray[np.float64] | None
+    cross_gamma_by_year: NDArray[np.float64] | None
+    early_cross_gamma: EarlyRisk
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
         """The content of the risk report asked for, since #180: risk_view's selection of this
@@ -126,32 +145,44 @@ class TradeResults:
         return tuple([schedule.codes[int(row)] for row in self.contracts])
 
 
+Labels = tuple[str, str, str, str]
+
+
 def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     """The one way to read a risk report's content, since #178, _ReportRisk's selection. By day:
     the nominal delta and the delta are on the observation days, the preparation's vector and the
     result's, totalled by the saved scalars; the DV01 is on the payment days, the result's vector
     the evaluation summed onto the axis the encoding made once, totalled by the saved DV01, a
-    cleared result's a total of nothing over no dated row, its DV01 having no dated axis; all three
-    are on the union of the two axes the encoding made, each vector copied through its saved
+    cleared result's a total of nothing over no dated row, its DV01 having no dated axis; since
+    #197 the cross-gamma is on the observation days as the delta is, the result's vector and its
+    saved total, a cleared result's the known zero shown as a column of zeros on those days; all
+    four are on the union of the two axes the encoding made, each vector copied through its saved
     places and zero where only the other kind has a date, a cleared result's all on the
-    observation days with a DV01 column of zeros. By month or by year, since #186,
-    risk-contract-month-bucketing.md: the preparation's display axis, consecutive periods from the
-    valuation day's, a delta report through the last contract period and a DV01 report through
-    the last payment period, all three through the later, each saved vector copied through the
-    places the preparation saved and zero between them; a saved value before the start refuses the
-    report in the words prepared where the vector was made. The labels name the index and its
-    reporting lot for the deltas, `UNIT delta [UNIT]`, and the curve's group and the currency for
-    the DV01, `curve_1 USD dv01 [USD per basis point]`, `cleared USD dv01 [USD per basis point]`
-    where no curve values.
+    observation days with a DV01 column and a cross-gamma column of zeros. By month or by year,
+    since #186, risk-contract-month-bucketing.md: the preparation's display axis, consecutive
+    periods from the valuation day's, a delta or a cross-gamma report through the last contract
+    period and a DV01 report through the last payment period, all four through the later, each
+    saved vector copied through the places the preparation saved and zero between them; a saved
+    value before the start refuses the report in the words prepared where the vector was made.
+    The labels name the index and its reporting lot for the deltas, `UNIT delta [UNIT]`, the
+    curve's group and the currency for the DV01, `curve_1 USD dv01 [USD per basis point]`,
+    `cleared USD dv01 [USD per basis point]` where no curve values, and the index, the group and
+    the lot per basis point for the cross-gamma, `UNIT curve_1 cross_gamma [UNIT per basis
+    point]`.
 
     Work: a copy per column through the saved places, by reference where a day axis is the
-    risk's own; nothing summed, nothing sorted, nothing discovered, the Total the scalar the
-    evaluation stored.
+    risk's own, a column of zeros for a cleared result's cross-gamma; nothing summed, nothing
+    sorted, nothing discovered, the Total the scalar the evaluation stored.
     """
     terms = results.prepared.encoded.terms
     nominal_label, delta_label = delta_labels(terms.index, terms.reporting_lot)
     group = "curve_1" if results.curve is not None else "cleared"
-    labels = (nominal_label, delta_label, dv01_label(group, results.currency))
+    labels = (
+        nominal_label,
+        delta_label,
+        dv01_label(group, results.currency),
+        cross_gamma_label(terms.index, group, terms.reporting_lot),
+    )
     match bucket:
         case Bucket.DAY:
             return _day_view(results, risk, labels)
@@ -161,11 +192,11 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
             assert_never(bucket)
 
 
-def _day_view(results: TradeResults, risk: Risk, labels: tuple[str, str, str]) -> RiskView:
+def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
     """The day report's content, by reference where the axis is the risk's own."""
     prepared = results.prepared
     encoded = prepared.encoded
-    nominal_label, delta_label, dv01_label = labels
+    nominal_label, delta_label, dv01_label, cross_label = labels
     axes = encoded.payment_axes
     match risk:
         case Risk.NOMINAL_DELTA:
@@ -184,13 +215,25 @@ def _day_view(results: TradeResults, risk: Risk, labels: tuple[str, str, str]) -
                 return RiskView(NO_DAYS, (dv01_label,), (results.dv01,), (NOTHING,))
             dv01 = cast(NDArray[np.float64], results.dv01_by_day)  # made with the axes
             return RiskView(axes.days, (dv01_label,), (results.dv01,), (dv01,))
+        case Risk.CROSS_GAMMA:
+            cross = results.cross_gamma_by_day
+            if cross is None:
+                # Cleared: the known zero on the observation days, the column made for the report.
+                cross = np.zeros(encoded.days.size)
+            return RiskView(encoded.days, (cross_label,), (results.cross_gamma_total,), (cross,))
         case Risk.ALL:
-            totals = (results.lot_delta_total, results.discounted_lot_delta_total, results.dv01)
+            totals = (
+                results.lot_delta_total,
+                results.discounted_lot_delta_total,
+                results.dv01,
+                results.cross_gamma_total,
+            )
             if axes is None:
-                # Cleared: the observation days, the DV01 nothing on every row.
+                # Cleared: the observation days, the DV01 and the cross-gamma nothing on every row.
                 columns = (
                     prepared.daily_lots,
                     results.discounted_daily_lots,
+                    np.zeros(encoded.days.size),
                     np.zeros(encoded.days.size),
                 )
                 return RiskView(encoded.days, labels, totals, columns)
@@ -207,22 +250,26 @@ def _day_view(results: TradeResults, risk: Risk, labels: tuple[str, str, str]) -
                         axes.paid_in_days,
                         cast(NDArray[np.float64], results.dv01_by_day),
                     ),
+                    placed(
+                        union.size,
+                        axes.observed_in_days,
+                        cast(NDArray[np.float64], results.cross_gamma_by_day),  # made with them
+                    ),
                 ),
             )
         case _:
             assert_never(risk)
 
 
-def _period_view(
-    results: TradeResults, risk: Risk, bucket: Period, labels: tuple[str, str, str]
-) -> RiskView:
+def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labels) -> RiskView:
     """The month or the year report's content, since #186: the preparation's display axis cut to
     the selected risks' rows, the saved vectors copied through the saved places from the first
     period on or after the start, a saved value before it refused from the saved facts, worded
-    with the measure asked for."""
+    with the measure asked for; since #197 the cross-gamma on the delta's rows and places, a
+    cleared result's the known zero as a column of zeros."""
     prepared = results.prepared
-    nominal_label, delta_label, dv01_label = labels
-    unit, axis, nominal, discounted, dv01 = _saved(results, bucket)
+    nominal_label, delta_label, dv01_label, cross_label = labels
+    unit, axis, nominal, discounted, dv01, cross = _saved(results, bucket)
     match risk:
         case Risk.NOMINAL_DELTA:
             prepared.early_nominal.refuse("nominal delta", unit)
@@ -250,16 +297,38 @@ def _period_view(
             return RiskView(
                 axis.periods[: axis.dv01_rows], (dv01_label,), (results.dv01,), (column,)
             )
+        case Risk.CROSS_GAMMA:
+            if cross is None:
+                column = np.zeros(axis.delta_rows)  # cleared: the known zero over the delta rows
+            else:
+                results.early_cross_gamma.refuse("cross-gamma", unit)
+                column = placed(axis.delta_rows, axis.contract_in, cross[axis.contract_from :])
+            return RiskView(
+                axis.periods[: axis.delta_rows],
+                (cross_label,),
+                (results.cross_gamma_total,),
+                (column,),
+            )
         case Risk.ALL:
             prepared.early_nominal.refuse("nominal delta", unit)
             results.early_delta.refuse("delta", unit)
             rows = max(axis.delta_rows, axis.dv01_rows)
-            totals = (results.lot_delta_total, results.discounted_lot_delta_total, results.dv01)
+            totals = (
+                results.lot_delta_total,
+                results.discounted_lot_delta_total,
+                results.dv01,
+                results.cross_gamma_total,
+            )
             if dv01 is None:
                 dv01_on = np.zeros(rows)
             else:
                 results.early_dv01.refuse("DV01", unit)
                 dv01_on = placed(rows, axis.paid_in, dv01[axis.paid_from :])
+            if cross is None:
+                cross_on = np.zeros(rows)
+            else:
+                results.early_cross_gamma.refuse("cross-gamma", unit)
+                cross_on = placed(rows, axis.contract_in, cross[axis.contract_from :])
             return RiskView(
                 axis.periods[:rows],
                 labels,
@@ -268,6 +337,7 @@ def _period_view(
                     placed(rows, axis.contract_in, nominal[axis.contract_from :]),
                     placed(rows, axis.contract_in, discounted[axis.contract_from :]),
                     dv01_on,
+                    cross_on,
                 ),
             )
         case _:
@@ -276,9 +346,17 @@ def _period_view(
 
 def _saved(
     results: TradeResults, bucket: Period
-) -> tuple[Unit, PeriodAxis, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64] | None]:
+) -> tuple[
+    Unit,
+    PeriodAxis,
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64] | None,
+    NDArray[np.float64] | None,
+]:
     """A month or a year bucket's unit, its display axis and the saved vectors it places: the
-    nominal lots, the discounted lots and the DV01, None where the DV01 has no dated axis."""
+    nominal lots, the discounted lots, the DV01, None where the DV01 has no dated axis, and since
+    #197 the cross-gamma, None where it is the known zero."""
     prepared = results.prepared
     match bucket:
         case Bucket.MONTH:
@@ -288,6 +366,7 @@ def _saved(
                 prepared.monthly_lots,
                 results.discounted_monthly_lots,
                 results.dv01_by_month,
+                results.cross_gamma_by_month,
             )
         case Bucket.YEAR:
             return (
@@ -296,6 +375,7 @@ def _saved(
                 prepared.yearly_lots,
                 results.discounted_yearly_lots,
                 results.dv01_by_year,
+                results.cross_gamma_by_year,
             )
         case _:
             assert_never(bucket)

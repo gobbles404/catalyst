@@ -1379,10 +1379,11 @@ def test_an_iferc_batchs_preparation_and_tick_allocate_by_month_not_by_trade() -
     assert big_peak <= small_peak + 230 * 22 + SLACK
     quoted = iferc_market(history)
     big_prep = prepared_trades(big, history, WorkCounter())
-    # Since #190 the finite check keeps two boolean temporaries over the live slots for a moment.
+    # Since #190 the finite check keeps two boolean temporaries over the live slots for a moment;
+    # since #197 the record holds the cross-gamma's six fields, 48 bytes, None and 0.0 here.
     assert (
         least_peak(lambda: trade_results(big_prep, quoted, WorkCounter()))
-        <= 24 * 24 + KEYWORD_CALL + SLACK + 256
+        <= 24 * 24 + KEYWORD_CALL + SLACK + 304
     )
     small_prep = prepared_trades(small, history, WorkCounter())
     assert least_peak(lambda: trade_results(small_prep, quoted, WorkCounter())) <= (

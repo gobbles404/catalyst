@@ -201,7 +201,7 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
         "kernel": 1,
         "live_prices_read": 1,
         "payment_factors_read": 2,
-        "risk_reductions": 7,
+        "risk_reductions": 11,
         "slots_discounted": 2,
     }
     # The same preparation under a tick to 81: 110 and -110, 5.5 of NPV, 0.00935 of DV01, the lots
@@ -317,7 +317,7 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
             "kernel": 1,
             "live_prices_read": 0,
             "payment_factors_read": 0,
-            "risk_reductions": 7,
+            "risk_reductions": 11,
             "slots_discounted": 1,
         }
 
@@ -426,7 +426,7 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
         "kernel": 1,
         "live_prices_read": 2,
         "payment_factors_read": 3,
-        "risk_reductions": 7,
+        "risk_reductions": 11,
         "slots_discounted": 3,
     }
 
@@ -623,6 +623,7 @@ ALL_LABELS = (
     "UNIT nominal_delta [UNIT]",
     "UNIT delta [UNIT]",
     "curve_1 USD dv01 [USD per basis point]",
+    "UNIT curve_1 cross_gamma [UNIT per basis point]",
 )
 
 
@@ -771,19 +772,24 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     assert delta.totals == (pytest.approx(13.5, **CLOSE),)
     dv01 = risk_view(result, Risk.DV01, Bucket.DAY)
     assert dv01.dates is axes.days and dv01.columns[0] is result.dv01_by_day
-    assert dv01.labels == ALL_LABELS[2:] and dv01.totals == (
+    assert dv01.labels == ALL_LABELS[2:3] and dv01.totals == (
         pytest.approx(first + second, **CLOSE),
     )
+    # Since #197 the cross-gamma beside them, each lot's discounted lots times its own time:
+    # 9 at 732 days and 4.5 at 737, on the observation days, zero on the payment-only day.
+    cross_a, cross_b = -0.0001 * 732 / 365 * 9.0, -0.0001 * 737 / 365 * 4.5
     everything = risk_view(result, Risk.ALL, Bucket.DAY)
     assert everything.dates is axes.union_days and everything.labels == ALL_LABELS
     assert everything.totals == (
         15.0,
         pytest.approx(13.5, **CLOSE),
         pytest.approx(first + second, **CLOSE),
+        pytest.approx(cross_a + cross_b, **CLOSE),
     )
     np.testing.assert_allclose(everything.columns[0], [10.0, 5.0, 0.0], **TIGHT)
     np.testing.assert_allclose(everything.columns[1], [9.0, 4.5, 0.0], **TIGHT)
     np.testing.assert_allclose(everything.columns[2], [0.0, first, second], **TIGHT)
+    np.testing.assert_allclose(everything.columns[3], [cross_a, cross_b, 0.0], **TIGHT)
     by_year = risk_view(result, Risk.ALL, Bucket.YEAR)
     np.testing.assert_array_equal(by_year.dates, dates("2027-01-01", "2028-01-01", "2029-01-01"))
     np.testing.assert_allclose(by_year.columns[0], [10.0, 0.0, 5.0], **TIGHT)
@@ -807,7 +813,12 @@ def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_array
     assert everything.dates is prep.encoded.days
     assert everything.columns[0] is prep.daily_lots and everything.columns[1] is prep.daily_lots
     np.testing.assert_array_equal(everything.columns[2], [0.0])
-    assert everything.labels == (*ALL_LABELS[:2], "cleared USD dv01 [USD per basis point]")
+    np.testing.assert_array_equal(everything.columns[3], [0.0])
+    assert everything.labels == (
+        *ALL_LABELS[:2],
+        "cleared USD dv01 [USD per basis point]",
+        "UNIT cleared cross_gamma [UNIT per basis point]",
+    )
 
 
 def test_a_dv01_bucket_past_the_largest_number_is_refused_by_its_payment_day() -> None:

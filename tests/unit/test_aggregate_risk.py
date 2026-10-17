@@ -45,7 +45,14 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.resolution import ResolvedTrades
 from goosedove.trades.results import TradeResults, risk_view
-from goosedove.trades.risk_report import Bucket, Risk, RiskView, delta_labels, dv01_label
+from goosedove.trades.risk_report import (
+    Bucket,
+    Risk,
+    RiskView,
+    cross_gamma_label,
+    delta_labels,
+    dv01_label,
+)
 from goosedove.trades.terms import Route
 
 MONTHS = (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05"))
@@ -72,6 +79,10 @@ HNG_NOMINAL, HNG_DELTA = "HNG nominal_delta [LOT]", "HNG delta [LOT]"
 WTI_NOMINAL, WTI_DELTA = "WTI nominal_delta [LOT]", "WTI delta [LOT]"
 CURVE_1 = "curve_1 USD dv01 [USD per basis point]"
 CLEARED_USD = "cleared USD dv01 [USD per basis point]"
+HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
+HNG_CLEARED_CROSS = "HNG cleared cross_gamma [LOT per basis point]"
+WTI_CROSS = "WTI curve_1 cross_gamma [LOT per basis point]"
+WTI_CLEARED_CROSS = "WTI cleared cross_gamma [LOT per basis point]"
 
 
 def valued_on(
@@ -173,12 +184,15 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     np.testing.assert_array_equal(agg.by_month.union[[0, 12, 24]], dates(JAN_27, JAN_28, JAN_29))
     np.testing.assert_array_equal(agg.by_month.paid_in[0], [12, 24])
     assert agg.by_month.observed_from == (0,) and agg.by_month.paid_from == (0,)
-    # Two occurrences, one group of each kind; the entries of every saved vector aligned once,
-    # eight over the index's four axes and six over the curve's three; eleven reductions; the
-    # three buckets' axes, six coordinates each.
+    # Two occurrences, one group of each kind and since #197 two cross groups, A's cleared pair
+    # and B's on the curve; the entries of every saved vector aligned once, eight over the
+    # index's four axes, six over the curve's three and four over B's delta axes again for the
+    # cross-gamma, the cleared pair aligning nothing; fifteen reductions; the three buckets'
+    # axes, six coordinates each.
     assert counter.freeze().as_dict() == {
-        "aggregate_reductions": 11,
-        "entries_aligned": 14,
+        "aggregate_reductions": 15,
+        "cross_groups": 2,
+        "entries_aligned": 18,
         "index_groups": 1,
         "rate_groups": 1,
         "report_coordinates": 64,
@@ -199,13 +213,30 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
     np.testing.assert_array_equal(agg.rate_groups[0].occurrences, [1, 3])
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
     np.testing.assert_array_equal(view.dates, dates(AS_OF, "2027-01-05", A_YEAR, TWO_YEARS))
-    assert view.labels == (HNG_NOMINAL, HNG_DELTA, WTI_NOMINAL, WTI_DELTA, CURVE_1)
+    # Since #197 the four cross groups after the rate group, one per pair in first appearance:
+    # HNG cleared, nothing; HNG on curve_1, B's -0.00095 + 0.0018 on its observation day; WTI
+    # cleared, nothing; WTI on curve_1, D's -0.00038 on the 5th.
+    assert view.labels == (
+        HNG_NOMINAL,
+        HNG_DELTA,
+        WTI_NOMINAL,
+        WTI_DELTA,
+        CURVE_1,
+        HNG_CLEARED_CROSS,
+        HNG_CROSS,
+        WTI_CLEARED_CROSS,
+        WTI_CROSS,
+    )
     assert view.totals == (
         10.0,
         pytest.approx(10.5, **CLOSE),
         6.0,
         pytest.approx(5.8, **CLOSE),
         pytest.approx(0.0066, **CLOSE),
+        0.0,
+        pytest.approx(0.00085, **CLOSE),
+        0.0,
+        pytest.approx(-0.00038, **CLOSE),
     )
     expected = (
         [10.0, 0.0, 0.0, 0.0],
@@ -213,6 +244,10 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
         [0.0, 6.0, 0.0, 0.0],
         [0.0, 5.8, 0.0, 0.0],
         [0.0, 0.0, -0.0114, 0.018],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.00085, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, -0.00038, 0.0, 0.0],
     )
     for got, want in zip(view.columns, expected, strict=True):
         np.testing.assert_allclose(got, want, **TIGHT)
@@ -237,8 +272,9 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
     np.testing.assert_allclose(by_year.columns[1], [10.5, 0.0, 0.0], **TIGHT)
     np.testing.assert_allclose(by_year.columns[4], [0.0, -0.0114, 0.018], **TIGHT)
     assert counter.freeze().as_dict() == {
-        "aggregate_reductions": 19,
-        "entries_aligned": 25,
+        "aggregate_reductions": 27,  # eight more since #197, B's and D's cross-gamma on four axes
+        "cross_groups": 4,
+        "entries_aligned": 33,  # eight more, the two bilateral sources' delta axes again
         "index_groups": 2,
         "rate_groups": 1,
         "report_coordinates": 66,
@@ -281,7 +317,17 @@ def test_every_occurrence_counts_and_the_groups_follow_first_appearance(
     np.testing.assert_array_equal(thrice.rate_groups[0].occurrences, [1])
     base = aggregate_view(collected(a, b, c, d), Risk.ALL, Bucket.DAY)
     reordered = aggregate_view(collected(c, d, a, b), Risk.ALL, Bucket.DAY)
-    assert reordered.labels == (WTI_NOMINAL, WTI_DELTA, HNG_NOMINAL, HNG_DELTA, CURVE_1)
+    assert reordered.labels == (
+        WTI_NOMINAL,
+        WTI_DELTA,
+        HNG_NOMINAL,
+        HNG_DELTA,
+        CURVE_1,
+        WTI_CLEARED_CROSS,
+        WTI_CROSS,
+        HNG_CLEARED_CROSS,
+        HNG_CROSS,
+    )
     np.testing.assert_array_equal(reordered.dates, base.dates)
     for label in base.labels:
         total, values = column(base, label)
@@ -415,7 +461,7 @@ def test_curves_group_by_object_and_currency_and_are_numbered_by_first_appearanc
     assert view.labels == (CURVE_1, "curve_2 USD dv01 [USD per basis point]")
     assert view.totals == (pytest.approx(0.0085, **CLOSE), pytest.approx(0.0085, **CLOSE))
     np.testing.assert_allclose(view.columns[1], [-0.0095, 0.018], **TIGHT)
-    assert len(aggregate_view(agg, Risk.ALL, Bucket.DAY).labels) == 4
+    assert len(aggregate_view(agg, Risk.ALL, Bucket.DAY).labels) == 6  # two cross groups too
     cents = index(
         "HNGC",
         "HNG settled in cents",
@@ -460,7 +506,15 @@ def test_a_collection_with_no_curve_reports_a_dv01_of_nothing_per_currency(
     assert dv01.columns[0].size == 0
     everything = aggregate_view(agg, Risk.ALL, Bucket.DAY)
     np.testing.assert_array_equal(everything.dates, dates(AS_OF, "2027-01-05"))
-    assert everything.labels == (HNG_NOMINAL, HNG_DELTA, WTI_NOMINAL, WTI_DELTA, CLEARED_USD)
+    assert everything.labels == (
+        HNG_NOMINAL,
+        HNG_DELTA,
+        WTI_NOMINAL,
+        WTI_DELTA,
+        CLEARED_USD,
+        HNG_CLEARED_CROSS,
+        WTI_CLEARED_CROSS,
+    )
     assert everything.totals[4] == 0.0
     np.testing.assert_array_equal(everything.columns[4], [0.0, 0.0])
     np.testing.assert_allclose(everything.columns[3], [0.0, 2.0], **TIGHT)
@@ -511,9 +565,10 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     scalars = {
         "index", "reporting_lot", "history", "price_vector", "lot_delta_total",
         "discounted_lot_delta_total", "curve", "number", "currency", "dv01",
+        "cross_gamma_total",
     }  # fmt: skip
     frozen: list[Any] = []
-    for group in (*agg.index_groups, *agg.rate_groups):
+    for group in (*agg.index_groups, *agg.rate_groups, *agg.cross_groups):
         frozen.extend(getattr(group, f.name) for f in fields(group) if f.name not in scalars)
     for axes in (agg.by_day, agg.by_month, agg.by_year):
         frozen.extend((axes.observed, axes.paid, axes.union))
@@ -645,6 +700,7 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
             assert view.labels == (
                 *delta_labels(terms.index, terms.reporting_lot),
                 dv01_label(group, result.currency),
+                cross_gamma_label(terms.index, group, terms.reporting_lot),
             )
     agg = collected(*results)
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
@@ -652,4 +708,13 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
     assert list(view.labels[: len(pairs)]) == pairs
     rate_labels = {dv01_label(f"curve_{r.number}", r.currency) for r in agg.rate_groups}
     rate_labels |= {dv01_label("cleared", c) for c in agg.currencies}
-    assert set(view.labels[len(pairs) :]) <= rate_labels and len(view.labels) > len(pairs)
+    cross_labels = {
+        cross_gamma_label(
+            c.index, "cleared" if c.number is None else f"curve_{c.number}", c.reporting_lot
+        )
+        for c in agg.cross_groups
+    }
+    assert set(view.labels[len(pairs) :]) <= rate_labels | cross_labels
+    assert len(view.labels) == len(pairs) + (len(agg.rate_groups) or len(agg.currencies)) + len(
+        cross_labels
+    )

@@ -252,8 +252,9 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
 # of 2,500 rows at 8,912. Measured 2026-10-04: preparing 8,912 bytes, a tick 1,144, the values
 # report 1,967 and the risk report 1,948; the risk report 2,079 since #177, its sixth column, and
 # since #178 3,591 bytes for all three by day, 24 observation days under the Total in four
-# columns, the rectangle and the DV01 column of zeros, within four slacks.
-RISK_PEAK = 4 * SLACK
+# columns, the rectangle and the DV01 column of zeros, and since #197 4,233 for all four, the
+# cross-gamma's column of zeros beside the DV01's, within five slacks.
+RISK_PEAK = 5 * SLACK
 
 
 def test_the_valuation_path_allocates_by_slot_and_never_by_trade(sheet: dict[str, Any]) -> None:
@@ -304,8 +305,9 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "DiscountCurve.max_date": 1,
         "Market.live_prices": 1,
         "_discounted": 1,
-        "early_risk": 2,  # since #186
-        "early_fact": 4,
+        "_cross_gamma": 1,  # since #197, after every rule of the discounted path
+        "early_risk": 3,  # since #186, and the cross-gamma's since #197
+        "early_fact": 6,
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 6,
         "_publish": 1,
@@ -331,18 +333,20 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
         # by month and by year, since #186, the display axis, the saved refusals read for every
         # risk shown and a copy per column, a cleared result's DV01 nothing to copy or refuse.
         if bucket == "day":
-            copies = {"placed": 3} if risk == "all" and on_curve else {}
+            copies = {"placed": 4} if risk == "all" and on_curve else {}
             return {"_day_view": 1, **copies}
-        if risk == "dv01":
+        if risk in ("dv01", "cross_gamma"):
+            # Since #197 the cross-gamma like the DV01: a cleared result's the known zero, a
+            # column of zeros made and nothing refused.
             shown = {"EarlyRisk.refuse": 1, "placed": 1} if on_curve else {}
             return {"_period_view": 1, "_saved": 1, **shown}
         if risk == "all":
-            n = 3 if on_curve else 2
+            n = 4 if on_curve else 2
             return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": n, "placed": n}
         return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 1, "placed": 1}
 
     for results, on_curve in ((cleared, False), (discounted, True)):
-        for risk in ("nominal_delta", "delta", "dv01", "all"):
+        for risk in ("nominal_delta", "delta", "dv01", "cross_gamma", "all"):
             for bucket in ("day", "month", "year"):
                 profile = call_profile(
                     lambda handle=results, risk=risk, bucket=bucket: PATH["_ReportRisk"](
@@ -356,11 +360,12 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "_text": 3,
                     "_resolve": 1,
                     "_ReportRisk": 1,
-                    "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
+                    "choice": 2,  # the risk's word, one of five, and the bucket's, one of three
                     "TradeResults.report": 1,  # the result's own selection, since #180
                     "risk_view": 1,
                     "delta_labels": 1,  # the headings, spelled once in risk_report.py
                     "dv01_label": 1,
+                    "cross_gamma_label": 1,
                     **selected(on_curve, risk, bucket),
                     "_risk_table": 1,
                     "MixedArray.table": 2,  # the valuation day and the dates to serials
@@ -376,9 +381,12 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
 # Measured 2026-10-11 at 2,500 trades over 24 slots: a bilateral tick 5,901 bytes against the
 # cleared tick's 1,490, the curve's handle, the groups' amounts, factors, NPVs and DV01s, the
 # discounted lots by reference, day, month and year and, since #178, the DV01 by payment day,
-# month and year, 5,093 before them; the risk report of all three by day 6,263 bytes, 48 rows
-# under the Total, the 24 observation days and the 24 payment days in four columns, the three
-# vectors placed on the union, against the cleared batch's 3,591, within seven slacks.
+# month and year, 5,093 before them, and 8,257 on 2026-10-17 since #197, the cross-gamma's
+# weight by group, its vector by slot and its four saved views, within nine slacks; the risk
+# report of all three by day 6,263 bytes, 48 rows under the Total, the 24 observation days and
+# the 24 payment days in four columns, the three vectors placed on the union, against the
+# cleared batch's 3,591, within seven slacks, and 7,313 for all four since #197, the
+# cross-gamma's column placed beside them, within eight.
 def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     sheet: dict[str, Any], bilateral: dict[str, Any]
 ) -> None:
@@ -387,10 +395,10 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
     )
     assert (
         least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"]))
-        <= 8 * SLACK
+        <= 9 * SLACK
     )
     results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
-    assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 7 * SLACK
+    assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 8 * SLACK
 
 
 # --- a collection of results through the seam, since #180 -----------------------------------------
@@ -442,23 +450,26 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
         "_AggregateResults": 1,
         "aggregate_results": 1,
         "_grouped_by_index": 1,
+        "_curve_numbers": 1,  # since #197, one numbering for the rate and the cross groups
         "_grouped_by_curve": 1,
+        "_grouped_by_index_and_curve": 1,
         "_index_group": 1,
         "_rate_group": 1,
-        "_summed": 7,
-        "_compensated": 11,
-        "_outrun": 3,
+        "_cross_group": 1,
+        "_summed": 11,
+        "_compensated": 15,
+        "_outrun": 4,
         "_report_axes": 1,
         "_period_report_axes": 2,
         "period_start": 2,
-        "places_from": 4,
+        "places_from": 6,
         "rows_through": 4,
         "display_periods": 2,
         "_early_lots": 2,
-        "early_risk": 3,
-        "early_fact": 6,
+        "early_risk": 4,
+        "early_fact": 8,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 20,
+        "WorkCounter.hit": 29,
         "_publish": 1,
     }
     # The seam makes no numpy call of its own: every one below is the collector's, the same at two
@@ -466,21 +477,21 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
     # look per text cell counted the texts before it, n squared over the range.
     assert numpy_calls(lambda: PATH["_AggregateResults"](cells)) == {
         "generic.astype": 2,  # the valuation day to its month and its year, since #186
-        "ndarray.any": 11,
-        "ndarray.astype": 10,  # the display axes' keys, periods and first days, by group and bucket
-        "ndarray.flatten": 10,
-        "ndarray.nonzero": 6,  # the looks for risk before the start, three measures by two buckets
-        "ndarray.ravel": 6,
-        "ndarray.searchsorted": 15,
-        "ndarray.setflags": 33,
-        "ndarray.sort": 10,
-        "numpy._make_extobj": 11,
-        "numpy._unique_hash": 10,
+        "ndarray.any": 15,  # since #197 the cross group's four looks for a sum past the largest
+        "ndarray.astype": 14,  # the display axes' keys, periods and first days
+        "ndarray.flatten": 14,  # since #197 the cross group's four unions among the uniques
+        "ndarray.nonzero": 8,  # the looks for risk before the start, four measures, two buckets
+        "ndarray.ravel": 8,
+        "ndarray.searchsorted": 23,  # since #197 eight more, the cross group's places
+        "ndarray.setflags": 46,  # since #197 thirteen more, the cross group's arrays and places
+        "ndarray.sort": 14,
+        "numpy._make_extobj": 15,
+        "numpy._unique_hash": 14,
         "numpy.arange": 2,  # the two display axes
-        "numpy.array": 2,
-        "numpy.asanyarray": 26,
-        "numpy.zeros": 22,
-        "ufunc.reduce": 11,
+        "numpy.array": 3,  # the three groups' positions
+        "numpy.asanyarray": 36,
+        "numpy.zeros": 30,  # fifteen compensated passes, two each
+        "ufunc.reduce": 15,
     }
     assert bridge.live_handles()[0] == live[0] + 2
 
@@ -504,7 +515,8 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
         ("nominal_delta", {"_lots": 1, "placed": 1}, 1),
         ("delta", {"_discounted_lots": 1, "placed": 1}, 1),
         ("dv01", {"_dv01": 1, "placed": 1}, 1),
-        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "placed": 3}, 3),
+        ("cross_gamma", {"_cross_gamma": 1, "placed": 1}, 1),
+        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "_cross_gamma": 1, "placed": 4}, 4),
     ):
         for bucket in ("day", "month", "year"):
             profile = call_profile(
@@ -522,6 +534,7 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
                 "aggregate_view": 1,
                 "delta_labels": 1,  # one index group; the headings spelled once in risk_report.py
                 "dv01_label": 2,  # one rate group, and the cleared column of its one currency
+                "cross_gamma_label": 1,  # one cross group, since #197
                 "_axes_of": 1,
                 "_refuse_early": 1,  # since #186; the saved refusals read by month and by year
                 **({} if bucket == "day" else {"_early_of": 1, "EarlyRisk.refuse": refused}),
@@ -539,16 +552,18 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
 
 # Measured 2026-10-11 at two results of 2,500 trades over 24 slots: the collection 16,640 bytes,
 # the stacked day axes of the two sources with their places and the compensated pass over them, the
-# unions and the record; its report of all three by day 6,263 bytes, the same rectangle
-# a result's report lays out, 48 dated rows in four columns.
+# unions and the record, and 19,092 on 2026-10-17 since #197 with the cross group, its four
+# unions and places beside the index group's, within nineteen slacks; its report of all three by
+# day 6,263 bytes, the same rectangle a result's report lays out, 48 dated rows in four columns,
+# and all four since #197 within eight slacks.
 def test_a_collection_allocates_by_the_saved_entries_and_its_report_by_the_rectangle(
     sheet: dict[str, Any], bilateral: dict[str, Any]
 ) -> None:
     handles = n_results(sheet, bilateral, 2_500, 24)
     cells = Cells.from_rows([[handle] for handle in handles])
-    assert least_peak(lambda: PATH["_AggregateResults"](cells)) <= 17 * SLACK
+    assert least_peak(lambda: PATH["_AggregateResults"](cells)) <= 19 * SLACK
     collection = str(PATH["_AggregateResults"](cells))
-    assert least_peak(lambda: PATH["_ReportRisk"](collection, "all", "day")) <= 7 * SLACK
+    assert least_peak(lambda: PATH["_ReportRisk"](collection, "all", "day")) <= 8 * SLACK
 
 
 # --- a combined payment calendar, combine-holiday-calendars.md ------------------------------------
