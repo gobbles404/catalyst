@@ -195,6 +195,8 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_specification": 1,  # once per distinct unit, one here
         "_the_conditions": 1,
         "observed": 1,  # the methods' observations, made here so that payment counts from them
+        "requires_whole_month": 1,  # the methods' two facts the observations read, once each
+        "counts_back_from_expiry": 1,
         "_the_days": 1,  # one method present, its observations once
         "with_holiday_calendar": 1,  # the index's calendar typed once for the methods that read it
         "observations": 1,
@@ -587,6 +589,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_the_groups": 1,
         "_distinct": 2,  # the groups by contract and day, the slots by group and day
         "_the_references": 1,
+        "requires_booked_reference": 1,  # the methods' fact the references read, once
         "with_holiday_calendar": 2,  # the observations' and the encoding's
         "open_days": 1,
         "contract_on": 1,
@@ -984,18 +987,27 @@ BASIS = index(
 # anchored on the schedule's last trading day instead. Its numpy loses the search, the unique over
 # the components' methods with its sort, hash, nonzero, ravel and flatten, a look and three
 # conversions, and gains one look, the publication days against the components' own.
+# On an IFERC index the observations read no calendar and make no days, and the one fact read is
+# the methods' IFERC support, by the terms and then by the observations.
 IFERC_RESOLUTION = {
     name: count
-    for name, count in {**resolution_ledger(1), **WHOLE_MONTHS}.items()
-    if name not in ("_the_days", "with_holiday_calendar", "_last_days")
+    for name, count in {**resolution_ledger(1), **WHOLE_MONTHS, "supported_on_iferc": 2}.items()
+    if name
+    not in (
+        "_the_days",
+        "with_holiday_calendar",
+        "_last_days",
+        "requires_whole_month",
+        "counts_back_from_expiry",
+    )
 }
 IFERC_RESOLUTION_NUMPY = {
     name: count
     for name, count in {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
-        "ndarray.any": 24,
-        "ndarray.all": 2,
+        "ndarray.any": 23,  # one fewer: the IFERC rule is read as every row supported, one all
+        "ndarray.all": 3,  # in place of any row other than lastday, since the rule has one owner
         "ndarray.nonzero": 3,
         "ndarray.ravel": 3,
         "ndarray.flatten": 7,

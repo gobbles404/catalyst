@@ -26,7 +26,12 @@ from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.index_definitions.kind import Kind, described
 from goosedove.instruments.definitions import Instrument
-from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
+from goosedove.trades.schedule_methods import (
+    METHODS,
+    ScheduleMethod,
+    permits_physical_settlement,
+    supported_on_iferc,
+)
 
 
 class Route(Enum):
@@ -417,9 +422,9 @@ def _the_method(
                 "settlement_method is 'physical', expected 'financial' on an IFERC index; an "
                 "IFERC basis future is cash settled on its month's published index"
             )
-        other = schedule_method != METHODS.index(ScheduleMethod.LASTDAY)
-        if other.any():
-            i = int(other.argmax())
+        supported = supported_on_iferc(schedule_method)
+        if not supported.all():
+            i = int((~supported).argmax())
             raise ValueError(
                 f"schedule_method of {named_trade(trade_ids, i)} is "
                 f"{METHODS[int(schedule_method[i])].value!r}, expected 'lastday' on an IFERC "
@@ -430,10 +435,10 @@ def _the_method(
         case Settlement.FINANCIAL:
             return
         case Settlement.PHYSICAL:
-            other = schedule_method != METHODS.index(ScheduleMethod.LASTDAY)
-            if not other.any():
+            permitted = permits_physical_settlement(schedule_method)
+            if permitted.all():
                 return
-            i = int(other.argmax())
+            i = int((~permitted).argmax())
             method = METHODS[int(schedule_method[i])]
             trade = named_trade(trade_ids, i)
             match method:
