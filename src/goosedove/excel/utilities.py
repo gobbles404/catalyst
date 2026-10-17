@@ -23,7 +23,7 @@ from goosedove.excel.bridge import (
     TextColumn,
     excel_function,
 )
-from goosedove.globals.discount_curve import DiscountCurve
+from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_codes import (
     cme_code,
@@ -882,3 +882,22 @@ def util_InterpolateContracts(
         made.expiries,
         made.prices,
     )
+
+
+@excel_function
+def util_BumpDiscountCurve(
+    curve: Annotated[
+        Handle[DiscountCurve],
+        "The curve handle: the cell showing _CreateDiscountCurve's or this function's result, "
+        "such as B2, or a name for it.",
+    ],
+    bump_bps: Annotated[
+        float,
+        "The parallel shift of the curve's zero rates in basis points, a signed number: 1 for one "
+        "basis point up, -25 for twenty-five down, 0.5 for half a point; a number, not text.",
+    ],
+) -> Handle[DiscountCurve]:
+    """Bumps a discount curve by a parallel shift of its continuously compounded zero rates in
+    basis points, every day's factor moved from its start, ACT/365F, under the
+    curve's rules, and shows the new curve's handle, an ordinary curve for _EvaluateTrades."""
+    return bump_discount_curve(curve, bump_bps, WorkCounter())
