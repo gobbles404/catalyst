@@ -149,6 +149,10 @@ namespace Goosedove.Host.Tests
             // Contract prices interpolated between anchors: the index handle first, missing or naming no live object, in the seam's words; the live index and the library's rules are in the fact below.
             yield return new object[] { "util_InterpolateContracts", new object[] { ExcelMissing.Value, Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is missing, expected index handle" };
             yield return new object[] { "util_InterpolateContracts", new object[] { "x", Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is text 'x' naming no live object, expected index handle" };
+            // A discount curve bumped by basis points: the curve first, missing, text naming nothing or a number, in the seam's words; the live curve and the library's rule are in the fact below.
+            yield return new object[] { "util_BumpDiscountCurve", new object[] { ExcelMissing.Value, 1.0 }, "#ERROR util_BumpDiscountCurve: curve is missing, expected discount curve handle" };
+            yield return new object[] { "util_BumpDiscountCurve", new object[] { "x", 1.0 }, "#ERROR util_BumpDiscountCurve: curve is text 'x' naming no live object, expected discount curve handle" };
+            yield return new object[] { "util_BumpDiscountCurve", new object[] { 46276.0, 1.0 }, "#ERROR util_BumpDiscountCurve: curve is number 46276.0, expected discount curve handle" };
             // The two date helpers: a day in and the code of its month out, in capitals; a code in and the first day of its month out, a serial. A day outside the years two digits name and a strip fail in the library's words, a serial with a time, text and a blank in the seam's.
             yield return new object[] { "util_DateToFut", new object[] { 46161.0 }, "K26" };
             yield return new object[] { "util_DateToFut", new object[] { 46387.0 }, "Z26" };
@@ -426,6 +430,36 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR util_InterpolateContracts: anchor_contracts cell (1, 1) is number 202704.0, expected text", Seam.Call("util_InterpolateContracts", index, Column(202704.0, 202706.0), Column(70.0, 76.0)));
             var gapped = Index(Seam.Call("_CreateFuturesSchedule", Column("J27", "M27"), Column(46468.0, 46527.0), ExcelMissing.Value), holidays, "GAP");
             Assert.Equal("#ERROR util_InterpolateContracts: ValueError: the index's schedule has no contract for 2027-05, K27, expected every month from 2027-04 to 2027-06, the anchors' range", Seam.Call("util_InterpolateContracts", gapped, Column("J27", "M27"), Column(70.0, 76.0)));
+        }
+
+        // A discount curve bumped by basis points, bump-discount-curve.md: the three-day curve a
+        // basis point up is a new curve of the same days, its first factor 1 and the others moved by
+        // exp(-0.0001 tau), tau the days from the start over 365; a bump of nothing moves nothing;
+        // text where the bump should be is the seam's refusal, and a curve of ones bumped down the
+        // library's, by the row that rose.
+        [Fact]
+        public void a_discount_curve_is_bumped_by_basis_points_into_an_ordinary_curve()
+        {
+            var curve = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), Curve());
+            var bumped = (string)Seam.Call("util_BumpDiscountCurve", curve, 1.0);
+            Assert.StartsWith(Pid + ":discount_curve:", bumped);
+            Assert.NotEqual(curve, bumped);
+            var spill = (object[,])Seam.Call("util_ReadHandle", bumped);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal("date", spill[0, 0]);
+            Assert.Equal("discount_factor", spill[0, 1]);
+            Assert.Equal("float64", spill[1, 1]);
+            Assert.Equal(46276.0, spill[2, 0]);
+            Assert.Equal(46278.0, spill[4, 0]);
+            Assert.Equal(1.0, spill[2, 1]);
+            Assert.Equal(0.9998997260548321, (double)spill[3, 1], 15);
+            Assert.Equal(0.9997994521645337, (double)spill[4, 1], 15);
+            var still = (object[,])Seam.Call("util_ReadHandle", Seam.Call("util_BumpDiscountCurve", curve, 0.0));
+            Assert.Equal(0.9998, still[4, 1]);
+            Assert.Equal("#ERROR util_BumpDiscountCurve: bump_bps is text '1bp', expected number", Seam.Call("util_BumpDiscountCurve", curve, "1bp"));
+            var ones = Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 46277.0, 1.0 }, { 46278.0, 1.0 } });
+            Assert.Equal("#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404", Seam.Call("util_BumpDiscountCurve", ones, -1.0));
         }
 
         // A row of the fixed_float's fields bound against the instrument named: the holiday calendar cell

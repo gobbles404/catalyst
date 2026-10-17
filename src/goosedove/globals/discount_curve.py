@@ -2,6 +2,7 @@
 from the anchors the desk supplies, the days between them filled by a straight line on the
 factor. docs/library/globals/discount-curve.md is the page."""
 
+import math
 from dataclasses import dataclass
 from typing import Final
 
@@ -9,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.interpolation import interpolate_discount_factors
+from goosedove.instrumentation.work_counts import WorkCounter
 
 # The most days a curve holds: a sheet's rows less the two heading rows util_ReadHandle spills
 # first, so that whatever a creator keeps can be read back. A curve two thousand years long that
@@ -86,3 +88,36 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) 
     every_day.setflags(write=False)
     values.setflags(write=False)
     return DiscountCurve(every_day, values)
+
+
+FACTORS_SHIFTED = "factors_shifted"  # one per stored day of the curve bumped, since each is moved
+
+
+def bump_discount_curve(
+    curve: DiscountCurve, bump_bps: float, counter: WorkCounter
+) -> DiscountCurve:
+    """The one way to bump a DiscountCurve, bump-discount-curve.md: a parallel shift of its
+    continuously compounded zero rates by that many basis points, the move the DV01 and the
+    cross-gamma measure, applied to every stored day's factor from the curve's own start,
+    ACT/365F, and the result built through the ordinary constructor over the daily table, so
+    that the curve's rules judge it and nothing here says again what a curve is.
+
+    tau is the calendar days from the start over 365, and the day's factor becomes
+    factor * exp(-bump_bps / 10000 * tau). A bump up lowers every factor after the first; a bump
+    down raises them, and is accepted while no factor rises on the one before, so a curve of
+    ones bumped down is refused by the row that rose, as is a bump so large that a factor
+    overflows or underflows to nothing, numpy's flags down and the rules the judge. The first
+    factor stays 1 exactly, since exp(0) is 1; a bump of nothing moves nothing, bit for bit. The
+    bump is a finite number, as the sheet sends one, a Python caller's nan or inf refused by
+    name; no text is read and nothing is rounded. The curve is read and never written, and the
+    new curve owns its arrays, frozen. Work: one factor shifted per stored day, reported to the
+    counter, and the constructor's own over the curve's length; nothing per trade, no market,
+    history or valuation date read.
+    """
+    if not math.isfinite(bump_bps):
+        raise ValueError(f"bump_bps is {bump_bps!r}, expected a finite number of basis points")
+    tau = (curve.dates - curve.start_date).astype(np.int64) / 365.0
+    with np.errstate(over="ignore", under="ignore"):  # the constructor's rules are the judge
+        shifted = curve.factors * np.exp(-(bump_bps / 10000.0) * tau)
+    counter.hit(FACTORS_SHIFTED, int(shifted.size))
+    return discount_curve(curve.dates, shifted)

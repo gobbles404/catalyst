@@ -184,6 +184,29 @@ def test_the_date_shift_explains_itself() -> None:
     ]
 
 
+def test_the_bump_explains_itself() -> None:
+    description, arguments, hidden = SPECS["util_BumpDiscountCurve"]
+    assert not hidden
+    assert description == (
+        "Bumps a discount curve by a parallel shift of its continuously compounded zero rates in "
+        "basis points, every day's factor moved from its start, ACT/365F, under the curve's "
+        "rules, and shows the new curve's handle, an ordinary curve for _EvaluateTrades."
+    )
+    assert arguments == [
+        (
+            "curve",
+            "The curve handle: the cell showing _CreateDiscountCurve's or this function's result, "
+            "such as B2, or a name for it.",
+        ),
+        (
+            "bump_bps",
+            "The parallel shift of the curve's zero rates in basis points, a signed number: 1 for "
+            "one basis point up, -25 for twenty-five down, 0.5 for half a point; a number, not "
+            "text.",
+        ),
+    ]
+
+
 def test_the_interpolation_explains_itself() -> None:
     description, arguments, hidden = SPECS["util_InterpolateContracts"]
     assert not hidden

@@ -1212,3 +1212,17 @@ def test_an_interpolation_costs_its_months_and_publishes_nothing(contracts: int)
         88 * contracts + 8 * SLACK
     )
     assert bridge.live_handles() == live
+
+
+# A bump pays the library's own peak, test_bump_budgets.py, about 59 bytes a day of the curve
+# beyond two slacks, and nothing more for the seam: measured 2,311 bytes at three days and
+# 216,395 at 3,631 on 2026-10-17. The new curve keeps its two columns, 16 bytes a day, and
+# nothing once released; the source curve is not its to keep.
+@pytest.mark.parametrize("days", [3, 3_631])
+def test_a_bump_costs_its_days_and_keeps_two_columns_until_released(days: int) -> None:
+    handle = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(days))
+    assert least_peak(lambda: ENTRY["util_BumpDiscountCurve"](handle, 1.0)) <= (
+        64 * days + 3 * SLACK
+    )
+    kept = retained_numpy_bytes(lambda: ENTRY["util_BumpDiscountCurve"](handle, 1.0))
+    assert kept == (days * (DAY_BYTES + NUMBER_BYTES), 0)

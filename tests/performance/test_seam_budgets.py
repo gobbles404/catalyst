@@ -2467,3 +2467,49 @@ def test_an_interpolation_resolves_one_handle_reads_two_columns_and_lays_out_thr
         "ndarray.setflags": 2,
     }
     assert bridge.live_handles() == live
+
+
+# --- a discount curve bumped by basis points, bump-discount-curve.md -----------------------------
+
+# The handle resolved and the number read, the library's shift and the constructor over it, the
+# same ledger as test_bump_budgets.py pins, and one publication: fourteen functions, the accept
+# rule once per argument, the same at three days and at ten years, the work per day inside
+# numpy calls no ledger counts.
+BUMP_LEDGER = {
+    "Registered.run": 1,
+    "_arguments": 1,
+    "_validate": 2,
+    "_text": 1,
+    "_resolve": 1,
+    "_number": 1,
+    "util_BumpDiscountCurve": 1,
+    "WorkCounter.__init__": 1,
+    "bump_discount_curve": 1,
+    "DiscountCurve.start_date": 1,
+    "WorkCounter.hit": 1,
+    "discount_curve": 1,
+    "interpolate_discount_factors": 1,
+    "_publish": 1,
+}
+BUMP_NUMPY = {
+    "ndarray.astype": 2,
+    "numpy._make_extobj": 1,
+    "ndarray.all": 1,
+    "ndarray.any": 2,
+    "ufunc.reduce": 3,
+    "numpy.asarray": 2,
+    "numpy.arange": 2,
+    "numpy.interp": 1,
+    "ndarray.repeat": 1,
+    "ndarray.setflags": 2,
+}
+
+
+@pytest.mark.parametrize("days", [3, 3_631])
+def test_a_bump_is_a_handle_and_a_number_in_and_one_publication_out(
+    call_profile: CallProfile, numpy_calls: CallProfile, days: int
+) -> None:
+    handle = PATH["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(days))
+    PATH["util_BumpDiscountCurve"](handle, 1.0)
+    assert call_profile(lambda: PATH["util_BumpDiscountCurve"](handle, 1.0)) == BUMP_LEDGER
+    assert numpy_calls(lambda: PATH["util_BumpDiscountCurve"](handle, 1.0)) == BUMP_NUMPY
