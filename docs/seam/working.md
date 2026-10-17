@@ -227,7 +227,7 @@ dotnet test host\Goosedove.Host.Tests -c Release  # the host's tests, no Excel n
 .\tools\excel_lifetime.ps1                          # every lifetime group, before merging ownership changes
 ```
 
-`uv run pytest -n auto` already runs the pins; the fifth line is for when they are what you are working on. The host's tests start Python themselves, finding the project's own with `uv run python`, so they need no config file and no Excel. Never add `# type: ignore` or `# noqa` to get a step green; fix the code. And after pulling:
+`uv run pytest -n auto` already runs the pins, and the documentation link check of section 11; the fifth line is for when the pins are what you are working on. The host's tests start Python themselves, finding the project's own with `uv run python`, so they need no config file and no Excel. Never add `# type: ignore` or `# noqa` to get a step green; fix the code. And after pulling:
 
 ```powershell
 uv sync --locked
@@ -274,6 +274,7 @@ uv sync --locked
 | the smoke test in a hidden Excel, Excel by hand, the build and the config it writes | `tools/excel_smoke.ps1`, `tools/excel_dev.ps1`, `tools/host_build.ps1` |
 | the whole check, and the Python-side measurement | `check.ps1`, `measure.ps1` |
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
+| the documentation link check, section 11, and the decision numbers' own test | `tools/check_doc_links.py`, `tests/test_doc_links.py`, `tests/test_doc_decision_numbers.py` |
 | what CI runs | `.github/workflows/ci.yml` |
 | the rules, the tenets, and the general learnings | `AGENTS.md`, `PRINCIPLES.md`, [golden-rules.md](../golden-rules.md) |
 
@@ -295,3 +296,11 @@ One owner per fact. A page says what the code does today, and for anything else 
 | a proposed behaviour or an open decision | its ticket under `docs/engineering-tickets/`, marked as proposed; a ticket that has been built is the plan as it was, and the pages above say what is |
 
 Keep the contracts precise through any cleanup: units, accepted inputs, financial meaning, the order of refusals and intentional limitations stay as they are. When the code, a test and a page disagree, record the disagreement for its own decision; do not pick one by editing the other two.
+
+## 11. Checking the links
+
+`uv run python tools/check_doc_links.py` follows every local link in the repository's Markdown and names the ones that no longer resolve; `tests/test_doc_links.py` runs the same check, so `.\check.ps1` and CI fail on a broken reference before it ships. It sees the working tree of the Git-indexed files: `git ls-files` says which files exist and their text is read from disk, so an edit saved but not committed counts, a staged new page counts, and a page that exists only untracked, in another checkout or in an open pull request is a missing target until it is added here.
+
+The Markdown is read by markdown-it-py, a development dependency, and the HTML it finds by Python's own parser, so what is a link, what a reference resolves to, what is code or a comment and what a heading says are the parsers' to decide. The check owns the rest: the file inventory, the path a destination names and its spelling, case included, the file or directory it names, and the identifiers a fragment must match, GitHub's spelling of each heading with `-1`, `-2` on a repeated one, plus any explicit `<a id>` or `<a name>` anchor, which may not repeat or shadow a heading's. Checked: inline links, images and reference links, same-page and cross-page fragments, encoded and `<...>` destinations with a query string ignored; a directory is valid when it holds an indexed file present on disk. Not checked, by design: what the parser does not render as a link, such as a reference without a definition or an example in code or a comment; external links, which are never fetched; a fragment on a target that is not Markdown, such as a source line or a PDF page. A drive or UNC destination is reported as not portable; a `file:` destination is text to the parser, so it is no link at all. The decision numbers of the Decided sections of [inputs.md](inputs.md) and [outputs.md](outputs.md) are held unique by `tests/test_doc_decision_numbers.py`, apart from the link check; a new rule takes a named section, as [NUL in input text](inputs.md#nul-in-input-text) does.
+
+Each line of output names the page, the line its block starts on, the reason and the destination as the parser read it, with the resolved path after an arrow when it differs: `docs/seam/host.md:60: unknown fragment: inputs.md#old-input-rule`. Fix the reference: retarget it, or remove the link and keep the words. A historical reference to removed material takes a commit-pinned link, and one whose target cannot be established is brought back for a decision, not excused.

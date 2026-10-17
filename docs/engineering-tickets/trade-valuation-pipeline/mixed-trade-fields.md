@@ -3,7 +3,7 @@
 [Pipeline overview](README.md) · [Multiple payment groups](multiple-payment-groups.md)
 
 **Status:** Built in #163 on the prototype stack above #162, the page as a ticket, reviewed at
-`d9768f9` with two P3s fixed on the branch; the [As built](#as-built-nn) section at the end says
+`d9768f9` with two P3s fixed on the branch; the [As built](#as-built-163) section at the end says
 what was built and what was not. Written
 8 October 2026 as the next prototype slice after PR #162, reviewed at `fa7cb93`, a
 continuation of the prototype that does not decide how the full stack will land or what
