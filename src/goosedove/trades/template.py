@@ -24,10 +24,10 @@ from goosedove.index_definitions.date_offsets import Instruction, read_offset
 from goosedove.index_definitions.periods import period_months
 from goosedove.instruments.definitions import FieldType, Instrument
 from goosedove.instruments.fields import FieldValues, selected
+from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.terms import (
     QuantityPer,
     Route,
-    ScheduleMethod,
     Settlement,
     finite_prices,
     marketing_reserves,

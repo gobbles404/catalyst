@@ -37,14 +37,13 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import month_bounds
+from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.terms import (
     BASES,
-    METHODS,
     PaymentTerms,
     QuantityPer,
     ResolvedTrades,
     Route,
-    ScheduleMethod,
     Settlement,
     one_choice,
     resolved_trades,
@@ -340,6 +339,8 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
         "observed": 1,
         "trade_schedule_of": 1,
         "with_holiday_calendar": 1,  # the index's calendar typed once for the methods that read it
+        "requires_whole_month": 1,  # the methods' two facts the observations read, once each
+        "counts_back_from_expiry": 1,
         "_whole_months": 1,  # each component covers its whole month, the expiry-based rule
         "_the_days": 1,  # one method present, its observations once
         "observations": 1,
@@ -350,6 +351,8 @@ def test_the_encoding_runs_the_same_functions_at_any_size(
     with_expiries = {
         "observed": 1,
         "trade_schedule_of": 1,
+        "requires_whole_month": 1,  # the methods' two facts the observations read, once each
+        "counts_back_from_expiry": 1,
         "_whole_months": 1,
         "_with_expiries_priced": 1,
         "with_holiday_calendar": 1,
@@ -379,6 +382,7 @@ ENCODING_LEDGER = {
     "_the_groups": 1,
     "_distinct": 2,
     "_the_references": 1,
+    "requires_booked_reference": 1,  # the methods' fact the references read, once
     "with_holiday_calendar": 1,
     "open_days": 1,
     "contract_on": 1,
@@ -486,6 +490,8 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
         "observed": 1,
         "trade_schedule_of": 1,
         "with_holiday_calendar": 1,
+        "requires_whole_month": 1,  # the methods' two facts the observations read, once each
+        "counts_back_from_expiry": 1,
         "_the_days": 1,
         "observations": 1,
     }
@@ -997,6 +1003,8 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
         "observed": 1,
         "trade_schedule_of": 1,
         "with_holiday_calendar": 1,
+        "requires_whole_month": 1,  # the methods' two facts the observations read, once each
+        "counts_back_from_expiry": 1,
         "_whole_months": 1,
         "_with_expiries_priced": 1,
         "open_days": 1,
@@ -1270,7 +1278,8 @@ def iferc_market(history: MarketHistory) -> Market:
 IFERC_ENCODING_LEDGER = {
     name: count
     for name, count in ENCODING_LEDGER.items()
-    if name not in ("with_holiday_calendar", "open_days", "contract_on")
+    if name
+    not in ("with_holiday_calendar", "open_days", "contract_on", "requires_booked_reference")
 }
 # The IFERC preparation's numpy beside the futures': one look fewer, no slot before the calendar
 # to refuse since the first month is a month, and one search more, each slot's row found among
@@ -1297,6 +1306,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert call_profile(lambda: observed_of(terms)) == {
         "observed": 1,
         "trade_schedule_of": 1,
+        "supported_on_iferc": 1,  # the methods' fact the observations read on an IFERC index
         "_whole_months": 1,
         "observations": 1,
     }

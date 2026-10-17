@@ -23,7 +23,14 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import with_holiday_calendar
-from goosedove.trades.terms import METHODS, ScheduleMethod, trade_schedule_of
+from goosedove.trades.schedule_methods import (
+    METHODS,
+    ScheduleMethod,
+    counts_back_from_expiry,
+    requires_whole_month,
+    supported_on_iferc,
+)
+from goosedove.trades.terms import trade_schedule_of
 
 # How far the weights of a component may miss one, a few units in the last place: 1/3 three
 # times is one exactly, 1/7 seven times is not.
@@ -157,7 +164,7 @@ def observed(
             # Since #167: one observation per component, the month's index on its publication
             # day with the whole weight, lastday alone and the whole month; no pricing calendar
             # is read, an IFERC index having none.
-            lastday = method == METHODS.index(ScheduleMethod.LASTDAY)
+            lastday = supported_on_iferc(method)
             if not lastday.all():
                 k = int((~lastday).argmax())
                 raise ValueError(
@@ -178,12 +185,10 @@ def observed(
             assert_never(schedule)
     expiry = schedule.future_expiry[contract]
     holidays = with_holiday_calendar(index.holiday_calendar)
-    expiry_based = method != METHODS.index(ScheduleMethod.ASIAN)
+    expiry_based = requires_whole_month(method)
     if expiry_based.any():
         _whole_months(schedule, contract, start, end, method, expiry_based, named, FUTURES_WHOLE)
-    before_expiry = (method == METHODS.index(ScheduleMethod.PENULTIMATE)) | (
-        method == METHODS.index(ScheduleMethod.LAST3DAY)
-    )
+    before_expiry = counts_back_from_expiry(method)
     if before_expiry.any():
         _with_expiries_priced(schedule, contract, expiry, method, before_expiry, holidays)
     parts = [

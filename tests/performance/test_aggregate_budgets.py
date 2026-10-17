@@ -22,7 +22,7 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.results import TradeResults
 from goosedove.trades.risk_report import Bucket, Risk
-from goosedove.trades.terms import ScheduleMethod
+from goosedove.trades.schedule_methods import ScheduleMethod
 
 COUNTS = [1, 2, 24]
 COUNT_IDS = ["one source", "two sources", "twenty-four sources"]

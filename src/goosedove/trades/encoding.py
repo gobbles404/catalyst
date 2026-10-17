@@ -31,7 +31,8 @@ from goosedove.index_definitions.kind import with_holiday_calendar
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
-from goosedove.trades.terms import METHODS, ResolvedTrades, Route, ScheduleMethod
+from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
+from goosedove.trades.terms import ResolvedTrades, Route
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -481,7 +482,7 @@ def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArra
             f"after the schedule's last expiry, {schedule.future_expiry[-1]}; nothing prices it"
         )
     method = terms.schedule_method[terms.occurrence][observations.component]
-    own = method != METHODS.index(ScheduleMethod.ASIAN)
+    own = requires_booked_reference(method)
     other = own & (reference != terms.contract[observations.component])
     if other.any():
         j = int(other.argmax())
