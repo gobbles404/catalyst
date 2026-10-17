@@ -31,10 +31,13 @@ EXCEPTIONS_FILE = PurePosixPath("tools/doc_link_exceptions.toml")
 DECISION_SECTIONS = (PurePosixPath("docs/seam/inputs.md"), PurePosixPath("docs/seam/outputs.md"))
 MARKDOWN = MarkdownIt("commonmark").enable("table")
 BLOCKS_WITHOUT_LINKS = frozenset({"fence", "code_block", "html_block"})
+CONTAINERS = frozenset(
+    {"blockquote_open", "bullet_list_open", "ordered_list_open", "list_item_open"}
+)
 
 INLINE_CODE = re.compile(r"(`+)(.+?)\1", re.DOTALL)
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-EXPLICIT_ANCHOR = re.compile(r"""<a\b[^>]*?\b(?:id|name)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
+EXPLICIT_ANCHOR = re.compile(r"""<a\b[^>]*?\s(?:id|name)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:[ \t]*(?:\n[ \t]*)?(<[^>]*>|\S+)", re.MULTILINE)
 LINK_TEXT = r"(?:[^\[\]]|\[[^\[\]]*\])*"
 INLINE_LINK = re.compile(
@@ -88,12 +91,14 @@ class Exception_:
 @dataclass(frozen=True, slots=True)
 class Prose:
     """A page as markdown-it reads it: each run of prose with the line it starts on, each
-    heading's words, each HTML block, and the lines that are code or HTML and hold no link."""
+    heading's words, each HTML block, the lines that are code or HTML and hold no link, and the
+    lines any block covers, outside which the parser consumed a reference definition."""
 
     runs: tuple[tuple[int, str], ...]
     headings: tuple[tuple[int, str], ...]
     html: tuple[tuple[int, str], ...]
     silent_lines: frozenset[int]
+    covered_lines: frozenset[int]
 
 
 def tracked_files(root: Path) -> tuple[str, ...]:
@@ -121,9 +126,12 @@ def read_prose(text: str) -> Prose:
     headings: list[tuple[int, str]] = []
     html: list[tuple[int, str]] = []
     silent: set[int] = set()
+    covered: set[int] = set()
     previous = ""
     for token in MARKDOWN.parse(text):
         first = token.map[0] + 1 if token.map else 0
+        if token.map and token.nesting != -1 and token.type not in CONTAINERS:
+            covered.update(range(token.map[0] + 1, token.map[1] + 1))
         if token.type in BLOCKS_WITHOUT_LINKS and token.map:
             silent.update(range(token.map[0] + 1, token.map[1] + 1))
             if token.type == "html_block":
@@ -133,7 +141,7 @@ def read_prose(text: str) -> Prose:
             if previous == "heading_open":
                 headings.append((first, plain_text(token.children)))
         previous = token.type
-    return Prose(tuple(runs), tuple(headings), tuple(html), frozenset(silent))
+    return Prose(tuple(runs), tuple(headings), tuple(html), frozenset(silent), frozenset(covered))
 
 
 def slug(heading: str) -> str:
@@ -205,13 +213,15 @@ def strip_brackets(destination: str) -> str:
     return destination
 
 
-def definitions_of(text: str, silent: frozenset[int]) -> dict[str, tuple[str, int]]:
-    """Reference definitions by label, the destination on the same line or the next, outside
-    code and HTML; the first definition of a label wins, as it does for GitHub."""
+def definitions_of(text: str, covered: frozenset[int]) -> dict[str, tuple[str, int]]:
+    """Reference definitions by label, the destination on the same line or the next, read only
+    from the lines no block covers, which are the lines the parser gave to its reference rule;
+    a definition-shaped line inside a paragraph, a comment or code is not one. The first
+    definition of a label wins, as it does for GitHub."""
     found: dict[str, tuple[str, int]] = {}
     for match in DEFINITION.finditer(text):
         line = line_of(1, text, match.start())
-        if line not in silent:
+        if line not in covered:
             found.setdefault(normalized(match.group(1)), (strip_brackets(match.group(2)), line))
     return found
 
@@ -248,7 +258,7 @@ def read_page(root: Path, path: str) -> Page | None:
     text = file.read_text(encoding="utf-8")
     prose = read_prose(text)
     anchors, faults = anchors_of(path, prose)
-    return Page(path, links_of(prose, definitions_of(text, prose.silent_lines)), anchors, faults)
+    return Page(path, links_of(prose, definitions_of(text, prose.covered_lines)), anchors, faults)
 
 
 def split_destination(destination: str) -> tuple[str, str]:

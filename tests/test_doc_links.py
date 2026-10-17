@@ -104,6 +104,27 @@ def test_reference_links_and_explicit_anchors(tmp_path: Path) -> None:
     ]
 
 
+def test_a_definition_inside_a_comment_is_not_a_definition(tmp_path: Path) -> None:
+    repository(
+        tmp_path,
+        {
+            "a.md": "Intro <!--\n[ref]: target.md\n-->\n\n[ref]\n\n[ref]: missing.md\n",
+            "target.md": "",
+        },
+    )
+    assert failures(tmp_path) == [
+        "a.md:5: missing tracked target (definition at line 7): missing.md"
+    ]
+
+
+def test_an_anchor_attribute_is_a_whole_name(tmp_path: Path) -> None:
+    repository(
+        tmp_path,
+        {"a.md": '<a data-id="wrong" id="here"></a>\n\n[ok](#here) [bad](#wrong)\n'},
+    )
+    assert failures(tmp_path) == ["a.md:3: unknown fragment: #wrong"]
+
+
 def test_a_link_wrapped_over_two_lines_is_still_a_link(tmp_path: Path) -> None:
     repository(tmp_path, {"a.md": "Some words, then a [link](\nmissing.md) and more.\n"})
     assert failures(tmp_path) == ["a.md:1: missing tracked target: missing.md"]
