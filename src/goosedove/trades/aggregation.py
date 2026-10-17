@@ -48,13 +48,15 @@ from goosedove.trades.display_axes import (
     rows_through,
 )
 from goosedove.trades.encoding import PaymentAxes
-from goosedove.trades.results import (
+from goosedove.trades.results import TradeResults
+from goosedove.trades.risk_report import (
     NO_DAYS,
     NOTHING,
     Bucket,
     Risk,
     RiskView,
-    TradeResults,
+    delta_labels,
+    dv01_label,
     placed,
 )
 
@@ -656,12 +658,11 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
     groups = aggregate.index_groups
     rates = aggregate.rate_groups
     _refuse_early(aggregate, risk, bucket)
-    nominal = tuple([f"{g.index.name} nominal_delta [{g.reporting_lot.name}]" for g in groups])
-    delta = tuple([f"{g.index.name} delta [{g.reporting_lot.name}]" for g in groups])
-    dv01 = tuple(
-        [f"curve_{r.number} {r.currency} dv01 [{r.currency} per basis point]" for r in rates]
-    )
-    cleared = tuple([f"cleared {c} dv01 [{c} per basis point]" for c in aggregate.currencies])
+    pairs = [delta_labels(g.index, g.reporting_lot) for g in groups]
+    nominal = tuple([pair[0] for pair in pairs])
+    delta = tuple([pair[1] for pair in pairs])
+    dv01 = tuple([dv01_label(f"curve_{r.number}", r.currency) for r in rates])
+    cleared = tuple([dv01_label("cleared", c) for c in aggregate.currencies])
     match risk:
         case Risk.NOMINAL_DELTA:
             columns = tuple(

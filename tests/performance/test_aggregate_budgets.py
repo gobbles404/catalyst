@@ -20,7 +20,8 @@ from goosedove.trades.aggregation import AggregateResults, aggregate_results, ag
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.results import Bucket, Risk, TradeResults
+from goosedove.trades.results import TradeResults
+from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.terms import ScheduleMethod
 
 COUNTS = [1, 2, 24]
@@ -282,6 +283,8 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
             early = {} if bucket is Bucket.DAY else {"_early_of": 1, "EarlyRisk.refuse": refused}
             assert call_profile(lambda r=risk, b=bucket: aggregate_view(agg, r, b)) == {
                 "aggregate_view": 1,
+                "delta_labels": index_groups,  # the headings, spelled once in risk_report.py
+                "dv01_label": rate_groups + len(agg.currencies),
                 "_axes_of": 1,
                 "_refuse_early": 1,
                 **early,
@@ -303,6 +306,8 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
         )
         assert call_profile(lambda b=bucket: aggregate_view(agg, Risk.ALL, b)) == {
             "aggregate_view": 1,
+            "delta_labels": index_groups,
+            "dv01_label": rate_groups + len(agg.currencies),
             "_axes_of": 1,
             "_refuse_early": 1,
             **early,

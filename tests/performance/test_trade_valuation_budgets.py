@@ -359,6 +359,8 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "choice": 2,  # the risk's word, one of four, and the bucket's, one of three
                     "TradeResults.report": 1,  # the result's own selection, since #180
                     "risk_view": 1,
+                    "delta_labels": 1,  # the headings, spelled once in risk_report.py
+                    "dv01_label": 1,
                     **selected(on_curve, risk, bucket),
                     "_risk_table": 1,
                     "MixedArray.table": 2,  # the valuation day and the dates to serials
@@ -518,6 +520,8 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
                 "choice": 2,
                 "AggregateResults.report": 1,
                 "aggregate_view": 1,
+                "delta_labels": 1,  # one index group; the headings spelled once in risk_report.py
+                "dv01_label": 2,  # one rate group, and the cleared column of its one currency
                 "_axes_of": 1,
                 "_refuse_early": 1,  # since #186; the saved refusals read by month and by year
                 **({} if bucket == "day" else {"_early_of": 1, "EarlyRisk.refuse": refused}),

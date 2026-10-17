@@ -1,5 +1,6 @@
-"""What an evaluation saves, and how a report selects from it. TradeResults is the snapshot
-`trade_results` in evaluation.py makes once for a batch against one market: the preparation and
+"""What an evaluation saves, and how a report selects from it, in the words of risk_report.py.
+TradeResults is the snapshot `trade_results` in evaluation.py makes once for a batch against one
+market: the preparation and
 the market by reference, the values, the risk by contract and by date, the bilateral payment facts
 and the booked reserves, read-only. risk_view and the helpers beside it are what _ReportRisk reads
 from a saved result: a selection by reference, a copy through saved places where the axis is
@@ -8,8 +9,7 @@ never calculates, so it imports the records that precede a result and nothing of
 aggregation or Excel. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import Literal, assert_never, cast
+from typing import assert_never, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,50 +19,18 @@ from goosedove.market.market import Market
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.reserves import Reserves
+from goosedove.trades.risk_report import (
+    NO_DAYS,
+    NOTHING,
+    Bucket,
+    Period,
+    Risk,
+    RiskView,
+    delta_labels,
+    dv01_label,
+    placed,
+)
 from goosedove.trades.terms import Route
-
-
-class Bucket(Enum):
-    """What a risk report sums by: the day, or since #186 the calendar month or year, the pricing
-    contract's for the deltas and the payment's for the DV01, _ReportRisk's three choices, a
-    quarter none of them."""
-
-    DAY = "day"
-    MONTH = "month"
-    YEAR = "year"
-
-
-class Risk(Enum):
-    """What a risk report shows, since #178: the nominal delta, the delta weighted by the route's
-    valuation treatment, the DV01, or all three on one axis, _ReportRisk's four choices; a
-    summary none of them."""
-
-    NOMINAL_DELTA = "nominal_delta"
-    DELTA = "delta"
-    DV01 = "dv01"
-    ALL = "all"
-
-
-@dataclass(frozen=True, slots=True)
-class RiskView:
-    """One risk report's content, since #178, selected by reference and placed through saved
-    places: dates, the bucket starts, increasing, observation days under the deltas, payment days
-    under the DV01 and their union under all; labels, one heading per risk column, the index's
-    name and its reporting lot's for a delta, the curve's group and the currency for a DV01;
-    totals, the saved scalars, one per label; and columns, one dated vector per label, the saved
-    vector itself where the axis is its own and a copy placed on the shared axis under all, zero
-    where that axis has no entry of its kind. Nothing is summed, sorted or converted here."""
-
-    dates: NDArray[np.datetime64]
-    labels: tuple[str, ...]
-    totals: tuple[float, ...]
-    columns: tuple[NDArray[np.float64], ...]
-
-
-NO_DAYS: NDArray[np.datetime64] = np.empty(0, dtype="datetime64[D]")
-NOTHING: NDArray[np.float64] = np.empty(0)
-NO_DAYS.setflags(write=False)
-NOTHING.setflags(write=False)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -181,12 +149,9 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     evaluation stored.
     """
     terms = results.prepared.encoded.terms
-    currency = results.currency
-    nominal_label = f"{terms.index.name} nominal_delta [{terms.reporting_lot.name}]"
-    delta_label = f"{terms.index.name} delta [{terms.reporting_lot.name}]"
+    nominal_label, delta_label = delta_labels(terms.index, terms.reporting_lot)
     group = "curve_1" if results.curve is not None else "cleared"
-    dv01_label = f"{group} {currency} dv01 [{currency} per basis point]"
-    labels = (nominal_label, delta_label, dv01_label)
+    labels = (nominal_label, delta_label, dv01_label(group, results.currency))
     match bucket:
         case Bucket.DAY:
             return _day_view(results, risk, labels)
@@ -194,9 +159,6 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
             return _period_view(results, risk, bucket, labels)
         case _:
             assert_never(bucket)
-
-
-Period = Literal[Bucket.MONTH, Bucket.YEAR]
 
 
 def _day_view(results: TradeResults, risk: Risk, labels: tuple[str, str, str]) -> RiskView:
@@ -337,10 +299,3 @@ def _saved(
             )
         case _:
             assert_never(bucket)
-
-
-def placed(size: int, places: NDArray[np.intp], vector: NDArray[np.float64]) -> NDArray[np.float64]:
-    """A saved vector copied onto a report axis through its saved places, zero elsewhere."""
-    column = np.zeros(size)
-    column[places] = vector
-    return column

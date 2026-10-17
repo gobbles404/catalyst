@@ -47,7 +47,8 @@ from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments, prepared_trades
 from goosedove.trades.resolution import month_bounds
-from goosedove.trades.results import Bucket, Risk, TradeResults, risk_view
+from goosedove.trades.results import TradeResults, risk_view
+from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.terms import (
     BASES,
     METHODS,
@@ -482,6 +483,8 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
         )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
+            "delta_labels": 1,  # the headings, spelled once in risk_report.py for both paths
+            "dv01_label": 1,
             **selected,
             "placed": 3,
         }
