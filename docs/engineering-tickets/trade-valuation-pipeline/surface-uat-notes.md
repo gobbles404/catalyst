@@ -39,6 +39,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 22 / cross-gamma | [Cross gamma of commodity delta to one discount curve](single-curve-cross-gamma.md) | [#197](https://github.com/gobbles404/goosedove/pull/197), awaiting review | Evaluate a bilateral batch on a curve and read `_ReportRisk(results,"cross_gamma","month")`: the Total in lots per basis point over the contract's months, negative for lots bought and paid for later; `all` ends with the column; tick the quote and watch it stand, move a factor and watch it move; collect a cleared and a bilateral batch of one index and read the cleared pair's zero column beside the curve's; read `contract_cross_gamma` and `cross_gamma_unit` at the end of `util_ReadHandle` on the results. The kept workbook's block from row 2767 holds the ticket's example with its quote and curve moves. |
 | 21 / item 18 | [Brokerage and clearing applicability](reserve-fee-applicability.md) | [#188](https://github.com/gobbles404/goosedove/pull/188), awaiting review | On a specification charging 10 brokerage and 4 clearing per LOT, book one +10 LOT month four ways and read `_ReportReserves`: bilateral direct 0/0, bilateral brokered 100/0, cleared direct 0/40, cleared brokered 100/40; type `None`, `none` or `NONE` as the broker and see no brokerage; mix `ION` and `None` in a ticket column; move the broker between template and ticket; sell instead of buy; read the kept workbook's block from row 2722. |
 | 23 / item 21 | [Linear interpolation of contract prices](interpolate-contract-prices.md) | [#198](https://github.com/gobbles404/goosedove/pull/198), awaiting review | Point `util_InterpolateContracts` at an index handle, a column of two or more contract months as codes or as CME spells them, `202704`, typed as text, and a column of their prices: the spill names every month from the first anchor's through the last's with its futures expiry and its price on the line between the anchors by calendar days, the ticket's `J27` at 70 and `M27` at 76 putting `K27` at 72.949, 29 of 59 days along. Feed the price column to `_CreatePriceVector` from the market's prompt; move an anchor price or a schedule expiry and watch the spill, the market and the mark follow; type the anchors out of order, twice, or as numbers and read the refusals. The kept workbook's block from row 2812 holds the example with its two moves and the same mark on the prices typed by hand. |
+| 24 / item 22 | [Bump a discount curve](bump-discount-curve.md) | [#199](https://github.com/gobbles404/goosedove/pull/199), awaiting review | Point `util_BumpDiscountCurve` at a curve handle and a signed number of basis points, `1`, `-1`, `0.5` or `0`: the result is an ordinary curve, read back with `util_ReadHandle`, 0.95 a year out becoming 0.9499050047498416 under +1 and 0.9500950047501583 under -1, the first factor 1 and every day kept; evaluate the same prepared trades and market on the curve bumped each way and compare half the difference of the marks with the saved DV01 and half the difference of the deltas with the saved cross-gamma; bump a curve of ones down and read the refusal; type `+1bp` and read the seam's. The kept workbook's block from row 2849 holds the cross-gamma block's curve bumped each way with the centered checks. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -599,3 +600,23 @@ anchor's own price exact; the contract, date and price paired in view; a missing
 and the price column feeding an ordinary vector and market through an anchor-price move and an
 expiry move, with the same mark on the same prices typed by hand. The kept workbook's block
 from row 2812 holds the example.
+
+## 22. Bump a discount curve
+
+Owner agreement, 17 October: `util_BumpDiscountCurve(curve, bump_bps)` takes a curve handle
+and a signed numeric bump in basis points, including fractional and zero bumps. It returns
+an ordinary discount curve for `util_ReadHandle` and `_EvaluateTrades`. The
+[focused ticket](bump-discount-curve.md) is built in #199 as one feature PR;
+[bump-discount-curve.md](../../library/utilities/bump-discount-curve.md) owns the function.
+
+Use the same parallel continuously compounded rate shift and ACT/365F convention as DV01
+and cross-gamma, applied to every stored daily factor from the curve's own start. Retain
+existing curve checks: downward bumps are accepted only when the resulting factors remain
+valid. Do not add a valuation-date parameter or change the source curve.
+
+UAT: a factor of 0.95 at 365 days becomes 0.9499050047498416 under +1 bp and
+0.9500950047501583 under -1 bp. Check the date/factor spill, unchanged source, fractional
+and zero bumps, and visible refusal of a downward bump on a curve of ones. Reevaluate the
+same prepared trades and market with each bumped curve: centered changes in discounted
+delta and NPV should agree with the original cross-gamma and DV01, within numerical tolerance.
+The kept workbook's block from row 2849 holds the checks on the cross-gamma block's curve.

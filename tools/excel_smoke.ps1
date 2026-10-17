@@ -1805,6 +1805,21 @@ $formulas = [ordered]@{
     "=util_InterpolateContracts(SA15,{202612;202703},UB1:UB2)" = "#ERROR util_InterpolateContracts: anchor_contracts cell (1, 1) is number 202612.0, expected text"
     '=util_InterpolateContracts(SA15,{"N27";"U27"},UB1:UB2)' = "#ERROR util_InterpolateContracts: ValueError: the index's schedule has no contract for 2027-08, Q27, expected every month from 2027-07 to 2027-09, the anchors' range"
     "=util_InterpolateContracts(SA15,UA1:UA2,UB1)" = "#ERROR util_InterpolateContracts: ValueError: anchor_prices has 1 price, expected 2, one per anchor contract"
+    # A discount curve bumped by basis points, bump-discount-curve.md: the three-day curve AA1 a
+    # basis point up in UC1, its first factor 1 and its last, 0.9998, moved two days of ACT/365F;
+    # a bump of nothing in UC2 moving nothing; text, a left-out bump, a failed creator and a curve
+    # of ones bumped down refused.
+    "=ROWS(util_ReadHandle(UC1))" = "5"
+    "=INDEX(util_ReadHandle(UC1),1,2)" = "discount_factor"
+    "=INDEX(util_ReadHandle(UC1),2,2)" = "float64"
+    "=INDEX(util_ReadHandle(UC1),3,2)" = "1"
+    "=INDEX(util_ReadHandle(UC1),5,1)" = "46278"
+    '=TEXT(INDEX(util_ReadHandle(UC1),5,2),"0.000000000000")' = "0.999799452165"
+    "=INDEX(util_ReadHandle(UC2),5,2)" = "0.9998"
+    '=util_BumpDiscountCurve(AA1,"1bp")' = "#ERROR util_BumpDiscountCurve: bump_bps is text '1bp', expected number"
+    "=util_BumpDiscountCurve(AA1)" = "#ERROR util_BumpDiscountCurve: bump_bps is missing, expected number"
+    "=util_BumpDiscountCurve(AA3,1)" = "#ERROR util_BumpDiscountCurve: curve is the creator's failure, expected discount curve handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=util_BumpDiscountCurve(UC3,-1)" = "#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -2978,6 +2993,14 @@ $cells = [ordered]@{
     # the half-year index HALF, Z26 at 3 and H27 at 4.8.
     "UA1" = "Z26"; "UB1" = "3"
     "UA2" = "H27"; "UB2" = "4.8"
+    # A discount curve bumped by basis points, bump-discount-curve.md: AA1's three days a basis
+    # point up and by nothing, and a curve of ones to bump down.
+    "UC1" = "=util_BumpDiscountCurve(AA1,1)"
+    "UC2" = "=util_BumpDiscountCurve(AA1,0)"
+    "UD1" = "11-Sep-2026"; "UE1" = "1"
+    "UD2" = "12-Sep-2026"; "UE2" = "1"
+    "UD3" = "13-Sep-2026"; "UE3" = "1"
+    "UC3" = "=_CreateDiscountCurve(Y1:Z1,UD1:UE3)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

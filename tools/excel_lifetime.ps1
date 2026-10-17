@@ -33,6 +33,10 @@
 #          a factor change, a full recalculation and a held old collection over the handle
 #          texts across a second tick; the last
 #          workbook closed. check.ps1 runs this group beside core.
+#   bumps  a bilateral batch on a curve of its own and the curve bumped by basis points: an
+#          equal call sharing the bump; a quote tick remaking the results and reusing the
+#          bump; the bump changed, the factor changed, the bump refused and repaired.
+#          check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -41,7 +45,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -573,6 +577,110 @@ $calendars = {
     Check "as the readback does" ((Text $state $sheet "D5") -eq "6") (Text $state $sheet "D5")
     $c = Settle $state $sheet { param($c) $c.Live -eq 3 }
     Check "three live again, two more published" ($c.Live -eq 3 -and $c.Published -eq 7 -and $c.Released -eq 4) $c.Text
+    Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
+}
+
+# --- bumps ----------------------------------------------------------------------------------------
+# The chain, a bilateral template facing ACME Trading over the payment calendar in D13, a lot of
+# two NYMEX lots of q26 at 70 in K6:N6, prepared against the chain's history and evaluated against
+# its market on a curve of its own, W1:X4, 1 on the valuation day, 0.99 on q26's payment day, 23
+# July 2026, and 0.9 at the end of 2027: 5,544 of mark. Then bump-discount-curve.md: the curve a
+# basis point up in G29 is a curve of its own, the payment day's factor 0.99 less 58 days of a
+# basis point and the mark on it read through TEXT; an equal call in H29 shares the handle; the
+# curve a basis point down in H30 and half the difference of the two marks the saved DV01 to its
+# truncation; a quote tick remakes the three results and reuses the curve and both bumps; the
+# bump changed remakes the bump and its results while the curve stands; a changed factor remakes
+# the curve, both bumps and the three results; text where the bump should be fails the bump in
+# the seam's words and its results as the consumer, both owning nothing until repaired.
+$bumps = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "C13" "1-Jan-2026"
+    Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
+    Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
+    Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_time_lag"; Put $state $sheet "R26" "payment_holiday_calendar"
+    Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"
+    Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
+    Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
+    Put $state $sheet "W3" "23-Jul-2026"; Put $state $sheet "X3" "0.99"
+    Put $state $sheet "W4" "31-Dec-2027"; Put $state $sheet "X4" "0.9"
+    Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:R26,K27:R27)'
+    Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
+    Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
+    Put $state $sheet "D29" "=_CreateDiscountCurve(W1:X1,W2:X4)"
+    Put $state $sheet "D30" "=_EvaluateTrades(D28,D11,D29)"
+    Put $state $sheet "D31" "=INDEX(_ReportValues(D30),3,1)"
+    Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30,"dv01","day"),4,2),"0.000000")'
+    Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,1)"
+    Put $state $sheet "G30" "=_EvaluateTrades(D28,D11,G29)"
+    Put $state $sheet "G31" '=TEXT(INDEX(_ReportValues(G30),3,1),"0.000000")'
+    Put $state $sheet "G32" '=TEXT(INDEX(util_ReadHandle(G29),61,2),"0.000000000000")'
+    Put $state $sheet "H29" "=util_BumpDiscountCurve(D29,1)"
+    Put $state $sheet "H30" "=util_BumpDiscountCurve(D29,-1)"
+    Put $state $sheet "H31" "=_EvaluateTrades(D28,D11,H30)"
+    Put $state $sheet "H32" '=TEXT((INDEX(_ReportValues(G30),3,1)-INDEX(_ReportValues(H31),3,1))/2,"0.000000")'
+    $id = Id $state
+    $curve = Text $state $sheet "D29"
+    $bump = Text $state $sheet "G29"
+    $down = Text $state $sheet "H30"
+    $onBump = Text $state $sheet "G30"
+    Check "the mark on the curve is 5,544, two lots of 2.8 over 70 at 0.99" ((Text $state $sheet "D31") -eq "5544") (Text $state $sheet "D31")
+    Check "the bump's cell shows a discount curve handle of its own" ($bump.StartsWith("${id}:discount_curve:") -and $bump -ne $curve) $bump
+    Check "the payment day's factor a basis point up, 0.99 less 58 days of a basis point" ((Text $state $sheet "G32") -eq "0.989984268618") (Text $state $sheet "G32")
+    Check "and the mark on the bump follows it" ((Text $state $sheet "G31") -eq "5543.911904") (Text $state $sheet "G31")
+    Check "the results on the bump show a handle of their own" ($onBump.StartsWith("${id}:trade_results:WTI NYMEX:") -and $onBump -ne (Text $state $sheet "D30")) $onBump
+    Check "an equal call shares the bump's handle" ((Text $state $sheet "H29") -eq $bump) (Text $state $sheet "H29")
+    Check "half the difference of the marks on the bumps each way is the saved DV01, -0.088096" ((Text $state $sheet "H32") -eq "-0.088096" -and (Text $state $sheet "D34") -eq "-0.088096") ((Text $state $sheet "H32") + " " + (Text $state $sheet "D34"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 10) }
+    Check "the chain, the calendar, the template, the batch, the preparation, the curve, two bumps and three results: twenty-one live, twenty-one published, the equal call reusing" ($c.Live -eq 21 -and $c.Published -eq 21 -and $c.Released -eq 0) $c.Text
+
+    # A quote tick: the vector, the market and the three results publish anew, the old five
+    # released; the curve and both bumps are reused as they are.
+    Put $state $sheet "A11" "73.8"
+    Check "a quote tick remakes the results on the bump" ((Text $state $sheet "G30") -ne $onBump -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
+    Check "and the mark on the bump follows the quote" ((Text $state $sheet "G31") -eq "7523.880441") (Text $state $sheet "G31")
+    Check "while the curve and both bumps stand" ((Text $state $sheet "D29") -eq $curve -and (Text $state $sheet "G29") -eq $bump -and (Text $state $sheet "H30") -eq $down) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 5 }
+    Check "the old vector, market and three results are released; five more published" ($c.Live -eq 21 -and $c.Published -eq 26 -and $c.Released -eq 5) $c.Text
+
+    # The equal call cleared, the bump stands on its own cell; then the bump changed to two basis
+    # points: the bump and its results publish anew, the old two released; the curve stands.
+    Clear-Cell $state $sheet "H29"
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "the equal call cleared releases nothing, the bump held by its own cell" ($c.Live -eq 21 -and $c.Published -eq 26 -and $c.Released -eq 5) $c.Text
+    $onBump = Text $state $sheet "G30"
+    Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
+    Check "a changed bump gives the bump a new handle" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "G29")
+    Check "and the factor two basis points up" ((Text $state $sheet "G32") -eq "0.989968537486") (Text $state $sheet "G32")
+    Check "and its results a new one, while the curve stands" ((Text $state $sheet "G30") -ne $onBump -and (Text $state $sheet "D29") -eq $curve) (Text $state $sheet "G30")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 7 }
+    Check "the old bump and its results are released; two more published" ($c.Live -eq 21 -and $c.Published -eq 28 -and $c.Released -eq 7) $c.Text
+
+    # A changed factor: the curve, both bumps and the three results publish anew, the old six
+    # released.
+    $bump = Text $state $sheet "G29"
+    Put $state $sheet "X3" "0.98"
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D29")
+    Check "and both bumps new ones" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "H30") -ne $down -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:")) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 13 }
+    Check "the old curve, bumps and results are released; six more published" ($c.Live -eq 21 -and $c.Published -eq 34 -and $c.Released -eq 13) $c.Text
+
+    # Text where the bump should be: the bump fails in the seam's words and its results as the
+    # consumer, both own nothing; repaired, both rebuild.
+    $refusedBump = "#ERROR util_BumpDiscountCurve: bump_bps is text '1bp', expected number"
+    Put $state $sheet "G29" '=util_BumpDiscountCurve(D29,"1bp")'
+    Check "a bump its creator refuses shows the refusal" ((Text $state $sheet "G29") -eq $refusedBump) (Text $state $sheet "G29")
+    Check "and fails its results as the consumer" ((Text $state $sheet "G30") -eq "#ERROR _EvaluateTrades: discount_curve is the creator's failure, expected discount curve handle: $refusedBump") (Text $state $sheet "G30")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 19 }
+    Check "the bump and its results own nothing: nineteen live, two released, nothing published" ($c.Live -eq 19 -and $c.Published -eq 34 -and $c.Released -eq 15) $c.Text
+    Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
+    Check "repaired, the bump and its results rebuild" ((Text $state $sheet "G29").StartsWith("${id}:discount_curve:") -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
+    Check "twenty-one live again, two more published" ($c.Live -eq 21 -and $c.Published -eq 36 -and $c.Released -eq 15) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -1128,7 +1236,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]
