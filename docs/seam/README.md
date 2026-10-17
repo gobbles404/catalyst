@@ -10,6 +10,7 @@ These pages are for two readers: the owner, an Excel power user who is not a pro
 
 | The question | The page |
 |---|---|
+| How does the whole thing fit together, library and seam? | [../architecture.md](../architecture.md): the pieces in the order a sheet builds them, what is made again when something changes, and where the code is |
 | What happens between typing a formula and seeing the answer? | [walk.md](walk.md): one call from the cell to the answer, in order, with diagrams of the layers it crosses and of what is copied and what is only pointed at |
 | What may I send a function, and what happens when I send the wrong thing? | [inputs.md](inputs.md): what Excel sends, the rules, and the decisions taken |
 | What may a function return, and what does the cell show? | [outputs.md](outputs.md): the result rules and the decisions taken |
@@ -83,7 +84,7 @@ The rule behind all of it: work is counted, and the counts are tests; time is a 
 
 ## This directory is the map
 
-Every page here moves with the code it describes, and nothing about the seam is written anywhere else.
+Every page here moves with the code it describes, and nothing about the seam is written anywhere else. Which page owns which fact, across the repository, is [working.md](working.md#10-what-each-page-owns).
 
 - A new declared type moves [inputs.md](inputs.md), [outputs.md](outputs.md) if it can be returned, and the two tables in [bridge.md](bridge.md).
 - A change to the host moves [host.md](host.md), the steps in [walk.md](walk.md), and the pins in `HostWorkBudgets.cs`.

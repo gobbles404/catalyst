@@ -11,10 +11,10 @@ A scalar is one of six kinds.
 | Kind | Examples | Notes |
 |---|---|---|
 | Number | `42`, `3.14`, a date, a time, `5%`, `$1,250` | Always a finite double. The format never travels: a date is its serial (2026-09-08 is 46273), 5% is 0.05, $1,250 is 1250, 14:30 is 0.604. Digits typed past the fifteenth become zeros. A workbook on the 1904 date system sends serials 1,462 days lower, with no signal; such workbooks are not supported. |
-| Text | `"Brent"`, `""`, `'123`, `"WTI "` | Exactly as typed, up to 32,767 characters. Empty text is text. A number stored as text is text. Trailing and non-breaking spaces survive. Since #189 a text holding NUL (U+0000), the character the host separates a range's texts with, is refused by the host before Python, decision 43. |
+| Text | `"Brent"`, `""`, `'123`, `"WTI "` | Exactly as typed, up to 32,767 characters. Empty text is text. A number stored as text is text. Trailing and non-breaking spaces survive. A text holding NUL (U+0000), the character the host separates a range's texts with, is refused by the host before Python, [NUL in input text](#nul-in-input-text). |
 | Boolean | `TRUE`, `FALSE` | Never a number. |
 | Blank | an empty cell | Never zero and never empty text. |
-| Error | `#N/A`, `#DIV/0!`, `#VALUE!`, `#REF!`, `#NAME?`, `#NUM!`, `#NULL!`, `#GETTING_DATA` | The host returns the first one it finds before Python runs. Newer errors such as `#SPILL!` and `#CALC!` arrive as `#VALUE!`. So do rich data types, in-cell images, LAMBDA values, multi-area references like `(A1:B2,D1:D2)`, and 3-D references. Since #189 the host's pass stops at the first Excel error or text holding NUL (U+0000) it meets, whichever comes first, decision 43. |
+| Error | `#N/A`, `#DIV/0!`, `#VALUE!`, `#REF!`, `#NAME?`, `#NUM!`, `#NULL!`, `#GETTING_DATA` | The host returns the first one it finds before Python runs. Newer errors such as `#SPILL!` and `#CALC!` arrive as `#VALUE!`. So do rich data types, in-cell images, LAMBDA values, multi-area references like `(A1:B2,D1:D2)`, and 3-D references. The host's pass stops at the first Excel error or text holding NUL (U+0000) it meets, whichever comes first, [NUL in input text](#nul-in-input-text). |
 | Missing | the argument left out: `=Fn(A1,)` | Distinct from blank. Can appear inside an array in rare cases, such as `EXPAND` with its pad argument omitted. |
 
 An array holds the six kinds, cell by cell.
@@ -252,8 +252,6 @@ column left to right, and then the function, which checks meaning, the template 
 ticket disjoint, the required fields present, the choices supported. The function receives a
 `FieldValues`, defined in the library, which never imports the seam: the instrument, the fields
 present and each typed column by name. `EchoFieldRow` and `CountFieldRows` are the probes.
-43. Input text may not hold NUL (U+0000). The host packs a range's texts into one string separated by NUL, so a NUL inside a cell would split into two cells on the other side and move text into another field; since #189 the host refuses it where its pass reaches it, before any shape, type or meaning rule: `#ERROR host: _CreateTradeTemplate argument 3 cell (1, 1) is text holding NUL (U+0000), expected text without it`, a scalar text argument the same without the cell, the argument counted from 1 and the cell as `INDEX` counts within the range supplied. The pass is the one the host already makes, arguments left to right and a range's cells row-major, and it stops at the first Excel error or NUL it meets: an earlier Excel error comes back unchanged, an earlier NUL is reported without the scan looking ahead, and a later argument is not reached. Nothing is removed, replaced or escaped, and the message never carries the character. The two characters backslash and zero are ordinary text, as are tabs, line breaks, nonbreaking spaces and texts beginning `#ERROR`; empty text, blanks and missing arguments keep their rules, and `cells_from_buffers` stays a trusted reader of what the host packed. [reject-nul-input-text.md](../engineering-tickets/reject-nul-input-text.md).
-
 Decided 2026-10-10, a cell of a field that supplied nothing, by the owner, as the ticket
 [contract-codes-and-dates.md](../engineering-tickets/trade-valuation-pipeline/contract-codes-and-dates.md);
 built in #172.
@@ -310,6 +308,12 @@ what it needs; the seam does not say which kind it was, and the library checks n
 naming `object` or a type that is no handle refuses to register, `ReadHandleOrText: handle declares
 Handle[Curve] | str, which the seam cannot receive`, and no default is taken. `ReadEither` is the
 probe.
+
+### NUL in input text
+
+Decided 2026-10-16, text holding NUL, by the owner, as the ticket [reject-nul-input-text.md](../engineering-tickets/reject-nul-input-text.md), which says what was built. Its own rule, under its own name: the numbered decisions above keep their numbers.
+
+Input text may not hold NUL (U+0000). The host packs a range's texts into one string separated by NUL, so a NUL inside a cell would split into two cells on the other side and move text into another field; the host refuses it where its pass reaches it, before any shape, type or meaning rule: `#ERROR host: _CreateTradeTemplate argument 3 cell (1, 1) is text holding NUL (U+0000), expected text without it`, a scalar text argument the same without the cell, the argument counted from 1 and the cell as `INDEX` counts within the range supplied. The pass is the one the host already makes, arguments left to right and a range's cells row-major, and it stops at the first Excel error or NUL it meets: an earlier Excel error comes back unchanged, an earlier NUL is reported without the scan looking ahead, and a later argument is not reached. Nothing is removed, replaced or escaped, and the message never carries the character. The two characters backslash and zero are ordinary text, as are tabs, line breaks, nonbreaking spaces and texts beginning `#ERROR`; empty text, blanks and missing arguments keep their rules, and `cells_from_buffers` stays a trusted reader of what the host packed. How the host carries it out is [host.md](host.md#the-way-in).
 
 ## Not supported
 

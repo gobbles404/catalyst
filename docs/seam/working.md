@@ -16,7 +16,7 @@ Start from what the cell shows. The first column is the text, the second who put
 | `#ERROR Forward: price is text 'Brent', expected number`, or `#ERROR Strip: values cell (3, 1) is blank, expected number` | the bridge, rejecting an argument | Read it literally: the function, the argument, what arrived, what was declared. Reject means a call-time failure. Inside a range the cell is counted the way `INDEX` counts, row then column from 1 within the range that was passed, because no sheet address ever crosses. The words are [inputs.md](inputs.md)'s, and so is the rule behind each: a boolean is not a number, text is never a number, empty text is not text, and a blank cell is not a missing argument. |
 | `#ERROR Forward: returned text 'x', expected number`, or `#ERROR Prices: result cell (3, 1) is not a finite number` | the bridge, rejecting the result | The function returned something its declared return type does not allow. This is a fault in the function or in its declaration, not in the sheet. [outputs.md](outputs.md) has the rules and the full list of what fails. |
 | `#ERROR Fail: ValueError: as asked` | the function itself | The function raised, and the cell carries its type and its message. The message is the library's; act on it there. |
-| `#ERROR host: ...` | the host | Rare, and worth reporting whole: an exception escaping the trip, a cell holding a type the scan does not know, a result whose memory the host could not read as an array of numbers, or since #189 a text holding NUL (U+0000) in an argument, named by the function, the argument and the cell. [host.md](host.md) names each. `#ERROR python did not start: ...` is the host too; no formula can reach it today, because when Python does not start nothing is registered and the cell shows `#NAME?`. |
+| `#ERROR host: ...` | the host | Rare, and worth reporting whole: an exception escaping the trip, a cell holding a type the scan does not know, a result whose memory the host could not read as an array of numbers, or a text holding NUL (U+0000) in an argument, [inputs.md](inputs.md#nul-in-input-text). [host.md](host.md) names each. `#ERROR python did not start: ...` is the host too; no formula can reach it today, because when Python does not start nothing is registered and the cell shows `#NAME?`. |
 
 Two functions to type first, in this order.
 
@@ -124,7 +124,7 @@ The record asks for two next, and until they exist no runner has a row for a tex
 6. Add a row to `tools/excel_smoke.ps1`, so the probe is checked in a real Excel with the exact text it must show, and the same row to `host/Goosedove.Host.Tests/CallTests.cs`, which replays the smoke rows without Excel. Add the name to the set of hidden probes in `tests/unit/test_bridge.py`: that test asks only that the set contains them, so a missing name never fails, which is why it has to be done on purpose.
 7. Give it a ledger in `tests/performance/test_seam_budgets.py`, both lists where numpy is asked anything, and a ceiling in `tests/performance/test_seam_allocation.py`.
 8. Add a counts test to `tests/performance/HostWorkBudgets.cs`, which is compiled into the host's test project: what the host did for one warm call, as an exact table of counters.
-9. Add it to the probe tables in [measuring.md](measuring.md), with its knob, and [bridge.md](bridge.md), with what it proves. Then correct every count of probes the pages state: section 2 of this page, [README.md](README.md), [host.md](host.md), [bridge.md](bridge.md) twice, and the row in [history.md](history.md) that gives their number and says none of them takes a text or a date range.
+9. Add it to the probe tables in [measuring.md](measuring.md), with its knob, and [bridge.md](bridge.md), with what it proves. The tables are the list; a page that states a count of probes drops the count when it is next touched, as [AGENTS.md](../../AGENTS.md) asks.
 
 ## 5. Changing the seam and measuring it
 
@@ -140,7 +140,7 @@ The record asks for two next, and until they exist no runner has a row for a tex
    ```
 
    With no parameters the base is where this branch left `origin/main`; `-Base` names another; `-SkipExcel` runs the Python and host runners only. The base is checked out into a temporary worktree, a second copy of the code in Windows' temp folder under the name `goosedove-base-<the base's short revision>`, so this tree is never touched, and "after" is this tree as it stands, uncommitted changes included. The runners alternate sides so drift lands on both. The results land in `profiles\before` and `profiles\after`, and the report in `profiles\compare.md`: every timed row of every layer, every host counter that differs, and the allocation figures. Paste that report whole into the pull request. Read it as [measuring.md](measuring.md) says: a row counts as moved only when its two batch spreads do not overlap, and a move is real when it is large, consistent across sizes, and where the change aimed; a large move where it did not aim is the finding.
-5. Move the pages the change moves: [host.md](host.md) and the steps in [walk.md](walk.md) for the host, [bridge.md](bridge.md) for the bridge, [inputs.md](inputs.md) or [outputs.md](outputs.md) when a rule changed, and a row in [history.md](history.md)'s timeline saying what this change moved.
+5. Move the pages that own what changed, section 10: [host.md](host.md) and the steps in [walk.md](walk.md) for the host, [bridge.md](bridge.md) for the bridge, [inputs.md](inputs.md) or [outputs.md](outputs.md) when a rule changed; and a row in [history.md](history.md) when the change declined something, settled a question or set a new baseline, not for a routine change.
 6. Run `.\check.ps1` and fix what it reports (section 7).
 7. Open the pull request with the template's six headings in order: What; Counts, with the counters before and after; Tenets; Conflicts; Checked in Excel; Not done. One purpose, and a title that names kind and scope first, `feat(seam):`, `feat(host):`, `chore(tools):` or `docs:`. The counts are the evidence. No timing gates a merge; the timings are the record that says whether the counts mattered.
 
@@ -276,3 +276,22 @@ uv sync --locked
 | the pull request template | `.github/PULL_REQUEST_TEMPLATE.md` |
 | what CI runs | `.github/workflows/ci.yml` |
 | the rules, the tenets, and the general learnings | `AGENTS.md`, `PRINCIPLES.md`, [golden-rules.md](../golden-rules.md) |
+
+## 10. What each page owns
+
+One owner per fact. A page says what the code does today, and for anything else it links to the owner; a change edits the owners it changed and leaves the other pages to their links. The rule is in [AGENTS.md](../../AGENTS.md); this table is the map.
+
+| The fact | The owner |
+|---|---|
+| an instrument's fields: names, meanings, types, choices and rules | `src/goosedove/instruments/definitions.py`; `_ShowInstrument` spills it, and `tests/unit/test_instruments.py` holds the grid on its page equal to the spill |
+| a worksheet function's signature and its Excel help | its declaration, the annotations and the docstring, which registration reads; `tests/unit/test_help.py` pins the words |
+| what a function does today: its behaviour, units, limitations and a worked example | its page under `docs/library/` |
+| what may cross into Python, and the order refusals come in | [inputs.md](inputs.md) |
+| what may come back, and how the cell shows it | [outputs.md](outputs.md) |
+| a handle's text, publication, sharing and release | [handles.md](handles.md) |
+| how the host or the bridge carries a rule out | [host.md](host.md) and [bridge.md](bridge.md), and the comment beside the code, each linking to the rule it carries out |
+| exact messages, hand-worked numbers, work counts and ceilings | the tests that pin them; a page keeps a derivation worth reading and names the test file, not every case |
+| why a change was made, and the evidence at that revision | its pull request; [history.md](history.md) for what was declined or parked |
+| a proposed behaviour or an open decision | its ticket under `docs/engineering-tickets/`, marked as proposed; a ticket that has been built is the plan as it was, and the pages above say what is |
+
+Keep the contracts precise through any cleanup: units, accepted inputs, financial meaning, the order of refusals and intentional limitations stay as they are. When the code, a test and a page disagree, record the disagreement for its own decision; do not pick one by editing the other two.

@@ -36,6 +36,14 @@ Never add `# type: ignore` or `# noqa` to make it pass; fix the code.
   unwanted work or side effects do not occur are valid.
 - Never change source and golden files in the same pull request.
 
+## Docs
+
+- Read in this order: PRINCIPLES.md, this file, `docs/architecture.md`, then the page that owns what you are changing.
+- One owner per fact. A page says what the code does today and links to the owner for the rest;
+  the owners are the table in `docs/seam/working.md` §10. A change edits the owners it changed and no other page.
+- No pull-request numbers, status lines, "since" stamps or test inventories in a page. Why a change
+  was made is its pull request; what was declined or parked is `docs/seam/history.md`.
+
 ## Pull requests
 
 - One purpose. Conventional commit titles: `feat(scope): ...`, `fix(scope): ...`, `chore: ...`.

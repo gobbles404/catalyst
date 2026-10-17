@@ -4,6 +4,8 @@
 **Purpose:** Make the responsibilities and connections understandable before choosing their implementation.\
 **Reading order:** This overview, instrument definitions, CreateTrades and its retained state, then the worked example and individual responsibility documents.
 
+**Where it stands:** the pipeline this packet designed is built. [docs/architecture.md](../../architecture.md) says how it fits together, and the function pages under [docs/library/trades/](../../library/trades/kernel.md) say what each function does today; where a page and a ticket here differ, the page is current and the ticket is the plan as it was. A ticket still open says so in its status line.
+
 ## How to use this handoff
 
 This packet is the authoritative design for the next trade implementation. Read it alongside

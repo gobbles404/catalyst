@@ -81,7 +81,7 @@ curve:      A discount-curve handle: the cell showing _CreateDiscountCurve's res
 - The function's line says what the function makes. For a creator it explains the handle once, `shows its handle, the text other formulas take as the curve`, because that is where the desk first meets the word.
 - Rules stay out of the help. A line says what to pick; the page and the error message say what must hold and what went wrong. No seam words: nothing about serials, ranges, schemas or types.
 - Where an argument takes a unit code, its help lists the accepted codes.
-- A page quotes the declaration under Excel help, as it quotes the messages that tests pin, so a reviewer reads it in one place per function; a change to one changes both in the same pull request.
+- The declaration is the one source of the help, and `tests/unit/test_help.py` pins its words. A page need not quote it; one that does changes with it in the same pull request.
 
 The optional form, written once, as the `Times` probe declares it:
 
@@ -96,16 +96,16 @@ Excel shows `Times(x, [factor])`, and on the second argument `[factor]: One mult
 
 ## A function page, section by section
 
-A page says what the desk types, sees and is told, and what must hold; how it crosses and what it costs belongs to the build, its pull request and its pins. Our functions are well defined, so most pages are short. The seam already checks every argument's type and shape and converts every result, so a page cites [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md) rather than restating them, describes nothing that is neither built nor specified, and lists only its own tests. A rule on a page is one a consumer needs today; a rule for a reader that is not built yet is a guess, and belongs to that reader when it is written. Its first line is its state, in words, and it moves with the code in the same pull request.
+A page says what the desk types, sees and is told, and what must hold; how it crosses and what it costs belongs to the build, its pull request and its pins. Our functions are well defined, so most pages are short. The seam already checks every argument's type and shape and converts every result, so a page cites [inputs.md](../seam/inputs.md) and [outputs.md](../seam/outputs.md) rather than restating them, describes nothing that is neither built nor specified, and lists only its own tests. A rule on a page is one a consumer needs today; a rule for a reader that is not built yet is a guess, and belongs to that reader when it is written. It says what the function does today and moves with the code in the same pull request; it carries no pull-request numbers, status lines or counts, which age: the pull request holds the number, and [history.md](../seam/history.md) what was declined.
 
 The sections, in this order:
 
 | Section | Holds |
 |---|---|
-| Title, then the state alone | `Ready to ship.`, `Waiting on the seam: ...` naming the one item in words, or `Built in #NN.`; then one sentence saying what the function is |
+| Title, then one sentence | what the function is and does today; a function not yet built says so, naming in words the one seam item it waits on, if any |
 | Worksheet contract | the Python declaration, the formula a user types, what the cell shows, and one line that the seam checks the declared types |
-| Excel help | the function line and one line per argument, quoted from the declaration: the desk-facing text |
+| Excel help | optional: the function line and the argument lines, quoted when the page has something to say about them; the declaration is the source and `tests/unit/test_help.py` pins the words |
 | The library checks | the rules of meaning a consumer needs today, usually one or two, each with its exact message in the seam's grammar |
 | What it computes | the calculation, under a heading that names it, such as The interpolation or The definitions, where there is one |
-| Tests | one row per test to write: the case and its kind, example, property or golden; when built, where each is pinned |
+| Tests | the files that pin the page's rules and numbers, each named once with what it holds in a phrase; not a list of every case |
 | Not here | what a reader might expect and will not find, and who decides it when that is known: a question only a later function can settle is a sentence here, not a rule |

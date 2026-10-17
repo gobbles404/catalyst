@@ -24,7 +24,7 @@ On a fresh machine, [docs/getting-started.md](docs/getting-started.md) walks fro
     .\tools\excel_dev.ps1 workbooks\handles.xlsx    the same, on a saved workbook
     .\tools\excel_show.ps1 workbooks\handles.xlsx   print a workbook as its cells show, with the add-in loaded
 
-How the seam is measured, what is counted and what is timed, is in [docs/seam/measuring.md](docs/seam/measuring.md). Everything written about the seam, the one place Excel and Python talk, starts at [docs/seam/README.md](docs/seam/README.md); the library's worksheet functions, one page each that is the spec until the function is built, start at [docs/library/README.md](docs/library/README.md).
+How the pieces fit together, from an index to a risk report, and where each responsibility lives, is [docs/architecture.md](docs/architecture.md); which page owns which fact is [docs/seam/working.md](docs/seam/working.md#10-what-each-page-owns). How the seam is measured, what is counted and what is timed, is in [docs/seam/measuring.md](docs/seam/measuring.md). Everything written about the seam, the one place Excel and Python talk, starts at [docs/seam/README.md](docs/seam/README.md); the library's worksheet functions, one page each that is the spec until the function is built, start at [docs/library/README.md](docs/library/README.md).
 
 ## The add-in
 
