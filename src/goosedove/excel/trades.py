@@ -34,15 +34,10 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.aggregation import AggregateResults, aggregate_results
-from goosedove.trades.evaluation import (
-    Bucket,
-    Risk,
-    RiskView,
-    TradeResults,
-    trade_results,
-)
+from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import Trades, trades
+from goosedove.trades.results import Bucket, Risk, RiskView, TradeResults
 from goosedove.trades.template import TradeTemplate, choice, trade_template
 
 # The worksheet functions this module registers, named here so that their leading underscore

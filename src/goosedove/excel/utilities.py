@@ -48,9 +48,9 @@ from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.price_vector import PriceVector
 from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded
-from goosedove.trades.evaluation import TradeResults
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.resolution import Trades
+from goosedove.trades.results import TradeResults
 from goosedove.trades.template import TradeTemplate
 from goosedove.trades.terms import BASIS_NAMES, METHOD_NAMES
 

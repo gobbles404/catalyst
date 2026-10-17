@@ -18,8 +18,9 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
 from goosedove.trades.encoding import PaymentAxes, encoded
-from goosedove.trades.evaluation import Bucket, Risk, TradeResults, trade_results
+from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
+from goosedove.trades.results import Bucket, Risk, TradeResults
 from goosedove.trades.terms import ScheduleMethod
 
 COUNTS = [1, 2, 24]

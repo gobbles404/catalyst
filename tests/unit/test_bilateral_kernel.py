@@ -45,9 +45,10 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
 from goosedove.trades.encoding import PaymentAxes, encoded
-from goosedove.trades.evaluation import Bucket, Risk, TradeResults, risk_view, trade_results
+from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import trades
+from goosedove.trades.results import Bucket, Risk, TradeResults, risk_view
 from goosedove.trades.template import trade_template
 from goosedove.trades.terms import (
     PaymentTerms,

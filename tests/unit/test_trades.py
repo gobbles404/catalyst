@@ -35,10 +35,11 @@ from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.market_data.iferc_fixings import iferc_fixings
 from goosedove.market_data.price_vector import price_vector
 from goosedove.trades.encoding import encoded
-from goosedove.trades.evaluation import TradeResults, trade_results
+from goosedove.trades.evaluation import trade_results
 from goosedove.trades.observations import Observations, observations, observed
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.resolution import month_bounds
+from goosedove.trades.results import TradeResults
 from goosedove.trades.terms import (
     BASES,
     METHODS,
