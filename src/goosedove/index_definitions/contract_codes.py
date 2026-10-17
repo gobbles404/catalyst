@@ -1,10 +1,17 @@
 """Contract codes as the desk types them, a month letter and a two-digit year, F26 for January
 2026: the code of the month after, the month as CME's data feeds spell it, 202601, the code of
 the month a day falls in and the first day of a code's month. Text or one date in, text or one
-date out, no object and no handle. docs/library/utilities/next-fut.md, fut-to-cme.md,
-date-to-fut.md and fut-to-date.md are the pages."""
+date out, no object and no handle; and the months of a schedule's codes, one read per code, for
+the trades' resolution and the contract-price interpolation. docs/library/utilities/next-fut.md,
+fut-to-cme.md, date-to-fut.md and fut-to-date.md are the pages."""
+
+from typing import Any, cast
 
 import numpy as np
+from numpy.typing import NDArray
+
+from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.iferc_schedule import IfercSchedule
 
 # The exchanges' month letters, January to December, and the same in lowercase, the two
 # spellings a code's letter is read in; the ten digits a year is written with.
@@ -77,3 +84,38 @@ def first_day_of(contract: str) -> np.datetime64:
     a code names on its own, a contract's expiry being its schedule's to say."""
     month, year = month_and_year(contract)
     return np.datetime64(f"{year}-{month:02d}-01", "D")
+
+
+def schedule_months(schedule: FuturesSchedule | IfercSchedule) -> NDArray[np.int64]:
+    """The month of every code of the schedule, as numpy counts months, one read per code: a
+    code that is no contract code is refused by row, and so are two rows for one month, since a
+    month resolved to two rows would name no contract. The resolution reads them once,
+    resolves the ticket's periods against them and hands them to the terms, which keep them for
+    the encoding's contract-month axes since #186; since #198 the contract-price interpolation
+    reads them once to place its anchors and the months between."""
+    codes = schedule.codes
+    months = np.empty(len(codes), dtype=np.int64)
+    for i, code in enumerate(codes):
+        try:
+            month, year = month_and_year(code)
+        except ValueError:
+            raise ValueError(
+                f"index schedule row {i + 1} is {code!r}, expected a contract code, "
+                "a month letter and a two-digit year such as F26"
+            ) from None
+        months[i] = (year - 1970) * 12 + month - 1
+    order = np.argsort(months, kind="stable")
+    by_month = months[order]
+    same = np.flatnonzero(by_month[1:] == by_month[:-1])
+    if same.size:
+        a, b = int(order[same[0]]), int(order[same[0] + 1])
+        raise ValueError(
+            f"index schedule rows {a + 1} and {b + 1} are {codes[a]!r} and {codes[b]!r}, "
+            f"both {month_label(by_month[same[0]])}, expected one contract per month"
+        )
+    return months
+
+
+def month_label(count: object) -> str:
+    """A month as numpy counts them, written as the sheet reads one: 2027-04."""
+    return str(np.datetime64(int(cast(Any, count)), "M"))

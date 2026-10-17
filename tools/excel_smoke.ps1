@@ -1777,6 +1777,34 @@ $formulas = [ordered]@{
     "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    # Contract prices interpolated between anchors, interpolate-contract-prices.md, on the half-year
+    # index HALF: Z26 at 3 and H27 at 4.8, expiring 29 December and 29 March, give F27 and G27 29 and
+    # 57 of 90 days along, 3.58 and 4.14, under the two heading rows; the months as CME spells them
+    # the same; out of order, twice, as numbers and past the schedule refused.
+    "=ROWS(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2))" = "6"
+    "=COLUMNS(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2))" = "3"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),1,1)" = "contract_code"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),1,2)" = "future_expiry"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),1,3)" = "price"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),2,1)" = "str"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),2,2)" = "datetime64[D]"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),2,3)" = "float64"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),3,1)" = "Z26"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),4,1)" = "F27"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),5,1)" = "G27"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),6,1)" = "H27"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),4,2)" = "46414"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),6,2)" = "46475"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),3,3)" = "3"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),4,3)" = "3.58"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),5,3)" = "4.14"
+    "=INDEX(util_InterpolateContracts(SA15,UA1:UA2,UB1:UB2),6,3)" = "4.8"
+    '=INDEX(util_InterpolateContracts(SA15,{"202612";"202703"},UB1:UB2),5,3)' = "4.14"
+    '=util_InterpolateContracts(SA15,{"H27";"Z26"},UB1:UB2)' = "#ERROR util_InterpolateContracts: ValueError: anchor_contracts row 2 is 'Z26', 2026-12, expected a month after row 1's 'H27', 2027-03"
+    '=util_InterpolateContracts(SA15,{"Z26";"202612"},UB1:UB2)' = "#ERROR util_InterpolateContracts: ValueError: anchor_contracts rows 1 and 2 are 'Z26' and '202612', both 2026-12, expected each month once"
+    "=util_InterpolateContracts(SA15,{202612;202703},UB1:UB2)" = "#ERROR util_InterpolateContracts: anchor_contracts cell (1, 1) is number 202612.0, expected text"
+    '=util_InterpolateContracts(SA15,{"N27";"U27"},UB1:UB2)' = "#ERROR util_InterpolateContracts: ValueError: the index's schedule has no contract for 2027-08, Q27, expected every month from 2027-07 to 2027-09, the anchors' range"
+    "=util_InterpolateContracts(SA15,UA1:UA2,UB1)" = "#ERROR util_InterpolateContracts: ValueError: anchor_prices has 1 price, expected 2, one per anchor contract"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -2946,6 +2974,10 @@ $cells = [ordered]@{
     "TJ7" = "trade_id"; "TK7" = "trade_date"; "TL7" = "contract_code"; "TM7" = "quantity"; "TN7" = "fixed_price"
     "TJ8" = "4001"; "TK8" = "1-Oct-2026"; "TL8" = "X26"; "TM8" = "1"; "TN8" = "3"
     "TE12" = "=_CreateTrades(TE10,TJ7:TN7,TJ8:TN8,TE11)"
+    # Contract prices interpolated between anchors, interpolate-contract-prices.md: two anchors on
+    # the half-year index HALF, Z26 at 3 and H27 at 4.8.
+    "UA1" = "Z26"; "UB1" = "3"
+    "UA2" = "H27"; "UB2" = "4.8"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

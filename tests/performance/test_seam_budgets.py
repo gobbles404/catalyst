@@ -2387,3 +2387,83 @@ def test_a_combination_resolves_each_calendar_once_and_unites_them_once(
         "numpy.array": 1,  # the one copy the calendar keeps
         "ndarray.setflags": 1,  # frozen
     }
+
+
+# --- contract prices interpolated between anchors, interpolate-contract-prices.md --------------
+
+
+def cl_months() -> object:
+    """The ticket's CL-style index through the seam: J27, K27 and M27 expiring 22 March, 20 April
+    and 20 May 2027, under the suite's one set of conventions and specifications."""
+    return an_index(
+        PATH["_CreateFuturesSchedule"](
+            Cells.from_rows([["J27"], ["K27"], ["M27"]]),
+            Cells.from_rows([[46468.0], [46497.0], [46527.0]]),
+            MISSING,
+        ),
+        PATH["_CreateHolidayCalendar"](holiday_column(1)),
+    )
+
+
+# The handle resolved and the two columns read as any text column and number column are; the
+# library's one reading of the anchors, one of the schedule and one interpolation; and the three
+# columns laid out through the table builder, the expiries to serials. Twenty-five functions,
+# the accept rule once per argument; nothing is published.
+def test_an_interpolation_resolves_one_handle_reads_two_columns_and_lays_out_three(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    index = cl_months()
+    anchors = Cells.from_rows([["202704"], ["202706"]])
+    prices = Cells.from_rows([[70.0], [76.0]])
+    PATH["util_InterpolateContracts"](index, anchors, prices)
+    live = bridge.live_handles()
+    assert call_profile(lambda: PATH["util_InterpolateContracts"](index, anchors, prices)) == {
+        "Registered.run": 1,
+        "_arguments": 1,
+        "_validate": 3,
+        "_text": 1,
+        "_resolve": 1,
+        "_text_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
+        "_texts": 1,
+        "_numbers": 1,
+        "util_InterpolateContracts": 1,
+        "WorkCounter.__init__": 1,
+        "interpolate_contracts": 1,
+        "_anchor_months": 1,
+        "_month_of": 2,  # one reading per anchor label
+        "month_and_year": 3,  # the schedule's three codes; the anchors are CME months
+        "schedule_months": 1,
+        "WorkCounter.hit": 4,
+        "MixedArray.table": 1,
+        "_table_column": 2,
+        "_column": 1,
+        "_serials": 1,  # the expiries
+        "_unit": 1,
+        "_mixed_out": 1,
+        "_bad_mixed": 1,
+    }
+    # The library's own ledger, test_interpolation_budgets.py, under the seam's columns in and
+    # the table out: the two columns looked at, the dates read for their unit and the serials
+    # made contiguous.
+    assert numpy_calls(lambda: PATH["util_InterpolateContracts"](index, anchors, prices)) == {
+        "numpy.empty": 4,
+        "numpy.arange": 1,
+        "ndarray.argsort": 3,
+        "ndarray.searchsorted": 1,
+        "ndarray.nonzero": 4,
+        "ndarray.ravel": 4,
+        "ndarray.all": 3,
+        "ndarray.any": 6,
+        "ufunc.reduce": 9,
+        "numpy.count_nonzero": 1,
+        "numpy.asarray": 3,
+        "numpy.asanyarray": 4,
+        "numpy.ascontiguousarray": 2,
+        "numpy.datetime_data": 1,
+        "numpy._make_extobj": 1,
+        "numpy.interp": 1,
+        "ndarray.setflags": 2,
+    }
+    assert bridge.live_handles() == live

@@ -19,6 +19,7 @@ from test_seam_allocation import KEYWORD_CALL, SLACK, least_peak
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.contract_codes import schedule_months
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
 from goosedove.index_definitions.holiday_calendar import holiday_calendar
@@ -47,7 +48,6 @@ from goosedove.trades.terms import (
     Settlement,
     one_choice,
     resolved_trades,
-    schedule_months,
 )
 
 CallProfile = Callable[[Callable[[], object]], dict[str, int]]

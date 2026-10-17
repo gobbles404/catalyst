@@ -19,6 +19,8 @@ from goosedove.excel.bridge import (
     Date,
     Handle,
     MixedArray,
+    NumberColumn,
+    TextColumn,
     excel_function,
 )
 from goosedove.globals.discount_curve import DiscountCurve
@@ -39,12 +41,14 @@ from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.periods import end_date, start_date
+from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FieldType
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
 from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
+from goosedove.market_data.interpolated_contracts import interpolate_contracts
 from goosedove.market_data.price_vector import PriceVector
 from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded
@@ -848,3 +852,33 @@ def util_ShiftDate(
     -1bd the one before, +7cd a week on, +0em the month's last day, a chain such as
     +3em+25cd-1bd+1bd applied left to right, and shows the date."""
     return Date(shift_date(date, offset, holiday_calendar))
+
+
+@excel_function
+def util_InterpolateContracts(
+    index: Annotated[
+        Handle[Index],
+        "The index handle: the cell showing _CreateIndex's result, such as B9, or a name for it; a "
+        "futures index, whose schedule has a futures expiry per contract.",
+    ],
+    anchor_contracts: Annotated[
+        TextColumn,
+        "A column of at least two contract months in increasing order, each a code such as F26 or "
+        "the month as CME spells it, 202601, as text, without a header, such as A2:A3.",
+    ],
+    anchor_prices: Annotated[
+        NumberColumn,
+        "A column of one price per anchor, in the same rows and the index's quote convention, "
+        "without a header, such as B2:B3.",
+    ],
+) -> MixedArray:
+    """Infers every monthly contract from the first anchor's month through the last's, each with
+    the index's futures expiry and the price on the straight line between its anchors weighted
+    by calendar days, and spills contract_code, future_expiry and price."""
+    made = interpolate_contracts(index, anchor_contracts, anchor_prices, WorkCounter())
+    return MixedArray.table(
+        [("contract_code", "future_expiry", "price"), ("str", "datetime64[D]", "float64")],
+        made.codes,
+        made.expiries,
+        made.prices,
+    )
