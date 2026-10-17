@@ -20,7 +20,8 @@ from goosedove.trades.aggregation import AggregateResults, aggregate_results, ag
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
-from goosedove.trades.results import Bucket, Risk, TradeResults
+from goosedove.trades.results import TradeResults
+from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.terms import ScheduleMethod
 
 COUNTS = [1, 2, 24]

@@ -44,7 +44,8 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.resolution import ResolvedTrades
-from goosedove.trades.results import Bucket, Risk, RiskView, TradeResults, risk_view
+from goosedove.trades.results import TradeResults, risk_view
+from goosedove.trades.risk_report import Bucket, Risk, RiskView
 from goosedove.trades.terms import Route
 
 MONTHS = (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05"))

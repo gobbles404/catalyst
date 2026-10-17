@@ -47,7 +47,8 @@ from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments, prepared_trades
 from goosedove.trades.resolution import month_bounds
-from goosedove.trades.results import Bucket, Risk, TradeResults, risk_view
+from goosedove.trades.results import TradeResults, risk_view
+from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.terms import (
     BASES,
     METHODS,

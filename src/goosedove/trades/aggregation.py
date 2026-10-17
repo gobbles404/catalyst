@@ -48,15 +48,8 @@ from goosedove.trades.display_axes import (
     rows_through,
 )
 from goosedove.trades.encoding import PaymentAxes
-from goosedove.trades.results import (
-    NO_DAYS,
-    NOTHING,
-    Bucket,
-    Risk,
-    RiskView,
-    TradeResults,
-    placed,
-)
+from goosedove.trades.results import TradeResults
+from goosedove.trades.risk_report import NO_DAYS, NOTHING, Bucket, Risk, RiskView, placed
 
 SOURCES_COLLECTED = "sources_collected"  # occurrences, every one, a repeated result counted again
 INDEX_GROUPS = "index_groups"  # one per distinct index object among the occurrences
