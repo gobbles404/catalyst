@@ -82,33 +82,20 @@ components; a part of a month prices under `asian` alone, and [util_StartDate](.
 handle since #173. `schedule_method` is `lastday`, `penultimate`, `last3day` or `asian`, the four
 built on a futures index, any other word refused by name, and on an IFERC index since #167
 `lastday` alone, the month's index on its publication day,
-[iferc-basis-futures.md](../../engineering-tickets/trade-valuation-pipeline/iferc-basis-futures.md). `route` is `cleared` or `bilateral`: a cleared batch values undiscounted, takes no curve and
-incurs the clearing reserve, a bilateral one is valued on the discount curve `_EvaluateTrades`
-requires since #177 and incurs none, since #188,
-[reserve-fee-applicability.md](../../engineering-tickets/trade-valuation-pipeline/reserve-fee-applicability.md). `settlement_method` is
+[iferc-basis-futures.md](../../engineering-tickets/trade-valuation-pipeline/iferc-basis-futures.md). `route` is `cleared` or `bilateral`: a cleared batch values undiscounted and takes no curve, a bilateral one is valued on the discount curve `_EvaluateTrades` requires; which reserves each route incurs is [_ReportReserves](../trades/report-reserves.md)'s rule. `settlement_method` is
 `physical`, which pays on no day and supplies no payment field, or `financial`, which requires
 `payment_time_lag` and `payment_holiday_calendar`, the lag counted strictly after each
 component's anchor on that calendar: on a futures index its last observation day, and on an
 IFERC index since #167 the month's last trading date, the index printing later. `clearing_house` is required with a cleared route
 and refused with a bilateral one, the organization's name kept as typed, selecting no rate and
 exempting no fee; `counterparty` since #175 the reverse, required with a bilateral
-route and refused with a cleared one, a label kept per row; and `broker` names the broker whose
-presence charges the brokerage reserve since #188, `none` in any case naming none for a screen
-trade. The labels are read for nothing else but the readback. Since #188 the descriptions of these
-four fields say what each controls, which the sheet reads in the grid above. `fixed_price` is the agreed price in the
+route and refused with a cleared one, a label kept per row; and `broker` names the broker, or `none` in any case for a screen trade; what a broker's presence charges is [_ReportReserves](../trades/report-reserves.md)'s rule. The labels are read for nothing else but the readback. The descriptions of these four fields say what each controls, which the sheet reads in the grid above. `fixed_price` is the agreed price in the
 index's quote units, `trade_id` the source system's deal number since #168, a whole number of at
 most 15 digits read back as a number, duplicates kept as separate trades,
 [numeric-trade-ids.md](../../engineering-tickets/trade-valuation-pipeline/numeric-trade-ids.md),
 `trade_date` the day the deal was struck.
 
-`marketing_reserve`, since #175, is an optional amount in the index's settlement currency, a marketing
-cost booked once per ticket row whatever its months, quantity, days or sign: the template's one value
-booked once by every row or the ticket's column, finite and zero or more, a negative amount, NaN and
-the infinities refused naming the field and the first such row, a blank cell refused as any number's;
-left out of both, zero. The amounts are summed once when the batch is made, over the rows and never
-the components, into the marketing reserve [_ReportReserves](../trades/report-reserves.md) shows, and
-enter no mark, cash, delta or DV01; the trades readback shows the row's amount on each of its
-components, the one amount and no allocation, so the column is never summed down a strip.
+`marketing_reserve` is an optional amount in the index's settlement currency, the template's one value or the ticket's column, booked once per ticket row; what it must hold, what it books and that it enters no value are [_ReportReserves](../trades/report-reserves.md)'s; the trades readback shows the row's amount on each of its components, the one amount and no allocation, so the column is never summed down a strip.
 
 ## Excel help
 

@@ -4,9 +4,7 @@ The pricing library: what each worksheet function is meant to do, one page per f
 
 These pages are for an engineer building a function and for the owner reviewing what will be built. They are not the desk's documentation: what a person sees when typing a formula is Excel's own help text, the function line and one line per argument, and each page carries that text under Excel help so there is one source for it. Nothing here ships with a release.
 
-For trade work, start with the [trade valuation pipeline handoff](../engineering-tickets/trade-valuation-pipeline/README.md).
-It establishes how instrument definitions, templates, CreateTrades, PrepareTrades, evaluation
-and readers connect. The trade function pages below specify individual parts of that design.
+How the pieces fit together, from an index to a risk report, is [architecture.md](../architecture.md). The trade pipeline's design, as agreed before it was built, is the [pipeline packet](../engineering-tickets/trade-valuation-pipeline/README.md); where a page below and a ticket differ, the page says what is built.
 
 ## The pages
 
@@ -22,7 +20,7 @@ and readers connect. The trade function pages below specify individual parts of 
 | [trades/report-values.md](trades/report-values.md) | `_ReportValues`, the mark and the cash under the route's labels, the currency and the valuation day, as stored |
 | [trades/report-risk.md](trades/report-risk.md) | `_ReportRisk(results, risk, bucket)`, since #178, over one evaluated batch's results or since #180 a collection's: the nominal delta, the delta or the DV01, or all three, by day, calendar month or calendar year, the saved Total above the dated rows, the deltas on observation days and the DV01 on payment days, as stored; since #186 the month and year views of the deltas by the pricing contract month or year, every period view running from the valuation period on, a saved risk before it refused |
 | [trades/aggregate-results.md](trades/aggregate-results.md) | `_AggregateResults(result_handles)`, since #180: a cell, a row or a column of results handles collected in the order given, every one counted, into one handle of its own kind, the saved lots summed by the exact index object and the saved DV01 by the exact curve object and currency, nothing valued again, which `_ReportRisk` reports as a batch's; the readback its membership rows |
-| [trades/report-reserves.md](trades/report-reserves.md) | `_ReportReserves`, the batch's booked brokerage and clearing, since #175 marketing the amounts the rows booked, summed once each, and their currency, as creation stored them; since #188 brokerage on the trades naming a broker, `none` in any case naming none, and clearing on a cleared route |
+| [trades/report-reserves.md](trades/report-reserves.md) | `_ReportReserves`, the batch's booked brokerage, clearing and marketing reserves and their currency, as creation stored them; which fee a row incurs is the page's rule |
 | [CreateTrades and retained state](../engineering-tickets/trade-valuation-pipeline/create-trade.md) | Public trade creation wraps private resolution and encoding; one handle retains resolved facts, static arrays, market input references and mappings |
 | [conventions.md](conventions.md) | how a function page is written, the skeleton to copy for a new one, and the few rules that hold everywhere |
 | [time.md](time.md) | the decisions on contract months, their codes, calendar days and business days, recorded ahead of the functions that need them |
@@ -62,9 +60,9 @@ The handle that the creators return, text in a cell that stands for a live objec
 Four steps, and the page is the only document. A page says what the desk types, sees and is told, and what must hold. How it crosses and what it costs belongs to the build.
 
 1. **Write the page when the function is next, not before.** From the skeleton in [conventions.md](conventions.md): the formula a person types, the cells beside it, what the cell shows, the declaration, the help lines, the rules it needs today with their messages, the tests to write, and Not here. That is the spec, and it is a docs pull request.
-2. **Engineering answers one question on that pull request: can the seam carry it as written?** If yes, the page's first line reads `Ready to ship.` If not, the page names the one seam item in words, the item goes in the seam's wanted-next table in [inputs.md](../seam/inputs.md) with the recommended form, and the first line reads `Waiting on the seam: ...`. That answer is the merge gate.
+2. **Engineering answers one question on that pull request: can the seam carry it as written?** If yes, the page says so in one line. If not, the page names the one seam item in words, and the item goes in the seam's wanted-next table in [inputs.md](../seam/inputs.md) with the recommended form. That answer is the merge gate.
 3. **Seam first, when needed, in its own pull request.** A new type follows [working.md §3](../seam/working.md#3-adding-a-declared-type); a new form of declaration is the same shape and smaller.
-4. **Build in one pull request**, following [working.md §2](../seam/working.md#2-adding-a-worksheet-function). Open it against the seam branch when there is one, so GitHub shows only its own changes and it can merge only after the seam does. The build sets the first line to `Built in #NN`, points the Tests table at the files, and the page becomes the reference.
+4. **Build in one pull request**, following [working.md §2](../seam/working.md#2-adding-a-worksheet-function). Open it against the seam branch when there is one, so GitHub shows only its own changes and it can merge only after the seam does. The build makes the page the reference: it says what was built and names the tests that pin it; the pull request, not the page, carries the number.
 
 Three things not to do:
 

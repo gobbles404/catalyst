@@ -17,7 +17,7 @@ def _ReportReserves(results: Handle[TradeResults]) -> MixedArray: ...
 | | float64 | float64 | float64 | str |
 | | 50 | 20 | 0 | USD |
 
-One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it; a blank, a number or a handle of another kind fails in the seam's words, `results is blank, expected trade results handle`. The spill is three rows by four columns: the headers, the types and one row of the stored values. `brokerage_reserve` and `clearing_reserve` are positive costs in `currency`; `marketing_reserve` is 0 until the marketing reserve is built, with no field in a template or a ticket; `currency` is the index's settlement currency, the conventions' `currency_unit`, the one the specifications' rates are in.
+One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it; a blank, a number or a handle of another kind fails in the seam's words, `results is blank, expected trade results handle`. The spill is three rows by four columns: the headers, the types and one row of the stored values. `brokerage_reserve` and `clearing_reserve` are positive costs in `currency`; `marketing_reserve` is the amount the rows booked, zero when neither the template nor the ticket supplied the field; `currency` is the index's settlement currency, the conventions' `currency_unit`, the one the specifications' rates are in.
 
 The example is the ticket's, on an index whose specifications charge LOT, a thousand barrels, 10.00 of brokerage and 4.00 of clearing a lot, and BBL, one barrel, 0.01 and 0.004, settled in USD, under a cleared template naming ION as broker; four trades of one month each:
 

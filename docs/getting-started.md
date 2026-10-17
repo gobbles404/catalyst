@@ -138,4 +138,4 @@ Eight steps in order, stopping at the first failure: formatting, lint, types, th
 
 ## Where to read next
 
-[README.md](../README.md) lists the daily commands. [docs/seam/working.md](seam/working.md) says how a change is checked and, in its section 8, how the add-in is loaded by hand and what `goosedove.cfg` holds. [docs/library/README.md](library/README.md) is one page per worksheet function, and [docs/seam/README.md](seam/README.md) is the way into everything written about the seam, the one place Excel and Python meet.
+[architecture.md](architecture.md) says how the pieces fit together and where each responsibility lives. [README.md](../README.md) lists the daily commands. [docs/seam/working.md](seam/working.md) says how a change is checked and, in its section 8, how the add-in is loaded by hand and what `goosedove.cfg` holds. [docs/library/README.md](library/README.md) is one page per worksheet function, and [docs/seam/README.md](seam/README.md) is the way into everything written about the seam, the one place Excel and Python meet.
