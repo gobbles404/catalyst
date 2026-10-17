@@ -20,6 +20,7 @@ from numpy.typing import NDArray
 from goosedove.calendar.calendar import calendar
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.contract_codes import schedule_months
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import FuturesSchedule, futures_schedule
 from goosedove.index_definitions.gas_daily_schedule import gas_daily_schedule
@@ -52,7 +53,6 @@ from goosedove.trades.terms import (
     named_trade,
     one_choice,
     resolved_trades,
-    schedule_months,
     whole_trade_ids,
 )
 

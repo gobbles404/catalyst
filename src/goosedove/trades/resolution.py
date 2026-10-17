@@ -23,6 +23,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.unit_conversions import UnitConversions
+from goosedove.index_definitions.contract_codes import month_label, schedule_months
 from goosedove.index_definitions.date_offsets import shift_days
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
@@ -52,11 +53,9 @@ from goosedove.trades.terms import (
     Route,
     Settlement,
     marketing_reserves,
-    month_label,
     named_trade,
     reporting_lot_of,
     resolved_trades,
-    schedule_months,
     trade_schedule_of,
     whole_trade_ids,
 )
