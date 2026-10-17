@@ -483,6 +483,8 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
         )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
+            "delta_labels": 1,  # the headings, spelled once in risk_report.py for both paths
+            "dv01_label": 1,
             **selected,
             "placed": 3,
         }

@@ -19,7 +19,17 @@ from goosedove.market.market import Market
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.reserves import Reserves
-from goosedove.trades.risk_report import NO_DAYS, NOTHING, Bucket, Period, Risk, RiskView, placed
+from goosedove.trades.risk_report import (
+    NO_DAYS,
+    NOTHING,
+    Bucket,
+    Period,
+    Risk,
+    RiskView,
+    delta_labels,
+    dv01_label,
+    placed,
+)
 from goosedove.trades.terms import Route
 
 
@@ -139,12 +149,9 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
     evaluation stored.
     """
     terms = results.prepared.encoded.terms
-    currency = results.currency
-    nominal_label = f"{terms.index.name} nominal_delta [{terms.reporting_lot.name}]"
-    delta_label = f"{terms.index.name} delta [{terms.reporting_lot.name}]"
+    nominal_label, delta_label = delta_labels(terms.index, terms.reporting_lot)
     group = "curve_1" if results.curve is not None else "cleared"
-    dv01_label = f"{group} {currency} dv01 [{currency} per basis point]"
-    labels = (nominal_label, delta_label, dv01_label)
+    labels = (nominal_label, delta_label, dv01_label(group, results.currency))
     match bucket:
         case Bucket.DAY:
             return _day_view(results, risk, labels)

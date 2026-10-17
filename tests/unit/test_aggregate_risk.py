@@ -45,7 +45,7 @@ from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.resolution import ResolvedTrades
 from goosedove.trades.results import TradeResults, risk_view
-from goosedove.trades.risk_report import Bucket, Risk, RiskView
+from goosedove.trades.risk_report import Bucket, Risk, RiskView, delta_labels, dv01_label
 from goosedove.trades.terms import Route
 
 MONTHS = (("Z26", "2026-12-31"), ("F27", "2027-01-04"), ("F29", "2029-01-05"))
@@ -627,3 +627,29 @@ def test_every_view_sums_to_the_total_above_it(sources: dict[str, TradeResults])
             view = aggregate_view(agg, risk, bucket)
             for total, values in zip(view.totals, view.columns, strict=True):
                 assert float(values.sum()) == pytest.approx(total, **CLOSE), (risk, bucket)
+
+
+def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeResults]) -> None:
+    """risk_report.py's two helpers are the one spelling of every column heading: the single
+    result's view and the collection's carry what they return and nothing else."""
+    results = tuple(sources.values())
+    terms = results[0].prepared.encoded.terms
+    assert delta_labels(terms.index, terms.reporting_lot) == (HNG_NOMINAL, HNG_DELTA)
+    assert dv01_label("curve_1", "USD") == CURVE_1
+    assert dv01_label("cleared", "USD") == CLEARED_USD
+    for result in results:
+        terms = result.prepared.encoded.terms
+        group = "curve_1" if result.curve is not None else "cleared"
+        for bucket in Bucket:
+            view = risk_view(result, Risk.ALL, bucket)
+            assert view.labels == (
+                *delta_labels(terms.index, terms.reporting_lot),
+                dv01_label(group, result.currency),
+            )
+    agg = collected(*results)
+    view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
+    pairs = [label for g in agg.index_groups for label in delta_labels(g.index, g.reporting_lot)]
+    assert list(view.labels[: len(pairs)]) == pairs
+    rate_labels = {dv01_label(f"curve_{r.number}", r.currency) for r in agg.rate_groups}
+    rate_labels |= {dv01_label("cleared", c) for c in agg.currencies}
+    assert set(view.labels[len(pairs) :]) <= rate_labels and len(view.labels) > len(pairs)

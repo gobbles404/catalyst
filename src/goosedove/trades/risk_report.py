@@ -14,6 +14,8 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.index_definitions.index import Index, ReportingLot
+
 
 class Bucket(Enum):
     """What a risk report sums by: the day, or since #186 the calendar month or year, the pricing
@@ -66,3 +68,20 @@ def placed(size: int, places: NDArray[np.intp], vector: NDArray[np.float64]) -> 
     column = np.zeros(size)
     column[places] = vector
     return column
+
+
+def delta_labels(index: Index, reporting_lot: ReportingLot) -> tuple[str, str]:
+    """The two delta columns' headings, the nominal delta's then the delta's: the index's short
+    name as the desk typed it and the reporting lot's, `HNG nominal_delta [LOT]` and
+    `HNG delta [LOT]`, read off the two records and nothing resolved or converted here."""
+    return (
+        f"{index.name} nominal_delta [{reporting_lot.name}]",
+        f"{index.name} delta [{reporting_lot.name}]",
+    )
+
+
+def dv01_label(group: str, currency: str) -> str:
+    """The DV01 column's heading over the group its caller named, `curve_1` by first appearance
+    among a collection's curves or `cleared` where no curve values, in the group's currency:
+    `curve_1 USD dv01 [USD per basis point]`. Which group and which currency are the caller's."""
+    return f"{group} {currency} dv01 [{currency} per basis point]"
