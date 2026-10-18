@@ -107,9 +107,7 @@ GAS_DAILY_SCHEDULE = gas_daily_schedule(
     dates("2026-09-30", "2026-10-31", "2026-11-30"),
 )
 IFERC_SCHEDULE = iferc_schedule(
-    ("V26", "X26", "Z26"),
-    dates("2026-09-30", "2026-10-30", "2026-11-30"),
-    dates("2026-10-01", "2026-11-02", "2026-12-01"),
+    ("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01")
 )
 
 
@@ -680,7 +678,7 @@ def any_iferc_history(data: st.DataObject) -> MarketHistory:
     )
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
     codes = tuple(f"c{i}" for i in range(count))
-    schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
+    schedule = iferc_schedule(codes, published)
     as_of = published[0] + np.timedelta64(data.draw(st.integers(-10, int(gaps[1:].sum()))), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed)[::-1]  # the newest month first, as the desk keeps them
@@ -780,7 +778,7 @@ def a_monthly_iferc_history(first_year: int, last_year: int, as_of: str) -> Mark
     codes = tuple(
         f"{MONTH_CODES[i % 12]}{(first_year + i // 12) % 100}" for i in range(months.size)
     )
-    schedule = iferc_schedule(codes, months - np.timedelta64(1, "D"), months)
+    schedule = iferc_schedule(codes, months)
     return an_iferc_history(as_of, schedule)
 
 

@@ -756,7 +756,7 @@ def the_iferc_index() -> str:
     """The IFERC index of the schedule page's three months, made once."""
     schedule = bridge.call(
         "_CreateIfercSchedule",
-        [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
+        [column("V26", "X26", "Z26"), column(OCT_1, NOV_2, DEC_1)],
     )
     return an_index(schedule, MISSING, "Henry Hub IFERC")
 

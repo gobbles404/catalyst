@@ -104,20 +104,15 @@ def _CreateIfercSchedule(
         TextColumn,
         "The column of contract codes, such as A2:A4 holding V26 to Z26, one per contract month.",
     ],
-    last_trading_date: Annotated[
-        DateColumn,
-        "The column of last trading dates beside the codes, such as B2:B4, one per code.",
-    ],
     publication_date: Annotated[
         DateColumn,
-        "The column of dates the index is published, beside the codes, such as C2:C4, one per "
-        "code.",
+        "The column of dates the index is published, beside the codes, such as B2:B4, one per "
+        "code, the day each month is observed and the day its payment counts from.",
     ],
 ) -> Handle[IfercSchedule]:
-    """Creates an IFERC schedule from the contract months of one index, the day each month's
-    future stops trading and the day its index is published, and shows its handle, the text
-    other formulas take as the schedule."""
-    return iferc_schedule(contract_code, last_trading_date, publication_date)
+    """Creates an IFERC schedule from the contract months of one index and the day each month's
+    index is published, and shows its handle, the text other formulas take as the schedule."""
+    return iferc_schedule(contract_code, publication_date)
 
 
 @excel_function

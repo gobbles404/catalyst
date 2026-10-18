@@ -300,12 +300,12 @@ namespace Goosedove.Host.Tests
             // The holiday calendar: one column of dates, a blank in it, and a row where a column is expected.
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Column(46023.0, ExcelEmpty.Value, 46069.0) }, "#ERROR _CreateHolidayCalendar: holiday cell (2, 1) is blank, expected date" };
             yield return new object[] { "_CreateHolidayCalendar", new object[] { Row(46023.0, 46023.0) }, "#ERROR _CreateHolidayCalendar: holiday is 1x2 array, expected column of dates" };
-            // The IFERC schedule: a last trading column one row short, the library's words; a blank among the publication dates, a number among the codes, the publication dates left out and a row where a column is expected, the seam's.
-            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26", "Z26"), Column(46295.0, 46325.0), Column(46296.0, 46328.0, 46357.0) }, "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 2 dates, expected 3, one per contract_code" };
-            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Column(46295.0, 46325.0), Column(46296.0, ExcelEmpty.Value) }, "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date" };
-            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", 46023.0), Column(46295.0, 46325.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
-            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Column(46295.0, 46325.0), ExcelMissing.Value }, "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates" };
-            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Row(46295.0, 46325.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: last_trading_date is 1x2 array, expected column of dates" };
+            // The IFERC schedule: a publication column one row short, the library's words; a blank among the publication dates, a number among the codes, the publication dates left out and a row where a column is expected, the seam's.
+            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26", "Z26"), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code" };
+            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Column(46296.0, ExcelEmpty.Value) }, "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date" };
+            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", 46023.0), Column(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text" };
+            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), ExcelMissing.Value }, "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates" };
+            yield return new object[] { "_CreateIfercSchedule", new object[] { Column("V26", "X26"), Row(46296.0, 46328.0) }, "#ERROR _CreateIfercSchedule: publication_date is 1x2 array, expected column of dates" };
             // The Gas Daily schedule: a first-date column one row short, the library's words; a blank among the last dates, a number among the codes, the last dates left out and a row where a column is expected, the seam's.
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26", "X26"), Column(46266.0, 46296.0), Column(46295.0, 46326.0, 46356.0) }, "#ERROR _CreateGasDailySchedule: ValueError: first_date has 2 dates, expected 3, one per contract_code" };
             yield return new object[] { "_CreateGasDailySchedule", new object[] { Column("U26", "V26"), Column(46266.0, 46296.0), Column(46295.0, ExcelEmpty.Value) }, "#ERROR _CreateGasDailySchedule: last_date cell (2, 1) is blank, expected date" };
@@ -1436,30 +1436,27 @@ namespace Goosedove.Host.Tests
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", oneDay)).GetLength(0));
         }
 
-        // An IFERC schedule: three columns make one, three single cells make one of one contract
-        // month, and util_ReadHandle spills it back, the three headers, the three types, then a
-        // row per contract month, the code as text and both dates as serials.
+        // An IFERC schedule: two columns make one, two single cells make one of one contract
+        // month, and util_ReadHandle spills it back, the two headers, the two types, then a
+        // row per contract month, the code as text and the publication day as a serial; since
+        // iferc-publication-payment-anchor.md the schedule holds no last trading date.
         [Fact]
-        public void an_iferc_schedule_is_created_from_three_columns_and_read_back_through_its_handle()
+        public void an_iferc_schedule_is_created_from_two_columns_and_read_back_through_its_handle()
         {
-            var handle = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var handle = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
             Assert.StartsWith(Pid + ":iferc_schedule:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal(2, spill.GetLength(1));
             Assert.Equal("contract_code", spill[0, 0]);
-            Assert.Equal("last_trading_date", spill[0, 1]);
-            Assert.Equal("publication_date", spill[0, 2]);
+            Assert.Equal("publication_date", spill[0, 1]);
             Assert.Equal("str", spill[1, 0]);
             Assert.Equal("datetime64[D]", spill[1, 1]);
-            Assert.Equal("datetime64[D]", spill[1, 2]);
             Assert.Equal("V26", spill[2, 0]);
-            Assert.Equal(46295.0, spill[2, 1]);
-            Assert.Equal(46296.0, spill[2, 2]);
+            Assert.Equal(46296.0, spill[2, 1]);
             Assert.Equal("Z26", spill[4, 0]);
-            Assert.Equal(46356.0, spill[4, 1]);
-            Assert.Equal(46357.0, spill[4, 2]);
-            var one = (string)Seam.Call("_CreateIfercSchedule", "V26", 46295.0, 46296.0);
+            Assert.Equal(46357.0, spill[4, 1]);
+            var one = (string)Seam.Call("_CreateIfercSchedule", "V26", 46296.0);
             Assert.NotEqual(handle, one);
             Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
         }
@@ -1577,7 +1574,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(3.0, spill[2, 3]);
             Assert.Equal(2.0, spill[2, 4]);
             Assert.Equal(true, spill[2, 5]);
-            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
             var monthly = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateIndex", "Henry Hub IFERC", "Henry Hub natural gas - Inside FERC monthly index", iferc, conventions, specifications, ExcelMissing.Value, ExcelMissing.Value));
             Assert.Equal("Henry Hub natural gas - Inside FERC monthly index", monthly[2, 1]);
             Assert.Equal("IFERC", monthly[2, 2]);
@@ -1679,7 +1676,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(true, flowDays[26, 3]);
             Assert.Equal(false, flowDays[27, 3]);
             Assert.Equal("X26", flowDays[92, 1]);
-            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
             var months = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), Index(iferc, ExcelMissing.Value)));
             Assert.Equal(5, months.GetLength(0));
             Assert.Equal(46328.0, months[3, 0]);
@@ -1766,7 +1763,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(false, days[13, 3]);
             Assert.Equal("unfixed", days[13, 4]);
             Assert.Equal("unfixed", days[92, 4]);
-            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
             var ifercIndex = Index(iferc, ExcelMissing.Value, "Henry Hub IFERC");
             var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), ifercIndex);
             var indices = (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85), ifercIndex);
@@ -1907,7 +1904,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(3.10, days[32, 4]);
             Assert.Equal(3.40, days[63, 4]);
             Assert.Equal(3.40, days[92, 4]);
-            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46295.0, 46325.0, 46356.0), Column(46296.0, 46328.0, 46357.0));
+            var iferc = (string)Seam.Call("_CreateIfercSchedule", Column("V26", "X26", "Z26"), Column(46296.0, 46328.0, 46357.0));
             var ifercIndex = Index(iferc, ExcelMissing.Value, "Henry Hub IFERC");
             var november = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46341.0, 0.5), ifercIndex);
             var monthly = (string)Seam.Call("_CreateMarketHistory", november, (string)Seam.Call("_CreateIfercFixings", Column("X26", "V26"), Column(2.10, 1.85), ifercIndex));
@@ -1947,7 +1944,7 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void iferc_fixings_are_created_from_two_columns_and_an_index_and_read_back_through_their_handle()
         {
-            var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("F26", "G26", "H26", "J26"), Column(46022.0, 46052.0, 46080.0, 46112.0), Column(46027.0, 46055.0, 46083.0, 46113.0));
+            var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("F26", "G26", "H26", "J26"), Column(46027.0, 46055.0, 46083.0, 46113.0));
             var index = Index(schedule, ExcelMissing.Value, "Waha IFERC");
             var handle = (string)Seam.Call("_CreateIfercFixings", Column("J26", "H26", "G26", "F26"), Column(1.60, 1.95, 2.10, 1.85), index);
             Assert.StartsWith(Pid + ":iferc_fixings:Waha IFERC:", handle);
@@ -2012,7 +2009,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: price has 2 prices, expected 3, one per flow_date", Seam.Call("_CreateGasDailyFixings", Column(46271.0, 46270.0, 46269.0), Column(2.875, 2.93), index));
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-04, expected 2026-09-05, the day before row 1's 2026-09-06", Seam.Call("_CreateGasDailyFixings", Column(46271.0, 46269.0), Column(2.875, 2.93), index));
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: flow_date row 2 is 2026-09-05, expected 2026-09-03, the day before row 1's 2026-09-04", Seam.Call("_CreateGasDailyFixings", Column(46269.0, 46270.0), Column(2.93, 2.875), index));
-            var iferc = Index(Seam.Call("_CreateIfercSchedule", "F26", 46022.0, 46027.0), ExcelMissing.Value, "Waha IFERC");
+            var iferc = Index(Seam.Call("_CreateIfercSchedule", "F26", 46027.0), ExcelMissing.Value, "Waha IFERC");
             Assert.Equal("#ERROR _CreateGasDailyFixings: ValueError: index is an IFERC index, expected a Gas Daily index", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, iferc));
             Assert.Equal("#ERROR _CreateGasDailyFixings: index is gas daily schedule handle '" + schedule + "', expected index handle", Seam.Call("_CreateGasDailyFixings", 46269.0, 2.93, schedule));
         }
@@ -2288,12 +2285,12 @@ namespace Goosedove.Host.Tests
             Assert.Equal(1.0, (double)((object[,])Seam.Call("_ReportRisk", last, "nominal_delta", "month"))[4, 1], 6);
         }
 
-        // IFERC basis futures, iferc-basis-futures.md: the Waha-like index, X26, Z26 and F27 last
-        // trading 46325, 46356 and 46387 and published 46328, 46357 and 46391, dollars an MMBtu, a
-        // 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the payment
-        // calendar closing New Year's Day, 46388; the template cleared, financial, lastday, LOT a
-        // month at +3bd; WAH001, 1 LOT of Z26 at -0.50 booked 46356, paying 46359, read back in the
-        // batch. On 46357, the publication day, live at -0.30: 500 of mark, a lot, the slot Z26 on
+        // IFERC basis futures, iferc-basis-futures.md: the Waha-like index, X26, Z26 and F27
+        // published 46328, 46357 and 46391, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU, the
+        // LOT reported, no pricing calendar; the payment calendar closing New Year's Day, 46388; the
+        // template cleared, financial, lastday, LOT a month at +2bd from publication since
+        // iferc-publication-payment-anchor.md; WAH001, 1 LOT of Z26 at -0.50 booked 46356, paying
+        // 46359, read back in the batch. On 46357, the publication day, live at -0.30: 500 of mark, a lot, the slot Z26 on
         // 46357 paying 46359 with 2,500 of live coefficient, a tick to -0.25 625 on the same
         // preparation with the first results standing; on 46358 with the index at -0.20, 750 of
         // mark, fixed and unpaid, no lot; on 46359, 750 of cash. The delta by day one row, 46357, a
@@ -2301,14 +2298,14 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void an_iferc_basis_future_marks_fixes_and_pays_from_its_published_index()
         {
-            var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("X26", "Z26", "F27"), Column(46325.0, 46356.0, 46387.0), Column(46328.0, 46357.0, 46391.0));
+            var schedule = (string)Seam.Call("_CreateIfercSchedule", Column("X26", "Z26", "F27"), Column(46328.0, 46357.0, 46391.0));
             var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 2500.0, "MMBTU", 0.0, 0.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "WAHA", "Waha basis - ICE", schedule, conventions, specifications, ExcelMissing.Value, "LOT");
             Assert.StartsWith(Pid + ":index:WAHA:", index);
             var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
-            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "lastday", "cleared", "financial", "ICE Clear Europe", "+3bd", pays));
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "lastday", "cleared", "financial", "ICE Clear Europe", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var row = new object[,] { { 1001.0, 46356.0, "Z26", 1.0, -0.5 } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, row, template);

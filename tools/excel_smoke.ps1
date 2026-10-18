@@ -1099,10 +1099,10 @@ $formulas = [ordered]@{
     "=_ReportRisk(MY8)"                     = "#ERROR _ReportRisk: risk is missing, expected text"
     '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or cashflow results handle"
     # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, X26, Z26 and F27
-    # last trading 30 October, 30 November and 31 December and published 2 November, 1 December
-    # and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU,
-    # the LOT reported, no pricing calendar; the template in NR3 cleared, financial, lastday, LOT a
-    # month at +3bd on the calendar in NK2 closing New Year's Day; WAH001, 1 LOT of Z26 at -0.50
+    # published 2 November, 1 December and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a
+    # 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the template in NR3
+    # cleared, financial, lastday, LOT a month at +2bd from publication on the calendar in NK2
+    # closing New Year's Day, iferc-publication-payment-anchor.md; WAH001, 1 LOT of Z26 at -0.50
     # booked 30 November in NR6, paying 3 December, 46359, read back in the batch. On 1 December in
     # OC8, the publication day, live at -0.30: 500 of mark, one lot, the slot Z26 on 46357 paying
     # 46359, 2,500 of live coefficient; a tick to -0.25 in OC16, 625 over the same preparation; on
@@ -1401,28 +1401,28 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EA10),32,2)" = "U26"
     "=INDEX(util_ReadHandle(EA10),32,5)" = "2.2"
     "=_CreateMarket(DU2,EA11)" = "#ERROR _CreateMarket: ValueError: price_vector has 4 prices, expected at most 3, one per contract from 'U26' through 'X26'"
-    # The IFERC schedule: a creator over three contract months, their codes, the day each month's
-    # future stops trading and the day its index is published, in DA to DC, and over the first row
-    # alone, read back through util_ReadHandle; a last trading column one row long and a
-    # publication column one row short, the library's words; a blank among the publication dates,
-    # a number among the codes, the publication dates left out and a row where a column is
+    # The IFERC schedule: a creator over three contract months, their codes and the day each
+    # month's index is published, in DA and DC, and over the first row alone, read back through
+    # util_ReadHandle, two columns since iferc-publication-payment-anchor.md; a publication column
+    # one row long and one row short, the library's words; a blank among the publication dates, a
+    # number among the codes, the publication dates left out and a row where a column is
     # expected, the seam's.
     '=MID(DE1,FIND(":",DE1)+1,15)' = "iferc_schedule:"
     '=MID(DE2,FIND(":",DE2)+1,15)' = "iferc_schedule:"
     "=INDEX(util_ReadHandle(DE1),1,1)" = "contract_code"
-    "=INDEX(util_ReadHandle(DE1),1,3)" = "publication_date"
+    "=INDEX(util_ReadHandle(DE1),1,2)" = "publication_date"
     "=INDEX(util_ReadHandle(DE1),2,2)" = "datetime64[D]"
     "=INDEX(util_ReadHandle(DE1),3,1)" = "V26"
-    "=INDEX(util_ReadHandle(DE1),4,2)" = "46325"
-    "=INDEX(util_ReadHandle(DE1),5,3)" = "46357"
-    "=COLUMNS(util_ReadHandle(DE1))"   = "3"
+    "=INDEX(util_ReadHandle(DE1),4,2)" = "46328"
+    "=INDEX(util_ReadHandle(DE1),5,2)" = "46357"
+    "=COLUMNS(util_ReadHandle(DE1))"   = "2"
     "=ROWS(util_ReadHandle(DE2))"      = "3"
-    "=_CreateIfercSchedule(DA2:DA4,DB2:DB5,DC2:DC4)" = "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 4 dates, expected 3, one per contract_code"
-    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DC2:DC3)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code"
-    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DD2:DD4)" = "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date"
-    "=_CreateIfercSchedule(DA6:DA7,DB2:DB3,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
-    "=_CreateIfercSchedule(DA2:DA4,DB2:DB4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
-    "=_CreateIfercSchedule(DA2:DA4,DB2:DC2,DC2:DC4)" = "#ERROR _CreateIfercSchedule: last_trading_date is 1x2 array, expected column of dates"
+    "=_CreateIfercSchedule(DA2:DA4,DC2:DC5)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 4 dates, expected 3, one per contract_code"
+    "=_CreateIfercSchedule(DA2:DA4,DC2:DC3)" = "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, expected 3, one per contract_code"
+    "=_CreateIfercSchedule(DA2:DA4,DD2:DD4)" = "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date"
+    "=_CreateIfercSchedule(DA6:DA7,DC2:DC3)" = "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, expected text"
+    "=_CreateIfercSchedule(DA2:DA4)" = "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates"
+    "=_CreateIfercSchedule(DA2:DA4,DC2:DD2)" = "#ERROR _CreateIfercSchedule: publication_date is 1x2 array, expected column of dates"
     # The Gas Daily schedule: a creator over three contract months, their codes and the first and
     # last day of gas of each, in DG to DI, and over the first row alone, read back through
     # util_ReadHandle; a first-date column one row long and a last-date column one row short, the
@@ -2482,10 +2482,10 @@ $cells = [ordered]@{
     "NF9" = "=_CreateMarket(NF5,NF6)"
     "NF7" = "=_PrepareTrades(MS4,NF5)"
     "NF8" = "=_EvaluateTrades(NF7,NF9)"
-    "NH1" = "X26"; "NI1" = "30-Oct-2026"; "NJ1" = "2-Nov-2026"
-    "NH2" = "Z26"; "NI2" = "30-Nov-2026"; "NJ2" = "1-Dec-2026"
-    "NH3" = "F27"; "NI3" = "31-Dec-2026"; "NJ3" = "4-Jan-2027"
-    "NH4" = "=_CreateIfercSchedule(NH1:NH3,NI1:NI3,NJ1:NJ3)"
+    "NH1" = "X26"; "NJ1" = "2-Nov-2026"
+    "NH2" = "Z26"; "NJ2" = "1-Dec-2026"
+    "NH3" = "F27"; "NJ3" = "4-Jan-2027"
+    "NH4" = "=_CreateIfercSchedule(NH1:NH3,NJ1:NJ3)"
     "NK1" = "1-Jan-2027"
     "NK2" = "=_CreateHolidayCalendar(NK1)"
     "NL1" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
@@ -2493,7 +2493,7 @@ $cells = [ordered]@{
     "NM2" = "MMBTU"; "NN2" = "1"; "NO2" = "MMBTU"; "NP2" = "0"; "NQ2" = "0"
     "NM3" = "=_CreateContractSpecifications(EI1:EM1,NM1:NQ2)"
     "NH5" = '=_CreateIndex("WAHA","Waha basis - ICE",NH4,NL1,NM3,,"LOT")'
-    "NR2" = "LOT"; "NS2" = "month"; "NT2" = "lastday"; "NU2" = "cleared"; "NV2" = "financial"; "NW2" = "ICE Clear Europe"; "NX2" = "+3bd"; "NY2" = "=NK2"
+    "NR2" = "LOT"; "NS2" = "month"; "NT2" = "lastday"; "NU2" = "cleared"; "NV2" = "financial"; "NW2" = "ICE Clear Europe"; "NX2" = "+2bd"; "NY2" = "=NK2"
     "NR3" = '=_CreateTradeTemplate("fixed_float",IJ1:IQ1,NR2:NY2)'
     "NR5" = "1001"; "NS5" = "30-Nov-2026"; "NT5" = "Z26"; "NU5" = "1"; "NV5" = "-0.5"
     "NR6" = "=_CreateTrades(NH5,IS1:IW1,NR5:NV5,NR3)"
@@ -2502,7 +2502,7 @@ $cells = [ordered]@{
     "NR11" = "trade_id"; "NS11" = "trade_date"; "NT11" = "contract_code"; "NU11" = "quantity"; "NV11" = "fixed_price"; "NW11" = "schedule_method"
     "NR12" = "1001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "asian"
     "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_time_lag"; "NX14" = "payment_holiday_calendar"
-    "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+3bd"; "NX15" = "=NK2"
+    "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+2bd"; "NX15" = "=NK2"
     "NR16" = '=_CreateTradeTemplate("fixed_float",NR14:NX14,NR15:NX15)'
     "OA1" = "Z26"; "OB1" = "-0.2"
     "OA2" = "X26"; "OB2" = "-0.4"
@@ -2734,17 +2734,17 @@ $cells = [ordered]@{
     "CW7" = "=_CreateFuturesFixings(CQ2:CQ5,CR2:CR5,ED3)"
     "CW5" = "=_CreateMarketHistory(CW4,CW7)"
     "CW6" = "=_CreateMarket(CW5,CW2)"
-    # The IFERC schedule: three contract months of the Waha basis, the day each month's future
-    # stops trading and the day its index is published, a fourth last trading date for a column
-    # one row long, a copy of the publication column with a blank, a code over a number, and two
-    # creator cells, over the three rows and over the first row alone.
-    "DA2" = "V26"; "DB2" = "30-Sep-2026"; "DC2" = "1-Oct-2026"; "DD2" = "1-Oct-2026"
-    "DA3" = "X26"; "DB3" = "30-Oct-2026"; "DC3" = "2-Nov-2026"
-    "DA4" = "Z26"; "DB4" = "30-Nov-2026"; "DC4" = "1-Dec-2026"; "DD4" = "1-Dec-2026"
-    "DB5" = "31-Dec-2026"
+    # The IFERC schedule: three contract months of the Waha basis and the day each month's index
+    # is published, a fourth publication date for a column one row long, a copy of the publication
+    # column with a blank, a code over a number, and two creator cells, over the three rows and
+    # over the first row alone.
+    "DA2" = "V26"; "DC2" = "1-Oct-2026"; "DD2" = "1-Oct-2026"
+    "DA3" = "X26"; "DC3" = "2-Nov-2026"
+    "DA4" = "Z26"; "DC4" = "1-Dec-2026"; "DD4" = "1-Dec-2026"
+    "DC5" = "4-Jan-2027"
     "DA6" = "V26"; "DA7" = "46023"
-    "DE1" = "=_CreateIfercSchedule(DA2:DA4,DB2:DB4,DC2:DC4)"
-    "DE2" = "=_CreateIfercSchedule(DA2,DB2,DC2)"
+    "DE1" = "=_CreateIfercSchedule(DA2:DA4,DC2:DC4)"
+    "DE2" = "=_CreateIfercSchedule(DA2,DC2)"
     # The Gas Daily schedule: three contract months of Henry Hub Gas Daily, the first and last day
     # of gas of each, a fourth first date for a column one row long, a copy of the last-date column
     # with a blank, a code over a number, and two creator cells, over the three rows and over the
@@ -2863,14 +2863,14 @@ $cells = [ordered]@{
     "PB2" = "=_CreateHolidayCalendar(PB1)"
     "PB3" = "12-Aug-2026"; "PB4" = "30-Jan-2026"; "PB5" = "31-Jan-2028"
     # The IFERC index the fixings in BQ1 take: a schedule of their four months, January first as
-    # a schedule runs, the codes in BV, ICE's last trading days and Platts' publication days
-    # beside them, and an index over it.
+    # a schedule runs, the codes in BV and Platts' publication days beside them, and an index
+    # over it.
     "EC5" = "Waha IFERC"
-    "EF2" = "31-Dec-2025"; "EG2" = "5-Jan-2026"
-    "EF3" = "30-Jan-2026"; "EG3" = "2-Feb-2026"
-    "EF4" = "27-Feb-2026"; "EG4" = "2-Mar-2026"
-    "EF5" = "31-Mar-2026"; "EG5" = "1-Apr-2026"
-    "EE1" = "=_CreateIfercSchedule(BV2:BV5,EF2:EF5,EG2:EG5)"
+    "EG2" = "5-Jan-2026"
+    "EG3" = "2-Feb-2026"
+    "EG4" = "2-Mar-2026"
+    "EG5" = "1-Apr-2026"
+    "EE1" = "=_CreateIfercSchedule(BV2:BV5,EG2:EG5)"
     "EE2" = '=_CreateIndex(EC5,"Waha basis - Inside FERC monthly index",EE1,AP1,BY1)'
     # Contract codes and dates on one ticket, contract-codes-and-dates.md: the synthetic BBL_ASIAN
     # index of U26, V26, X26 and Z26 expiring 29-Sep-2026, 30-Oct-2026, 30-Nov-2026 and 31-Dec-2026

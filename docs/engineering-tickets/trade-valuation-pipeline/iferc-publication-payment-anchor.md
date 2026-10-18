@@ -1,7 +1,7 @@
 # Anchor IFERC payments on publication dates
 
-**Status:** Drafted 18 October 2026 by the owner, reviewed the same day and built as the first
-commit's PR on `feat/iferc-publication-anchor` from `feat/keyed-curves`, stacked on #203. The
+**Status:** Drafted 18 October 2026 by the owner, reviewed the same day and built in #204 on
+`feat/iferc-publication-anchor` from `feat/keyed-curves`, stacked on #203. The
 review's five edits are in: the same-day refusal pins move to a zero lag, the one-rule help
 sentence, Excel's own refusal of a stale three-argument cell, the references beyond the owning
 pages, and the two budget moves. The ICE comparison below was gathered during the review.

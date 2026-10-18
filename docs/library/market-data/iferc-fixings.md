@@ -14,18 +14,18 @@ def _CreateIfercFixings(
 ) -> Handle[IfercFixings]: ...
 ```
 
-Waha IFERC, the first four months of 2026, the newest month in the first row as the desk keeps them and the creator requires, with the prices illustrative and not published values; the schedule in C to E runs the other way, January first as a schedule does, its codes beside ICE's last trading days and Platts' publication days, the days the creator reads for the order:
+Waha IFERC, the first four months of 2026, the newest month in the first row as the desk keeps them and the creator requires, with the prices illustrative and not published values; the schedule in C to E runs the other way, January first as a schedule does, its codes beside Platts' publication days, the days the creator reads for the order:
 
-| | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|
-| 1 | contract_code | price | contract_code | last_trading_date | publication_date | |
-| 2 | J26 | 1.60 | F26 | 31-Dec-2025 | 5-Jan-2026 | `=_CreateIfercSchedule(C2:C5, D2:D5, E2:E5)` shows `30512:iferc_schedule:51` |
-| 3 | H26 | 1.95 | G26 | 30-Jan-2026 | 2-Feb-2026 | `=_CreateIndex("Waha IFERC", "Waha basis - Inside FERC monthly index", F2, B10, B11)` shows `30512:index:Waha IFERC:52`, B10 and B11 holding the conventions and the specifications |
-| 4 | G26 | 2.10 | H26 | 27-Feb-2026 | 2-Mar-2026 | |
-| 5 | F26 | 1.85 | J26 | 31-Mar-2026 | 1-Apr-2026 | |
-| 6 | `=_CreateIfercFixings(A2:A5, B2:B5, F3)` | shows `30512:iferc_fixings:Waha IFERC:53` | | | | |
-| 7 | `=_CreateIfercFixings(A2, B2, F3)` | shows `30512:iferc_fixings:Waha IFERC:54`, the fixings of one month, April's | | | | |
-| 8 | `=_CreateIfercFixings(C2:C5, B2:B5, F3)` | shows `#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-02, expected a month published before row 1's 'F26', published 2026-01-05`, the schedule's own order being the wrong way up for a series | | | | |
+| | A | B | C | D | E |
+|---|---|---|---|---|---|
+| 1 | contract_code | price | contract_code | publication_date | |
+| 2 | J26 | 1.60 | F26 | 5-Jan-2026 | `=_CreateIfercSchedule(C2:C5, D2:D5)` shows `30512:iferc_schedule:51` |
+| 3 | H26 | 1.95 | G26 | 2-Feb-2026 | `=_CreateIndex("Waha IFERC", "Waha basis - Inside FERC monthly index", E2, B10, B11)` shows `30512:index:Waha IFERC:52`, B10 and B11 holding the conventions and the specifications |
+| 4 | G26 | 2.10 | H26 | 2-Mar-2026 | |
+| 5 | F26 | 1.85 | J26 | 1-Apr-2026 | |
+| 6 | `=_CreateIfercFixings(A2:A5, B2:B5, E3)` | shows `30512:iferc_fixings:Waha IFERC:53` | | | |
+| 7 | `=_CreateIfercFixings(A2, B2, E3)` | shows `30512:iferc_fixings:Waha IFERC:54`, the fixings of one month, April's | | | |
+| 8 | `=_CreateIfercFixings(C2:C5, B2:B5, E3)` | shows `#ERROR _CreateIfercFixings: ValueError: contract_code row 2 is 'G26', published 2026-02-02, expected a month published before row 1's 'F26', published 2026-01-05`, the schedule's own order being the wrong way up for a series | | | | |
 
 Two columns of one kind each and a handle, all three required, none with a default, the columns selected without the header row: row 1 is for the person reading the sheet, and the function never sees it. The form is the IFERC schedule's, columns paired by position, chosen for the sheet's ergonomics, a handful of months typed by hand rather than a history pasted from a feed, at the cost [inputs.md](../../seam/inputs.md) decision 38 states: two columns can be selected one row out of step, and equal lengths cannot catch it. The code column is `contract_code`, as the schedule's is, because the code labels the month the index is for; the same text names the future on that month, and in the sample the fixings hold the schedule's four months the other way up, the desk keeping its months newest first and a schedule running oldest first. The series runs newest first, so that a new month is a row added at the top, the row the desk reads first; the creator reads the order off the schedule's publication days, never off the codes, so `F27` follows `Z26` by its day whatever its spelling says. A price is any number a cell holds, zero and below included, and Waha has printed below zero. The index comes by handle because it is an object the sheet already holds, made once by [_CreateIndex](../index-definitions/index.md) and named by its cell, as decisions 34 to 37 say: the function receives the index the seam keeps, never the text, and reads its schedule's months and their days through it; a cell that is not an index's handle fails in the seam's words, `index is number 1.6, expected index handle`, before the function runs, and an index of another kind in the library's words, below. No holiday calendar is taken: an IFERC index has none, since the month prints on a day the schedule already holds. The seam checks each column alone, text one column wide, numbers one column wide, no blank cells, resolves the handle, and hands over a tuple of texts, an array of numbers and the index; nothing here restates that. A single cell is a column of one, so the fixings of one month need no range. The result is a handle: text in the cell that stands for the fixings the seam keeps, declared `Handle[IfercFixings]`, as [bridge.md](../../seam/bridge.md#a-handle-one-store-and-the-text) says. Consumers refer to the creator cell or to a defined name referring to it, and receive the fixings, their index by reference and their two columns, oldest first. The index is one object: the fixings and the calendar of their market refer to the same `_CreateIndex` cell, or a name for it, and are remade together when the index is.
 
@@ -75,7 +75,7 @@ The examples and properties below are `tests/unit/test_iferc_fixings.py`; the se
 | the fixings of one month accepted, from a one-row range and from two single cells; twelve months given newest first over a schedule running the other way, kept in the schedule's order | example |
 | a price below zero and a zero kept as given | example |
 | a month left out kept as given, whether a month is skipped being the history's rule; the fixings of no months, which the library's own callers make | example |
-| the order read from the publication days alone: a year's end, `F27` after `Z26`, taken the way the days run and refused the way the codes spell; a schedule whose rows run backwards and one whose last trading days do, the days deciding each | example |
+| the order read from the publication days alone: a year's end, `F27` after `Z26`, taken the way the days run and refused the way the codes spell; a schedule whose rows run backwards, the days deciding | example |
 | a futures index and a Gas Daily index: rejected, naming the kind, before the columns are looked at | example |
 | a price column one row short, one row long, one price for four codes and four prices for one code: rejected, naming the count; the count checked before the codes | example |
 | a code the index does not hold, first, last and between, and a code in another case than the schedule's: rejected, naming the row and the code | example |

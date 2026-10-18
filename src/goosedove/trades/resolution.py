@@ -26,9 +26,7 @@ from goosedove.globals.discount_curve import curve_name
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.contract_codes import month_label, schedule_months
 from goosedove.index_definitions.date_offsets import shift_days
-from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
-from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index import Index
 from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
@@ -229,19 +227,12 @@ def resolved(
         end,
         lambda k: named_trade(trade_ids, int(occurrence[k])),
     )
-    # The anchors are handed over as a temporary, not held across the kernel's copies below.
-    match schedule:
-        case FuturesSchedule():
-            payment = _the_payment_terms(
-                settlement, fields, _last_days(observations, occurrence.size), occurrence, counter
-            )
-        case IfercSchedule():
-            # Since #167: the month's last trading day, the exchange's; the index prints later.
-            payment = _the_payment_terms(
-                settlement, fields, schedule.last_trading_date[contract], occurrence, counter
-            )
-        case _:
-            assert_never(schedule)
+    # One anchor for every index since iferc-publication-payment-anchor.md, each component's
+    # last observation day, the expiry under lastday on a futures index and the publication day
+    # on an IFERC one, handed over as a temporary, not held across the kernel's copies below.
+    payment = _the_payment_terms(
+        settlement, fields, _last_days(observations, occurrence.size), occurrence, counter
+    )
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
     terms = resolved_trades(
@@ -682,10 +673,11 @@ def _the_payment_terms(
 ) -> PaymentTerms | None:
     """For a financial settlement, the payment terms: each occurrence's payment rule as written and
     its payment calendar, retained, and each component's payment day, the rule applied to its
-    anchor instruction by instruction, since #181: on a futures index its last observation day, the
+    anchor instruction by instruction, since #181: its last observation day on every index, the
     one day under lastday and penultimate, the third under last3day and the month's last pricing
-    day under asian, and on an IFERC index since #167 its month's last trading day, the exchange's,
-    the index printing later; business days on that calendar, Monday to Friday less its holidays,
+    day under asian on a futures index, and on an IFERC index the month's publication day, since
+    iferc-publication-payment-anchor.md; business days on that calendar, Monday to Friday less
+    its holidays,
     the anchor rolled back to the last eligible day on or before it first, so that a day the
     calendar closes is not itself counted, calendar days and month ends whatever the calendar.
     Each distinct rule is read once, `payment_rule_of`, and applied once per calendar it is paid

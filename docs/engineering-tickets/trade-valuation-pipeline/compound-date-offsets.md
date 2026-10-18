@@ -63,8 +63,9 @@ Preserve the current anchors:
 
 - Futures-index components start from their last observation date, as resolved by
   their schedule method.
-- IFERC components start from their schedule's last trading date. Publication
-  remains the separate observation/fixing date.
+- IFERC components start from their publication date, their one observation, since
+  [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md); until then
+  from their schedule's last trading date.
 
 Apply the existing financial check to the **final payment date**: it must be
 strictly after the group's last observation date. Negative or zero instructions

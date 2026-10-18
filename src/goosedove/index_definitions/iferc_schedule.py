@@ -1,6 +1,6 @@
 """An IFERC schedule: the contract months of one index settled on Inside FERC's monthly index,
-each month's code, the day its future stops trading and the day its index is published, kept as
-given. docs/library/index-definitions/iferc-schedule.md is the page."""
+each month's code and the day its index is published, kept as given.
+docs/library/index-definitions/iferc-schedule.md is the page."""
 
 from dataclasses import dataclass
 
@@ -10,39 +10,30 @@ from numpy.typing import NDArray
 
 @dataclass(frozen=True, slots=True)
 class IfercSchedule:
-    """Codes and dates aligned by position, the dates read-only: codes[i], last_trading_date[i]
-    and publication_date[i] describe one contract month, the code labelling the delivery month
-    the index is for, the first date the exchange's, the day the future on that month stops
-    trading, and the second the publisher's, the day the index for that month prints. The codes
-    are as the desk typed them, in the order given, and the dates as given."""
+    """Codes and dates aligned by position, the dates read-only: codes[i] and publication_date[i]
+    describe one contract month, the code labelling the delivery month the index is for and the
+    date the publisher's, the day the index for that month prints, the one day the month is
+    observed on and, since iferc-publication-payment-anchor.md, the day its payment counts from.
+    The codes are as the desk typed them, in the order given, and the dates as given."""
 
     codes: tuple[str, ...]
-    last_trading_date: NDArray[np.datetime64]
     publication_date: NDArray[np.datetime64]
 
 
 def iferc_schedule(
-    codes: tuple[str, ...],
-    last_trading_date: NDArray[np.datetime64],
-    publication_date: NDArray[np.datetime64],
+    codes: tuple[str, ...], publication_date: NDArray[np.datetime64]
 ) -> IfercSchedule:
-    """The one way to make an IfercSchedule: its one rule of meaning, that the columns line up,
-    checked once, the last trading dates first and then the publication dates.
+    """The one way to make an IfercSchedule: its one rule of meaning, that the column lines up
+    with the codes, checked once.
 
-    Each date column is copied and then frozen, so the schedule owns its data: a Python caller
+    The date column is copied and then frozen, so the schedule owns its data: a Python caller
     keeps whatever it passed, and a later change to an input never changes a schedule. The codes
     are the seam's tuple, kept as they are. Nothing else is checked: each code once and the
     publication days increasing are the calendar's rules, checked when a calendar is made over
     an index holding this schedule; each fixing's code one of its months is the IFERC fixings'
-    rule; whether a month's index prints after its future stops trading and what a code means
-    are no reader's rule, since no reader needs them.
+    rule; what a code means is no reader's rule, since no reader needs it.
     """
-    count = len(codes)
-    return IfercSchedule(
-        codes,
-        _one_per_code("last_trading_date", last_trading_date, count),
-        _one_per_code("publication_date", publication_date, count),
-    )
+    return IfercSchedule(codes, _one_per_code("publication_date", publication_date, len(codes)))
 
 
 def _one_per_code(name: str, dates: NDArray[np.datetime64], count: int) -> NDArray[np.datetime64]:

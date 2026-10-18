@@ -135,24 +135,21 @@ def test_a_schedule_spills_its_columns_with_the_options_last() -> None:
     ]
 
 
-# Serials for 30 September, 30 October and 30 November 2026, the days three IFERC contract
-# months stop trading, and 1 October, 2 November and 1 December, the days their indices print.
-def test_an_iferc_schedule_spills_its_three_columns_under_two_heading_rows() -> None:
+# Serials for 1 October, 2 November and 1 December 2026, the days three IFERC contract months'
+# indices print.
+def test_an_iferc_schedule_spills_its_two_columns_under_two_heading_rows() -> None:
     codes = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
-    last_trading = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
     published = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
-    kinds, slots, joined = read(
-        bridge.call("_CreateIfercSchedule", [codes, last_trading, published])
-    )
+    kinds, slots, joined = read(bridge.call("_CreateIfercSchedule", [codes, published]))
     assert rows((kinds, slots, joined)) == [
-        ["contract_code", "last_trading_date", "publication_date"],
-        ["str", "datetime64[D]", "datetime64[D]"],
-        ["V26", 46295.0, 46296.0],
-        ["X26", 46325.0, 46328.0],
-        ["Z26", 46356.0, 46357.0],
+        ["contract_code", "publication_date"],
+        ["str", "datetime64[D]"],
+        ["V26", 46296.0],
+        ["X26", 46328.0],
+        ["Z26", 46357.0],
     ]
-    assert kinds.shape == (5, 3)
-    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE, NUMBER_CODE]] * 3
+    assert kinds.shape == (5, 2)
+    assert kinds[2:].tolist() == [[TEXT_CODE, NUMBER_CODE]] * 3
 
 
 # Serials for the first and last days of September, October and November 2026, three contract
@@ -339,7 +336,6 @@ def test_the_other_two_histories_spill_the_same_five_columns() -> None:
         "_CreateIfercSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
-            Cells.from_rows([[46295.0], [46325.0]]),
             Cells.from_rows([[46296.0], [46328.0]]),
         ],
     )
@@ -395,7 +391,6 @@ def test_iferc_fixings_spill_codes_as_text_and_prices_exactly() -> None:
         "_CreateIfercSchedule",
         [
             Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]]),
-            Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]]),
             Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]]),
         ],
     )
@@ -449,7 +444,6 @@ def test_the_other_two_markets_spill_the_same_five_columns() -> None:
         "_CreateIfercSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
-            Cells.from_rows([[46295.0], [46325.0]]),
             Cells.from_rows([[46296.0], [46328.0]]),
         ],
     )
@@ -653,7 +647,6 @@ def test_the_prompt_code_reads_the_first_contract_quoted_on_each_kind() -> None:
         "_CreateIfercSchedule",
         [
             Cells.from_rows([["V26"], ["X26"]]),
-            Cells.from_rows([[46295.0], [46325.0]]),
             Cells.from_rows([[46296.0], [46328.0]]),
         ],
     )
@@ -683,7 +676,7 @@ def test_a_calendar_with_no_unfixed_period_has_no_prompt_code_through_the_seam()
     assert bridge.call("util_ReadPrompt", [ended]) == message
     published = bridge.call(
         "_CreateIfercSchedule",
-        [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
+        [Cells.from_rows([["V26"]]), Cells.from_rows([[46296.0]])],
     )
     after = bridge.call(
         "_CreateCalendar",
@@ -1205,7 +1198,7 @@ def test_an_index_spills_one_row_of_what_it_holds() -> None:
     ]
     month = bridge.call(
         "_CreateIfercSchedule",
-        [Cells.from_rows([["V26"]]), Cells.from_rows([[46295.0]]), Cells.from_rows([[46296.0]])],
+        [Cells.from_rows([["V26"]]), Cells.from_rows([[46296.0]])],
     )
     kinds, slots, joined = read(
         bridge.call(

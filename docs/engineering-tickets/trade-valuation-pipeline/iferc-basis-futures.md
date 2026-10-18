@@ -25,6 +25,8 @@ Keep two dates distinct: **publication determines when the monthly price fixes;
 last trading determines the payment anchor.** The existing IFERC schedule already
 contains both. No new instrument, schedule field or public function is needed.
 
+*Superseded on the anchor by [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md): the payment counts from the publication day, and the schedule holds no last trading date.*
+
 ## Product evidence
 
 ICE's [Waha Basis Future (WAH)](https://www.ice.com/products/6590171/Waha-Basis-Future)
@@ -107,7 +109,7 @@ one index. Gas Daily trade support, bilateral rates and new period-entry UX are 
 |---|---|
 | Resolution | Map each monthly component to its IFERC schedule row once; retain the actual index and its static specifications. |
 | Observations | One observation per component, on that row's `publication_date`, with weight 1. The pricing reference is the same monthly contract. |
-| Payment terms | Count the component's `payment_time_lag` from its `last_trading_date`, on its supplied payment holiday calendar. |
+| Payment terms | Count the component's `payment_time_lag` from its `last_trading_date`, on its supplied payment holiday calendar. Superseded: from its publication day, [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md). |
 | Encoding | Convert quantity once, retain the fixed leg and dated exposure, and group by booked contract and resolved payment date. |
 | Preparation | Bind observation slots to the monthly calendar/history rows; apply published fixings, calculate live exposure and separate unpaid amounts from cash. |
 | Evaluation | Read each distinct live monthly reference once and use the existing aggregate arithmetic and results. |
@@ -248,7 +250,7 @@ Engineering's record of what landed, in the ticket's terms.
   physical settlement is refused, `settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis future is cash settled on its month's published index`. The instrument help says so: `all four are built on a
   futures index, asian averaging the month's pricing days; lastday alone on an IFERC index, its
   published month`.
-- **Payment.** The resolution anchors each component's lag on the schedule's `last_trading_date`
+- **Payment.** Superseded by [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md), which anchors every component on its last observation day. As built here, the resolution anchored each component's lag on the schedule's `last_trading_date`
   on an IFERC index and on its last observation day on a futures one, counted on the row's payment
   calendar as before: WAH001's `+3bd` from 30 November is 3 December, F27's 6 January with New
   Year's Day closed, X26's 4 November; a calendar closing 2 December gives 4 December and moves no
