@@ -436,7 +436,7 @@ def _discounted(
         "its groups' DV01s sum past the largest number",
     )
     # Since #197 the cross-gamma, after every rule above and under its own.
-    cross_gamma, cross_by_day, cross_by_month, cross_by_year, cross_by_curve, early_cross = (
+    cross_gamma, cross_by_day, cross_by_month, cross_by_year, cross_by_curve, cross_total, early = (
         _cross_gamma(prepared, pays, discounted_lots, words, as_of, curves, places)
     )
     # Since #186 the facts refusing a month or a year report of the discounted lots or the DV01
@@ -529,7 +529,7 @@ def _discounted(
         dv01_by_group=dv01_by_group,
         payment_factor=payment_factor,
         early_delta=early_delta,
-        cross_gamma_total=float(cross_by_curve.sum()),
+        cross_gamma_total=cross_total,
         # Each curve's share of the DV01 and of the cross-gamma, its row of the arrays above by
         # reference, on the axes they were summed onto.
         rate_contributions=tuple(
@@ -562,7 +562,7 @@ def _discounted(
                     encoded.contract_years,
                     cross_by_year[c * contract_years : (c + 1) * contract_years],
                     float(cross_by_curve[c]),
-                    early_cross[c],
+                    early[c],
                 )
                 for c, curve in enumerate(curves)
             ]
@@ -604,11 +604,13 @@ def _cross_gamma(
     NDArray[np.float64],
     NDArray[np.float64],
     NDArray[np.float64],
+    float,
     tuple[EarlyRisk, ...],
 ]:
     """The cross-gamma, since #197, single-curve-cross-gamma.md, and since named-curves-slice-3.md
     every curve's at once: by reference, by day, by contract month, by contract year, a row per
-    curve in one array per axis, the totals by curve, and the facts refusing a month or a year
+    curve in one array per axis, the totals by curve and their sum, the batch's cross-gamma with
+    every used curve shifted together, and the facts refusing a month or a year
     report of each curve's standing before the valuation day's period. Each unpaid group's
     weight is -0.0001 times its time fraction, its factor's derivative over the factor for a rise
     of one basis point in the continuously compounded zero rates of its own curve, the convention
@@ -622,7 +624,9 @@ def _cross_gamma(
     never the axis, one path whether any slot is live. The arithmetic runs with numpy's flags
     down and the rules judge: each curve's vector by reference, three views and total are finite,
     else the first that is not is refused by its contract, its bucket or the batch, with its
-    curve; the four arrays are frozen.
+    curve, and the curves' totals sum finite, else the batch's cross-gamma is refused as its
+    DV01 is, two finite totals adding past the largest number without a word; the four arrays
+    are frozen.
 
     Work: one weight per group, one product per slot and four reductions, counted by the caller;
     nothing sorted, no factor and no day read again, no pass per curve.
@@ -652,6 +656,7 @@ def _cross_gamma(
             places.contract_year_of_month, weights=by_month, minlength=curve_count * years
         )
         totals = by_reference.reshape(curve_count, references).sum(axis=1)
+        total = float(totals.sum())  # the batch's, judged below with the curves' own
     per_bp = f"{words} per basis point"
     outrun = ~np.isfinite(by_reference)
     if outrun.any():
@@ -680,6 +685,11 @@ def _cross_gamma(
             f"expected a finite number of {per_bp}; the contracts' cross-gammas, each finite, sum "
             "past the largest number"
         )
+    if not np.isfinite(total):
+        raise ValueError(
+            f"the batch has {total!r} of cross-gamma in all, expected a finite number of {per_bp}; "
+            "the curves' cross-gammas, each finite, sum past the largest number"
+        )
     early = tuple(
         [
             early_risk(
@@ -699,4 +709,4 @@ def _cross_gamma(
     )
     for array in (by_reference, by_day, by_month, by_year, totals):
         array.setflags(write=False)
-    return by_reference, by_day, by_month, by_year, totals, early
+    return by_reference, by_day, by_month, by_year, totals, total, early

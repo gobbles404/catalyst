@@ -27,7 +27,7 @@ from test_bilateral_kernel import (
 )
 from test_trades import an_index, dates, history_on, observed_of, quoted
 
-from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
+from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
 from goosedove.globals.discount_curve_set import DiscountCurveSet
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -464,3 +464,88 @@ def test_bumping_one_curve_moves_its_share_alone_and_agrees_with_its_analytic_ri
         )
         assert given(moved.payment_factor)[1] == given(base.payment_factor)[1]
         assert moved.curves[1] is FFOIS
+
+
+# --- the curves' cross-gammas summed, since the review of #203 ------------------------------
+
+# Z26 the boundary and four live contracts, so that each curve can hold its large lots on
+# contracts of its own.
+FOUR = an_index(
+    "UNIT",
+    (
+        ("Z26", "2026-12-31"),
+        ("F27", "2027-01-04"),
+        ("G27", "2027-02-01"),
+        ("H27", "2027-03-01"),
+        ("J27", "2027-04-01"),
+    ),
+    ("2027-12-27",),
+    ("USD", "BBL"),
+    ("VOLUME", "BBL"),
+    ("UNIT", 1.0, "BBL"),
+)
+FAR = str(np.datetime64(AS_OF) + np.timedelta64(1_048_573, "D"))  # the last day a curve may reach
+NEAR = ("2027-01-05", "2027-02-02", "2027-03-02", "2027-04-02")  # the day after each expiry
+BIG = 1.6e308  # lots: finite, and 0.287 of it a curve's share from a payment 2,872 years out
+
+
+def far_and_near(keys: tuple[str, ...], lots: float = BIG) -> ResolvedTrades:
+    """Per contract a row of BIG lots paying on FAR and one of -BIG paying the next day, at 1
+    against a quote of 1 so that every amount is nothing: the deltas cancel on every axis while
+    each curve's cross-gamma is 0.287 of twice BIG, its two far payments' weight, finite; the
+    first two contracts under the first key, the last two under the second."""
+    terms = terms_of(
+        (lots, -lots) * 4,
+        tuple(day for near in NEAR for day in (FAR, near)),
+        (261,) * 8,
+        contracts=(1, 1, 2, 2, 3, 3, 4, 4),
+        fixed=1.0,
+        ix=FOUR,
+    )
+    return replace(terms, discount_curve_key=(keys[0],) * 4 + (keys[1],) * 4)
+
+
+def test_two_finite_cross_gamma_totals_summing_past_the_largest_number_are_refused() -> None:
+    far = np.datetime64(FAR)
+    sofr = discount_curve("SOFR", np.array([np.datetime64(AS_OF), far]), np.array([1.0, 1.0]))
+    ffois = discount_curve("FFOIS", np.array([np.datetime64(AS_OF), far]), np.array([1.0, 1.0]))
+    history = history_on(FOUR, AS_OF, {})
+    market = quoted(history, 1.0, 1.0, 1.0, 1.0)
+    # On one curve the four contracts' shares, all of 2027, sum to 4 times 0.287 of BIG, past the
+    # largest number: refused by their year. Two contracts a curve, each curve's year and total
+    # are finite, and only the batch's total is not.
+    alone = prepared(far_and_near(("SOFR", "SOFR")), history)
+    with pytest.raises(ValueError) as refused:
+        valued_on(alone, curve_set(sofr), market)
+    assert str(refused.value) == (
+        "the contract year from 2027-01-01 has -inf of cross-gamma on SOFR in all, expected a "
+        "finite number of lots of UNIT (1 BBL) per basis point; its slots' cross-gammas sum past "
+        "the largest number"
+    )
+    prep = prepared(far_and_near(("SOFR", "FFOIS")), history)
+    with pytest.raises(ValueError) as refused:
+        valued_on(prep, curve_set(sofr, ffois), market)
+    assert str(refused.value) == (
+        "the batch has -inf of cross-gamma in all, expected a finite number of lots of UNIT "
+        "(1 BBL) per basis point; the curves' cross-gammas, each finite, sum past the largest "
+        "number"
+    )
+    # Half the lots: each curve's total finite and their sum too, the batch accepted.
+    halved = far_and_near(("SOFR", "FFOIS"), BIG / 2)
+    result = valued_on(prepared(halved, history), curve_set(sofr, ffois), market)
+    assert result.discounted_lot_delta_total == 0.0 and result.dv01 == 0.0
+
+    def share(near: tuple[str, ...]) -> float:
+        """A curve's cross-gamma on a curve of ones: each row's lots times -0.0001 times its
+        payment's time, the two far rows' and the two near rows'."""
+        days = np.array([FAR, near[0], FAR, near[1]], dtype="datetime64[D]")
+        taus = (days - np.datetime64(AS_OF)).astype(np.float64) / 365
+        return float((np.array([BIG / 2, -BIG / 2] * 2) * -0.0001 * taus).sum())
+
+    sofr_share, ffois_share = share(NEAR[:2]), share(NEAR[2:])
+    assert cross_gammas(result) == (
+        pytest.approx(sofr_share, rel=1e-9),
+        pytest.approx(ffois_share, rel=1e-9),
+    )
+    assert np.isfinite(result.cross_gamma_total)
+    assert result.cross_gamma_total == pytest.approx(sofr_share + ffois_share, rel=1e-9)
