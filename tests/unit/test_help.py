@@ -45,10 +45,16 @@ def test_the_curve_creator_explains_itself() -> None:
     description, arguments, hidden = SPECS["_CreateDiscountCurve"]
     assert not hidden
     assert description == (
-        "Creates a discount curve from anchor dates and their discount factors, every day "
-        "between filled in, and shows its handle, the text other formulas take as the curve."
+        "Creates a discount curve under its name from anchor dates and their discount factors, "
+        "every day between filled in, and shows its handle, the text other formulas take as "
+        "the curve."
     )
     assert arguments == [
+        (
+            "name",
+            "The curve's name, text such as SOFR, exact and case-sensitive with no whitespace "
+            "around it: what a trade's discount_curve_key will select and the reports will show.",
+        ),
         (
             "header_row",
             "The header cells of your curve table, such as A1:B1, reading date and "
@@ -59,6 +65,24 @@ def test_the_curve_creator_explains_itself() -> None:
             "The rows under the headers, such as A2:B12: one anchor per row, its date and "
             "discount factor, dates increasing from the valuation date at 1, the factors never "
             "rising.",
+        ),
+    ]
+
+
+def test_the_curve_collector_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CollectDiscountCurves"]
+    assert not hidden
+    assert description == (
+        "Collects named discount curves into one collection, each name once, the curves as "
+        "they are and nothing of their factors combined, and shows its handle, the text other "
+        "formulas take as the collection."
+    )
+    assert arguments == [
+        (
+            "curve_handles",
+            "The curves to collect: a cell, a row or a column of cells showing "
+            "_CreateDiscountCurve's or util_BumpDiscountCurve's results, such as B2:B3, each "
+            "name once.",
         ),
     ]
 

@@ -85,14 +85,34 @@ def test_a_valuation_date_spills_its_two_fields_under_two_heading_rows() -> None
 
 
 def test_a_curve_spills_its_table_with_dates_as_serials_and_factors_exactly() -> None:
-    handle = bridge.call("_CreateDiscountCurve", [HEADERS, BODY])
+    handle = bridge.call("_CreateDiscountCurve", ["SOFR", HEADERS, BODY])
     assert rows(read(handle)) == [
-        ["date", "discount_factor"],
-        ["datetime64[D]", "float64"],
-        [SEP_11, 1.0],
-        [SEP_12, 0.9999],
-        [SEP_13, 0.9998],
+        ["date", "discount_factor", "name"],
+        ["datetime64[D]", "float64", "str"],
+        [SEP_11, 1.0, "SOFR"],
+        [SEP_12, 0.9999, "SOFR"],
+        [SEP_13, 0.9998, "SOFR"],
     ]
+
+
+# A collection of curves spills one row per curve in the order given, the name, the span and
+# the days, not the daily factors, which each curve's own handle spills; a collection of one is
+# a collection, since #201.
+def test_a_collection_of_curves_spills_one_row_per_curve_in_the_order_given() -> None:
+    sofr = bridge.call("_CreateDiscountCurve", ["SOFR", HEADERS, BODY])
+    ffois = bridge.call(
+        "_CreateDiscountCurve",
+        ["FFOIS", HEADERS, Cells.from_rows([[SEP_11, 1.0], [SEP_11 + 3, 0.9997]])],
+    )
+    both = bridge.call("_CollectDiscountCurves", [Cells.from_rows([[ffois], [sofr]])])
+    assert rows(read(both)) == [
+        ["name", "start_date", "end_date", "days"],
+        ["str", "datetime64[D]", "datetime64[D]", "int64"],
+        ["FFOIS", SEP_11, SEP_11 + 3, 4.0],
+        ["SOFR", SEP_11, SEP_13, 3.0],
+    ]
+    one = bridge.call("_CollectDiscountCurves", [sofr])
+    assert rows(read(one))[2:] == [["SOFR", SEP_11, SEP_13, 3.0]]
 
 
 def test_a_schedule_spills_its_columns_with_the_options_last() -> None:
@@ -549,9 +569,9 @@ def test_contract_specifications_spill_one_row_per_contract_under_two_heading_ro
 # Anchors three days apart spill four days, the anchors exact and the days between on the line.
 def test_a_curve_from_anchors_spills_every_day_between_them() -> None:
     anchors = Cells.from_rows([[SEP_11, 1.0], [SEP_11 + 3, 0.9997]])
-    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", [HEADERS, anchors]))
-    assert kinds.shape == (6, 2)
-    assert joined == "date\0discount_factor\0datetime64[D]\0float64"
+    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", ["SOFR", HEADERS, anchors]))
+    assert kinds.shape == (6, 3)
+    assert joined == "date\0discount_factor\0name\0datetime64[D]\0float64\0str" + "\0SOFR" * 4
     assert slots[2:, 0].tolist() == [SEP_11, SEP_12, SEP_13, SEP_11 + 3]
     assert slots[2, 1] == 1.0 and slots[5, 1] == 0.9997
     assert np.allclose(slots[3:5, 1], [0.9999, 0.9998], rtol=0, atol=1e-15)
@@ -560,22 +580,29 @@ def test_a_curve_from_anchors_spills_every_day_between_them() -> None:
 # --- a spill is the table its creator took ----------------------------------
 
 
+# The spill is what the creator took: the name on any row, the two headers and the rows' first
+# two cells; the name's column is display, not a column of the table.
 def test_a_curves_spill_fed_back_to_its_creator_makes_an_equal_curve() -> None:
-    first = bridge.call("_CreateDiscountCurve", [HEADERS, BODY])
+    first = bridge.call("_CreateDiscountCurve", ["SOFR", HEADERS, BODY])
     spilled = rows(read(first))
     second = bridge.call(
-        "_CreateDiscountCurve", [Cells.from_rows([spilled[0]]), Cells.from_rows(spilled[2:])]
+        "_CreateDiscountCurve",
+        [
+            spilled[2][2],
+            Cells.from_rows([spilled[0][:2]]),
+            Cells.from_rows([row[:2] for row in spilled[2:]]),
+        ],
     )
     assert second != first  # a new creator call publishes anew
     assert rows(read(second)) == spilled
 
 
 @given(count=st.integers(1, 400))
-def test_any_curve_of_n_days_spills_n_plus_two_rows_by_two(count: int) -> None:
+def test_any_curve_of_n_days_spills_n_plus_two_rows_by_three(count: int) -> None:
     body = Cells.from_rows([[SEP_11 + i, 1.0 - i * 1e-5] for i in range(count)])
-    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", [HEADERS, body]))
-    assert kinds.shape == (count + 2, 2)
-    assert joined == "date\0discount_factor\0datetime64[D]\0float64"
+    kinds, slots, joined = read(bridge.call("_CreateDiscountCurve", ["SOFR", HEADERS, body]))
+    assert kinds.shape == (count + 2, 3)
+    assert joined == ("date\0discount_factor\0name\0datetime64[D]\0float64\0str" + "\0SOFR" * count)
     assert slots[2:, 0].tolist() == [SEP_11 + i for i in range(count)]
     assert slots[2:, 1].tolist() == [1.0 - i * 1e-5 for i in range(count)]
 

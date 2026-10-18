@@ -47,6 +47,7 @@ def test_the_worked_bumps_move_the_factor_a_year_out_and_keep_the_first_at_one()
         counter = WorkCounter()
         made = bumped(SOURCE, bump, counter)
         assert isinstance(made, DiscountCurve) and made is not SOURCE
+        assert made.name == "SOFR"  # the source's name, since #201
         np.testing.assert_array_equal(made.dates, SOURCE.dates)
         assert made.factors.size == 366
         assert made.factors[0] == 1.0  # exactly, exp(0) being 1
@@ -201,11 +202,11 @@ def test_the_ticket_batch_centers_on_its_saved_dv01_and_cross_gamma_at_a_tenth_o
 
 HEADERS = Cells.from_rows([["date", "discount_factor"]])
 ANCHORS = Cells.from_rows([[serial(AS_OF), 1.0], [serial(A_YEAR), 0.95]])
-HANDLE = re.compile(r"^\d+:discount_curve:\d+$")
+HANDLE = re.compile(r"^\d+:discount_curve:SOFR:\d+$")  # the source's name kept, since #201
 
 
 def a_curve() -> str:
-    text = ENTRY["_CreateDiscountCurve"](HEADERS, ANCHORS)
+    text = ENTRY["_CreateDiscountCurve"]("SOFR", HEADERS, ANCHORS)
     assert isinstance(text, str) and HANDLE.fullmatch(text), text
     return text
 
@@ -217,10 +218,10 @@ def test_the_seam_makes_an_ordinary_curve_handle_that_reads_back_and_bumps_again
     assert isinstance(made, str) and HANDLE.fullmatch(made) and made != source
     assert bridge.live_handles()[0] == live + 1  # one publication
     rows = spilled(ENTRY["util_ReadHandle"](made))
-    assert rows[0] == ["date", "discount_factor"]
-    assert rows[1] == ["datetime64[D]", "float64"]
+    assert rows[0] == ["date", "discount_factor", "name"]
+    assert rows[1] == ["datetime64[D]", "float64", "str"]
     assert len(rows) == 368
-    assert rows[2] == [serial(AS_OF), 1.0]
+    assert rows[2] == [serial(AS_OF), 1.0, "SOFR"]
     assert rows[367][0] == serial(A_YEAR)
     assert rows[367][1] == pytest.approx(UP_ONE, rel=0, abs=1e-15)
     down = ENTRY["util_BumpDiscountCurve"](source, -1.0)
@@ -233,7 +234,7 @@ def test_the_seam_makes_an_ordinary_curve_handle_that_reads_back_and_bumps_again
     nothing = ENTRY["util_BumpDiscountCurve"](source, 0.0)
     assert spilled(ENTRY["util_ReadHandle"](nothing)) == spilled(ENTRY["util_ReadHandle"](source))
     # The source reads back as it was.
-    assert spilled(ENTRY["util_ReadHandle"](source))[367] == [serial(A_YEAR), 0.95]
+    assert spilled(ENTRY["util_ReadHandle"](source))[367] == [serial(A_YEAR), 0.95, "SOFR"]
 
 
 def test_the_seam_refuses_in_its_own_words_and_relays_the_library_s() -> None:
@@ -269,7 +270,7 @@ def test_the_seam_refuses_in_its_own_words_and_relays_the_library_s() -> None:
         "#ERROR util_BumpDiscountCurve: bump_bps is missing, expected number"
     )
     ones = ENTRY["_CreateDiscountCurve"](
-        HEADERS, Cells.from_rows([[serial(AS_OF), 1.0], [serial(A_YEAR), 1.0]])
+        "SOFR", HEADERS, Cells.from_rows([[serial(AS_OF), 1.0], [serial(A_YEAR), 1.0]])
     )
     assert re.fullmatch(
         r"#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, "

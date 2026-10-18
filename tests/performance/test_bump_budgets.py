@@ -21,7 +21,7 @@ IDS = ["eight days", "a year and a day", "ten years"]
 
 def daily_curve(days: int) -> DiscountCurve:
     dates = np.arange(FIRST, FIRST + np.timedelta64(days, "D"), dtype="datetime64[D]")
-    return discount_curve(dates, 1.0 - np.arange(days, dtype=np.float64) * 1e-6)
+    return discount_curve("SOFR", dates, 1.0 - np.arange(days, dtype=np.float64) * 1e-6)
 
 
 @pytest.mark.parametrize("days", SIZES, ids=IDS)

@@ -26,6 +26,7 @@ from goosedove.excel.bridge import (
     excel_function,
 )
 from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve
+from goosedove.globals.discount_curve_set import DiscountCurveSet
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.index_definitions.contract_codes import (
     cme_code,
@@ -81,8 +82,30 @@ def valuation_date_table(obj: ValuationDate) -> MixedArray:
 
 @shown.register
 def discount_curve_table(obj: DiscountCurve) -> MixedArray:
+    # The days and their factors, and since #201 the curve's name on every row, last, so that
+    # every positional read of the two columns stands.
     return MixedArray.table(
-        [("date", "discount_factor"), ("datetime64[D]", "float64")], obj.dates, obj.factors
+        [("date", "discount_factor", "name"), ("datetime64[D]", "float64", "str")],
+        obj.dates,
+        obj.factors,
+        (obj.name,) * obj.dates.size,
+    )
+
+
+@shown.register
+def discount_curve_set_table(obj: DiscountCurveSet) -> MixedArray:
+    # One row per curve in the order given, since #201: its name, its first and its last day
+    # and the days between, inclusive; the daily factors are each curve's own handle's to spill.
+    curves = obj.curves
+    return MixedArray.table(
+        [
+            ("name", "start_date", "end_date", "days"),
+            ("str", "datetime64[D]", "datetime64[D]", "int64"),
+        ],
+        obj.names,
+        np.array([c.start_date for c in curves], dtype="datetime64[D]"),
+        np.array([c.max_date for c in curves], dtype="datetime64[D]"),
+        np.array([c.dates.size for c in curves], dtype=np.int64),
     )
 
 

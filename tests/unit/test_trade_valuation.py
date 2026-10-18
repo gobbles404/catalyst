@@ -1297,6 +1297,7 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "expected discount curve handle"
     )
     curve = ENTRY["_CreateDiscountCurve"](
+        "SOFR",
         row("date", "discount_factor"),
         rows([serial("2026-11-24"), 1.0], [serial("2027-11-24"), 0.9]),
     )
@@ -4406,7 +4407,7 @@ def unit_history(unit: dict[str, Any], as_of: str, finals: dict[str, float] | No
 def unit_curve(*anchors: tuple[str, float]) -> str:
     return str(
         ENTRY["_CreateDiscountCurve"](
-            row("date", "discount_factor"), rows(*[[serial(d), f] for d, f in anchors])
+            "SOFR", row("date", "discount_factor"), rows(*[[serial(d), f] for d, f in anchors])
         )
     )
 

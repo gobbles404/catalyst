@@ -250,7 +250,7 @@ def bumped(curve: DiscountCurve, h: float) -> DiscountCurve:
     parallel shift of h in the continuously compounded zero rates, the convention itself and not
     an interpolation of bumped anchors."""
     tau = (curve.dates - curve.start_date).astype(np.int64) / 365.0
-    return discount_curve(curve.dates, curve.factors * np.exp(-h * tau))
+    return discount_curve(curve.name, curve.dates, curve.factors * np.exp(-h * tau))
 
 
 def test_the_analytic_cross_gamma_agrees_with_a_centered_difference_of_the_discounted_lots() -> (

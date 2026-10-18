@@ -28,7 +28,8 @@ How the pieces fit together, from an index to a risk report, is [architecture.md
 | [time.md](time.md) | the decisions on contract months, their codes, calendar days and business days, recorded ahead of the functions that need them |
 | [follow-ups.md](follow-ups.md) | the two consolidation follow-ups pinned on 26 September 2026, on the index conventions and the contract specifications, both resolved in #110: a record, with nothing outstanding |
 | [globals/valuation-date.md](globals/valuation-date.md) | `_CreateValuationDate`, a date and progress through that day |
-| [globals/discount-curve.md](globals/discount-curve.md) | `_CreateDiscountCurve`, a daily curve from anchors, the days between filled by a straight line, and its upper date bound |
+| [globals/discount-curve.md](globals/discount-curve.md) | `_CreateDiscountCurve`, a daily curve under its name from anchors, the days between filled by a straight line, and its upper date bound; the name in the handle and the readback |
+| [globals/collect-discount-curves.md](globals/collect-discount-curves.md) | `_CollectDiscountCurves`, named curves gathered as they are into one collection, each name once, with a compact handle and a membership readback; what `_EvaluateTrades` will take when every bilateral trade names its curve |
 | [globals/unit-conversions.md](globals/unit-conversions.md) | `UnitConversions`, the shipped unit definitions and the conversion between them |
 | [index-definitions/futures-schedule.md](index-definitions/futures-schedule.md) | `_CreateFuturesSchedule`, the contract months of one index, the day each future expires and, where given, its option |
 | [index-definitions/holiday-calendar.md](index-definitions/holiday-calendar.md) | `_CreateHolidayCalendar`, the days one market is closed, listed one by one |

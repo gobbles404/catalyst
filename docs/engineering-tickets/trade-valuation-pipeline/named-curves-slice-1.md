@@ -2,7 +2,7 @@
 
 [Parent arc](multiple-discount-curves.md) · slice 1 of 4 · [Curve](../../library/globals/discount-curve.md) · [Bump](../../library/utilities/bump-discount-curve.md) · [Handles](../../seam/handles.md)
 
-**Status:** Slice ticket for owner review, 18 October 2026, the first commit of its PR on `feat/named-curves` from main `504cb34`. No implementation yet.
+**Status:** Built in #201 on `feat/named-curves` from main `504cb34`, 18 October 2026, the ticket reviewed and corrected first. The pages that own what was built are [discount-curve.md](../../library/globals/discount-curve.md), [collect-discount-curves.md](../../library/globals/collect-discount-curves.md), [bump-discount-curve.md](../../library/utilities/bump-discount-curve.md), [read-handle.md](../../library/utilities/read-handle.md) and [handles.md](../../seam/handles.md). One wording changed at implementation: the library receives the curves as a tuple and no cell coordinates, so a repeated name is refused by position, `curve_handles cell 1 and cell 2 are both named 'SOFR'`, the cells counted from one in the order the sheet gave them, not `cells (1, 1) and (1, 2)` as drafted; the seam's own refusals of a cell keep their coordinates.
 
 ## Outcome
 
@@ -29,7 +29,7 @@ util_BumpDiscountCurve(curve, bump_bps)         -> discount_curve handle, the so
 | 10 | `=A9` | `=A7` | the scenario's members, the bumped SOFR and the same FFOIS, in two cells |
 | 11 | `=_CollectDiscountCurves(A10:B10)` | shows `30512:discount_curve_set:6`, the scenario collection | |
 | 12 | `=A6` | `=A9` | the base SOFR and the bumped SOFR, two snapshots of one name |
-| 13 | `=_CollectDiscountCurves(A12:B12)` | shows `#ERROR _CollectDiscountCurves: ValueError: curve_handles cells (1, 1) and (1, 2) are both named 'SOFR', expected each name once` | |
+| 13 | `=_CollectDiscountCurves(A12:B12)` | shows `#ERROR _CollectDiscountCurves: ValueError: curve_handles cell 1 and cell 2 are both named 'SOFR', expected each name once` | |
 
 A range given to `_CollectDiscountCurves` holds curve handles alone: A6:A9 would take in the collection in A8 and is refused by that cell as another kind, so the members are gathered through cells that refer to the curves. `name` is the required first argument of `_CreateDiscountCurve`, text as the seam checks any text scalar, a number, a blank, empty text and a range refused in its words; the library holds it to a name, text with no whitespace around it and not whitespace alone. The table, the interpolation and the curve's rules stand as they are. The handle carries the name where an index's name goes, through the named-handle machinery, as the cashflows carry their currency. `curve_handles` is a cell, a row or a column of curve handles through the handle-vector seam, one kind, in the order given, at least one cell; a blank, text naming nothing, another kind's handle and a nested collection are refused by their cell in the seam's words. The collection's handle stays compact; its members are its readback's to show.
 
@@ -38,7 +38,7 @@ A range given to `_CollectDiscountCurves` holds curve handles alone: A6:A9 would
 | Rule | Refused as |
 |---|---|
 | the name has no whitespace around it and is not whitespace alone, since a key will match it exactly, case and all | `name is ' SOFR', expected a name with no whitespace around it`; `name is '  ', expected a name, not whitespace alone` |
-| each name once in a collection, the same handle twice included; the first repeat named with the cell it repeats | `curve_handles cells (1, 1) and (1, 2) are both named 'SOFR', expected each name once` |
+| each name once in a collection, the same handle twice included; the first repeat named with the cell it repeats, the cells counted from one in the order given | `curve_handles cell 1 and cell 2 are both named 'SOFR', expected each name once` |
 
 Nothing else: a collection checks no date, since which curves must start on the valuation day and cover which payments is the evaluation's to decide for the curves a batch selects, in slice 4; two curves of different spans sit in one collection. Equal factors under different names are two curves; two snapshots of one name are refused in one collection and, across results, kept apart by identity in slice 3.
 
@@ -76,7 +76,7 @@ Naming a curve costs nothing per day: the record gains a reference. A collection
 
 ## Tests
 
-The names, the two rules, the readbacks, the bump keeping the name and the handles' texts, in `tests/unit/test_discount_curve.py`, `tests/unit/test_bump_discount_curve.py` and a new `tests/unit/test_discount_curve_set.py`, with the seam's words; the help pinned; the curve and bump budgets re-pinned where a name entered the ledger and the collection's own in the seam suites; the host facts and smoke rows; the lifetime script's curves named; the kept workbook migrated.
+The names, the two rules, the readbacks, the bump keeping the name and the handles' texts, in `tests/unit/test_discount_curve.py`, `tests/unit/test_bump_discount_curve.py` and a new `tests/unit/test_discount_curve_set.py`, with the seam's words; the help pinned; the curve and bump budgets re-pinned where a name entered the ledger and the collection's own in `tests/performance/test_discount_curve_set_budgets.py`; the host facts and smoke rows; the lifetime script's curves named; the kept workbook migrated.
 
 ## Not in this slice
 

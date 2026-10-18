@@ -54,7 +54,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal("One multiplier. 1 when omitted.", factor.Description);
             var curve = attributes.FindIndex(a => ((ExcelFunctionAttribute)a).Name == "_CreateDiscountCurve");
             Assert.False(((ExcelFunctionAttribute)attributes[curve]).IsHidden);
-            var table = (ExcelArgumentAttribute)argumentAttributes[curve][1];
+            var name = (ExcelArgumentAttribute)argumentAttributes[curve][0];
+            Assert.Equal("name", name.Name);
+            Assert.StartsWith("The curve's name, text such as SOFR", name.Description);
+            var table = (ExcelArgumentAttribute)argumentAttributes[curve][2];
             Assert.Equal("table", table.Name);
             Assert.StartsWith("The rows under the headers", table.Description);
         }

@@ -69,7 +69,7 @@ LATE = (
 def curve_on(as_of: str) -> DiscountCurve:
     """A curve anchored on the valuation day, 1 there and 0.9 at the end of 2028."""
     return discount_curve(
-        np.array([as_of, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9])
+        "SOFR", np.array([as_of, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9])
     )
 
 
