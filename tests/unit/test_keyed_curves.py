@@ -25,20 +25,26 @@ from test_bilateral_kernel import (
     given,
     terms_of,
 )
-from test_trades import an_index, dates, history_on, observed_of, quoted
+from test_cross_gamma import trades_on
+from test_trades import an_index, dates, day, history_on, observed_of, quoted
 
+from goosedove.calendar.calendar import calendar
 from goosedove.globals.discount_curve import DiscountCurve, bump_discount_curve, discount_curve
 from goosedove.globals.discount_curve_set import DiscountCurveSet
 from goosedove.globals.unit_conversions import UNITS
+from goosedove.globals.valuation_date import valuation_date
+from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market import Market
-from goosedove.market.market_history import MarketHistory
+from goosedove.market.market_history import MarketHistory, market_history
+from goosedove.market_data.futures_fixings import futures_fixings
 from goosedove.trades.aggregation import aggregate_view
 from goosedove.trades.encoding import Encoded, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
 from goosedove.trades.results import TradeResults, risk_view
 from goosedove.trades.risk_report import Bucket, Risk
+from goosedove.trades.schedule_methods import ScheduleMethod
 from goosedove.trades.terms import ResolvedTrades
 
 # The parent's index: a reporting lot of 10,000 barrels, G27 expiring 1 February 2027 so that its
@@ -549,3 +555,182 @@ def test_two_finite_cross_gamma_totals_summing_past_the_largest_number_are_refus
     )
     assert np.isfinite(result.cross_gamma_total)
     assert result.cross_gamma_total == pytest.approx(sofr_share + ffois_share, rel=1e-9)
+
+
+# --- two asians on two curves over one month, live and as fixings arrive -------------------------
+
+# The cross-gamma suite's index: contracts expiring on their month's last weekday, so that V26
+# prices every weekday of October 2026, twenty-two of them, the calendar closed on one day that
+# matters to nothing.
+ETH = an_index(
+    "ETH",
+    (("U26", "2026-09-30"), ("V26", "2026-10-30"), ("X26", "2026-11-30")),
+    ("2027-12-27",),
+    ("USD", "BBL"),
+    ("VOLUME", "BBL"),
+    ("LOT", 1.0, "BBL"),
+)
+OCTOBER_DAYS = 22
+A_DAY = 10.0 / OCTOBER_DAYS  # A's lots on each pricing day, the month's ten spread over them
+PAY = "2027-10-15"
+ETH_QUOTES = (4.0, 3.5)  # V26 and X26, V26 one over the fixed price of 3
+
+
+def asians(keys: tuple[str, ...], quantities: tuple[float, ...] = (10.0, -10.0)) -> ResolvedTrades:
+    """A +10 lots of V26 by the month and B -10, at 3, both paying 15 October 2027, booked on 1
+    October 2026, each under its own key: the same averaging days and the same payment day."""
+    terms = trades_on(
+        ETH,
+        quantities,
+        (3.0,) * len(quantities),
+        (PAY,) * len(quantities),
+        ("+365cd",) * len(quantities),
+        ScheduleMethod.ASIAN,
+        as_of="2026-10-01",
+    )
+    return replace(terms, discount_curve_key=keys)
+
+
+def eth_curves(as_of: str) -> DiscountCurveSet:
+    """SOFR 0.95 and FFOIS 0.90 on the payment day, each anchored on the valuation day."""
+    return curve_set(
+        curve_of((as_of, 1.0), (PAY, 0.95)), curve_of((as_of, 1.0), (PAY, 0.90), name="FFOIS")
+    )
+
+
+def history_with(ix: Index, as_of: str, settles: dict[str, float]) -> MarketHistory:
+    """The index's history valued that day: a settle of 3.00 on every fixed pricing day but the
+    ones given, the fixings creator taking them newest first; the fixture's own arithmetic."""
+    cal = calendar(valuation_date(day(as_of), 0.5), ix)
+    priced = cal.dates[cal.is_fixed & cal.is_priced]
+    prices = np.full(priced.size, 3.0)
+    for text, settle in settles.items():
+        prices[priced == np.datetime64(text)] = settle
+    return market_history(cal, futures_fixings(priced[::-1].copy(), prices[::-1].copy(), ix))
+
+
+def tau_from(as_of: str) -> float:
+    return float((np.datetime64(PAY) - np.datetime64(as_of)).astype(np.int64)) / 365
+
+
+def test_two_asians_on_two_curves_keep_each_curves_share_of_every_day() -> None:
+    # Valued on 1 October 2026 with every October day live and V26 at 4: the twenty-two days
+    # under two keys are two groups and forty-four slots, never netted; no nominal delta, 0.5 of
+    # discounted delta, 9.5 less 9.0, and 0.5 over 22 on each day; 10 and -10 of amount, 9.5 and
+    # -9.0 of NPV, each curve's DV01 and cross-gamma its own; and the mixed batch's share of each
+    # curve is what that trade alone makes on it.
+    as_of = "2026-10-01"
+    history = history_on(ETH, as_of, {})
+    market = quoted(history, *ETH_QUOTES)
+    prep = prepared(asians(("SOFR", "FFOIS")), history)
+    enc = prep.encoded
+    assert enc.keys == ("SOFR", "FFOIS") and enc.days.size == OCTOBER_DAYS
+    np.testing.assert_array_equal(keys_of_groups(enc), [0, 1])
+    assert enc.group_contract.size == 2 and enc.slot_group.size == 2 * OCTOBER_DAYS
+    assert int(prep.is_fixed.sum()) == 0
+    counter = WorkCounter()
+    result = valued_on(prep, eth_curves(as_of), market, counter)
+    assert counter.freeze().as_dict() == {
+        "curves_selected": 2,
+        "groups_valued": 2,
+        "kernel": 1,
+        "live_prices_read": 1,
+        "payment_factors_read": 2,
+        "risk_reductions": 12,
+        "slots_discounted": 2 * OCTOBER_DAYS,
+        "slots_weighted": 2 * OCTOBER_DAYS,
+    }
+    tau = tau_from(as_of)
+    assert result.lot_delta_total == pytest.approx(0.0, **CLOSE)
+    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    np.testing.assert_allclose(result.discounted_lot_delta, [0.5], **TIGHT)
+    np.testing.assert_allclose(result.discounted_daily_lots, [0.5 / OCTOBER_DAYS] * 22, **TIGHT)
+    np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
+    np.testing.assert_allclose(given(result.payment_amount), [10.0, -10.0], **TIGHT)
+    np.testing.assert_allclose(given(result.npv_by_group), [9.5, -9.0], **TIGHT)
+    assert result.mark == pytest.approx(0.5, **CLOSE)
+    assert dv01s(result) == (
+        pytest.approx(-0.0001 * tau * 9.5, **CLOSE),
+        pytest.approx(0.0001 * tau * 9.0, **CLOSE),
+    )
+    assert cross_gammas(result) == (
+        pytest.approx(-0.0001 * tau * 9.5, **CLOSE),
+        pytest.approx(0.0001 * tau * 9.0, **CLOSE),
+    )
+    sofr_cross, ffois_cross = result.cross_contributions
+    np.testing.assert_allclose(
+        sofr_cross.cross_gamma_by_day, [-0.0001 * tau * A_DAY * 0.95] * 22, **TIGHT
+    )
+    np.testing.assert_allclose(
+        ffois_cross.cross_gamma_by_day, [0.0001 * tau * A_DAY * 0.90] * 22, **TIGHT
+    )
+    # Each trade alone on its curve: the mixed batch's share of that curve, entry for entry.
+    a = valued_on(prepared(asians(("SOFR",), (10.0,)), history), eth_curves(as_of), market)
+    b = valued_on(prepared(asians(("FFOIS",), (-10.0,)), history), eth_curves(as_of), market)
+    assert a.curves[0].name == "SOFR" and b.curves[0].name == "FFOIS"
+    assert a.discounted_lot_delta_total == pytest.approx(9.5, **CLOSE)
+    assert b.discounted_lot_delta_total == pytest.approx(-9.0, **CLOSE)
+    for mixed, alone in zip(result.rate_contributions, (a, b), strict=True):
+        assert mixed.dv01 == pytest.approx(alone.rate_contributions[0].dv01, **CLOSE)
+        np.testing.assert_allclose(
+            mixed.dv01_by_day, alone.rate_contributions[0].dv01_by_day, **TIGHT
+        )
+    for mixed_cross, alone in zip(result.cross_contributions, (a, b), strict=True):
+        np.testing.assert_allclose(
+            mixed_cross.cross_gamma_by_day, alone.cross_contributions[0].cross_gamma_by_day, **TIGHT
+        )
+        assert mixed_cross.cross_gamma_total == pytest.approx(
+            alone.cross_contributions[0].cross_gamma_total, **CLOSE
+        )
+
+
+def test_the_two_asians_as_fixings_arrive_keep_each_days_amount_on_its_curve() -> None:
+    # The same batch prepared on 7 October 2026, four days fixed at 3.2, 3.4, 3.0 and 3.0, then
+    # on the 8th with the 7th fixed at 3.6: the newly fixed day leaves the live lots, 18 then 17
+    # of the 22 a trade, and its exposure times its settle joins its own trade's payment group,
+    # SOFR's for A and FFOIS's for B; the unpaid groups keep their DV01 on their own curves; every
+    # number from the fixture's own arithmetic. Then the 7th corrected to 3.1: the two groups'
+    # set amounts move by that day's lots times half a dollar, each on its own curve, while the
+    # lots, the factors and the ownership stand.
+    settles = {"2026-10-01": 3.2, "2026-10-02": 3.4, "2026-10-07": 3.6}
+    terms = asians(("SOFR", "FFOIS"))
+
+    def check(as_of: str, fixed: tuple[str, ...], prices: dict[str, float]) -> None:
+        live = OCTOBER_DAYS - len(fixed)
+        tau = tau_from(as_of)
+        # A's legs: the set amount, each fixed day's lots times its settle; the offset, the
+        # month's lots times the fixed price; the live amount, each live day's lots times the
+        # quote. B's are the negatives, on FFOIS.
+        set_amount = sum(A_DAY * prices.get(d, 3.0) for d in fixed)
+        amount = set_amount - 10.0 * 3.0 + live * A_DAY * ETH_QUOTES[0]
+        npv_a, npv_b = amount * 0.95, -amount * 0.90
+        history = history_with(ETH, as_of, prices)
+        prep = prepared(terms, history)
+        assert int(prep.is_fixed.sum()) == 2 * len(fixed)
+        np.testing.assert_array_equal(keys_of_groups(prep.encoded), [0, 1])
+        np.testing.assert_allclose(prep.set_amount, [set_amount, -set_amount], **TIGHT)
+        result = valued_on(prep, eth_curves(as_of), quoted(history, *ETH_QUOTES))
+        assert [c.name for c in result.curves] == ["SOFR", "FFOIS"]
+        np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
+        assert result.lot_delta_total == pytest.approx(0.0, **CLOSE)
+        assert result.discounted_lot_delta_total == pytest.approx(0.05 * live * A_DAY, **CLOSE)
+        fixed_days = np.isin(prep.encoded.days, np.array(fixed, dtype="datetime64[D]"))
+        np.testing.assert_allclose(
+            result.discounted_daily_lots, np.where(fixed_days, 0.0, 0.5 / OCTOBER_DAYS), **TIGHT
+        )
+        np.testing.assert_allclose(given(result.payment_amount), [amount, -amount], **TIGHT)
+        np.testing.assert_allclose(given(result.npv_by_group), [npv_a, npv_b], **TIGHT)
+        assert result.mark == pytest.approx(npv_a + npv_b, **CLOSE)
+        assert dv01s(result) == (
+            pytest.approx(-0.0001 * tau * npv_a, **CLOSE),
+            pytest.approx(-0.0001 * tau * npv_b, **CLOSE),
+        )
+        assert cross_gammas(result) == (
+            pytest.approx(-0.0001 * tau * live * A_DAY * 0.95, **CLOSE),
+            pytest.approx(0.0001 * tau * live * A_DAY * 0.90, **CLOSE),
+        )
+
+    four = ("2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06")
+    check("2026-10-07", four, settles)
+    check("2026-10-08", (*four, "2026-10-07"), settles)
+    check("2026-10-08", (*four, "2026-10-07"), {**settles, "2026-10-07": 3.1})
