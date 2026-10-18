@@ -17,6 +17,10 @@ from numpy.typing import NDArray
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.trades.display_axes import EarlyRisk
 
+# The word a heading gives a batch on no curve, `cleared USD dv01 [USD per basis point]` and
+# `HNG cleared cross_gamma [LOT per basis point]`; never a curve's word.
+CLEARED = "cleared"
+
 
 @dataclass(frozen=True, slots=True)
 class RateContribution:
@@ -64,9 +68,14 @@ def curve_words(curves: Sequence[DiscountCurve]) -> dict[int, str]:
     """Each distinct curve object's word in a heading, keyed by the object's identity: its name as
     typed, or, where two or more distinct objects share a name, the name qualified by the object's
     place among that name's objects in the order given, `SOFR (curve_1)` and `SOFR (curve_2)`, both
-    of them and never the first left bare. Display, not identity: nothing groups by the word. A
-    single result's one curve is its bare name; a collection's words follow the first appearance
-    of each object among its sources' contributions."""
+    of them and never the first left bare. Every word is distinct: a qualifier never repeats a
+    word the report already uses, a name one of the curves carries, `cleared` or an earlier
+    qualifier, the place counting on past it, so a curve named `SOFR (curve_1)` keeps its name
+    beside `SOFR (curve_2)` and `SOFR (curve_3)`; and a curve named `cleared` is qualified as a
+    shared name is, `cleared (curve_1)`, the bare word kept for a batch on no curve. Display, not
+    identity: nothing groups by the word. A single result's one curve is its bare name; a
+    collection's words follow the first appearance of each object among its sources'
+    contributions."""
     first: dict[int, DiscountCurve] = {}
     for curve in curves:
         first.setdefault(id(curve), curve)
@@ -74,10 +83,23 @@ def curve_words(curves: Sequence[DiscountCurve]) -> dict[int, str]:
     for key, curve in first.items():
         by_name.setdefault(curve.name, []).append(key)
     words: dict[int, str] = {}
+    qualifying = False
     for name, keys in by_name.items():
-        if len(keys) == 1:
+        if len(keys) == 1 and name != CLEARED:
             words[keys[0]] = name
         else:
-            for k, key in enumerate(keys, start=1):
-                words[key] = f"{name} (curve_{k})"
+            qualifying = True
+    if not qualifying:
+        return words  # every name its own and none the cleared word: nothing more is made
+    taken = {CLEARED, *words.values()}
+    for name, keys in by_name.items():
+        if len(keys) == 1 and name != CLEARED:
+            continue
+        place = 0
+        for key in keys:
+            place += 1
+            while (word := f"{name} (curve_{place})") in taken:
+                place += 1
+            taken.add(word)
+            words[key] = word
     return words

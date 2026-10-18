@@ -52,7 +52,12 @@ from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.price_vector import PriceVector
-from goosedove.trades.contributions import CrossContribution, RateContribution, curve_words
+from goosedove.trades.contributions import (
+    CLEARED,
+    CrossContribution,
+    RateContribution,
+    curve_words,
+)
 from goosedove.trades.display_axes import (
     NONE_EARLY,
     EarlyRisk,
@@ -971,10 +976,10 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
     nominal = tuple([pair[0] for pair in pairs])
     delta = tuple([pair[1] for pair in pairs])
     dv01 = tuple([dv01_label(r.word, r.currency) for r in rates])
-    cleared = tuple([dv01_label("cleared", c) for c in aggregate.currencies])
+    cleared = tuple([dv01_label(CLEARED, c) for c in aggregate.currencies])
     cross = tuple(
         [
-            cross_gamma_label(c.index, "cleared" if c.word is None else c.word, c.reporting_lot)
+            cross_gamma_label(c.index, CLEARED if c.word is None else c.word, c.reporting_lot)
             for c in crosses
         ]
     )

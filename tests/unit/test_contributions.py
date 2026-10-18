@@ -3,13 +3,25 @@ contribution from a bilateral evaluation, by reference to the arrays the evaluat
 from a cleared batch, one rate contribution from a batch of cashflows; and the words a report
 names a curve by, the name bare or, where two objects share one, both qualified."""
 
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from test_aggregate_risk import HNG_HISTORY, HNG_MARKET, hng, valued_on
 from test_bilateral_kernel import A_YEAR, AS_OF, TWO_YEARS, cross, curve_of, prepared_on, rate
 from test_bilateral_kernel import terms_of as bilateral_terms
 from test_bilateral_kernel import valued as trades_valued
 from test_cashflows import booked
 from test_cashflows import valued as cashflows_valued
 
-from goosedove.trades.contributions import CrossContribution, RateContribution, curve_words
+from goosedove.instrumentation.work_counts import WorkCounter
+from goosedove.trades.aggregation import aggregate_results, aggregate_view
+from goosedove.trades.contributions import (
+    CLEARED,
+    CrossContribution,
+    RateContribution,
+    curve_words,
+)
+from goosedove.trades.results import risk_view
+from goosedove.trades.risk_report import Bucket, Risk
 from goosedove.trades.terms import Route
 
 SOFR = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
@@ -42,6 +54,70 @@ def test_two_objects_of_one_name_are_both_qualified_by_first_appearance() -> Non
     twin = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
     assert curve_words([SOFR, twin])[id(twin)] == "SOFR (curve_2)"
     assert curve_words([twin])[id(twin)] == "SOFR"
+
+
+def test_a_qualifier_never_repeats_a_name_or_the_cleared_word() -> None:
+    # The review of 2bb4574: a name in the qualifier's own form beside two objects of the name
+    # it qualifies, and a curve named for a batch on no curve. Every word is distinct, the place
+    # counting on past a word the report already uses, and `cleared` is kept for no curve.
+    again = curve_of((AS_OF, 1.0), (A_YEAR, 0.94), name="SOFR")
+    literal = curve_of((AS_OF, 1.0), (A_YEAR, 0.93), name="SOFR (curve_1)")
+    assert curve_words([SOFR, again, literal]) == {
+        id(SOFR): "SOFR (curve_2)",
+        id(again): "SOFR (curve_3)",
+        id(literal): "SOFR (curve_1)",
+    }
+    later = curve_of((AS_OF, 1.0), (A_YEAR, 0.93), name="SOFR (curve_2)")
+    assert curve_words([SOFR, again, later]) == {
+        id(SOFR): "SOFR (curve_1)",
+        id(again): "SOFR (curve_3)",
+        id(later): "SOFR (curve_2)",
+    }
+    cleared = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), name=CLEARED)
+    assert curve_words([cleared]) == {id(cleared): "cleared (curve_1)"}
+    assert curve_words([SOFR, cleared]) == {id(SOFR): "SOFR", id(cleared): "cleared (curve_1)"}
+    taken = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), name="cleared (curve_1)")
+    assert curve_words([cleared, taken]) == {
+        id(cleared): "cleared (curve_2)",
+        id(taken): "cleared (curve_1)",
+    }
+
+
+@settings(deadline=None)
+@given(
+    names=st.lists(
+        st.sampled_from(
+            ["SOFR", "FFOIS", CLEARED, "SOFR (curve_1)", "SOFR (curve_2)", "cleared (curve_1)"]
+        ),
+        max_size=8,
+    )
+)
+def test_every_word_is_distinct_whatever_the_names(names: list[str]) -> None:
+    curves = [curve_of((AS_OF, 1.0), (A_YEAR, 0.95), name=name) for name in names]
+    words = curve_words(curves)
+    assert len(words) == len(curves) and len(set(words.values())) == len(curves)
+    assert CLEARED not in words.values()
+    for curve in curves:
+        if names.count(curve.name) == 1 and curve.name != CLEARED:
+            assert words[id(curve)] == curve.name
+
+
+def test_a_curve_named_cleared_keeps_its_columns_apart_from_a_cleared_batch() -> None:
+    named = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90), name=CLEARED)
+    on_named = valued_on(hng((10.0,), (A_YEAR,), Route.BILATERAL), HNG_HISTORY, HNG_MARKET, named)
+    assert risk_view(on_named, Risk.ALL, Bucket.DAY).labels[2:] == (
+        "cleared (curve_1) USD dv01 [USD per basis point]",
+        "HNG cleared (curve_1) cross_gamma [LOT per basis point]",
+    )
+    cleared = valued_on(hng((10.0,), (A_YEAR,), Route.CLEARED), HNG_HISTORY, HNG_MARKET, None)
+    both = aggregate_results([cleared, on_named], WorkCounter())
+    assert aggregate_view(both, Risk.CROSS_GAMMA, Bucket.DAY).labels == (
+        "HNG cleared cross_gamma [LOT per basis point]",
+        "HNG cleared (curve_1) cross_gamma [LOT per basis point]",
+    )
+    assert aggregate_view(both, Risk.DV01, Bucket.DAY).labels == (
+        "cleared (curve_1) USD dv01 [USD per basis point]",
+    )
 
 
 # --- the contributions on the records -------------------------------------------------------------

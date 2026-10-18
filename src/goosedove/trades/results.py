@@ -16,7 +16,12 @@ from numpy.typing import NDArray
 
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.market.market import Market
-from goosedove.trades.contributions import CrossContribution, RateContribution, curve_words
+from goosedove.trades.contributions import (
+    CLEARED,
+    CrossContribution,
+    RateContribution,
+    curve_words,
+)
 from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, Unit
 from goosedove.trades.preparation import PreparedTrades
 from goosedove.trades.reserves import Reserves
@@ -185,8 +190,8 @@ def risk_view(results: TradeResults, risk: Risk, bucket: Bucket) -> RiskView:
         )
     else:
         # Cleared: no curve values, the one DV01 column and the one cross-gamma column of nothing.
-        dv01_labels = (dv01_label("cleared", results.currency),)
-        cross_labels = (cross_gamma_label(terms.index, "cleared", terms.reporting_lot),)
+        dv01_labels = (dv01_label(CLEARED, results.currency),)
+        cross_labels = (cross_gamma_label(terms.index, CLEARED, terms.reporting_lot),)
     labels: Labels = (nominal_label, delta_label, dv01_labels, cross_labels)
     match bucket:
         case Bucket.DAY:
