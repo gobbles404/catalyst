@@ -33,7 +33,7 @@ from goosedove.trades.template import TradeTemplate, trade_template
 
 DAY_BEFORE = "2027-01-03"
 CURVE = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
-DV01_LABEL = "curve_1 USD dv01 [USD per basis point]"
+DV01_LABEL = "SOFR USD dv01 [USD per basis point]"
 
 
 # --- the two records from Python, as the seam would build them ------------------------------------
@@ -145,9 +145,13 @@ def test_the_worked_example_books_three_payments_and_values_them_by_hand() -> No
     np.testing.assert_allclose(result.payment_factor, [1.0, 0.95, 0.90], **TIGHT)
     np.testing.assert_allclose(result.npv, [0.0, 9_500.0, -9_000.0], **TIGHT)
     assert result.payment_cash.tolist() == [250.0, 0.0, 0.0]
-    np.testing.assert_allclose(result.dv01_by_day, [0.0, -0.95, 1.80], **TIGHT)
-    np.testing.assert_allclose(result.dv01_by_month, [0.0, -0.95, 1.80], **TIGHT)
-    np.testing.assert_allclose(result.dv01_by_year, [0.0, -0.95, 1.80], **TIGHT)
+    (contribution,) = result.rate_contributions  # the one curve's share, the whole of it
+    assert contribution.curve is result.curve and contribution.currency == "USD"
+    assert contribution.dv01 == result.dv01
+    assert contribution.days is result.cashflows.payment_days
+    np.testing.assert_allclose(contribution.dv01_by_day, [0.0, -0.95, 1.80], **TIGHT)
+    np.testing.assert_allclose(contribution.dv01_by_month, [0.0, -0.95, 1.80], **TIGHT)
+    np.testing.assert_allclose(contribution.dv01_by_year, [0.0, -0.95, 1.80], **TIGHT)
     assert counter.freeze().as_dict() == {
         "payment_factors_read": 2,
         "payments_valued": 2,
@@ -158,9 +162,9 @@ def test_the_worked_example_books_three_payments_and_values_them_by_hand() -> No
         result.payment_factor,
         result.npv,
         result.payment_cash,
-        result.dv01_by_day,
-        result.dv01_by_month,
-        result.dv01_by_year,
+        result.rate_contributions[0].dv01_by_day,
+        result.rate_contributions[0].dv01_by_month,
+        result.rate_contributions[0].dv01_by_year,
         batch.trade_date,
         batch.amount,
         batch.payment_date,

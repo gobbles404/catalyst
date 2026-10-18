@@ -204,7 +204,7 @@ def test_the_peaks_follow_the_rows_and_the_days_and_the_records_keep_their_colum
         + result.payment_factor.nbytes
         + result.npv.nbytes
         + result.payment_cash.nbytes
-        + result.dv01_by_day.nbytes
+        + result.rate_contributions[0].dv01_by_day.nbytes
     )
     assert held == 33 * days
 

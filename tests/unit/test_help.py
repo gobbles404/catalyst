@@ -845,14 +845,14 @@ def test_the_two_reports_explain_themselves() -> None:
         (
             "result_handles",
             "The results handles to collect: a cell, a row or a column of cells showing "
-            "_EvaluateTrades's results, such as B2:B5, in the order given, every one counted and a "
-            "repeat counted again.",
+            "_EvaluateTrades's or _EvaluateCashflows's results, in any mix, such as B2:B5, in the "
+            "order given, a repeat counted again.",
         )
     ]
     assert description == (
-        "Collects evaluated batches' saved risk into one collection, the lots by index, the DV01 "
-        "by curve and currency and the cross-gamma by index and curve, nothing valued again, and "
-        "shows its handle, which _ReportRisk takes beside a single result's."
+        "Collects evaluated batches' saved risk, trades' and cashflows', into one collection, the "
+        "lots by index, the DV01 by curve and currency and the cross-gamma by index and curve, "
+        "nothing valued again, and shows its handle, which _ReportRisk takes."
     )
     description, arguments, hidden = SPECS["_ReportReserves"]
     assert not hidden and arguments == [

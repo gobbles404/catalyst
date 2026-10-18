@@ -2,7 +2,7 @@
 
 [Parent arc](multiple-discount-curves.md) · slice 2 of 3 · [Slice 1](named-curves-slice-1.md) · [Risk](../../library/trades/report-risk.md) · [Collection](../../library/trades/aggregate-results.md) · [Cashflows](../../library/cashflows/evaluate-cashflows.md) · [Cashflow ticket](cashflow-instrument.md)
 
-**Status:** Approved for implementation on 18 October 2026, after review of the ticket as the first commit of its PR on `feat/curve-contributions` from `feat/named-curves` at `045fe1a`, stacked on #201; the review corrected B8's and B10's expected results, which hold the SOFR cashflow too, and asked for a test of several contributions from one result. Folds in the cashflow aggregation, the cashflow ticket's second PR, as decided on 18 October.
+**Status:** Built in #202 on `feat/curve-contributions` from `feat/named-curves` at `045fe1a`, stacked on #201, 18 October 2026, the ticket reviewed first: the review corrected B8's and B10's expected results, which hold the SOFR cashflow too, and asked for a test of several contributions from one result. Folds in the cashflow aggregation, the cashflow ticket's second PR, as decided on 18 October. The pages that own what was built are [report-risk.md](../../library/trades/report-risk.md), [aggregate-results.md](../../library/trades/aggregate-results.md), [evaluate-cashflows.md](../../library/cashflows/evaluate-cashflows.md), [read-handle.md](../../library/utilities/read-handle.md) and [inputs.md](../../seam/inputs.md) decision 44.
 
 ## Outcome
 

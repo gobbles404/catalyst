@@ -342,12 +342,22 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
             return {"_day_view": 1, **copies}
         if risk in ("dv01", "cross_gamma"):
             # Since #197 the cross-gamma like the DV01: a cleared result's the known zero, a
-            # column of zeros made and nothing refused.
-            shown = {"EarlyRisk.refuse": 1, "placed": 1} if on_curve else {}
+            # column of zeros made and nothing refused; since slice 2 the contribution's
+            # vector picked for the bucket.
+            of = "_dv01_of" if risk == "dv01" else "_cross_of"
+            shown = {"EarlyRisk.refuse": 1, "placed": 1, of: 1} if on_curve else {}
             return {"_period_view": 1, "_saved": 1, **shown}
         if risk == "all":
             n = 4 if on_curve else 2
-            return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": n, "placed": n}
+            of = {"_dv01_of": 1, "_cross_of": 1} if on_curve else {}
+            return {
+                "_period_view": 1,
+                "_period_all": 1,
+                "_saved": 1,
+                "EarlyRisk.refuse": n,
+                "placed": n,
+                **of,
+            }
         return {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 1, "placed": 1}
 
     for results, on_curve in ((cleared, False), (discounted, True)):
@@ -371,6 +381,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
                     "delta_labels": 1,  # the headings, spelled once in risk_report.py
                     "dv01_label": 1,
                     "cross_gamma_label": 1,
+                    **({"curve_words": 1} if on_curve else {}),  # the curve's word, since slice 2
                     **selected(on_curve, risk, bucket),
                     "_risk_table": 1,
                     "MixedArray.table": 2,  # the valuation day and the dates to serials
@@ -455,7 +466,10 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
         "_AggregateResults": 1,
         "aggregate_results": 1,
         "_grouped_by_index": 1,
-        "_curve_numbers": 1,  # since #197, one numbering for the rate and the cross groups
+        "_contributions_of": 1,  # since slice 2: the contributions counted and the words made
+        "_cross_contributions": 2 * n,
+        "_curve_words": 1,  # one wording for the rate and the cross groups
+        "curve_words": 1,
         "_grouped_by_curve": 1,
         "_grouped_by_index_and_curve": 1,
         "_index_group": 1,
@@ -474,7 +488,7 @@ def test_a_collection_resolves_each_handle_once_and_runs_the_collector_alone(
         "early_risk": 4,
         "early_fact": 8,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 29,
+        "WorkCounter.hit": 30,
         "_publish": 1,
     }
     # The seam makes no numpy call of its own: every one below is the collector's, the same at two
@@ -521,7 +535,18 @@ def test_a_collection_report_resolves_one_handle_and_copies_through_saved_places
         ("delta", {"_discounted_lots": 1, "placed": 1}, 1),
         ("dv01", {"_dv01": 1, "placed": 1}, 1),
         ("cross_gamma", {"_cross_gamma": 1, "placed": 1}, 1),
-        ("all", {"_lots": 1, "_discounted_lots": 1, "_dv01": 1, "_cross_gamma": 1, "placed": 4}, 4),
+        (
+            "all",
+            {
+                "_aggregate_all": 1,
+                "_lots": 1,
+                "_discounted_lots": 1,
+                "_dv01": 1,
+                "_cross_gamma": 1,
+                "placed": 4,
+            },
+            4,
+        ),
     ):
         for bucket in ("day", "month", "year"):
             profile = call_profile(

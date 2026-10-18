@@ -6,7 +6,7 @@ WTI observing 5 January at 55 against 50, the bilateral sources on one USD curve
 and 0.90 two years out, every payment unpaid. The tolerances are the bilateral kernel's.
 docs/library/trades/aggregate-results.md is the page."""
 
-from dataclasses import fields
+from dataclasses import fields, replace
 from typing import Any
 
 import numpy as np
@@ -19,12 +19,16 @@ from test_bilateral_kernel import (
     TIGHT,
     TRIO,
     TWO_YEARS,
+    cross,
     curve_of,
-    given,
+    rate,
     terms_of,
 )
+from test_cashflows import DAY_BEFORE, booked
+from test_cashflows import valued as cashflows_valued
 from test_trades import an_index, dates, history_on, numbers, observed_of, quoted
 
+from goosedove.cashflows.valuation import CashflowResults
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
@@ -40,6 +44,7 @@ from goosedove.trades.aggregation import (
     aggregate_results,
     aggregate_view,
 )
+from goosedove.trades.contributions import RateContribution
 from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
@@ -52,6 +57,7 @@ from goosedove.trades.risk_report import (
     cross_gamma_label,
     delta_labels,
     dv01_label,
+    placed,
 )
 from goosedove.trades.terms import Route
 
@@ -77,11 +83,11 @@ A_DAY, B_DAY = np.datetime64(AS_OF), np.datetime64("2027-01-05")
 JAN_27, JAN_28, JAN_29 = "2027-01-01", "2028-01-01", "2029-01-01"
 HNG_NOMINAL, HNG_DELTA = "HNG nominal_delta [LOT]", "HNG delta [LOT]"
 WTI_NOMINAL, WTI_DELTA = "WTI nominal_delta [LOT]", "WTI delta [LOT]"
-CURVE_1 = "curve_1 USD dv01 [USD per basis point]"
+CURVE_1 = "SOFR USD dv01 [USD per basis point]"
 CLEARED_USD = "cleared USD dv01 [USD per basis point]"
-HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
+HNG_CROSS = "HNG SOFR cross_gamma [LOT per basis point]"
 HNG_CLEARED_CROSS = "HNG cleared cross_gamma [LOT per basis point]"
-WTI_CROSS = "WTI curve_1 cross_gamma [LOT per basis point]"
+WTI_CROSS = "WTI SOFR cross_gamma [LOT per basis point]"
 WTI_CLEARED_CROSS = "WTI cleared cross_gamma [LOT per basis point]"
 
 
@@ -127,7 +133,7 @@ def sources() -> dict[str, TradeResults]:
     }
 
 
-def collected(*results: TradeResults) -> AggregateResults:
+def collected(*results: TradeResults | CashflowResults) -> AggregateResults:
     return aggregate_results(list(results), WorkCounter())
 
 
@@ -164,7 +170,7 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     np.testing.assert_allclose(group.monthly_lots, [10.0], **TIGHT)
     np.testing.assert_allclose(group.discounted_yearly_lots, [10.5], **TIGHT)
     (rate,) = agg.rate_groups
-    assert rate.curve is FLAT and rate.number == 1 and rate.currency == "USD"
+    assert rate.curve is FLAT and rate.word == "SOFR" and rate.currency == "USD"
     np.testing.assert_array_equal(rate.occurrences, [1])
     np.testing.assert_array_equal(rate.days, dates(A_YEAR, TWO_YEARS))
     np.testing.assert_allclose(rate.dv01_by_day, [-0.0095, 0.018], **TIGHT)
@@ -191,6 +197,7 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     # axes, six coordinates each.
     assert counter.freeze().as_dict() == {
         "aggregate_reductions": 15,
+        "contributions_collected": 2,
         "cross_groups": 2,
         "entries_aligned": 18,
         "index_groups": 1,
@@ -209,7 +216,7 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
     counter = WorkCounter()
     agg = aggregate_results([sources[k] for k in "abcd"], counter)
     assert [g.index for g in agg.index_groups] == [HNG, WTI]
-    assert [r.number for r in agg.rate_groups] == [1]
+    assert [r.word for r in agg.rate_groups] == ["SOFR"]
     np.testing.assert_array_equal(agg.rate_groups[0].occurrences, [1, 3])
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
     np.testing.assert_array_equal(view.dates, dates(AS_OF, "2027-01-05", A_YEAR, TWO_YEARS))
@@ -273,6 +280,7 @@ def test_the_four_sources_make_two_index_groups_and_one_rate_group(
     np.testing.assert_allclose(by_year.columns[4], [0.0, -0.0114, 0.018], **TIGHT)
     assert counter.freeze().as_dict() == {
         "aggregate_reductions": 27,  # eight more since #197, B's and D's cross-gamma on four axes
+        "contributions_collected": 4,
         "cross_groups": 4,
         "entries_aligned": 33,  # eight more, the two bilateral sources' delta axes again
         "index_groups": 2,
@@ -437,12 +445,13 @@ def test_the_collection_refuses_what_does_not_belong_in_the_order_given(
     np.testing.assert_array_equal(agg.index_groups[0].occurrences, [0, 1])
 
 
-def test_curves_group_by_object_and_currency_and_are_numbered_by_first_appearance(
+def test_curves_group_by_object_and_currency_and_are_named_by_first_appearance(
     sources: dict[str, TradeResults],
 ) -> None:
-    # B on FLAT and B again on a curve equal in every value but another object: one index group
-    # and two rate groups, curve_1 and curve_2, each with B's DV01; then one curve valuing an index
-    # settled in cents: the same curve_1 in two currencies, two groups, the cents a hundredfold.
+    # B on FLAT and B again on a curve equal in every value but another object, both named SOFR:
+    # one index group and two rate groups, SOFR (curve_1) and SOFR (curve_2), both qualified, each
+    # with B's DV01; then one curve valuing an index settled in cents: the same SOFR in two
+    # currencies, two groups under one bare word, the cents a hundredfold.
     b = sources["b"]
     equal_values = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
     b_equal = valued_on(
@@ -453,12 +462,15 @@ def test_curves_group_by_object_and_currency_and_are_numbered_by_first_appearanc
     )
     agg = collected(b, b_equal)
     assert len(agg.index_groups) == 1
-    assert [(r.curve, r.number, r.currency) for r in agg.rate_groups] == [
-        (FLAT, 1, "USD"),
-        (equal_values, 2, "USD"),
+    assert [(r.curve, r.word, r.currency) for r in agg.rate_groups] == [
+        (FLAT, "SOFR (curve_1)", "USD"),
+        (equal_values, "SOFR (curve_2)", "USD"),
     ]
     view = aggregate_view(agg, Risk.DV01, Bucket.DAY)
-    assert view.labels == (CURVE_1, "curve_2 USD dv01 [USD per basis point]")
+    assert view.labels == (
+        "SOFR (curve_1) USD dv01 [USD per basis point]",
+        "SOFR (curve_2) USD dv01 [USD per basis point]",
+    )
     assert view.totals == (pytest.approx(0.0085, **CLOSE), pytest.approx(0.0085, **CLOSE))
     np.testing.assert_allclose(view.columns[1], [-0.0095, 0.018], **TIGHT)
     assert len(aggregate_view(agg, Risk.ALL, Bucket.DAY).labels) == 6  # two cross groups too
@@ -485,10 +497,10 @@ def test_curves_group_by_object_and_currency_and_are_numbered_by_first_appearanc
     )
     assert in_cents.currency == "CENT" and in_cents.dv01 == pytest.approx(0.85, **CLOSE)
     agg = collected(b, in_cents)
-    assert [(r.number, r.currency) for r in agg.rate_groups] == [(1, "USD"), (1, "CENT")]
+    assert [(r.word, r.currency) for r in agg.rate_groups] == [("SOFR", "USD"), ("SOFR", "CENT")]
     assert agg.currencies == ("USD", "CENT")
     view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
-    assert view.labels == (CURVE_1, "curve_1 CENT dv01 [CENT per basis point]")
+    assert view.labels == (CURVE_1, "SOFR CENT dv01 [CENT per basis point]")
     np.testing.assert_allclose(view.columns[1], [0.0, -0.95, 1.8], **TIGHT)  # 2027 to 2029
     assert view.totals[1] == pytest.approx(0.85, **CLOSE)
 
@@ -533,7 +545,7 @@ def test_a_fully_paid_source_keeps_its_payment_axis_and_its_rate_group() -> None
     assert paid.dv01 == 0.0 and paid.cash == pytest.approx(0.0, abs=1e-9)
     agg = collected(paid)
     (rate,) = agg.rate_groups
-    assert rate.dv01 == 0.0 and rate.number == 1
+    assert rate.dv01 == 0.0 and rate.word == "SOFR"
     np.testing.assert_array_equal(rate.days, dates(A_YEAR, TWO_YEARS))
     np.testing.assert_array_equal(rate.dv01_by_day, [0.0, 0.0])
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
@@ -551,7 +563,7 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     kept = {
         "lot_delta": a.lot_delta.copy(),
         "daily": b.discounted_daily_lots.copy(),
-        "dv01": given(b.dv01_by_day).copy(),
+        "dv01": rate(b).dv01_by_day.copy(),
         "days": b.prepared.encoded.days.copy(),
     }
     inputs = [a, b]
@@ -560,11 +572,11 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     assert agg.sources == (a, b)
     np.testing.assert_array_equal(a.lot_delta, kept["lot_delta"])
     np.testing.assert_array_equal(b.discounted_daily_lots, kept["daily"])
-    np.testing.assert_array_equal(given(b.dv01_by_day), kept["dv01"])
+    np.testing.assert_array_equal(rate(b).dv01_by_day, kept["dv01"])
     np.testing.assert_array_equal(b.prepared.encoded.days, kept["days"])
     scalars = {
         "index", "reporting_lot", "history", "price_vector", "lot_delta_total",
-        "discounted_lot_delta_total", "curve", "number", "currency", "dv01",
+        "discounted_lot_delta_total", "curve", "word", "currency", "dv01",
         "cross_gamma_total",
     }  # fmt: skip
     frozen: list[Any] = []
@@ -690,11 +702,11 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
     results = tuple(sources.values())
     terms = results[0].prepared.encoded.terms
     assert delta_labels(terms.index, terms.reporting_lot) == (HNG_NOMINAL, HNG_DELTA)
-    assert dv01_label("curve_1", "USD") == CURVE_1
+    assert dv01_label("SOFR", "USD") == CURVE_1
     assert dv01_label("cleared", "USD") == CLEARED_USD
     for result in results:
         terms = result.prepared.encoded.terms
-        group = "curve_1" if result.curve is not None else "cleared"
+        group = result.curve.name if result.curve is not None else "cleared"
         for bucket in Bucket:
             view = risk_view(result, Risk.ALL, bucket)
             assert view.labels == (
@@ -706,15 +718,217 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
     view = aggregate_view(agg, Risk.ALL, Bucket.DAY)
     pairs = [label for g in agg.index_groups for label in delta_labels(g.index, g.reporting_lot)]
     assert list(view.labels[: len(pairs)]) == pairs
-    rate_labels = {dv01_label(f"curve_{r.number}", r.currency) for r in agg.rate_groups}
+    rate_labels = {dv01_label(r.word, r.currency) for r in agg.rate_groups}
     rate_labels |= {dv01_label("cleared", c) for c in agg.currencies}
     cross_labels = {
-        cross_gamma_label(
-            c.index, "cleared" if c.number is None else f"curve_{c.number}", c.reporting_lot
-        )
+        cross_gamma_label(c.index, "cleared" if c.word is None else c.word, c.reporting_lot)
         for c in agg.cross_groups
     }
     assert set(view.labels[len(pairs) :]) <= rate_labels | cross_labels
     assert len(view.labels) == len(pairs) + (len(agg.rate_groups) or len(agg.currencies)) + len(
         cross_labels
+    )
+
+
+# --- several contributions from one result, the shape slice 3 fills -------------------------------
+
+
+def on_two_curves(
+    sources: dict[str, TradeResults], second: DiscountCurve
+) -> tuple[TradeResults, TradeResults, TradeResults]:
+    """B's two rows as two single-row batches, +10 paying a year out on FLAT and -10 paying two
+    years out on the second curve, and B remade as one result valued on both: its discounted
+    risk the two rows' summed, its batch scalars the sums and both pairs of contributions kept,
+    as a result valued on two curves will be kept in slice 3; nothing is valued again. The two
+    rows share B's one contract and observation day, so the summed vectors align entry for
+    entry."""
+    first = valued_on(hng((10.0,), (A_YEAR,), Route.BILATERAL), HNG_HISTORY, HNG_MARKET, FLAT)
+    second_row = valued_on(
+        hng((-10.0,), (TWO_YEARS,), Route.BILATERAL), HNG_HISTORY, HNG_MARKET, second
+    )
+    axes = sources["b"].prepared.encoded.payment_axes
+    assert axes is not None
+
+    def on_the_batch_axes(c: RateContribution) -> RateContribution:
+        # A row's contribution stands on its own batch's payment days; the two-curve result
+        # keeps each on the whole batch's, as the evaluation will sum them in slice 3.
+        return RateContribution(
+            c.curve,
+            c.currency,
+            c.dv01,
+            axes.days,
+            placed(axes.days.size, np.searchsorted(axes.days, c.days), c.dv01_by_day),
+            axes.months,
+            placed(axes.months.size, np.searchsorted(axes.months, c.months), c.dv01_by_month),
+            axes.years,
+            placed(axes.years.size, np.searchsorted(axes.years, c.years), c.dv01_by_year),
+            c.early_dv01,
+        )
+
+    mixed = replace(
+        sources["b"],
+        mark=first.mark + second_row.mark,
+        discounted_lot_delta=first.discounted_lot_delta + second_row.discounted_lot_delta,
+        discounted_lot_delta_total=(
+            first.discounted_lot_delta_total + second_row.discounted_lot_delta_total
+        ),
+        discounted_price_sensitivity=(
+            first.discounted_price_sensitivity + second_row.discounted_price_sensitivity
+        ),
+        discounted_daily_lots=first.discounted_daily_lots + second_row.discounted_daily_lots,
+        discounted_monthly_lots=(
+            first.discounted_monthly_lots + second_row.discounted_monthly_lots
+        ),
+        discounted_yearly_lots=first.discounted_yearly_lots + second_row.discounted_yearly_lots,
+        dv01=first.dv01 + second_row.dv01,
+        cross_gamma_total=first.cross_gamma_total + second_row.cross_gamma_total,
+        rate_contributions=(on_the_batch_axes(rate(first)), on_the_batch_axes(rate(second_row))),
+        cross_contributions=(cross(first), cross(second_row)),
+    )
+    return first, second_row, mixed
+
+
+def same_view(one: RiskView, other: RiskView) -> None:
+    """Two views alike column for column: the labels, the dates, the Totals and every vector."""
+    assert one.labels == other.labels
+    np.testing.assert_array_equal(one.dates, other.dates)
+    assert len(one.totals) == len(other.totals) == len(one.columns) == len(other.columns)
+    for a, b in zip(one.totals, other.totals, strict=True):
+        assert a == pytest.approx(b, **CLOSE)
+    for a, b in zip(one.columns, other.columns, strict=True):
+        np.testing.assert_allclose(a, b, **TIGHT)
+
+
+def test_a_result_on_two_curves_collected_alone_reports_what_its_single_curve_results_do_together(
+    sources: dict[str, TradeResults],
+) -> None:
+    other = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92), name="FFOIS")
+    first, second_row, mixed = on_two_curves(sources, other)
+    alone, apart = collected(mixed), collected(first, second_row)
+    assert [r.word for r in alone.rate_groups] == ["SOFR", "FFOIS"]
+    assert [r.word for r in apart.rate_groups] == ["SOFR", "FFOIS"]
+    assert [c.word for c in alone.cross_groups] == ["SOFR", "FFOIS"]
+    assert len(alone.index_groups) == 1
+    # One source contributing twice: a position once per group; apart, the second source's.
+    np.testing.assert_array_equal(alone.rate_groups[1].occurrences, [0])
+    np.testing.assert_array_equal(apart.rate_groups[1].occurrences, [1])
+    for risk in Risk:
+        for bucket in Bucket:
+            same_view(aggregate_view(alone, risk, bucket), aggregate_view(apart, risk, bucket))
+    # The result's own view agrees with the collection of it, and each curve keeps its own
+    # DV01, never netted with the other's.
+    for bucket in Bucket:
+        same_view(risk_view(mixed, Risk.ALL, bucket), aggregate_view(alone, Risk.ALL, bucket))
+    view = aggregate_view(alone, Risk.DV01, Bucket.DAY)
+    assert column(view, CURVE_1)[0] == pytest.approx(-0.0095, **CLOSE)  # the first row's
+    ffois = column(view, "FFOIS USD dv01 [USD per basis point]")
+    assert ffois[0] == pytest.approx(0.0184, **CLOSE)  # -10 at 0.92 two years out
+    assert first.dv01 == pytest.approx(-0.0095, **CLOSE)
+    assert second_row.dv01 == pytest.approx(0.0184, **CLOSE)
+
+
+def test_a_result_on_two_snapshots_of_one_name_qualifies_both_in_every_heading(
+    sources: dict[str, TradeResults],
+) -> None:
+    again = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92))  # named SOFR too
+    first, second_row, mixed = on_two_curves(sources, again)
+    alone, apart = collected(mixed), collected(first, second_row)
+    for agg in (alone, apart):
+        assert [r.word for r in agg.rate_groups] == ["SOFR (curve_1)", "SOFR (curve_2)"]
+    view = aggregate_view(alone, Risk.ALL, Bucket.YEAR)
+    assert view.labels[2:] == (
+        "SOFR (curve_1) USD dv01 [USD per basis point]",
+        "SOFR (curve_2) USD dv01 [USD per basis point]",
+        "HNG SOFR (curve_1) cross_gamma [LOT per basis point]",
+        "HNG SOFR (curve_2) cross_gamma [LOT per basis point]",
+    )
+    same_view(view, aggregate_view(apart, Risk.ALL, Bucket.YEAR))
+    # On its own the result names its two curves the same way, two objects of one name.
+    assert risk_view(mixed, Risk.DV01, Bucket.DAY).labels == view.labels[2:4]
+
+
+# --- a batch of cashflows as a source -------------------------------------------------------------
+
+
+def test_a_cashflow_source_joins_its_curves_rate_group_and_moves_nothing_else(
+    sources: dict[str, TradeResults],
+) -> None:
+    # The cashflow ticket's batch, 0.85 of DV01, -0.95 a year out and +1.80 two years out, valued
+    # on b's curve: one rate group of both, b's lots and cross-gamma untouched.
+    b = sources["b"]
+    cashflow = cashflows_valued(booked(), curve=FLAT)
+    counter = WorkCounter()
+    agg = aggregate_results([b, cashflow], counter)
+    counts = counter.freeze().as_dict()
+    assert counts["sources_collected"] == 2 and counts["contributions_collected"] == 3
+    assert (counts["index_groups"], counts["rate_groups"], counts["cross_groups"]) == (1, 1, 1)
+    (rate_group,) = agg.rate_groups
+    assert rate_group.curve is FLAT and rate_group.word == "SOFR"
+    np.testing.assert_array_equal(rate_group.occurrences, [0, 1])
+    assert rate_group.dv01 == pytest.approx(0.0085 + 0.85, **CLOSE)
+    np.testing.assert_array_equal(rate_group.days, dates(DAY_BEFORE, A_YEAR, TWO_YEARS))
+    np.testing.assert_allclose(rate_group.dv01_by_day, [0.0, -0.0095 - 0.95, 0.018 + 1.8], **TIGHT)
+    np.testing.assert_array_equal(agg.index_groups[0].occurrences, [0])
+    np.testing.assert_array_equal(agg.cross_groups[0].occurrences, [0])
+    assert agg.sources == (b, cashflow)
+    alone = collected(b)
+    for bucket in Bucket:
+        for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.CROSS_GAMMA):
+            same_view(aggregate_view(agg, risk, bucket), aggregate_view(alone, risk, bucket))
+    view = aggregate_view(agg, Risk.ALL, Bucket.YEAR)
+    assert view.labels == (HNG_NOMINAL, HNG_DELTA, CURVE_1, HNG_CROSS)
+    np.testing.assert_array_equal(view.dates, dates("2027-01-01", "2028-01-01", "2029-01-01"))
+    total, dv01 = column(view, CURVE_1)
+    assert total == pytest.approx(0.8585, **CLOSE)
+    np.testing.assert_allclose(dv01, [0.0, -0.9595, 1.818], **TIGHT)
+    assert column(view, HNG_CROSS)[0] == pytest.approx(0.00085, **CLOSE)
+    assert column(view, HNG_DELTA)[0] == pytest.approx(0.5, **CLOSE)
+
+
+def test_a_cashflow_on_another_curve_is_a_column_of_its_own(
+    sources: dict[str, TradeResults],
+) -> None:
+    b = sources["b"]
+    ffois = curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92), name="FFOIS")
+    agg = collected(b, cashflows_valued(booked(), curve=ffois))
+    assert [r.word for r in agg.rate_groups] == ["SOFR", "FFOIS"]
+    view = aggregate_view(agg, Risk.DV01, Bucket.YEAR)
+    assert view.labels == (CURVE_1, "FFOIS USD dv01 [USD per basis point]")
+    total, by_year = column(view, "FFOIS USD dv01 [USD per basis point]")
+    assert total == pytest.approx(0.88, **CLOSE)
+    np.testing.assert_allclose(by_year, [0.0, -0.96, 1.84], **TIGHT)
+    unmoved = aggregate_view(collected(b), Risk.DV01, Bucket.YEAR)
+    assert column(view, CURVE_1)[0] == pytest.approx(column(unmoved, CURVE_1)[0], **CLOSE)
+    np.testing.assert_allclose(column(view, CURVE_1)[1], column(unmoved, CURVE_1)[1], **TIGHT)
+
+
+def test_a_collection_of_cashflows_alone_reports_the_dv01_and_refuses_the_commodity_selectors() -> (
+    None
+):
+    cashflow = cashflows_valued(booked(), curve=FLAT)
+    agg = collected(cashflow)
+    assert agg.index_groups == () and agg.cross_groups == () and len(agg.rate_groups) == 1
+    assert agg.currencies == ("USD",)
+    for bucket in Bucket:
+        same_view(aggregate_view(agg, Risk.DV01, bucket), cashflow.report(Risk.DV01, bucket))
+        same_view(aggregate_view(agg, Risk.ALL, bucket), cashflow.report(Risk.ALL, bucket))
+        for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.CROSS_GAMMA):
+            with pytest.raises(ValueError) as caught:
+                aggregate_view(agg, risk, bucket)
+            assert str(caught.value) == (
+                f"risk is {risk.value!r}, expected dv01 or all for a collection of cashflows "
+                "alone, which has no commodity risk"
+            )
+    twice = aggregate_view(collected(cashflow, cashflow), Risk.DV01, Bucket.DAY)
+    assert twice.totals == (pytest.approx(1.7, **CLOSE),)
+    np.testing.assert_allclose(twice.columns[0], [0.0, -1.9, 3.6], **TIGHT)
+
+
+def test_a_cashflow_source_is_held_to_the_valuation_day() -> None:
+    later_curve = curve_of(("2027-01-05", 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
+    later = cashflows_valued(booked(), as_of="2027-01-05", curve=later_curve)
+    with pytest.raises(ValueError) as caught:
+        collected(cashflows_valued(booked(), curve=FLAT), later)
+    assert str(caught.value) == (
+        "results 2 is valued on 2027-01-05, expected 2027-01-04, the valuation day of results 1"
     )

@@ -4,8 +4,8 @@
 
 **Status:** Built in #200, 17 October 2026, as the first of two PRs from main; the collection through
 `_AggregateResults`, the second's, was folded on 18 October into slice 2 of the named-curve arc,
-[named-curves-slice-2.md](named-curves-slice-2.md), which reworks the collector in the one place
-the integration touches; [create-cashflows.md](../../library/cashflows/create-cashflows.md)
+[named-curves-slice-2.md](named-curves-slice-2.md), built in #202, which reworked the collector in
+the one place the integration touches; [create-cashflows.md](../../library/cashflows/create-cashflows.md)
 and [evaluate-cashflows.md](../../library/cashflows/evaluate-cashflows.md) own the functions.
 The review points below were decided on 17 October 2026: USD alone, one currency per batch;
 `cashflow_mark` and `cashflow_cash`; `dv01` by day, month and year with `all` the DV01 alone

@@ -964,7 +964,11 @@ def retained_numpy_bytes(create: Callable[[], object]) -> tuple[int, int]:
     """The numpy bytes a creator's publication holds once the call has returned, and once it has
     been released. The inputs and the handles the creator depends on are made before this is
     called, so nothing of theirs is counted. The publication is released whatever happens in
-    between, and both the creation and the release must have succeeded."""
+    between, and both the creation and the release must have succeeded. numpy imports its
+    masked-array module the first time np.unique runs in a process, nine bytes of singletons
+    that would count as retained by whichever creator first reached it: reached here, before
+    tracing, so that the measure is the creator's whatever ran before."""
+    np.ma.is_masked(np.empty(0))  # the lazy import above, outside the trace
     tracemalloc.start()
     try:
         made = create()

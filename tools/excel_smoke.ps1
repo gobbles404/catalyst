@@ -124,6 +124,36 @@ $formulas = [ordered]@{
     '=_CreateDiscountCurve("",Y1:Z1,Y2:Z4)' = "#ERROR _CreateDiscountCurve: name is empty text, expected text"
     "=_CreateDiscountCurve(Y1:Z1,Y1:Z1,Y2:Z4)" = "#ERROR _CreateDiscountCurve: name is 1x2 array, expected text"
     "=_CreateDiscountCurve(UQ9,Y1:Z1,Y2:Z4)" = "#ERROR _CreateDiscountCurve: name is blank, expected text"
+    # Trades and cashflows in one collection, named-curves-slice-2.md: the cashflow batch UF5 valued on
+    # the UNIT trade's curve QV12 and collected with its results QV8 in UT3, the cashflow's 0.85 of
+    # DV01 joining SOFR's 0.0085 while the delta and the cross-gamma are the trade's alone; the
+    # cashflows alone in UT4, their own report and the commodity selectors refused; the batch on a
+    # second curve named FFOIS collected beside in UT8, a column of its own; the readback's cashflow
+    # row; and a cashflows handle among the results refused at its cell naming both kinds.
+    '=INDEX(_ReportRisk(UT3,"all","year"),2,4)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UT3,"all","year"),2,5)' = "UNIT SOFR cross_gamma [UNIT per basis point]"
+    '=INDEX(_ReportRisk(UT3,"all","year"),4,3)' = "0.5"
+    '=INDEX(_ReportRisk(UT3,"all","year"),4,4)' = "0.8585"
+    '=INDEX(_ReportRisk(UT3,"all","year"),4,5)' = "0.00085"
+    '=ROWS(_ReportRisk(UT3,"dv01","year"))' = "7"
+    '=INDEX(_ReportRisk(UT3,"dv01","year"),6,2)' = "-0.9595"
+    '=INDEX(_ReportRisk(UT3,"dv01","year"),7,2)' = "1.818"
+    '=INDEX(_ReportRisk(UT3,"delta","year"),4,2)' = "0.5"
+    '=ROWS(_ReportRisk(UT4,"dv01","year"))' = "7"
+    '=INDEX(_ReportRisk(UT4,"dv01","year"),4,2)' = "0.85"
+    '=_ReportRisk(UT4,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a collection of cashflows alone, which has no commodity risk"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),2,3)' = "FFOIS USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),4,2)' = "0.8585"
+    '=INDEX(_ReportRisk(UT8,"dv01","year"),4,3)' = "0.88"
+    "=INDEX(util_ReadHandle(UT3),4,2)" = "-"
+    "=INDEX(util_ReadHandle(UT3),4,4)" = "cashflow"
+    "=INDEX(util_ReadHandle(UT3),4,5)" = "SOFR"
+    "=INDEX(util_ReadHandle(UT3),4,7)" = "-"
+    "=INDEX(util_ReadHandle(UT3),4,9)" = "0.85"
+    "=INDEX(util_ReadHandle(UT3),4,12)" = "-"
+    "=INDEX(util_ReadHandle(UT3),3,5)" = "SOFR"
+    '=LEFT(_AggregateResults(UT9:UT10),72)' = "#ERROR _AggregateResults: result_handles cell (2, 1) is cashflows handle"
     # The futures schedule: a creator with three columns and one with two, read back through
     # util_ReadHandle with the options last; a futures column one row short and a blank in the
     # options column.
@@ -1497,7 +1527,7 @@ $formulas = [ordered]@{
     # payment month, January 2029: twenty-five dated rows, the DV01s on the 17th and the 29th.
     '=ROWS(_ReportRisk(QV8,"all","month"))'      = "29"
     '=COLUMNS(_ReportRisk(QV8,"all","month"))'   = "5"
-    '=INDEX(_ReportRisk(QV8,"all","month"),2,5)' = "UNIT curve_1 cross_gamma [UNIT per basis point]"
+    '=INDEX(_ReportRisk(QV8,"all","month"),2,5)' = "UNIT SOFR cross_gamma [UNIT per basis point]"
     '=INDEX(_ReportRisk(QV8,"all","month"),4,5)' = "0.00085"
     '=INDEX(_ReportRisk(QV8,"all","month"),5,5)' = "0.00085"
     '=INDEX(_ReportRisk(QV8,"all","month"),17,5)' = "0"
@@ -1507,7 +1537,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV8,"all","month"),2,1)' = "period"
     '=INDEX(_ReportRisk(QV8,"all","month"),2,2)' = "UNIT nominal_delta [UNIT]"
     '=INDEX(_ReportRisk(QV8,"all","month"),2,3)' = "UNIT delta [UNIT]"
-    '=INDEX(_ReportRisk(QV8,"all","month"),2,4)' = "curve_1 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV8,"all","month"),2,4)' = "SOFR USD dv01 [USD per basis point]"
     '=INDEX(_ReportRisk(QV8,"all","month"),3,1)' = "str | datetime64[D]"
     '=INDEX(_ReportRisk(QV8,"all","month"),3,4)' = "float64"
     '=INDEX(_ReportRisk(QV8,"all","month"),4,1)' = "Total"
@@ -1536,7 +1566,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(QV8,"delta","year"),5,1)' = "46388"
     '=INDEX(_ReportRisk(QV8,"delta","year"),5,2)' = "0.5"
     '=ROWS(_ReportRisk(QV8,"dv01","day"))'       = "6"
-    '=INDEX(_ReportRisk(QV8,"dv01","day"),2,2)'  = "curve_1 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(QV8,"dv01","day"),2,2)'  = "SOFR USD dv01 [USD per basis point]"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),4,2)'  = "0.0085"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),5,1)'  = "46756"
     '=INDEX(_ReportRisk(QV8,"dv01","day"),5,2)'  = "-0.0095"
@@ -1551,7 +1581,7 @@ $formulas = [ordered]@{
     # tick to 81 leaves it, the curve at 0.96 and 0.92 moves it to 0.00088; the cleared twin's
     # known zero under the cleared label; the readback's two columns last.
     '=ROWS(_ReportRisk(QV8,"cross_gamma","month"))' = "5"
-    '=INDEX(_ReportRisk(QV8,"cross_gamma","month"),2,2)' = "UNIT curve_1 cross_gamma [UNIT per basis point]"
+    '=INDEX(_ReportRisk(QV8,"cross_gamma","month"),2,2)' = "UNIT SOFR cross_gamma [UNIT per basis point]"
     '=INDEX(_ReportRisk(QV8,"cross_gamma","month"),4,2)' = "0.00085"
     '=INDEX(_ReportRisk(QV8,"cross_gamma","month"),5,1)' = "46388"
     '=INDEX(_ReportRisk(QV8,"cross_gamma","month"),5,2)' = "0.00085"
@@ -1660,7 +1690,8 @@ $formulas = [ordered]@{
     # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 collected down a column
     # in RT8 and across a row in RT9, a handle of its own kind; the same reader over it, all three by
     # month: one UNIT group, 20 nominal and 20.5 discounted, and two curve groups, QV12's 0.0085 as
-    # curve_1 and the curve of ones' -0.01 as curve_2, on the union of the observation month and the
+    # SOFR (curve_1) and the curve of ones' -0.01 as SOFR (curve_2), two snapshots of one name both
+    # qualified, on the union of the observation month and the
     # two payment months; by day the three days; the DV01 alone on the two payment days, the deltas
     # alone on the one observation day or year; QV24 alone a collection as itself, its DV01 the
     # cleared column of nothing. The readback's three membership rows, one per occurrence, with each
@@ -1674,8 +1705,8 @@ $formulas = [ordered]@{
     '=LEFT(RT9,FIND(":",RT9,FIND(":",RT9)+1))'     = "{pid}:aggregate_results:"
     '=ROWS(_ReportRisk(RT8,"all","month"))'      = "29"
     '=COLUMNS(_ReportRisk(RT8,"all","month"))'   = "8"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,6)' = "UNIT curve_1 cross_gamma [UNIT per basis point]"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,7)' = "UNIT curve_2 cross_gamma [UNIT per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,6)' = "UNIT SOFR (curve_1) cross_gamma [UNIT per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,7)' = "UNIT SOFR (curve_2) cross_gamma [UNIT per basis point]"
     '=INDEX(_ReportRisk(RT8,"all","month"),2,8)' = "UNIT cleared cross_gamma [UNIT per basis point]"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,6)' = "0.00085"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,7)' = "-0.001"
@@ -1692,8 +1723,8 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(RT8,"all","month"),1,5)' = "-"
     '=INDEX(_ReportRisk(RT8,"all","month"),2,2)' = "UNIT nominal_delta [UNIT]"
     '=INDEX(_ReportRisk(RT8,"all","month"),2,3)' = "UNIT delta [UNIT]"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,4)' = "curve_1 USD dv01 [USD per basis point]"
-    '=INDEX(_ReportRisk(RT8,"all","month"),2,5)' = "curve_2 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,4)' = "SOFR (curve_1) USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(RT8,"all","month"),2,5)' = "SOFR (curve_2) USD dv01 [USD per basis point]"
     '=INDEX(_ReportRisk(RT8,"all","month"),3,5)' = "float64"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,1)' = "Total"
     '=INDEX(_ReportRisk(RT8,"all","month"),4,2)' = "20"
@@ -1760,8 +1791,8 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(RT8),3,2)"    = "UNIT"
     "=INDEX(util_ReadHandle(RT8),3,3)"    = "UNIT"
     "=INDEX(util_ReadHandle(RT8),3,4)"    = "bilateral"
-    "=INDEX(util_ReadHandle(RT8),3,5)"    = "curve_1"
-    "=INDEX(util_ReadHandle(RT8),4,5)"    = "curve_2"
+    "=INDEX(util_ReadHandle(RT8),3,5)"    = "SOFR (curve_1)"
+    "=INDEX(util_ReadHandle(RT8),4,5)"    = "SOFR (curve_2)"
     "=INDEX(util_ReadHandle(RT8),5,4)"    = "cleared"
     "=INDEX(util_ReadHandle(RT8),5,5)"    = "-"
     "=INDEX(util_ReadHandle(RT8),3,6)"    = "USD"
@@ -1774,11 +1805,11 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(RT8),5,9)"    = "0"
     "=INDEX(util_ReadHandle(RT8),3,10)"   = "46391"
     "=LEFT(_AggregateResults(QJ8),58)"    = "#ERROR _AggregateResults: result_handles is index handle '"
-    "=_AggregateResults(C2)"              = "#ERROR _AggregateResults: result_handles is blank, expected trade results handles in a cell, a row or a column"
-    "=_AggregateResults(1)"               = "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results handles in a cell, a row or a column"
-    "=_AggregateResults(RT3:RU4)"         = "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results handles"
-    "=_AggregateResults(RT3:RT6)"         = "#ERROR _AggregateResults: result_handles cell (4, 1) is blank, expected trade results handle"
-    "=_AggregateResults()"                = "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column"
+    "=_AggregateResults(C2)"              = "#ERROR _AggregateResults: result_handles is blank, expected trade results or cashflow results handles in a cell, a row or a column"
+    "=_AggregateResults(1)"               = "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results or cashflow results handles in a cell, a row or a column"
+    "=_AggregateResults(RT3:RU4)"         = "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results or cashflow results handles"
+    "=_AggregateResults(RT3:RT6)"         = "#ERROR _AggregateResults: result_handles cell (4, 1) is blank, expected trade results or cashflow results handle"
+    "=_AggregateResults()"                = "#ERROR _AggregateResults: result_handles is missing, expected trade results or cashflow results handles in a cell, a row or a column"
     "=_AggregateResults(RW1:RW2)"         = "#ERROR _AggregateResults: ValueError: results 2 is valued on 2027-01-05, expected 2027-01-04, the valuation day of results 1"
     "=_AggregateResults(RX1:RX2)"         = "#ERROR _AggregateResults: ValueError: results 2 is on index 'UNIT' quoted off another price vector than results 1, expected one price vector for one index"
     "=LEFT(_AggregateResults(QV7),68)"    = "#ERROR _AggregateResults: result_handles is prepared trades handle '"
@@ -1810,7 +1841,7 @@ $formulas = [ordered]@{
     '=INDEX(_ReportRisk(SA28,"all","day"),10,2)' = "1"
     '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"0H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"2H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '2H27', expected months the index's schedule has a contract for; it has none for 2027-08"
-    "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     # Contract prices interpolated between anchors, interpolate-contract-prices.md, on the half-year
@@ -1868,7 +1899,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(UF8),3,1)" = "500"
     "=INDEX(_ReportValues(UF8),3,2)" = "250"
     "=INDEX(_ReportValues(UF8),3,3)" = "USD"
-    '=INDEX(_ReportRisk(UF8,"dv01","year"),2,2)' = "curve_1 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),2,2)' = "SOFR USD dv01 [USD per basis point]"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),4,2)' = "0.85"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),6,2)' = "-0.95"
     '=INDEX(_ReportRisk(UF8,"dv01","year"),7,2)' = "1.8"
@@ -3088,6 +3119,19 @@ $cells = [ordered]@{
     "UQ3" = "=_CollectDiscountCurves(UQ2:UR2)"
     "UQ4" = "=AA1"; "UR4" = "=UC1"
     "UQ5" = "=_CollectDiscountCurves(AA1)"
+    # Trades and cashflows in one collection, named-curves-slice-2.md: the cashflow batch UF5 on the
+    # UNIT trade's curve QV12, collected with QV8 through cells referring to both; alone; the batch
+    # on a second curve, FFOIS, the 0.96 and 0.92 table of RA:RB, collected beside; and the batch's
+    # own handle under QV8, a cashflows handle among the results.
+    "UT1" = "=_EvaluateCashflows(UF5,UF6,QV12)"
+    "UT2" = "=QV8"; "UU2" = "=UT1"
+    "UT3" = "=_AggregateResults(UT2:UU2)"
+    "UT4" = "=_AggregateResults(UT1)"
+    "UT5" = '=_CreateDiscountCurve("FFOIS",RA1:RB1,RA2:RB4)'
+    "UT6" = "=_EvaluateCashflows(UF5,UF6,UT5)"
+    "UT7" = "=QV8"; "UU7" = "=UT1"; "UV7" = "=UT6"
+    "UT8" = "=_AggregateResults(UT7:UV7)"
+    "UT9" = "=QV8"; "UT10" = "=UF5"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

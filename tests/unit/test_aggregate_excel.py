@@ -40,9 +40,9 @@ AS_OF = UNIT_AS_OF
 JAN_27, JAN_28 = "2027-01-01", "2028-01-01"
 HNG_NOMINAL, HNG_DELTA = "HNG nominal_delta [LOT]", "HNG delta [LOT]"
 WTI_NOMINAL, WTI_DELTA = "WTI nominal_delta [LOT]", "WTI delta [LOT]"
-HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
+HNG_CROSS = "HNG SOFR cross_gamma [LOT per basis point]"
 HNG_CLEARED_CROSS = "HNG cleared cross_gamma [LOT per basis point]"
-WTI_CROSS = "WTI curve_1 cross_gamma [LOT per basis point]"
+WTI_CROSS = "WTI SOFR cross_gamma [LOT per basis point]"
 WTI_CLEARED_CROSS = "WTI cleared cross_gamma [LOT per basis point]"
 PER_BP = "lots of LOT (1 BBL) per basis point"
 READBACK_HEADERS = [
@@ -201,7 +201,7 @@ def test_the_sources_value_as_the_ticket_says(sheet: dict[str, Any]) -> None:
 
 def test_two_hng_sources_collect_into_one_handle_the_reader_takes(sheet: dict[str, Any]) -> None:
     # B2:B3 as a column: one handle of the new kind, no index name in it; all three by month under
-    # the HNG labels and curve_1, the Total 20, 19.5 and -0.0095 over January 2027's lots and
+    # the HNG labels and SOFR, the Total 20, 19.5 and -0.0095 over January 2027's lots and
     # January 2028's DV01, the eleven months between at zero since #186, the spill running from
     # the valuation month to the last payment month.
     agg = collected(sheet["b2"], sheet["b3"])
@@ -327,7 +327,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             "HNG",
             "LOT",
             "bilateral",
-            "curve_1",
+            "SOFR",
             "USD",
             10.0,
             pytest.approx(9.5),
@@ -342,7 +342,7 @@ def test_the_readback_lists_the_membership_in_the_order_given(sheet: dict[str, A
             "WTI",
             "LOT",
             "bilateral",
-            "curve_1",
+            "SOFR",
             "USD",
             4.0,
             pytest.approx(3.8),
@@ -455,7 +455,7 @@ def test_a_failed_source_shows_the_creators_failure_once_through_the_collection(
     collection = str(ENTRY["_AggregateResults"](stacked([sheet["b2"], failed])))
     assert collection == (
         "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected "
-        f"trade results handle: {failed}"
+        f"trade results or cashflow results handle: {failed}"
     )
     assert ENTRY["_ReportRisk"](collection, "all", "day") == (
         "#ERROR _ReportRisk: results is the creator's failure, expected trade results or "
@@ -466,7 +466,7 @@ def test_a_failed_source_shows_the_creators_failure_once_through_the_collection(
     )
     assert ENTRY["_AggregateResults"](beside(collection, sheet["b2"])) == (
         "#ERROR _AggregateResults: result_handles cell (1, 1) is the creator's failure, expected "
-        f"trade results handle: {failed}"
+        f"trade results or cashflow results handle: {failed}"
     )
     assert bridge.live_handles() == live
 
@@ -544,47 +544,47 @@ def test_the_collector_refuses_its_inputs_at_their_cells_and_publishes_nothing(
     live = bridge.live_handles()
     assert collect(Cells.from_rows([[b2, b3], [b3, b2]])) == (
         "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one "
-        "column of trade results handles"
+        "column of trade results or cashflow results handles"
     )
     assert collect(stacked([b2, None])) == (
         "#ERROR _AggregateResults: result_handles cell (2, 1) is blank, expected trade results "
-        "handle"
+        "or cashflow results handle"
     )
     assert collect(beside(b2, 3.0)) == (
         "#ERROR _AggregateResults: result_handles cell (1, 2) is number 3.0, expected trade "
-        "results handle"
+        "results or cashflow results handle"
     )
     assert collect(stacked([b2, ""])) == (
         "#ERROR _AggregateResults: result_handles cell (2, 1) is empty text, expected trade "
-        "results handle"
+        "results or cashflow results handle"
     )
     assert collect(stacked([b2, "x"])) == (
         "#ERROR _AggregateResults: result_handles cell (2, 1) is text 'x' naming no live object, "
-        "expected trade results handle"
+        "expected trade results or cashflow results handle"
     )
     assert collect(stacked([b2, sheet["hng"]])) == (
         f"#ERROR _AggregateResults: result_handles cell (2, 1) is index handle {sheet['hng']!r}, "
-        "expected trade results handle"
+        "expected trade results or cashflow results handle"
     )
     assert collect(stacked([nested, b3])) == (
         f"#ERROR _AggregateResults: result_handles cell (1, 1) is aggregate results handle "
-        f"{nested!r}, expected trade results handle"
+        f"{nested!r}, expected trade results or cashflow results handle"
     )
     assert collect(stacked([failed, b2])) == (
         "#ERROR _AggregateResults: result_handles cell (1, 1) is the creator's failure, expected "
-        f"trade results handle: {failed}"
+        f"trade results or cashflow results handle: {failed}"
     )
     assert collect(bridge.MISSING) == (
-        "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a "
-        "cell, a row or a column"
+        "#ERROR _AggregateResults: result_handles is missing, expected trade results or cashflow "
+        "results handles in a cell, a row or a column"
     )
     assert collect(None) == (
-        "#ERROR _AggregateResults: result_handles is blank, expected trade results handles in a "
-        "cell, a row or a column"
+        "#ERROR _AggregateResults: result_handles is blank, expected trade results or cashflow "
+        "results handles in a cell, a row or a column"
     )
     assert collect(sheet["hng"]) == (
         f"#ERROR _AggregateResults: result_handles is index handle {sheet['hng']!r}, expected "
-        "trade results handle"
+        "trade results or cashflow results handle"
     )
     assert collect(stacked([b2, on_later])) == (
         "#ERROR _AggregateResults: ValueError: results 2 is valued on 2027-01-05, expected "
@@ -623,3 +623,165 @@ def test_the_reader_takes_either_kind_and_the_other_reports_take_one(sheet: dict
         "#ERROR _ReportRisk: ValueError: risk is 'gamma', expected nominal_delta, delta, dv01, "
         "cross_gamma or all"
     )
+
+
+# --- trades and cashflows in one collection, named-curves-slice-2.md -----------------------------
+
+SOFR_USD = "SOFR USD dv01 [USD per basis point]"
+FFOIS_USD = "FFOIS USD dv01 [USD per basis point]"
+HNG_NOMINAL_LOT = "HNG nominal_delta [LOT]"
+HNG_DELTA_LOT = "HNG delta [LOT]"
+CASHFLOWS_ALONE = (
+    "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a collection of "
+    "cashflows alone, which has no commodity risk"
+)
+
+
+def cashflow_batch() -> str:
+    """The cashflow ticket's batch as a handle: 10,000 receivable a year out, 10,000 payable two
+    years out and 250 paid the day before the valuation day, in USD."""
+    template = ENTRY["_CreateTradeTemplate"]("cashflow", row("currency"), row("USD"))
+    return str(
+        ENTRY["_CreateCashflows"](
+            row("trade_id", "trade_date", "amount", "payment_date"),
+            rows(
+                [1.0, serial(AS_OF), 10_000.0, serial(A_YEAR_OUT)],
+                [2.0, serial(AS_OF), -10_000.0, serial(TWO_YEARS_OUT)],
+                [3.0, serial(AS_OF), 250.0, serial(AS_OF) - 1],
+            ),
+            template,
+        )
+    )
+
+
+def cashflows_on(curve: str) -> str:
+    """That batch valued on the valuation day over the curve given: 0.85 of DV01 on the ticket's
+    curve, -0.95 a year out and +1.80 two years out."""
+    date = ENTRY["_CreateValuationDate"](serial(AS_OF), 0.5)
+    return str(ENTRY["_EvaluateCashflows"](cashflow_batch(), date, curve))
+
+
+def test_a_trade_and_a_cashflow_collect_and_the_cashflow_moves_its_curves_dv01_alone(
+    sheet: dict[str, Any],
+) -> None:
+    b3 = sheet["b3"]
+    cashflow = cashflows_on(sheet["curve"])
+    assert report(cashflow, "dv01", "year")[3] == ["Total", pytest.approx(0.85)]
+    both = collected(b3, cashflow)
+    table = report(both, "all", "year")
+    assert table[:3] == risk_head(AS_OF, HNG_NOMINAL_LOT, HNG_DELTA_LOT, SOFR_USD, HNG_CROSS)
+    assert table[3:] == [
+        ["Total", 10.0, pytest.approx(9.5), pytest.approx(0.8405), pytest.approx(-0.00095)],
+        [serial("2027-01-01"), 10.0, pytest.approx(9.5), 0.0, pytest.approx(-0.00095)],
+        [serial("2028-01-01"), 0.0, 0.0, pytest.approx(-0.9595), 0.0],
+        [serial("2029-01-01"), 0.0, 0.0, pytest.approx(1.8), 0.0],
+    ]
+    # The lots and the cross-gamma are the trade's alone, in every view.
+    for risk in ("nominal_delta", "delta", "cross_gamma"):
+        for bucket in ("day", "month", "year"):
+            assert report(both, risk, bucket) == report(b3, risk, bucket), (risk, bucket)
+
+
+def test_a_cashflow_on_another_curve_is_a_column_of_its_own_and_cashflows_alone_collect(
+    sheet: dict[str, Any],
+) -> None:
+    b3 = sheet["b3"]
+    ffois = unit_curve((AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92), name="FFOIS")
+    on_sofr, on_ffois = cashflows_on(sheet["curve"]), cashflows_on(ffois)
+    three = collected(b3, on_sofr, on_ffois)
+    table = report(three, "dv01", "year")
+    assert table[:3] == risk_head(AS_OF, SOFR_USD, FFOIS_USD)
+    assert table[3:] == [
+        ["Total", pytest.approx(0.8405), pytest.approx(0.88)],
+        [serial("2027-01-01"), 0.0, 0.0],
+        [serial("2028-01-01"), pytest.approx(-0.9595), pytest.approx(-0.96)],
+        [serial("2029-01-01"), pytest.approx(1.8), pytest.approx(1.84)],
+    ]
+    # Cashflows alone: the result's own report under dv01 and all, twice doubled, and the
+    # commodity selectors refused in the cashflow result's words.
+    alone = collected(on_sofr)
+    for risk in ("dv01", "all"):
+        for bucket in ("day", "month", "year"):
+            assert report(alone, risk, bucket) == report(on_sofr, risk, bucket), (risk, bucket)
+    assert report(collected(on_sofr, on_sofr), "dv01", "year")[3] == ["Total", pytest.approx(1.7)]
+    assert ENTRY["_ReportRisk"](alone, "delta", "day") == CASHFLOWS_ALONE
+    # The readback: a cashflow row shows cashflow under the route, its curve's word, its currency,
+    # its DV01 and the day, and a dash where a batch of cashflows has no number.
+    table = spilled(ENTRY["util_ReadHandle"](three))
+    assert table[:2] == [READBACK_HEADERS, READBACK_TYPES]
+    assert table[2][1:5] == ["HNG", "LOT", "bilateral", "SOFR"]
+    assert table[3] == [
+        2.0,
+        "-",
+        "-",
+        "cashflow",
+        "SOFR",
+        "USD",
+        "-",
+        "-",
+        pytest.approx(0.85),
+        serial(AS_OF),
+        "-",
+        "-",
+    ]
+    assert table[4] == [
+        3.0,
+        "-",
+        "-",
+        "cashflow",
+        "FFOIS",
+        "USD",
+        "-",
+        "-",
+        pytest.approx(0.88),
+        serial(AS_OF),
+        "-",
+        "-",
+    ]
+
+
+def test_two_snapshots_of_one_name_are_both_qualified_in_a_collection(
+    sheet: dict[str, Any],
+) -> None:
+    b3 = sheet["b3"]
+    second = unit_curve((AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92))  # SOFR again
+    b3_second = valued(sheet, "hng", 1002, 10.0, 70.0, "+261bd", "bilateral", second)
+    ffois = unit_curve((AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92), name="FFOIS")
+    four = collected(b3, cashflows_on(sheet["curve"]), cashflows_on(ffois), b3_second)
+    table = report(four, "dv01", "year")
+    assert table[1] == [
+        "period",
+        "SOFR (curve_1) USD dv01 [USD per basis point]",
+        FFOIS_USD,
+        "SOFR (curve_2) USD dv01 [USD per basis point]",
+    ]
+    assert table[3] == ["Total", pytest.approx(0.8405), pytest.approx(0.88), pytest.approx(-0.0096)]
+    table = report(four, "cross_gamma", "year")
+    assert table[1] == [
+        "period",
+        "HNG SOFR (curve_1) cross_gamma [LOT per basis point]",
+        "HNG SOFR (curve_2) cross_gamma [LOT per basis point]",
+    ]
+    assert table[3] == ["Total", pytest.approx(-0.00095), pytest.approx(-0.00096)]
+    readback = spilled(ENTRY["util_ReadHandle"](four))
+    assert [line[4] for line in readback[2:]] == [
+        "SOFR (curve_1)",
+        "SOFR (curve_1)",
+        "FFOIS",
+        "SOFR (curve_2)",
+    ]
+    # A single result on one curve names it bare, whatever a collection shows beside it.
+    assert report(b3_second, "dv01", "year")[1] == ["period", SOFR_USD]
+
+
+def test_a_handle_of_another_kind_among_results_is_refused_naming_both_kinds(
+    sheet: dict[str, Any],
+) -> None:
+    b3 = sheet["b3"]
+    batch = cashflow_batch()
+    live = bridge.live_handles()
+    assert collected(b3, batch) == (
+        f"#ERROR _AggregateResults: result_handles cell (2, 1) is cashflows handle {batch!r}, "
+        "expected trade results or cashflow results handle"
+    )
+    assert bridge.live_handles() == live

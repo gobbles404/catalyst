@@ -17,7 +17,8 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.payments import curve_starts_on, discounted, factors_on, time_fractions
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.display_axes import EarlyRisk, PeriodAxis, early_risk, period_axis
+from goosedove.trades.contributions import RateContribution
+from goosedove.trades.display_axes import PeriodAxis, early_risk, period_axis
 from goosedove.trades.risk_report import NO_DAYS, Bucket, Risk, RiskView, dv01_label, placed
 
 PAYMENT_FACTORS_READ = "payment_factors_read"  # one per distinct unpaid payment day
@@ -33,10 +34,12 @@ class CashflowResults:
     in all, in the currency per basis point. Then per distinct payment day of the batch,
     increasing, paid or not: is_paid; payment_factor, the curve's on an unpaid day and 1 on a
     paid one, read for nothing; npv, the day's amount times its factor, zero on a paid day;
-    payment_cash, the amount on a paid day and zero on an unpaid one; and dv01_by_day. Then the
-    DV01 by payment month and year on the batch's saved axes, the two display axes from the
-    valuation day's period, and the facts refusing a month or a year report of a DV01 standing
-    before the start, found once here."""
+    payment_cash, the amount on a paid day and zero on an unpaid one. Then the two display axes
+    from the valuation day's period and, since named-curves-slice-2.md, the batch's one rate
+    contribution, the curve's share of the DV01, the whole of it: the DV01 by payment day, month
+    and year on the batch's saved axes, its total, and the facts refusing a month or a year
+    report of it standing before the start, found once here; the collection sums it into its
+    curve's group beside the trades'."""
 
     cashflows: Cashflows
     curve: DiscountCurve
@@ -49,12 +52,9 @@ class CashflowResults:
     payment_factor: NDArray[np.float64]
     npv: NDArray[np.float64]
     payment_cash: NDArray[np.float64]
-    dv01_by_day: NDArray[np.float64]
-    dv01_by_month: NDArray[np.float64]
-    dv01_by_year: NDArray[np.float64]
     by_month: PeriodAxis
     by_year: PeriodAxis
-    early_dv01: EarlyRisk
+    rate_contributions: tuple[RateContribution, ...]
 
     def report(self, risk: Risk, bucket: Bucket) -> RiskView:
         """The content of the risk report asked for, _ReportRisk's selection: the DV01 by payment
@@ -73,18 +73,19 @@ class CashflowResults:
                 )
             case _:
                 assert_never(risk)
-        label = dv01_label("curve_1", self.currency)
+        contribution = self.rate_contributions[0]  # one curve values a batch of cashflows
+        label = dv01_label(contribution.curve.name, self.currency)
         match bucket:
             case Bucket.DAY:
                 return RiskView(
-                    self.cashflows.payment_days, (label,), (self.dv01,), (self.dv01_by_day,)
+                    contribution.days, (label,), (self.dv01,), (contribution.dv01_by_day,)
                 )
             case Bucket.MONTH | Bucket.YEAR:
                 if bucket is Bucket.MONTH:
-                    unit, axis, saved = "M", self.by_month, self.dv01_by_month
+                    unit, axis, saved = "M", self.by_month, contribution.dv01_by_month
                 else:
-                    unit, axis, saved = "Y", self.by_year, self.dv01_by_year
-                self.early_dv01.refuse("DV01", unit)
+                    unit, axis, saved = "Y", self.by_year, contribution.dv01_by_year
+                contribution.early_dv01.refuse("DV01", unit)
                 column = placed(axis.dv01_rows, axis.paid_in, saved[axis.paid_from :])
                 return RiskView(axis.periods[: axis.dv01_rows], (label,), (self.dv01,), (column,))
             case _:
@@ -169,7 +170,7 @@ def cashflow_results(
     by_month = period_axis(as_of, NO_DAYS, batch.months, "M")
     by_year = period_axis(as_of, NO_DAYS, batch.years, "Y")
     early_dv01 = early_risk(
-        "the batch",
+        f"{curve.name} {currency}",
         "payment",
         as_of,
         f"{currency} per basis point",
@@ -199,10 +200,20 @@ def cashflow_results(
         factor,
         npv,
         payment_cash,
-        dv01_by_day,
-        dv01_by_month,
-        dv01_by_year,
         by_month,
         by_year,
-        early_dv01,
+        (
+            RateContribution(
+                curve,
+                currency,
+                dv01,
+                days,
+                dv01_by_day,
+                batch.months,
+                dv01_by_month,
+                batch.years,
+                dv01_by_year,
+                early_dv01,
+            ),
+        ),
     )

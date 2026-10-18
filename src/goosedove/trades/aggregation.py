@@ -25,23 +25,34 @@ places and discovers, sorts and sums nothing; the day, month and year views are 
 the saved month and year vectors summed onto their own unions and never bucketed again.
 
 Positions name an occurrence in a refusal, counted from one as a sheet counts; the arrays hold
-them from zero. Work is counted by the occurrences collected, the groups, the entries aligned,
-the reductions and the report coordinates saved.
+them from zero. Work is counted by the occurrences collected, the contributions read, the
+groups, the entries aligned, the reductions and the report coordinates saved.
+
+Since named-curves-slice-2.md a result keeps its rate risk and its cross-gamma per curve, as
+contributions, contributions.py, and the collector reads contributions and never results: a
+rate group is the exact curve object and the currency over every contribution on them, a cross
+group the exact index object and curve object, so a result on several curves joins several
+groups with nothing here to change. A batch of cashflows is a source beside a batch of trades,
+its one rate contribution joining its curve's rate group and nothing else, no index group and
+no cross group being its; a collection holds trades, cashflows or both, and a position names
+either kind. The headings carry each curve's name, qualified where two objects share one.
 """
 
 import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, assert_never, cast
+from typing import Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.cashflows.valuation import CashflowResults
 from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.index_definitions.index import Index, ReportingLot
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.trades.contributions import CrossContribution, RateContribution, curve_words
 from goosedove.trades.display_axes import (
     NONE_EARLY,
     EarlyRisk,
@@ -52,7 +63,6 @@ from goosedove.trades.display_axes import (
     places_from,
     rows_through,
 )
-from goosedove.trades.encoding import PaymentAxes
 from goosedove.trades.results import TradeResults
 from goosedove.trades.risk_report import (
     NO_DAYS,
@@ -68,7 +78,10 @@ from goosedove.trades.risk_report import (
 
 SOURCES_COLLECTED = "sources_collected"  # occurrences, every one, a repeated result counted again
 INDEX_GROUPS = "index_groups"  # one per distinct index object among the occurrences
-RATE_GROUPS = "rate_groups"  # one per distinct curve object and currency among the bilateral ones
+RATE_GROUPS = "rate_groups"  # one per distinct curve object and currency among the contributions
+CONTRIBUTIONS_COLLECTED = (
+    "contributions_collected"  # rate and cross contributions read, since slice 2
+)
 CROSS_GROUPS = (
     "cross_groups"  # since #197, one per index object and curve object pair, cleared none
 )
@@ -77,6 +90,10 @@ AGGREGATE_REDUCTIONS = "aggregate_reductions"  # compensated sums of saved vecto
 REPORT_COORDINATES = (
     "report_coordinates"  # entries of the report axes saved, over the three buckets
 )
+
+# A source of a collection: an evaluated batch of trades, or since named-curves-slice-2.md a
+# valued batch of cashflows, which contributes its DV01 and nothing else.
+Source = TradeResults | CashflowResults
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,13 +129,14 @@ class IndexGroup:
 
 @dataclass(frozen=True, slots=True)
 class RateGroup:
-    """One curve's and one currency's DV01 across the bilateral occurrences valued on them: the
-    curve object, its number by first appearance among the collection's curves, curve_1 the
-    first, the currency, the occurrences' positions, the saved DV01s summed, and the unions of
-    the occurrences' payment axes with the DV01 summed onto each. Every array frozen."""
+    """One curve's and one currency's DV01 across the contributions on them, trades' and
+    cashflows': the curve object, its word in a heading, its name qualified where another
+    object of the collection shares it, the currency, the positions of the sources contributing,
+    the saved DV01s summed, and the unions of the contributions' payment axes with the DV01
+    summed onto each. Every array frozen."""
 
     curve: DiscountCurve
-    number: int
+    word: str
     currency: str
     occurrences: NDArray[np.intp]
     dv01: float
@@ -138,12 +156,12 @@ NO_REFERENCES.setflags(write=False)
 class CrossGroup:
     """One index's cross-gamma on one curve across the occurrences on the pair, since #197,
     single-curve-cross-gamma.md: the index object and its reporting lot, the curve object and its
-    number by first appearance among the collection's curves, the number the rate groups give it,
-    and the occurrences' positions, increasing; references the union of the occurrences' pricing
+    word in a heading, the word the rate groups give it, and the occurrences' positions,
+    increasing; references the union of the occurrences' pricing
     references with the saved cross-gamma summed onto them and the total the saved scalars summed;
     days, months and years the unions of their observation days, contract months and contract
     years, the delta's axes, with the cross-gamma summed onto each. A cleared occurrence is on no
-    curve: its pair's curve and number are None and its risk the known zero, held as empty axes
+    curve: its pair's curve and word are None and its risk the known zero, held as empty axes
     and vectors with a total of 0.0, nothing summed and no buffer made, so that a cleared source
     shows its zero column beside a bilateral one and nothing is summed across curves. Every array
     frozen."""
@@ -151,7 +169,7 @@ class CrossGroup:
     index: Index
     reporting_lot: ReportingLot
     curve: DiscountCurve | None
-    number: int | None
+    word: str | None
     occurrences: NDArray[np.intp]
     references: NDArray[np.intp]
     cross_gamma: NDArray[np.float64]
@@ -213,7 +231,7 @@ class AggregateResults:
     made."""
 
     as_of: np.datetime64
-    sources: tuple[TradeResults, ...]
+    sources: tuple[Source, ...]
     index_groups: tuple[IndexGroup, ...]
     rate_groups: tuple[RateGroup, ...]
     cross_groups: tuple[CrossGroup, ...]
@@ -233,7 +251,7 @@ class AggregateResults:
         return aggregate_view(self, risk, bucket)
 
 
-def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> AggregateResults:
+def aggregate_results(sources: Sequence[Source], counter: WorkCounter) -> AggregateResults:
     """The one way to collect evaluated batches, aggregate-risk-kernel.md: the occurrences
     snapshotted as given, one or many on one path, none refused; each occurrence in order held to
     the first's valuation day and to its index's first occurrence's history and price vector,
@@ -242,9 +260,12 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
     scalars summed, each new number and vector finite or the first that is not refused by its
     measure, group and coordinate, since #197 the cross-gamma by the pair of index object and
     curve object, a cleared source's pair on no curve the known zero and nothing summed; and
-    the report axes made with every place saved.
+    the report axes made with every place saved. Since named-curves-slice-2.md the groups sum
+    contributions, a batch of cashflows a source whose one contribution joins its curve's rate
+    group and nothing else, and the headings carry the curves' names.
 
-    Work: one occurrence per source, one group per index object, per curve and currency and
+    Work: one occurrence per source, one contribution per contribution read, one group per
+    index object, per curve and currency and
     per index and curve pair, one entry aligned per saved entry, one reduction per vector
     summed and one coordinate per entry of the report axes, reported to the counter; no quote,
     fixing or factor read, no trade resolved, no conversion and no evaluation.
@@ -254,22 +275,28 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
         raise ValueError("results are none, expected at least one evaluated batch")
     as_of = results[0].as_of
     by_index = _grouped_by_index(results, as_of)
-    numbers = _curve_numbers(results)
-    by_curve = _grouped_by_curve(results, numbers)
+    words = _curve_words(results)
+    by_curve = _grouped_by_curve(results)
     by_pair = _grouped_by_index_and_curve(results)
     counter.hit(SOURCES_COLLECTED, len(results))
+    counter.hit(CONTRIBUTIONS_COLLECTED, _contributions_of(results))
     counter.hit(INDEX_GROUPS, len(by_index))
     counter.hit(RATE_GROUPS, len(by_curve))
     counter.hit(CROSS_GROUPS, len(by_pair))
-    index_groups = tuple([_index_group(results, positions, counter) for positions in by_index])
+    index_groups = tuple(
+        [_index_group(members, positions, counter) for positions, members in by_index]
+    )
     rate_groups = tuple(
         [
-            _rate_group(results, curve, number, currency, positions, counter)
-            for curve, number, currency, positions in by_curve
+            _rate_group(curve, words[id(curve)], currency, positions, members, counter)
+            for curve, currency, positions, members in by_curve
         ]
     )
     cross_groups = tuple(
-        [_cross_group(results, positions, numbers, counter) for positions in by_pair]
+        [
+            _cross_group(first, positions, members, words, counter)
+            for first, positions, members in by_pair
+        ]
     )
     by_day = _report_axes(
         [g.days for g in index_groups],
@@ -316,7 +343,7 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
     early_dv01 = tuple(
         [
             early_risk(
-                f"curve_{r.number} {r.currency}",
+                f"{r.word} {r.currency}",
                 "payment",
                 as_of,
                 f"{r.currency} per basis point",
@@ -335,9 +362,9 @@ def aggregate_results(sources: Sequence[TradeResults], counter: WorkCounter) -> 
     early_cross = tuple(
         [
             NONE_EARLY
-            if c.number is None
+            if c.word is None
             else early_risk(
-                f"index {c.index.name!r} on curve_{c.number}",
+                f"index {c.index.name!r} on {c.word}",
                 "contract",
                 as_of,
                 f"{c.reporting_lot.words} per basis point",
@@ -392,13 +419,17 @@ def _early_lots(
     )
 
 
-def _grouped_by_index(results: tuple[TradeResults, ...], as_of: np.datetime64) -> list[list[int]]:
-    """The occurrences' positions grouped by the exact index object, in first-appearance order,
-    each occurrence in the order given held to the valuation day, then to its group's first
-    occurrence's history and price vector, the objects and not their values; a distinct index
-    object whose name a group already has is refused, two indexes of one name being a mistake to
-    show and not a group to make."""
-    groups: list[list[int]] = []
+def _grouped_by_index(
+    results: tuple[Source, ...], as_of: np.datetime64
+) -> list[tuple[list[int], list[TradeResults]]]:
+    """The trade occurrences' positions grouped by the exact index object, in first-appearance
+    order, each occurrence in the order given held to the valuation day, then to its group's
+    first occurrence's history and price vector, the objects and not their values; a distinct
+    index object whose name a group already has is refused, two indexes of one name being a
+    mistake to show and not a group to make. A batch of cashflows is held to the valuation day
+    and to nothing else, having no index, history or price vector, and joins no group. Each
+    group is its positions and its members, the results themselves, in the order given."""
+    groups: list[tuple[list[int], list[TradeResults]]] = []
     by_identity: dict[int, int] = {}
     by_name: dict[str, int] = {}
     for k, source in enumerate(results):
@@ -407,6 +438,13 @@ def _grouped_by_index(results: tuple[TradeResults, ...], as_of: np.datetime64) -
                 f"results {k + 1} is valued on {source.as_of}, expected {as_of}, the valuation "
                 "day of results 1"
             )
+        match source:
+            case CashflowResults():
+                continue
+            case TradeResults():
+                pass
+            case _:
+                assert_never(source)
         ix = source.prepared.encoded.terms.index
         g = by_identity.get(id(ix))
         if g is None:
@@ -414,71 +452,89 @@ def _grouped_by_index(results: tuple[TradeResults, ...], as_of: np.datetime64) -
             if named is not None:
                 raise ValueError(
                     f"results {k + 1} is on another index named {ix.name!r} than results "
-                    f"{groups[named][0] + 1}, expected one index for one name"
+                    f"{groups[named][0][0] + 1}, expected one index for one name"
                 )
             by_identity[id(ix)] = by_name[ix.name] = len(groups)
-            groups.append([k])
+            groups.append(([k], [source]))
             continue
-        first = results[groups[g][0]]
+        positions, members = groups[g]
+        first = members[0]
         if source.prepared.history is not first.prepared.history:
             raise ValueError(
                 f"results {k + 1} is on index {ix.name!r} over another history than results "
-                f"{groups[g][0] + 1}, expected one history for one index"
+                f"{positions[0] + 1}, expected one history for one index"
             )
         if source.market.price_vector is not first.market.price_vector:
             raise ValueError(
                 f"results {k + 1} is on index {ix.name!r} quoted off another price vector than "
-                f"results {groups[g][0] + 1}, expected one price vector for one index"
+                f"results {positions[0] + 1}, expected one price vector for one index"
             )
-        groups[g].append(k)
+        positions.append(k)
+        members.append(source)
     return groups
 
 
-def _curve_numbers(results: tuple[TradeResults, ...]) -> dict[int, int]:
-    """Each distinct curve object's number by its first appearance among the collection's
-    curves, whatever the currency, curve_1 the first, by the object's identity; the rate groups
-    and since #197 the cross groups read one numbering, so that curve_1 names one curve in every
-    heading."""
-    numbers: dict[int, int] = {}
-    for source in results:
-        if source.curve is not None:
-            numbers.setdefault(id(source.curve), len(numbers) + 1)
-    return numbers
+def _cross_contributions(source: Source) -> tuple[CrossContribution, ...]:
+    """A source's cross contributions: a batch of trades' own, a batch of cashflows' none, having
+    no commodity risk."""
+    match source:
+        case TradeResults():
+            return source.cross_contributions
+        case CashflowResults():
+            return ()
+        case _:
+            assert_never(source)
+
+
+def _contributions_of(results: tuple[Source, ...]) -> int:
+    return sum([len(s.rate_contributions) + len(_cross_contributions(s)) for s in results])
+
+
+def _curve_words(results: tuple[Source, ...]) -> dict[int, str]:
+    """Each distinct curve object's word in a heading, by the object's identity, contributions.py's
+    words over the collection's curves in first appearance among the sources' contributions,
+    the rate contributions before the cross contributions of each source; the rate groups and
+    the cross groups read one wording, so that a word names one curve in every heading."""
+    return curve_words(
+        [
+            c.curve
+            for source in results
+            for c in (*source.rate_contributions, *_cross_contributions(source))
+        ]
+    )
 
 
 def _grouped_by_curve(
-    results: tuple[TradeResults, ...], numbers: dict[int, int]
-) -> list[tuple[DiscountCurve, int, str, list[int]]]:
-    """The bilateral occurrences' positions grouped by the exact curve object and the result's
-    currency, in first-appearance order, each curve under the number its first appearance among
-    the collection's curves gave it whatever the currency, so that one curve valuing two
-    currencies is two groups of one number; a cleared occurrence, valued on no curve, is in no
-    group."""
-    groups: list[tuple[DiscountCurve, int, str, list[int]]] = []
+    results: tuple[Source, ...],
+) -> list[tuple[DiscountCurve, str, list[int], list[RateContribution]]]:
+    """The rate contributions grouped by the exact curve object and the currency, in
+    first-appearance order, with the positions of the sources contributing, a source once
+    however many of its contributions join, and the contributions themselves; a cleared
+    occurrence, with no contribution, is in no group."""
+    groups: list[tuple[DiscountCurve, str, list[int], list[RateContribution]]] = []
     where: dict[tuple[int, str], int] = {}
     for k, source in enumerate(results):
-        curve = source.curve
-        if curve is None:
-            continue
-        number = numbers[id(curve)]
-        g = where.get((id(curve), source.currency))
-        if g is None:
-            where[(id(curve), source.currency)] = len(groups)
-            groups.append((curve, number, source.currency, [k]))
-        else:
-            groups[g][3].append(k)
+        for c in source.rate_contributions:
+            g = where.get((id(c.curve), c.currency))
+            if g is None:
+                where[(id(c.curve), c.currency)] = len(groups)
+                groups.append((c.curve, c.currency, [k], [c]))
+            else:
+                _, _, positions, members = groups[g]
+                if positions[-1] != k:
+                    positions.append(k)
+                members.append(c)
     return groups
 
 
 def _index_group(
-    results: tuple[TradeResults, ...], positions: list[int], counter: WorkCounter
+    members: list[TradeResults], positions: list[int], counter: WorkCounter
 ) -> IndexGroup:
     """One index group's risk: the saved reference, day, month and year vectors of its
     occurrences summed onto the unions of their saved axes, both lots on each, the totals the
     saved scalars summed, every new number finite or refused."""
-    first = results[positions[0]]
+    first = members[0]
     terms = first.prepared.encoded.terms
-    members = [results[k] for k in positions]
     references, (lots, discounted) = _summed(
         [m.prepared.encoded.references for m in members],
         ([m.lot_delta for m in members], [m.discounted_lot_delta for m in members]),
@@ -558,33 +614,24 @@ def _index_group(
 
 
 def _rate_group(
-    results: tuple[TradeResults, ...],
     curve: DiscountCurve,
-    number: int,
+    word: str,
     currency: str,
     positions: list[int],
+    members: list[RateContribution],
     counter: WorkCounter,
 ) -> RateGroup:
-    """One rate group's DV01: the saved payment day, month and year vectors of its occurrences
+    """One rate group's DV01: the saved payment day, month and year vectors of its contributions
     summed onto the unions of their saved payment axes, the total the saved DV01s summed, every
     new number finite or refused."""
-    members = [results[k] for k in positions]
-    # Bilateral occurrences, valued on this curve: the axes and the vectors were made with them.
-    axes = [cast(PaymentAxes, m.prepared.encoded.payment_axes) for m in members]
     days, (by_day,) = _summed(
-        [a.days for a in axes],
-        ([cast(NDArray[np.float64], m.dv01_by_day) for m in members],),
-        counter,
+        [m.days for m in members], ([m.dv01_by_day for m in members],), counter
     )
     months, (by_month,) = _summed(
-        [a.months for a in axes],
-        ([cast(NDArray[np.float64], m.dv01_by_month) for m in members],),
-        counter,
+        [m.months for m in members], ([m.dv01_by_month for m in members],), counter
     )
     years, (by_year,) = _summed(
-        [a.years for a in axes],
-        ([cast(NDArray[np.float64], m.dv01_by_year) for m in members],),
-        counter,
+        [m.years for m in members], ([m.dv01_by_year for m in members],), counter
     )
     total = sum([m.dv01 for m in members])  # compensated, an overflow kept as inf
     where, value = _outrun(
@@ -597,52 +644,69 @@ def _rate_group(
     )
     if where is not None:
         raise ValueError(
-            f"the DV01 of curve_{number} {currency} {where} is {value!r}, expected a finite "
+            f"the DV01 of {word} {currency} {where} is {value!r}, expected a finite "
             f"amount of {currency} per basis point; the results' DV01s sum past the largest number"
         )
     occurrences = np.array(positions, dtype=np.intp)
     for array in (occurrences, days, months, years):
         array.setflags(write=False)
     return RateGroup(
-        curve, number, currency, occurrences, total, days, by_day, months, by_month, years, by_year
+        curve, word, currency, occurrences, total, days, by_day, months, by_month, years, by_year
     )
 
 
-def _grouped_by_index_and_curve(results: tuple[TradeResults, ...]) -> list[list[int]]:
-    """The occurrences' positions grouped by the exact index object and the exact curve object, a
-    cleared occurrence's curve none, in first-appearance order of the pair, since #197; the rules
-    over the indexes are _grouped_by_index's, checked before this groups, so that an index's
-    occurrences are compatible whatever curves they are on."""
-    groups: list[list[int]] = []
+def _grouped_by_index_and_curve(
+    results: tuple[Source, ...],
+) -> list[tuple[TradeResults, list[int], list[CrossContribution | None]]]:
+    """The trade occurrences' cross contributions grouped by the exact index object and the exact
+    curve object, a cleared occurrence's pair on no curve and its member None, in first-appearance
+    order of the pair, since #197, each group with its first occurrence and the positions of the
+    sources contributing; the rules over the indexes are _grouped_by_index's, checked before this
+    groups, so that an index's occurrences are compatible whatever curves they are on. A batch of
+    cashflows, with no index, is in no group."""
+    groups: list[tuple[TradeResults, list[int], list[CrossContribution | None]]] = []
     where: dict[tuple[int, int | None], int] = {}
     for k, source in enumerate(results):
-        curve = source.curve
-        key = (id(source.prepared.encoded.terms.index), None if curve is None else id(curve))
-        g = where.get(key)
-        if g is None:
-            where[key] = len(groups)
-            groups.append([k])
-        else:
-            groups[g].append(k)
+        match source:
+            case CashflowResults():
+                continue
+            case TradeResults():
+                pass
+            case _:
+                assert_never(source)
+        ix = id(source.prepared.encoded.terms.index)
+        contributions: tuple[CrossContribution | None, ...] = source.cross_contributions or (None,)
+        for c in contributions:
+            key = (ix, None if c is None else id(c.curve))
+            g = where.get(key)
+            if g is None:
+                where[key] = len(groups)
+                groups.append((source, [k], [c]))
+            else:
+                _, positions, members = groups[g]
+                if positions[-1] != k:
+                    positions.append(k)
+                members.append(c)
     return groups
 
 
 def _cross_group(
-    results: tuple[TradeResults, ...],
+    first: TradeResults,
     positions: list[int],
-    numbers: dict[int, int],
+    members: list[CrossContribution | None],
+    words: dict[int, str],
     counter: WorkCounter,
 ) -> CrossGroup:
     """One cross group's cross-gamma, since #197: the saved reference, day, month and year
-    vectors of its occurrences summed onto the unions of their saved delta axes, the total the
+    vectors of its contributions summed onto the unions of their saved delta axes, the total the
     saved scalars summed, every new number finite or refused by the index, the curve and the
-    coordinate; a cleared pair the known zero, empty axes and vectors, nothing summed and
-    nothing counted."""
-    first = results[positions[0]]
+    coordinate; a cleared pair, its members None, the known zero, empty axes and vectors,
+    nothing summed and nothing counted."""
     terms = first.prepared.encoded.terms
     occurrences = np.array(positions, dtype=np.intp)
     occurrences.setflags(write=False)
-    if first.curve is None:
+    contributions = [m for m in members if m is not None]
+    if not contributions:
         return CrossGroup(
             terms.index,
             terms.reporting_lot,
@@ -659,30 +723,30 @@ def _cross_group(
             NO_DAYS,
             NOTHING,
         )
-    members = [results[k] for k in positions]
-    # Bilateral occurrences, valued on this curve: the four vectors were made with the axes.
+    # Contributions on this curve: the four vectors were made with the axes beside them.
     references, (by_reference,) = _summed(
-        [m.prepared.encoded.references for m in members],
-        ([cast(NDArray[np.float64], m.cross_gamma) for m in members],),
+        [m.references for m in contributions],
+        ([m.cross_gamma for m in contributions],),
         counter,
     )
     days, (by_day,) = _summed(
-        [m.prepared.encoded.days for m in members],
-        ([cast(NDArray[np.float64], m.cross_gamma_by_day) for m in members],),
+        [m.days for m in contributions],
+        ([m.cross_gamma_by_day for m in contributions],),
         counter,
     )
     months, (by_month,) = _summed(
-        [m.prepared.encoded.contract_months for m in members],
-        ([cast(NDArray[np.float64], m.cross_gamma_by_month) for m in members],),
+        [m.months for m in contributions],
+        ([m.cross_gamma_by_month for m in contributions],),
         counter,
     )
     years, (by_year,) = _summed(
-        [m.prepared.encoded.contract_years for m in members],
-        ([cast(NDArray[np.float64], m.cross_gamma_by_year) for m in members],),
+        [m.years for m in contributions],
+        ([m.cross_gamma_by_year for m in contributions],),
         counter,
     )
-    total = sum([m.cross_gamma_total for m in members])  # compensated, an overflow kept as inf
-    number = numbers[id(first.curve)]
+    total = sum([m.cross_gamma_total for m in contributions])  # compensated, inf kept
+    curve = contributions[0].curve
+    word = words[id(curve)]
     codes = terms.schedule.codes
     where, value = _outrun(
         (
@@ -695,7 +759,7 @@ def _cross_group(
     )
     if where is not None:
         raise ValueError(
-            f"the cross-gamma of index {terms.index.name!r} on curve_{number} {where} is "
+            f"the cross-gamma of index {terms.index.name!r} on {word} {where} is "
             f"{value!r}, expected a finite number of {terms.reporting_lot.words} per basis point; "
             "the results' cross-gammas sum past the largest number"
         )
@@ -704,8 +768,8 @@ def _cross_group(
     return CrossGroup(
         terms.index,
         terms.reporting_lot,
-        first.curve,
-        number,
+        curve,
+        word,
         occurrences,
         references,
         by_reference,
@@ -794,7 +858,7 @@ def _report_axes(
     when no curve values, and the union of both with every group's places; since #197 each
     cross group's places on the delta union and on the union of both, a cleared group's none;
     every array frozen, the coordinates reported to the counter."""
-    observed = np.unique(np.concatenate(observation_axes))
+    observed = np.unique(np.concatenate(observation_axes)) if observation_axes else NO_DAYS
     paid = np.unique(np.concatenate(payment_axes)) if payment_axes else NO_DAYS
     union = np.union1d(observed, paid)
     observed_in = tuple([np.searchsorted(observed, axis) for axis in observation_axes])
@@ -850,7 +914,7 @@ def _period_report_axes(
     observed_places = [places_from(axis, start, unit) for axis in contract_axes]
     paid_places = [places_from(axis, start, unit) for axis in payment_axes]
     cross_places = [places_from(axis, start, unit) for axis in cross_axes]
-    delta_rows = max([rows_through(p) for _, p in observed_places])
+    delta_rows = max([rows_through(p) for _, p in observed_places], default=0)
     dv01_rows = max([rows_through(p) for _, p in paid_places], default=0)
     periods = display_periods(start, max(delta_rows, dv01_rows))
     periods.setflags(write=False)  # before the views below, which take the flag as made
@@ -883,11 +947,13 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
     """The one way to read a collection's report, _ReportRisk's selection over a collection: the
     index groups' nominal lots or discounted lots on the union of their observation axes, one
     column per group under the index's name and its reporting lot's; the rate groups' DV01 on the
-    union of their payment axes, one column per group under its curve's number and its currency,
+    union of their payment axes, one column per group under its curve's word and its currency,
     a collection with no curve one column of nothing per currency, `cleared USD dv01 [...]`, over
     no day; since #197 the cross groups' cross-gamma on the union of the observation axes, one
-    column per index and curve pair under the index's name, `curve_1` or `cleared` and its
-    reporting lot per basis point, a cleared pair's column zero; and all four on the union of
+    column per index and curve pair under the index's name, the curve's word or `cleared` and its
+    reporting lot per basis point, a cleared pair's column zero; a collection of cashflows alone,
+    with no index group, its DV01 columns under `dv01` and `all` and the three commodity
+    selectors refused by name, as a batch of cashflows refuses them; and all four on the union of
     both, each index group's two columns, then each rate group's, then each cross group's, every
     vector copied through the places the collection saved and zero where the group has no entry.
     The Totals are the groups' saved sums. Nothing is summed, sorted or discovered.
@@ -898,17 +964,17 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
     groups = aggregate.index_groups
     rates = aggregate.rate_groups
     crosses = aggregate.cross_groups
+    if not groups:
+        _refuse_commodity_risk(risk)
     _refuse_early(aggregate, risk, bucket)
     pairs = [delta_labels(g.index, g.reporting_lot) for g in groups]
     nominal = tuple([pair[0] for pair in pairs])
     delta = tuple([pair[1] for pair in pairs])
-    dv01 = tuple([dv01_label(f"curve_{r.number}", r.currency) for r in rates])
+    dv01 = tuple([dv01_label(r.word, r.currency) for r in rates])
     cleared = tuple([dv01_label("cleared", c) for c in aggregate.currencies])
     cross = tuple(
         [
-            cross_gamma_label(
-                c.index, "cleared" if c.number is None else f"curve_{c.number}", c.reporting_lot
-            )
+            cross_gamma_label(c.index, "cleared" if c.word is None else c.word, c.reporting_lot)
             for c in crosses
         ]
     )
@@ -959,37 +1025,56 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
             totals = tuple([c.cross_gamma_total for c in crosses])
             return RiskView(axes.observed, cross, totals, columns)
         case Risk.ALL:
-            labels: list[str] = []
-            totals_all: list[float] = []
-            every: list[NDArray[np.float64]] = []
-            for g, label_n, label_d, places, start in zip(
-                groups, nominal, delta, axes.observed_in_union, axes.observed_from, strict=True
-            ):
-                labels.extend((label_n, label_d))
-                totals_all.extend((g.lot_delta_total, g.discounted_lot_delta_total))
-                every.append(placed(axes.union.size, places, _lots(g, bucket)[start:]))
-                every.append(placed(axes.union.size, places, _discounted_lots(g, bucket)[start:]))
-            if rates:
-                for r, label, places, start in zip(
-                    rates, dv01, axes.paid_in_union, axes.paid_from, strict=True
-                ):
-                    labels.append(label)
-                    totals_all.append(r.dv01)
-                    every.append(placed(axes.union.size, places, _dv01(r, bucket)[start:]))
-            else:
-                for label in cleared:
-                    labels.append(label)
-                    totals_all.append(0.0)
-                    every.append(np.zeros(axes.union.size))
-            for c, label, places, start in zip(
-                crosses, cross, axes.cross_in_union, axes.cross_from, strict=True
-            ):
-                labels.append(label)
-                totals_all.append(c.cross_gamma_total)
-                every.append(placed(axes.union.size, places, _cross_gamma(c, bucket)[start:]))
-            return RiskView(axes.union, tuple(labels), tuple(totals_all), tuple(every))
+            return _aggregate_all(aggregate, bucket, axes, nominal, delta, dv01, cleared, cross)
         case _:
             assert_never(risk)
+
+
+def _aggregate_all(
+    aggregate: AggregateResults,
+    bucket: Bucket,
+    axes: ReportAxes,
+    nominal: tuple[str, ...],
+    delta: tuple[str, ...],
+    dv01: tuple[str, ...],
+    cleared: tuple[str, ...],
+    cross: tuple[str, ...],
+) -> RiskView:
+    """All four on the union of the axes: each index group's two columns, then each rate group's,
+    or the columns of nothing where no curve values, then each cross group's, every vector copied
+    through the places the collection saved."""
+    groups = aggregate.index_groups
+    rates = aggregate.rate_groups
+    crosses = aggregate.cross_groups
+    labels: list[str] = []
+    totals_all: list[float] = []
+    every: list[NDArray[np.float64]] = []
+    for g, label_n, label_d, places, start in zip(
+        groups, nominal, delta, axes.observed_in_union, axes.observed_from, strict=True
+    ):
+        labels.extend((label_n, label_d))
+        totals_all.extend((g.lot_delta_total, g.discounted_lot_delta_total))
+        every.append(placed(axes.union.size, places, _lots(g, bucket)[start:]))
+        every.append(placed(axes.union.size, places, _discounted_lots(g, bucket)[start:]))
+    if rates:
+        for r, label, places, start in zip(
+            rates, dv01, axes.paid_in_union, axes.paid_from, strict=True
+        ):
+            labels.append(label)
+            totals_all.append(r.dv01)
+            every.append(placed(axes.union.size, places, _dv01(r, bucket)[start:]))
+    else:
+        for label in cleared:
+            labels.append(label)
+            totals_all.append(0.0)
+            every.append(np.zeros(axes.union.size))
+    for c, label, places, start in zip(
+        crosses, cross, axes.cross_in_union, axes.cross_from, strict=True
+    ):
+        labels.append(label)
+        totals_all.append(c.cross_gamma_total)
+        every.append(placed(axes.union.size, places, _cross_gamma(c, bucket)[start:]))
+    return RiskView(axes.union, tuple(labels), tuple(totals_all), tuple(every))
 
 
 def _axes_of(aggregate: AggregateResults, bucket: Bucket) -> ReportAxes:
@@ -1050,6 +1135,22 @@ def _cross_gamma(group: CrossGroup, bucket: Bucket) -> NDArray[np.float64]:
             return group.cross_gamma_by_year
         case _:
             assert_never(bucket)
+
+
+def _refuse_commodity_risk(risk: Risk) -> None:
+    """A collection of cashflows alone, with no index group, has no commodity risk: the three
+    commodity selectors are refused by name, in the words a batch of cashflows refuses them,
+    rather than shown over an index the collection has not."""
+    match risk:
+        case Risk.NOMINAL_DELTA | Risk.DELTA | Risk.CROSS_GAMMA:
+            raise ValueError(
+                f"risk is {risk.value!r}, expected dv01 or all for a collection of cashflows "
+                "alone, which has no commodity risk"
+            )
+        case Risk.DV01 | Risk.ALL:
+            return
+        case _:
+            assert_never(risk)
 
 
 def _refuse_early(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> None:

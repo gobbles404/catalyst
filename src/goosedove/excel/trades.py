@@ -147,15 +147,15 @@ def _EvaluateTrades(
 @excel_function
 def _AggregateResults(
     result_handles: Annotated[
-        Handles[TradeResults],
+        Handles[TradeResults | CashflowResults],
         "The results handles to collect: a cell, a row or a column of cells showing "
-        "_EvaluateTrades's results, such as B2:B5, in the order given, every one counted and a "
-        "repeat counted again.",
+        "_EvaluateTrades's or _EvaluateCashflows's results, in any mix, such as B2:B5, in the "
+        "order given, a repeat counted again.",
     ],
 ) -> Handle[AggregateResults]:
-    """Collects evaluated batches' saved risk into one collection, the lots by index, the DV01 by
-    curve and currency and the cross-gamma by index and curve, nothing valued again, and shows
-    its handle, which _ReportRisk takes beside a single result's."""
+    """Collects evaluated batches' saved risk, trades' and cashflows', into one collection, the
+    lots by index, the DV01 by curve and currency and the cross-gamma by index and curve, nothing
+    valued again, and shows its handle, which _ReportRisk takes."""
     return aggregate_results(result_handles, WorkCounter())
 
 

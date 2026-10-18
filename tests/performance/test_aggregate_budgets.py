@@ -11,10 +11,15 @@ the same history beside them."""
 import numpy as np
 import pytest
 from test_bilateral_budgets import CASES, IDS, bilateral_terms, curve_on, tick
+from test_cashflow_budgets import AS_OF as CASHFLOW_AS_OF
+from test_cashflow_budgets import a_batch as a_cashflow_batch
+from test_cashflow_budgets import a_curve as a_cashflow_curve
 from test_seam_allocation import SLACK, least_peak
 from test_trade_budgets import GAS, CallProfile, a_batch, a_history, a_market, observed_of
 
+from goosedove.cashflows.valuation import cashflow_results
 from goosedove.globals.unit_conversions import UNITS
+from goosedove.globals.valuation_date import valuation_date
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
 from goosedove.trades.encoding import PaymentAxes, encoded
@@ -139,6 +144,7 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
     )
     assert counter.freeze().as_dict() == {
         "aggregate_reductions": 15,
+        "contributions_collected": 2 * count,  # a rate and a cross contribution per source
         "cross_groups": 1,
         "entries_aligned": count * per_source,
         "index_groups": 1,
@@ -180,12 +186,15 @@ def test_a_collection_runs_the_same_functions_at_any_size(
     # The membership and the three groupings, one index group, one rate group and since #197 one
     # cross group summed over eleven axes by fifteen compensated passes, four looks for a sum
     # past the largest number and the three buckets' axes with the cross group's places;
-    # twenty-nine counts; nothing of the kernel, the market, the curve or the preparation is
-    # called.
+    # thirty counts, the contributions among them since slice 2, and the curves' words made
+    # once; nothing of the kernel, the market, the curve or the preparation is called.
     assert call_profile(lambda: aggregate_results(sources, counter)) == {
         "aggregate_results": 1,
         "_grouped_by_index": 1,
-        "_curve_numbers": 1,
+        "_contributions_of": 1,
+        "_cross_contributions": 2 * count,  # once for the count, once for the words
+        "_curve_words": 1,
+        "curve_words": 1,
         "_grouped_by_curve": 1,
         "_grouped_by_index_and_curve": 1,
         "_index_group": 1,
@@ -203,7 +212,7 @@ def test_a_collection_runs_the_same_functions_at_any_size(
         "_early_lots": 2,
         "early_risk": 4,
         "early_fact": 8,
-        "WorkCounter.hit": 29,
+        "WorkCounter.hit": 30,
     }
     # Fourteen uniques, the eleven unions of saved axes, the cross group's four among them since
     # #197, the day report axes and their union, each a flatten, a sort and a hash; twenty-three
@@ -354,6 +363,7 @@ def test_a_view_copies_through_saved_places_and_discovers_nothing(
             "_axes_of": 1,
             "_refuse_early": 1,
             **early,
+            "_aggregate_all": 1,
             "_lots": 1,
             "_discounted_lots": 1,
             "_dv01": 1,
@@ -427,7 +437,7 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
     )
     assert counter.freeze().as_dict()["rate_groups"] == 1
     assert counter.freeze().as_dict()["cross_groups"] == 2
-    assert [c.number for c in agg.cross_groups] == [1, None]
+    assert [c.word for c in agg.cross_groups] == ["SOFR", None]
     assert (
         call_profile(lambda: aggregate_results([discounted, cleared], WorkCounter()))["_summed"]
         == 11
@@ -438,3 +448,81 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
         ]
         == 51  # since #197 the bilateral pair's thirteen more and the cleared pair's five
     )
+
+
+# A batch of cashflows beside a bilateral batch of trades valued on the cashflows' day over one
+# curve, since named-curves-slice-2.md: one index group of the trades alone, one rate group of
+# both, one cross group of the trades; the cashflows' payment days, months and years aligned onto
+# the rate group's unions and nothing else of theirs read; the same eleven unions and fifteen
+# compensated passes as two trade batches; three contributions counted.
+def test_a_cashflow_source_adds_its_payment_entries_to_its_curves_group_and_nothing_else(
+    call_profile: CallProfile, numpy_calls: CallProfile
+) -> None:
+    as_of = str(CASHFLOW_AS_OF)
+    terms = bilateral_terms(500, 12, ScheduleMethod.LASTDAY)
+    history = a_history(as_of=as_of, ix=GAS)
+    market = a_market(history)
+    curve = a_cashflow_curve(2_000)  # from the cashflows' day, past every payment of either
+    discounted = tick(
+        prepared_trades(
+            encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
+        ),
+        market,
+        curve,
+    )
+    cashflows = cashflow_results(
+        a_cashflow_batch(2_000, 20), valuation_date(CASHFLOW_AS_OF, 0.5), curve, WorkCounter()
+    )
+    counter = WorkCounter()
+    agg = aggregate_results([discounted, cashflows], counter)
+    np.testing.assert_array_equal(agg.index_groups[0].occurrences, [0])
+    np.testing.assert_array_equal(agg.rate_groups[0].occurrences, [0, 1])
+    np.testing.assert_array_equal(agg.cross_groups[0].occurrences, [0])
+    paid = payment_axes(discounted)
+    trade_axes = (
+        discounted.prepared.encoded.references.size
+        + discounted.prepared.encoded.days.size
+        + discounted.prepared.encoded.contract_months.size
+        + discounted.prepared.encoded.contract_years.size
+    )
+    batch = cashflows.cashflows
+    counts = counter.freeze().as_dict()
+    assert counts["sources_collected"] == 2 and counts["contributions_collected"] == 3
+    assert (counts["index_groups"], counts["rate_groups"], counts["cross_groups"]) == (1, 1, 1)
+    assert counts["entries_aligned"] == (
+        2 * trade_axes  # the lots and, since #197, the cross-gamma on the four delta axes
+        + paid.days.size
+        + paid.months.size
+        + paid.years.size
+        + batch.payment_days.size
+        + batch.months.size
+        + batch.years.size
+    )
+    assert counts["aggregate_reductions"] == 15
+    profile = call_profile(lambda: aggregate_results([discounted, cashflows], WorkCounter()))
+    assert profile["_summed"] == 11 and profile["_compensated"] == 15
+    assert profile["_cross_contributions"] == 4 and profile["_contributions_of"] == 1
+    # Cashflows alone: no index group and no cross group, the rate group's three unions and
+    # three passes, the report axes with no observation day.
+    counter = WorkCounter()
+    alone = aggregate_results([cashflows], counter)
+    assert alone.index_groups == () and alone.cross_groups == ()
+    counts = counter.freeze().as_dict()
+    assert counts["sources_collected"] == 1 and counts["contributions_collected"] == 1
+    assert (counts["index_groups"], counts["rate_groups"], counts["cross_groups"]) == (0, 1, 0)
+    assert counts["entries_aligned"] == (
+        batch.payment_days.size + batch.months.size + batch.years.size
+    )
+    assert counts["aggregate_reductions"] == 3
+    profile = call_profile(lambda: aggregate_results([cashflows], WorkCounter()))
+    assert profile["_summed"] == 3 and profile["_compensated"] == 3
+    assert "_index_group" not in profile and "_cross_group" not in profile
+    assert alone.by_day.observed.size == 0 and alone.by_day.paid.size == batch.payment_days.size
+    # The views copy through saved places and nothing more, as a trade collection's do.
+    for bucket in Bucket:
+        for risk in (Risk.DV01, Risk.ALL):
+            view = aggregate_view(alone, risk, bucket)
+            assert (
+                least_peak(lambda r=risk, b=bucket: aggregate_view(alone, r, b))
+                <= 8 * view.dates.size + SLACK
+            )

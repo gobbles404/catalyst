@@ -22,7 +22,7 @@ def _EvaluateCashflows(
 | | float64 | float64 | str | datetime64[D] |
 | | 500 | 250 | USD | 4-Jan-2027 |
 | 17 | `=_ReportRisk(A12,"dv01","year")` | 4-Jan-2027 | | |
-| | period | curve_1 USD dv01 [USD per basis point] | | |
+| | period | SOFR USD dv01 [USD per basis point] | | |
 | | str \| datetime64[D] | float64 | | |
 | | Total | 0.85 | | |
 | | 1-Jan-2027 | 0 | | |
@@ -64,7 +64,7 @@ In this order, the first failure being the message; a failure publishes no handl
 
 ## What it retains
 
-The batch and the curve by reference, `as_of` and the currency; the mark, the cash and the DV01; per distinct payment day, increasing, paid or not, whether it has paid, its factor, 1 on a paid day, its value, its cash and its DV01; the DV01 by payment month and by year on the batch's axes; the two display axes from the valuation day's period; and the facts refusing a month or a year report of a DV01 before the start, found once here and never found. Nothing is valued again by a report.
+The batch and the curve by reference, `as_of` and the currency; the mark, the cash and the DV01; per distinct payment day, increasing, paid or not, whether it has paid, its factor, 1 on a paid day, its value, its cash and its DV01; the DV01 by payment month and by year on the batch's axes; the two display axes from the valuation day's period; and the facts refusing a month or a year report of a DV01 before the start, found once here and never found; since [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md) the DV01 by day, by month and by year with their axes, the total and those facts are held as the curve's one rate contribution, `RateContribution` in `trades/contributions.py`, the same arrays by reference, which the reports read and [_AggregateResults](../trades/aggregate-results.md) collects. Nothing is valued again by a report.
 
 ## Reading it back
 
@@ -76,4 +76,4 @@ The worked example and the receipt of a hundred through a curve move, the paymen
 
 ## Not here
 
-A collection of cashflow results with a batch of trades' through `_AggregateResults`: the next ticket's, which adds the batch's DV01 to the curve's and currency's group and no commodity group. Another currency, FX, credit adjustments, several curves within one batch, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.
+A collection of cashflow results with a batch of trades' through `_AggregateResults`: built as [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md), the batch's one rate contribution joining the group of its curve and currency and no commodity group, [aggregate-results.md](../trades/aggregate-results.md). Another currency, FX, credit adjustments, several curves within one batch, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.
