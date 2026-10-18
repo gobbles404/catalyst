@@ -645,3 +645,42 @@ fractional and zero amounts, duplicate rows, different payment dates, a curve up
 date roll to payment; a fixed_float template refused; `delta` refused. The kept workbook's
 block from row 2864 holds the example over the cross-gamma block's curve and valuation date,
 and the receipt of a hundred on the two curves and on its payment day.
+
+## 24. Multiple discount curves within one trade batch
+
+Agreed direction, not implemented: the [named-curve arc](multiple-discount-curves.md) names
+ordinary curves, gathers them with `_CollectDiscountCurves(curve_handles)`, and requires
+every bilateral trade to select one by `discount_curve_key`, even with a singleton set.
+One collection cell can feed many evaluations. It preserves payment/curve ownership
+through valuation and saved risk. Individual handles show the curve name; collection
+handles stay compact, with membership in readback.
+Quotes in item 25 will reuse that completed worksheet contract. Cashflow multi-curve
+evaluation remains separate; its existing one-curve path is preserved.
+
+UAT target: mixed-key batches agree with separately evaluated batches collected together;
+opposing exposures on different curves retain their discounted value/risk; replacing a
+curve under the same key reuses the trades/preparation; changing a ticket's key rebuilds
+them; missing keys fail, including a singleton with the wrong name; adding an unused
+curve changes no selection. Reports identify each contribution's curve and qualify both
+snapshots when distinct curves share a name. The cashflow aggregation PR lands separately
+before the third of the planned four stacked slices.
+
+## 25. Template based quoting
+
+Updated owner direction, 18 October: follow the named-curve arc with
+`_CreateQuoteTemplate(instrument, fields, values)` and
+`_Quote(market, contract_code, template, [discount_curve_set])`, one numeric whole-period price.
+The [ticket](template-based-quoting.md) gives quoting its own template handle, with booking
+and quoting requirements on shared instrument field definitions. Booking-only fields are
+refused, not ignored. The quote template supplies schedule method, `month`/`calday` basis,
+route, payment terms and the static curve key. Cleared quotes are undiscounted; bilateral
+payment dates on or before `as_of` use factor 1, future dates the selected curve. CAL27
+requested in June retains every month, with past fixings and live prices for the remaining
+observations. This supersedes the [four-input prototype](quoting-prototype.md), not implemented.
+
+UAT will compare cleared and bilateral Jan/Feb prices under both quantity bases, CAL27 in
+June, an entirely fixed and paid financial period, and an Asian across a reference roll.
+Check a payment exactly on `as_of` at factor 1 and a fully fixed but unpaid month still
+discounted. Exercise payment-calendar, market, fixing, selected-curve and key changes,
+partial quote templates and wrong-template/booking-field refusals. Record whether the
+dedicated quote template feels natural and what inspection the scalar is missing.
