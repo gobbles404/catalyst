@@ -6,6 +6,18 @@ Running list started 8 October 2026 while testing the trade prototype in Excel.
 Status and suggested handoff order updated **11 October 2026**. Item numbers are stable
 references to the detailed notes below; the pending-work order is a recommendation.
 
+## ZIP installation verification
+
+Reported 18 October 2026: setup from a source ZIP fails in the documentation link test,
+which requires a Git index that archives do not contain. The local fix explicitly skips
+that repository scan for source ZIPs and skips its Git-dependent fixtures when Git is not
+installed. Other tests continue; developer checkouts and CI retain the strict link check.
+See the [check's owner](../../seam/working.md#11-checking-the-links).
+
+UAT: run setup verification from a fresh ZIP, with and without Git on PATH. Confirm the
+documented skips and successful remaining checks; installing Git or running `git init`
+must not be necessary. The fix is pending release.
+
 ## Implemented and reviewed: release testing
 
 These fifteen changes are implemented on the prototype stack through **PR #178**, the last
