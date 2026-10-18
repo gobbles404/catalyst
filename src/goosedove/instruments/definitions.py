@@ -52,30 +52,35 @@ class Instrument:
     fields: tuple[Field, ...]
 
 
+# The two booking fields every instrument shares, one definition each: the identifier and the
+# day the deal was struck.
+TRADE_ID = Field(
+    "trade_id",
+    "External numeric identifier of the executed deal",
+    False,
+    NONE,
+    FieldType.NUMBER,
+    "a whole number of at most 15 digits",
+    "The source system's deal number, whole, -999999999999999 to 999999999999999, "
+    "never text; duplicates keep separate occurrences",
+)
+TRADE_DATE = Field(
+    "trade_date",
+    "Date the deal was executed",
+    True,
+    NONE,
+    FieldType.DATE,
+    "no fixed list",
+    "The day the deal was struck, never inferred from the valuation date or today",
+)
+
 FIXED_FLOAT = Instrument(
     "fixed_float",
     "A fixed-for-floating position on a specified reference contract, with explicit observation "
     "and settlement terms.",
     (
-        Field(
-            "trade_id",
-            "External numeric identifier of the executed deal",
-            False,
-            NONE,
-            FieldType.NUMBER,
-            "a whole number of at most 15 digits",
-            "The source system's deal number, whole, -999999999999999 to 999999999999999, "
-            "never text; duplicates keep separate occurrences",
-        ),
-        Field(
-            "trade_date",
-            "Date the deal was executed",
-            True,
-            NONE,
-            FieldType.DATE,
-            "no fixed list",
-            "The day the deal was struck, never inferred from the valuation date or today",
-        ),
+        TRADE_ID,
+        TRADE_DATE,
         Field(
             "contract_code",
             "One monthly contract or a strip of monthly contracts, the row's period when it "
@@ -257,6 +262,65 @@ FIXED_FLOAT = Instrument(
     ),
 )
 
+CASHFLOW = Instrument(
+    "cashflow",
+    "A known signed amount in one currency, payable on one explicit date.",
+    (
+        TRADE_ID,
+        TRADE_DATE,
+        Field(
+            "amount",
+            "Signed amount of the payment in the stated currency, positive received and "
+            "negative paid",
+            True,
+            NONE,
+            FieldType.NUMBER,
+            "a finite signed amount, fractions and zero included",
+            "The whole payment in whole units of the currency, 100 USD a hundred dollars, not a "
+            "price or a quantity; a zero row is kept; nothing is read from it beyond its sign",
+        ),
+        Field(
+            "currency",
+            "Settlement currency of the payment",
+            True,
+            NONE,
+            FieldType.CODE,
+            "USD",
+            "USD exactly, the one currency this version books, one per batch; CENT is a scale of "
+            "the dollar and no currency, and an amount is never read as cents; no conversion",
+        ),
+        Field(
+            "payment_date",
+            "The scheduled payment date, past, present or future",
+            True,
+            NONE,
+            FieldType.DATE,
+            "no fixed list",
+            "Used as entered, never rolled, never inferred from a schedule; on or before the "
+            "valuation day the amount is cash, after it the amount is discounted on the curve",
+        ),
+        Field(
+            "counterparty",
+            "The payer or payee: a trading counterparty, a broker or an exchange",
+            False,
+            NONE,
+            FieldType.TEXT,
+            "no fixed list",
+            "A label kept as typed, each row its own; attribution and nothing more, no curve, no "
+            "fee and no netting",
+        ),
+        Field(
+            "description",
+            "What the payment is for, such as Swap termination or Clearing rebate",
+            False,
+            NONE,
+            FieldType.TEXT,
+            "no fixed list",
+            "A label kept as typed; nothing is read from the words",
+        ),
+    ),
+)
+
 
 def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
     """The one way to make a catalog: each name once and nonempty, each description nonempty,
@@ -281,7 +345,7 @@ def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
     return instruments
 
 
-CATALOG = catalog(FIXED_FLOAT)
+CATALOG = catalog(FIXED_FLOAT, CASHFLOW)
 
 
 def instrument(name: str, instruments: tuple[Instrument, ...] = CATALOG) -> Instrument:

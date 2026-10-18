@@ -240,6 +240,7 @@ def test_a_report_resolves_one_handle_and_lays_out_one_row(
         if dated:
             expected["_serials"] = 1  # the day to its serial
             expected["_unit"] = 1
+            expected["trade_values_label"] = 1  # the route's word for the labels, since #200
         assert profile == expected, name
     assert bridge.live_handles() == live  # a report publishes nothing
 

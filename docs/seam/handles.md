@@ -64,6 +64,7 @@ pid:kind:count
 | market | `30512:market:WTI:36` | `market_history.calendar.index.name` |
 | trades | `30512:trades:WTI:41` | `resolved.index.name`, the index the batch was resolved against, since #139 |
 | prepared trades, trade results | `30512:prepared_trades:WTI:43`, `30512:trade_results:WTI:45` | the batch's index through the records, `encoded.terms.index.name` and `prepared.encoded.terms.index.name`, since #141 |
+| cashflows, cashflow results | `30512:cashflows:USD:12`, `30512:cashflow_results:USD:13` | the batch's one currency, `currency`, where an index's name would be, since #200 |
 | valuation date, discount curve, trade template | `30512:valuation_date:1`, `30512:discount_curve:2`, `30512:trade_template:40` | none: a template serves any compatible index and carries none |
 | the three schedules, the holiday calendar, the conventions, the contract specifications | `30512:futures_schedule:12`, `30512:holiday_calendar:13`, `30512:index_conventions:14`, `30512:contract_specifications:15` | none: an index uses them, which names them nothing, and their creators gain no argument |
 

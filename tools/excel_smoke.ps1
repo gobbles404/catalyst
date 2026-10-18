@@ -533,7 +533,8 @@ $formulas = [ordered]@{
     # and a blank in the seam's.
     "=INDEX(_ListInstruments(),1,1)"  = "instrument"
     "=INDEX(_ListInstruments(),2,1)"  = "fixed_float"
-    "=ROWS(_ListInstruments())"       = "2"
+    "=ROWS(_ListInstruments())"       = "3"
+    "=INDEX(_ListInstruments(),3,1)"  = "cashflow"
     "=COLUMNS(_ListInstruments())"    = "2"
     '=INDEX(_ShowInstrument("fixed_float"),1,1)'  = "field"
     '=INDEX(_ShowInstrument("fixed_float"),1,2)'  = "trade_id"
@@ -543,7 +544,7 @@ $formulas = [ordered]@{
     # Since #189, reject-nul-input-text.md: the two characters backslash and zero are ordinary text, refused
     # here by the seam as the name of no instrument. A genuine U+0000 the harness cannot deliver: CHAR(0) is
     # #VALUE! and a text typed through COM is cut at the NUL, so the host's refusal of one is the host tests' alone.
-    '=_ShowInstrument("fixed\0float")'  = '#ERROR _ShowInstrument: ValueError: instrument is ''fixed\\0float'', expected one of: ''fixed_float'''
+    '=_ShowInstrument("fixed\0float")'  = '#ERROR _ShowInstrument: ValueError: instrument is ''fixed\\0float'', expected one of: ''fixed_float'', ''cashflow'''
     '=INDEX(_ShowInstrument("fixed_float"),3,4)'  = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),4,4)'  = "no start_date and end_date on the row"
     '=INDEX(_ShowInstrument("fixed_float"),4,5)'  = "no contract_code on the row, or with end_date"
@@ -557,8 +558,8 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),6,19)' = "a finite amount of zero or more"
     '=ROWS(_ShowInstrument("fixed_float"))'       = "7"
     '=COLUMNS(_ShowInstrument("fixed_float"))'    = "19"
-    '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
-    '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'"
+    '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
+    '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflo"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
     # A row of an instrument's fields bound against the instrument named, the handle cell resolved
     # to its calendar and echoed as the words of its kind; rows of two fields counted; the name in
@@ -570,7 +571,7 @@ $formulas = [ordered]@{
     '=INDEX(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2),2,6)' = "10"
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
-    '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
+    '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
     '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
@@ -619,7 +620,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(EW13),4,13)" = "46258"
     "=ROWS(util_ReadHandle(EW13))"       = "4"
     "=COLUMNS(util_ReadHandle(EW13))"    = "21"
-    '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
+    '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
     '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
@@ -725,7 +726,7 @@ $formulas = [ordered]@{
     "=_EvaluateTrades(FG6,CW6)" = "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'Henry Hub NYMEX', expected the one the trades were prepared against"
     '=_PrepareTrades("x:trades:9",CT7)' = "#ERROR _PrepareTrades: trades is text 'x:trades:9' naming no live object, expected trades handle"
     "=_EvaluateTrades(FG6)" = "#ERROR _EvaluateTrades: market is missing, expected market handle"
-    "=_ReportValues(C2)"    = "#ERROR _ReportValues: results is blank, expected trade results handle"
+    "=_ReportValues(C2)"    = "#ERROR _ReportValues: results is blank, expected trade results or cashflow results handle"
     # The toy lifecycle's paid state: TOY_GAS in FM5, financial, paying two business days after
     # each expiry on the calendar in FM4, valued on 30-Nov-2026 in FM9 with Z26's final settle of
     # 3.23 on 25 November among its fixings, F27 quoted at 3.50 and G27 at 3.60 in FM11; two trades,
@@ -1027,7 +1028,7 @@ $formulas = [ordered]@{
     '=_ReportRisk(MY8,"delta",C2)'          = "#ERROR _ReportRisk: bucket is blank, expected text"
     '=_ReportRisk(MY8,"delta")'             = "#ERROR _ReportRisk: bucket is missing, expected text"
     "=_ReportRisk(MY8)"                     = "#ERROR _ReportRisk: risk is missing, expected text"
-    '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle"
+    '=_ReportRisk(C2,"delta","day")'        = "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or cashflow results handle"
     # IFERC basis futures, iferc-basis-futures.md: the Waha-like index in NH5, X26, Z26 and F27
     # last trading 30 October, 30 November and 31 December and published 2 November, 1 December
     # and 4 January, 46328, 46357 and 46391, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU,
@@ -1775,7 +1776,7 @@ $formulas = [ordered]@{
     '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"0H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28"
     '=_CreateTrades(SA15,SD7:SH7,{3003,46357,"2H27",1,3},SA16)' = "#ERROR _CreateTrades: ValueError: contract_code row 1 is '2H27', expected months the index's schedule has a contract for; it has none for 2027-08"
     "=RY4"                                = "#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
-    '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
+    '=_ReportRisk(RY4,"all","day")'       = "#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     "=util_ReadHandle(RY4)"               = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts"
     # Contract prices interpolated between anchors, interpolate-contract-prices.md, on the half-year
     # index HALF: Z26 at 3 and H27 at 4.8, expiring 29 December and 29 March, give F27 and G27 29 and
@@ -1820,6 +1821,32 @@ $formulas = [ordered]@{
     "=util_BumpDiscountCurve(AA1)" = "#ERROR util_BumpDiscountCurve: bump_bps is missing, expected number"
     "=util_BumpDiscountCurve(AA3,1)" = "#ERROR util_BumpDiscountCurve: curve is the creator's failure, expected discount curve handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     "=util_BumpDiscountCurve(UC3,-1)" = "#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404"
+    # The cashflow instrument, cashflow-instrument.md: in the catalog with its eight columns; the
+    # ticket's three payments booked under a template of USD and Firm A and valued on 4 January 2027
+    # over the curve 1, 0.95 and 0.90, 500 of mark, 250 of cash and 0.85 of DV01 through the reports
+    # and the readback; delta refused by name, a fixed_float template at the first cashflow header,
+    # a curve of another day and a left-out date in their own words.
+    '=INDEX(_ShowInstrument("cashflow"),1,4)' = "amount"
+    '=INDEX(_ShowInstrument("cashflow"),3,4)' = "TRUE"
+    '=COLUMNS(_ShowInstrument("cashflow"))' = "8"
+    "=INDEX(_ReportValues(UF8),1,1)" = "cashflow_mark"
+    "=INDEX(_ReportValues(UF8),3,1)" = "500"
+    "=INDEX(_ReportValues(UF8),3,2)" = "250"
+    "=INDEX(_ReportValues(UF8),3,3)" = "USD"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),2,2)' = "curve_1 USD dv01 [USD per basis point]"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),4,2)' = "0.85"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),6,2)' = "-0.95"
+    '=INDEX(_ReportRisk(UF8,"dv01","year"),7,2)' = "1.8"
+    '=ROWS(_ReportRisk(UF8,"all","day"))' = "7"
+    "=ROWS(util_ReadHandle(UF8))" = "5"
+    "=INDEX(util_ReadHandle(UF8),1,10)" = "cashflow_mark"
+    "=INDEX(util_ReadHandle(UF8),3,10)" = "500"
+    "=INDEX(util_ReadHandle(UF8),4,10)" = "-"
+    "=INDEX(util_ReadHandle(UF5),3,6)" = "Firm A"
+    '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
+    "=_EvaluateCashflows(UF5,UF6,AA1)" = "#ERROR _EvaluateCashflows: ValueError: discount_curve starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
+    "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -3001,6 +3028,23 @@ $cells = [ordered]@{
     "UD2" = "12-Sep-2026"; "UE2" = "1"
     "UD3" = "13-Sep-2026"; "UE3" = "1"
     "UC3" = "=_CreateDiscountCurve(Y1:Z1,UD1:UE3)"
+    # The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the ticket's
+    # three payments, the valuation date and the curve, and the batch valued.
+    "UF1" = "currency"; "UG1" = "counterparty"
+    "UF2" = "USD"; "UG2" = "Firm A"
+    "UF4" = '=_CreateTradeTemplate("cashflow",UF1:UG1,UF2:UG2)'
+    "UH1" = "trade_id"; "UI1" = "trade_date"; "UJ1" = "amount"; "UK1" = "payment_date"; "UL1" = "description"
+    "UH2" = "1"; "UI2" = "4-Jan-2027"; "UJ2" = "10000"; "UK2" = "4-Jan-2028"; "UL2" = "Receivable"
+    "UH3" = "2"; "UI3" = "4-Jan-2027"; "UJ3" = "-10000"; "UK3" = "3-Jan-2029"; "UL3" = "Payable"
+    "UH4" = "3"; "UI4" = "4-Jan-2027"; "UJ4" = "250"; "UK4" = "3-Jan-2027"; "UL4" = "Earlier rebate"
+    "UF5" = "=_CreateCashflows(UH1:UL1,UH2:UL4,UF4)"
+    "UN1" = "date"; "UO1" = "discount_factor"
+    "UN2" = "4-Jan-2027"; "UO2" = "1"
+    "UN3" = "4-Jan-2028"; "UO3" = "0.95"
+    "UN4" = "3-Jan-2029"; "UO4" = "0.9"
+    "UF6" = "=_CreateValuationDate(UN2,0.5)"
+    "UF7" = "=_CreateDiscountCurve(UN1:UO1,UN2:UO4)"
+    "UF8" = "=_EvaluateCashflows(UF5,UF6,UF7)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

@@ -7,7 +7,7 @@ The batch's values from its results, as evaluation stored them: the mark and the
 ## Worksheet contract
 
 ```python
-def _ReportValues(results: Handle[TradeResults]) -> MixedArray: ...
+def _ReportValues(results: Handle[TradeResults] | Handle[CashflowResults]) -> MixedArray: ...
 ```
 
 | | A | B | C | D |
@@ -17,14 +17,14 @@ def _ReportValues(results: Handle[TradeResults]) -> MixedArray: ...
 | | float64 | float64 | str | datetime64[D] |
 | | 7000 | 0 | USD | 24-Nov-2026 |
 
-One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it, A12 in the example, whose history and market handles sit in I11 and I12 beside the index in I3, outside this three-by-four spill at A13:D15 and the risk report's at A17:E19; a cell of another kind fails in the seam's words, `results is prepared trades handle '30512:prepared_trades:Henry Hub NYMEX:43', expected trade results handle`. The spill is three rows by four columns, a table as every reader spills one: the headers, the types and one row. The labels are the route's, `cleared_mark` and `cleared_cash`, or `bilateral_mark` and `bilateral_cash` since #177, the bilateral mark the unpaid payment groups' NPV on the curve `_EvaluateTrades` took and the bilateral cash the nominal paid amounts, undiscounted as the cleared cash is, [kernel.md](kernel.md#the-bilateral-path); the other route's fields are not shown as zeros. The mark is a currency amount, the undiscounted entry-to-current-price P&L of the payment groups not yet settled, live slots at their quotes and fixed slots at their settles; the cash the cumulative entry-to-final-price P&L of the groups settled by the valuation day, the payment day on or before it, undiscounted, every settled group of the batch through that day; neither is a bank reconciliation, and margining is outside the model. The day is the history's valuation day, a date as the sheet formats one.
+One handle, required: the results, the cell showing `_EvaluateTrades`'s result or a name for it, A12 in the example, whose history and market handles sit in I11 and I12 beside the index in I3, outside this three-by-four spill at A13:D15 and the risk report's at A17:E19; a cell of another kind fails in the seam's words, `results is prepared trades handle '30512:prepared_trades:Henry Hub NYMEX:43', expected trade results or cashflow results handle`. The spill is three rows by four columns, a table as every reader spills one: the headers, the types and one row. The labels are the route's, `cleared_mark` and `cleared_cash`, or `bilateral_mark` and `bilateral_cash` since #177, the bilateral mark the unpaid payment groups' NPV on the curve `_EvaluateTrades` took and the bilateral cash the nominal paid amounts, undiscounted as the cleared cash is, [kernel.md](kernel.md#the-bilateral-path); the other route's fields are not shown as zeros. Since #200 a batch of cashflows' results, [evaluate-cashflows.md](../cashflows/evaluate-cashflows.md), show under `cashflow_mark` and `cashflow_cash`, the mark the discounted value of the unpaid payments and the cash the paid amounts, one declaration of two kinds, [inputs.md](../../seam/inputs.md) decision 45, the word before the labels the result's own. The mark is a currency amount, the undiscounted entry-to-current-price P&L of the payment groups not yet settled, live slots at their quotes and fixed slots at their settles; the cash the cumulative entry-to-final-price P&L of the groups settled by the valuation day, the payment day on or before it, undiscounted, every settled group of the batch through that day; neither is a bank reconciliation, and margining is outside the model. The day is the history's valuation day, a date as the sheet formats one.
 
 ## Excel help
 
 | Item | Text |
 |---|---|
-| Function | Reports the batch's values from its results: the mark and the cash under the route's labels, the currency and the valuation day, as evaluation stored them. |
-| results | The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name for it. |
+| Function | Reports the batch's values from its results: the mark and the cash under the route's labels, or under cashflow for a batch of cashflows, the currency and the valuation day, as evaluation stored them. |
+| results | The results handle: the cell showing _EvaluateTrades's or _EvaluateCashflows's result, such as A12, or a name for it. |
 
 ## The library checks
 

@@ -149,6 +149,10 @@ namespace Goosedove.Host.Tests
             // Contract prices interpolated between anchors: the index handle first, missing or naming no live object, in the seam's words; the live index and the library's rules are in the fact below.
             yield return new object[] { "util_InterpolateContracts", new object[] { ExcelMissing.Value, Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is missing, expected index handle" };
             yield return new object[] { "util_InterpolateContracts", new object[] { "x", Column("J27", "M27"), Column(70.0, 76.0) }, "#ERROR util_InterpolateContracts: index is text 'x' naming no live object, expected index handle" };
+            // Cashflows: the template handle last and required, missing in the seam's words; the evaluator's handles missing or naming nothing; the live batch and the library's rules are in the fact below.
+            yield return new object[] { "_CreateCashflows", new object[] { Row("trade_date"), Row(46391.0), ExcelMissing.Value }, "#ERROR _CreateCashflows: template is missing, expected trade template handle" };
+            yield return new object[] { "_EvaluateCashflows", new object[] { ExcelMissing.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _EvaluateCashflows: cashflows is missing, expected cashflows handle" };
+            yield return new object[] { "_EvaluateCashflows", new object[] { "x", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _EvaluateCashflows: cashflows is text 'x' naming no live object, expected cashflows handle" };
             // A discount curve bumped by basis points: the curve first, missing, text naming nothing or a number, in the seam's words; the live curve and the library's rule are in the fact below.
             yield return new object[] { "util_BumpDiscountCurve", new object[] { ExcelMissing.Value, 1.0 }, "#ERROR util_BumpDiscountCurve: curve is missing, expected discount curve handle" };
             yield return new object[] { "util_BumpDiscountCurve", new object[] { "x", 1.0 }, "#ERROR util_BumpDiscountCurve: curve is text 'x' naming no live object, expected discount curve handle" };
@@ -246,14 +250,14 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+1bd", ExcelEmpty.Value }, "#ERROR util_ShiftDate: holiday_calendar is blank, expected holiday calendar handle" };
             yield return new object[] { "util_ShiftDate", new object[] { 46304.0, "+7cd", "x:holiday_calendar:9" }, "#ERROR util_ShiftDate: holiday_calendar is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             // The instrument catalog's show: one exact name in. Another case, a blank, a number and a left-out name fail, the name in the library's words and the rest in the seam's; the spills are in the catalog fact below.
-            yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'" };
-            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'" };  // the name until #174
+            yield return new object[] { "_ShowInstrument", new object[] { "Future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
+            yield return new object[] { "_ShowInstrument", new object[] { "future" }, "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflow'" };  // the name until #174
             yield return new object[] { "_ShowInstrument", new object[] { ExcelEmpty.Value }, "#ERROR _ShowInstrument: instrument is blank, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { 1.0 }, "#ERROR _ShowInstrument: instrument is number 1.0, expected text" };
             yield return new object[] { "_ShowInstrument", new object[] { ExcelMissing.Value }, "#ERROR _ShowInstrument: instrument is missing, expected text" };
             // A row or rows of an instrument's fields, through the two probes: the name in another case in the library's words, then the width, the headers in input order, exact, and the cells column by column, in the seam's; a handle cell naming no live object; two rows where one is wanted.
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
-            yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'" };
+            yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
@@ -262,7 +266,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("payment_holiday_calendar"), "x:holiday_calendar:9" }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'x:holiday_calendar:9' naming no live object, expected holiday calendar handle" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Column(1.0, 2.0) }, "#ERROR EchoFieldRow: values is 2x1 array, expected one row of field values" };
             // The trade template: the name in another case in the library's words; two rows where one is wanted, the extra row filled or blank, and a number where text is expected in the seam's; a value against its field's own rule in the library's. The trades: the index and the template left out, and a text naming no live object, in the seam's words, before any binding; the batch itself is in the fact below.
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float'" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "Future", Row("quantity_unit"), "NYMEX NG" }, "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", "NYMEX NG") }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
@@ -276,8 +280,8 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_PrepareTrades", new object[] { ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _PrepareTrades: trades is missing, expected trades handle" };
             yield return new object[] { "_PrepareTrades", new object[] { "x:trades:gas:9", "y:market_history:gas:9" }, "#ERROR _PrepareTrades: trades is text 'x:trades:gas:9' naming no live object, expected trades handle" };
             yield return new object[] { "_EvaluateTrades", new object[] { ExcelEmpty.Value, ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _EvaluateTrades: prepared is blank, expected prepared trades handle" };
-            yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results handle" };
-            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle" };
+            yield return new object[] { "_ReportValues", new object[] { 1.0 }, "#ERROR _ReportValues: results is number 1.0, expected trade results or cashflow results handle" };
+            yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or cashflow results handle" };
             yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
             // The collector, since #180: the vector left out, a scalar that is no text, a true array, and a cell naming nothing, in the seam's words.
             yield return new object[] { "_AggregateResults", new object[] { ExcelMissing.Value }, "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column" };
@@ -462,6 +466,57 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404", Seam.Call("util_BumpDiscountCurve", ones, -1.0));
         }
 
+        // The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the
+        // ticket's three payments, valued on 4 January 2027 over the curve 1, 0.95 and 0.90: 500 of
+        // mark, 250 of cash and 0.85 of DV01, the handles named for the currency; the values and
+        // the risk reports, the readback with its totals once and the batch's rows; delta refused by
+        // name; a fixed_float template refused at the ticket's first cashflow header and, with a
+        // ticket of the shared fields, by name.
+        [Fact]
+        public void cashflows_are_booked_from_a_template_and_a_ticket_and_valued_on_a_curve()
+        {
+            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency", "counterparty"), Row("USD", "Firm A"));
+            Assert.StartsWith(Pid + ":trade_template:", template);
+            var fields = Row("trade_id", "trade_date", "amount", "payment_date", "description");
+            var rows = new object[,] { { 1.0, 46391.0, 10000.0, 46756.0, "Receivable" }, { 2.0, 46391.0, -10000.0, 47121.0, "Payable" }, { 3.0, 46391.0, 250.0, 46390.0, "Earlier rebate" } };
+            var batch = (string)Seam.Call("_CreateCashflows", fields, rows, template);
+            Assert.StartsWith(Pid + ":cashflows:USD:", batch);
+            var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var curve = Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
+            var results = (string)Seam.Call("_EvaluateCashflows", batch, date, curve);
+            Assert.StartsWith(Pid + ":cashflow_results:USD:", results);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal("cashflow_mark", values[0, 0]);
+            Assert.Equal("cashflow_cash", values[0, 1]);
+            Assert.Equal(500.0, (double)values[2, 0], 9);
+            Assert.Equal(250.0, values[2, 1]);
+            Assert.Equal("USD", values[2, 2]);
+            Assert.Equal(46391.0, values[2, 3]);
+            var risk = (object[,])Seam.Call("_ReportRisk", results, "dv01", "year");
+            Assert.Equal(7, risk.GetLength(0));
+            Assert.Equal(2, risk.GetLength(1));
+            Assert.Equal("curve_1 USD dv01 [USD per basis point]", risk[1, 1]);
+            Assert.Equal("Total", risk[3, 0]);
+            Assert.Equal(0.85, (double)risk[3, 1], 12);
+            Assert.Equal(46753.0, risk[5, 0]);
+            Assert.Equal(-0.95, (double)risk[5, 1], 12);
+            Assert.Equal(1.8, (double)risk[6, 1], 12);
+            var read = (object[,])Seam.Call("util_ReadHandle", results);
+            Assert.Equal(5, read.GetLength(0));
+            Assert.Equal(12, read.GetLength(1));
+            Assert.Equal("cashflow_mark", read[0, 9]);
+            Assert.Equal(500.0, (double)read[2, 9], 9);
+            Assert.Equal("-", read[3, 9]);
+            var booked = (object[,])Seam.Call("util_ReadHandle", batch);
+            Assert.Equal(5, booked.GetLength(0));
+            Assert.Equal(7, booked.GetLength(1));
+            Assert.Equal("Firm A", booked[2, 5]);
+            Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
+            var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
+        }
+
         // A row of the fixed_float's fields bound against the instrument named: the holiday calendar cell
         // resolved to the object behind the handle and echoed as the words of its kind, the date as
         // its serial, the number as itself, under the field names in the sheet's order.
@@ -489,11 +544,13 @@ namespace Goosedove.Host.Tests
         public void the_instrument_catalog_is_listed_and_the_future_shown()
         {
             var listed = (object[,])Seam.Call("_ListInstruments");
-            Assert.Equal(2, listed.GetLength(0));
+            Assert.Equal(3, listed.GetLength(0));
             Assert.Equal(2, listed.GetLength(1));
             Assert.Equal("instrument", listed[0, 0]);
             Assert.Equal("description", listed[0, 1]);
             Assert.Equal("fixed_float", listed[1, 0]);
+            Assert.Equal("cashflow", listed[2, 0]);
+            Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(7, shown.GetLength(0));
             Assert.Equal(19, shown.GetLength(1));
@@ -694,7 +751,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(36000.0, (double)((object[,])Seam.Call("_ReportValues", later))[2, 0], 6);
             Assert.Equal(34000.0, (double)((object[,])Seam.Call("_ReportValues", results))[2, 0], 6);
             Assert.Equal("#ERROR _EvaluateTrades: prepared is trades handle '" + trades + "', expected prepared trades handle", Seam.Call("_EvaluateTrades", trades, market, ExcelMissing.Value));
-            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results or aggregate results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
+            Assert.Equal("#ERROR _ReportRisk: results is prepared trades handle '" + prepared + "', expected trade results or aggregate results or cashflow results handle", Seam.Call("_ReportRisk", prepared, "all", "day"));
             // Since #180, aggregate-risk-excel-integration.md: the results collected twice down a column,
             // one collection handle of its own kind, and the same reader over it, every Total doubled on
             // the same axis under the same labels; one result alone collected as itself; the readback's
@@ -749,13 +806,13 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _AggregateResults: ValueError: results 2 is on index 'sample' quoted off another price vector than results 1, expected one price vector for one index", Seam.Call("_AggregateResults", Row(results, later)));
             Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is blank, expected trade results handle", Seam.Call("_AggregateResults", Column(results, ExcelEmpty.Value)));
             Assert.Equal("#ERROR _AggregateResults: result_handles is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_AggregateResults", prepared));
-            Assert.Equal("#ERROR _ReportValues: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportValues", collection));
+            Assert.Equal("#ERROR _ReportValues: results is aggregate results handle '" + collection + "', expected trade results or cashflow results handle", Seam.Call("_ReportValues", collection));
             Assert.Equal("#ERROR _ReportReserves: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportReserves", collection));
             // A failed evaluation in a cell fails the collection behind the cell's name, the creator's text
             // whole, and the reader over the failed collection shows that text once behind its own wrapper.
             var broken = (string)Seam.Call("_AggregateResults", Column(results, "#ERROR _EvaluateTrades: ValueError: x"));
             Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: x", broken);
-            Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
+            Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
         }
 
         // Combined holiday calendars, combine-holiday-calendars.md: the ticket's calendars A, listing

@@ -55,6 +55,8 @@ from numpy.typing import NDArray
 
 import goosedove
 from goosedove.calendar.calendar import Calendar
+from goosedove.cashflows.booking import Cashflows
+from goosedove.cashflows.valuation import CashflowResults
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.index import Index
 from goosedove.instruments.definitions import FieldType, Instrument
@@ -1438,6 +1440,8 @@ _NAMED: Final[dict[type[object], str]] = {
     Trades: "resolved.index.name",
     PreparedTrades: "encoded.terms.index.name",
     TradeResults: "prepared.encoded.terms.index.name",
+    Cashflows: "currency",  # the batch's one currency where an index's name would be, since #200
+    CashflowResults: "currency",
 }
 
 

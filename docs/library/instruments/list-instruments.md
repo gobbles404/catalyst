@@ -23,9 +23,10 @@ It spills a header and one row per inspectable definition, with exactly these tw
 | instrument | description |
 |---|---|
 | fixed_float | A fixed-for-floating position on a specified reference contract, with explicit observation and settlement terms. |
+| cashflow | A known signed amount in one currency, payable on one explicit date. |
 
-This is the first catalog, the one row. Another row comes when that instrument's field contract
-is defined and inspectable. Being listed establishes schema availability, not support for
+Two rows since #200, the cashflow's beside the fixed_float's; another row comes when an
+instrument's field contract is defined and inspectable. Being listed establishes schema availability, not support for
 every product or valuation measure. The definitions are `src/goosedove/instruments/definitions.py`,
 frozen library data authored and checked there, each name once and nonempty, each description
 nonempty; the function is `src/goosedove/excel/instruments.py`, which lays them out as one table
@@ -60,9 +61,10 @@ trade construction. Do not maintain an independent hand-written list for this sp
 The definitions are immutable within the running library. Reading them depends on no trade,
 index, history, valuation date, price vector or active workbook selection.
 
+A known dated payment is the `cashflow` since #200,
+[cashflow-instrument.md](../../engineering-tickets/trade-valuation-pipeline/cashflow-instrument.md).
 Candidate future additions remain in the design discussion until their schemas are defined:
-single-index `swap`, a known dated cash flow, and the explicitly agreed meaning of static
-cash. `basis_swap` and `option` remain out of the first scope. The older names
+single-index `swap` and the explicitly agreed meaning of static cash. `basis_swap` and `option` remain out of the first scope. The older names
 `cashflow_event`, `cashflow_schedule` and `settled_position` are examples to review, not
 aliases to silently accept alongside the eventual identifiers.
 

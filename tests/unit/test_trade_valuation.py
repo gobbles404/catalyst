@@ -1306,10 +1306,11 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     )
     assert ENTRY["_ReportValues"](ng["prepared"]) == (
         f"#ERROR _ReportValues: results is prepared trades handle {ng['prepared']!r}, "
-        "expected trade results handle"
+        "expected trade results or cashflow results handle"
     )
     assert ENTRY["_ReportRisk"](None, "all", "day") == (
-        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle"
+        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or "
+        "cashflow results handle"
     )
     # Then the library: another index's history, the same facts and name; a market over another
     # history; a physical contract past its expiry; a bilateral route.
@@ -3345,11 +3346,12 @@ def test_the_risk_report_refuses_a_risk_or_a_bucket_that_is_none_of_its_words(
         "#ERROR _ReportRisk: risk is missing, expected text"
     )
     assert ENTRY["_ReportRisk"](None, "gamma", "quarter") == (
-        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle"
+        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or "
+        "cashflow results handle"
     )
     assert ENTRY["_ReportRisk"](prepared, "delta", "day") == (
         f"#ERROR _ReportRisk: results is prepared trades handle {prepared!r}, "
-        "expected trade results or aggregate results handle"
+        "expected trade results or aggregate results or cashflow results handle"
     )
 
 
