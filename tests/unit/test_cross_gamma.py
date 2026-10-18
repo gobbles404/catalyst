@@ -26,6 +26,7 @@ from test_bilateral_kernel import (
     UNIT,
     cross,
     curve_of,
+    curve_set,
     given,
     prepared_on,
     terms_of,
@@ -107,6 +108,7 @@ def trades_on(
     route: Route = Route.BILATERAL,
     settlement: Settlement = Settlement.FINANCIAL,
     as_of: str = AS_OF,
+    key: str = "SOFR",
 ) -> ResolvedTrades:
     """One trade per quantity, each its own payment group, on row 1 of the index's schedule
     unless other rows are given, by the month under the method; bilateral and financial unless
@@ -125,6 +127,7 @@ def trades_on(
         dates(*[as_of] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
         *bounds_of(ix, contract), numbers(*fixed), payment,
         counterparty=None if route is Route.CLEARED else ("ACME Trading",) * n,
+        discount_curve_key=None if route is Route.CLEARED else (key,) * n,
     )  # fmt: skip
 
 
@@ -179,12 +182,14 @@ def test_the_worked_example_prices_by_hand() -> None:
     early = cross(result).early_cross_gamma
     assert early.month is None and early.year is None
     assert counter.freeze().as_dict() == {
+        "curves_selected": 1,
         "groups_valued": 2,
         "kernel": 1,
         "live_prices_read": 1,
         "payment_factors_read": 2,
-        "risk_reductions": 11,  # the lots and the cross-gamma onto four axes each, the DV01 three
+        "risk_reductions": 12,  # the lots and the cross-gamma onto four axes each, the DV01 four
         "slots_discounted": 2,
+        "slots_weighted": 2,  # the cross-gamma's product over the slots, once
     }
     # Each trade alone, the contribution rows: A -0.00095, B +0.0009, the batch their sum.
     a = valued(prepared_on(trades_on(HNG, (10.0,), (70.0,), PAYS[:1], LAGS[:1])), QUOTES, CURVE)
@@ -363,7 +368,7 @@ def test_a_cleared_batch_holds_the_known_zero_and_asks_for_no_curve() -> None:
     for settlement in (Settlement.FINANCIAL, Settlement.PHYSICAL):
         prep = prepared_on(terms_of(route=Route.CLEARED, settlement=settlement))
         result = valued(prep, (80.0, 50.0), None)
-        assert result.curve is None and result.cross_gamma_total == 0.0
+        assert result.curves == () and result.cross_gamma_total == 0.0
         assert result.rate_contributions == () and result.cross_contributions == ()
 
 
@@ -470,7 +475,7 @@ def test_a_contract_month_before_the_valuation_month_is_a_saved_fact() -> None:
     assert early.month.value == pytest.approx(-0.000285, **CLOSE)
     assert early.month.what == PER_BP
     assert early.month.words("cross-gamma").startswith(
-        "the cross-gamma of index 'NG3' in the contract month from 2026-09-01 is "
+        "the cross-gamma of index 'NG3' on SOFR in the contract month from 2026-09-01 is "
     )
 
 
@@ -576,9 +581,9 @@ def test_a_cross_gamma_bucket_past_the_largest_number_is_refused_by_its_contract
     with pytest.raises(ValueError) as refused:
         valued(prep, (1.0,) * 9, curve_of((AS_OF, 1.0), (far, 0.999)))
     assert str(refused.value) == (
-        "the contract year from 2027-01-01 has -inf of cross-gamma in all, expected a finite "
-        "number of lots of EIGHT (1 BBL) per basis point; its slots' cross-gammas sum past the "
-        "largest number"
+        "the contract year from 2027-01-01 has -inf of cross-gamma on SOFR in all, expected a "
+        "finite number of lots of EIGHT (1 BBL) per basis point; its slots' cross-gammas sum past "
+        "the largest number"
     )
 
 
@@ -660,7 +665,9 @@ def test_a_month_report_of_cross_gamma_before_the_valuation_month_is_refused() -
         trades_on(ng3, (3.0,), (3.0,), ("2027-10-14",), ("+364cd",), as_of=OCTOBER), OCTOBER
     )
     result = valued(prep, (3.2, 3.3), curve_of((OCTOBER, 1.0), ("2027-10-14", 0.95)))
-    head = "the cross-gamma of index 'NG3' in the contract month from 2026-09-01 is -0.00028"
+    head = (
+        "the cross-gamma of index 'NG3' on SOFR in the contract month from 2026-09-01 is -0.00028"
+    )
     tail = (
         f"{PER_BP}, before the report's first month, 2026-10-01, the month of as_of 2026-10-14; "
         "the day view shows where it stands"
@@ -703,7 +710,7 @@ def valued_on(
     prep = prepared_trades(
         encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
     )
-    return trade_results(prep, market, WorkCounter(), curve)
+    return trade_results(prep, market, WorkCounter(), None if curve is None else curve_set(curve))
 
 
 def hng_source(

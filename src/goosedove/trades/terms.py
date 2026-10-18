@@ -112,7 +112,10 @@ class ResolvedTrades:
     case, the desk's word for a screen trade, reserve-fee-applicability.md; marketing_reserve[i]
     since #175 the marketing cost the row booked once, a finite amount of zero or more in the
     settlement currency, None as a whole when neither the template nor the ticket supplied it,
-    read by the reserves alone. Per
+    read by the reserves alone; discount_curve_key[i], since named-curves-slice-3.md, the
+    exact name of the curve the row's payments discount on, one per occurrence for a bilateral
+    batch and None as a whole for a cleared one, read by the encoding for the groups and by the
+    evaluation to select the curve, never a curve itself. Per
     component, the contract months the occurrences hold: occurrence[k] the row of the occurrence
     it belongs to, contract[k] the row of the schedule its month is, quantity[k] the signed whole
     count of the specification as entered, per the basis, start_date[k] and end_date[k] the first
@@ -140,6 +143,7 @@ class ResolvedTrades:
     trade_ids: NDArray[np.int64] | None
     clearing_house: tuple[str, ...] | None
     counterparty: tuple[str, ...] | None
+    discount_curve_key: tuple[str, ...] | None
     broker: tuple[str, ...] | None
     brokered: NDArray[np.bool_]
     trade_dates: NDArray[np.datetime64]
@@ -194,6 +198,7 @@ def resolved_trades(
     schedule_month: NDArray[np.int64] | None = None,
     counterparty: tuple[str, ...] | None = None,
     marketing_reserve: NDArray[np.float64] | None = None,
+    discount_curve_key: tuple[str, ...] | None = None,
 ) -> ResolvedTrades:
     """The one way to make ResolvedTrades: the rules of the first fixed_float profile, checked once,
     in this order, the first failure being the message; then the columns copied and frozen.
@@ -242,8 +247,15 @@ def resolved_trades(
     schedule = trade_schedule_of(index)
     lot = reporting_lot_of(index)
     occurrences = _the_occurrences(
-        trade_dates, trade_ids, clearing_house, counterparty, broker, marketing_reserve
+        trade_dates,
+        trade_ids,
+        clearing_house,
+        counterparty,
+        discount_curve_key,
+        broker,
+        marketing_reserve,
     )
+    _the_keys(route, discount_curve_key)
     _the_selections(index, specification, schedule_method, quantity_per, occurrences)
     _the_method(schedule_method, settlement, trade_ids, index.kind)
     _the_components(
@@ -283,6 +295,7 @@ def resolved_trades(
         None if trade_ids is None else _frozen_ids(trade_ids),
         clearing_house,
         counterparty,
+        discount_curve_key,
         broker,
         brokered,
         _frozen_days(trade_dates),
@@ -454,6 +467,7 @@ def _the_occurrences(
     trade_ids: NDArray[np.int64] | None,
     clearing_house: tuple[str, ...] | None,
     counterparty: tuple[str, ...] | None,
+    discount_curve_key: tuple[str, ...] | None,
     broker: tuple[str, ...] | None,
     marketing_reserve: NDArray[np.float64] | None,
 ) -> int:
@@ -469,6 +483,7 @@ def _the_occurrences(
     for name, texts in (
         ("clearing_house", clearing_house),
         ("counterparty", counterparty),
+        ("discount_curve_key", discount_curve_key),
         ("broker", broker),
     ):
         if texts is not None and len(texts) != occurrences:
@@ -481,6 +496,26 @@ def _the_occurrences(
             "one per occurrence"
         )
     return occurrences
+
+
+def _the_keys(route: Route, discount_curve_key: tuple[str, ...] | None) -> None:
+    """A bilateral batch names its curves, since named-curves-slice-3.md, one key per occurrence,
+    and a cleared batch names none, the definition's condition; the resolution reads each key by
+    the curve's name rule, and the kernel holds the presence alone."""
+    match route:
+        case Route.BILATERAL:
+            if discount_curve_key is None:
+                raise ValueError(
+                    "discount_curve_key is missing, expected it when route = bilateral"
+                )
+        case Route.CLEARED:
+            if discount_curve_key is not None:
+                raise ValueError(
+                    f"discount_curve_key is {discount_curve_key[0]!r}, expected none unless "
+                    "route = bilateral"
+                )
+        case _:
+            assert_never(route)
 
 
 def _the_components(

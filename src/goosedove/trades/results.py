@@ -64,16 +64,19 @@ class TradeResults:
     record by reference, which no tick changes, _ReportReserves spills and the results
     readback shows once.
 
-    Since #176, the bilateral fields. curve is the discount curve the batch was valued on, None for
-    a cleared batch. discounted_lot_delta[r], discounted_lot_delta_total,
+    Since #176, the bilateral fields. curves, since named-curves-slice-3.md, are the exact curve
+    objects the batch's keys selected from the collection it was evaluated with, in key order,
+    the curves the contributions below are owned by, and none for a cleared batch; the
+    collection itself is not kept. discounted_lot_delta[r], discounted_lot_delta_total,
     discounted_price_sensitivity[r] and the discounted daily, monthly and yearly lots are the
     nominal vectors weighted by each live slot's payment factor before the sums, the lots the desk
     hedges to; for a cleared batch they are
     the nominal arrays themselves, by reference, since nothing discounts. payment_amount[g] is the
     group's offset, set amount and live amount together, npv_by_group[g] that amount times its
     payment factor, zero for a paid group, dv01_by_group[g] -0.0001 times the group's day count over
-    365 times its NPV, and payment_factor[g] the curve's factor on the group's payment day, 1.0 for
-    a paid group, the policy and no read; the four None for a cleared batch, which values no group.
+    365 times its NPV, and payment_factor[g] the factor of the group's own curve, the one its key
+    named, on the group's payment day, 1.0 for a paid group, the policy and no read; the four
+    None for a cleared batch, which values no group.
     mark for a bilateral batch is the NPV of the unpaid groups and dv01 their sensitivity summed,
     negative for an amount receivable.
 
@@ -93,12 +96,13 @@ class TradeResults:
     -0.0001 times its payment's time fraction, summed by reference, by observation day and,
     by reference, onto the contract months and years, the discounted lots' own axes, since
     the payment supplies the time and not the axis, in lot_unit per basis point, negative for
-    lots bought and paid for later, with its total and its early facts. One of each today,
-    the batch being valued on one curve; none for a cleared batch, whose lots nothing
-    discounts, the known zero and no buffer. The batch's dv01 and cross_gamma_total stay:
-    the batch's risk with every used curve shifted by one basis point together, the one
-    contribution's total today and the sum of the contributions' when a batch is valued on
-    several, explicitly not the sensitivity to one curve alone."""
+    lots bought and paid for later, with its total and its early facts. One of each per curve
+    the batch's keys selected, since named-curves-slice-3.md, in key order, each the share of
+    the groups on that curve, the vectors rows of arrays summed by curve at once; none for a
+    cleared batch, whose lots nothing discounts, the known zero and no buffer. The batch's
+    dv01 and cross_gamma_total are the contributions' totals summed: the batch's risk with
+    every used curve shifted by one basis point together, explicitly not the sensitivity to
+    one curve alone."""
 
     prepared: PreparedTrades
     market: Market
@@ -116,7 +120,7 @@ class TradeResults:
     lot_unit: str
     dv01: float
     reserves: Reserves
-    curve: DiscountCurve | None
+    curves: tuple[DiscountCurve, ...]
     discounted_lot_delta: NDArray[np.float64]
     discounted_lot_delta_total: float
     discounted_price_sensitivity: NDArray[np.float64]

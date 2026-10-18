@@ -29,7 +29,7 @@ from goosedove.excel.bridge import (
     TextRow,
     excel_function,
 )
-from goosedove.globals.discount_curve import DiscountCurve
+from goosedove.globals.discount_curve_set import DiscountCurveSet
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
@@ -131,17 +131,17 @@ def _EvaluateTrades(
         "The market handle over the history the trades were prepared against: the cell showing "
         "_CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
     ],
-    discount_curve: Annotated[
-        Handle[DiscountCurve] | None,
-        "The discount-curve handle for a bilateral batch: the cell showing _CreateDiscountCurve's "
-        "result, such as I13, or a name for it, starting on the valuation day and covering every "
-        "unpaid payment day; left out for a cleared batch.",
+    discount_curve_set: Annotated[
+        Handle[DiscountCurveSet] | None,
+        "The collection handle for a bilateral batch: the cell showing _CollectDiscountCurves's "
+        "result, such as I13, or a name for it, holding every curve the rows name by "
+        "discount_curve_key, each starting on the valuation day; left out for a cleared batch.",
     ] = None,
 ) -> Handle[TradeResults]:
     """Evaluates prepared trades against one market, live observations at their quotes and fixed
-    at their settles, a bilateral batch's payments discounted on the curve, into mark, cash, delta
+    at their settles, each bilateral payment discounted on its row's curve, into mark, cash, delta
     and DV01, and shows the results' handle, which the reports take."""
-    return trade_results(prepared, market, WorkCounter(), discount_curve)
+    return trade_results(prepared, market, WorkCounter(), discount_curve_set)
 
 
 @excel_function

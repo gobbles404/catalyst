@@ -126,6 +126,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "route",
         "settlement_method",
         "counterparty",
+        "discount_curve_key",
         "payment_time_lag",
         "payment_holiday_calendar",
     ]
@@ -141,6 +142,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
                     "bilateral",
                     "financial",
                     "ACME Trading",
+                    "SOFR",
                     "+2bd",
                     holidays,
                 ]
@@ -152,7 +154,8 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         Cells.from_rows([["date", "discount_factor"]]),
         Cells.from_rows([[serial(AS_OF), 1.0], [serial(np.datetime64("2028-12-31", "D")), 0.9]]),
     )
-    return {"template": template, "curve": curve}
+    curves = PATH["_CollectDiscountCurves"](curve)  # the collection of one, since slice 3
+    return {"template": template, "curve": curve, "curves": curves}
 
 
 @pytest.mark.parametrize(("rows", "contracts"), SIZES, ids=IDS)
@@ -289,7 +292,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
     )
 
     def tick() -> object:
-        return PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+        return PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curves"])
 
     assert str(tick()).split(":")[1:3] == ["trade_results", "gas"]
     # The curve the third handle resolved; the kernel's bilateral path, the rules and the discounted
@@ -302,7 +305,8 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "_resolve": 3,
         "_EvaluateTrades": 1,
         "trade_results": 1,
-        "_the_curve": 1,
+        "_the_curves": 1,  # the rules and the key bound, since named-curves-slice-3.md
+        "_each_period_finite": 2,  # each curve's DV01 views and cross-gamma views finite
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,
         "DiscountCurve.max_date": 1,
@@ -314,7 +318,7 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "early_risk": 3,  # since #186, and the cross-gamma's since #197
         "early_fact": 6,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 6,
+        "WorkCounter.hit": 8,
         "_publish": 1,
     }
 
@@ -330,7 +334,7 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2), sheet["history"])
     cleared = PATH["_EvaluateTrades"](prepared, sheet["market"], bridge.MISSING)
     prepared = PATH["_PrepareTrades"](a_batch(sheet, 5, 2, bilateral["template"]), sheet["history"])
-    discounted = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+    discounted = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curves"])
     live = bridge.live_handles()
 
     def selected(on_curve: bool, risk: str, bucket: str) -> dict[str, int]:
@@ -398,7 +402,9 @@ def test_the_risk_report_resolves_one_handle_selects_a_view_and_lays_it_out(
 # cleared tick's 1,490, the curve's handle, the groups' amounts, factors, NPVs and DV01s, the
 # discounted lots by reference, day, month and year and, since #178, the DV01 by payment day,
 # month and year, 5,093 before them, and 8,257 on 2026-10-17 since #197, the cross-gamma's
-# weight by group, its vector by slot and its four saved views, within nine slacks; the risk
+# weight by group, its vector by slot and its four saved views, and 9,249 on 2026-10-18 since
+# named-curves-slice-3.md, the DV01 totals by curve and the keyed payments' records, within
+# ten slacks; the risk
 # report of all three by day 6,263 bytes, 48 rows under the Total, the 24 observation days and
 # the 24 payment days in four columns, the three vectors placed on the union, against the
 # cleared batch's 3,591, within seven slacks, and 7,313 for all four since #197, the
@@ -410,10 +416,10 @@ def test_the_bilateral_path_allocates_by_group_and_slot_and_never_by_trade(
         a_batch(sheet, 2_500, 24, bilateral["template"]), sheet["history"]
     )
     assert (
-        least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"]))
-        <= 9 * SLACK
+        least_peak(lambda: PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curves"]))
+        <= 10 * SLACK
     )
-    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"])
+    results = PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curves"])
     assert least_peak(lambda: PATH["_ReportRisk"](results, "all", "day")) <= 8 * SLACK
 
 
@@ -428,7 +434,7 @@ def n_results(
         a_batch(sheet, rows, contracts, bilateral["template"]), sheet["history"]
     )
     return [
-        str(PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curve"]))
+        str(PATH["_EvaluateTrades"](prepared, sheet["market"], bilateral["curves"]))
         for _ in range(n)
     ]
 

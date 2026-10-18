@@ -48,6 +48,7 @@ def test_the_same_functions_and_numpy_calls_at_any_length(
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 1,
         "discount_curve": 1,
+        "curve_name": 1,  # the name rule, shared with the key since slice 3
         "interpolate_discount_factors": 1,
     }
     assert numpy_calls(lambda: bump_discount_curve(curve, 1.0, WorkCounter())) == {

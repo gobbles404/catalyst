@@ -39,6 +39,7 @@ from test_trade_budgets import (
 )
 
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
+from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
@@ -66,10 +67,13 @@ LATE = (
 )
 
 
-def curve_on(as_of: str) -> DiscountCurve:
+KEYS = ("SOFR", "FFOIS", "SONIA", "ESTR")  # the names a batch's rows key, in key order
+
+
+def curve_on(as_of: str, name: str = "SOFR") -> DiscountCurve:
     """A curve anchored on the valuation day, 1 there and 0.9 at the end of 2028."""
     return discount_curve(
-        "SOFR", np.array([as_of, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9])
+        name, np.array([as_of, "2028-12-31"], dtype="datetime64[D]"), np.array([1.0, 0.9])
     )
 
 
@@ -111,9 +115,14 @@ IDS = [
 ]
 
 
-def bilateral_terms(components: int, contracts: int, method: ScheduleMethod) -> ResolvedTrades:
-    """test_trade_budgets' terms made bilateral: the route and a counterparty; under asian that
-    module's asian index and its payment days, as its own asian_terms."""
+def bilateral_terms(
+    components: int, contracts: int, method: ScheduleMethod, keys: int = 1
+) -> ResolvedTrades:
+    """test_trade_budgets' terms made bilateral: the route, a counterparty and, since
+    named-curves-slice-3.md, each row's discount_curve_key, the first of KEYS alone or that many
+    of them round robin, so that with two or four over twenty-four contracts each contract's
+    rows name one key and the groups stand as at one curve; under asian that module's asian index
+    and its payment days, as its own asian_terms."""
     rows = 1 + np.arange(components, dtype=np.intp) % contracts
     asian = method is ScheduleMethod.ASIAN
     return resolved_trades(
@@ -130,19 +139,31 @@ def bilateral_terms(components: int, contracts: int, method: ScheduleMethod) -> 
             (ASIAN_PAYS if asian else PAYS)[rows],
         ),
         counterparty=("ACME Trading",) * components,
+        discount_curve_key=tuple(KEYS[i % keys] for i in range(components)),
     )  # fmt: skip
 
 
 def a_bilateral_batch(
-    components: int, contracts: int, method: ScheduleMethod, as_of: str
+    components: int, contracts: int, method: ScheduleMethod, as_of: str, keys: int = 1
 ) -> PreparedTrades:
-    terms = bilateral_terms(components, contracts, method)
+    terms = bilateral_terms(components, contracts, method, keys)
     enc = encoded(terms, observed_of(terms), UNITS, WorkCounter())
     return prepared_trades(enc, a_history(as_of=as_of, ix=terms.index), WorkCounter())
 
 
-def tick(prep: PreparedTrades, market: Market, curve: DiscountCurve) -> TradeResults:
-    return trade_results(prep, market, WorkCounter(), curve)
+def curve_set(*curves: DiscountCurve) -> DiscountCurveSet:
+    """A collection of the curves, the form the evaluation takes since named-curves-slice-3.md."""
+    return collect_discount_curves(curves, WorkCounter())
+
+
+def set_on(as_of: str, curves: int = 1) -> DiscountCurveSet:
+    """The collection of that many curves anchored on the valuation day, named for the first
+    KEYS, made before a ledger looks."""
+    return curve_set(*[curve_on(as_of, name) for name in KEYS[:curves]])
+
+
+def tick(prep: PreparedTrades, market: Market, curves: DiscountCurveSet) -> TradeResults:
+    return trade_results(prep, market, WorkCounter(), curves)
 
 
 def mapped(prep: PreparedTrades) -> UnpaidPayments:
@@ -206,19 +227,21 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     # fixture's own dates; every array frozen and retained, eight bytes a day and twenty-four a
     # group.
     pays = mapped(prep)
+    (keyed,) = pays.by_key  # one key: the unpaid groups themselves, by reference, since slice 3
+    assert keyed.groups is pays.groups
     unsettled = np.flatnonzero(~prep.is_settled)
     assert unsettled.size == unpaid
     np.testing.assert_array_equal(pays.groups, unsettled)
     payment_date = enc.payment_date
     assert payment_date is not None
-    np.testing.assert_array_equal(pays.days, np.sort(payment_date[unsettled]))
-    np.testing.assert_array_equal(pays.days[pays.day_of_group], payment_date[unsettled])
+    np.testing.assert_array_equal(keyed.days, np.sort(payment_date[unsettled]))
+    np.testing.assert_array_equal(keyed.days[keyed.day_of_group], payment_date[unsettled])
     np.testing.assert_array_equal(
         pays.tau, (payment_date[unsettled] - np.datetime64(as_of)).astype(np.int64) / 365.0
     )
-    arrays = (pays.days, pays.groups, pays.day_of_group, pays.tau)
+    arrays = (keyed.days, pays.groups, keyed.day_of_group, pays.tau)
     assert all(not array.flags.writeable for array in arrays)
-    assert sum(array.nbytes for array in arrays) == 8 * (pays.days.size + 3 * unpaid)
+    assert sum(array.nbytes for array in arrays) == 8 * (keyed.days.size + 3 * unpaid)
     # The one helper beside the cleared preparation's functions, the unique's numpy over the
     # cleared ledger, and the peak within 192 bytes an unpaid group and two slacks of the cleared
     # preparation's, the unique's own arrays the slack when no group is unpaid.
@@ -267,8 +290,9 @@ def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     counter = WorkCounter()
-    trade_results(prep, a_market(prep.history), counter, curve_on(as_of))
+    trade_results(prep, a_market(prep.history), counter, set_on(as_of))
     assert counter.freeze().as_dict() == {
+        "curves_selected": 1,  # the one key bound, since named-curves-slice-3.md
         "groups_valued": unpaid,
         "kernel": 1,
         "live_prices_read": prep.live_references.size,  # one quote a live contract
@@ -276,8 +300,9 @@ def test_a_bilateral_tick_reports_its_factors_groups_slots_and_reductions(
         # The lots onto the references, the days, the months and the years; the DV01s onto the
         # payment days, their months and their years; since #197 the cross-gammas onto the
         # references, the days, the months and the years.
-        "risk_reductions": 11,
+        "risk_reductions": 12,  # and since slice 3 the DV01 totals by curve, over the groups
         "slots_discounted": slots_of(method, contracts),  # every slot, a fixed one by nothing
+        "slots_weighted": slots_of(method, contracts),  # the cross-gamma's product, once
     }
 
 
@@ -296,10 +321,10 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
     quoted = a_market(prep.history)  # made before the ledger looks, as the market is on a sheet
-    curve = curve_on(as_of)
-    assert call_profile(lambda: tick(prep, quoted, curve)) == {
+    curves = set_on(as_of)  # made before the ledger looks, as a collection is on a sheet
+    assert call_profile(lambda: tick(prep, quoted, curves)) == {
         "trade_results": 1,
-        "_the_curve": 1,  # the four rules, before any quote is read
+        "_the_curves": 1,  # the rules and the keys bound, before any quote is read
         "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,  # the rule's look and the factors' positions
         "DiscountCurve.max_date": 1,  # the coverage rule
@@ -308,10 +333,11 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
         "factors_on": 1,  # the factors by position, shared since #200
         "discounted": 1,  # the values and the DV01s, shared since #200
         "_cross_gamma": 1,  # since #197, after every rule of the discounted path
+        "_each_period_finite": 2,  # each curve's DV01 views and cross-gamma views, since slice 3
         "early_risk": 3,  # the discounted lots, the DV01 and the cross-gamma before the start
         "early_fact": 6,
         "WorkCounter.__init__": 1,
-        "WorkCounter.hit": 6,
+        "WorkCounter.hit": 8,
     }
     # No sort, no unique, no count: the days are the preparation's. The positions of the unpaid
     # days on the curve, the one conversion; the error state set once for the discounting and,
@@ -323,18 +349,21 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     # views finite, with the market's own; the bincounts' reductions among the rest; and the new
     # arrays frozen, seventeen of them. The same with no slot live: the sums are over every slot
     # and never over none.
-    assert numpy_calls(lambda: tick(prep, quoted, curve)) == {
-        "ndarray.any": 16,  # since #190 the live contributions finite before the groups sum them
+    assert numpy_calls(lambda: tick(prep, quoted, curves)) == {
+        "ndarray.any": 17,  # since #190 the live contributions finite before the groups sum
+        # them; since slice 3 each curve's cross-gamma total looked at
         "ndarray.astype": 1,
         "ndarray.nonzero": 6,  # the lots, the DV01 and the cross-gamma before the start
         "ndarray.ravel": 6,
-        "ndarray.setflags": 17,
-        "ndarray.sum": 4,  # the global live sum is the cleared route's alone since #190
+        "ndarray.reshape": 1,  # the cross-gamma by reference as a row per curve, since slice 3
+        "ndarray.setflags": 19,  # since slice 3 the DV01 and cross-gamma totals by curve too
+        "ndarray.sum": 5,  # the global live sum is the cleared route's alone since #190; since
+        # slice 3 the cross-gamma totals by curve and their sum
         "numpy._make_extobj": 3,  # the contributions' flags, the discounting's, the cross-gamma's
         "numpy.asanyarray": 6,  # the six looks' views
         "numpy.empty": 1,
         "numpy.zeros": 3,
-        "ufunc.reduce": 20,
+        "ufunc.reduce": 22,
     }
 
 
@@ -369,8 +398,8 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     assert axes is not None
     paid = axes.days.size + axes.months.size + axes.years.size
     quoted = a_market(prep.history)
-    curve = curve_on(as_of)
-    assert least_peak(lambda: tick(prep, quoted, curve)) <= (
+    curves = set_on(as_of)
+    assert least_peak(lambda: tick(prep, quoted, curves)) <= (
         128 * groups
         + 32 * slots
         + 32 * live
@@ -378,7 +407,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
         + KEYWORD_CALL
         + 5 * SLACK
     )
-    result = tick(prep, quoted, curve)
+    result = tick(prep, quoted, curves)
     new: tuple[NDArray[np.float64] | None, ...] = (
         result.discounted_lot_delta,
         result.discounted_price_sensitivity,
@@ -475,7 +504,7 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
     unpaid: int,
 ) -> None:
     prep = a_bilateral_batch(components, contracts, method, as_of)
-    result = tick(prep, a_market(prep.history), curve_on(as_of))
+    result = tick(prep, a_market(prep.history), set_on(as_of))
     for risk in (Risk.NOMINAL_DELTA, Risk.DELTA, Risk.DV01, Risk.CROSS_GAMMA):
         # By day, by reference: no numpy call at all and nothing allocated beyond the record. By
         # month and by year, since #186, one zeros over the display axis filled through the saved
@@ -523,3 +552,115 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
         assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
             32 * view.dates.size + 2 * SLACK
         )
+
+
+# --- several curves, since named-curves-slice-3.md -----------------------------------------------
+# The two live batches with their rows keyed over two and over four curves, each contract's rows
+# under one key: the groups, the factors and the slots as at one curve, one curve bound per key,
+# twelve reductions whatever the number of curves, the slots multiplied once for the lots and once
+# for the cross-gamma and never once per curve, the same functions called once with the per-curve
+# rules once per curve, and the retained vectors growing by one curve's seven rows per curve.
+
+LIVE_CASES = [CASES[1], CASES[3]]
+# What a curve adds beyond its seven rows of arrays: the seven views' headers, the two records and
+# their facts, 1,128 bytes measured on the lastday batch, the same at two curves and at four.
+CURVE_RECORDS = 1_200
+LIVE_IDS = [IDS[1], IDS[3]]
+
+
+@pytest.mark.parametrize("curves", [1, 2, 4], ids=["one curve", "two curves", "four curves"])
+@pytest.mark.parametrize(
+    ("method", "components", "contracts", "as_of", "live", "unpaid"), LIVE_CASES, ids=LIVE_IDS
+)
+def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slots(
+    call_profile: CallProfile,
+    method: ScheduleMethod,
+    components: int,
+    contracts: int,
+    as_of: str,
+    live: int,
+    unpaid: int,
+    curves: int,
+) -> None:
+    prep = a_bilateral_batch(components, contracts, method, as_of, keys=curves)
+    encoding = prep.encoded
+    pays = prep.unpaid_payments
+    assert pays is not None and len(pays.by_key) == curves
+    assert encoding.keys == KEYS[:curves]
+    assert pays.groups.size == unpaid  # each contract under one key: the groups as at one curve
+    assert sum(keyed.days.size for keyed in pays.by_key) == unpaid
+    slots = encoding.slot_group.size
+    assert slots == slots_of(method, contracts)
+    quoted = a_market(prep.history)
+    collection = set_on(as_of, curves)
+    counter = WorkCounter()
+    trade_results(prep, quoted, counter, collection)
+    assert counter.freeze().as_dict() == {
+        "curves_selected": curves,
+        "groups_valued": unpaid,
+        "kernel": 1,
+        "live_prices_read": prep.live_references.size,
+        "payment_factors_read": unpaid,  # each key's days, one factor a day, the days split
+        "risk_reductions": 12,
+        "slots_discounted": slots,  # every slot once, whatever the number of curves
+        "slots_weighted": slots,
+    }
+    assert call_profile(lambda: tick(prep, quoted, collection)) == {
+        "trade_results": 1,
+        "_the_curves": 1,
+        "curve_starts_on": curves,  # the per-curve rules, once per curve selected
+        "DiscountCurve.start_date": 2 * curves,
+        "DiscountCurve.max_date": curves,
+        "Market.live_prices": 1,
+        "_discounted": 1,
+        "factors_on": curves,  # one read per curve over its own days
+        "discounted": 1,  # the values and the DV01s of every group at once
+        "_cross_gamma": 1,
+        "_each_period_finite": 2,
+        "early_risk": 1 + 2 * curves,  # the delta's, then each curve's DV01 and cross-gamma
+        "early_fact": 2 + 4 * curves,
+        "WorkCounter.__init__": 1,
+        "WorkCounter.hit": 8,
+    }
+    result = tick(prep, quoted, collection)
+    assert len(result.rate_contributions) == len(result.cross_contributions) == curves
+    assert tuple(c.curve.name for c in result.rate_contributions) == KEYS[:curves]
+    refs = encoding.references.size
+    buckets = encoding.days.size + encoding.contract_months.size + encoding.contract_years.size
+    axes = encoding.payment_axes
+    assert axes is not None
+    paid = axes.days.size + axes.months.size + axes.years.size
+    groups = encoding.group_contract.size
+    new: list[NDArray[np.float64] | None] = [
+        result.discounted_lot_delta,
+        result.discounted_price_sensitivity,
+        result.discounted_daily_lots,
+        result.discounted_monthly_lots,
+        result.discounted_yearly_lots,
+        result.payment_amount,
+        result.npv_by_group,
+        result.dv01_by_group,
+        result.payment_factor,
+    ]
+    for rate in result.rate_contributions:
+        new += [rate.dv01_by_day, rate.dv01_by_month, rate.dv01_by_year]
+    for cross in result.cross_contributions:
+        new += [
+            cross.cross_gamma,
+            cross.cross_gamma_by_day,
+            cross.cross_gamma_by_month,
+            cross.cross_gamma_by_year,
+        ]
+    retained = sum(0 if array is None else array.nbytes for array in new)
+    assert retained == 8 * (3 * refs + 2 * buckets + paid + 4 * groups) + 8 * (curves - 1) * (
+        refs + buckets + paid
+    )
+    assert least_peak(lambda: tick(prep, quoted, collection)) <= (
+        128 * groups
+        + 32 * slots
+        + 32 * live
+        + 8 * (refs + 2 * buckets + paid)
+        + (curves - 1) * (8 * (refs + buckets + paid) + CURVE_RECORDS)
+        + KEYWORD_CALL
+        + 5 * SLACK
+    )

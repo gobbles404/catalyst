@@ -2217,10 +2217,11 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
             "route",
             "settlement_method",
             "counterparty",
+            "discount_curve_key",
         ),
         cells(
-            [46289.0, "Z26", 1.0, 3.0, "bilateral", "physical", "ACME Trading"],
-            [46289.0, "F27", 2.0, 3.0, "bilateral", "physical", "Beta Energy"],
+            [46289.0, "Z26", 1.0, 3.0, "bilateral", "physical", "ACME Trading", "SOFR"],
+            [46289.0, "F27", 2.0, 3.0, "bilateral", "physical", "Beta Energy", "SOFR"],
         ),
         template,
     )
@@ -2231,7 +2232,9 @@ def test_the_spill_shows_the_batchs_facts_wherever_they_came_from(sheet: dict[st
     assert [line[5] for line in table[2:]] == ["physical", "physical"]
     assert table[0][6] == "counterparty"
     assert [line[6] for line in table[2:]] == ["ACME Trading", "Beta Energy"]  # each row its own
-    assert [line[8] for line in table[2:]] == ["NYMEX NG", "NYMEX NG"]  # the unit, the template's
+    assert table[0][7] == "discount_curve_key"  # since named-curves-slice-3.md, after it
+    assert [line[7] for line in table[2:]] == ["SOFR", "SOFR"]
+    assert [line[9] for line in table[2:]] == ["NYMEX NG", "NYMEX NG"]  # the unit, the template's
 
 
 def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any]) -> None:

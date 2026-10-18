@@ -10,7 +10,7 @@ the same history beside them."""
 
 import numpy as np
 import pytest
-from test_bilateral_budgets import CASES, IDS, bilateral_terms, curve_on, tick
+from test_bilateral_budgets import CASES, IDS, bilateral_terms, curve_set, set_on, tick
 from test_cashflow_budgets import AS_OF as CASHFLOW_AS_OF
 from test_cashflow_budgets import a_batch as a_cashflow_batch
 from test_cashflow_budgets import a_curve as a_cashflow_curve
@@ -41,11 +41,11 @@ def valued_sources(
     terms = bilateral_terms(components, contracts, method)
     history = a_history(as_of=as_of, ix=terms.index)
     market = a_market(history)
-    curve = curve_on(as_of)
+    curves = set_on(as_of)
     prep = prepared_trades(
         encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
     )
-    pair = [tick(prep, market, curve), tick(prep, market, curve)]
+    pair = [tick(prep, market, curves), tick(prep, market, curves)]
     return (pair * (count // 2 + 1))[:count]
 
 
@@ -406,7 +406,7 @@ def test_a_cleared_source_beside_a_bilateral_one_adds_its_entries_and_no_rate_gr
             encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
         ),
         market,
-        curve_on(as_of),
+        set_on(as_of),
     )
     cleared = trade_results(
         prepared_trades(a_batch(components, contracts), history, WorkCounter()),
@@ -468,7 +468,7 @@ def test_a_cashflow_source_adds_its_payment_entries_to_its_curves_group_and_noth
             encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
         ),
         market,
-        curve,
+        curve_set(curve),
     )
     cashflows = cashflow_results(
         a_cashflow_batch(2_000, 20), valuation_date(CASHFLOW_AS_OF, 0.5), curve, WorkCounter()

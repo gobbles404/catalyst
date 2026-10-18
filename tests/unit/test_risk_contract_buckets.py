@@ -83,6 +83,8 @@ def a_template(
         del fields[k], values[k]
         fields.insert(4, "counterparty")
         values.insert(4, counterparty)
+        fields.insert(5, "discount_curve_key")  # and names its curve, since slice 3
+        values.insert(5, "SOFR")
     return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
 
 
@@ -97,7 +99,8 @@ def booked(
 def valued_on(trades: str, history: str, market: str, curve: object = bridge.MISSING) -> str:
     """The batch prepared against that history and valued on that market, the objects shared by
     every batch that is to collect with it."""
-    results = ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market, curve)
+    curves = curve if curve is bridge.MISSING else ENTRY["_CollectDiscountCurves"](curve)
+    results = ENTRY["_EvaluateTrades"](ENTRY["_PrepareTrades"](trades, history), market, curves)
     assert not str(results).startswith("#ERROR"), results
     return str(results)
 

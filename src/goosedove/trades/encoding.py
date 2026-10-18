@@ -17,7 +17,7 @@ Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
 from dataclasses import dataclass
-from typing import assert_never
+from typing import Any, assert_never
 
 import numpy as np
 from numpy.typing import NDArray
@@ -68,6 +68,30 @@ class PaymentAxes:
 
 
 @dataclass(frozen=True, slots=True)
+class CurveAxes:
+    """The places the by-curve risk arrays are summed into, since named-curves-slice-3.md, for a
+    bilateral batch and for no other, static for the batch: every curve's seven vectors stand in
+    one array per axis, a row per curve of the batch's keys in key order, so that one reduction
+    over the groups or the slots writes every curve's row at once with the group's curve beside
+    the axis in its key. slot_reference[s] and slot_day[s], each slot's place by its group's
+    curve among the references and the observation days; group_payment_day[g], each group's
+    place by its curve among the payment days; payment_month_of_day and payment_year_of_month,
+    the place of each row's payment day among the months and of each row's month among the
+    years, the rows flattened; contract_month_of_reference and contract_year_of_month, the same
+    for the delta's axes. A batch on one key holds the encoding's own places by reference,
+    nothing made; curves is the number of keys."""
+
+    curves: int
+    slot_reference: NDArray[np.intp]
+    slot_day: NDArray[np.intp]
+    group_payment_day: NDArray[np.intp]
+    payment_month_of_day: NDArray[np.intp]
+    payment_year_of_month: NDArray[np.intp]
+    contract_month_of_reference: NDArray[np.intp]
+    contract_year_of_month: NDArray[np.intp]
+
+
+@dataclass(frozen=True, slots=True)
 class Encoded:
     """The terms and the observations, by reference, and the arrays derived from them once, all
     read-only.
@@ -82,11 +106,16 @@ class Encoded:
     fixed price, so that the coefficient times the contract's price plus the offset is the
     component's entry-to-price P&L.
 
-    Per payment group, the components of one contract that pay on one day: group_contract[g], the
+    Per payment group, the components of one contract that pay on one day and, since
+    named-curves-slice-3.md, under one discount_curve_key: group_contract[g], the
     schedule row of the g-th group's contract, the contract its components were booked on, which
-    owns their fixed leg and their payment, the groups in the schedule's order and, within a
-    contract, by the day they pay, so that a contract whose components pay on two days is two
-    groups and a contract under a physical settlement, which pays on no day, one;
+    owns their fixed leg and their payment, the groups in the schedule's order, within a
+    contract by the day they pay and within a day by their key, the keys in the order the rows
+    first name them, so that a contract whose components pay on two days is two groups, two
+    components paying on one day under two keys two groups never netted before discounting, and
+    a contract under a physical settlement, which pays on no day, one; keys, the batch's distinct
+    keys in that order, and key_of_group[g] each group's place among them, None with no key, a
+    cleared batch's;
     group_of_component[k]; offset_of_group[g], the components' offsets summed; payment_date[g],
     the day the group pays, an array for a financial settlement and None for a physical one.
 
@@ -128,7 +157,9 @@ class Encoded:
     Then, since #178, payment_axes, the payment-time axes a DV01 report is summed onto and the
     union of their days with the observation days, PaymentAxes, made once here for a bilateral
     batch and None for a cleared or a physical one; the month and year displays are the
-    preparation's since #186."""
+    preparation's since #186. And curve_axes, since named-curves-slice-3.md, the places the
+    by-curve risk arrays are summed into, CurveAxes, for a bilateral batch and None for the
+    rest."""
 
     terms: ResolvedTrades
     observations: Observations
@@ -155,6 +186,9 @@ class Encoded:
     contract_year_of_month: NDArray[np.intp]
     reserves: Reserves
     payment_axes: PaymentAxes | None
+    keys: tuple[str, ...]
+    key_of_group: NDArray[np.intp] | None
+    curve_axes: CurveAxes | None
 
     def slot_trade(self, slot: int) -> str:
         """The words for a slot's first trade, as ResolvedTrades.named gives them: `trade
@@ -192,8 +226,10 @@ def encoded(
     dollars; every price the batch meets, a quote, a settle or the fixed price, multiplies the
     coefficient and never the quantity. The offset: minus the coefficient times the fixed price.
     The groups: under a financial settlement the distinct pairs of contract and payment day among
-    the components, the components sorted by contract and then by day, one lexsort, which puts
-    the groups in the schedule's order and a contract's groups by the day they pay, and each
+    the components, and since named-curves-slice-3.md the distinct triples with the row's
+    discount_curve_key where the batch has keys, the components sorted by contract, then by day,
+    then by key, one lexsort, which puts the groups in the schedule's order, a contract's groups by
+    the day they pay and a day's by the key in the order the rows first name the keys, and each
     component's place among them; under a physical settlement, which pays on no day, the distinct
     contracts, one unique. The offsets summed by group, one bincount, so that two occurrences on
     one contract paying on one day are one group with their offsets added, a duplicate occurrence
@@ -318,7 +354,7 @@ def encoded(
                 f"{terms.named(k)} has {float(values[k])!r} of {what}, expected a finite {unit}; "
                 f"{why}"
             )
-    group_contract, payment_date, group_of_component = _the_groups(terms)
+    group_contract, payment_date, group_of_component, keys, key_of_group = _the_groups(terms)
     with np.errstate(over="ignore", invalid="ignore"):
         offset_of_group = np.bincount(
             group_of_component, weights=offset, minlength=group_contract.size
@@ -326,7 +362,9 @@ def encoded(
     outrun = ~np.isfinite(offset_of_group)
     if outrun.any():
         g = int(outrun.argmax())
-        group = group_words(terms.schedule.codes, group_contract, payment_date, g)
+        group = group_words(
+            terms.schedule.codes, group_contract, payment_date, g, keys, key_of_group
+        )
         raise ValueError(
             f"the fixed leg of {group} is {float(offset_of_group[g])!r}, expected a finite amount "
             f"of {currency}; its components' fixed legs, each finite, sum past the largest number"
@@ -363,9 +401,31 @@ def encoded(
         if terms.route is Route.BILATERAL and payment_date is not None
         else None
     )
+    # Since named-curves-slice-3.md the places every curve's risk is summed into at once, made
+    # here for a bilateral batch; a batch on one key holds the places above by reference.
+    curve_axes = (
+        _the_curve_axes(
+            len(keys),
+            key_of_group,
+            slot_group,
+            reference_of_slot,
+            days[1],
+            references.size,
+            days[0].size,
+            payment_axes,
+            periods[1],
+            periods[3],
+            periods[0].size,
+            periods[2].size,
+        )
+        if payment_axes is not None and key_of_group is not None
+        else None
+    )
     if payment_date is not None:
         _payments_after_observations(terms, group_contract, payment_date, slot_group, slot_date)
         payment_date.setflags(write=False)
+    if key_of_group is not None:
+        key_of_group.setflags(write=False)
     counter.hit(ENCODED_COMPONENTS, int(terms.contract.size))
     counter.hit(ENCODED_GROUPS, int(group_contract.size))
     counter.hit(ENCODED_OBSERVATIONS, int(observations.component.size))
@@ -391,7 +451,16 @@ def encoded(
     for array in arrays:
         array.setflags(write=False)
     return Encoded(
-        terms, observations, *arrays[:6], payment_date, *arrays[6:], reserved, payment_axes
+        terms,
+        observations,
+        *arrays[:6],
+        payment_date,
+        *arrays[6:],
+        reserved,
+        payment_axes,
+        keys,
+        key_of_group,
+        curve_axes,
     )
 
 
@@ -400,44 +469,118 @@ def group_words(
     group_contract: NDArray[np.intp],
     payment_date: NDArray[np.datetime64] | None,
     g: int,
+    keys: tuple[str, ...] = (),
+    key_of_group: NDArray[np.intp] | None = None,
 ) -> str:
     """A payment group named in a message, since #190: its contract and, under a financial
-    settlement, the day it pays, `F27 paying on 2027-01-04`; a physical group its contract alone,
-    since it pays on no day. A sum over a group is blamed on the group, never on one of its
-    trades."""
+    settlement, the day it pays, `F27 paying on 2027-01-04`, and since named-curves-slice-3.md
+    its key where the batch has keys, `F27 paying on 2027-01-04 on SOFR`; a physical group its
+    contract alone, since it pays on no day. A sum over a group is blamed on the group, never on
+    one of its trades."""
     code = codes[int(group_contract[g])]
-    return code if payment_date is None else f"{code} paying on {payment_date[g]}"
+    words = code if payment_date is None else f"{code} paying on {payment_date[g]}"
+    if key_of_group is None:
+        return words
+    return f"{words} on {keys[int(key_of_group[g])]}"
 
 
 def _the_groups(
     terms: ResolvedTrades,
-) -> tuple[NDArray[np.intp], NDArray[np.datetime64] | None, NDArray[np.intp]]:
+) -> tuple[
+    NDArray[np.intp],
+    NDArray[np.datetime64] | None,
+    NDArray[np.intp],
+    tuple[str, ...],
+    NDArray[np.intp] | None,
+]:
     """The payment groups: under a financial settlement the distinct pairs of contract and payment
-    day among the components, in the schedule's order and by day within a contract; under a
-    physical settlement, which pays on no day, the distinct contracts. Each group's contract, its
-    payment day or None, and each component's group."""
+    day among the components, in the schedule's order and by day within a contract, and since
+    named-curves-slice-3.md the distinct triples with the row's key where the batch has keys, by
+    key within a day, the keys in the order the rows first name them; under a physical settlement,
+    which pays on no day, the distinct contracts. Each group's contract, its payment day or None,
+    each component's group, the batch's distinct keys and each group's key, the keys empty and
+    the key of each group None where the batch has none."""
     contract = terms.contract
     if terms.payment is None:
         group_contract, group_of_component = np.unique(contract, return_inverse=True)
-        return group_contract, None, group_of_component
-    group_of_component, heads = _distinct(contract, terms.payment.date.astype(np.int64))
-    return contract[heads], terms.payment.date[heads], group_of_component
+        return group_contract, None, group_of_component, (), None
+    day = terms.payment.date.astype(np.int64)
+    if terms.discount_curve_key is None:
+        group_of_component, heads = _distinct(contract, day)
+        return contract[heads], terms.payment.date[heads], group_of_component, (), None
+    keys = tuple(dict.fromkeys(terms.discount_curve_key))  # distinct, by first appearance
+    place = {key: i for i, key in enumerate(keys)}
+    key_of_occurrence = np.array([place[key] for key in terms.discount_curve_key], dtype=np.intp)
+    key_of_component = key_of_occurrence[terms.occurrence]
+    group_of_component, heads = _distinct(contract, day, key_of_component)
+    return (
+        contract[heads],
+        terms.payment.date[heads],
+        group_of_component,
+        keys,
+        key_of_component[heads],
+    )
 
 
-def _distinct(
-    major: NDArray[np.intp], minor: NDArray[np.int64]
-) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
-    """The distinct pairs of major and minor among the items, in order of major and then minor:
-    each item's pair, counted from zero in that order, and the first item of each pair, in pair
-    order, one lexsort over the items."""
-    order = np.lexsort((minor, major))
-    sorted_major, sorted_minor = major[order], minor[order]
+def _distinct(*keys: NDArray[Any]) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """The distinct tuples of the keys among the items, in order of the first key, then the second
+    and so on: each item's tuple, counted from zero in that order, and the first item of each
+    tuple, in tuple order, one lexsort over the items."""
+    order = np.lexsort(keys[::-1])
+    sorted_keys = [key[order] for key in keys]
     first = np.ones(order.size, dtype=np.bool_)
-    first[1:] = (sorted_major[1:] != sorted_major[:-1]) | (sorted_minor[1:] != sorted_minor[:-1])
-    pair_of_sorted = np.cumsum(first) - 1
-    pair_of_item = np.empty(order.size, dtype=np.intp)
-    pair_of_item[order] = pair_of_sorted
-    return pair_of_item, order[first]
+    first[1:] = sorted_keys[0][1:] != sorted_keys[0][:-1]
+    for sorted_key in sorted_keys[1:]:
+        first[1:] |= sorted_key[1:] != sorted_key[:-1]
+    tuple_of_sorted = np.cumsum(first) - 1
+    tuple_of_item = np.empty(order.size, dtype=np.intp)
+    tuple_of_item[order] = tuple_of_sorted
+    return tuple_of_item, order[first]
+
+
+def _the_curve_axes(
+    curves: int,
+    key_of_group: NDArray[np.intp],
+    slot_group: NDArray[np.intp],
+    reference_of_slot: NDArray[np.intp],
+    day_of_slot: NDArray[np.intp],
+    references: int,
+    days: int,
+    payment_axes: PaymentAxes,
+    contract_month_of_reference: NDArray[np.intp],
+    contract_year_of_month: NDArray[np.intp],
+    contract_months: int,
+    contract_years: int,
+) -> CurveAxes:
+    """The places every curve's risk is summed into at once, since named-curves-slice-3.md: each
+    slot's and each group's place offset by its curve's row, and each row's places among the
+    months and the years, the rows flattened; a batch on one key holds the encoding's own places
+    by reference and makes nothing, its ledger standing."""
+    if curves == 1:
+        return CurveAxes(
+            1,
+            reference_of_slot,
+            day_of_slot,
+            payment_axes.day_of_group,
+            payment_axes.month_of_day,
+            payment_axes.year_of_month,
+            contract_month_of_reference,
+            contract_year_of_month,
+        )
+    key_of_slot = key_of_group[slot_group]
+    rows = np.arange(curves, dtype=np.intp)[:, None]
+    arrays = (
+        key_of_slot * references + reference_of_slot,
+        key_of_slot * days + day_of_slot,
+        key_of_group * payment_axes.days.size + payment_axes.day_of_group,
+        (rows * payment_axes.months.size + payment_axes.month_of_day).ravel(),
+        (rows * payment_axes.years.size + payment_axes.year_of_month).ravel(),
+        (rows * contract_months + contract_month_of_reference).ravel(),
+        (rows * contract_years + contract_year_of_month).ravel(),
+    )
+    for array in arrays:
+        array.setflags(write=False)
+    return CurveAxes(curves, *arrays)
 
 
 def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:

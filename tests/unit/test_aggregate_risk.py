@@ -21,6 +21,7 @@ from test_bilateral_kernel import (
     TWO_YEARS,
     cross,
     curve_of,
+    curve_set,
     rate,
     terms_of,
 )
@@ -99,13 +100,21 @@ def valued_on(
     prep = prepared_trades(
         encoded(terms, observed_of(terms), UNITS, WorkCounter()), history, WorkCounter()
     )
-    return trade_results(prep, quoted_on, WorkCounter(), curve)
+    return trade_results(
+        prep, quoted_on, WorkCounter(), None if curve is None else curve_set(curve)
+    )
 
 
 def hng(
-    quantities: tuple[float, ...], pays: tuple[str, ...], route: Route, fixed: float = 70.0
+    quantities: tuple[float, ...],
+    pays: tuple[str, ...],
+    route: Route,
+    fixed: float = 70.0,
+    key: str = "SOFR",
 ) -> ResolvedTrades:
-    return terms_of(quantities, pays, (261,) * len(quantities), route=route, fixed=fixed, ix=HNG)
+    return terms_of(
+        quantities, pays, (261,) * len(quantities), route=route, fixed=fixed, ix=HNG, key=key
+    )
 
 
 def wti(quantities: tuple[float, ...], route: Route) -> ResolvedTrades:
@@ -706,7 +715,7 @@ def test_the_headings_are_spelled_once_for_both_paths(sources: dict[str, TradeRe
     assert dv01_label("cleared", "USD") == CLEARED_USD
     for result in results:
         terms = result.prepared.encoded.terms
-        group = result.curve.name if result.curve is not None else "cleared"
+        group = result.curves[0].name if result.curves else "cleared"
         for bucket in Bucket:
             view = risk_view(result, Risk.ALL, bucket)
             assert view.labels == (
@@ -744,7 +753,10 @@ def on_two_curves(
     entry."""
     first = valued_on(hng((10.0,), (A_YEAR,), Route.BILATERAL), HNG_HISTORY, HNG_MARKET, FLAT)
     second_row = valued_on(
-        hng((-10.0,), (TWO_YEARS,), Route.BILATERAL), HNG_HISTORY, HNG_MARKET, second
+        hng((-10.0,), (TWO_YEARS,), Route.BILATERAL, key=second.name),
+        HNG_HISTORY,
+        HNG_MARKET,
+        second,
     )
     axes = sources["b"].prepared.encoded.payment_axes
     assert axes is not None
