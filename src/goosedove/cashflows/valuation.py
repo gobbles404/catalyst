@@ -17,7 +17,7 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.payments import curve_starts_on, discounted, factors_on, time_fractions
 from goosedove.globals.valuation_date import ValuationDate
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.trades.contributions import RateContribution
+from goosedove.trades.contributions import RateContribution, curve_words
 from goosedove.trades.display_axes import PeriodAxis, early_risk, period_axis
 from goosedove.trades.risk_report import NO_DAYS, Bucket, Risk, RiskView, dv01_label, placed
 
@@ -74,7 +74,11 @@ class CashflowResults:
             case _:
                 assert_never(risk)
         contribution = self.rate_contributions[0]  # one curve values a batch of cashflows
-        label = dv01_label(contribution.curve.name, self.currency)
+        # The curve's word as every report gives it, contributions.py: its name, or qualified
+        # where the name is the cleared batch's word, the heading a collection of the batch
+        # alone shows.
+        word = curve_words([contribution.curve])[id(contribution.curve)]
+        label = dv01_label(word, self.currency)
         match bucket:
             case Bucket.DAY:
                 return RiskView(

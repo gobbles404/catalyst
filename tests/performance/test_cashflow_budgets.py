@@ -169,6 +169,7 @@ def test_the_same_functions_and_numpy_calls_at_any_size(
     assert call_profile(lambda: result.report(Risk.DV01, Bucket.MONTH)) == {
         "CashflowResults.report": 1,
         "EarlyRisk.refuse": 1,
+        "curve_words": 1,  # the curve's word, as every report names it
         "dv01_label": 1,
         "placed": 1,
     }

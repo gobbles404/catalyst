@@ -163,3 +163,17 @@ def test_a_batch_of_cashflows_keeps_one_rate_contribution_on_its_curve() -> None
     assert contribution.months is result.cashflows.months
     assert contribution.years is result.cashflows.years
     assert not contribution.dv01_by_month.flags.writeable
+
+
+def test_a_batch_of_cashflows_reports_under_the_word_its_collection_shows() -> None:
+    # The review of 5b14c61: the result's own report names its curve by the word a
+    # collection of the batch alone shows, a curve named cleared qualified in both.
+    for name, word in (("SOFR", "SOFR"), (CLEARED, "cleared (curve_1)")):
+        curve = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90), name=name)
+        result = cashflows_valued(booked(), curve=curve)
+        alone = aggregate_results([result], WorkCounter())
+        for bucket in Bucket:
+            direct = result.report(Risk.DV01, bucket)
+            collected = aggregate_view(alone, Risk.DV01, bucket)
+            assert direct.labels == collected.labels == (f"{word} USD dv01 [USD per basis point]",)
+            assert direct.totals == collected.totals == (result.dv01,)
