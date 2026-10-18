@@ -667,7 +667,10 @@ shown last on every row of its readback, the bump keeping it; `_CollectDiscountC
 named curves by reference under a compact handle, each name once, read back as one row per
 curve. Every creation on the sheets, in the host, the tests and the pages supplies a name; the
 kept workbook's sixteen were renamed in place with every economic cell unchanged. Nothing takes
-a collection yet. The rest of the arc, slices 2 to 4, is not implemented.
+a collection yet. The rest of the arc, slices 2 and 3 since the sequence was revised on 18
+October, is not implemented: slice 2 the curve-owned contributions, the named labels and the
+collection of trades and cashflows, [named-curves-slice-2.md](named-curves-slice-2.md), under
+review; slice 3 the keyed booking, the mixed-curve evaluation and the worksheet cutover.
 
 Agreed direction: the [named-curve arc](multiple-discount-curves.md) names
 ordinary curves, gathers them with `_CollectDiscountCurves(curve_handles)`, and requires

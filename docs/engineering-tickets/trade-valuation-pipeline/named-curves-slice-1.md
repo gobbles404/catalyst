@@ -80,4 +80,4 @@ The names, the two rules, the readbacks, the bump keeping the name and the handl
 
 ## Not in this slice
 
-The `discount_curve_key` field, the collection as `_EvaluateTrades`'s input, the key's binding, per-curve risk and the labels `SOFR USD dv01`: slices 2 to 4. The cashflow collection through `_AggregateResults`: its own PR before slice 3. Anything numeric about the curves themselves.
+Per-curve risk, the labels `SOFR USD dv01` and the cashflow collection through `_AggregateResults`: slice 2, [named-curves-slice-2.md](named-curves-slice-2.md). The `discount_curve_key` field, the collection as `_EvaluateTrades`'s input and the key's binding: slice 3. Anything numeric about the curves themselves.
