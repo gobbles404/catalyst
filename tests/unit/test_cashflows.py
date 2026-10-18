@@ -161,11 +161,21 @@ def test_the_worked_example_books_three_payments_and_values_them_by_hand() -> No
         result.dv01_by_day,
         result.dv01_by_month,
         result.dv01_by_year,
+        batch.trade_date,
         batch.amount,
+        batch.payment_date,
         batch.payment_days,
         batch.payment_amounts,
-    ):
+        batch.day_of_row,
+        batch.months,
+        batch.month_of_day,
+        batch.years,
+        batch.year_of_month,
+    ):  # every array the batch and the result keep, the mappings included
         assert not array.flags.writeable
+    assert batch.trade_id is not None and not batch.trade_id.flags.writeable
+    with pytest.raises(ValueError, match="read-only"):
+        batch.month_of_day[0] = 1  # a mapping kept frozen: no later cast hands back a copy
 
 
 def test_a_receipt_of_a_hundred_moves_with_the_curve_and_the_day_and_the_batch_never() -> None:

@@ -105,6 +105,11 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
         )
     month_keys, month_of_day = np.unique(days.astype("datetime64[M]"), return_inverse=True)
     year_keys, year_of_month = np.unique(month_keys.astype("datetime64[Y]"), return_inverse=True)
+    # The three mappings as the record declares them, cast before they are frozen, so that the
+    # arrays kept are the arrays frozen and no later cast hands back a writable copy.
+    day_of_row = day_of_row.astype(np.intp, copy=False)
+    month_of_day = month_of_day.astype(np.intp, copy=False)
+    year_of_month = year_of_month.astype(np.intp, copy=False)
     months = month_keys.astype("datetime64[D]")
     years = year_keys.astype("datetime64[D]")
     arrays: tuple[NDArray[np.generic], ...] = (
@@ -127,11 +132,11 @@ def cashflows(ticket: FieldValues, template: TradeTemplate, counter: WorkCounter
         description,
         days,
         sums,
-        day_of_row.astype(np.intp),
+        day_of_row,
         months,
-        month_of_day.astype(np.intp),
+        month_of_day,
         years,
-        year_of_month.astype(np.intp),
+        year_of_month,
     )
 
 
