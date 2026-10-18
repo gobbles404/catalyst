@@ -301,10 +301,13 @@ def test_a_bilateral_tick_resolves_three_handles_and_runs_the_discounted_path_al
         "_EvaluateTrades": 1,
         "trade_results": 1,
         "_the_curve": 1,
+        "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,
         "DiscountCurve.max_date": 1,
         "Market.live_prices": 1,
         "_discounted": 1,
+        "factors_on": 1,  # the factors by position, shared since #200
+        "discounted": 1,  # the values and the DV01s, shared since #200
         "_cross_gamma": 1,  # since #197, after every rule of the discounted path
         "early_risk": 3,  # since #186, and the cross-gamma's since #197
         "early_fact": 6,

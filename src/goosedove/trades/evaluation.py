@@ -26,6 +26,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.globals.discount_curve import DiscountCurve
+from goosedove.globals.payments import curve_starts_on, discounted, factors_on
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
 from goosedove.trades.display_axes import NONE_EARLY, EarlyRisk, early_risk
@@ -214,12 +215,7 @@ def _the_curve(prepared: PreparedTrades, curve: DiscountCurve | None) -> Discoun
             "discount_curve is missing, expected a discount curve with a bilateral batch, whose "
             "payments it discounts"
         )
-    as_of = prepared.history.calendar.valuation_date.as_of
-    if curve.start_date != as_of:
-        raise ValueError(
-            f"discount_curve starts on {curve.start_date}, expected {as_of}, the valuation date; "
-            "a curve is never rebased"
-        )
+    curve_starts_on(curve, prepared.history.calendar.valuation_date.as_of)
     payment_date = cast(NDArray[np.datetime64], encoded.payment_date)  # financial: the rule above
     uncovered = ~prepared.is_settled & (payment_date > curve.max_date)
     if uncovered.any():
@@ -290,13 +286,12 @@ def _discounted(
             + np.bincount(live_group, weights=dated_live_contribution, minlength=groups)
         )
         payment_factor = np.ones(groups)  # a paid group's policy factor, read for nothing
-        payment_factor[pays.groups] = curve.factors[(pays.days - curve.start_date).astype(np.intp)][
-            pays.day_of_group
-        ]
+        payment_factor[pays.groups] = factors_on(curve, pays.days)[pays.day_of_group]
         npv = np.zeros(groups)
-        npv[pays.groups] = amount[pays.groups] * payment_factor[pays.groups]
         dv01_by_group = np.zeros(groups)
-        dv01_by_group[pays.groups] = -0.0001 * pays.tau * npv[pays.groups]
+        npv[pays.groups], dv01_by_group[pays.groups] = discounted(
+            amount[pays.groups], payment_factor[pays.groups], pays.tau
+        )
         mark = float(npv.sum())
         dv01 = float(dv01_by_group.sum())
         discounted_lots = prepared.dated_live_lots * payment_factor[encoded.slot_group]

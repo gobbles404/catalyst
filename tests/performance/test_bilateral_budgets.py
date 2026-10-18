@@ -236,6 +236,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
         "early_risk": 1,
         "early_fact": 2,
         "_unpaid_payments": 1,
+        "time_fractions": 1,  # ACT/365F, the arithmetic shared with the cashflows since #200
         "WorkCounter.__init__": 1,
         "WorkCounter.hit": 4,
     }
@@ -299,10 +300,13 @@ def test_a_bilateral_tick_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: tick(prep, quoted, curve)) == {
         "trade_results": 1,
         "_the_curve": 1,  # the four rules, before any quote is read
+        "curve_starts_on": 1,  # the start rule, shared with the cashflows since #200
         "DiscountCurve.start_date": 2,  # the rule's look and the factors' positions
         "DiscountCurve.max_date": 1,  # the coverage rule
         "Market.live_prices": 1,
         "_discounted": 1,
+        "factors_on": 1,  # the factors by position, shared since #200
+        "discounted": 1,  # the values and the DV01s, shared since #200
         "_cross_gamma": 1,  # since #197, after every rule of the discounted path
         "early_risk": 3,  # the discounted lots, the DV01 and the cross-gamma before the start
         "early_fact": 6,
