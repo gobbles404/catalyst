@@ -98,10 +98,11 @@ payment as the third clearing-organization business day after the last trading d
 published final settlement date is not itself a payment-date instruction.
 
 The [Waha expiry table](https://www.ice.com/products/6590171/Waha-Basis-Future/expiry), read
-on 18 October 2026, gives the last trading date and the final settlement date of every listed
-month; the final settlement date is two clearing business days after last trading in each,
-and payment is the business day after it. With the index printing on the month's first
-business day, the supplied input, publication `+2bd` reproduces every one:
+on 18 October 2026, gives the last trading date and the final settlement date of each listed
+month. In the seven examples below the final settlement date is two clearing business days
+after last trading, and payment is the business day after it. With the index printing on the
+month's first business day, the supplied input, publication `+2bd` reproduces each of the
+seven; the table lists other months, and holiday crossings, this comparison does not cover:
 
 | Month | ICE last trading | ICE final settlement | Payment, last trading `+3bd` | Publication, supplied | Publication `+2bd` |
 |---|---|---|---|---|---|
@@ -113,9 +114,9 @@ business day, the supplied input, publication `+2bd` reproduces every one:
 | Nov27 | Fri 29 Oct 2027 | Tue 2 Nov 2027 | Wed 3 Nov 2027 | Mon 1 Nov 2027 | Wed 3 Nov 2027 |
 | Dec27 | Tue 30 Nov 2027 | Thu 2 Dec 2027 | Fri 3 Dec 2027 | Wed 1 Dec 2027 | Fri 3 Dec 2027 |
 
-No listed month's window from last trading to payment crosses Thanksgiving, 26 November 2026
-and 25 November 2027, or Good Friday, 26 March 2027; New Year's Day is the one holiday crossed,
-in Jan27, and both counts honour it. The two counts agree whenever publication is the first
+None of these seven months' windows from last trading to payment crosses Thanksgiving,
+26 November 2026 and 25 November 2027, or Good Friday, 26 March 2027; New Year's Day is the one
+holiday crossed among them, in Jan27, and both counts honour it. The two counts agree whenever publication is the first
 clearing business day after last trading. A month whose index prints later than that would
 pay a day late under a uniform `+2bd`: surface its dates for a convention decision before
 claiming support. Do not silently adjust a calendar, invent another field or hide the
