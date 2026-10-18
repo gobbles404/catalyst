@@ -1,6 +1,6 @@
 # Named discount curves within one trade batch
 
-**Status:** Agreed feature direction, updated after engineering feedback on 18 October 2026. The collector is `_CollectDiscountCurves`; every bilateral trade keeps an explicit curve key, including the one-curve case. [Cashflow PR200](https://github.com/gobbles404/goosedove/pull/200), including its mapping-array fix, is merged; its cashflow collection follow-up remains a separate PR and lands before slice 3. This arc precedes [template-based quoting](template-based-quoting.md).
+**Status:** Agreed feature direction, updated after engineering feedback on 18 October 2026. The collector is `_CollectDiscountCurves`; every bilateral trade keeps an explicit curve key, including the one-curve case. [Cashflow PR200](https://github.com/gobbles404/goosedove/pull/200), including its mapping-array fix, is merged; its cashflow collection follow-up is folded into slice 2, [named-curves-slice-2.md](named-curves-slice-2.md), as decided on 18 October. This arc precedes [template-based quoting](template-based-quoting.md).
 
 **Starting point:** Main after the single-curve cross-gamma, contract interpolation, curve-bump and cashflow work. Record the actual base and any subsequent cashflow dependency when implementation starts. Use a feature branch and a short sequence of independently reviewable PRs.
 
@@ -45,7 +45,7 @@ The public behavior is:
 | One-curve trade evaluation after the change | Supply a singleton curve set to `_EvaluateTrades`, with the booked key matching its curve. Cut over kept callers; no direct-curve alternative and no implicit selection when a key is absent. |
 | Name matching | Nonempty text, exact and case-sensitive; no trimming, alias or fallback to the first curve. Reject whitespace-only names and surrounding whitespace. |
 | Extra curves in a set | Allowed. Validate valuation-date and payment coverage for the curves the batch selects; unused curves do not impose coverage requirements. |
-| Two distinct curve snapshots sharing a name across evaluated results | Keep separate groups by exact object identity, as today; distinguish headings with the existing local curve number. A shared name never proves shared market state. |
+| Two distinct curve snapshots sharing a name across evaluated results | Keep separate groups by exact object identity, as today; qualify both headings with the local curve number, `SOFR (curve_1)` and `SOFR (curve_2)`. A shared name never proves shared market state. |
 
 Engineering should raise a concrete implementation conflict before changing these rules. The one-time caller migration is part of the arc, rather than a reason to introduce a permanent singleton exception.
 
@@ -209,7 +209,7 @@ Full evaluation on each changed quote or curve is acceptable initially. No selec
 
 Plan the stacked PRs in the order below, revised on 18 October after slice 1 landed its review: the saved contributions, the reporting and the collection first, with today's single-curve evaluator producing one contribution and every economic number unchanged, then the keyed booking and the mixed-curve evaluation with the complete worksheet migration. The complete stack is the integration and UAT target: each PR stays useful for review, but no temporary adapter is written and no extra PR forced to make an intermediate state independently shippable; a temporary gap is named in the slice ticket that opens it and closed before the stack lands on main. Engineering writes each short slice ticket as the first commit of that PR, including its hand answers, acceptance and migration scope, and presents it for owner review before adding implementation. The parent ticket establishes the direction; the slice ticket makes the work reviewable. If a boundary below proves artificial in the code, the slice ticket proposes combining the slices rather than building around it.
 
-Use `feat/named-curves` for the first branch, then a separate branch for each subsequent PR based on the preceding head and targeting that preceding branch. This is one feature arc, not four PRs sharing one moving branch. Each PR remains independently reviewable and leaves the repository coherent. Land bottom-up by squash-merging; after each merge, rebase the next branch onto `main`, retarget its PR to `main`, and restack its dependants, checking each next diff before it lands.
+Use `feat/named-curves` for the first branch, then a separate branch for each subsequent PR based on the preceding head and targeting that preceding branch. This is one feature arc, not several PRs sharing one moving branch. Each PR remains independently reviewable and leaves the repository coherent. Land bottom-up by squash-merging; after each merge, rebase the next branch onto `main`, retarget its PR to `main`, and restack its dependants, checking each next diff before it lands.
 
 | Slice | Reviewable outcome |
 |---|---|
