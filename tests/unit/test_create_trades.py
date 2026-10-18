@@ -3227,6 +3227,69 @@ def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() ->
     )
 
 
+# --- the ticket's date examples, iferc-publication-payment-anchor.md ----------------------------
+
+# A second Waha-like index whose December months publish on 4 December 2026 and 1 December 2025,
+# for the examples of a publication day closed on the payment calendar and of a year earlier.
+LATE = index(
+    "LATE",
+    "Waha basis - ICE, published on the fourth",
+    iferc_schedule(("Z25", "Z26"), dates("2025-12-01", "2026-12-04")),
+    WAHA.conventions,
+    WAHA.specifications,
+    None,
+    "LOT",
+    UNITS,
+)
+
+
+def test_the_tickets_date_examples_pin_on_both_routes() -> None:
+    # iferc-publication-payment-anchor.md's table, each counted from Z26's publication day: +2bd
+    # pays 3 December and +5bd, the desk's bilateral terms, 8 December, cleared or bilateral
+    # alike; with 2 December closed +2bd pays the 4th; a publication day itself closed, the 4th
+    # on LATE, +1bd pays Monday the 7th; a year earlier, Z25 published 1 December 2025, +5bd pays
+    # the 8th; +0bd is the publication day and -1bd the day before, both refused by the existing
+    # rule, which names the observation the payment must follow.
+    bilateral = {
+        **{k: v for k, v in WAHA_TEMPLATE.items() if k != "clearing_house"},
+        "route": "bilateral",
+        "counterparty": "ACME Trading",
+        "discount_curve_key": "SOFR",
+    }
+    for template in (WAHA_TEMPLATE, bilateral):
+        two, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+2bd"})
+        np.testing.assert_array_equal(paid_on(two), dates("2026-12-03"))
+        five, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+5bd"})
+        np.testing.assert_array_equal(paid_on(five), dates("2026-12-08"))
+    closed, _ = created(
+        WAHA,
+        WAHA_TICKET,
+        {**WAHA_TEMPLATE, "payment_holiday_calendar": holiday_calendar(dates("2026-12-02"))},
+    )
+    np.testing.assert_array_equal(paid_on(closed), dates("2026-12-04"))
+    on_a_closed_day, _ = created(
+        LATE,
+        WAHA_TICKET,
+        {
+            **WAHA_TEMPLATE,
+            "payment_time_lag": "+1bd",
+            "payment_holiday_calendar": holiday_calendar(dates("2026-12-04")),
+        },
+    )
+    np.testing.assert_array_equal(paid_on(on_a_closed_day), dates("2026-12-07"))
+    earlier, _ = created(
+        LATE,
+        {**WAHA_TICKET, "trade_date": ["2025-11-28"], "contract_code": ["Z25"]},
+        {**WAHA_TEMPLATE, "payment_time_lag": "+5bd"},
+    )
+    np.testing.assert_array_equal(paid_on(earlier), dates("2025-12-08"))
+    for lag, day in (("+0bd", "2026-12-01"), ("-1bd", "2026-11-30")):
+        assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": lag}) == (
+            f"Z26 pays on {day}, expected a day after its last observation, 2026-12-01, when its "
+            "final price exists"
+        )
+
+
 # --- half-year strips, half-year-strips.md --------------------------------------------------------
 
 # A financial one-unit index with every month from November 2026 to July 2028, X26 the boundary,
