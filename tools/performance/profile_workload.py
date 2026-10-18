@@ -3,7 +3,10 @@
 from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
+from typing import cast
 
+import numpy as np
+from numpy.typing import NDArray
 from pyinstrument import Profiler
 
 from goosedove.excel import bridge
@@ -46,11 +49,21 @@ def workloads() -> dict[str, Callable[[], object]]:
     headers = Cells.from_rows([["date", "product", "quantity", "cleared"]])
     trades = Cells.from_rows([[46276.0 + i, f"p{i}", float(i), i % 2 == 0] for i in range(n // 4)])
     # The reader's handle: a ten-year curve created once here, since a creator under the
-    # profiler would retain a curve per call.
+    # profiler would retain a curve per call; the handle and one readback checked before any
+    # profile, so that a refused creator cannot be profiled as a readback.
     curve = ENTRY["_CreateDiscountCurve"](
+        "SOFR",
         Cells.from_rows([["date", "discount_factor"]]),
         Cells.from_rows([[46276.0 + i, 1.0 - i * 1e-5] for i in range(3_631)]),
     )
+    if not isinstance(curve, str) or ":discount_curve:SOFR:" not in curve:
+        raise RuntimeError(f"the curve was not created: {curve!r}")
+    spill = ENTRY["util_ReadHandle"](curve)
+    if not isinstance(spill, tuple):
+        raise RuntimeError(f"the curve did not read back: {spill!r:.200}")
+    kinds, _, _ = cast(tuple[NDArray[np.uint8], NDArray[np.float64], str], spill)
+    if kinds.shape != (3_633, 3):
+        raise RuntimeError(f"the curve did not read back as 3,633 rows by 3: {kinds.shape}")
     return {
         "util_ReadHandle": lambda: ENTRY["util_ReadHandle"](curve),
         "Zero": lambda: ENTRY["Zero"](),

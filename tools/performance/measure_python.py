@@ -148,7 +148,7 @@ def scenarios() -> list[Scenario]:
     # creators themselves have no row, because each call would retain an object for the life of
     # the run.
     valuation = ENTRY["_CreateValuationDate"](46276.0, 0.5)
-    curve = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    curve = ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, curve_body(3_631))
     cases = [
         Scenario("Zero", "scalar", 0, 1, lambda run=ENTRY["Zero"]: run(), equals(0.0)),
         Scenario("Add", "scalar", 2, 1, lambda run=ENTRY["Add"]: run(1.0, 2.0), equals(3.0)),
@@ -156,7 +156,8 @@ def scenarios() -> list[Scenario]:
             "Times", "missing", 1, 1, lambda run=ENTRY["Times"]: run(5.0, MISSING), equals(5.0)
         ),
         # A handle in: the resolver, then the object's table out. The valuation date's spill is
-        # six cells, so the row is the handle's cost; the ten-year curve's is 7,266 cells out.
+        # six cells, so the row is the handle's cost; the ten-year curve's is 10,899 cells out,
+        # its days, its factors and its name on every row.
         Scenario(
             "util_ReadHandle",
             "a handle in",
@@ -169,9 +170,9 @@ def scenarios() -> list[Scenario]:
             "util_ReadHandle",
             "a ten-year curve out",
             1,
-            7_266,
+            10_899,
             lambda run=ENTRY["util_ReadHandle"], h=curve: run(h),
-            mixed_out(3_633, 2),
+            mixed_out(3_633, 3),
         ),
     ]
     for n in (10, *SIZES):  # ten cells is a trade's own row, smaller than the working size
