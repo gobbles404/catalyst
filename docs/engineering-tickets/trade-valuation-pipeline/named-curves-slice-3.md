@@ -1,0 +1,110 @@
+# Keyed booking, mixed-curve evaluation and the worksheet cutover
+
+[Parent arc](multiple-discount-curves.md) · slice 3 of 3 · [Slice 1](named-curves-slice-1.md) · [Slice 2](named-curves-slice-2.md) · [Evaluation](../../library/trades/evaluate-trades.md) · [Trades](../../library/trades/create-trades.md) · [Kernel](../../library/trades/kernel.md) · [Risk](../../library/trades/report-risk.md) · [Collection](../../library/trades/aggregate-results.md) · [Curve set](../../library/globals/collect-discount-curves.md)
+
+**Status:** For review as the first commit of its PR on `feat/keyed-curves` from `feat/curve-contributions`, stacked on #202, 18 October 2026. Implementation follows the owner's approval of this ticket. The last slice of the arc: when it lands, the stack is the integration and UAT target the owner set on 18 October, and the gaps slice 2 named are closed.
+
+## Outcome
+
+Every bilateral `fixed_float` row names the curve its payments discount on, `discount_curve_key`, supplied by the template or the ticket and never both, required on the bilateral route and refused on the cleared one, a singleton included. `_EvaluateTrades` takes a collection of named curves where it took one curve: each distinct key is bound once to the curve of that exact name, each payment group is discounted on its own curve, and the result keeps one DV01 contribution and one cross-gamma contribution per curve used, the shape slice 2 made, so a batch on SOFR and FFOIS reports `SOFR USD dv01` beside `FFOIS USD dv01` and `HNG SOFR cross_gamma` beside `HNG FFOIS cross_gamma`, and a mixed batch collected alone reports what its single-key batches collected together report. The direct-curve argument is gone, no shim kept: every kept caller supplies a collection, and every number the suites pin today stands through a singleton collection whose curve the batch's key names. Cashflows keep their one curve and their contract. Nothing of quoting: [template-based quoting](template-based-quoting.md) follows this slice.
+
+## Worksheet contract
+
+```text
+_EvaluateTrades(prepared, market, [discount_curve_set]) -> trade_results handle
+```
+
+The third argument, optional and last as the curve was, is the cell showing `_CollectDiscountCurves`'s result or a name for it: a cleared batch wants it left out and refuses one supplied, a bilateral batch requires it, a collection of one curve included. The field, in the `fixed_float` definition after `counterparty`, the two bilateral labels together:
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `discount_curve_key` | text | with route = bilateral; refused with cleared | the exact name of the curve of the supplied collection this row's payments discount on |
+
+The parent's example, A +10 lots of G27 on SOFR and B -5 on FFOIS, both at 4.00 against a quote of 4.10, observed on 1 February 2027 and paying 4 January 2028, 365 days after the valuation day 4 January 2027, on a one-lot index of 10,000 units quoted in USD per unit:
+
+| | A | B | C | D |
+|---|---|---|---|---|
+| 2 | `=_CreateDiscountCurve("SOFR",F1:G1,F2:F3)` | `30512:discount_curve:SOFR:2` | | |
+| 3 | `=_CreateDiscountCurve("FFOIS",F1:G1,F5:G6)` | `30512:discount_curve:FFOIS:3` | | |
+| 4 | `=_CollectDiscountCurves(B2:B3)` | `30512:discount_curve_set:4` | | |
+| 6 | contract_code | quantity | fixed_price | discount_curve_key |
+| 7 | G27 | 10 | 4.00 | SOFR |
+| 8 | G27 | -5 | 4.00 | FFOIS |
+| 9 | `=_CreateTrades(I3,A6:D6,A7:D8,B10)` | the template B10 bilateral, financial, `counterparty` and the payment fields | | |
+| 11 | `=_PrepareTrades(B9,I11)` | | | |
+| 12 | `=_EvaluateTrades(B11,I12,B4)` | `30512:trade_results:HNG:14` | | |
+
+`=_ReportRisk(B12,"all","month")`:
+
+| period | HNG nominal_delta [LOT] | HNG delta [LOT] | SOFR USD dv01 [USD per basis point] | FFOIS USD dv01 [USD per basis point] | HNG SOFR cross_gamma [LOT per basis point] | HNG FFOIS cross_gamma [LOT per basis point] |
+|---|---:|---:|---:|---:|---:|---:|
+| Total | 5 | 5 | -0.95 | 0.45 | -0.00095 | 0.00045 |
+| 1-Jan-2027 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 1-Feb-2027 | 5 | 5 | 0 | 0 | -0.00095 | 0.00045 |
+| 1-Mar-2027 to 1-Dec-2027 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 1-Jan-2028 | 0 | 0 | -0.95 | 0.45 | 0 | 0 |
+
+`_ReportValues` shows the mark 5,000 and no cash, the net amount discounted on two curves, 9,500 and -4,500. The columns stand in key order, the order the keys first appear down the ticket's rows, the order the result keeps its contributions in. The seam resolves the collection as it resolves any handle: a curve handle where the collection is expected is refused by its kind, `discount_curve_set is discount curve handle '30512:discount_curve:SOFR:2', expected discount curve set handle`, the cutover's one new refusal on every old formula, and a blank, a number, empty text, a dead handle or a left-out argument are what decision 39 makes them, [inputs.md](../../seam/inputs.md). The template's readback shows the key among the fields it supplies, as it shows every field; the trades readback shows it on every row after `counterparty`.
+
+## The booking
+
+The field follows the conditional fields' rules, [create-trades.md](../../library/trades/create-trades.md): present exactly when the route is bilateral, `discount_curve_key is missing, expected it when route = bilateral` and `discount_curve_key is 'SOFR', expected none unless route = bilateral`, the template's one value for every row or the ticket's column, never both. Its text is read by the curve's own name rule, [discount-curve.md](../../library/globals/discount-curve.md), the one rule in one place, so a key with whitespace around it or of whitespace alone fails where it is typed, `discount_curve_key is ' SOFR', expected a name with no whitespace around it` in a template and `discount_curve_key row 2 is ' SOFR', ...` in a ticket, rather than naming no curve later; the text is otherwise kept as typed, exact and case-sensitive, no alias, no trimming. The resolved terms keep it per occurrence, `discount_curve_key[i]`, a tuple like `counterparty`'s, None as a whole exactly for a cleared batch. Nothing of a curve is read at creation: the key names a curve the collection will hold when the batch is evaluated, so a template stays partial and a batch is created before its curves are.
+
+The encoding extends a payment group's identity with the key: a group is the distinct contract, payment day and key among the components, the groups in the schedule's order, by day within a contract and by key within a day, the keys in first-appearance order among the rows; `Encoded.keys`, the batch's distinct keys in that order, and `key_of_group[g]`, every array frozen. Two components of one contract paying on one day under different keys are two groups, neither netted against the other before discounting, the parent's rule; under one key they are one group as today. The slots, the delta axes and the payment axes are unchanged, the payment axes over every group whatever its key, so one DV01 report axis serves every curve. A group is named with its key in every message that names one, `F27 paying on 2028-01-04 on SOFR`. The preparation keeps, per key in key order, the unpaid payments of that key's groups, `UnpaidPayments` as today but one per key, the distinct unpaid days of each key's groups with each group's place and its time fraction, made once where the groups settled are decided; `payment_days_mapped` counts the days over the keys, a day two curves pay on counted once per curve, the distinct curve and payment-day pairs the parent asks to measure. The display axes by month and by year stand, over every payment.
+
+## The evaluation
+
+The rules, in this order, the first failure being the message, [kernel.md](../../library/trades/kernel.md): the market over the history the batch was prepared against; a cleared batch refuses a collection supplied, `discount_curve_set is supplied, expected none unless route = bilateral; a cleared batch is undiscounted`; a bilateral batch is financial, as today, and requires a collection, `discount_curve_set is missing, expected a collection of discount curves with a bilateral batch, whose payments it discounts`; each distinct key is bound to the curve of that exact name in the collection, in key order, the first unbound refused naming the key, the first row booking it and the names the collection holds, `discount_curve_key 'SONIA' of trade 1003 at row 3 names no curve of the collection, which holds SOFR and FFOIS; expected a curve of that name`, no fallback to the first curve, a singleton whose name the key does not match refused the same way; then each selected curve, in key order, starts on the valuation day, `discount curve 'FFOIS' starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is never rebased`, the rule both evaluators share now naming the curve, and covers its own unpaid payment days, `the payment of F27 on 2029-01-03 on FFOIS is past the discount curve 'FFOIS', which runs from 2027-01-04 to 2028-12-31; expected every unpaid payment day covered`; a curve of the collection no key selects imposes nothing and is read for nothing. A batch paid in full still binds its keys and checks each selected curve's start, the parent's rule.
+
+The arithmetic is today's, [the bilateral path](../../library/trades/kernel.md#the-bilateral-path), with the factors gathered per curve: each key's curve read once per distinct unpaid payment day of that key's groups and placed on those groups, so `payment_factor[g]` is each group's own curve's factor; the amounts, the NPVs and the DV01s by group in one pass over every unpaid group as today, the mark their sum and `dv01` their sum, every used curve shifted together; the discounted lots each slot's lots times its own group's factor, one combined delta vector per batch, summed onto the references, the days, the months and the years as today, four reductions. Then per curve, in key order: the DV01 of that key's groups summed onto the payment axes by day, month and year, three reductions, with its total; the cross-gamma of that key's groups, each group's weight -0.0001 times its time fraction and a group on another curve nothing, gathered onto the slots and multiplied into the discounted lots, summed onto the references, the days, the contract months and the contract years, four reductions, with its total; and the early facts of each view. Each curve's vectors stand on the batch's shared axes by reference, zero where that curve's groups pay nothing, so a report and the collector copy through the saved places as today. The batch's `cross_gamma_total` is the curves' totals summed. Every number is finite or the first that is not is refused where it is made, the combined checks as today and each curve's views named by the curve, `the payment day 2028-01-04 has -inf of DV01 on SOFR in all, ...`. Nothing is valued twice: one key resolution per distinct key, one factor read per distinct curve and payment-day pair, one pass over the groups, one product over the slots for the lots and one per curve for the cross-gamma, 4 + 7k reductions for k curves, 11 for one as today.
+
+## What a result keeps
+
+`TradeResults.curve` becomes `curves`, the exact curve objects the batch selected in key order, none for a cleared batch; `rate_contributions` and `cross_contributions` hold one record per curve in that order; `payment_factor`, `payment_amount`, `npv_by_group` and `dv01_by_group` stand per group; `dv01` and `cross_gamma_total` keep their meaning, every used curve shifted by one basis point together, the sums of the contributions' totals and the sensitivity to neither curve alone. The collection is not retained: a result holds what it used, and a collection's handle may go while results on its curves live. `RateContribution` and `CrossContribution` keep their shape; nothing is copied into them.
+
+## Reports and readbacks
+
+`_ReportRisk` is unchanged in words and shape: one DV01 column and one cross-gamma column per contribution, in key order, each named by the curve's word as slice 2 names it, the deltas one column per index; `_ReportValues` and `_ReportReserves` as today; `_AggregateResults` sums the contributions as slice 2 made it, a result on two curves joining two rate groups and two cross groups with no change there, which is the slice 2 test of several contributions from one result made real. The readbacks close slice 2's gaps:
+
+| Handle | Change |
+|---|---|
+| `trades` | `discount_curve_key` after `counterparty`, in the definition's order, where the batch has it |
+| `trade_results` | `discount_curve_key` and `discount_curve`, the key on every slot row, its group's, and the name of the curve the group was discounted on, appended last after `cross_gamma_unit` so that no column before them moves, the pattern #197 set; a cleared result a dash in both |
+| `aggregate_results` | the `curve` cell shows the words of every curve the source used, in key order, joined with a comma and a space, `SOFR, FFOIS`, qualified where slice 2 qualifies; one row per occurrence as today, the source's saved scalars shown once and never per curve |
+| `prepared_trades`, `cashflow_results`, `trade_template` | unchanged; a template shows the key among the fields it supplies as it shows every field |
+
+## Hand-worked acceptance
+
+The parent's fixture: a one-lot index of 10,000 units quoted in USD per unit, no fees, G27 observed on 1 February 2027 under lastday on a schedule and a calendar that make that day valid, both rows paying 4 January 2028, 365 days after the valuation day 4 January 2027, quoted 4.10 against 4.00; SOFR 0.95 and FFOIS 0.90 on the payment day, every curve 1 on the valuation day.
+
+| Row | Lots | Curve | Factor | Amount | Mark | Nominal delta | Delta | DV01 | Cross-gamma |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| A | 10 | SOFR | 0.95 | 10,000 | 9,500 | 10 | 9.5 | -0.95 | -0.00095 |
+| B | -5 | FFOIS | 0.90 | -5,000 | -4,500 | -5 | -4.5 | 0.45 | 0.00045 |
+| the batch | 5 | two curves | | 5,000 | 5,000 | 5 | 5 | two columns | two columns |
+
+The mark of 5,000 equals the net amount by the arithmetic of these inputs and by no rule; the batch scalars are -0.50 of DV01 and -0.0005 of cross-gamma, both curves shifted together. B at -10 lots with everything else as it was: nominal delta 0, mark 500, delta 0.5, DV01 -0.95 and 0.90, cross-gamma -0.00095 and 0.0009, the essential test that compression has kept each curve's ownership. SOFR's factor 0.96 in a new curve, FFOIS as it was, the two collected again: mark 5,100, delta 5.1, SOFR -0.96 and -0.00096, FFOIS unmoved at 0.45 and 0.00045, and the old result holding the old curve and the old numbers. A singleton collection of SOFR with A alone: today's single-curve numbers exactly, -0.95 and -0.00095. A and B as two single-key batches collected together report, column for column, what the mixed batch alone reports, Totals and every dated vector by day, month and year, the rows repeated and reversed too. The bump check, item 5 of the parent: `util_BumpDiscountCurve` on SOFR alone, up and down one basis point, collected each time with the unchanged FFOIS, the centered differences of the mark and of the discounted delta agreeing with SOFR's analytic DV01 and cross-gamma within the tolerance the bump page justifies, FFOIS's contributions unchanged to the last digit. Every existing bilateral number, the kernel's example, the aggregate page's four sources, the risk buckets' tables, the cross-gamma block, the bump's checks and the kept workbook's 22 evaluations, stands through a singleton collection.
+
+## Migration
+
+The field, in `instruments/definitions.py` and [show-instrument.md](../../library/instruments/show-instrument.md); the resolution's conditions and the terms; the encoding's groups; the preparation's unpaid payments per key; the evaluation; the records and the three readbacks. Every bilateral booking gains its key and every bilateral evaluation a collection: in the Python suites through the fixtures' helpers, `terms_of`, `valued`, `valued_on`, `tick` and the sheet fixtures, 14 files booking the bilateral route; the smoke's 3 bilateral templates and 13 evaluation formulas with a third argument; the lifetime's 2 templates and 5 evaluations, its `valuation` and `bumps` groups walking a curve change, a collection reordered and a key renamed; the host's 2 bookings and 27 evaluations; the two performance tools under `tools/performance`, outside the gate and migrated with it, slice 1's lesson; the kept workbook's 7 bilateral templates, B2003, B2016, B2033, B2398, B2726, B2730 and B2778, each gaining `discount_curve_key` with its curve's name, and its 22 bilateral evaluations over 15 curve cells, one `_CollectDiscountCurves` cell per curve cell and the evaluations pointed at it, no collector per evaluation where the curve is shared; the positional reads of `trades` readbacks on bilateral batches shifted one column from the column after `counterparty` on, of `trade_results` none, and of collections' `curve` cells unchanged for a source on one curve. The harness takes both sheets' `UsedRange.Value2` before and after, allowing the handle texts, the new columns and the new cells and nothing else, every economic cell equal. Pages: [evaluate-trades.md](../../library/trades/evaluate-trades.md), [create-trades.md](../../library/trades/create-trades.md), [trade-template.md](../../library/trades/trade-template.md), [show-instrument.md](../../library/instruments/show-instrument.md), [kernel.md](../../library/trades/kernel.md), [prepare-trades.md](../../library/trades/prepare-trades.md), [report-risk.md](../../library/trades/report-risk.md), [aggregate-results.md](../../library/trades/aggregate-results.md), [read-handle.md](../../library/utilities/read-handle.md), [collect-discount-curves.md](../../library/globals/collect-discount-curves.md), [discount-curve.md](../../library/globals/discount-curve.md) for the shared start rule's words, [evaluate-cashflows.md](../../library/cashflows/evaluate-cashflows.md) for the same, the library index, [inputs.md](../../seam/inputs.md) decision 39's example, the seam history, the packet, UAT item 24 and the parent's delivery table.
+
+## Work and budgets
+
+The ledgers at one curve equal today's but for `curves_selected`, one, and the unpaid payments per key, one record; at k curves `curves_selected` k, `payment_factors_read` the distinct curve and payment-day pairs, `groups_valued` and `slots_discounted` as today, the cross-gamma's product once per curve over the slots, and `risk_reductions` 4 + 7k. Retained memory per curve: three vectors on the payment axes and four on the delta axes, eight bytes an entry, the same arrays as today at one curve and k times them at k; no copy of any curve, collection or axis. Peaks follow the groups, the slots and the axes as today, each key's cross-gamma product a transient over the slots. The PR states the counts for one, two and four curves beside today's, measured, and pins them beside the existing bilateral budgets; no whole-batch pass per curve, no selective repricing, no cache.
+
+## Tests
+
+- The field's rules, the template's and the ticket's, the name rule's words, the two routes; the groups by contract, day and key, two keys on one day two groups, one key one, the slots unchanged; the unpaid payments per key; in `tests/unit/test_create_trades.py`, `test_trades.py`, `test_trade_template.py` and `test_bilateral_kernel.py`.
+- The parent's acceptance, items 1 to 8: the hand numbers above; the singleton equivalence over every existing bilateral case, a wrong name, a missing key, an unused curve added; the mixed batch against its parts collected, every vector, repeated and reversed; compression by key under several payment dates and asian observations; the fixed-but-unpaid payment with DV01 and no commodity risk, then paid; a quote, a curve and the history changed in turn, the dependencies rebuilt and held results keeping their objects; the bump check per curve; every refusal in the words above; two indexes sharing a rate group on one curve and cross groups apart; the records frozen; in `tests/unit/test_bilateral_kernel.py`, `test_trade_valuation.py`, `test_cross_gamma.py`, `test_aggregate_risk.py`, `test_aggregate_excel.py` and `test_bump_discount_curve.py`.
+- The three readbacks, column for column, and the collection's `curve` cell for a source on two curves; the help lines; in `tests/unit/test_utilities.py`, `test_aggregate_excel.py` and `test_help.py`.
+- The budgets at one, two and four curves in `tests/performance/test_bilateral_budgets.py` and the valuation and aggregate budgets migrated.
+- The host's fact for the hand example and the refusals; the smoke's block; the lifetime's `valuation` and `bumps` groups and a `curves` walk; the kept workbook's block holding the grid above beside the bump block, the 22 evaluations recalculated to their pinned numbers.
+
+## Gaps closed
+
+Slice 2's three: a result holds one contribution of each kind per curve used, several where keys differ; the collection's readback shows every curve a source used; the trade results readback shows the key and the curve's name on the payment groups. Nothing kept for compatibility: the direct-curve form of `_EvaluateTrades` is removed and refused by the seam's kind rule.
+
+## Not in this slice
+
+Cashflows on several curves, the cashflow evaluator keeping its one ordinary curve; template-based quoting; mixed routes or several indexes in one batch; FX, key-rate DV01, a rates correlation model, netting or a global curve registry; selective repricing when one curve moves, a full evaluation as today; a change to any existing single-curve number.
