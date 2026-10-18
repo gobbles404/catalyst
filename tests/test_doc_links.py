@@ -2,16 +2,21 @@
 here so that `check.ps1` and CI fail on a broken reference. The fixtures are small repositories
 made with `git init` and `git add`, since the checker's view is the working tree of the
 Git-indexed files, and each states its expected answer outright; the last test is the repository
-itself."""
+itself. Source ZIPs have no Git index, so that last check is explicitly skipped there. Fixtures
+need the Git executable and skip if it is absent; the parser-only tests still run."""
 
+import shutil
 import subprocess
 from pathlib import Path
 
 import check_doc_links as checker
+import pytest
 from check_doc_links import check, slug
 
 
 def repository(root: Path, files: dict[str, str]) -> None:
+    if shutil.which("git") is None:
+        pytest.skip("Git is not installed; this fixture tests Git-indexed documentation")
     subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
     put(root, files)
     stage(root)
@@ -230,6 +235,10 @@ def test_machine_specific_destinations_are_not_repository_links(tmp_path: Path) 
 
 
 def test_the_repository_itself() -> None:
+    # A worktree has a .git file, a clone a directory, and a source ZIP neither. Check this
+    # root rather than asking Git, which could discover an unrelated repository above a ZIP.
+    if not (checker.ROOT / ".git").exists():
+        pytest.skip("Git metadata is absent in a source ZIP; repository links are checked in CI")
     faults, followed = check(checker.ROOT)
     assert faults == []
     assert followed > 1000
