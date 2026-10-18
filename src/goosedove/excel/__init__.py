@@ -8,6 +8,7 @@ added here and nowhere else.
 from goosedove.excel import (
     bridge,
     calendar,
+    cashflows,
     globals,
     index_definitions,
     instruments,
@@ -21,6 +22,7 @@ from goosedove.excel import (
 __all__ = [
     "bridge",
     "calendar",
+    "cashflows",
     "globals",
     "index_definitions",
     "instruments",

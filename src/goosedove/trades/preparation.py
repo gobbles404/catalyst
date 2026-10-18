@@ -14,6 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar
+from goosedove.globals.payments import time_fractions
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import IndexConventions
@@ -158,7 +159,7 @@ def _unpaid_payments(
     groups = np.flatnonzero(unsettled)
     pays = encoded.payment_date[groups]
     days, day_of_group = np.unique(pays, return_inverse=True)
-    tau = (pays - as_of).astype(np.int64) / 365.0
+    tau = time_fractions(as_of, pays)
     for array in (days, groups, day_of_group, tau):
         array.setflags(write=False)
     counter.hit(PAYMENT_DAYS_MAPPED, int(days.size))

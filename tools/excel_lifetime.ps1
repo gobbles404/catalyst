@@ -37,6 +37,9 @@
 #          equal call sharing the bump; a quote tick remaking the results and reusing the
 #          bump; the bump changed, the factor changed, the bump refused and repaired.
 #          check.ps1 runs this group beside core.
+#   cashflows  a batch of cashflows on a curve of its own beside the chain: a commodity tick
+#          leaving it as it is; a changed factor, the day rolled onto a payment, the template
+#          cleared and repaired. check.ps1 runs this group beside core.
 #   quit   Excel quitting with live publications: a clean exit, whatever callbacks arrive.
 #
 # Excel delivers its disconnects after an edit returns, so every count that depends on them is
@@ -45,7 +48,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "cashflows", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -685,6 +688,102 @@ $bumps = {
     Close-Book $state $book
 }
 
+# --- cashflows ------------------------------------------------------------------------------------
+# The chain, then cashflow-instrument.md: a template of USD and Firm A in A14:B15, the ticket's
+# three payments in A17:E20, a valuation date on 4 January 2027 in G14 and a curve of its own in
+# H14:I17, 1 on the day, 0.95 a year out and 0.9 two years out, and the batch valued: 500 of mark,
+# 250 of cash and 0.85 of DV01, the two handles named for the currency; a commodity tick remakes
+# the chain's vector and market and nothing of the cashflows; a changed factor remakes the curve
+# and the results, the batch standing; the day rolled onto the receivable's payment day with the
+# curve moved remakes the date, the curve and the results, the receivable cash; the template cleared
+# fails the batch in the seam's words and the results as its consumer, both owning nothing until
+# repaired; the last workbook closed.
+$cashflows = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "A14" "currency"; Put $state $sheet "B14" "counterparty"
+    Put $state $sheet "A15" "USD"; Put $state $sheet "B15" "Firm A"
+    Put $state $sheet "A17" "trade_id"; Put $state $sheet "B17" "trade_date"; Put $state $sheet "C17" "amount"; Put $state $sheet "D17" "payment_date"; Put $state $sheet "E17" "description"
+    Put $state $sheet "A18" "1"; Put $state $sheet "B18" "4-Jan-2027"; Put $state $sheet "C18" "10000"; Put $state $sheet "D18" "4-Jan-2028"; Put $state $sheet "E18" "Receivable"
+    Put $state $sheet "A19" "2"; Put $state $sheet "B19" "4-Jan-2027"; Put $state $sheet "C19" "-10000"; Put $state $sheet "D19" "3-Jan-2029"; Put $state $sheet "E19" "Payable"
+    Put $state $sheet "A20" "3"; Put $state $sheet "B20" "4-Jan-2027"; Put $state $sheet "C20" "250"; Put $state $sheet "D20" "3-Jan-2027"; Put $state $sheet "E20" "Earlier rebate"
+    Put $state $sheet "G14" "4-Jan-2027"
+    Put $state $sheet "H14" "date"; Put $state $sheet "I14" "discount_factor"
+    Put $state $sheet "H15" "4-Jan-2027"; Put $state $sheet "I15" "1"
+    Put $state $sheet "H16" "4-Jan-2028"; Put $state $sheet "I16" "0.95"
+    Put $state $sheet "H17" "3-Jan-2029"; Put $state $sheet "I17" "0.9"
+    Put $state $sheet "D22" '=_CreateTradeTemplate("cashflow",A14:B14,A15:B15)'
+    Put $state $sheet "D23" "=_CreateCashflows(A17:E17,A18:E20,D22)"
+    Put $state $sheet "D24" "=_CreateValuationDate(G14,0.5)"
+    Put $state $sheet "D25" "=_CreateDiscountCurve(H14:I14,H15:I17)"
+    Put $state $sheet "D26" "=_EvaluateCashflows(D23,D24,D25)"
+    Put $state $sheet "D27" "=INDEX(_ReportValues(D26),3,1)"
+    Put $state $sheet "D28" "=INDEX(_ReportValues(D26),3,2)"
+    Put $state $sheet "D29" '=TEXT(INDEX(_ReportRisk(D26,"dv01","year"),4,2),"0.0000")'
+    Put $state $sheet "D30" "=ROWS(util_ReadHandle(D26))"
+    $id = Id $state
+    $batch = Text $state $sheet "D23"
+    $curve = Text $state $sheet "D25"
+    $results = Text $state $sheet "D26"
+    Check "the batch's cell shows a cashflows handle named for the currency" ($batch.StartsWith("${id}:cashflows:USD:")) $batch
+    Check "and the results' cell a cashflow results handle" ($results.StartsWith("${id}:cashflow_results:USD:")) $results
+    Check "500 of mark, 250 of cash and 0.85 of DV01" ((Text $state $sheet "D27") -eq "500" -and (Text $state $sheet "D28") -eq "250" -and (Text $state $sheet "D29") -eq "0.8500") ((Text $state $sheet "D27") + " " + (Text $state $sheet "D28") + " " + (Text $state $sheet "D29"))
+    Check "the readback holds three payment days under two heading rows" ((Text $state $sheet "D30") -eq "5") (Text $state $sheet "D30")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) }
+    Check "the chain, the template, the batch, the date, the curve and the results: sixteen live, sixteen published" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
+
+    # A commodity tick: the chain's vector and market publish anew, the old two released; the
+    # cashflows are no consumer of a quote and stand.
+    Put $state $sheet "A11" "73.8"
+    Check "a commodity tick leaves the batch, the curve and the results as they are" ((Text $state $sheet "D23") -eq $batch -and (Text $state $sheet "D25") -eq $curve -and (Text $state $sheet "D26") -eq $results) (Text $state $sheet "D26")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 2 }
+    Check "the old vector and market are released; two more published" ($c.Live -eq 16 -and $c.Published -eq 18 -and $c.Released -eq 2) $c.Text
+
+    # A changed factor: the curve and the results publish anew, the old two released; the batch
+    # stands and the mark follows, 600 at 0.96.
+    Put $state $sheet "I16" "0.96"
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D25") -ne $curve -and (Text $state $sheet "D25").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D25")
+    Check "and the results a new one, 600 of mark" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D27") -eq "600") (Text $state $sheet "D27")
+    Check "while the batch stands" ((Text $state $sheet "D23") -eq $batch) (Text $state $sheet "D23")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 4 }
+    Check "the old curve and results are released; two more published" ($c.Live -eq 16 -and $c.Published -eq 20 -and $c.Released -eq 4) $c.Text
+
+    # The day rolled onto the receivable's payment day with the curve moved to start there, the
+    # three together under manual calculation: the date, the curve and the results publish anew,
+    # the old three released; the receivable and the rebate are cash, the payable discounted.
+    $results = Text $state $sheet "D26"
+    Invoke-ExcelCall "manual calculation" { $state.Excel.Calculation = -4135 }
+    Put $state $sheet "G14" "4-Jan-2028"
+    Put $state $sheet "H15" "4-Jan-2028"; Put $state $sheet "I15" "1"
+    Put $state $sheet "H16" "3-Jan-2029"; Put $state $sheet "I16" "0.9"
+    Clear-Cell $state $sheet "H17"; Clear-Cell $state $sheet "I17"
+    Put $state $sheet "D25" "=_CreateDiscountCurve(H14:I14,H15:I16)"
+    Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
+    Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
+    Check "the day rolled gives the results a new handle" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:")) (Text $state $sheet "D26")
+    Check "the receivable and the rebate are cash, 10,250, and the payable -9,000 of mark" ((Text $state $sheet "D27") -eq "-9000" -and (Text $state $sheet "D28") -eq "10250") ((Text $state $sheet "D27") + " " + (Text $state $sheet "D28"))
+    Check "and the DV01 the payable's alone, 0.9" ((Text $state $sheet "D29") -eq "0.9000") (Text $state $sheet "D29")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 7 }
+    Check "the old date, curve and results are released; three more published" ($c.Live -eq 16 -and $c.Published -eq 23 -and $c.Released -eq 7) $c.Text
+
+    # The template cleared: the batch fails in the seam's words and the results as its consumer,
+    # the three own nothing; typed back, all three rebuild.
+    Clear-Cell $state $sheet "D22"
+    $refused = "#ERROR _CreateCashflows: template is blank, expected trade template handle"
+    Check "the template cleared fails the batch in the seam's words" ((Text $state $sheet "D23") -eq $refused) (Text $state $sheet "D23")
+    Check "and the results as its consumer" ((Text $state $sheet "D26") -eq "#ERROR _EvaluateCashflows: cashflows is the creator's failure, expected cashflows handle: $refused") (Text $state $sheet "D26")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
+    Check "the template, the batch and the results own nothing: thirteen live, three released" ($c.Live -eq 13 -and $c.Published -eq 23 -and $c.Released -eq 10) $c.Text
+    Put $state $sheet "D22" '=_CreateTradeTemplate("cashflow",A14:B14,A15:B15)'
+    Check "typed back, the three rebuild" ((Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:") -and (Text $state $sheet "D28") -eq "10250") (Text $state $sheet "D26")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
+    Check "sixteen live again, three more published" ($c.Live -eq 16 -and $c.Published -eq 26 -and $c.Released -eq 10) $c.Text
+    Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
+}
+
 # --- quit ---------------------------------------------------------------------------------------
 
 # --- trades ---------------------------------------------------------------------------------------
@@ -968,7 +1067,7 @@ $valuation = {
     Check "which shows n26 settled" ((Text $state $sheet "D22") -eq "TRUE") (Text $state $sheet "D22")
     Check "the two-price vector left in place across the roll is refused by the market" ((Text $state $sheet "D11") -eq $refused) (Text $state $sheet "D11")
     Check "the results fail as the market's consumer" ((Text $state $sheet "D18") -eq "#ERROR _EvaluateTrades: market is the creator's failure, expected market handle: $refused") (Text $state $sheet "D18")
-    Check "the report spilled shows the failure in the creator's words" ((Text $state $sheet "D23") -eq "#ERROR _ReportValues: results is the creator's failure, expected trade results handle: $refused") (Text $state $sheet "D23")
+    Check "the report spilled shows the failure in the creator's words" ((Text $state $sheet "D23") -eq "#ERROR _ReportValues: results is the creator's failure, expected trade results or cashflow results handle: $refused") (Text $state $sheet "D23")
     Check "the mark read through INDEX shows #REF!, no number" ((Text $state $sheet "D19") -eq "#REF!") (Text $state $sheet "D19")
     Check "the delta read likewise" ((Text $state $sheet "D20") -eq "#REF!") (Text $state $sheet "D20")
     Check "and the cash read" ((Text $state $sheet "D21") -eq "#REF!") (Text $state $sheet "D21")
@@ -1236,7 +1335,7 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; quit = $quit }
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; cashflows = $cashflows; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

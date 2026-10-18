@@ -20,6 +20,7 @@ from typing import Final, assert_never
 
 import numpy as np
 
+from goosedove.cashflows.rules import currency_of, finite_amounts
 from goosedove.index_definitions.date_offsets import Instruction, read_offset
 from goosedove.index_definitions.periods import period_months
 from goosedove.instruments.definitions import FieldType, Instrument
@@ -170,6 +171,14 @@ def marketing_reserve_of(where: str, number: float) -> float:
     return number
 
 
+def amount_of(where: str, number: float) -> float:
+    """A cashflow's amount by the cashflows' rule, finite, zero and fractions included, named by
+    its field, since #200: the one amount a template holds, every row of a batch made under it
+    paying it."""
+    finite_amounts(np.array([number]), lambda _: where)
+    return number
+
+
 def months_of(where: str, text: str) -> tuple[int, int]:
     """The first month of a contract code or strip and the month after its last, as numpy counts
     months, through the period grammar, which reads `Z26`, `z26`, `CAL27` and `Z27-X28` alike;
@@ -194,6 +203,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
         "payment_time_lag": payment_rule_of,
+        "currency": currency_of,  # the cashflow instrument's, since #200
     }
 )
 NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = MappingProxyType(
@@ -202,5 +212,6 @@ NUMBER_READERS: Final[Mapping[str, Callable[[str, float], float | int]]] = Mappi
         "quantity": quantity_of,
         "fixed_price": price_of,
         "marketing_reserve": marketing_reserve_of,
+        "amount": amount_of,  # the cashflow instrument's, since #200
     }
 )

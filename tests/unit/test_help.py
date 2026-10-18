@@ -722,23 +722,78 @@ def test_the_evaluation_explains_itself() -> None:
     ]
 
 
+def test_the_cashflow_functions_explain_themselves() -> None:
+    description, arguments, hidden = SPECS["_CreateCashflows"]
+    assert not hidden
+    assert description == (
+        "Creates a batch of cashflows, known signed amounts in one currency each on its own "
+        "payment date, from a template's shared fields and a ticket's rows, and shows its "
+        "handle, the text _EvaluateCashflows takes as the cashflows."
+    )
+    assert arguments == [
+        (
+            "fields",
+            "The ticket's header cells in one row, such as A4:E4, using names shown by "
+            "_ShowInstrument for cashflow and none the template supplies.",
+        ),
+        (
+            "cashflow_rows",
+            "The rows under the headers, such as A5:E9, one payment per row, a repeated row a "
+            "second payment.",
+        ),
+        (
+            "template",
+            "The trade-template handle: the cell showing _CreateTradeTemplate's result for the "
+            "cashflow instrument, such as B3, or a name for it, which supplies the shared "
+            "fields.",
+        ),
+    ]
+    description, arguments, hidden = SPECS["_EvaluateCashflows"]
+    assert not hidden
+    assert description == (
+        "Values a batch of cashflows on the valuation day: each unpaid payment discounted on "
+        "the curve's factor for its day with its DV01, each paid one cash, and shows the "
+        "results' handle, the text the reports and util_ReadHandle take."
+    )
+    assert arguments == [
+        (
+            "cashflows",
+            "The cashflows handle: the cell showing _CreateCashflows's result, such as A10, or "
+            "a name for it.",
+        ),
+        (
+            "valuation_date",
+            "The valuation-date handle: the cell showing _CreateValuationDate's result, such "
+            "as B2, or a name for it; the day the unpaid payments are discounted to.",
+        ),
+        (
+            "discount_curve",
+            "The discount-curve handle: the cell showing _CreateDiscountCurve's result, such "
+            "as B5, or a name for it, starting on the valuation day and covering every unpaid "
+            "payment day.",
+        ),
+    ]
+
+
 def test_the_two_reports_explain_themselves() -> None:
     results = (
         "results",
-        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
-        "for it.",
+        "The results handle: the cell showing _EvaluateTrades's or _EvaluateCashflows's result, "
+        "such as A12, or a name for it.",
     )
     description, arguments, hidden = SPECS["_ReportValues"]
     assert not hidden and arguments == [results]
     assert description == (
         "Reports the batch's values from its results: the mark and the cash under the route's "
-        "labels, the currency and the valuation day, as evaluation stored them."
+        "labels, or under cashflow for a batch of cashflows, the currency and the valuation "
+        "day, as evaluation stored them."
     )
     description, arguments, hidden = SPECS["_ReportRisk"]
     either = (
         "results",
-        "The results handle, one evaluated batch's or a collection's: the cell showing "
-        "_EvaluateTrades's or _AggregateResults's result, such as A12, or a name for it.",
+        "The results handle, one evaluated batch's, a collection's or a batch of cashflows': "
+        "the cell showing _EvaluateTrades's, _AggregateResults's or _EvaluateCashflows's "
+        "result, such as A12, or a name for it.",
     )
     assert not hidden and arguments == [
         either,
@@ -776,7 +831,13 @@ def test_the_two_reports_explain_themselves() -> None:
         "shows its handle, which _ReportRisk takes beside a single result's."
     )
     description, arguments, hidden = SPECS["_ReportReserves"]
-    assert not hidden and arguments == [results]
+    assert not hidden and arguments == [
+        (
+            "results",
+            "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
+            "for it.",
+        )
+    ]
     assert description == (
         "Reports the batch's booked reserves from its results: brokerage on the trades naming a "
         "broker and clearing on a cleared route, each trade's unsigned quantity times its "

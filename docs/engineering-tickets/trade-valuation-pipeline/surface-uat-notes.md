@@ -40,6 +40,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 21 / item 18 | [Brokerage and clearing applicability](reserve-fee-applicability.md) | [#188](https://github.com/gobbles404/goosedove/pull/188), awaiting review | On a specification charging 10 brokerage and 4 clearing per LOT, book one +10 LOT month four ways and read `_ReportReserves`: bilateral direct 0/0, bilateral brokered 100/0, cleared direct 0/40, cleared brokered 100/40; type `None`, `none` or `NONE` as the broker and see no brokerage; mix `ION` and `None` in a ticket column; move the broker between template and ticket; sell instead of buy; read the kept workbook's block from row 2722. |
 | 23 / item 21 | [Linear interpolation of contract prices](interpolate-contract-prices.md) | [#198](https://github.com/gobbles404/goosedove/pull/198), awaiting review | Point `util_InterpolateContracts` at an index handle, a column of two or more contract months as codes or as CME spells them, `202704`, typed as text, and a column of their prices: the spill names every month from the first anchor's through the last's with its futures expiry and its price on the line between the anchors by calendar days, the ticket's `J27` at 70 and `M27` at 76 putting `K27` at 72.949, 29 of 59 days along. Feed the price column to `_CreatePriceVector` from the market's prompt; move an anchor price or a schedule expiry and watch the spill, the market and the mark follow; type the anchors out of order, twice, or as numbers and read the refusals. The kept workbook's block from row 2812 holds the example with its two moves and the same mark on the prices typed by hand. |
 | 24 / item 22 | [Bump a discount curve](bump-discount-curve.md) | [#199](https://github.com/gobbles404/goosedove/pull/199), awaiting review | Point `util_BumpDiscountCurve` at a curve handle and a signed number of basis points, `1`, `-1`, `0.5` or `0`: the result is an ordinary curve, read back with `util_ReadHandle`, 0.95 a year out becoming 0.9499050047498416 under +1 and 0.9500950047501583 under -1, the first factor 1 and every day kept; evaluate the same prepared trades and market on the curve bumped each way and compare half the difference of the marks with the saved DV01 and half the difference of the deltas with the saved cross-gamma; bump a curve of ones down and read the refusal; type `+1bp` and read the seam's. The kept workbook's block from row 2849 holds the cross-gamma block's curve bumped each way with the centered checks. |
+| 25 / item 23 | [Cashflow instrument](cashflow-instrument.md) | [#200](https://github.com/gobbles404/goosedove/pull/200), awaiting review | Make a template with `_CreateTradeTemplate("cashflow", ...)` holding `currency` USD and a `counterparty`; book rows of `trade_id`, `trade_date`, `amount`, `payment_date` and `description` with `_CreateCashflows`; value them with `_EvaluateCashflows` on a valuation-date handle and a curve starting on that day; read `_ReportValues` for `cashflow_mark` and `cashflow_cash`, `_ReportRisk(results,"dv01","year")` and `util_ReadHandle` on both handles; move a factor, roll the day onto a payment, type `CENT` or `usd`, a fixed_float template and `delta`, and read the refusals. The kept workbook's block from row 2864 holds the ticket's example. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
 results. The Asian roll then exercises reference mapping; the daily report checks its
@@ -620,3 +621,27 @@ and zero bumps, and visible refusal of a downward bump on a curve of ones. Reeva
 same prepared trades and market with each bumped curve: centered changes in discounted
 delta and NPV should agree with the original cross-gamma and DV01, within numerical tolerance.
 The kept workbook's block from row 2849 holds the checks on the cross-gamma block's curve.
+
+## 23. Cashflow instrument
+
+The next instrument after the utilities: one known signed monetary amount on one explicit
+payment date, for a fee, a rebate or a termination payment, with no commodity index. The
+[ticket](cashflow-instrument.md) is built in #200 as the first of its two PRs. The agreed
+path reuses `_CreateTradeTemplate("cashflow", fields, values)`, then
+`_CreateCashflows(fields, cashflow_rows, template)` and
+`_EvaluateCashflows(cashflows, valuation_date, discount_curve)`, with no preparation,
+commodity index, history or market. Cashflows have their own records and entry functions,
+[create-cashflows.md](../../library/cashflows/create-cashflows.md) and
+[evaluate-cashflows.md](../../library/cashflows/evaluate-cashflows.md), sharing the payment
+arithmetic, the templates, the readers and the reports; the collection through
+`_AggregateResults` is the second PR's. The owner's decisions of 17 October 2026: USD alone, one
+currency per batch; the labels `cashflow_mark` and `cashflow_cash`; `dv01` by day, month and
+year, `all` the DV01 alone and the commodity selectors refused by name; the currency in the
+handle; the batch read back row by row and the results by payment day with the totals once.
+
+UAT: the ticket's two future payments of +10,000 and -10,000 USD on different dates give 500
+of mark and 0.85 USD per basis point of DV01, and the past rebate 250 of cash. Check signs,
+fractional and zero amounts, duplicate rows, different payment dates, a curve update and a
+date roll to payment; a fixed_float template refused; `delta` refused. The kept workbook's
+block from row 2864 holds the example over the cross-gamma block's curve and valuation date,
+and the receipt of a hundred on the two curves and on its payment day.

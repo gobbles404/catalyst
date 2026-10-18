@@ -163,7 +163,7 @@ def test_the_echo_probe_spills_the_bound_row_back_under_its_field_names(calendar
             "Future",
             row("Quantity"),
             row("ten"),
-            "ValueError: instrument is 'Future', expected one of: 'fixed_float'",
+            "ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'",
         ),
         (
             "fixed_float",
@@ -282,9 +282,9 @@ def test_a_handle_of_another_kind_in_a_handle_column_is_refused_naming_the_cell(
 def test_the_instrument_is_read_before_the_headers_and_the_cells() -> None:
     # A wrong name, a wrong header and a wrong cell together: the name is refused first.
     out = ENTRY["EchoFieldRow"]("Future", row("Quantity"), row("ten"))
-    assert (
-        out
-        == "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
+    assert out == (
+        "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: "
+        "'fixed_float', 'cashflow'"
     )
     # The right name, a wrong width and a wrong header: the width is refused first.
     out = ENTRY["EchoFieldRow"]("fixed_float", row("Quantity"), row(1.0, 2.0))

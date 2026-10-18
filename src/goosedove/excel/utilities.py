@@ -13,6 +13,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from goosedove.calendar.calendar import Calendar
+from goosedove.cashflows.booking import Cashflows
+from goosedove.cashflows.valuation import CashflowResults
 from goosedove.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
@@ -665,6 +667,99 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
 
 
 PAYMENT_COLUMNS = ("payment_factor", "payment_amount", "group_npv", "group_dv01")
+
+
+@shown.register
+def cashflows_table(obj: Cashflows) -> MixedArray:
+    # One row per payment booked, in the ticket's order, since #200, under the definition's field
+    # names in its order: trade_id where the batch has it, trade_date, amount, currency on every
+    # row, payment_date, and counterparty and description where the batch has them, the
+    # template's value on every row as a ticket's column is on its own, so that a payment reads
+    # whole from its row; nothing of the valuation, which the results show.
+    n = obj.rows
+    headers: list[str] = []
+    types: list[str] = []
+    columns: list[NDArray[Any] | tuple[str, ...]] = []
+
+    def text(name: str, column: tuple[str, ...]) -> None:
+        headers.append(name)
+        types.append("str")
+        columns.append(column)
+
+    def numbers(name: str, kind: str, column: NDArray[Any]) -> None:
+        headers.append(name)
+        types.append(kind)
+        columns.append(column)
+
+    if obj.trade_id is not None:
+        numbers("trade_id", "int64", obj.trade_id)
+    numbers("trade_date", "datetime64[D]", obj.trade_date)
+    numbers("amount", "float64", obj.amount)
+    text("currency", (obj.currency,) * n)
+    numbers("payment_date", "datetime64[D]", obj.payment_date)
+    if obj.counterparty is not None:
+        text("counterparty", obj.counterparty)
+    if obj.description is not None:
+        text("description", obj.description)
+    return MixedArray.table([tuple(headers), tuple(types)], *columns)
+
+
+@shown.register
+def cashflow_results_table(obj: CashflowResults) -> MixedArray:
+    # One row per distinct payment day of the batch, increasing, paid or not, since #200: the
+    # day, the amount the rows summed to on it, whether it has paid, its factor, 1 on a paid
+    # day, its npv, its cash and its dv01, with the currency and the valuation day on every row so
+    # that a row reads whole; then the batch's totals once, on the first row and a dash below,
+    # cashflow_mark, cashflow_cash and cashflow_dv01, the numbers the reports show, since a total
+    # repeated on every day would read as each day's and sum twice.
+    days = obj.cashflows.payment_days
+    n = days.size
+    table = MixedArray.table(
+        [
+            (
+                "payment_date",
+                "amount",
+                "is_paid",
+                "payment_factor",
+                "npv",
+                "cash",
+                "dv01",
+                "currency",
+                "as_of",
+            ),
+            (
+                "datetime64[D]",
+                "float64",
+                "bool",
+                "float64",
+                "float64",
+                "float64",
+                "float64",
+                "str",
+                "datetime64[D]",
+            ),
+        ],
+        days,
+        obj.cashflows.payment_amounts,
+        obj.is_paid,
+        obj.payment_factor,
+        obj.npv,
+        obj.payment_cash,
+        obj.dv01_by_day,
+        (obj.currency,) * n,
+        np.full(n, obj.as_of, dtype="datetime64[D]"),
+    )
+    once = np.zeros(n, dtype=np.bool_)
+    once[0] = True  # the batch's own facts, on the first row
+    return _widened(
+        table,
+        [
+            _numbers_on("cashflow_mark", np.array([obj.mark]), once),
+            _numbers_on("cashflow_cash", np.array([obj.cash]), once),
+            _numbers_on("cashflow_dv01", np.array([obj.dv01]), once),
+        ],
+    )
+
 
 # A column a plain table cannot hold, written by kind: its name, its type word, and per body row
 # its kind, its number and its word, a number on the rows that hold one and a dash on the rest,

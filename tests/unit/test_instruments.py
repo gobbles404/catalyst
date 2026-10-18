@@ -19,6 +19,7 @@ from goosedove.excel.instruments import (
     schema_cells,
 )
 from goosedove.instruments.definitions import (
+    CASHFLOW,
     CATALOG,
     FIXED_FLOAT,
     NONE,
@@ -46,7 +47,7 @@ FIELDS = tuple([field.name for field in FIXED_FLOAT.fields])
 
 
 def test_the_catalog_holds_the_fixed_float_with_its_eighteen_fields_in_order() -> None:
-    assert [each.name for each in CATALOG] == ["fixed_float"]
+    assert [each.name for each in CATALOG] == ["fixed_float", "cashflow"]
     assert FIELDS == (
         "trade_id",
         "trade_date",
@@ -131,12 +132,15 @@ def test_a_definition_that_cannot_be_authored_says_why(
 
 def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_there_are() -> None:
     assert instrument("fixed_float") is FIXED_FLOAT
+    assert instrument("cashflow") is CASHFLOW
     with pytest.raises(
-        ValueError, match=r"^instrument is 'Future', expected one of: 'fixed_float'$"
+        ValueError,
+        match=r"^instrument is 'Future', expected one of: 'fixed_float', 'cashflow'$",
     ):
         instrument("Future")
     with pytest.raises(
-        ValueError, match=r"^instrument is ' fixed_float', expected one of: 'fixed_float'$"
+        ValueError,
+        match=r"^instrument is ' fixed_float', expected one of: 'fixed_float', 'cashflow'$",
     ):
         instrument(" fixed_float")
     with pytest.raises(
@@ -145,7 +149,8 @@ def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_ther
     ):
         instrument("fixed_float", ())
     with pytest.raises(
-        ValueError, match=r"^instrument is 'future', expected one of: 'fixed_float'$"
+        ValueError,
+        match=r"^instrument is 'future', expected one of: 'fixed_float', 'cashflow'$",
     ):
         instrument("future")  # the name until #174, refused as any other word
     two = (FIXED_FLOAT, Instrument("swap", "d", (a_field(),)))
@@ -160,13 +165,15 @@ def test_an_instrument_is_found_by_its_exact_name_or_refused_with_the_names_ther
 
 def test_the_list_spills_a_header_and_one_row_per_instrument() -> None:
     listed = _ListInstruments()
-    assert listed.shape == (2, 2)
+    assert listed.shape == (3, 2)
     assert listed.texts == (
         "instrument",
         "description",
         "fixed_float",
         "A fixed-for-floating position on a specified reference contract, with explicit "
         "observation and settlement terms.",
+        "cashflow",
+        "A known signed amount in one currency, payable on one explicit date.",
     )
     assert (listed.kinds == TEXT_CODE).all()
 
@@ -223,16 +230,20 @@ def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     assert "" not in shown.texts
 
 
-def test_the_show_page_shows_the_same_cells_as_the_spill() -> None:
+@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 19), (CASHFLOW, 8)])
+def test_the_show_page_shows_the_same_cells_as_the_spill(
+    definition: Instrument, columns: int
+) -> None:
     page = Path(__file__).resolve().parents[2] / "docs/library/instruments/show-instrument.md"
     lines = page.read_text(encoding="utf-8").split("\n")
-    start = next(i for i, line in enumerate(lines) if line.startswith("| field | trade_id |"))
+    first = "| field | " + " | ".join(field.name for field in definition.fields[:3]) + " |"
+    start = next(i for i, line in enumerate(lines) if line.startswith(first))
     table = [[cell.strip() for cell in line.split("|")[1:-1]] for line in lines[start : start + 8]]
     del table[1]  # the markdown separator row
-    shown = schema_cells(FIXED_FLOAT)
+    shown = schema_cells(definition)
     texts = iter(shown.texts)
     for r in range(7):
-        for c in range(19):
+        for c in range(columns):
             kind = shown.kinds[r, c]
             if kind == TEXT_CODE:
                 cell = next(texts)
@@ -243,14 +254,16 @@ def test_the_show_page_shows_the_same_cells_as_the_spill() -> None:
 
 def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
-    assert kinds.shape == (2, 2) and text.split("\0")[2] == "fixed_float"
+    assert kinds.shape == (3, 2) and text.split("\0")[2::2] == ["fixed_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
     assert kinds.shape == (7, 19) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert ENTRY["_ShowInstrument"]("Future") == (
-        "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float'"
+        "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "
+        "'fixed_float', 'cashflow'"
     )
     assert ENTRY["_ShowInstrument"]("future") == (  # the name until #174
-        "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float'"
+        "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: "
+        "'fixed_float', 'cashflow'"
     )
     assert (
         ENTRY["_ShowInstrument"](None)

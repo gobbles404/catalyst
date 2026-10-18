@@ -459,7 +459,7 @@ def test_a_failed_source_shows_the_creators_failure_once_through_the_collection(
     )
     assert ENTRY["_ReportRisk"](collection, "all", "day") == (
         "#ERROR _ReportRisk: results is the creator's failure, expected trade results or "
-        f"aggregate results handle: {failed}"
+        f"aggregate results or cashflow results handle: {failed}"
     )
     assert ENTRY["util_ReadHandle"](collection) == (
         f"#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: {failed}"
@@ -605,14 +605,15 @@ def test_the_reader_takes_either_kind_and_the_other_reports_take_one(sheet: dict
     agg = collected(sheet["b2"], sheet["b3"])
     assert ENTRY["_ReportRisk"](sheet["hng"], "all", "day") == (
         f"#ERROR _ReportRisk: results is index handle {sheet['hng']!r}, expected trade results or "
-        "aggregate results handle"
+        "aggregate results or cashflow results handle"
     )
     assert ENTRY["_ReportRisk"](None, "all", "day") == (
-        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results handle"
+        "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or "
+        "cashflow results handle"
     )
     assert ENTRY["_ReportValues"](agg) == (
         f"#ERROR _ReportValues: results is aggregate results handle {agg!r}, expected trade "
-        "results handle"
+        "results or cashflow results handle"
     )
     assert ENTRY["_ReportReserves"](agg) == (
         f"#ERROR _ReportReserves: results is aggregate results handle {agg!r}, expected trade "

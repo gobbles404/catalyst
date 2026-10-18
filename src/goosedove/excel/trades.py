@@ -12,10 +12,12 @@ what it shows about that argument as a person types the formula. How to write a 
 docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
+from functools import singledispatch
 from typing import Annotated
 
 import numpy as np
 
+from goosedove.cashflows.valuation import CashflowResults
 from goosedove.excel.bridge import (
     NUMBER_CODE,
     TEXT_CODE,
@@ -157,20 +159,35 @@ def _AggregateResults(
     return aggregate_results(result_handles, WorkCounter())
 
 
+@singledispatch
+def values_label(results: object) -> str:
+    """The word _ReportValues labels a result's mark and cash with: a batch of trades' route,
+    cleared or bilateral, here, and since #200 a batch of cashflows' instrument, cashflow,
+    registered in the cashflows' own module; a kind nobody registered fails rather than
+    guessing."""
+    raise ValueError(f"{type(results).__name__} has no values report")
+
+
+@values_label.register
+def trade_values_label(results: TradeResults) -> str:
+    return results.route.value
+
+
 @excel_function
 def _ReportValues(
     results: Annotated[
-        Handle[TradeResults],
-        "The results handle: the cell showing _EvaluateTrades's result, such as A12, or a name "
-        "for it.",
+        Handle[TradeResults] | Handle[CashflowResults],
+        "The results handle: the cell showing _EvaluateTrades's or _EvaluateCashflows's result, "
+        "such as A12, or a name for it.",
     ],
 ) -> MixedArray:
     """Reports the batch's values from its results: the mark and the cash under the route's
-    labels, the currency and the valuation day, as evaluation stored them."""
-    route = results.route.value
+    labels, or under cashflow for a batch of cashflows, the currency and the valuation day, as
+    evaluation stored them."""
+    label = values_label(results)
     return MixedArray.table(
         [
-            (f"{route}_mark", f"{route}_cash", "currency", "as_of"),
+            (f"{label}_mark", f"{label}_cash", "currency", "as_of"),
             ("float64", "float64", "str", "datetime64[D]"),
         ],
         np.array([results.mark]),
@@ -183,9 +200,10 @@ def _ReportValues(
 @excel_function
 def _ReportRisk(
     results: Annotated[
-        Handle[TradeResults] | Handle[AggregateResults],
-        "The results handle, one evaluated batch's or a collection's: the cell showing "
-        "_EvaluateTrades's or _AggregateResults's result, such as A12, or a name for it.",
+        Handle[TradeResults] | Handle[AggregateResults] | Handle[CashflowResults],
+        "The results handle, one evaluated batch's, a collection's or a batch of cashflows': the "
+        "cell showing _EvaluateTrades's, _AggregateResults's or _EvaluateCashflows's result, "
+        "such as A12, or a name for it.",
     ],
     risk: Annotated[
         str,
