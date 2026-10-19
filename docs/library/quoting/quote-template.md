@@ -1,6 +1,6 @@
 # _CreateQuoteTemplate
 
-Built from [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), with `_Quote`. The static terms of a quote under the `fixed_float`'s definition, created once and taken by every quote made under it beside the market and the contract code the quote prices: the fields a quote reads, held as a trade template holds its defaults, and none of the booking facts, so a quote template books nothing and a trade template quotes nothing. The code is `src/goosedove/quoting/template.py`, the record and its builder, and `src/goosedove/excel/quoting.py`, the worksheet function.
+Built from [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), with [_Quote](quote.md). The static terms of a quote under the `fixed_float`'s definition, created once and taken by every quote made under it beside the market and the contract code the quote prices: the fields a quote reads, held as a trade template holds its defaults, and none of the booking facts, so a quote template books nothing and a trade template quotes nothing. The code is `src/goosedove/quoting/template.py`, the record and its builder, and `src/goosedove/excel/quoting.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -43,7 +43,7 @@ Which fields a quote template may hold is the definition's own metadata, the `qu
 | each header, in the sheet's order and before any value is read, is a field a quote template may hold: a booking fact, the identifiers, the dates, the quantity and its unit, the price, the labels and the reserve, is refused by name, and so is a period field, `contract_code`, `start_date` or `end_date`, whose cell may be blank for a trade template and is refused here whatever it holds, since the quote's own contract code argument owns the period | `quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar` |
 | each value, read once for the rule intrinsic to its field by the trade template's readers, [trade-template.md](../trades/trade-template.md) the table of them: a code from its list, a payment rule read whole, a curve key with no whitespace around it | `route is 'Cleared', expected cleared or bilateral`; `payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd`; `discount_curve_key is ' SOFR', expected a name with no whitespace around it` |
 
-Nothing is required of a template, which is a partial record. Which terms a completed quote needs, the four codes always, the payment fields with a financial settlement and the key on the bilateral route, as the `quote_required` and `quote_required_when` rows say, and whether the terms agree with one another and with the index and the market, are `_Quote`'s checks, against the template, the contract code and the market together. So a key beside a cleared route, or a lag beside a physical settlement, is held here as typed and refused when a quote is made.
+Nothing is required of a template, which is a partial record. Which terms a completed quote needs, the four codes always, the payment fields with a financial settlement and the key on the bilateral route, as the `quote_required` and `quote_required_when` rows say, and whether the terms agree with one another and with the index and the market, are [_Quote](quote.md)'s checks, against the template, the contract code and the market together. So a key beside a cleared route, or a lag beside a physical settlement, is held here as typed and refused when a quote is made.
 
 ## What it retains
 
@@ -73,4 +73,4 @@ Each value is the one the row held: a code, a payment rule and the curve key as 
 
 ## Not here
 
-The quote itself, what it requires of the template, how it prices and what it refuses: `_Quote`'s page. Booking under a quote template. A quantity, a fixed price, a label, a reserve, an index or a market on the template; a second quote instrument; a reader of what a completed quote resolved.
+The quote itself, what it requires of the template, how it prices and what it refuses: [quote.md](quote.md). Booking under a quote template. A quantity, a fixed price, a label, a reserve, an index or a market on the template; a second quote instrument; a reader of what a completed quote resolved.

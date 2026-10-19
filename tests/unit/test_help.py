@@ -766,6 +766,39 @@ def test_the_quote_template_creator_explains_itself() -> None:
     ]
 
 
+def test_the_quote_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_Quote"]
+    assert not hidden
+    assert description == (
+        "Quotes one whole-period fixed price for a contract or strip on one market from a quote "
+        "template's terms, fixings for the observations that have passed and the day's quotes for "
+        "the rest, a bilateral payment discounted on the template's curve."
+    )
+    assert arguments == [
+        (
+            "market",
+            "The market handle: the cell showing _CreateMarket's result, such as I12, or a name "
+            "for it, with the day's quotes over the history they follow.",
+        ),
+        (
+            "contract_code",
+            "The contract or strip to quote, such as Z26, F27-G27, 1H27 or CAL27, every month of "
+            "it a contract of the market's schedule.",
+        ),
+        (
+            "template",
+            "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as "
+            "B3, or a name for it, which supplies the quote's terms.",
+        ),
+        (
+            "[discount_curve_set]",
+            "The collection handle for a bilateral quote: the cell showing "
+            "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
+            "the template names; left out for a cleared quote.",
+        ),
+    ]
+
+
 def test_the_cashflow_functions_explain_themselves() -> None:
     description, arguments, hidden = SPECS["_CreateCashflows"]
     assert not hidden
