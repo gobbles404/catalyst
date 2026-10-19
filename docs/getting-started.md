@@ -50,7 +50,7 @@ Add that folder to your account's Path (Settings, System, About, Advanced system
 uv sync --locked
 ```
 
-This creates `.venv` in the repository with Python 3.13.13 and the exact versions `uv.lock` records, numpy and scipy for the library and the tools for the checks. uv uses your installed 3.13.13 when it finds one and otherwise downloads a 3.13.13 of its own into the environment; both are fine, since the add-in follows whichever Python the environment holds. `--locked` refuses to change the lock file, which is what you want: if it complains that the lock needs updating, your clone differs from `main`, so run `git status` and `git pull` rather than editing anything.
+This creates `.venv` in the repository with Python 3.13.13 and the exact versions `uv.lock` records, numpy for the library and the tools for the checks. uv uses your installed 3.13.13 when it finds one and otherwise downloads a 3.13.13 of its own into the environment; both are fine, since the add-in follows whichever Python the environment holds. `--locked` refuses to change the lock file, which is what you want: if it complains that the lock needs updating, your clone differs from `main`, so run `git status` and `git pull` rather than editing anything.
 
 Check it:
 
