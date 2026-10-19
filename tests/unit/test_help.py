@@ -636,7 +636,9 @@ def test_the_catalog_list_explains_itself() -> None:
 def test_the_catalog_show_explains_itself() -> None:
     description, arguments, hidden = SPECS["_ShowInstrument"]
     assert not hidden
-    assert description == "Shows an instrument's fields, requirements, types and rules."
+    assert description == (
+        "Shows an instrument's fields, requirements, types and rules, for booking and quoting."
+    )
     assert arguments == [
         ("instrument", "One instrument name from _ListInstruments, such as fixed_float."),
     ]

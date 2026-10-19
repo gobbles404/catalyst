@@ -382,6 +382,7 @@ ENCODING_LEDGER = {
     "_the_groups": 1,
     "_distinct": 2,
     "_the_references": 1,
+    "observation_references": 1,  # the reader shared with a quote, template-based-quoting.md
     "requires_booked_reference": 1,  # the methods' fact the references read, once
     "with_holiday_calendar": 1,
     "open_days": 1,
@@ -408,6 +409,7 @@ def test_the_preparation_runs_the_same_functions_at_any_size(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -516,6 +518,7 @@ def test_an_asian_batch_observes_a_month_per_component_and_ticks_like_a_lastday_
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -563,6 +566,7 @@ def test_a_last3day_batch_prepares_and_ticks_with_the_same_functions_as_a_lastda
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -676,6 +680,7 @@ def test_a_daily_batch_runs_the_same_functions_as_a_lastday_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -743,6 +748,7 @@ def test_a_calday_batch_encodes_prepares_and_ticks_like_a_month_one(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -849,6 +855,7 @@ def test_two_payment_days_per_contract_double_the_groups_and_slots_and_not_the_q
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -1042,6 +1049,7 @@ def test_a_mixed_batch_dispatches_over_its_methods_once_and_values_through_the_o
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -1178,6 +1186,7 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite
@@ -1333,6 +1342,7 @@ def test_an_iferc_batch_observes_once_a_component_and_runs_the_kernel_on_monthly
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite

@@ -656,8 +656,9 @@ namespace Goosedove.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills seven rows by nineteen columns since #175, the labels down the first column, the
-        // fields across the first row and the required row booleans, every other cell text.
+        // the shown fixed_float spills ten rows by twenty columns, the seven rows of booking and since
+        // template-based-quoting.md the three of quoting, the labels down the first column, the fields across
+        // the first row and the required, quote_allowed and quote_required rows booleans, every other cell text.
         [Fact]
         public void the_instrument_catalog_is_listed_and_the_future_shown()
         {
@@ -670,7 +671,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("cashflow", listed[2, 0]);
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
-            Assert.Equal(7, shown.GetLength(0));
+            Assert.Equal(10, shown.GetLength(0));
             Assert.Equal(20, shown.GetLength(1));
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
@@ -692,6 +693,17 @@ namespace Goosedove.Host.Tests
             Assert.Equal("holiday calendar handle", shown[4, 18]);
             Assert.Equal("the index's specification names", shown[5, 14]);
             Assert.Equal("month, calday", shown[5, 15]);
+            Assert.Equal("quote_allowed", shown[7, 0]);
+            Assert.Equal("quote_required", shown[8, 0]);
+            Assert.Equal("quote_required_when", shown[9, 0]);
+            Assert.Equal(false, shown[7, 1]);  // trade_id: a booking fact no quote template holds
+            Assert.Equal(true, shown[7, 6]);  // schedule_method: held and always required
+            Assert.Equal(true, shown[8, 6]);
+            Assert.Equal(true, shown[7, 17]);  // payment_time_lag: held, required with a financial settlement
+            Assert.Equal(false, shown[8, 17]);
+            Assert.Equal("settlement_method = financial", shown[9, 17]);
+            Assert.Equal("route = bilateral", shown[9, 11]);
+            Assert.Equal("none", shown[9, 1]);
         }
 
         // The NG example of the trade-valuation pipeline: a template of the fixed_float's six shared

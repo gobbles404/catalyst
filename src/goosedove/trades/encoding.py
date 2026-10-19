@@ -16,6 +16,7 @@ batch.
 Nothing here changes on a tick, a fixing
 or a roll of the valuation date. docs/library/trades/kernel.md is the page."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, assert_never
 
@@ -25,6 +26,7 @@ from numpy.typing import NDArray
 from goosedove.calendar.calendar import contract_on, open_days
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.futures_schedule import FuturesSchedule
+from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.index_conventions import CURRENCY
 from goosedove.index_definitions.kind import with_holiday_calendar
@@ -584,36 +586,58 @@ def _the_curve_axes(
 
 
 def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArray[np.intp]:
-    """Each observation's reference, the contract pricing its day. On a futures index: the day
-    open on the index's market, within the schedule, and under the expiry-based methods the
-    component's own contract; under asian whichever contract the calendar gives, one gather of
-    the methods onto the observations. On an IFERC index, since #167: the component's own
-    contract, whose index publishes on that very day, else refused, an IFERC month pricing
-    once; no calendar is read, an IFERC index having none."""
-    match terms.schedule:
+    """Each observation's reference for a batch: observation_references over the terms' schedule,
+    holiday calendar, contracts and methods, each component named as the terms name its trade."""
+    return observation_references(
+        terms.schedule,
+        terms.index.holiday_calendar,
+        observations,
+        terms.contract,
+        terms.schedule_method[terms.occurrence],
+        terms.named,
+    )
+
+
+def observation_references(
+    schedule: FuturesSchedule | IfercSchedule,
+    holiday_calendar: HolidayCalendar | None,
+    observations: Observations,
+    contract: NDArray[np.intp],
+    method: NDArray[np.intp],
+    named: Callable[[int], str],
+) -> NDArray[np.intp]:
+    """Each observation's reference, the contract pricing its day, for a batch of trades and
+    since template-based-quoting.md for a quote alike: contract[k] and method[k] the k-th
+    component's schedule row and method, and named(k) the words a refusal gives it. On a futures
+    index: the day open on the index's market, within the schedule, and under the expiry-based
+    methods the component's own contract; under asian whichever contract the calendar gives,
+    one gather of the methods onto the observations. On an IFERC index, since #167: the
+    component's own contract, whose index publishes on that very day, else refused, an IFERC
+    month pricing once; no calendar is read, an IFERC index having none."""
+    match schedule:
         case IfercSchedule() as iferc:
-            contract = terms.contract[observations.component]
-            published = iferc.publication_date[contract]
+            own_contract = contract[observations.component]
+            published = iferc.publication_date[own_contract]
             off = published != observations.date
             if off.any():
                 j = int(off.argmax())
                 raise ValueError(
-                    f"{terms.named(int(observations.component[j]))} observes "
+                    f"{named(int(observations.component[j]))} observes "
                     f"{observations.date[j]}, expected {published[j]}, the day "
-                    f"{iferc.codes[int(contract[j])]}'s index publishes; an IFERC month prices "
-                    "once, on that day"
+                    f"{iferc.codes[int(own_contract[j])]}'s index publishes; an IFERC month "
+                    "prices once, on that day"
                 )
-            return contract
-        case FuturesSchedule() as schedule:
+            return own_contract
+        case FuturesSchedule():
             pass
         case _:
-            assert_never(terms.schedule)
+            assert_never(schedule)
     codes = schedule.codes
-    closed = ~open_days(with_holiday_calendar(terms.index.holiday_calendar), observations.date)
+    closed = ~open_days(with_holiday_calendar(holiday_calendar), observations.date)
     if closed.any():
         j = int(closed.argmax())
         raise ValueError(
-            f"{terms.named(int(observations.component[j]))} observes {observations.date[j]}, "
+            f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             "a day the index's market is closed; no settle exists or will"
         )
     reference = contract_on(schedule, observations.date)
@@ -621,21 +645,22 @@ def _the_references(terms: ResolvedTrades, observations: Observations) -> NDArra
     if beyond.any():
         j = int(beyond.argmax())
         raise ValueError(
-            f"{terms.named(int(observations.component[j]))} observes {observations.date[j]}, "
+            f"{named(int(observations.component[j]))} observes {observations.date[j]}, "
             f"after the schedule's last expiry, {schedule.future_expiry[-1]}; nothing prices it"
         )
-    method = terms.schedule_method[terms.occurrence][observations.component]
-    own = requires_booked_reference(method)
-    other = own & (reference != terms.contract[observations.component])
+    of_observation = method[observations.component]
+    own = requires_booked_reference(of_observation)
+    other = own & (reference != contract[observations.component])
     if other.any():
         j = int(other.argmax())
         component = int(observations.component[j])
-        code = codes[int(terms.contract[component])]
+        code = codes[int(contract[component])]
         pricing = codes[int(reference[j])]
         raise ValueError(
-            f"{terms.named(component)} observes {code} on {observations.date[j]}, a day "
-            f"{pricing} prices; the {METHODS[int(method[j])].value} method takes the contract's "
-            f"own days, and a futures history holds no settle of {code} for a day {pricing} prices"
+            f"{named(component)} observes {code} on {observations.date[j]}, a day "
+            f"{pricing} prices; the {METHODS[int(of_observation[j])].value} method takes the "
+            f"contract's own days, and a futures history holds no settle of {code} for a day "
+            f"{pricing} prices"
         )
     return reference
 

@@ -106,8 +106,63 @@ def test_the_catalog_holds_the_fixed_float_with_its_nineteen_fields_in_order() -
     assert all(field.required_when == NONE for field in FIXED_FLOAT.fields if field.required)
 
 
-def a_field(name: str = "f", required_when: str = NONE, rule: str = "r") -> Field:
-    return Field(name, "d", True, required_when, FieldType.TEXT, "o", rule)
+def test_the_quote_metadata_says_what_a_quote_template_may_hold_and_a_quote_requires() -> None:
+    # template-based-quoting.md: a quote template holds the seven fields of a trade's terms a
+    # quote reads and none of the booking facts; four are always required, the two payment
+    # fields with a financial settlement and the curve key on the bilateral route; a cashflow
+    # has no quote.
+    by_name = {field.name: field for field in FIXED_FLOAT.fields}
+    assert [field.name for field in FIXED_FLOAT.fields if field.quote_allowed] == [
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "discount_curve_key",
+        "quantity_per",
+        "payment_time_lag",
+        "payment_holiday_calendar",
+    ]
+    assert [field.name for field in FIXED_FLOAT.fields if field.quote_required] == [
+        "schedule_method",
+        "route",
+        "settlement_method",
+        "quantity_per",
+    ]
+    assert by_name["discount_curve_key"].quote_required_when == "route = bilateral"
+    assert by_name["payment_time_lag"].quote_required_when == "settlement_method = financial"
+    assert by_name["payment_holiday_calendar"].quote_required_when == (
+        "settlement_method = financial"
+    )
+    assert all(
+        field.quote_required_when == NONE
+        for field in FIXED_FLOAT.fields
+        if not field.quote_allowed or field.quote_required
+    )
+    assert not any(field.quote_allowed for field in CASHFLOW.fields)
+    assert all(
+        not field.quote_required and field.quote_required_when == NONE for field in CASHFLOW.fields
+    )
+
+
+def a_field(
+    name: str = "f",
+    required_when: str = NONE,
+    rule: str = "r",
+    quote_allowed: bool = False,
+    quote_required: bool = False,
+    quote_required_when: str = NONE,
+) -> Field:
+    return Field(
+        name,
+        "d",
+        True,
+        required_when,
+        FieldType.TEXT,
+        "o",
+        rule,
+        quote_allowed=quote_allowed,
+        quote_required=quote_required,
+        quote_required_when=quote_required_when,
+    )
 
 
 @pytest.mark.parametrize(
@@ -122,6 +177,18 @@ def a_field(name: str = "f", required_when: str = NONE, rule: str = "r") -> Fiel
         ((Instrument("x", "d", (a_field(), a_field())),), "x defines field 'f' twice"),
         ((Instrument("x", "d", (a_field(rule=""),)),), "x field 'f' has an empty cell"),
         ((Instrument("x", "d", (a_field(required_when=""),)),), "x field 'f' has an empty cell"),
+        (
+            (Instrument("x", "d", (a_field(quote_allowed=True, quote_required_when=""),)),),
+            "x field 'f' has an empty cell",
+        ),
+        (
+            (Instrument("x", "d", (a_field(quote_required=True),)),),
+            "x field 'f' is required by a quote but not allowed in one",
+        ),
+        (
+            (Instrument("x", "d", (a_field(quote_required_when="route = bilateral"),)),),
+            "x field 'f' is required by a quote but not allowed in one",
+        ),
     ],
 )
 def test_a_definition_that_cannot_be_authored_says_why(
@@ -190,12 +257,12 @@ def test_every_listed_instrument_is_shown_by_its_listed_name() -> None:
     assert names == tuple([each.name for each in CATALOG])
     for name in names:
         kinds, _, _ = spilled(ENTRY["_ShowInstrument"](name))
-        assert kinds.shape[0] == 7
+        assert kinds.shape[0] == 10
 
 
-def test_a_one_field_definition_shows_seven_rows_and_two_columns() -> None:
+def test_a_one_field_definition_shows_ten_rows_and_two_columns() -> None:
     one = schema_cells(Instrument("one", "d", (a_field("only"),)))
-    assert one.shape == (7, 2)
+    assert one.shape == (10, 2)
     assert one.texts == (
         "field",
         "only",
@@ -210,24 +277,34 @@ def test_a_one_field_definition_shows_seven_rows_and_two_columns() -> None:
         "o",
         "rule",
         "r",
+        "quote_allowed",
+        "quote_required",
+        "quote_required_when",
+        NONE,
     )
     assert one.kinds[2, 1] == BOOLEAN_CODE and one.numeric_slots[2, 1] == 1.0
+    assert one.kinds[7, 1] == BOOLEAN_CODE and one.numeric_slots[7, 1] == 0.0
+    assert one.kinds[8, 1] == BOOLEAN_CODE and one.numeric_slots[8, 1] == 0.0
 
 
-def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
+def test_the_show_spills_ten_rows_and_a_column_per_field() -> None:
     shown = _ShowInstrument("fixed_float")
-    assert shown.shape == (7, 20)
-    assert tuple([shown.texts[i] for i in (0, 20, 40, 41, 61, 81, 101)]) == ROWS  # column one
+    assert shown.shape == (10, 20)
+    labels = (0, 20, 40, 41, 61, 81, 101, 121, 122, 123)  # column one, among the texts
+    assert tuple([shown.texts[i] for i in labels]) == ROWS
     assert shown.texts[:20] == ("field", *FIELDS)
-    required = shown.kinds[2]
-    assert required[0] == TEXT_CODE and (required[1:] == BOOLEAN_CODE).all()
-    np.testing.assert_array_equal(
-        shown.numeric_slots[2, 1:],
-        [field.required for field in FIXED_FLOAT.fields],
-    )
-    other_rows = np.delete(shown.kinds, 2, axis=0)
+    # The required row and, since template-based-quoting.md, the two quote rows of booleans
+    # after their labels: what a quote template may hold and what a quote always requires.
+    for row, fact in ((2, "required"), (7, "quote_allowed"), (8, "quote_required")):
+        kinds = shown.kinds[row]
+        assert kinds[0] == TEXT_CODE and (kinds[1:] == BOOLEAN_CODE).all()
+        np.testing.assert_array_equal(
+            shown.numeric_slots[row, 1:],
+            [getattr(field, fact) for field in FIXED_FLOAT.fields],
+        )
+    other_rows = np.delete(shown.kinds, (2, 7, 8), axis=0)
     assert (other_rows == TEXT_CODE).all()
-    assert len(shown.texts) == 7 * 20 - 19
+    assert len(shown.texts) == 10 * 20 - 3 * 19
     assert "" not in shown.texts
 
 
@@ -239,11 +316,11 @@ def test_the_show_page_shows_the_same_cells_as_the_spill(
     lines = page.read_text(encoding="utf-8").split("\n")
     first = "| field | " + " | ".join(field.name for field in definition.fields[:3]) + " |"
     start = next(i for i, line in enumerate(lines) if line.startswith(first))
-    table = [[cell.strip() for cell in line.split("|")[1:-1]] for line in lines[start : start + 8]]
+    table = [[cell.strip() for cell in line.split("|")[1:-1]] for line in lines[start : start + 11]]
     del table[1]  # the markdown separator row
     shown = schema_cells(definition)
     texts = iter(shown.texts)
-    for r in range(7):
+    for r in range(10):
         for c in range(columns):
             kind = shown.kinds[r, c]
             if kind == TEXT_CODE:
@@ -257,7 +334,8 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
     assert kinds.shape == (3, 2) and text.split("\0")[2::2] == ["fixed_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
-    assert kinds.shape == (7, 20) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert kinds.shape == (10, 20) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert slots[7, 6] == 1.0 and slots[8, 6] == 1.0 and slots[7, 1] == 0.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "
         "'fixed_float', 'cashflow'"

@@ -625,8 +625,17 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),1,20)' = "marketing_reserve"
     '=INDEX(_ShowInstrument("fixed_float"),3,20)' = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),6,20)' = "a finite amount of zero or more"
-    '=ROWS(_ShowInstrument("fixed_float"))'       = "7"
+    # Since template-based-quoting.md three rows more: what a quote template may hold, what a quote always
+    # requires, and the condition that otherwise requires it.
+    '=ROWS(_ShowInstrument("fixed_float"))'       = "10"
     '=COLUMNS(_ShowInstrument("fixed_float"))'    = "20"
+    '=INDEX(_ShowInstrument("fixed_float"),8,1)'  = "quote_allowed"
+    '=INDEX(_ShowInstrument("fixed_float"),8,2)'  = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),8,7)'  = "TRUE"
+    '=INDEX(_ShowInstrument("fixed_float"),9,7)'  = "TRUE"
+    '=INDEX(_ShowInstrument("fixed_float"),9,18)' = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),10,18)' = "settlement_method = financial"
+    '=INDEX(_ShowInstrument("fixed_float"),10,12)' = "route = bilateral"
     '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
     '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflo"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
