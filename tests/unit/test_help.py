@@ -745,6 +745,27 @@ def test_the_evaluation_explains_itself() -> None:
     ]
 
 
+def test_the_quote_template_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateQuoteTemplate"]
+    assert not hidden
+    assert description == (
+        "Creates the static terms of a quote under an instrument and shows their handle, the "
+        "text _Quote takes as the quote template."
+    )
+    assert arguments == [
+        (
+            "instrument",
+            "One instrument name from _ListInstruments; fixed_float, the one a quote prices.",
+        ),
+        (
+            "fields",
+            "The field-name cells in one row, such as A1:G1, using names _ShowInstrument marks "
+            "quote_allowed.",
+        ),
+        ("values", "The values in one row beneath those fields, such as A2:G2."),
+    ]
+
+
 def test_the_cashflow_functions_explain_themselves() -> None:
     description, arguments, hidden = SPECS["_CreateCashflows"]
     assert not hidden

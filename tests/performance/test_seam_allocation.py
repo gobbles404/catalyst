@@ -1164,6 +1164,29 @@ def test_the_trade_creators_keep_the_batchs_columns_and_the_templates_scalars() 
     assert (
         least_peak(lambda: ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)) <= 4 * SLACK
     )
+    # A quote template of the ticket's seven fields, since template-based-quoting.md, the same
+    # readers over one fewer field and no mask of supplied cells: within the same four slacks.
+    quote_names = Cells.from_rows(
+        [
+            [
+                "route",
+                "settlement_method",
+                "schedule_method",
+                "quantity_per",
+                "payment_time_lag",
+                "payment_holiday_calendar",
+                "discount_curve_key",
+            ]
+        ]
+    )
+    quote_values = Cells.from_rows(
+        [["bilateral", "financial", "asian", "calday", "+5bd", holidays, "SOFR"]]
+    )
+
+    def a_quote() -> object:
+        return ENTRY["_CreateQuoteTemplate"]("fixed_float", quote_names, quote_values)
+
+    assert least_peak(a_quote) <= 4 * SLACK
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", names, values)
     rows = N // 4
     headers = Cells.from_rows([["trade_date", "contract_code", "quantity", "fixed_price"]])
