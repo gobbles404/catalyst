@@ -44,6 +44,7 @@ from goosedove.index_definitions.holiday_calendar import holiday_calendar
 from goosedove.index_definitions.iferc_schedule import iferc_schedule
 from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
+from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.market.market import Market
@@ -806,6 +807,170 @@ def test_an_equivalent_trade_booked_at_the_quote_marks_zero_with_every_payment_a
             WorkCounter(),
         )
         assert trade_results(prep, m, WorkCounter(), curves).mark == pytest.approx(0.0, abs=1e-9)
+
+
+# --- the balance of a period, balance-of-period-quotes.md -----------------------------------------
+
+JAN_11 = "2027-01-11"
+RATES_JAN = curve_set(curve_of((JAN_11, 1.0), ("2027-02-01", 0.99), ("2027-03-01", 0.98)))
+WHOLE = (
+    "the expiry-based methods take the contract's month entire, and a part of it prices under asian"
+)
+
+
+def on_jan_11(*quotes: float) -> Market:
+    """The strip's market on Monday 11 January: the 4th to the 8th fixed at 25, the rest live."""
+    return priced(STRIP, JAN_11, january(25.0), *quotes)
+
+
+def test_the_balance_of_a_period_runs_from_the_valuation_day_by_hand() -> None:
+    # The whole January quotes 28 from five fixings and fifteen live days; its balance, the 11th
+    # to the 31st, quotes the fifteen live days alone, 29, on either route and either basis. The
+    # strip's balance weighs January's balance and February alike per month, as the booking model
+    # weighs a partial month, and 21 days against 28 per calendar day.
+    m = on_jan_11(29.0, 60.0)
+    assert quote_on(m, "F27", financial()) == pytest.approx(28.0, **CLOSE)
+    for template, curves in (
+        (financial(), None),
+        (bilateral(), RATES_JAN),
+        (financial(per="calday"), None),
+        (bilateral(per="calday"), RATES_JAN),
+    ):
+        assert quote_on(m, "BALF27", template, curves) == pytest.approx(29.0, **CLOSE)
+    assert quote_on(m, "balf27-g27", financial()) == pytest.approx(44.5, **CLOSE)
+    assert quote_on(m, "BALF27-G27", bilateral(), RATES_JAN) == pytest.approx(87.51 / 1.97, **CLOSE)
+    assert quote_on(m, "BALF27-G27", financial(per="calday")) == pytest.approx(2289 / 49, **CLOSE)
+    assert quote_on(m, "BALF27-G27", bilateral(per="calday"), RATES_JAN) == pytest.approx(
+        2249.31 / 48.23, **CLOSE
+    )
+    counts = counts_of(m, "BALF27-G27", bilateral(), RATES_JAN)
+    assert (counts["months_resolved"], counts["observations_made"], counts["fixings_read"]) == (
+        2,
+        35,
+        0,
+    )
+    assert (counts["live_prices_read"], counts["payment_factors_read"]) == (2, 2)
+    # The balance of a period still ahead is the period.
+    assert quote_on(m, "BALG27", financial()) == pytest.approx(60.0, **CLOSE)
+
+
+def test_balcal27_in_june_is_the_seven_months_left() -> None:
+    # June from its eleven live days alone, 42, and the six months after at 40; on a curve at
+    # 0.98 for every payment ahead the bilateral quotes equal the cleared ones, every payment now
+    # carrying one factor, where CAL27's paid months at factor one keep it apart.
+    m = in_june(june(), 42.0, *[40.0] * 6)
+    rates = curve_set(curve_of((JUNE_16, 1.0), ("2027-07-01", 0.98), ("2028-01-03", 0.98)))
+    assert quote_on(m, "BALCAL27", financial()) == pytest.approx(282 / 7, **CLOSE)
+    assert quote_on(m, "BALCAL27", bilateral(), rates) == pytest.approx(282 / 7, **CLOSE)
+    assert quote_on(m, "BALCAL27", financial(per="calday")) == pytest.approx(7990 / 199, **CLOSE)
+    assert quote_on(m, "BALCAL27", bilateral(per="calday"), rates) == pytest.approx(
+        7990 / 199, **CLOSE
+    )
+    assert quote_on(m, "CAL27", bilateral(), rates) == pytest.approx(424.4 / 11.86, **CLOSE)
+    counts = counts_of(m, "BALCAL27", bilateral(), rates)
+    assert (counts["months_resolved"], counts["observations_made"], counts["fixings_read"]) == (
+        7,
+        143,
+        0,
+    )
+    assert (counts["live_prices_read"], counts["payment_factors_read"]) == (7, 7)
+
+
+def test_a_balance_is_refused_as_a_dated_period_is() -> None:
+    refused(
+        priced(STRIP, "2027-02-01", january(30.0), 60.0),
+        "BALF27",
+        financial(),
+        "valuation_date is 2027-02-01, after 'BALF27' ended on 2027-01-31, expected a valuation "
+        "day on or before the period's last day",
+    )
+    m = on_jan_11(29.0, 60.0)
+    for method in ("lastday", "penultimate", "last3day"):
+        refused(
+            m,
+            "BALF27",
+            financial(method=method),
+            "F27 of the quote is covered from 2027-01-11 to 2027-01-31, part of its month, "
+            f"expected the whole month under {method}; {WHOLE}",
+        )
+    refused(
+        m,
+        "BALZ2027",
+        financial(),
+        "contract_code is 'BALZ2027', expected a contract or strip with two-digit years, such as "
+        "F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28",
+    )
+    # Saturday 30 January: the balance of January holds no pricing day, and the strip's first
+    # component being empty refuses the strip, nothing dropped silently.
+    saturday = priced(STRIP, "2027-01-30", january(30.0), 60.0)
+    for code in ("BALF27", "BALF27-G27"):
+        refused(
+            saturday,
+            code,
+            financial(),
+            "F27 of the quote has no pricing day from 2027-01-30 to 2027-01-31, expected a Monday "
+            "to Friday of the days it covers the index's market is open on; the asian method "
+            "averages the pricing days a component covers",
+        )
+    # An IFERC month is one price for the whole month: its balance in progress is refused.
+    cal = calendar(valuation_date(day("2026-11-15"), 0.5), WAHA)
+    waha = quoted(market_history(cal, iferc_fixings(("X26",), numbers(0.5), WAHA)), -0.4, -0.3)
+    assert quote_on(waha, "BALZ26", financial(method="lastday", lag="+2bd")) == -0.4
+    refused(
+        waha,
+        "BALX26",
+        financial(method="lastday", lag="+2bd"),
+        "X26 of the quote is covered from 2026-11-15 to 2026-11-30, part of its month, expected "
+        "the whole month under lastday; an IFERC month's index is one price for the whole month",
+    )
+
+
+def test_an_equivalent_trade_booked_on_the_balances_dates_marks_zero() -> None:
+    # The balance's own dates from the two utilities, the quote as the fixed price, a barrel of
+    # each month under asian paying +1bd on the weekend calendar: zero mark on either route under
+    # either basis, the hand numbers above standing on their own beside this comparison.
+    m = on_jan_11(29.0, 60.0)
+    first, last = start_date("BALF27-G27", day(JAN_11)), end_date("BALF27-G27", day(JAN_11))
+    assert (first, last) == (day("2027-01-11"), day("2027-02-28"))
+    starts, ends = dates(str(first), "2027-02-01"), dates("2027-01-31", str(last))
+    for route, curves in ((Route.CLEARED, None), (Route.BILATERAL, RATES_JAN)):
+        for basis in (QuantityPer.MONTH, QuantityPer.CALDAY):
+            template = (
+                financial(per=basis.value) if route is Route.CLEARED else bilateral(per=basis.value)
+            )
+            k = quote_on(m, "BALF27-G27", template, curves)
+            keyed = route is Route.BILATERAL
+            terms = resolved_trades(
+                FIXED_FLOAT,
+                STRIP,
+                spec(2),
+                route,
+                Settlement.FINANCIAL,
+                *picks(ScheduleMethod.ASIAN, basis, 2),
+                ids(1, 2),
+                None,
+                None,
+                dates(JAN_11, JAN_11),
+                np.arange(2, dtype=np.intp),
+                rows(1, 2),
+                numbers(1.0, 1.0),
+                starts,
+                ends,
+                numbers(k, k),
+                PaymentTerms(
+                    ("+1bd", "+1bd"), (WEEKENDS_ONLY,) * 2, dates("2027-02-01", "2027-03-01")
+                ),
+                counterparty=("ACME Trading",) * 2 if keyed else None,
+                discount_curve_key=("SOFR",) * 2 if keyed else None,
+            )
+            prep = prepared_trades(
+                encoded(terms, observed_of(terms), UNITS, WorkCounter()),
+                m.market_history,
+                WorkCounter(),
+            )
+            assert trade_results(prep, m, WorkCounter(), curves).mark == pytest.approx(
+                0.0, abs=1e-9
+            )
 
 
 # --- the worksheet function -----------------------------------------------------------------------

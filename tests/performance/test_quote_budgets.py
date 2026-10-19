@@ -210,14 +210,31 @@ def test_a_month_and_a_strip_report_their_work() -> None:
     cleared = counted("CAL27", CLEARED, None)
     assert "curves_selected" not in cleared and "payment_factors_read" not in cleared
     assert cleared["template_fields_read"] == 6
+    # The balance of the year: June from its eleven live days and the six months after, no
+    # fixing read, every payment ahead.
+    assert counted("BALCAL27", BILATERAL, RATES) == {
+        "curves_selected": 1,
+        "fixings_read": 0,
+        "live_prices_read": 7,
+        "months_resolved": 7,
+        "observations_made": 143,
+        "payment_days_made": 7,
+        "payment_factors_read": 7,
+        "payment_rules_read": 1,
+        "payment_shifts": 1,
+        "price_reductions": 3,
+        "schedule_codes_read": 13,
+        "template_fields_read": 7,
+    }
     paid = counted("F27-K27", BILATERAL, RATES)
     assert (paid["live_prices_read"], paid["payment_factors_read"]) == (0, 0)
     assert paid["curves_selected"] == 1
 
 
 # The package's functions a quote runs, once each whatever the period, a month and a year alike:
-# the terms read, the key bound to the collection's first curve, the months resolved through the
-# grammar and the schedule's thirteen codes, the observations made by one method, their references
+# the terms read, the key bound to the collection's first curve, the period read as the two date
+# utilities read it and resolved against the schedule's thirteen codes, the observations made by
+# one method, their references
 # and rows, the prices, quantities, payments and factors, the shares and their sum.
 LEDGER = {
     "quote": 1,
@@ -237,11 +254,14 @@ LEDGER = {
     "DiscountCurve.max_date": 1,
     "trade_schedule_of": 2,  # the quote's own read and the observations'
     "_the_method": 1,
-    "_the_months": 1,
-    "months_of": 1,
-    "period_months": 1,
-    "_period_months": 1,
-    "_label_months": 1,
+    "_the_period": 1,
+    "_the_span": 1,
+    "start_date": 1,  # the two readers the date utilities use, balance-of-period-quotes.md
+    "end_date": 1,
+    "balance_of": 2,  # each reader looks for the prefix
+    "period_months": 2,  # and reads the label
+    "_period_months": 2,
+    "_label_months": 2,
     "schedule_months": 1,
     "month_and_year": 13,  # every code of the schedule read for its month
     "schedule_rows": 1,
@@ -283,7 +303,9 @@ def test_a_month_and_a_strip_run_the_same_functions_once(call_profile: CallProfi
 # dates, weights, references, rows, prices and masks, over a floor of about 9,700 for the terms,
 # the key bound and the arrays over the months: 70 an observation over 10,000 and the slack.
 @pytest.mark.parametrize(
-    ("code", "observations"), [("M27", 22), ("CAL27", 261)], ids=["a month", "a year"]
+    ("code", "observations"),
+    [("M27", 22), ("CAL27", 261), ("BALCAL27", 143)],
+    ids=["a month", "a year", "the balance of the year"],
 )
 def test_a_quote_allocates_within_its_observations(code: str, observations: int) -> None:
     peak = least_peak(lambda: quote(MARKET, code, BILATERAL, RATES, WorkCounter()))
