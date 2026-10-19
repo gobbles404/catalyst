@@ -40,7 +40,7 @@ The shifted factors are built into a curve through the curve's own constructor a
 
 ## Checking the risk
 
-The DV01 and the cross-gamma are analytic derivatives of the mark and of the discounted lot delta in the rates; two evaluations on the curve bumped each way by `h` basis points approximate them by a centered difference, the denominator already in basis points:
+The DV01 and the cross-gamma are analytic derivatives of the mark and of the delta in the rates; two evaluations on the curve bumped each way by `h` basis points approximate them by a centered difference, the denominator already in basis points:
 
 ```text
 (NPV(+h)   - NPV(-h))   / (2 h)  ~  dv01

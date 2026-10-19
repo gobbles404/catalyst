@@ -167,10 +167,10 @@ def test_the_two_hng_sources_combine_by_index_and_by_curve(
     assert group.history is HNG_HISTORY and group.price_vector is HNG_MARKET.price_vector
     np.testing.assert_array_equal(group.occurrences, [0, 1])
     np.testing.assert_array_equal(group.references, [1])
-    np.testing.assert_allclose(group.lot_delta, [10.0], **TIGHT)
-    np.testing.assert_allclose(group.discounted_lot_delta, [10.5], **TIGHT)
-    assert group.lot_delta_total == 10.0
-    assert group.discounted_lot_delta_total == pytest.approx(10.5, **CLOSE)
+    np.testing.assert_allclose(group.nominal_delta, [10.0], **TIGHT)
+    np.testing.assert_allclose(group.delta, [10.5], **TIGHT)
+    assert group.nominal_delta_total == 10.0
+    assert group.delta_total == pytest.approx(10.5, **CLOSE)
     np.testing.assert_array_equal(group.days, dates(AS_OF))
     np.testing.assert_allclose(group.daily_lots, [10.0], **TIGHT)
     np.testing.assert_allclose(group.discounted_daily_lots, [10.5], **TIGHT)
@@ -327,8 +327,8 @@ def test_every_occurrence_counts_and_the_groups_follow_first_appearance(
     thrice = collected(a, b, a)
     (group,) = thrice.index_groups
     np.testing.assert_array_equal(group.occurrences, [0, 1, 2])
-    assert group.lot_delta_total == 20.0
-    assert group.discounted_lot_delta_total == pytest.approx(20.5, **CLOSE)
+    assert group.nominal_delta_total == 20.0
+    assert group.delta_total == pytest.approx(20.5, **CLOSE)
     np.testing.assert_allclose(group.daily_lots, [20.0], **TIGHT)
     assert thrice.rate_groups[0].dv01 == pytest.approx(0.0085, **CLOSE)
     np.testing.assert_array_equal(thrice.rate_groups[0].occurrences, [1])
@@ -450,7 +450,7 @@ def test_the_collection_refuses_what_does_not_belong_in_the_order_given(
     wrapper = market(HNG_HISTORY, HNG_MARKET.price_vector)
     on_wrapper = valued_on(hng((10.0,), (A_YEAR,), Route.CLEARED), HNG_HISTORY, wrapper, None)
     agg = collected(a, on_wrapper)
-    assert agg.index_groups[0].lot_delta_total == 20.0
+    assert agg.index_groups[0].nominal_delta_total == 20.0
     np.testing.assert_array_equal(agg.index_groups[0].occurrences, [0, 1])
 
 
@@ -570,7 +570,7 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     # numbers as they were.
     a, b = sources["a"], sources["b"]
     kept = {
-        "lot_delta": a.lot_delta.copy(),
+        "nominal_delta": a.nominal_delta.copy(),
         "daily": b.discounted_daily_lots.copy(),
         "dv01": rate(b).dv01_by_day.copy(),
         "days": b.prepared.encoded.days.copy(),
@@ -579,13 +579,13 @@ def test_the_collection_owns_its_membership_and_writes_nothing(
     agg = aggregate_results(inputs, WorkCounter())
     inputs.append(sources["c"])
     assert agg.sources == (a, b)
-    np.testing.assert_array_equal(a.lot_delta, kept["lot_delta"])
+    np.testing.assert_array_equal(a.nominal_delta, kept["nominal_delta"])
     np.testing.assert_array_equal(b.discounted_daily_lots, kept["daily"])
     np.testing.assert_array_equal(rate(b).dv01_by_day, kept["dv01"])
     np.testing.assert_array_equal(b.prepared.encoded.days, kept["days"])
     scalars = {
-        "index", "reporting_lot", "history", "price_vector", "lot_delta_total",
-        "discounted_lot_delta_total", "curve", "word", "currency", "dv01",
+        "index", "reporting_lot", "history", "price_vector", "nominal_delta_total",
+        "delta_total", "curve", "word", "currency", "dv01",
         "cross_gamma_total",
     }  # fmt: skip
     frozen: list[Any] = []
@@ -630,7 +630,7 @@ def test_sums_past_the_largest_number_are_refused_by_their_coordinate() -> None:
         at_one,
         None,
     )
-    assert up.lot_delta_total == big and up.mark == 0.0 and down.lot_delta_total == -big
+    assert up.nominal_delta_total == big and up.mark == 0.0 and down.nominal_delta_total == -big
     with pytest.raises(ValueError) as refused:
         collected(up, down, up, down)
     assert str(refused.value) == (
@@ -658,7 +658,7 @@ def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() 
         )
 
     bought, one, sold = hng_at_eighty(1e16), hng_at_eighty(1.0), hng_at_eighty(-1e16)
-    assert bought.mark == 0.0 and bought.lot_delta_total == 1e16
+    assert bought.mark == 0.0 and bought.nominal_delta_total == 1e16
     for order in (
         (bought, one, sold),
         (bought, sold, one),
@@ -666,10 +666,10 @@ def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() 
         (sold, one, bought),
     ):
         (group,) = collected(*order).index_groups
-        assert group.lot_delta_total == 1.0 and group.discounted_lot_delta_total == 1.0
+        assert group.nominal_delta_total == 1.0 and group.delta_total == 1.0
         for vector in (
-            group.lot_delta,
-            group.discounted_lot_delta,
+            group.nominal_delta,
+            group.delta,
             group.daily_lots,
             group.discounted_daily_lots,
             group.monthly_lots,
@@ -684,14 +684,14 @@ def test_cancelling_sources_keep_the_lot_in_every_vector_whatever_their_order() 
         return valued_on(terms, trio_history, trio_market, None)
 
     million, barrel, sold_million = trio_at_eighty(1e6), trio_at_eighty(1.0), trio_at_eighty(-1e6)
-    assert barrel.lot_delta_total == pytest.approx(1 / 3, **CLOSE)
+    assert barrel.nominal_delta_total == pytest.approx(1 / 3, **CLOSE)
     for order in ((million, barrel, sold_million), (million, sold_million, barrel)):
         (group,) = collected(*order).index_groups
-        assert group.lot_delta_total == pytest.approx(1 / 3, **CLOSE)
-        np.testing.assert_allclose(group.lot_delta, [1 / 3], **TIGHT)
+        assert group.nominal_delta_total == pytest.approx(1 / 3, **CLOSE)
+        np.testing.assert_allclose(group.nominal_delta, [1 / 3], **TIGHT)
         np.testing.assert_allclose(group.daily_lots, [1 / 3], **TIGHT)
         np.testing.assert_allclose(group.yearly_lots, [1 / 3], **TIGHT)
-        assert float(group.daily_lots.sum()) == pytest.approx(group.lot_delta_total, **CLOSE)
+        assert float(group.daily_lots.sum()) == pytest.approx(group.nominal_delta_total, **CLOSE)
 
 
 def test_every_view_sums_to_the_total_above_it(sources: dict[str, TradeResults]) -> None:
@@ -780,10 +780,8 @@ def on_two_curves(
     mixed = replace(
         sources["b"],
         mark=first.mark + second_row.mark,
-        discounted_lot_delta=first.discounted_lot_delta + second_row.discounted_lot_delta,
-        discounted_lot_delta_total=(
-            first.discounted_lot_delta_total + second_row.discounted_lot_delta_total
-        ),
+        delta=first.delta + second_row.delta,
+        delta_total=(first.delta_total + second_row.delta_total),
         discounted_price_sensitivity=(
             first.discounted_price_sensitivity + second_row.discounted_price_sensitivity
         ),

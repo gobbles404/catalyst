@@ -278,7 +278,7 @@ def display_periods(prep: PreparedTrades) -> int:
 PREPARATION_NUMPY = {
     "generic.astype": 2,  # the valuation day to its month and its year, since #186
     "ndarray.any": 9,  # the boundary slot; since #190 the set amounts by slot and by group and the
-    # sensitivity by contract finite; the lots, the lot delta and the three views finite
+    # sensitivity by contract finite; the lots, the nominal delta and the three views finite
     "ndarray.argsort": 1,
     "ndarray.astype": 7,  # the slot rows, and since #186 the two display axes' keys, periods and
     # first days, three a bucket
@@ -289,7 +289,7 @@ PREPARATION_NUMPY = {
     "ndarray.reshape": 1,
     "ndarray.searchsorted": 3,  # the fixed rows, and since #186 the contract periods' places, one
     # a bucket
-    "ndarray.setflags": 19,  # the eight, the two lot arrays since the lot delta, the three views,
+    "ndarray.setflags": 19,  # the eight, the two lot arrays of the nominal delta, the three views,
     # and since #186 the two display axes' three arrays each
     "ndarray.sum": 4,
     "numpy._make_extobj": 4,  # the error state set for the set amounts, the sensitivity, the lots
@@ -647,7 +647,7 @@ def test_a_daily_batch_prepares_per_slot_and_ticks_per_live_reference(
         prep.dated_live_exposure.nbytes == 8 * slots
         and prep.dated_live_lots.nbytes == 8 * slots  # the lot view per slot
         and prep.price_sensitivity.nbytes == 8 * contracts
-        and prep.lot_delta.nbytes == 8 * contracts
+        and prep.nominal_delta.nbytes == 8 * contracts
     )
     counter = WorkCounter()
     result = trade_results(prep, a_market(history), counter)

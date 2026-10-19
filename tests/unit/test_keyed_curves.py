@@ -135,10 +135,10 @@ def test_the_two_rows_are_discounted_on_their_own_curves_and_the_risk_stands_per
     np.testing.assert_allclose(given(result.npv_by_group), [9_500.0, -4_500.0], **TIGHT)
     np.testing.assert_allclose(given(result.dv01_by_group), [-0.95, 0.45], **TIGHT)
     # One combined delta for the batch: five nominal lots, five discounted, 9.5 less 4.5.
-    np.testing.assert_allclose(result.lot_delta, [5.0], **TIGHT)
-    assert result.lot_delta_total == pytest.approx(5.0, **CLOSE)
-    np.testing.assert_allclose(result.discounted_lot_delta, [5.0], **TIGHT)
-    assert result.discounted_lot_delta_total == pytest.approx(5.0, **CLOSE)
+    np.testing.assert_allclose(result.nominal_delta, [5.0], **TIGHT)
+    assert result.nominal_delta_total == pytest.approx(5.0, **CLOSE)
+    np.testing.assert_allclose(result.delta, [5.0], **TIGHT)
+    assert result.delta_total == pytest.approx(5.0, **CLOSE)
     np.testing.assert_allclose(result.discounted_daily_lots, [5.0], **TIGHT)
     # The batch scalars sum the curves, both shifted together, which no report selects.
     assert result.dv01 == pytest.approx(-0.50, **CLOSE)
@@ -186,9 +186,9 @@ def test_offsetting_rows_on_two_curves_keep_each_curves_ownership() -> None:
     # B at ten lots short: no nominal delta, 500 of mark and 0.5 of delta from the factors alone,
     # and the two curves' risks never netted before discounting.
     result = valued_on(prepared(keyed((TEN_LOTS, -TEN_LOTS))), curve_set(SOFR, FFOIS))
-    assert result.lot_delta_total == 0.0
+    assert result.nominal_delta_total == 0.0
     assert result.mark == pytest.approx(500.0, **CLOSE)
-    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    assert result.delta_total == pytest.approx(0.5, **CLOSE)
     assert dv01s(result) == (pytest.approx(-0.95, **CLOSE), pytest.approx(0.90, **CLOSE))
     assert cross_gammas(result) == (
         pytest.approx(-0.00095, **CLOSE),
@@ -203,7 +203,7 @@ def test_a_new_curve_under_one_key_moves_that_curves_numbers_alone() -> None:
     after = valued_on(prep, curve_set(sofr_96, FFOIS))
     assert after.curves == (sofr_96, FFOIS)
     assert after.mark == pytest.approx(5_100.0, **CLOSE)
-    assert after.discounted_lot_delta_total == pytest.approx(5.1, **CLOSE)
+    assert after.delta_total == pytest.approx(5.1, **CLOSE)
     assert dv01s(after) == (pytest.approx(-0.96, **CLOSE), pytest.approx(0.45, **CLOSE))
     assert cross_gammas(after) == (
         pytest.approx(-0.00096, **CLOSE),
@@ -425,8 +425,8 @@ def test_a_fixed_but_unpaid_group_keeps_its_curves_dv01_and_no_cross_gamma_until
     # No live lot on SOFR: its cross-gamma is the known zero; FFOIS carries B's lots.
     assert cross_gammas(result)[0] == 0.0
     assert cross_gammas(result)[1] == pytest.approx(-0.0001 * tau_b * -4.5, **CLOSE)
-    np.testing.assert_allclose(result.lot_delta, [0.0, -5.0], **TIGHT)
-    np.testing.assert_allclose(result.discounted_lot_delta, [0.0, -4.5], **TIGHT)
+    np.testing.assert_allclose(result.nominal_delta, [0.0, -5.0], **TIGHT)
+    np.testing.assert_allclose(result.delta, [0.0, -4.5], **TIGHT)
     assert counter.freeze().as_dict()["payment_factors_read"] == 2
     # Paid, on 1 February 2028: A is cash, SOFR still bound and read for no day.
     february = "2028-02-01"
@@ -457,9 +457,7 @@ def test_bumping_one_curve_moves_its_share_alone_and_agrees_with_its_analytic_ri
     # The centered differences of the mark and of the discounted delta are SOFR's analytic DV01
     # and cross-gamma, the third-order term of a basis point cubed over six within the tolerance.
     assert (up.mark - down.mark) / 2 == pytest.approx(dv01s(base)[0], rel=1e-8)
-    assert (up.discounted_lot_delta_total - down.discounted_lot_delta_total) / 2 == pytest.approx(
-        cross_gammas(base)[0], rel=1e-8
-    )
+    assert (up.delta_total - down.delta_total) / 2 == pytest.approx(cross_gammas(base)[0], rel=1e-8)
     for moved in (up, down):
         assert moved.rate_contributions[1].dv01 == base.rate_contributions[1].dv01
         np.testing.assert_array_equal(
@@ -539,7 +537,7 @@ def test_two_finite_cross_gamma_totals_summing_past_the_largest_number_are_refus
     # Half the lots: each curve's total finite and their sum too, the batch accepted.
     halved = far_and_near(("SOFR", "FFOIS"), BIG / 2)
     result = valued_on(prepared(halved, history), curve_set(sofr, ffois), market)
-    assert result.discounted_lot_delta_total == 0.0 and result.dv01 == 0.0
+    assert result.delta_total == 0.0 and result.dv01 == 0.0
 
     def share(near: tuple[str, ...]) -> float:
         """A curve's cross-gamma on a curve of ones: each row's lots times -0.0001 times its
@@ -641,9 +639,9 @@ def test_two_asians_on_two_curves_keep_each_curves_share_of_every_day() -> None:
         "slots_weighted": 2 * OCTOBER_DAYS,
     }
     tau = tau_from(as_of)
-    assert result.lot_delta_total == pytest.approx(0.0, **CLOSE)
-    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
-    np.testing.assert_allclose(result.discounted_lot_delta, [0.5], **TIGHT)
+    assert result.nominal_delta_total == pytest.approx(0.0, **CLOSE)
+    assert result.delta_total == pytest.approx(0.5, **CLOSE)
+    np.testing.assert_allclose(result.delta, [0.5], **TIGHT)
     np.testing.assert_allclose(result.discounted_daily_lots, [0.5 / OCTOBER_DAYS] * 22, **TIGHT)
     np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
     np.testing.assert_allclose(given(result.payment_amount), [10.0, -10.0], **TIGHT)
@@ -668,8 +666,8 @@ def test_two_asians_on_two_curves_keep_each_curves_share_of_every_day() -> None:
     a = valued_on(prepared(asians(("SOFR",), (10.0,)), history), eth_curves(as_of), market)
     b = valued_on(prepared(asians(("FFOIS",), (-10.0,)), history), eth_curves(as_of), market)
     assert a.curves[0].name == "SOFR" and b.curves[0].name == "FFOIS"
-    assert a.discounted_lot_delta_total == pytest.approx(9.5, **CLOSE)
-    assert b.discounted_lot_delta_total == pytest.approx(-9.0, **CLOSE)
+    assert a.delta_total == pytest.approx(9.5, **CLOSE)
+    assert b.delta_total == pytest.approx(-9.0, **CLOSE)
     for mixed, alone in zip(result.rate_contributions, (a, b), strict=True):
         assert mixed.dv01 == pytest.approx(alone.rate_contributions[0].dv01, **CLOSE)
         np.testing.assert_allclose(
@@ -712,8 +710,8 @@ def test_the_two_asians_as_fixings_arrive_keep_each_days_amount_on_its_curve() -
         result = valued_on(prep, eth_curves(as_of), quoted(history, *ETH_QUOTES))
         assert [c.name for c in result.curves] == ["SOFR", "FFOIS"]
         np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
-        assert result.lot_delta_total == pytest.approx(0.0, **CLOSE)
-        assert result.discounted_lot_delta_total == pytest.approx(0.05 * live * A_DAY, **CLOSE)
+        assert result.nominal_delta_total == pytest.approx(0.0, **CLOSE)
+        assert result.delta_total == pytest.approx(0.05 * live * A_DAY, **CLOSE)
         fixed_days = np.isin(prep.encoded.days, np.array(fixed, dtype="datetime64[D]"))
         np.testing.assert_allclose(
             result.discounted_daily_lots, np.where(fixed_days, 0.0, 0.5 / OCTOBER_DAYS), **TIGHT

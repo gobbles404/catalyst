@@ -593,8 +593,8 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
                 lots.append(terms.reporting_lot.name)
                 routes.append(source.route.value)
                 trade[k] = True
-                nominal[k] = source.lot_delta_total
-                delta[k] = source.discounted_lot_delta_total
+                nominal[k] = source.nominal_delta_total
+                delta[k] = source.delta_total
                 cross[k] = source.cross_gamma_total
                 units[k] = f"{source.lot_unit} per basis point"
             case CashflowResults():
@@ -628,7 +628,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # the slot's own live coefficient and the same exposure in lots, its live contribution,
     # coefficient times its contract's quote, all zero where it has fixed, and its contract's
     # risk, four retained vectors read by each slot's reference and so the same number on every
-    # slot of one contract, whatever group holds it: the sensitivity and the lot delta, nominal,
+    # slot of one contract, whatever group holds it: the sensitivity and the nominal delta, nominal,
     # and since #177 their discounted twins beside each, a cleared result's twins the nominal arrays
     # themselves, every one named contract_... so that none is read as the slot's and the
     # discounted apart from the nominal; then the two units those numbers are in, the batch's
@@ -663,7 +663,7 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
                 "live_contribution",
                 "contract_sensitivity",
                 "contract_discounted_sensitivity",
-                "contract_lot_delta",
+                "contract_nominal_delta",
                 "contract_delta",
                 "sensitivity_unit",
                 "lot_unit",
@@ -677,8 +677,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
         contribution,
         obj.price_sensitivity[reference],
         obj.discounted_price_sensitivity[reference],
-        obj.lot_delta[reference],
-        obj.discounted_lot_delta[reference],
+        obj.nominal_delta[reference],
+        obj.delta[reference],
         (obj.price_sensitivity_unit,) * slots,
         (obj.lot_unit,) * slots,
     )

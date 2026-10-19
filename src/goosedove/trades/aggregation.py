@@ -117,10 +117,10 @@ class IndexGroup:
     price_vector: PriceVector
     occurrences: NDArray[np.intp]
     references: NDArray[np.intp]
-    lot_delta: NDArray[np.float64]
-    discounted_lot_delta: NDArray[np.float64]
-    lot_delta_total: float
-    discounted_lot_delta_total: float
+    nominal_delta: NDArray[np.float64]
+    delta: NDArray[np.float64]
+    nominal_delta_total: float
+    delta_total: float
     days: NDArray[np.datetime64]
     daily_lots: NDArray[np.float64]
     discounted_daily_lots: NDArray[np.float64]
@@ -542,7 +542,7 @@ def _index_group(
     terms = first.prepared.encoded.terms
     references, (lots, discounted) = _summed(
         [m.prepared.encoded.references for m in members],
-        ([m.lot_delta for m in members], [m.discounted_lot_delta for m in members]),
+        ([m.nominal_delta for m in members], [m.delta for m in members]),
         counter,
     )
     days, (daily, discounted_daily) = _summed(
@@ -564,8 +564,8 @@ def _index_group(
         counter,
     )
     # Python's sum of floats is compensated and keeps a sum past the largest number as inf.
-    total = sum([m.lot_delta_total for m in members])
-    discounted_total = sum([m.discounted_lot_delta_total for m in members])
+    total = sum([m.nominal_delta_total for m in members])
+    discounted_total = sum([m.delta_total for m in members])
     codes = terms.schedule.codes
     for measure, by_reference, by_day, by_month, by_year, in_all in (
         ("nominal delta", lots, daily, monthly, yearly, total),
@@ -993,7 +993,7 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
                     )
                 ]
             )
-            totals = tuple([g.lot_delta_total for g in groups])
+            totals = tuple([g.nominal_delta_total for g in groups])
             return RiskView(axes.observed, nominal, totals, columns)
         case Risk.DELTA:
             columns = tuple(
@@ -1004,7 +1004,7 @@ def aggregate_view(aggregate: AggregateResults, risk: Risk, bucket: Bucket) -> R
                     )
                 ]
             )
-            totals = tuple([g.discounted_lot_delta_total for g in groups])
+            totals = tuple([g.delta_total for g in groups])
             return RiskView(axes.observed, delta, totals, columns)
         case Risk.DV01:
             if not rates:
@@ -1058,7 +1058,7 @@ def _aggregate_all(
         groups, nominal, delta, axes.observed_in_union, axes.observed_from, strict=True
     ):
         labels.extend((label_n, label_d))
-        totals_all.extend((g.lot_delta_total, g.discounted_lot_delta_total))
+        totals_all.extend((g.nominal_delta_total, g.delta_total))
         every.append(placed(axes.union.size, places, _lots(g, bucket)[start:]))
         every.append(placed(axes.union.size, places, _discounted_lots(g, bucket)[start:]))
     if rates:

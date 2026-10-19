@@ -862,7 +862,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("live_contribution", contributions[0, 6]);
             Assert.Equal("contract_sensitivity", contributions[0, 7]);
             Assert.Equal("contract_discounted_sensitivity", contributions[0, 8]);
-            Assert.Equal("contract_lot_delta", contributions[0, 9]);
+            Assert.Equal("contract_nominal_delta", contributions[0, 9]);
             Assert.Equal("contract_delta", contributions[0, 10]);
             Assert.Equal(20000.0, contributions[2, 4]);
             Assert.Equal(2.0, contributions[2, 5]);
@@ -1387,7 +1387,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
             Assert.Equal(26, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, last
-            Assert.Equal("contract_lot_delta", contributions[0, 10]);
+            Assert.Equal("contract_nominal_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
             Assert.Equal(0.0, contributions[5, 10]);

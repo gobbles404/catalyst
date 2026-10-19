@@ -410,7 +410,7 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     )
     result = tick(prep, quoted, curves)
     new: tuple[NDArray[np.float64] | None, ...] = (
-        result.discounted_lot_delta,
+        result.delta,
         result.discounted_price_sensitivity,
         result.discounted_daily_lots,
         result.discounted_monthly_lots,
@@ -429,7 +429,10 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
     assert retained == 8 * (3 * refs + 2 * buckets + paid + 4 * groups)
     assert all(array is None or array.dtype == np.float64 for array in new)
     # The nominal vectors are the preparation's, by reference, not copies.
-    assert result.lot_delta is prep.lot_delta and result.price_sensitivity is prep.price_sensitivity
+    assert (
+        result.nominal_delta is prep.nominal_delta
+        and result.price_sensitivity is prep.price_sensitivity
+    )
 
 
 # --- the payment-time axes and the risk views, since #178 -----------------------------------------
@@ -633,7 +636,7 @@ def test_a_bilateral_tick_on_several_curves_does_no_work_per_curve_over_the_slot
     paid = axes.days.size + axes.months.size + axes.years.size
     groups = encoding.group_contract.size
     new: list[NDArray[np.float64] | None] = [
-        result.discounted_lot_delta,
+        result.delta,
         result.discounted_price_sensitivity,
         result.discounted_daily_lots,
         result.discounted_monthly_lots,
