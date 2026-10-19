@@ -65,7 +65,8 @@ TEMPLATE_FIELDS_READ: Final = "template_fields_read"  # the template's values re
 MONTHS_RESOLVED: Final = "months_resolved"  # the period's months resolved to schedule rows
 OBSERVATIONS_MADE: Final = "observations_made"  # observations made over the months
 PAYMENT_DAYS_MADE: Final = "payment_days_made"  # one per month of a financial quote
-PRICE_REDUCTIONS: Final = "price_reductions"  # the sums formed: the months' prices, the two of K
+PRICE_REDUCTIONS: Final = "price_reductions"  # the sums formed: the months' prices, the
+# weights and the price
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,8 +102,10 @@ def quote(
     their pricing contracts and their calendar rows by the pipeline's rules, a fixed day's price
     off the history and a live day's off the market's quotes; a financial quote's payments after
     each month's last observation, within the sheet's calendar, and a physical quote's contracts
-    not yet expired; the selected curve covering every payment after the valuation day; and
-    every number finite."""
+    not yet expired; and the selected curve covering every payment after the valuation day.
+    The price is a convex combination of the months' prices, each a convex combination of
+    its observations' prices, so no product or sum runs past the largest number a finite
+    input stays within, and a factor as small as the curve allows scales nothing away."""
     terms = _the_terms(template, counter)
     calendar = market.market_history.calendar
     index = calendar.index
@@ -128,13 +131,7 @@ def quote(
     )
     is_fixed = calendar.is_fixed[rows]
     prices = _the_prices(market, references, rows, is_fixed, counter)
-    conventions = index.conventions
-    units = f"{conventions.quote_currency_unit} per {conventions.quote_quantity_unit}"
-    with np.errstate(over="ignore", invalid="ignore"):
-        monthly = np.bincount(
-            observations.component, weights=observations.weight * prices, minlength=n
-        )
-    _each_finite(monthly, "floating price", units, component, "its observations' prices")
+    monthly = np.bincount(observations.component, weights=observations.weight * prices, minlength=n)
     quantity = _the_quantities(terms.quantity_per, first, last)
     pays = _the_payments(terms, observations, n, component, counter)
     if pays is None:
@@ -142,24 +139,15 @@ def quote(
         factor = np.ones(n)
     else:
         factor = _the_factors(curve, terms.key, pays, as_of, component, counter)
-    with np.errstate(over="ignore", invalid="ignore"):
-        weighted = quantity * factor * monthly
-        numerator = float(weighted.sum())
-        denominator = float((quantity * factor).sum())
+    # Each month's share is its weight, quantity times factor, over the weights' sum, and the
+    # price the shares' sum of the months' prices: a convex combination at each step, the
+    # observations' weights summing to one and the shares to one, so no product or sum runs past
+    # the largest number a finite input stays within, and a factor as small as the curve allows,
+    # positive by its rule, scales nothing away: one month's share is one whatever its factor.
+    weight = quantity * factor
+    share = weight / weight.sum()
     counter.hit(PRICE_REDUCTIONS, 3)
-    _each_finite(weighted, "weighted price", units, component, "its quantity, factor and price")
-    if not np.isfinite(numerator):
-        raise ValueError(
-            f"the quote has {numerator!r} of weighted price in all, expected a finite number of "
-            f"{units}; the months' weighted prices, each finite, sum past the largest number"
-        )
-    price = numerator / denominator
-    if not np.isfinite(price):
-        raise ValueError(
-            f"the quote is {price!r}, expected a finite price in {units}; the weights sum to "
-            f"{denominator!r}"
-        )
-    return price
+    return float((share * monthly).sum())
 
 
 # --- the terms ------------------------------------------------------------------------------------
@@ -464,21 +452,3 @@ def _the_factors(
     factor = np.ones(pays.size)
     factor[future] = read[np.searchsorted(days, pays[future])]
     return factor
-
-
-def _each_finite(
-    numbers: NDArray[np.float64],
-    what: str,
-    units: str,
-    component: Callable[[int], str],
-    made_of: str,
-) -> None:
-    """Each month's number finite, else the first that is not refused by its month and what made
-    it, as the pipeline's stages refuse a product or a sum past the largest number."""
-    outrun = ~np.isfinite(numbers)
-    if outrun.any():
-        k = int(outrun.argmax())
-        raise ValueError(
-            f"{component(k)} has {float(numbers[k])!r} of {what}, expected a finite number of "
-            f"{units}; {made_of}, each finite, run past the largest number"
-        )

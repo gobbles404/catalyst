@@ -120,8 +120,14 @@ def financial(
     return a_template(**values)
 
 
-def bilateral(key: str = "SOFR", **terms: object) -> QuoteTemplate:
-    return financial(route="bilateral", key=key, **terms)  # type: ignore[arg-type]
+def bilateral(
+    key: str = "SOFR",
+    method: str = "asian",
+    per: str = "month",
+    lag: str = "+1bd",
+    payment_calendar: object = WEEKENDS_ONLY,
+) -> QuoteTemplate:
+    return financial("bilateral", method, per, lag, payment_calendar, key)
 
 
 def physical(method: str = "lastday", per: str = "month") -> QuoteTemplate:
@@ -741,21 +747,25 @@ def test_prices_may_be_zero_or_negative_and_the_quote_keeps_the_indexs_units() -
     )
 
 
-def test_a_weighted_price_past_the_largest_number_is_refused_by_its_month() -> None:
-    refused(
-        priced(STRIP, DEC_31, 3.0, 1e308, 60.0),
-        "F27-G27",
-        financial(per="calday"),
-        "F27 has inf of weighted price, expected a finite number of USD per BBL; its quantity, "
-        "factor and price, each finite, run past the largest number",
+def test_extreme_but_finite_inputs_price_as_exact_convex_combinations() -> None:
+    # Each month's share is its weight over the weights' sum and the price the shares' sum of
+    # the months' prices, so a factor as small as the curve allows scales nothing away: one
+    # month's share is one whatever its factor, and the price is the price. Nor does a sum run
+    # past the largest number, each being a convex combination of finite inputs.
+    tiny = curve_set(curve_of((DEC_31, 1.0), ("2027-02-01", 1e-300)))
+    assert quote_on(priced(STRIP, DEC_31, 3.0, 1e-30, 60.0), "F27", bilateral(), tiny) == (
+        pytest.approx(1e-30, rel=1e-12, abs=0)
     )
-    refused(
-        priced(STRIP, DEC_31, 3.0, 1e308, 1e308),
-        "F27-G27",
-        financial(),
-        "the quote has inf of weighted price in all, expected a finite number of USD per BBL; "
-        "the months' weighted prices, each finite, sum past the largest number",
+    both_tiny = curve_set(curve_of((DEC_31, 1.0), ("2027-02-01", 1e-300), ("2027-03-01", 1e-300)))
+    assert quote_on(priced(STRIP, DEC_31, 3.0, 30.0, 60.0), "F27-G27", bilateral(), both_tiny) == (
+        pytest.approx(MONTH_CLEARED, **CLOSE)
     )
+    assert quote_on(priced(STRIP, DEC_31, 3.0, 1e308, 1e308), "F27-G27", financial()) == (
+        pytest.approx(1e308, rel=1e-12, abs=0)
+    )
+    assert quote_on(
+        priced(STRIP, DEC_31, 3.0, 1e308, 60.0), "F27-G27", financial(per="calday")
+    ) == pytest.approx(1e308 * (31 / 59) + 60 * (28 / 59), rel=1e-12, abs=0)
 
 
 # --- an equivalent trade booked at the quote ---------------------------------------------------

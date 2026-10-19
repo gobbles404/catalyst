@@ -218,7 +218,7 @@ def test_a_month_and_a_strip_report_their_work() -> None:
 # The package's functions a quote runs, once each whatever the period, a month and a year alike:
 # the terms read, the key bound to the collection's first curve, the months resolved through the
 # grammar and the schedule's thirteen codes, the observations made by one method, their references
-# and rows, the prices, quantities, payments and factors, and the two finiteness checks.
+# and rows, the prices, quantities, payments and factors, the shares and their sum.
 LEDGER = {
     "quote": 1,
     "_the_terms": 1,
@@ -266,7 +266,6 @@ LEDGER = {
     "shift_days": 1,
     "_the_factors": 1,
     "factors_on": 1,
-    "_each_finite": 2,
     "WorkCounter.__init__": 1,
     "WorkCounter.hit": 12,
 }
