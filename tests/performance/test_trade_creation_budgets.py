@@ -202,7 +202,7 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "observations": 1,
         "last_days": 1,  # each component's last observation, the day its payment counts from
         "trade_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
-        "reporting_lot_of": 2,  # the resolution's and then the kernel's: the lot delta counts in
+        "reporting_lot_of": 2,  # the resolution's and the kernel's: the nominal delta counts in
         "schedule_months": 1,
         "month_and_year": 25,
         "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components

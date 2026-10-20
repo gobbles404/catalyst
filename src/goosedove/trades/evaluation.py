@@ -85,7 +85,7 @@ def trade_results(
     the unsettled offsets and set amounts plus the live amount, each finite or refused for the
     batch, since two finite floats add past the largest number without a word; the cash is the
     preparation's, the
-    sensitivity, the lot delta and its total the preparation's, shared, the discounted vectors
+    sensitivity, the nominal delta and its total the preparation's, shared, the discounted vectors
     those same arrays, since nothing discounts, DV01 zero and no group vector kept. A bilateral
     batch is _discounted's. The reserves are the encoding's, by reference, summed when the batch
     was made and never here.
@@ -172,16 +172,16 @@ def trade_results(
             f"{conventions.currency_unit} per {conventions.quote_currency_unit}/"
             f"{conventions.quote_quantity_unit}"
         ),
-        lot_delta=prepared.lot_delta,
-        lot_delta_total=prepared.lot_delta_total,
+        nominal_delta=prepared.nominal_delta,
+        nominal_delta_total=prepared.nominal_delta_total,
         lot_unit=terms.reporting_lot.words,
         dv01=0.0,  # the undiscounted model moves for no rate
         reserves=prepared.encoded.reserves,
         curves=(),
         # Cleared: nothing discounts, so the valuation-adjusted risk is the nominal risk itself,
         # the preparation's arrays by reference.
-        discounted_lot_delta=prepared.lot_delta,
-        discounted_lot_delta_total=prepared.lot_delta_total,
+        delta=prepared.nominal_delta,
+        delta_total=prepared.nominal_delta_total,
         discounted_price_sensitivity=prepared.price_sensitivity,
         discounted_daily_lots=prepared.daily_lots,
         discounted_monthly_lots=prepared.monthly_lots,
@@ -345,22 +345,22 @@ def _discounted(
         dv01_by_curve = np.bincount(key_of_group, weights=dv01_by_group, minlength=curve_count)
         dv01 = float(dv01_by_curve.sum())
         discounted_lots = prepared.dated_live_lots * payment_factor[encoded.slot_group]
-        discounted_lot_delta = np.bincount(
+        delta = np.bincount(
             encoded.reference_of_slot, weights=discounted_lots, minlength=encoded.references.size
         )
-        discounted_price_sensitivity = discounted_lot_delta * lot.coefficient
+        discounted_price_sensitivity = delta * lot.coefficient
         daily = np.bincount(
             encoded.day_of_slot, weights=discounted_lots, minlength=encoded.days.size
         )
         monthly = np.bincount(
             encoded.contract_month_of_reference,
-            weights=discounted_lot_delta,
+            weights=delta,
             minlength=encoded.contract_months.size,
         )
         yearly = np.bincount(
             encoded.contract_year_of_month, weights=monthly, minlength=encoded.contract_years.size
         )
-        discounted_total = float(discounted_lot_delta.sum())
+        discounted_total = float(delta.sum())
         # Since #178, the DV01 by payment day, month and year, the groups' DV01s summed onto the
         # axes the encoding made once, a paid group's nothing on its day, three bincounts; since
         # named-curves-slice-3.md every curve's row at once, the group's curve in the key.
@@ -388,12 +388,12 @@ def _discounted(
                 f"{currency}; the groups' amounts, each finite, sum past the largest number"
             )
     words = lot.words
-    outrun = ~np.isfinite(discounted_lot_delta)
+    outrun = ~np.isfinite(delta)
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{codes[int(encoded.references[r])]} has {float(discounted_lot_delta[r])!r} of "
-            f"discounted lot delta, expected a finite number of {words}; its discounted lots sum "
+            f"{codes[int(encoded.references[r])]} has {float(delta[r])!r} of "
+            f"delta, expected a finite number of {words}; its discounted lots sum "
             "past the largest number"
         )
     outrun = ~np.isfinite(discounted_price_sensitivity)
@@ -414,13 +414,13 @@ def _discounted(
         if outrun.any():
             b = int(outrun.argmax())
             raise ValueError(
-                f"{label} {starts[b]} has {float(lots[b])!r} of discounted lot delta in all, "
+                f"{label} {starts[b]} has {float(lots[b])!r} of delta in all, "
                 f"expected a finite number of {words}; its discounted lots sum past the largest "
                 "number"
             )
     if not np.isfinite(discounted_total):
         raise ValueError(
-            f"the batch has {discounted_total!r} of discounted lot delta in all, expected a finite "
+            f"the batch has {discounted_total!r} of delta in all, expected a finite "
             f"number of {words}; the contracts' discounted deltas, each finite, sum past the "
             "largest number"
         )
@@ -483,7 +483,7 @@ def _discounted(
         dv01_by_group,
         dv01_by_curve,
         payment_factor,
-        discounted_lot_delta,
+        delta,
         discounted_price_sensitivity,
         daily,
         monthly,
@@ -511,15 +511,15 @@ def _discounted(
         price_sensitivity_unit=(
             f"{currency} per {conventions.quote_currency_unit}/{conventions.quote_quantity_unit}"
         ),
-        lot_delta=prepared.lot_delta,
-        lot_delta_total=prepared.lot_delta_total,
+        nominal_delta=prepared.nominal_delta,
+        nominal_delta_total=prepared.nominal_delta_total,
         lot_unit=words,
         dv01=dv01,
         reserves=encoded.reserves,
         curves=curves,
         # Bilateral: the nominal risk weighted by each live slot's payment factor, made above.
-        discounted_lot_delta=discounted_lot_delta,
-        discounted_lot_delta_total=discounted_total,
+        delta=delta,
+        delta_total=discounted_total,
         discounted_price_sensitivity=discounted_price_sensitivity,
         discounted_daily_lots=daily,
         discounted_monthly_lots=monthly,

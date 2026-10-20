@@ -53,10 +53,10 @@ class TradeResults:
     rows of its references in the schedule's order, the same whatever has fixed;
     price_sensitivity[r] is the change in mark for a move of one quote unit in contract r, the
     live exposure referencing it and zero where every slot of it has fixed, in
-    price_sensitivity_unit, currency per quote currency per quote quantity unit; lot_delta[r] is
+    price_sensitivity_unit, currency per quote currency per quote quantity unit; nominal_delta[r] is
     the exposure still to price in contract r counted in lots of the index's reporting
     specification, the sensitivity over the lot's coefficient, in lot_unit, `lots of LOT (1000
-    BBL)`, and lot_delta_total their sum, the number the risk report shows as the delta; the
+    BBL)`, and nominal_delta_total their sum, the number the risk report shows as the delta; the
     three arrays are the preparation's own, shared and never written. dv01 is zero: the cleared
     model is undiscounted, so a rate move changes nothing, a result of the model and not a
     placeholder. as_of is the history's valuation day. reserves, since #170, is the batch's
@@ -67,7 +67,7 @@ class TradeResults:
     Since #176, the bilateral fields. curves, since named-curves-slice-3.md, are the exact curve
     objects the batch's keys selected from the collection it was evaluated with, in key order,
     the curves the contributions below are owned by, and none for a cleared batch; the
-    collection itself is not kept. discounted_lot_delta[r], discounted_lot_delta_total,
+    collection itself is not kept. delta[r], delta_total,
     discounted_price_sensitivity[r] and the discounted daily, monthly and yearly lots are the
     nominal vectors weighted by each live slot's payment factor before the sums, the lots the desk
     hedges to; for a cleared batch they are
@@ -91,7 +91,7 @@ class TradeResults:
     since #178 onto the payment-time axes the encoding made once, a paid group's nothing on
     its day, with its total and the facts refusing an early month or year; and
     cross_contributions, one CrossContribution per curve, since #197 single-curve-cross-gamma.md:
-    the sensitivity of each contract's discounted lot delta to a rise of one basis point in
+    the sensitivity of each contract's delta to a rise of one basis point in
     that curve's continuously compounded zero rates, each live slot's discounted lots times
     -0.0001 times its payment's time fraction, summed by reference, by observation day and,
     by reference, onto the contract months and years, the discounted lots' own axes, since
@@ -115,14 +115,14 @@ class TradeResults:
     contracts: NDArray[np.intp]
     price_sensitivity: NDArray[np.float64]
     price_sensitivity_unit: str
-    lot_delta: NDArray[np.float64]
-    lot_delta_total: float
+    nominal_delta: NDArray[np.float64]
+    nominal_delta_total: float
     lot_unit: str
     dv01: float
     reserves: Reserves
     curves: tuple[DiscountCurve, ...]
-    discounted_lot_delta: NDArray[np.float64]
-    discounted_lot_delta_total: float
+    delta: NDArray[np.float64]
+    delta_total: float
     discounted_price_sensitivity: NDArray[np.float64]
     discounted_daily_lots: NDArray[np.float64]
     discounted_monthly_lots: NDArray[np.float64]
@@ -217,13 +217,16 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
     match risk:
         case Risk.NOMINAL_DELTA:
             return RiskView(
-                encoded.days, (nominal_label,), (results.lot_delta_total,), (prepared.daily_lots,)
+                encoded.days,
+                (nominal_label,),
+                (results.nominal_delta_total,),
+                (prepared.daily_lots,),
             )
         case Risk.DELTA:
             return RiskView(
                 encoded.days,
                 (delta_label,),
-                (results.discounted_lot_delta_total,),
+                (results.delta_total,),
                 (results.discounted_daily_lots,),
             )
         case Risk.DV01:
@@ -256,8 +259,8 @@ def _day_view(results: TradeResults, risk: Risk, labels: Labels) -> RiskView:
                 else (results.cross_gamma_total,)
             )
             totals = (
-                results.lot_delta_total,
-                results.discounted_lot_delta_total,
+                results.nominal_delta_total,
+                results.delta_total,
                 *dv01_totals,
                 *cross_totals,
             )
@@ -307,7 +310,7 @@ def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labe
             return RiskView(
                 axis.periods[: axis.delta_rows],
                 (nominal_label,),
-                (results.lot_delta_total,),
+                (results.nominal_delta_total,),
                 (column,),
             )
         case Risk.DELTA:
@@ -316,7 +319,7 @@ def _period_view(results: TradeResults, risk: Risk, bucket: Period, labels: Labe
             return RiskView(
                 axis.periods[: axis.delta_rows],
                 (delta_label,),
-                (results.discounted_lot_delta_total,),
+                (results.delta_total,),
                 (column,),
             )
         case Risk.DV01:
@@ -406,8 +409,8 @@ def _period_all(
         axis.periods[:rows],
         (nominal_label, delta_label, *dv01_labels, *cross_labels),
         (
-            results.lot_delta_total,
-            results.discounted_lot_delta_total,
+            results.nominal_delta_total,
+            results.delta_total,
             *dv01_totals,
             *cross_totals,
         ),

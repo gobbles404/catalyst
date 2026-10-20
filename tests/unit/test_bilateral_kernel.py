@@ -214,10 +214,10 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     np.testing.assert_allclose(given(result.dv01_by_group), [-0.0095, 0.018], **TIGHT)
     np.testing.assert_array_equal(given(result.payment_factor), [0.95, 0.90])
     # The nominal risk is the preparation's, shared and nought; the discounted lots are 9.5 less 9.
-    assert result.lot_delta is prep.lot_delta and result.lot_delta_total == 0.0
+    assert result.nominal_delta is prep.nominal_delta and result.nominal_delta_total == 0.0
     assert result.price_sensitivity is prep.price_sensitivity
-    np.testing.assert_allclose(result.discounted_lot_delta, [0.5], **TIGHT)
-    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
+    np.testing.assert_allclose(result.delta, [0.5], **TIGHT)
+    assert result.delta_total == pytest.approx(0.5, **CLOSE)
     np.testing.assert_allclose(result.discounted_price_sensitivity, [0.5], **TIGHT)
     np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF))
     np.testing.assert_allclose(result.discounted_daily_lots, [0.5], **TIGHT)
@@ -238,13 +238,13 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     ticked = valued(prep, (81.0, 50.0), FLAT)
     assert ticked.mark == pytest.approx(5.5, **CLOSE)
     assert ticked.dv01 == pytest.approx(0.00935, **CLOSE)
-    assert ticked.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
-    assert ticked.lot_delta_total == 0.0
+    assert ticked.delta_total == pytest.approx(0.5, **CLOSE)
+    assert ticked.nominal_delta_total == 0.0
     other = valued(prep, (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 0.96), (TWO_YEARS, 0.92)))
     assert other.mark == pytest.approx(4.0, **CLOSE)
-    assert other.discounted_lot_delta_total == pytest.approx(0.4, **CLOSE)
+    assert other.delta_total == pytest.approx(0.4, **CLOSE)
     assert other.dv01 == pytest.approx(0.0088, **CLOSE)
-    assert other.lot_delta_total == 0.0
+    assert other.nominal_delta_total == 0.0
     for array in (result.payment_amount, result.npv_by_group, result.discounted_daily_lots):
         assert array is not None and not array.flags.writeable
 
@@ -256,8 +256,8 @@ def test_a_mark_of_nothing_still_carries_lots_and_dv01() -> None:
     prep = prepared_on(terms_of((10.0,), (A_YEAR,), (261,)))
     flat = valued(prep, (70.0, 50.0), FLAT)
     assert flat.mark == 0.0 and flat.dv01 == 0.0
-    assert flat.lot_delta_total == 10.0
-    assert flat.discounted_lot_delta_total == pytest.approx(9.5, **CLOSE)
+    assert flat.nominal_delta_total == 10.0
+    assert flat.delta_total == pytest.approx(9.5, **CLOSE)
     moved = valued(prep, (71.0, 50.0), FLAT)
     assert moved.mark == pytest.approx(9.5, **CLOSE)
     assert moved.dv01 == pytest.approx(-0.00095, **CLOSE)
@@ -277,9 +277,7 @@ def test_batch_equals_its_singletons_and_order_and_duplicates_count() -> None:
     b = valued(prepared_on(terms_of((-10.0,), (TWO_YEARS,), (522,))), (80.0, 50.0), FLAT)
     assert a.mark + b.mark == pytest.approx(batch.mark, **CLOSE)
     assert a.dv01 + b.dv01 == pytest.approx(batch.dv01, **CLOSE)
-    assert a.discounted_lot_delta_total + b.discounted_lot_delta_total == pytest.approx(
-        batch.discounted_lot_delta_total, **CLOSE
-    )
+    assert a.delta_total + b.delta_total == pytest.approx(batch.delta_total, **CLOSE)
     reversed_rows = valued(
         prepared_on(terms_of((-10.0, 10.0), (TWO_YEARS, A_YEAR), (522, 261))), (80.0, 50.0), FLAT
     )
@@ -292,7 +290,7 @@ def test_batch_equals_its_singletons_and_order_and_duplicates_count() -> None:
         given(twice.npv_by_group), [190.0], **TIGHT
     )  # one group, both trades
     assert twice.dv01 == pytest.approx(-0.019, **CLOSE)
-    assert twice.discounted_lot_delta_total == pytest.approx(19.0, **CLOSE)
+    assert twice.delta_total == pytest.approx(19.0, **CLOSE)
 
 
 # --- fixed is not paid ----------------------------------------------------------------------------
@@ -304,15 +302,15 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
     on_the_day = valued(prepared_on(terms), (80.0, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
     assert on_the_day.mark == pytest.approx(100.0, **CLOSE)
     assert on_the_day.dv01 == pytest.approx(-0.01, **CLOSE)
-    assert on_the_day.lot_delta_total == 10.0
-    assert on_the_day.discounted_lot_delta_total == pytest.approx(10.0, **CLOSE)
+    assert on_the_day.nominal_delta_total == 10.0
+    assert on_the_day.delta_total == pytest.approx(10.0, **CLOSE)
     # The next day, fixed at 82: 120 of NPV, 364 days out, no lots, and -0.0119671232876712 of DV01.
     fixed = prepared_on(terms, "2027-01-05", {"F27": 82.0})
     unpaid = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
     assert unpaid.mark == pytest.approx(120.0, **CLOSE)
     assert unpaid.cash == 0.0
     assert unpaid.dv01 == pytest.approx(-0.0001 * 364 / 365 * 120.0, **CLOSE)
-    assert unpaid.lot_delta_total == 0.0 and unpaid.discounted_lot_delta_total == 0.0
+    assert unpaid.nominal_delta_total == 0.0 and unpaid.delta_total == 0.0
     np.testing.assert_array_equal(given(unpaid.payment_factor), [1.0])
     # At 0.99 the same payment is worth 118.8.
     at_99 = valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 0.99)))
@@ -324,7 +322,7 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
         counter = WorkCounter()
         settled = valued(paid, (50.0,), curve_of((as_of, 1.0)), counter)
         assert settled.mark == 0.0 and settled.cash == pytest.approx(120.0, **CLOSE)
-        assert settled.dv01 == 0.0 and settled.discounted_lot_delta_total == 0.0
+        assert settled.dv01 == 0.0 and settled.delta_total == 0.0
         np.testing.assert_array_equal(
             given(settled.payment_factor), [1.0]
         )  # the policy, read for nothing
@@ -333,7 +331,7 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
         # vectors are floats of nothing, a sum over every slot and never numpy's integer zeros
         # for a sum over none.
         for array in (
-            settled.discounted_lot_delta,
+            settled.delta,
             settled.discounted_price_sensitivity,
             settled.discounted_daily_lots,
             settled.discounted_monthly_lots,
@@ -433,10 +431,8 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
     assert result.mark == pytest.approx(100 * d365 - 100 * d730 - 100 * d735, **CLOSE)
     # By reference, F27 then F29; by day, the two observation days; by month and year likewise.
     np.testing.assert_array_equal(prep.encoded.references, [1, 2])
-    np.testing.assert_allclose(
-        result.discounted_lot_delta, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
-    )
-    np.testing.assert_allclose(result.lot_delta, [0.0, 5.0])
+    np.testing.assert_allclose(result.delta, [10 * d365 - 10 * d730, 5 * d735], **TIGHT)
+    np.testing.assert_allclose(result.nominal_delta, [0.0, 5.0])
     np.testing.assert_array_equal(prep.encoded.days, dates(AS_OF, "2029-01-05"))
     np.testing.assert_allclose(
         result.discounted_daily_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
@@ -449,9 +445,7 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
     np.testing.assert_allclose(
         result.discounted_yearly_lots, [10 * d365 - 10 * d730, 5 * d735], **TIGHT
     )
-    assert result.discounted_lot_delta_total == pytest.approx(
-        10 * d365 - 10 * d730 + 5 * d735, **CLOSE
-    )
+    assert result.delta_total == pytest.approx(10 * d365 - 10 * d730 + 5 * d735, **CLOSE)
     assert counter.freeze().as_dict() == {
         "curves_selected": 1,
         "groups_valued": 3,
@@ -473,12 +467,12 @@ def test_a_cleared_batch_shares_its_nominal_arrays_and_keeps_no_group_vector() -
     result = valued(prep, (80.0, 50.0), None, counter)
     assert result.curves == () and result.dv01 == 0.0
     assert result.mark == pytest.approx(0.0, **CLOSE)  # +100 and -100, undiscounted, net
-    assert result.discounted_lot_delta is prep.lot_delta
+    assert result.delta is prep.nominal_delta
     assert result.discounted_price_sensitivity is prep.price_sensitivity
     assert result.discounted_daily_lots is prep.daily_lots
     assert result.discounted_monthly_lots is prep.monthly_lots
     assert result.discounted_yearly_lots is prep.yearly_lots
-    assert result.discounted_lot_delta_total == prep.lot_delta_total
+    assert result.delta_total == prep.nominal_delta_total
     assert result.payment_amount is None and result.npv_by_group is None
     assert result.dv01_by_group is None and result.payment_factor is None
     assert counter.freeze().as_dict() == {"kernel": 1, "live_prices_read": 1}
@@ -522,8 +516,8 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
     result = valued(prep, (80.0, 50.0), FLAT)
     assert result.mark == pytest.approx(5.0, **CLOSE)
     assert result.dv01 == pytest.approx(0.0085, **CLOSE)
-    assert result.discounted_lot_delta_total == pytest.approx(0.5, **CLOSE)
-    assert result.lot_delta_total == 0.0
+    assert result.delta_total == pytest.approx(0.5, **CLOSE)
+    assert result.nominal_delta_total == 0.0
 
 
 # --- the review of #176: the mapping once, every stored vector finite -----------------------------
@@ -614,7 +608,7 @@ def test_an_amount_past_the_largest_number_is_refused_by_its_group_or_as_cash() 
 def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_contract() -> None:
     # The review's case: half the largest number of barrels in each of two groups of F27, bought
     # at nothing and quoted nothing on a curve of ones, the reporting lot three barrels. The
-    # nominal sensitivity is their sum, the largest number exactly, the lot delta a third of it,
+    # nominal sensitivity is their sum, the largest number exactly, the nominal delta a third of it,
     # and the cleared batch publishes both with a mark of nothing. The discounted lots are a third
     # of each half, summed, and multiplied back by three they round past the largest number: the
     # bilateral tick refuses the sensitivity by its contract rather than publish inf beside a mark
@@ -625,9 +619,9 @@ def test_a_discounted_sensitivity_past_the_largest_number_is_refused_by_its_cont
     )
     assert cleared.mark == 0.0 and cleared.dv01 == 0.0
     np.testing.assert_array_equal(cleared.price_sensitivity, [LARGEST])
-    assert cleared.lot_delta_total == LARGEST / 3
+    assert cleared.nominal_delta_total == LARGEST / 3
     prep = prepared_on(terms_of(halves, fixed=0.0, ix=TRIO))
-    assert prep.lot_delta_total == LARGEST / 3
+    assert prep.nominal_delta_total == LARGEST / 3
     with pytest.raises(ValueError) as refused:
         valued(prep, (0.0, 50.0), curve_of((AS_OF, 1.0), (TWO_YEARS, 1.0)))
     assert str(refused.value) == (

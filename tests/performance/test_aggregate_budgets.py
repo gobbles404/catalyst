@@ -62,7 +62,7 @@ def retained_bytes(agg: AggregateResults) -> int:
         total += sum(
             a.nbytes
             for a in (
-                g.occurrences, g.references, g.lot_delta, g.discounted_lot_delta,
+                g.occurrences, g.references, g.nominal_delta, g.delta,
                 g.days, g.daily_lots, g.discounted_daily_lots,
                 g.months, g.monthly_lots, g.discounted_monthly_lots,
                 g.years, g.yearly_lots, g.discounted_yearly_lots,
@@ -162,7 +162,9 @@ def test_a_collection_counts_its_sources_groups_entries_and_reductions(
         rtol=1e-12,
         atol=1e-12,
     )
-    assert agg.index_groups[0].lot_delta_total == pytest.approx(count * sources[0].lot_delta_total)
+    assert agg.index_groups[0].nominal_delta_total == pytest.approx(
+        count * sources[0].nominal_delta_total
+    )
     assert agg.rate_groups[0].dv01 == pytest.approx(count * sources[0].dv01, rel=1e-12, abs=1e-15)
 
 

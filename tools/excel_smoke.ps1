@@ -763,7 +763,7 @@ $formulas = [ordered]@{
     "=ROWS(util_ReadHandle(FG6))"      = "3"
     "=INDEX(util_ReadHandle(FG7),1,7)" = "live_contribution"
     "=INDEX(util_ReadHandle(FG7),1,9)" = "contract_discounted_sensitivity"
-    "=INDEX(util_ReadHandle(FG7),1,10)" = "contract_lot_delta"
+    "=INDEX(util_ReadHandle(FG7),1,10)" = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(FG7),1,11)" = "contract_delta"
     "=INDEX(util_ReadHandle(FG7),3,5)" = "2000"
     "=INDEX(util_ReadHandle(FG7),3,6)" = "2"
@@ -970,7 +970,7 @@ $formulas = [ordered]@{
     "=INDEX(_ReportValues(KA14),3,2)"    = "180"
     '=INDEX(_ReportRisk(KA14,"nominal_delta","year"),4,2)'      = "0"
     "=COLUMNS(util_ReadHandle(KA14))"    = "26"
-    "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_lot_delta"
+    "=INDEX(util_ReadHandle(KA14),1,11)"  = "contract_nominal_delta"
     "=INDEX(util_ReadHandle(KA14),6,11)"  = "0"
     # Mixed fields in one batch, mixed-trade-fields.md: the four rows of Z26 at 10 in KU2:LA5, each
     # its own unit, basis, method and clearing house, read back row by row off the batch in KU7;

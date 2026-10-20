@@ -84,12 +84,14 @@ class PreparedTrades:
     the day they pay and never discounted. And the risk, which no tick changes:
     price_sensitivity[r], the live exposure summed by reference over the batch's whole axis, the
     encoding's references, zero where every slot of a reference has fixed, the settlement
-    currency the mark moves for a move of one unit of quote price in that contract; lot_delta[r],
+    currency the mark moves for a move of one unit of quote price in that contract;
+    nominal_delta[r],
     the same sensitivity over the reporting lot's coefficient, the batch's exposure still to
     price in lots of that specification, signed and fractional, a fully live lot one and a lot
-    half of whose observation weight has fixed a half; lot_delta_total, their sum; and since #166
+    half of whose observation weight has fixed a half; nominal_delta_total, their sum; and
+    since #166
     the same lots by time, daily_lots[d] the live lots summed onto the encoding's observation
-    days, and since #186 monthly_lots[m] the lot delta by reference summed onto the encoding's
+    days, and since #186 monthly_lots[m] the nominal delta by reference summed onto the encoding's
     contract months and yearly_lots[y] onto its contract years, the month and the year a
     contract is named for whatever days it is observed on, the three views _ReportRisk selects
     among, a bucket's lots zero once its contracts have fixed and its row kept; every one of
@@ -121,8 +123,8 @@ class PreparedTrades:
     set_unsettled: float
     cash: float
     price_sensitivity: NDArray[np.float64]
-    lot_delta: NDArray[np.float64]
-    lot_delta_total: float
+    nominal_delta: NDArray[np.float64]
+    nominal_delta_total: float
     daily_lots: NDArray[np.float64]
     monthly_lots: NDArray[np.float64]
     yearly_lots: NDArray[np.float64]
@@ -337,7 +339,7 @@ def prepared_trades(
     order since #190, reject-nonfinite-trade-arithmetic.md: each fixed slot's set amount, its
     exposure times its settle, named by the slot and the settle; each group's set amount, a sum
     blamed on the group by its contract and payment day; each contract's price sensitivity, its
-    live exposures summed; then the live lots, the lot deltas and their total, since #164, where
+    live exposures summed; then the live lots, the nominal deltas and their total, since #164, where
     a lot small enough, a BTU against quantities in the trillions of MMBTU, divides a finite
     exposure past the largest number once it is counted in lots; the lots by day, month and
     year; the cash, since #176, the settled groups' offsets and set amounts; and the unsettled
@@ -400,8 +402,8 @@ def prepared_trades(
     # flags stay down and the rules judge, a sum of opposite infinities among them.
     with np.errstate(over="ignore", invalid="ignore"):
         dated_live_lots = dated_live_exposure / lot.coefficient
-        lot_delta = price_sensitivity / lot.coefficient
-        lot_delta_total = float(lot_delta.sum())
+        nominal_delta = price_sensitivity / lot.coefficient
+        nominal_delta_total = float(nominal_delta.sum())
         cash = float((encoded.offset_of_group + set_amount)[is_settled].sum())
     words = lot.words
     outrun = ~np.isfinite(dated_live_lots)
@@ -411,16 +413,18 @@ def prepared_trades(
             f"{encoded.named_slot(s)}, has {float(dated_live_lots[s])!r} live lots, expected a "
             f"finite number of {words}; the exposure in lots outruns the largest number"
         )
-    outrun = ~np.isfinite(lot_delta)
+    outrun = ~np.isfinite(nominal_delta)
     if outrun.any():
         r = int(outrun.argmax())
         raise ValueError(
-            f"{codes[int(encoded.references[r])]} has {float(lot_delta[r])!r} of lot delta, "
+            f"{codes[int(encoded.references[r])]} has {float(nominal_delta[r])!r} of nominal "
+            "delta, "
             f"expected a finite number of {words}; the exposure in lots outruns the largest number"
         )
-    if not np.isfinite(lot_delta_total):
+    if not np.isfinite(nominal_delta_total):
         raise ValueError(
-            f"the batch has {lot_delta_total!r} of lot delta in all, expected a finite number of "
+            f"the batch has {nominal_delta_total!r} of nominal delta in all, expected a finite "
+            "number of "
             f"{words}; the contracts' deltas, each finite, sum past the largest number"
         )
     daily_lots = np.bincount(
@@ -428,7 +432,7 @@ def prepared_trades(
     )
     monthly_lots = np.bincount(
         encoded.contract_month_of_reference,
-        weights=lot_delta,
+        weights=nominal_delta,
         minlength=encoded.contract_months.size,
     )
     yearly_lots = np.bincount(
@@ -443,7 +447,7 @@ def prepared_trades(
         if outrun.any():
             b = int(outrun.argmax())
             raise ValueError(
-                f"{label} {starts[b]} has {float(lots[b])!r} of lot delta in all, expected a "
+                f"{label} {starts[b]} has {float(lots[b])!r} of nominal delta in all, expected a "
                 f"finite number of {words}; its exposures in lots sum past the largest number"
             )
     if not np.isfinite(cash):
@@ -493,7 +497,7 @@ def prepared_trades(
         live_references,
         reference_of_live_slot,
     )
-    for array in (*arrays, price_sensitivity, lot_delta, daily_lots, monthly_lots, yearly_lots):
+    for array in (*arrays, price_sensitivity, nominal_delta, daily_lots, monthly_lots, yearly_lots):
         array.setflags(write=False)
     return PreparedTrades(
         encoded,
@@ -503,8 +507,8 @@ def prepared_trades(
         set_unsettled,
         cash,
         price_sensitivity,
-        lot_delta,
-        lot_delta_total,
+        nominal_delta,
+        nominal_delta_total,
         daily_lots,
         monthly_lots,
         yearly_lots,
