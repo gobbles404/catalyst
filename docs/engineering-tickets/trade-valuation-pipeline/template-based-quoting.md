@@ -1,6 +1,6 @@
 # Quote templates and whole period pricing with named discount curves
 
-**Status:** Proposed follow-up ticket, updated owner direction 18 October 2026: separate quote templates from trade templates; retain the entire requested period, with factor 1 for payment dates on or before `as_of`. Implement after the [named discount curves arc](multiple-discount-curves.md) supplies named curves, curve sets and `discount_curve_key`. Use a feature branch and one focused PR. This replaces the public API proposed in the [four-input prototype](quoting-prototype.md); retain its useful examples, not a second worksheet call form.
+**Status:** Ready for quoting implementation; quoting itself is not built. The [named discount curves arc](multiple-discount-curves.md) is implemented through #203, and #204 supplies the publication-based IFERC payment anchor. Base the quoting feature branch on that completed stack, or on main once it contains those changes; this is a separate feature PR, not another named-curve slice. Retain the agreed separate quote templates and entire requested period, with factor 1 for payment dates on or before `as_of`. This replaces the public API proposed in the [four-input prototype](quoting-prototype.md); retain its useful examples, not a second worksheet call form.
 
 ## Outcome
 
@@ -13,7 +13,7 @@ _Quote(market, contract_code, template, [discount_curve_set]) -> number
 
 The quote output is one whole-period indicative fixed price in the index's quoted units, not a trade value or a handle. With all payments still ahead, it is the fair fixed price making the equivalent trade's mark zero. With elapsed payments, it includes those periods under the explicit convention below; it is not the remaining trade's zero-mark price or a reconstruction of a historical executable quote. This remains a first usable quoting slice for UAT, rather than a general quoting framework.
 
-[Pipeline packet](README.md) · [UAT notes](surface-uat-notes.md#25-template-based-quoting) · [Existing template](../../library/trades/trade-template.md) · [Schedule machinery](../../library/trades/kernel.md) · [Market](../../library/market/market.md)
+[Pipeline packet](README.md) · [UAT notes](surface-uat-notes.md#25-template-based-quoting) · [Existing template](../../library/trades/trade-template.md) · [Schedule machinery](../../library/trades/kernel.md) · [Market](../../library/market/market.md) · [Named curves](../../library/globals/discount-curve.md) · [Curve collection](../../library/globals/collect-discount-curves.md) · [Evaluation's curve rules](../../library/trades/evaluate-trades.md)
 
 ## Surface and dependency
 
@@ -37,7 +37,14 @@ Example bilateral template values:
 =_Quote(ngl_market, "CAL27", ngl_cleared_template)
 ```
 
-Here `rates` is made by the preceding arc's `_CollectDiscountCurves`, containing named ordinary curves created by `_CreateDiscountCurve`. A cleared financial template has `route = cleared` and no discount key; its other pricing and payment terms can be the same. These formulas become available through this implementation, not through the earlier prototype ticket.
+The rate inputs already exist:
+
+```text
+_CreateDiscountCurve(name, header_row, table) -> discount_curve_handle
+_CollectDiscountCurves(curve_handles) -> discount_curve_set_handle
+```
+
+Here `rates` is the collection made from a cell, row or column of named curve handles, such as SOFR and FFOIS. A one-curve quote still uses `_CollectDiscountCurves` over that one handle. The collection retains the curve objects; it does not blend their factors or put rates into the market. Only the two quoting functions above are new. A cleared financial template has `route = cleared` and no discount key; its other pricing and payment terms can be the same.
 
 The quote's first three arguments are required. Its template argument accepts a quote template only; a trade template fails by kind. Trade and cashflow booking likewise refuse quote templates. The fourth argument is an optional curve-set handle, with its meaning controlled by the template:
 
@@ -47,9 +54,9 @@ The quote's first three arguments are required. Its template argument accepts a 
 | `bilateral` | Required, including for a one-curve quote | Resolve the template's key in the supplied set |
 | `cleared` with a set supplied | Refused | No silently ignored rates input |
 
-Use the preceding arc's exact name-matching and selected-curve validation. No first-curve default, name alias or raw-curve alternative. Extra unused set members follow that arc's policy. One template selects one curve for this quote; the fact that a set can contain several curves does not introduce per-month curve selection here. Keep the existing seam's omitted-versus-blank distinction.
+Use the existing exact, case-sensitive name/key rule, with no surrounding whitespace, and the collection's unique-name rule. No first-curve default, name alias or raw-curve alternative. Bind the template's key once, including for a singleton set; then check only the selected curve's valuation-date start and future-payment coverage. Unused members may have other starts or shorter spans: do not validate their dates or read their factors. One template selects one curve for this quote; the fact that a set can contain several curves does not introduce per-month curve selection here. Keep the existing seam's omitted-versus-blank distinction.
 
-The market remains unchanged. Rates are supplied directly to `_Quote`, as they are to trade evaluation. Wait for the named-curve surface to be usable; do not implement temporary single-curve signatures in anticipation of it.
+The market remains unchanged. Rates are supplied directly to `_Quote`, as they are to `_EvaluateTrades(prepared, market, [discount_curve_set])`. A rates update makes a new curve and collection, leaving the quote template and market unchanged. For a bump scenario, replace the selected SOFR member with the result of `util_BumpDiscountCurve`; do not collect base and bumped SOFR together, because both retain the same name and the collection correctly refuses that duplicate. No single-curve adapter or named-curve migration is part of this PR.
 
 ## Instrument field requirements by purpose
 
@@ -62,7 +69,7 @@ Templates may remain partial. A creator checks supplied headers and values; `_Cr
 | Instrument carried by the template | Existing catalog rules | `fixed_float` only; unsupported instruments fail by name |
 | `route`, `settlement_method`, `schedule_method`, `quantity_per` | Existing required fields | Required; same value choices and compatible combinations |
 | `payment_time_lag`, `payment_holiday_calendar` | Existing financial/physical rules | Required for financial settlement, including cleared financial; absent for physical |
-| `discount_curve_key` | Preceding arc's rules | Required for bilateral; refused for cleared; resolved against the set at quote time |
+| `discount_curve_key` | Existing named-curve rules | Required for bilateral; refused for cleared; resolved against the set at quote time |
 | `contract_code`, `start_date`, `end_date` | Existing period rules | The quote's contract argument owns the period; these headers are not allowed in a quote template |
 | `fixed_price`, `quantity`, `quantity_unit` | Existing required fields | Not allowed as template inputs; price is the output and the relative quantity basis is sufficient |
 | Trade identifiers/dates, counterparty, broker, clearing-house attribution, reserves and other booking-only fields | Existing required/optional/conditional rules | Not allowed in a quote template |
@@ -98,7 +105,7 @@ K = sum_i(q_i * D_i * P_i) / sum_i(q_i * D_i)
 
 Return `K` in the index's price units. Relative quantities use one consistent underlying unit; a common quantity or unit-conversion scale cancels. `calday` includes weekends and holidays when weighting months, but it does not alter the schedule's within-month observation weights. Never use pricing-day counts as calendar-day quantities.
 
-Resolve each financial component's payment date with the same rules as trade creation: every component anchors on its last observation, the publication day on an IFERC index since [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md). Apply the existing compound date-offset reader and the supplied payment calendar. Preserve the rule that payment follows the final observation when its price is known. Keep each component's price, quantity and payment associated until the weighted sums are formed; do not blend prices first and then apply one factor to the strip.
+Resolve each financial component's payment date with the same rules as trade creation: every component anchors on its last observation. On an IFERC index that is the publication date, for both cleared and bilateral quotes; there is no last-trading-date input or reconstructed final-settlement-date step. Apply the existing compound date-offset reader and the supplied payment calendar. Preserve the rule that payment follows the final observation when its price is known. Keep each component's price, quantity and payment associated until the weighted sums are formed; do not blend prices first and then apply one factor to the strip. The anchor decision is [iferc-publication-payment-anchor.md](iferc-publication-payment-anchor.md).
 
 For bilateral quoting, the selected curve starts on the market's valuation date and covers every requested future payment date. Set factors to 1 for dates on or before `as_of` without requesting them from the curve: this is the quote convention, not extrapolation. A missing key, wrong start or uncovered future payment fails before a number is returned. Keep the bilateral set/key/start checks even for an entirely historical request, but perform zero factor reads when no payments are ahead. Discount factors weight **both** the floating-price numerator and the fixed-leg denominator. Consequently, one month with one payment has the same quoted price cleared or bilateral, and a common factor across all payments cancels too.
 
@@ -136,7 +143,7 @@ Let `as_of = 31 December 2026`. A month-matching Asian calendar closes weekends 
 
 January alone quotes 30 under both routes and both quantity bases. With the two floating prices reversed, the equal-month cleared quote remains 45 but the bilateral quote becomes `88.8 / 1.97 = 45.076142131979694`. This proves a scalar cleared price cannot be passed into a second function to recover the bilateral price.
 
-Include a second named curve with visibly different payment factors. Changing the template's key selects it; reordering the set does not change the answer. Updating only the selected curve reprices the quote over the same template and market. With both selected payment factors equal to 0.98, the bilateral quotes equal the corresponding cleared quotes.
+Include a second named curve with visibly different payment factors. Changing the template's key selects it; reordering the set does not change the answer. Updating only the selected curve reprices the quote over the same template and market. With both selected payment factors equal to 0.98, the bilateral quotes equal the corresponding cleared quotes. An unused curve with a different start or insufficient coverage does not fail or change the quote and causes no factor reads; selecting that curve fails by the relevant date rule. A singleton containing FFOIS cannot satisfy a template selecting SOFR. Exercise a new collection containing bumped SOFR in place of base SOFR, and the existing duplicate-name refusal if both are supplied.
 
 ### Fixings and methods
 
@@ -144,7 +151,7 @@ Retain independently checked examples from the superseded prototype:
 
 - A 20-observation Asian with five fixings at 25 and fifteen live projections at 29 has a single-month quote of 28. A live move to 30 gives 28.75; one fixing corrected up by 2 gives 28.10 with live prices still 29. Keep payment in the future; clearing versus bilateral discounting does not change that month's price.
 - December 2026 has 22 pricing days when weekends and 25 December are closed. With 15 days priced by F27 at 70 and seven by G27 at 76, the Asian price is `1582 / 22 = 71.9090909090909`. After the roll, history supplies F27's fixed observations and the live vector supplies only G27.
-- Pin lastday, penultimate and last3day dates and prices by hand, including a holiday immediately before expiry; pin IFERC's distinct observation and payment anchors. Test one month and a strip through the same calculation path.
+- Pin lastday, penultimate and last3day dates and prices by hand, including a holiday immediately before expiry. For IFERC, pin the publication observation and the payment offset from that same publication date under each route and its payment calendar; no last trading date is needed. Test one month and a strip through the same calculation path.
 
 On a multi-payment strip with unequal component prices, pin a payment-calendar change that shifts one component's payment and changes its factor relative to the others. The bilateral price then changes while the cleared price stands, provided both requests remain valid. A single month's factor would cancel, so do not use that case to expect a price change. Cover a leap February, a fully fixed but unpaid component, factor 1 on the payment day and the separate physical-expiry refusal.
 
@@ -166,7 +173,7 @@ Pin a historical fixing correction, a change to a live quote and a change to the
 
 Use `src/goosedove/quoting/template.py` for the quote template, `src/goosedove/quoting/quote.py` for pricing and `src/goosedove/excel/quoting.py` for the thin worksheet adapters. Shared field definitions remain under `instruments/`. Add `docs/library/quoting/quote-template.md` and `quote.md` as the respective maintained owners when built. A small private request or resolved-component record is appropriate if it clarifies responsibilities; no public quote-result handle is required.
 
-Reuse instrument/template validation, schedule methods, period parsing, observations, calendar references, date offsets, market access and the named-curve binding/factor lookup established by the preceding arc. Where a helper currently requires booked-trade records, extract only the shared facts/arrays calculation in a separate preparatory commit, keeping existing trade answers and refusal behavior unchanged. Do not build dummy trades or run the full booking, preparation, reserves and risk pipeline to solve a scalar quote. Do not create duplicate discounting or schedule implementations.
+Reuse instrument/template validation, schedule methods, period parsing, observations, calendar references, date offsets and market access. For rates, reuse the name/key reader in `globals/discount_curve.py` and the curve-start check and factor gather in `globals/payments.py`; factor gathering requires coverage to have been checked by the caller. The current key-binding helper in trade evaluation takes a prepared trade batch, so it is not a general quote resolver. If sharing key selection or schedule/payment resolution requires an extraction, move only the common facts/arrays calculation in a separate preparatory commit, keeping trade-specific error context and existing answers unchanged. Quote failures must name the requested key or component/payment, not a fictitious booked row. Do not build dummy trades or run the full booking, preparation, reserves and risk pipeline to solve a scalar quote. Do not create duplicate discounting or schedule implementations.
 
 Measure actual work through the existing counters: template fields read, resolved months, observations, fixed inputs, distinct live references, payment rules/dates, curve-key resolutions, distinct future payment factors read and price reductions. Selected-key lookup occurs once per bilateral quote; deduplicate factor reads on identical future payment dates. Past/today factors require no curve reads. A fully fixed quote reads no live prices, and a fully paid financial quote reads no factors. Report work and memory for a month and a strip; no timing gate.
 
@@ -174,7 +181,7 @@ Full request resolution on a changed input is acceptable initially. A price tick
 
 ## Verification and delivery
 
-Build the feature as one reviewable PR after the named-curve worksheet cutover. First establish purpose-aware field metadata and the quote-template path, with any small shared-helper extraction; then the quote calculation and worksheet coverage. Keep the commits independently understandable and existing booking behavior unchanged. Add no four-argument method/basis overload, trade-template acceptance or alternate `_QuoteDiscounted` function. If the superseded prototype has been implemented meanwhile, cut its callers over instead of retaining compatibility.
+Build the feature as one reviewable PR using the implemented named-curve worksheet surface and publication-based IFERC schedule. First establish purpose-aware field metadata and the quote-template path, with any small shared-helper extraction; then the quote calculation and worksheet coverage. Keep the commits independently understandable and existing booking behavior unchanged. The named-curve creators, trade/cashflow evaluation, saved risk contributions and risk reports retain their contracts; this PR consumes rates and returns a price. Add no four-argument method/basis overload, trade-template acceptance or alternate `_QuoteDiscounted` function.
 
 Acceptance includes the hand examples, ordinary zero/negative finite prices, unchanged quote units including cents per gallon, a flat-factor/single-payment cancellation, and zero mark when an equivalent valid financial trade is booked at `K` with all payments unpaid. For the trade comparison, use the same index, quantity basis, observations, payment rules and selected curve. Include both routes; do not derive expected prices solely from that comparison.
 

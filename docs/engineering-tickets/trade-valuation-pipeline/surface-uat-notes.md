@@ -709,7 +709,8 @@ before the third of the planned four stacked slices.
 
 ## 25. Template based quoting
 
-Updated owner direction, 18 October: follow the named-curve arc with
+Ready for implementation against the completed named-curve stack and IFERC publication
+anchor; quoting itself is not implemented. The separate feature PR adds
 `_CreateQuoteTemplate(instrument, fields, values)` and
 `_Quote(market, contract_code, template, [discount_curve_set])`, one numeric whole-period price.
 The [ticket](template-based-quoting.md) gives quoting its own template handle, with booking
@@ -718,11 +719,15 @@ refused, not ignored. The quote template supplies schedule method, `month`/`cald
 route, payment terms and the static curve key. Cleared quotes are undiscounted; bilateral
 payment dates on or before `as_of` use factor 1, future dates the selected curve. CAL27
 requested in June retains every month, with past fixings and live prices for the remaining
-observations. This supersedes the [four-input prototype](quoting-prototype.md), not implemented.
+observations. IFERC payment offsets start on publication under either route. This supersedes
+the [four-input prototype](quoting-prototype.md), not implemented.
 
 UAT will compare cleared and bilateral Jan/Feb prices under both quantity bases, CAL27 in
 June, an entirely fixed and paid financial period, and an Asian across a reference roll.
 Check a payment exactly on `as_of` at factor 1 and a fully fixed but unpaid month still
-discounted. Exercise payment-calendar, market, fixing, selected-curve and key changes,
+discounted. Use the existing `_CollectDiscountCurves` for one or several named curves;
+replace the selected member for a bump scenario, keeping its name. Exercise payment-calendar,
+market, fixing, selected-curve and key changes; an unused curve with a different start or short
+coverage must not affect the quote, while a wrong singleton key must fail. Check
 partial quote templates and wrong-template/booking-field refusals. Record whether the
 dedicated quote template feels natural and what inspection the scalar is missing.
