@@ -57,7 +57,7 @@ What each kind shows:
 | `discount_curve_set` | `name`, `start_date`, `end_date`, `days` | `str`, `datetime64[D]`, `datetime64[D]`, `int64` | one per curve in the order given, its name, its first and its last day and the days between, inclusive; the daily factors are each curve's own handle's to spill; [collect-discount-curves.md](../globals/collect-discount-curves.md) |
 | `futures_schedule` | `contract_code`, `future_expiry`, then `option_expiry` when the index has options | `str`, then `datetime64[D]` per date column | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
-| `iferc_schedule` | `contract_code`, `last_trading_date`, `publication_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
+| `iferc_schedule` | `contract_code`, `publication_date`, two columns since #204 | `str`, `datetime64[D]` | one per contract month |
 | `gas_daily_schedule` | `contract_code`, `first_date`, `last_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
 | `index_conventions` | `quote_currency_unit`, `quote_quantity_unit`, `currency_unit`, `quantity_type`, `quantity_unit` | `str` five times | one |
 | `contract_specifications` | `name`, `lot_size`, `lot_unit`, `brokerage_rate_per_lot`, `clearing_rate_per_lot` | `str`, `float64`, `str`, `float64`, `float64` | one per word for a quantity |

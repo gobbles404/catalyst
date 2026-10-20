@@ -322,7 +322,7 @@ def a_gas_daily_schedule() -> str:
 def an_iferc_schedule() -> str:
     text = bridge.call(
         "_CreateIfercSchedule",
-        [column("V26", "X26", "Z26"), column(SEP_30, OCT_30, NOV_30), column(OCT_1, NOV_2, DEC_1)],
+        [column("V26", "X26", "Z26"), column(OCT_1, NOV_2, DEC_1)],
     )
     assert isinstance(text, str) and text.startswith(f"{PID}:iferc_schedule:"), text
     return text
@@ -379,7 +379,7 @@ def test_a_gas_daily_gap_and_iferc_months_out_of_order_are_refused_in_the_librar
     )
     backwards = bridge.call(
         "_CreateIfercSchedule",
-        [column("X26", "V26"), column(OCT_30, SEP_30), column(NOV_2, OCT_1)],
+        [column("X26", "V26"), column(NOV_2, OCT_1)],
     )
     assert bridge.call("_CreateCalendar", [a_valuation(NOV_15), an_index(backwards)]) == (
         "#ERROR _CreateCalendar: ValueError: publication_date row 2 is 2026-10-01, "

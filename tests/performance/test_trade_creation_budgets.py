@@ -964,19 +964,17 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
 
 
 # --- an IFERC ticket, iferc-basis-futures.md ------------------------------------------------
-# The same 25 months on an IFERC index, each last trading on the last business day before its
-# month and published on the first business day of it; the ticket's rows resolve against it as
-# against the futures index, the lastday method the one an IFERC index takes.
-IFERC_LAST_TRADING = np.busday_offset(
-    MONTHS.astype("datetime64[D]"), -1, roll="forward", holidays=HOLIDAYS
-)
+# The same 25 months on an IFERC index, each published on the first business day of its month;
+# the ticket's rows resolve against it as against the futures index, the lastday method the one
+# an IFERC index takes, and each payment counts from the publication day since
+# iferc-publication-payment-anchor.md.
 IFERC_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
 BASIS = index(
     "basis",
     "Sample basis index",
-    iferc_schedule(CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION),
+    iferc_schedule(CODES, IFERC_PUBLICATION),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
@@ -985,9 +983,9 @@ BASIS = index(
     "lot",
     UNITS,
 )
-# The IFERC resolution's functions are the futures lastday resolution's but the three that read
-# the days: no pricing calendar typed, no days made, no last observation searched, the payment
-# anchored on the schedule's last trading day instead. Its numpy loses the search, the unique over
+# The IFERC resolution's functions are the futures lastday resolution's but the two that read
+# the days: no pricing calendar typed and no days made, the payment anchored on each component's
+# last observation, its publication day, by the same search. Its numpy loses the unique over
 # the components' methods with its sort, hash, nonzero, ravel and flatten, a look and three
 # conversions, and gains one look, the publication days against the components' own.
 # On an IFERC index the observations read no calendar and make no days, and the one fact read is
@@ -996,13 +994,7 @@ IFERC_RESOLUTION = {
     name: count
     for name, count in {**resolution_ledger(1), **WHOLE_MONTHS, "supported_on_iferc": 2}.items()
     if name
-    not in (
-        "_the_days",
-        "with_holiday_calendar",
-        "_last_days",
-        "requires_whole_month",
-        "counts_back_from_expiry",
-    )
+    not in ("_the_days", "with_holiday_calendar", "requires_whole_month", "counts_back_from_expiry")
 }
 IFERC_RESOLUTION_NUMPY = {
     name: count
@@ -1010,13 +1002,15 @@ IFERC_RESOLUTION_NUMPY = {
         **resolution_numpy(1),
         **WHOLE_MONTHS_NUMPY,
         "ndarray.any": 23,  # one fewer: the IFERC rule is read as every row supported, one all
+        "numpy.arange": 5,  # the components counted off for the anchor search, the futures' own
+        # since iferc-publication-payment-anchor.md, beside the observations' places
         "ndarray.all": 3,  # in place of any row other than lastday, since the rule has one owner
         "ndarray.nonzero": 3,
         "ndarray.ravel": 3,
         "ndarray.flatten": 7,
         "numpy.asanyarray": 18,
     }.items()
-    if name not in ("ndarray.sort", "ndarray.searchsorted", "numpy._unique_hash")
+    if name not in ("ndarray.sort", "numpy._unique_hash")
 }
 
 
@@ -1032,7 +1026,7 @@ def test_an_iferc_ticket_resolves_like_a_futures_one_without_the_days(
     assert terms.payment is not None
     np.testing.assert_array_equal(
         terms.payment.date,
-        np.busday_offset(IFERC_LAST_TRADING[terms.contract], 2, holidays=HOLIDAYS),
+        np.busday_offset(IFERC_PUBLICATION[terms.contract], 2, holidays=HOLIDAYS),
     )
     assert counter.freeze().as_dict() == {
         "payment_rules_read": 1,  # since #181: one rule, applied once over one calendar

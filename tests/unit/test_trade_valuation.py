@@ -3416,16 +3416,12 @@ def test_the_six_day_asian_reports_its_days_month_and_year_and_a_tick_changes_no
 
 
 # --- an IFERC basis future on the sheet, iferc-basis-futures.md -----------------------------
-# The ticket's Waha-like index through the seam: X26, Z26 and F27 with their last trading and
-# publication days, dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported and no
-# pricing calendar; a payment calendar closing New Year's Day; the template cleared, financial,
-# lastday, LOT a month at +3bd; WAH001, 1 LOT of Z26 at -0.50 booked 30 November, paying
-# 3 December.
-WAHA_MONTHS = [
-    ("X26", "2026-10-30", "2026-11-02"),
-    ("Z26", "2026-11-30", "2026-12-01"),
-    ("F27", "2026-12-31", "2027-01-04"),
-]
+# The ticket's Waha-like index through the seam: X26, Z26 and F27 with their publication days,
+# dollars an MMBtu, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported and no pricing calendar;
+# a payment calendar closing New Year's Day; the template cleared, financial, lastday, LOT a
+# month at +2bd from publication since iferc-publication-payment-anchor.md; WAH001, 1 LOT of Z26
+# at -0.50 booked 30 November, paying 3 December.
+WAHA_MONTHS = [("X26", "2026-11-02"), ("Z26", "2026-12-01"), ("F27", "2027-01-04")]
 WAHA_LOT = "lots of LOT (2500 MMBTU)"
 WAHA_NOMINAL = "WAHA nominal_delta [LOT]"
 WAHA_DELTA = "WAHA delta [LOT]"
@@ -3436,16 +3432,13 @@ WAHA_CORRECTED = {"X26": -0.40, "Z26": -0.10}
 WAHA_ROW: list[object] = [1001.0, serial("2026-11-30"), "Z26", 1.0, -0.5]
 
 
-def an_iferc_index(
-    name: str, months: list[tuple[str, str, str]], lots: list[tuple[str, float]]
-) -> str:
-    """An IFERC index through the seam: its months with their last trading and publication days,
-    dollars an MMBtu settled in dollars, the specifications given in MMBtu, the first the
-    reporting lot, and no pricing calendar."""
+def an_iferc_index(name: str, months: list[tuple[str, str]], lots: list[tuple[str, float]]) -> str:
+    """An IFERC index through the seam: its months with their publication days, dollars an MMBtu
+    settled in dollars, the specifications given in MMBtu, the first the reporting lot, and no
+    pricing calendar."""
     schedule = ENTRY["_CreateIfercSchedule"](
-        rows(*[[code] for code, _, _ in months]),
-        column([serial(last) for _, last, _ in months]),
-        column([serial(published) for _, _, published in months]),
+        rows(*[[code] for code, _ in months]),
+        column([serial(published) for _, published in months]),
     )
     conventions = ENTRY["_CreateIndexConventions"]("USD", "MMBTU", "USD", "ENERGY", "MMBTU")
     specifications = ENTRY["_CreateContractSpecifications"](
@@ -3481,7 +3474,7 @@ def waha() -> dict[str, Any]:
         "route": "cleared",
         "settlement_method": "financial",
         "clearing_house": "ICE Clear Europe",
-        "payment_time_lag": "+3bd",
+        "payment_time_lag": "+2bd",
         "payment_holiday_calendar": pays,
     }
     template = ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*fields.values()))
@@ -3586,7 +3579,7 @@ def test_the_waha_batch_reads_back_its_days_and_a_tick_reuses_its_preparation(
     at = dict(zip(headers, table[2], strict=True))
     assert headers[13] == "payment_date"
     assert (at["contract_code"], at["schedule_method"]) == ("Z26", "lastday")
-    assert (at["payment_time_lag"], at["payment_date"]) == ("+3bd", serial("2026-12-03"))
+    assert (at["payment_time_lag"], at["payment_date"]) == ("+2bd", serial("2026-12-03"))
     history, prepared, results = waha_state(waha, "2026-12-01", WAHA_X26, (-0.30, -0.10))
     ticked = str(
         ENTRY["_EvaluateTrades"](prepared, a_market(history, "WAHA", -0.25, -0.10), bridge.MISSING)

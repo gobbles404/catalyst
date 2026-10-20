@@ -42,18 +42,14 @@ def an_index(schedule: object, name: str = "Waha IFERC") -> Index:
 
 # The page's sample: Waha IFERC, the first four months of 2026, the codes as the desk keeps
 # them, the newest month in the first row, and an illustrative index beside each, over the index
-# of those four months, ICE's last trading days and Platts' publication days, January's index
-# having printed on the 5th. The schedule runs the other way, as schedules do, the oldest first,
-# and so do the columns the fixings keep.
+# of those four months and Platts' publication days, January's index having printed on the 5th.
+# The schedule runs the other way, as schedules do, the oldest first, and so do the columns the
+# fixings keep.
 CODES = ("J26", "H26", "G26", "F26")
 PRICES = prices(1.60, 1.95, 2.10, 1.85)
 KEPT_CODES = ("F26", "G26", "H26", "J26")
 KEPT_PRICES = prices(1.85, 2.10, 1.95, 1.60)
-SCHEDULE = iferc_schedule(
-    KEPT_CODES,
-    dates("2025-12-31", "2026-01-30", "2026-02-27", "2026-03-31"),
-    dates("2026-01-05", "2026-02-02", "2026-03-02", "2026-04-01"),
-)
+SCHEDULE = iferc_schedule(KEPT_CODES, dates("2026-01-05", "2026-02-02", "2026-03-02", "2026-04-01"))
 INDEX = an_index(SCHEDULE)
 FUTURES_INDEX = index(
     "WTI NYMEX",
@@ -74,16 +70,15 @@ def months_of(*codes: str) -> Index:
     """An IFERC index whose schedule holds exactly those months in that order, each published a
     day after the one before, so that a series over it runs the other way."""
     published = np.datetime64("2027-01-04", "D") + np.arange(len(codes)).astype("timedelta64[D]")
-    return an_index(iferc_schedule(codes, published - np.timedelta64(1, "D"), published))
+    return an_index(iferc_schedule(codes, published))
 
 
-def scheduled(*months: tuple[str, str, str]) -> Index:
-    """An IFERC index whose schedule holds those months as given, each a code, the day its future
-    stops trading and the day its index prints, in that row order whatever the days say."""
-    codes = tuple(code for code, _, _ in months)
-    last_trading = dates(*(day for _, day, _ in months))
-    published = dates(*(day for _, _, day in months))
-    return an_index(iferc_schedule(codes, last_trading, published))
+def scheduled(*months: tuple[str, str]) -> Index:
+    """An IFERC index whose schedule holds those months as given, each a code and the day its
+    index prints, in that row order whatever the days say."""
+    codes = tuple(code for code, _ in months)
+    published = dates(*(day for _, day in months))
+    return an_index(iferc_schedule(codes, published))
 
 
 # --- what is kept -------------------------------------------------------------
@@ -143,11 +138,11 @@ def test_a_series_of_no_rows_is_fixings_of_no_rows() -> None:
 
 
 # The order is read from the publication days the schedule holds beside the months, and from
-# nothing else: not from the codes' spelling, which runs the other way across a year's end, not
-# from the months' rows in the schedule, which a calendar would refuse but a fixing does not
-# read, and not from the futures' last trading days.
-def test_the_order_is_the_publication_days_not_the_codes_the_rows_or_the_trading_days() -> None:
-    year_end = scheduled(("Z26", "2026-11-30", "2026-12-01"), ("F27", "2026-12-31", "2027-01-04"))
+# nothing else: not from the codes' spelling, which runs the other way across a year's end, and
+# not from the months' rows in the schedule, which a calendar would refuse but a fixing does not
+# read.
+def test_the_order_is_the_publication_days_not_the_codes_or_the_rows() -> None:
+    year_end = scheduled(("Z26", "2026-12-01"), ("F27", "2027-01-04"))
     fixings = iferc_fixings(("F27", "Z26"), prices(3.1, 2.9), year_end)
     assert fixings.codes == ("Z26", "F27") and fixings.prices.tolist() == [2.9, 3.1]
     with pytest.raises(ValueError) as failure:
@@ -156,9 +151,7 @@ def test_the_order_is_the_publication_days_not_the_codes_the_rows_or_the_trading
         "contract_code row 2 is 'F27', published 2027-01-04, "
         "expected a month published before row 1's 'Z26', published 2026-12-01"
     )
-    rows_backwards = scheduled(
-        ("later", "2027-01-29", "2027-02-01"), ("earlier", "2026-12-31", "2027-01-04")
-    )
+    rows_backwards = scheduled(("later", "2027-02-01"), ("earlier", "2027-01-04"))
     fixings = iferc_fixings(("later", "earlier"), prices(2.0, 1.0), rows_backwards)
     assert fixings.codes == ("earlier", "later") and fixings.prices.tolist() == [1.0, 2.0]
     with pytest.raises(ValueError) as failure:
@@ -166,17 +159,6 @@ def test_the_order_is_the_publication_days_not_the_codes_the_rows_or_the_trading
     assert str(failure.value) == (
         "contract_code row 2 is 'later', published 2027-02-01, "
         "expected a month published before row 1's 'earlier', published 2027-01-04"
-    )
-    trading_backwards = scheduled(
-        ("A", "2026-02-27", "2026-01-05"), ("B", "2026-01-30", "2026-02-02")
-    )
-    fixings = iferc_fixings(("B", "A"), prices(2.0, 1.0), trading_backwards)
-    assert fixings.codes == ("A", "B") and fixings.prices.tolist() == [1.0, 2.0]
-    with pytest.raises(ValueError) as failure:
-        iferc_fixings(("A", "B"), prices(1.0, 2.0), trading_backwards)
-    assert str(failure.value) == (
-        "contract_code row 2 is 'B', published 2026-02-02, "
-        "expected a month published before row 1's 'A', published 2026-01-05"
     )
 
 
@@ -320,7 +302,7 @@ def test_fixings_that_cannot_be_made_say_why(
 # Two months the schedule says printed on one day cannot be newest first in either order: the
 # second row is refused, whichever month it holds, since the rule is strict.
 def test_two_months_published_on_one_day_are_refused_at_the_second_row() -> None:
-    same_day = scheduled(("A", "2026-01-01", "2026-01-05"), ("B", "2026-01-02", "2026-01-05"))
+    same_day = scheduled(("A", "2026-01-05"), ("B", "2026-01-05"))
     for codes in (("A", "B"), ("B", "A")):
         with pytest.raises(ValueError) as failure:
             iferc_fixings(codes, prices(1.0, 2.0), same_day)
@@ -338,16 +320,16 @@ def test_two_months_published_on_one_day_are_refused_at_the_second_row() -> None
 # and the two days before the order of the months.
 def test_a_month_the_schedule_holds_twice_is_refused_when_a_code_names_it() -> None:
     twice = scheduled(
-        ("F26", "2025-12-31", "2026-01-05"),
-        ("G26", "2026-01-30", "2026-02-02"),
-        ("G26", "2026-01-30", "2026-02-02"),
-        ("J26", "2026-03-31", "2026-04-01"),
+        ("F26", "2026-01-05"),
+        ("G26", "2026-02-02"),
+        ("G26", "2026-02-02"),
+        ("J26", "2026-04-01"),
     )
     disagreeing = scheduled(
-        ("F26", "2025-12-31", "2026-01-05"),
-        ("G26", "2026-01-30", "2026-02-02"),
-        ("G26", "2026-02-27", "2026-03-02"),
-        ("J26", "2026-03-31", "2026-04-01"),
+        ("F26", "2026-01-05"),
+        ("G26", "2026-02-02"),
+        ("G26", "2026-03-02"),
+        ("J26", "2026-04-01"),
     )
     for over in (twice, disagreeing):
         with pytest.raises(ValueError) as failure:
@@ -371,11 +353,11 @@ def test_a_month_the_schedule_holds_twice_is_refused_when_a_code_names_it() -> N
             iferc_fixings(codes, prices(*range(len(codes))), twice)
         assert str(failure.value) == message
     thrice = scheduled(
-        ("F26", "2025-12-31", "2026-01-05"),
-        ("G26", "2026-01-30", "2026-02-02"),
-        ("G26", "2026-01-30", "2026-02-02"),
-        ("J26", "2026-03-31", "2026-04-01"),
-        ("G26", "2026-01-30", "2026-02-02"),
+        ("F26", "2026-01-05"),
+        ("G26", "2026-02-02"),
+        ("G26", "2026-02-02"),
+        ("J26", "2026-04-01"),
+        ("G26", "2026-02-02"),
     )
     with pytest.raises(ValueError) as failure:
         iferc_fixings(("J26", "G26"), prices(1.60, 2.10), thrice)
@@ -429,11 +411,9 @@ def a_schedule_and_a_series(
 def iferc_fixings_schedule(
     labels: tuple[str, ...], published: NDArray[np.datetime64], rows: list[int]
 ) -> IfercSchedule:
-    """The schedule of those months laid out in that row order, each month keeping its own two
-    days, the future stopping trading the day before its index prints."""
-    codes = tuple(labels[i] for i in rows)
-    days = published[rows]
-    return iferc_schedule(codes, days - np.timedelta64(1, "D"), days)
+    """The schedule of those months laid out in that row order, each month keeping its own
+    publication day."""
+    return iferc_schedule(tuple(labels[i] for i in rows), published[rows])
 
 
 @settings(deadline=None)

@@ -2764,20 +2764,16 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
 
 
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
-# The ticket's Waha-like index as the kernel tests have it: X26, Z26 and F27 last trading on the
-# last business day before their months and published on the first business day of them, a 2,500
-# MMBtu LOT and a bare MMBTU, the LOT reported, no pricing calendar; the payment calendar closing
-# New Year's Day; the template cleared, financial, lastday, LOT a month at +3bd; WAH001, 1 LOT of
-# Z26 at -0.50 booked 30 November.
+# The ticket's Waha-like index as the kernel tests have it: X26, Z26 and F27 published on the
+# first business day of their months, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, no
+# pricing calendar; the payment calendar closing New Year's Day; the template cleared, financial,
+# lastday, LOT a month at +2bd from publication, iferc-publication-payment-anchor.md; WAH001, 1 LOT
+# of Z26 at -0.50 booked 30 November.
 
 WAHA = index(
     "WAHA",
     "Waha basis - ICE",
-    iferc_schedule(
-        ("X26", "Z26", "F27"),
-        dates("2026-10-30", "2026-11-30", "2026-12-31"),
-        dates("2026-11-02", "2026-12-01", "2027-01-04"),
-    ),
+    iferc_schedule(("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("LOT", "MMBTU"),
@@ -2799,7 +2795,7 @@ WAHA_TEMPLATE: dict[str, object] = {
     "route": "cleared",
     "settlement_method": "financial",
     "clearing_house": "ICE Clear Europe",
-    "payment_time_lag": "+3bd",
+    "payment_time_lag": "+2bd",
     "payment_holiday_calendar": WAHA_PAYS,
 }
 WAHA_TICKET: dict[str, list[object]] = {
@@ -2811,10 +2807,10 @@ WAHA_TICKET: dict[str, list[object]] = {
 }
 
 
-def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_trading() -> None:
+def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> None:
     # The terms hold the IFERC schedule; Z26 is row 1 covering the whole of December; the one
-    # observation is 1 December, the publication day, and the payment 3 December, three business
-    # days after the 30 November last trading day; the encoding a 2,500 MMBtu exposure with a
+    # observation is 1 December, the publication day, and the payment 3 December, two business
+    # days after it; the encoding a 2,500 MMBtu exposure with a
     # fixed leg of 1,250, one slot on 1 December referencing Z26; the counts one of each and the
     # schedule's three codes read.
     batch, counter = created(WAHA, WAHA_TICKET, WAHA_TEMPLATE)
@@ -2829,7 +2825,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
     np.testing.assert_array_equal(terms.quantity, [1])
     np.testing.assert_array_equal(terms.fixed_price, [-0.5])
     assert terms.payment is not None
-    assert terms.payment.lag == ("+3bd",)
+    assert terms.payment.lag == ("+2bd",)
     assert terms.payment.calendar == (WAHA_PAYS,)
     np.testing.assert_array_equal(terms.payment.date, dates("2026-12-03"))
     enc = batch.encoded
@@ -2856,13 +2852,13 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_last_tradi
     }
 
 
-def test_iferc_payment_counts_from_last_trading_on_the_payment_calendar_not_publication() -> None:
+def test_iferc_payment_counts_from_publication_on_the_payment_calendar() -> None:
     # A Z26-F27 strip: one component a month on one occurrence, Z26 paying 3 December and F27
-    # 6 January, 31 December plus three business days with New Year's Day closed, each observed
-    # on its own publication day. X26, the schedule's first month, booked 15 October pays
-    # 4 November. A calendar closing 2 December moves Z26's payment to the 4th and its observation
-    # not at all. Two rows at +3bd and +4bd are two groups of one contract. +1bd lands on the
-    # publication day and is refused by the existing rule.
+    # 6 January, 4 January plus two business days, each observed on its own publication day and
+    # paying from it. X26, the schedule's first month, booked 15 October pays 4 November. A
+    # calendar closing 2 December moves Z26's payment to the 4th and its observation not at all.
+    # Two rows at +2bd and +3bd are two groups of one contract. +0bd lands on the publication
+    # day and is refused by the existing rule.
     strip, _ = created(WAHA, {**WAHA_TICKET, "contract_code": ["Z26-F27"]}, WAHA_TEMPLATE)
     np.testing.assert_array_equal(strip.resolved.occurrence, [0, 0])
     np.testing.assert_array_equal(strip.resolved.contract, [1, 2])
@@ -2894,14 +2890,14 @@ def test_iferc_payment_counts_from_last_trading_on_the_payment_calendar_not_publ
             "contract_code": ["Z26", "Z26"],
             "quantity": [1, -1],
             "fixed_price": [-0.50, -0.50],
-            "payment_time_lag": ["+3bd", "+4bd"],
+            "payment_time_lag": ["+2bd", "+3bd"],
         },
         {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_time_lag"},
     )
     np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-03", "2026-12-04"))
     np.testing.assert_array_equal(pair.encoded.group_contract, [1, 1])
     assert pair.encoded.slot_group.size == 2
-    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+1bd"}) == (
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0bd"}) == (
         "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
         "final price exists"
     )
@@ -3202,13 +3198,13 @@ def test_a_rule_that_leaves_the_sheet_names_the_first_offending_row_in_ticket_or
     np.testing.assert_array_equal(paid_on(exact), dates("9999-12-31"))
 
 
-def test_an_iferc_chain_counts_from_last_trading_and_may_not_pay_on_publication_day() -> None:
-    # Z26's last trading day is Monday 30 November and its index prints on 1 December: +0em+2bd
-    # is the month's end, the 30th itself, and two business days on, 2 December; +3cd is 3
-    # December, the day +3bd pays, so the two are one group; +1cd is the publication day, refused
-    # by the existing rule, since the final price does not exist until that day is done.
+def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() -> None:
+    # Z26's index prints on Tuesday 1 December: +0em+2bd is December's end, the 31st, and two
+    # business days on with New Year's Day closed, 5 January 2027; +3cd is 4 December, the day
+    # +3bd pays, so the two are one group; +0cd is the publication day itself, refused by the
+    # existing rule, since the final price does not exist until that day is done.
     chain, _ = created(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0em+2bd"})
-    np.testing.assert_array_equal(paid_on(chain), dates("2026-12-02"))
+    np.testing.assert_array_equal(paid_on(chain), dates("2027-01-05"))
     np.testing.assert_array_equal(chain.encoded.slot_date, dates("2026-12-01"))
     pair, _ = created(
         WAHA,
@@ -3224,11 +3220,74 @@ def test_an_iferc_chain_counts_from_last_trading_and_may_not_pay_on_publication_
     )
     assert pair.resolved.payment is not None
     assert pair.resolved.payment.lag == ("+3bd", "+3cd")
-    np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-03"))
-    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+1cd"}) == (
+    np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-04"))
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0cd"}) == (
         "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
         "final price exists"
     )
+
+
+# --- the ticket's date examples, iferc-publication-payment-anchor.md ----------------------------
+
+# A second Waha-like index whose December months publish on 4 December 2026 and 1 December 2025,
+# for the examples of a publication day closed on the payment calendar and of a year earlier.
+LATE = index(
+    "LATE",
+    "Waha basis - ICE, published on the fourth",
+    iferc_schedule(("Z25", "Z26"), dates("2025-12-01", "2026-12-04")),
+    WAHA.conventions,
+    WAHA.specifications,
+    None,
+    "LOT",
+    UNITS,
+)
+
+
+def test_the_tickets_date_examples_pin_on_both_routes() -> None:
+    # iferc-publication-payment-anchor.md's table, each counted from Z26's publication day: +2bd
+    # pays 3 December and +5bd, the desk's bilateral terms, 8 December, cleared or bilateral
+    # alike; with 2 December closed +2bd pays the 4th; a publication day itself closed, the 4th
+    # on LATE, +1bd pays Monday the 7th; a year earlier, Z25 published 1 December 2025, +5bd pays
+    # the 8th; +0bd is the publication day and -1bd the day before, both refused by the existing
+    # rule, which names the observation the payment must follow.
+    bilateral = {
+        **{k: v for k, v in WAHA_TEMPLATE.items() if k != "clearing_house"},
+        "route": "bilateral",
+        "counterparty": "ACME Trading",
+        "discount_curve_key": "SOFR",
+    }
+    for template in (WAHA_TEMPLATE, bilateral):
+        two, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+2bd"})
+        np.testing.assert_array_equal(paid_on(two), dates("2026-12-03"))
+        five, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+5bd"})
+        np.testing.assert_array_equal(paid_on(five), dates("2026-12-08"))
+    closed, _ = created(
+        WAHA,
+        WAHA_TICKET,
+        {**WAHA_TEMPLATE, "payment_holiday_calendar": holiday_calendar(dates("2026-12-02"))},
+    )
+    np.testing.assert_array_equal(paid_on(closed), dates("2026-12-04"))
+    on_a_closed_day, _ = created(
+        LATE,
+        WAHA_TICKET,
+        {
+            **WAHA_TEMPLATE,
+            "payment_time_lag": "+1bd",
+            "payment_holiday_calendar": holiday_calendar(dates("2026-12-04")),
+        },
+    )
+    np.testing.assert_array_equal(paid_on(on_a_closed_day), dates("2026-12-07"))
+    earlier, _ = created(
+        LATE,
+        {**WAHA_TICKET, "trade_date": ["2025-11-28"], "contract_code": ["Z25"]},
+        {**WAHA_TEMPLATE, "payment_time_lag": "+5bd"},
+    )
+    np.testing.assert_array_equal(paid_on(earlier), dates("2025-12-08"))
+    for lag, day in (("+0bd", "2026-12-01"), ("-1bd", "2026-11-30")):
+        assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": lag}) == (
+            f"Z26 pays on {day}, expected a day after its last observation, 2026-12-01, when its "
+            "final price exists"
+        )
 
 
 # --- half-year strips, half-year-strips.md --------------------------------------------------------

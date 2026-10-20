@@ -433,16 +433,13 @@ IFERC_HANDLE = re.compile(r"[0-9]+:iferc_fixings:.+:([0-9]+)")
 # The schedule lists the same four months the other way, the oldest first, as a schedule does,
 # with ICE's last trading days and Platts' publication days for them, as serials.
 IFERC_MONTHS = Cells.from_rows([["F26"], ["G26"], ["H26"], ["J26"]])
-IFERC_LAST_TRADING = Cells.from_rows([[46022.0], [46052.0], [46080.0], [46112.0]])
 IFERC_PUBLICATION = Cells.from_rows([[46027.0], [46055.0], [46083.0], [46113.0]])
 
 
 @functools.cache
 def the_iferc_index() -> str:
     """The IFERC index of the four months the codes name, made once."""
-    schedule = bridge.call(
-        "_CreateIfercSchedule", [IFERC_MONTHS, IFERC_LAST_TRADING, IFERC_PUBLICATION]
-    )
+    schedule = bridge.call("_CreateIfercSchedule", [IFERC_MONTHS, IFERC_PUBLICATION])
     return an_index_of("Waha IFERC", schedule, MISSING)
 
 
@@ -638,7 +635,6 @@ def test_a_handle_of_another_kind_is_not_iferc_fixings() -> None:
             "_CreateIfercSchedule",
             [
                 Cells.from_rows([["F26"], ["G26"]]),
-                Cells.from_rows([[46022.0], [46052.0]]),
                 Cells.from_rows([[46027.0], [46055.0]]),
             ],
         ),

@@ -58,9 +58,7 @@ FUTURES_INDEX = index(
     None,
     UNITS,
 )
-IFERC_INDEX = an_index(
-    iferc_schedule(("F26",), dates("2025-12-31"), dates("2026-01-05")), "Waha IFERC"
-)
+IFERC_INDEX = an_index(iferc_schedule(("F26",), dates("2026-01-05")), "Waha IFERC")
 
 
 # --- what is kept -------------------------------------------------------------

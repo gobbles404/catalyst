@@ -639,22 +639,17 @@ def test_the_longest_gas_daily_calendar_a_sheet_shows_is_made_and_one_day_longer
 # --- an IFERC schedule: one row per month, dated by its publication day ----------------
 
 
-def an_iferc_schedule(*months: tuple[str, str, str]) -> IfercSchedule:
-    codes = tuple(code for code, _, _ in months)
-    last_trading = dates(*(trading for _, trading, _ in months))
-    published = dates(*(publication for _, _, publication in months))
-    return iferc_schedule(codes, last_trading, published)
+def an_iferc_schedule(*months: tuple[str, str]) -> IfercSchedule:
+    codes = tuple(code for code, _ in months)
+    published = dates(*(publication for _, publication in months))
+    return iferc_schedule(codes, published)
 
 
 # The IFERC schedule page's sample, three months of one index, valued on 15 November 2026,
 # when one of the three has been published.
-V26_IFERC = ("V26", "2026-09-30", "2026-10-01")
-X26_IFERC = ("X26", "2026-10-30", "2026-11-02")
-IFERC = an_iferc_schedule(
-    V26_IFERC,
-    X26_IFERC,
-    ("Z26", "2026-11-30", "2026-12-01"),
-)
+V26_IFERC = ("V26", "2026-10-01")
+X26_IFERC = ("X26", "2026-11-02")
+IFERC = an_iferc_schedule(V26_IFERC, X26_IFERC, ("Z26", "2026-12-01"))
 NOV_15 = valuation_date(day("2026-11-15"), 0.5)
 
 
@@ -690,7 +685,7 @@ def test_an_iferc_schedule_of_one_month_is_a_calendar() -> None:
     ("schedule", "message"),
     [
         (
-            an_iferc_schedule(V26_IFERC, ("V26", "2026-10-30", "2026-11-02")),
+            an_iferc_schedule(V26_IFERC, ("V26", "2026-11-02")),
             "contract_code row 2 is 'V26', already given at row 1",
         ),
         (
@@ -698,10 +693,10 @@ def test_an_iferc_schedule_of_one_month_is_a_calendar() -> None:
             "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-11-02",
         ),
         (
-            an_iferc_schedule(V26_IFERC, ("X26", "2026-10-30", "2026-10-01")),
+            an_iferc_schedule(V26_IFERC, ("X26", "2026-10-01")),
             "publication_date row 2 is 2026-10-01, expected a date after row 1's 2026-10-01",
         ),
-        (iferc_schedule((), dates(), dates()), "index has 0 contracts, expected at least 1"),
+        (iferc_schedule((), dates()), "index has 0 contracts, expected at least 1"),
     ],
     ids=["a code twice", "publication days out of order", "two publication days equal", "no month"],
 )
@@ -764,7 +759,7 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
         data.draw(st.integers(0, 20_000)), "D"
     )
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
-    schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
+    schedule = iferc_schedule(codes, published)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, 2500)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     assert np.array_equal(made.dates, published)
@@ -801,17 +796,13 @@ def test_every_iferc_month_is_one_row_dated_by_its_publication_day(data: st.Data
         (GAS_DAILY, None, "2026-11-29", "X26"),
         (GAS_DAILY, None, "2026-08-15", "U26"),
         (
-            an_iferc_schedule(
-                ("U26", "2026-08-28", "2026-09-01"), ("V26", "2026-09-30", "2026-10-01")
-            ),
+            an_iferc_schedule(("U26", "2026-09-01"), ("V26", "2026-10-01")),
             None,
             "2026-09-01",
             "U26",
         ),
         (
-            an_iferc_schedule(
-                ("U26", "2026-08-28", "2026-09-01"), ("V26", "2026-09-30", "2026-10-01")
-            ),
+            an_iferc_schedule(("U26", "2026-09-01"), ("V26", "2026-10-01")),
             None,
             "2026-09-02",
             "V26",

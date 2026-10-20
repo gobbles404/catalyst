@@ -163,7 +163,7 @@ def test_an_index_of_another_kind_is_refused_before_the_columns_are_looked_at() 
     iferc = index(
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
-        iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")),
+        iferc_schedule(("V26",), dates("2026-10-01")),
         CONVENTIONS,
         SPECIFICATIONS,
         None,

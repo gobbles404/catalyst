@@ -1037,48 +1037,46 @@ def test_a_holiday_calendar_is_one_column_in_and_one_publication_out(
 # --- the fifth index definition: three columns in, one publication out ---------------
 
 
-def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
-    """Codes, the day each month's future stops trading and the day its index is published, for
-    that many contract months, as the sheet sends them: the codes, the futures and the
-    third date column of schedule_columns."""
-    codes, last_trading, _, publications = schedule_columns(contracts)
-    return codes, last_trading, publications
+def iferc_columns(contracts: int) -> tuple[Cells, Cells]:
+    """Codes and the day each month's index is published, for that many contract months, as the
+    sheet sends them: the codes and the third date column of schedule_columns."""
+    codes, _, _, publications = schedule_columns(contracts)
+    return codes, publications
 
 
 # Ten years of IFERC contract months: the text column handed over as it is, one look and two
-# conversions per date column, the builder's two copies and one publication. Twenty-six calls
-# across fifteen functions, the accept rule once per argument: the futures schedule's ledger with
-# its options, column for column, the third date column here being the publication day.
-def test_an_iferc_schedule_is_three_columns_in_and_one_publication_out(
+# conversions for the date column, the builder's one copy and one publication. Nineteen calls
+# across fifteen functions, the accept rule once per argument: the futures schedule's ledger
+# without options, column for column, the date column here being the publication day, since
+# iferc-publication-payment-anchor.md.
+def test_an_iferc_schedule_is_two_columns_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    codes, last_trading, publications = iferc_columns(120)
-    PATH["_CreateIfercSchedule"](codes, last_trading, publications)
-    assert call_profile(
-        lambda: PATH["_CreateIfercSchedule"](codes, last_trading, publications)
-    ) == {
+    codes, publications = iferc_columns(120)
+    PATH["_CreateIfercSchedule"](codes, publications)
+    assert call_profile(lambda: PATH["_CreateIfercSchedule"](codes, publications)) == {
         "Registered.run": 1,
         "_arguments": 1,
-        "_validate": 3,
+        "_validate": 2,
         "_text_column": 1,
-        "_date_column": 2,
-        "_one_column": 3,
-        "_shape": 3,
+        "_date_column": 1,
+        "_one_column": 2,
+        "_shape": 2,
         "_texts": 1,
-        "_dates": 2,
-        "_not_dates": 2,
-        "_as_days": 2,
+        "_dates": 1,
+        "_not_dates": 1,
+        "_as_days": 1,
         "_CreateIfercSchedule": 1,
         "iferc_schedule": 1,
-        "_one_per_code": 2,
+        "_one_per_code": 1,
         "_publish": 1,
     }
-    assert numpy_calls(lambda: PATH["_CreateIfercSchedule"](codes, last_trading, publications)) == {
-        "ndarray.any": 2,  # one look per date column, for the calendar
-        "ndarray.astype": 4,  # each date column on its way to days
-        "numpy.array": 2,  # the two copies the schedule keeps
-        "ndarray.setflags": 2,  # frozen
-        "ufunc.reduce": 2,
+    assert numpy_calls(lambda: PATH["_CreateIfercSchedule"](codes, publications)) == {
+        "ndarray.any": 1,  # one look at the date column, for the calendar
+        "ndarray.astype": 2,  # the date column on its way to days
+        "numpy.array": 1,  # the one copy the schedule keeps
+        "ndarray.setflags": 1,  # frozen
+        "ufunc.reduce": 1,
     }
 
 

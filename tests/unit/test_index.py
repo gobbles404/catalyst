@@ -54,11 +54,7 @@ FUTURES = futures_schedule(
     ),
     None,
 )
-IFERC = iferc_schedule(
-    ("V26", "X26", "Z26"),
-    dates("2026-09-30", "2026-10-30", "2026-11-30"),
-    dates("2026-10-01", "2026-11-02", "2026-12-01"),
-)
+IFERC = iferc_schedule(("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01"))
 GAS_DAILY = gas_daily_schedule(
     ("U26", "V26", "X26"),
     dates("2026-09-01", "2026-10-01", "2026-11-01"),

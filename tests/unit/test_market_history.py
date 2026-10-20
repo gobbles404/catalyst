@@ -564,9 +564,7 @@ def test_a_gas_daily_history_that_cannot_be_made_says_why(
 
 
 IFERC_SCHEDULE = iferc_schedule(
-    ("V26", "X26", "Z26"),
-    dates("2026-09-30", "2026-10-30", "2026-11-30"),
-    dates("2026-10-01", "2026-11-02", "2026-12-01"),
+    ("V26", "X26", "Z26"), dates("2026-10-01", "2026-11-02", "2026-12-01")
 )
 
 
@@ -598,7 +596,7 @@ def test_the_iferc_sample_prices_the_published_months_and_no_other() -> None:
 
 
 def test_an_iferc_calendar_of_one_month_and_one_with_nothing_published() -> None:
-    october = an_index(iferc_schedule(("V26",), dates("2026-09-30"), dates("2026-10-01")), None)
+    october = an_index(iferc_schedule(("V26",), dates("2026-10-01")), None)
     one = calendar(valuation_date(day("2026-11-15"), 0.5), october)
     made = market_history(one, indices_for(("V26", 1.85), over=october))
     assert made.fixed_rows.tolist() == [0] and made.fixing_prices.tolist() == [1.85]
@@ -845,7 +843,7 @@ def test_every_fixed_month_takes_its_own_index_in_the_calendars_order(
     )
     published = start + np.cumsum(gaps).astype("timedelta64[D]")
     codes = tuple(f"c{i}" for i in range(count))
-    schedule = iferc_schedule(codes, published - np.timedelta64(1, "D"), published)
+    schedule = iferc_schedule(codes, published)
     as_of = start + np.timedelta64(data.draw(st.integers(-10, int(gaps.sum()) + 10)), "D")
     made = calendar(valuation_date(as_of, 0.5), an_index(schedule, None))
     fixed = np.flatnonzero(made.is_fixed).tolist()

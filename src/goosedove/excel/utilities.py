@@ -133,11 +133,10 @@ def futures_schedule_table(obj: FuturesSchedule) -> MixedArray:
 def iferc_schedule_table(obj: IfercSchedule) -> MixedArray:
     return MixedArray.table(
         [
-            ("contract_code", "last_trading_date", "publication_date"),
-            ("str", "datetime64[D]", "datetime64[D]"),
+            ("contract_code", "publication_date"),
+            ("str", "datetime64[D]"),
         ],
         obj.codes,
-        obj.last_trading_date,
         obj.publication_date,
     )
 

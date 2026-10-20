@@ -191,7 +191,7 @@ def test_a_handle_of_another_kind_is_not_a_schedule() -> None:
         f"#ERROR ReadFuturesSchedule: schedule is valuation date handle {other!r}, "
         "expected futures schedule handle"
     )
-    iferc = cast(str, bridge.call("_CreateIfercSchedule", ["V26", 46295.0, 46296.0]))
+    iferc = cast(str, bridge.call("_CreateIfercSchedule", ["V26", 46296.0]))
     assert bridge.call("ReadFuturesSchedule", [iferc]) == (
         f"#ERROR ReadFuturesSchedule: schedule is iferc schedule handle {iferc!r}, "
         "expected futures schedule handle"
@@ -398,165 +398,127 @@ def test_a_combination_refuses_its_cells_in_the_seams_words_and_publishes_nothin
 # serials, 30 September, 30 October and 30 November 2026 for the last trading dates and
 # 1 October, 2 November and 1 December for the publication dates.
 IFERC_CODES = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
-LAST_TRADING = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
 IFERC_PUBLICATIONS = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
 IFERC = re.compile(r"[0-9]+:iferc_schedule:([0-9]+)")
 
 
-# The library has no consumer of an IFERC schedule yet, so this hidden reader proves that a
-# handle resolves to the schedule the seam kept, with its columns as they arrived.
+# This hidden reader proves that a handle resolves to the schedule the seam kept, with its
+# columns as they arrived: the codes and, since iferc-publication-payment-anchor.md, the
+# publication days alone.
 @probe
 def ReadIfercSchedule(schedule: Handle[IfercSchedule]) -> str:
-    return (
-        f"{' '.join(schedule.codes)} | {days_or_none(schedule.last_trading_date)} | "
-        f"{days_or_none(schedule.publication_date)}"
-    )
+    return f"{' '.join(schedule.codes)} | {days_or_none(schedule.publication_date)}"
 
 
-def an_iferc_schedule(codes: object, last_trading: object, published: object) -> str:
-    text = bridge.call("_CreateIfercSchedule", [codes, last_trading, published])
+def an_iferc_schedule(codes: object, published: object) -> str:
+    text = bridge.call("_CreateIfercSchedule", [codes, published])
     assert isinstance(text, str) and IFERC.fullmatch(text), text
     return text
 
 
-def test_an_iferc_schedule_is_created_from_three_columns_and_read_back() -> None:
-    schedule = an_iferc_schedule(IFERC_CODES, LAST_TRADING, IFERC_PUBLICATIONS)
+def test_an_iferc_schedule_is_created_from_two_columns_and_read_back() -> None:
+    schedule = an_iferc_schedule(IFERC_CODES, IFERC_PUBLICATIONS)
     assert bridge.call("ReadIfercSchedule", [schedule]) == (
-        "V26 X26 Z26 | 2026-09-30 2026-10-30 2026-11-30 | 2026-10-01 2026-11-02 2026-12-01"
+        "V26 X26 Z26 | 2026-10-01 2026-11-02 2026-12-01"
     )
 
 
-# Three single cells are three columns of one, so a schedule of one contract month needs no range.
-def test_three_single_cells_are_an_iferc_schedule_of_one_contract_month() -> None:
-    schedule = an_iferc_schedule("V26", 46295.0, 46296.0)
-    assert bridge.call("ReadIfercSchedule", [schedule]) == "V26 | 2026-09-30 | 2026-10-01"
+# Two single cells are two columns of one, so a schedule of one contract month needs no range.
+def test_two_single_cells_are_an_iferc_schedule_of_one_contract_month() -> None:
+    schedule = an_iferc_schedule("V26", 46296.0)
+    assert bridge.call("ReadIfercSchedule", [schedule]) == "V26 | 2026-10-01"
 
 
 @pytest.mark.parametrize(
     ("args", "text"),
     [
         (
-            [
-                IFERC_CODES,
-                Cells.from_rows([[46295.0], [46325.0], [46356.0], [46387.0]]),
-                IFERC_PUBLICATIONS,
-            ],
-            "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 4 dates, "
-            "expected 3, one per contract_code",
-        ),
-        (
-            [IFERC_CODES, Cells.from_rows([[46295.0], [46325.0]]), IFERC_PUBLICATIONS],
-            "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 2 dates, "
-            "expected 3, one per contract_code",
-        ),
-        (
-            [
-                IFERC_CODES,
-                LAST_TRADING,
-                Cells.from_rows([[46296.0], [46328.0], [46357.0], [46387.0]]),
-            ],
+            [IFERC_CODES, Cells.from_rows([[46296.0], [46328.0], [46357.0], [46391.0]])],
             "#ERROR _CreateIfercSchedule: ValueError: publication_date has 4 dates, "
             "expected 3, one per contract_code",
         ),
         (
-            ["V26", LAST_TRADING, IFERC_PUBLICATIONS],
-            "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 3 dates, "
-            "expected 1, one per contract_code",
-        ),
-        (
-            [IFERC_CODES, Cells.from_rows([[46295.0], [46325.0]]), Cells.from_rows([[46296.0]])],
-            "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 2 dates, "
+            [IFERC_CODES, Cells.from_rows([[46296.0], [46328.0]])],
+            "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, "
             "expected 3, one per contract_code",
         ),
         (
-            [IFERC_CODES, LAST_TRADING, Cells.from_rows([[46296.0], [None], [46357.0]])],
+            ["V26", IFERC_PUBLICATIONS],
+            "#ERROR _CreateIfercSchedule: ValueError: publication_date has 3 dates, "
+            "expected 1, one per contract_code",
+        ),
+        (
+            [IFERC_CODES, Cells.from_rows([[46296.0], [None], [46357.0]])],
             "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date",
         ),
         (
-            [IFERC_CODES, LAST_TRADING, Cells.from_rows([[46296.0], [46328.5], [46357.0]])],
+            [IFERC_CODES, Cells.from_rows([[46296.0], [46328.5], [46357.0]])],
             "#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is number 46328.5, "
             "expected date",
         ),
         (
-            [
-                IFERC_CODES,
-                Cells.from_rows([["30-Sep-2026"], [46325.0], [46356.0]]),
-                IFERC_PUBLICATIONS,
-            ],
-            "#ERROR _CreateIfercSchedule: last_trading_date cell (1, 1) is text "
-            "'30-Sep-2026', expected date",
+            [IFERC_CODES, Cells.from_rows([["1-Oct-2026"], [46328.0], [46357.0]])],
+            "#ERROR _CreateIfercSchedule: publication_date cell (1, 1) is text "
+            "'1-Oct-2026', expected date",
         ),
         (
-            [Cells.from_rows([["V26"], [46023.0], ["Z26"]]), LAST_TRADING, IFERC_PUBLICATIONS],
+            [Cells.from_rows([["V26"], [46023.0], ["Z26"]]), IFERC_PUBLICATIONS],
             "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, "
             "expected text",
         ),
         (
-            [Cells.from_rows([["V26"], [""], ["Z26"]]), LAST_TRADING, IFERC_PUBLICATIONS],
+            [Cells.from_rows([["V26"], [""], ["Z26"]]), IFERC_PUBLICATIONS],
             "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is empty text, expected text",
         ),
         (
-            [Cells.from_rows([["V26", "X26", "Z26"]]), LAST_TRADING, IFERC_PUBLICATIONS],
+            [Cells.from_rows([["V26", "X26", "Z26"]]), IFERC_PUBLICATIONS],
             "#ERROR _CreateIfercSchedule: contract_code is 1x3 array, expected column of text",
         ),
         (
-            [IFERC_CODES, Cells.from_rows([[46295.0, 46325.0, 46356.0]]), IFERC_PUBLICATIONS],
-            "#ERROR _CreateIfercSchedule: last_trading_date is 1x3 array, expected column of dates",
+            [IFERC_CODES, Cells.from_rows([[46296.0, 46328.0, 46357.0]])],
+            "#ERROR _CreateIfercSchedule: publication_date is 1x3 array, expected column of dates",
         ),
         (
-            [MISSING, LAST_TRADING, IFERC_PUBLICATIONS],
+            [MISSING, IFERC_PUBLICATIONS],
             "#ERROR _CreateIfercSchedule: contract_code is missing, expected column of text",
         ),
         (
-            [IFERC_CODES, MISSING, IFERC_PUBLICATIONS],
-            "#ERROR _CreateIfercSchedule: last_trading_date is missing, expected column of dates",
-        ),
-        (
-            [IFERC_CODES, LAST_TRADING, MISSING],
+            [IFERC_CODES, MISSING],
             "#ERROR _CreateIfercSchedule: publication_date is missing, expected column of dates",
         ),
         (
-            [None, LAST_TRADING, IFERC_PUBLICATIONS],
+            [None, IFERC_PUBLICATIONS],
             "#ERROR _CreateIfercSchedule: contract_code is blank, expected column of text",
         ),
         (
-            [IFERC_CODES, None, IFERC_PUBLICATIONS],
-            "#ERROR _CreateIfercSchedule: last_trading_date is blank, expected column of dates",
-        ),
-        (
-            [IFERC_CODES, LAST_TRADING, None],
+            [IFERC_CODES, None],
             "#ERROR _CreateIfercSchedule: publication_date is blank, expected column of dates",
         ),
         (
             [
                 Cells.from_rows([["V26"], [46023.0], ["Z26"]]),
-                Cells.from_rows([[46295.0], [None], [46356.0]]),
-                Cells.from_rows([[46296.0], [46328.0]]),
+                Cells.from_rows([[46296.0], [None]]),
             ],
             "#ERROR _CreateIfercSchedule: contract_code cell (2, 1) is number 46023.0, "
             "expected text",
         ),
     ],
     ids=[
-        "a last trading column one row long",
-        "a last trading column one row short",
         "a publication column one row long",
-        "three last trading dates for one code",
-        "both date columns wrong, the last trading dates named first",
+        "a publication column one row short",
+        "three publication dates for one code",
         "a blank in the publication column",
         "a date with a time",
-        "text in the last trading column",
+        "text in the publication column",
         "a number among the codes",
         "empty text among the codes",
         "a row of codes",
         "a row of dates",
         "the codes left out",
-        "the last trading dates left out",
         "the publication dates left out",
         "a blank cell where the codes should be",
-        "a blank cell where the last trading dates should be",
         "a blank cell where the publication dates should be",
-        "every column wrong, the codes named first",
+        "both columns wrong, the codes named first",
     ],
 )
 def test_an_iferc_schedule_that_cannot_be_made_says_why(args: list[object], text: str) -> None:
@@ -566,21 +528,19 @@ def test_an_iferc_schedule_that_cannot_be_made_says_why(args: list[object], text
 # The publication number moves only when an object is stored, so a failed creator leaves no gap,
 # whether the library or the seam refused the call.
 def test_a_failed_iferc_schedule_publishes_no_object_and_no_handle() -> None:
-    before = number(an_iferc_schedule(IFERC_CODES, LAST_TRADING, IFERC_PUBLICATIONS), IFERC)
+    before = number(an_iferc_schedule(IFERC_CODES, IFERC_PUBLICATIONS), IFERC)
     assert bridge.call(
         "_CreateIfercSchedule",
-        [IFERC_CODES, Cells.from_rows([[46295.0], [46325.0]]), IFERC_PUBLICATIONS],
+        [IFERC_CODES, Cells.from_rows([[46296.0], [46328.0]])],
     ) == (
-        "#ERROR _CreateIfercSchedule: ValueError: last_trading_date has 2 dates, "
+        "#ERROR _CreateIfercSchedule: ValueError: publication_date has 2 dates, "
         "expected 3, one per contract_code"
     )
     assert bridge.call(
         "_CreateIfercSchedule",
-        [IFERC_CODES, LAST_TRADING, Cells.from_rows([[46296.0], [None], [46357.0]])],
+        [IFERC_CODES, Cells.from_rows([[46296.0], [None], [46357.0]])],
     ) == ("#ERROR _CreateIfercSchedule: publication_date cell (2, 1) is blank, expected date")
-    assert number(an_iferc_schedule(IFERC_CODES, LAST_TRADING, IFERC_PUBLICATIONS), IFERC) == (
-        before + 1
-    )
+    assert number(an_iferc_schedule(IFERC_CODES, IFERC_PUBLICATIONS), IFERC) == (before + 1)
 
 
 def test_a_handle_of_another_kind_is_not_an_iferc_schedule() -> None:
@@ -773,7 +733,7 @@ def test_a_failed_gas_daily_schedule_publishes_no_object_and_no_handle() -> None
 
 
 def test_a_handle_of_another_kind_is_not_a_gas_daily_schedule() -> None:
-    other = an_iferc_schedule(IFERC_CODES, LAST_TRADING, IFERC_PUBLICATIONS)
+    other = an_iferc_schedule(IFERC_CODES, IFERC_PUBLICATIONS)
     assert bridge.call("ReadGasDailySchedule", [other]) == (
         f"#ERROR ReadGasDailySchedule: schedule is iferc schedule handle {other!r}, "
         "expected gas daily schedule handle"
@@ -1091,7 +1051,6 @@ INDEX = re.compile(r"[0-9]+:index:.+:([0-9]+)")
 # with the days each month's future stops trading and its index is published, and the first and
 # last day of gas of each.
 INDEX_IFERC_CODES = Cells.from_rows([["V26"], ["X26"], ["Z26"]])
-INDEX_IFERC_LAST_TRADING = Cells.from_rows([[46295.0], [46325.0], [46356.0]])
 INDEX_IFERC_PUBLISHED = Cells.from_rows([[46296.0], [46328.0], [46357.0]])
 INDEX_GAS_DAILY_CODES = Cells.from_rows([["U26"], ["V26"], ["X26"]])
 INDEX_GAS_DAILY_FIRST = Cells.from_rows([[46266.0], [46296.0], [46327.0]])
@@ -1165,7 +1124,7 @@ def test_a_futures_index_is_created_from_text_and_four_handles_and_read_back_as_
 
 def test_an_iferc_and_a_gas_daily_index_are_created_without_a_holiday_calendar() -> None:
     _, _, conventions, specifications = the_parts()
-    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
+    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_PUBLISHED)
     monthly = an_index(
         "Henry Hub IFERC",
         "Henry Hub natural gas - Inside FERC monthly index",
@@ -1256,7 +1215,7 @@ def test_the_librarys_rules_reach_the_sheet_in_its_words_for_the_index() -> None
         "#ERROR _CreateIndex: ValueError: holiday_calendar is a holiday calendar, "
         "expected none with a Gas Daily schedule"
     )
-    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_LAST_TRADING, INDEX_IFERC_PUBLISHED)
+    iferc = an_iferc_schedule(INDEX_IFERC_CODES, INDEX_IFERC_PUBLISHED)
     assert bridge.call(
         "_CreateIndex",
         [

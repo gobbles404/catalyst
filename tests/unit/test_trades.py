@@ -4936,18 +4936,16 @@ def test_a_days_lots_past_the_largest_number_are_refused_by_their_day() -> None:
 
 
 # --- an IFERC basis future, iferc-basis-futures.md ------------------------------------------
-# The ticket's synthetic Waha-like index: three months, X26, Z26 and F27, each last trading on the
-# last business day before its month and its index published on the first business day of it,
-# dollars an MMBtu settled in dollars, a 2,500 MMBtu LOT and a bare MMBTU, the LOT reported, and no
-# pricing calendar, an IFERC index having none; the payment calendar closes New Year's Day. WAH001,
-# 1 LOT of Z26 at -0.50: 2,500 MMBtu of exposure and a fixed leg of 1,250, so an amount of
-# 1,250 + 2,500 times the basis, observed once, on 1 December, the day Z26's index publishes, and
-# paid 3 December, three business days after the 30 November last trading day.
+# The ticket's synthetic Waha-like index: three months, X26, Z26 and F27, each index published on
+# the first business day of its month, dollars an MMBtu settled in dollars, a 2,500 MMBtu LOT and
+# a bare MMBTU, the LOT reported, and no pricing calendar, an IFERC index having none; the payment
+# calendar closes New Year's Day. WAH001, 1 LOT of Z26 at -0.50: 2,500 MMBtu of exposure and a
+# fixed leg of 1,250, so an amount of 1,250 + 2,500 times the basis, observed once, on 1 December,
+# the day Z26's index publishes, and paid 3 December, two business days after it,
+# iferc-publication-payment-anchor.md.
 
 WAHA_SCHEDULE = iferc_schedule(
-    ("X26", "Z26", "F27"),
-    dates("2026-10-30", "2026-11-30", "2026-12-31"),
-    dates("2026-11-02", "2026-12-01", "2027-01-04"),
+    ("X26", "Z26", "F27"), dates("2026-11-02", "2026-12-01", "2027-01-04")
 )
 WAHA = index(
     "WAHA",
@@ -4968,7 +4966,7 @@ WAHA = index(
 )
 WAHA_PAYS = holiday_calendar(dates("2027-01-01"))
 WAHA_MONTHS = schedule_months(WAHA_SCHEDULE)
-# Each month's payment day at +3bd from its last trading day on that calendar, the ticket's table:
+# Each month's payment day at +2bd from its publication day on that calendar, the ticket's table:
 # 4 November, 3 December and, New Year's Day closed, 6 January.
 WAHA_PAYMENT = ("2026-11-04", "2026-12-03", "2027-01-06")
 WAHA_LOT = "lots of LOT (2500 MMBTU)"
@@ -4994,7 +4992,8 @@ def waha_terms(
     """Trades on the Waha-like index: lastday, cleared and financial in LOT, a month's quantity at
     -0.50, or the units, bases, methods and prices given, each component on the schedule row given,
     its own occurrence unless said, covering its whole month unless periods are given, and paying
-    its month's day at +3bd unless other days and lags are given; the labels WAH001 on."""
+    its month's day at +2bd from publication unless other days and lags are given; the labels
+    WAH001 on."""
     n = len(quantities)
     occ = np.arange(n, dtype=np.intp) if occurrence is None else rows(*occurrence)
     m = int(occ[-1]) + 1
@@ -5018,7 +5017,7 @@ def waha_terms(
         pay_days = (
             dates(*(WAHA_PAYMENT[int(c)] for c in contract)) if pays is None else dates(*pays)
         )
-        lag = ("+3bd",) * m if lags is None else tuple(f"+{n}bd" for n in lags)
+        lag = ("+2bd",) * m if lags is None else tuple(f"+{n}bd" for n in lags)
         payment = PaymentTerms(lag, (WAHA_PAYS,) * m, pay_days)
     return resolved_trades(
         FIXED_FLOAT,
@@ -5242,8 +5241,8 @@ def test_a_long_and_a_short_lot_paying_on_two_days_keep_their_groups_as_the_risk
 def test_a_z26_f27_strip_fixes_one_month_and_quotes_the_other_with_its_own_payment_days() -> None:
     # One occurrence, two components, one index and one payment day a month: on 2 December Z26's
     # index at -0.20 stands and F27 quotes -0.10, 750 and 1,000 of mark against -0.50, the delta
-    # zero on Z26 and a lot on F27; F27 pays 6 January, its 31 December last trading day plus
-    # three business days with New Year's Day closed.
+    # zero on Z26 and a lot on F27; F27 pays 6 January, its 4 January publication day plus two
+    # business days.
     strip = waha_terms(quantities=(1.0, 1.0), contracts=(1, 2), occurrence=(0, 0))
     np.testing.assert_array_equal(observed_of(strip).date, dates("2026-12-01", "2027-01-04"))
     result, _ = waha_valued("2026-12-02", Z26_FIXED, (-0.10,), strip)
@@ -5306,9 +5305,9 @@ def test_the_first_iferc_month_is_a_month_to_trade_and_the_existing_refusals_hol
 
 
 def test_a_payment_on_the_publication_day_is_refused_when_the_iferc_batch_is_encoded() -> None:
-    # +1bd from 30 November is 1 December, the day the index prints: no final price exists by the
+    # +0bd from 1 December is 1 December, the day the index prints: no final price exists by the
     # day-based cutoff, the existing rule, and nothing is delayed in its place.
-    same_day = waha_terms(pays=("2026-12-01",), lags=(1,))
+    same_day = waha_terms(pays=("2026-12-01",), lags=(0,))
     with pytest.raises(ValueError) as refused:
         encoded(same_day, observed_of(same_day), UNITS, WorkCounter())
     assert str(refused.value) == (

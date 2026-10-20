@@ -309,25 +309,23 @@ def test_a_holiday_calendar_keeps_a_copy_of_its_column() -> None:
     assert least_peak(lambda: ENTRY["_CreateHolidayCalendar"](holidays)) <= 17 * days + 2 * SLACK
 
 
-def iferc_columns(contracts: int) -> tuple[Cells, Cells, Cells]:
-    """Codes, the day each month's future stops trading and the day its index is published, for
-    that many contract months, as the sheet sends them: the codes, the futures and the
-    third date column of schedule_columns."""
-    codes, last_trading, _, publications = schedule_columns(contracts)
-    return codes, last_trading, publications
+def iferc_columns(contracts: int) -> tuple[Cells, Cells]:
+    """Codes and the day each month's index is published, for that many contract months, as the
+    sheet sends them: the codes and the third date column of schedule_columns."""
+    codes, _, _, publications = schedule_columns(contracts)
+    return codes, publications
 
 
-# An IFERC schedule keeps a copy of each of its two date columns, 8 bytes per contract month
-# each, and on the way pays each column's conversion to days and its look, as an expiry
-# schedule with options does: measured 4,928 bytes at 120 contract months on 2026-09-24, about
-# 32 bytes per month on top of a creator's small objects, which twice the slack covers; 39,516
-# at 1,200, the futures schedule with options' figures to the byte.
-def test_an_iferc_schedule_keeps_a_copy_of_each_date_column() -> None:
+# An IFERC schedule keeps a copy of its one date column, 8 bytes per contract month, and on the
+# way pays the column's conversion to days and its look, as a schedule without options does:
+# measured ALLOC_ONE bytes at 120 contract months on 2026-10-18, about 17 bytes per month on top
+# of a creator's small objects, which twice the slack covers.
+def test_an_iferc_schedule_keeps_a_copy_of_its_date_column() -> None:
     contracts = 120
-    codes, last_trading, publications = iferc_columns(contracts)
+    codes, publications = iferc_columns(contracts)
     assert (
-        least_peak(lambda: ENTRY["_CreateIfercSchedule"](codes, last_trading, publications))
-        <= 32 * contracts + 2 * SLACK
+        least_peak(lambda: ENTRY["_CreateIfercSchedule"](codes, publications))
+        <= 17 * contracts + 2 * SLACK
     )
 
 

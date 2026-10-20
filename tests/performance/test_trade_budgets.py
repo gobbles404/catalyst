@@ -1202,23 +1202,20 @@ def test_a_rolling_asian_batch_references_the_calendars_contracts_and_ticks_like
 
 
 # --- an IFERC basis batch, iferc-basis-futures.md -------------------------------------------
-# The same 25 months on an IFERC index: each month last trading on the last business day before
-# it and its index published on the first business day of it, 2,500 MMBtu a lot, no pricing
-# calendar; the payment three business days after last trading on the payment calendar. The
+# The same 25 months on an IFERC index: each month's index published on the first business day
+# of it, 2,500 MMBtu a lot, no pricing calendar; the payment two business days after publication
+# on the payment calendar, since iferc-publication-payment-anchor.md. The
 # first month is a month like any other, so the rows begin at 0. Valued on 10 March 2027 the
 # months of October 2026 to March 2027, rows 0 to 5, have published: a batch over 24 contracts has
 # six fixed and eighteen live, and one over two contracts two fixed and none live.
-IFERC_LAST_TRADING = np.busday_offset(
-    MONTHS.astype("datetime64[D]"), -1, roll="forward", holidays=HOLIDAYS
-)
 IFERC_PUBLICATION = np.busday_offset(
     MONTHS.astype("datetime64[D]"), 0, roll="forward", holidays=HOLIDAYS
 )
-IFERC_PAYS = np.busday_offset(IFERC_LAST_TRADING, 3, roll="backward", holidays=HOLIDAYS)
+IFERC_PAYS = np.busday_offset(IFERC_PUBLICATION, 2, roll="backward", holidays=HOLIDAYS)
 BASIS = index(
     "basis",
     "Sample basis index",
-    iferc_schedule(CODES, IFERC_LAST_TRADING, IFERC_PUBLICATION),
+    iferc_schedule(CODES, IFERC_PUBLICATION),
     index_conventions("USD", "MMBTU", "USD", "ENERGY", "MMBTU", UNITS),
     contract_specifications(
         ("lot",), np.array([2_500.0]), ("MMBTU",), np.array([0.0]), np.array([0.0]), UNITS
