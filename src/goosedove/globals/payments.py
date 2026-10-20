@@ -25,7 +25,8 @@ def curve_starts_on(curve: DiscountCurve, as_of: np.datetime64) -> None:
     evaluators share, since the sheet reads one rule."""
     if curve.start_date != as_of:
         raise ValueError(
-            f"discount_curve starts on {curve.start_date}, expected {as_of}, the valuation date; "
+            f"discount curve {curve.name!r} starts on {curve.start_date}, expected {as_of}, the "
+            "valuation date; "
             "a curve is never rebased"
         )
 

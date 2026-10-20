@@ -262,7 +262,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -631,7 +631,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("Firm A", booked[2, 5]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -671,13 +671,15 @@ namespace Goosedove.Host.Tests
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
             Assert.Equal(7, shown.GetLength(0));
-            Assert.Equal(19, shown.GetLength(1));
+            Assert.Equal(20, shown.GetLength(1));
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
             Assert.Equal("start_date", shown[0, 4]);
             Assert.Equal("counterparty", shown[0, 10]);
-            Assert.Equal("payment_holiday_calendar", shown[0, 17]);
-            Assert.Equal("marketing_reserve", shown[0, 18]);
+            Assert.Equal("discount_curve_key", shown[0, 11]);  // after the counterparty, since named-curves-slice-3.md
+            Assert.Equal("route = bilateral", shown[3, 11]);
+            Assert.Equal("payment_holiday_calendar", shown[0, 18]);
+            Assert.Equal("marketing_reserve", shown[0, 19]);
             Assert.Equal("required", shown[2, 0]);
             Assert.Equal(false, shown[2, 1]);
             Assert.Equal(true, shown[2, 2]);
@@ -686,10 +688,10 @@ namespace Goosedove.Host.Tests
             Assert.Equal("no contract_code on the row, or with start_date", shown[3, 5]);
             Assert.Equal("route = cleared", shown[3, 9]);
             Assert.Equal("route = bilateral", shown[3, 10]);
-            Assert.Equal("a finite amount of zero or more", shown[5, 18]);
-            Assert.Equal("holiday calendar handle", shown[4, 17]);
-            Assert.Equal("the index's specification names", shown[5, 13]);
-            Assert.Equal("month, calday", shown[5, 14]);
+            Assert.Equal("a finite amount of zero or more", shown[5, 19]);
+            Assert.Equal("holiday calendar handle", shown[4, 18]);
+            Assert.Equal("the index's specification names", shown[5, 14]);
+            Assert.Equal("month, calday", shown[5, 15]);
         }
 
         // The NG example of the trade-valuation pipeline: a template of the fixed_float's six shared
@@ -858,7 +860,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("group_dv01", contributions[0, 16]);
             Assert.Equal("-", contributions[2, 13]);  // a cleared batch retains no payment facts
             Assert.Equal("brokerage_reserve", contributions[0, 17]);
-            Assert.Equal(23, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, last
+            Assert.Equal(25, contributions.GetLength(1));  // since #197 the contract's cross-gamma and its unit, since named-curves-slice-3.md the key and the curve, last
             Assert.Equal("contract_cross_gamma", contributions[0, 21]);
             Assert.Equal("cross_gamma_unit", contributions[0, 22]);
             Assert.Equal(0.0, contributions[2, 21]);
@@ -1318,7 +1320,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(180.0, (double)values[2, 1], 6);
             Assert.Equal(0.0, (double)((object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year"))[3, 1], 6);
             var contributions = (object[,])Seam.Call("util_ReadHandle", paid);
-            Assert.Equal(24, contributions.GetLength(1));  // since #197 two columns more, last
+            Assert.Equal(26, contributions.GetLength(1));  // since #197 two columns more, since slice 3 two more, last
             Assert.Equal("contract_lot_delta", contributions[0, 10]);
             Assert.Equal("contract_delta", contributions[0, 11]);
             Assert.Equal(46365.0, contributions[5, 3]);
@@ -2431,7 +2433,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("USD", reserves[2, 3]);
             var table = (object[,])Seam.Call("util_ReadHandle", results);
             Assert.Equal(3, table.GetLength(0));
-            Assert.Equal(24, table.GetLength(1));  // since #197 the two cross-gamma columns, last
+            Assert.Equal(26, table.GetLength(1));  // since #197 the two cross-gamma columns, since slice 3 the key and the curve, last
             Assert.Equal("brokerage_reserve", table[0, 18]);
             Assert.Equal("currency", table[0, 21]);
             Assert.Equal(50.0, (double)table[2, 18], 9);
@@ -2455,7 +2457,7 @@ namespace Goosedove.Host.Tests
             var marketedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, 20.0 }, { 1003.0, 46346.0, "Z26-F27", 1.0, "LOT", 0.25, 25.0 }, { 1004.0, 46346.0, "Z26", 0.0, "LOT", 0.25, 5.0 } };
             var marketed = (string)Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, template);
             var marketedTable = (object[,])Seam.Call("util_ReadHandle", marketed);
-            Assert.Equal(24, marketedTable.GetLength(1));
+            Assert.Equal(24, marketedTable.GetLength(1));  // a cleared batch names no curve
             Assert.Equal("marketing_reserve", marketedTable[0, 15]);
             Assert.Equal("entered_contract_code", marketedTable[0, 16]);
             Assert.Equal(15.0, (double)marketedTable[2, 15], 9);
@@ -2497,19 +2499,23 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, brokeredHeaders, brokeredRows, template));
             Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
-            var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
+            var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
-            Assert.Equal(22, facedTable.GetLength(1));
+            Assert.Equal(23, facedTable.GetLength(1));
             Assert.Equal("counterparty", facedTable[0, 7]);
             Assert.Equal("ACME Trading", facedTable[2, 7]);
-            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve with a bilateral batch, whose payments it discounts", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), ExcelMissing.Value));
+            Assert.Equal("discount_curve_key", facedTable[0, 8]);  // after the counterparty, since named-curves-slice-3.md
+            Assert.Equal("SOFR", facedTable[2, 8]);
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve_set is missing, expected a collection of discount curves with a bilateral batch, whose payments it discounts", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), ExcelMissing.Value));
             // Since #197, single-curve-cross-gamma.md: the faced batch valued on a curve of 0.99 on its payment day, two business days past its 31 December expiry with New Year's Day closed,
             // 5 January 2027, 34 days out: a lot of Z26 net, 0.99 discounted, and -0.0001 times 33 over 365 times 0.99
             // of cross-gamma on the contract's 2026 under the curve's label; all four five wide; the readback's
             // last two columns the contract's cross-gamma on every row and its unit.
             var facedCurve = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.99 } });
-            var facedResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurve);
+            var facedCurves = (string)Seam.Call("_CollectDiscountCurves", facedCurve);  // the collection of one the evaluation takes since named-curves-slice-3.md
+            Assert.Equal("#ERROR _EvaluateTrades: discount_curve_set is discount curve handle '" + facedCurve + "', expected discount curve set handle", Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurve));
+            var facedResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurves);
             var facedCross = (object[,])Seam.Call("_ReportRisk", facedResults, "cross_gamma", "year");
             Assert.Equal(5, facedCross.GetLength(0));
             Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedCross[1, 1]);
@@ -2521,13 +2527,59 @@ namespace Goosedove.Host.Tests
             Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedAll[1, 4]);
             Assert.Equal(0.99, (double)facedAll[3, 2], 12);
             var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
-            Assert.Equal(24, facedReadback.GetLength(1));
+            Assert.Equal(26, facedReadback.GetLength(1));
             Assert.Equal("contract_cross_gamma", facedReadback[0, 22]);
             Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedReadback[2, 22], 12);
             Assert.Equal("lots of LOT (1000 BBL) per basis point", facedReadback[2, 23]);
+            Assert.Equal("discount_curve_key", facedReadback[0, 24]);  // the key and the curve, last, since named-curves-slice-3.md
+            Assert.Equal("SOFR", facedReadback[2, 24]);
+            Assert.Equal("discount_curve", facedReadback[0, 25]);
+            Assert.Equal("SOFR", facedReadback[2, 25]);
+            // Since named-curves-slice-3.md: two rows naming their curves on the ticket, two lots of Z26 on SOFR and one
+            // short on FFOIS, 0.99 and 0.98 on the payment day, 34 days out: 2,520 and -1,260 of amount, 1,260 of mark,
+            // one lot net and 1.98 less 0.98 discounted, each curve's DV01 and cross-gamma in its own column in key
+            // order, the readback naming the key and the curve on each row, the collection's curve cell both names,
+            // and a collection missing a key refused with the key, the row and the names it holds.
+            var keyedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "discount_curve_key");
+            var keyedRows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "SOFR" }, { 102.0, 46346.0, "Z26", -1.0, "LOT", 0.25, "FFOIS" } };
+            var unkeyed = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
+            var keyed = (string)Seam.Call("_CreateTrades", index, keyedHeaders, keyedRows, unkeyed);
+            var keyedTable = (object[,])Seam.Call("util_ReadHandle", keyed);
+            Assert.Equal("discount_curve_key", keyedTable[0, 8]);
+            Assert.Equal("SOFR", keyedTable[2, 8]);
+            Assert.Equal("FFOIS", keyedTable[3, 8]);
+            var ffoisCurve = (string)Seam.Call("_CreateDiscountCurve", "FFOIS", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.98 } });
+            var bothCurves = (string)Seam.Call("_CollectDiscountCurves", Column(facedCurve, ffoisCurve));
+            var keyedPrepared = (string)Seam.Call("_PrepareTrades", keyed, history);
+            Assert.Equal("#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 102 at row 2 names no curve of the collection, which holds SOFR; expected a curve of that name", Seam.Call("_EvaluateTrades", keyedPrepared, Market(), facedCurves));
+            var keyedResults = (string)Seam.Call("_EvaluateTrades", keyedPrepared, Market(), bothCurves);
+            Assert.Equal(1260.0, (double)((object[,])Seam.Call("_ReportValues", keyedResults))[2, 0], 9);
+            var perDay = 0.0001 * 34 / 365;
+            var keyedDv01 = (object[,])Seam.Call("_ReportRisk", keyedResults, "dv01", "day");
+            Assert.Equal(3, keyedDv01.GetLength(1));
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", keyedDv01[1, 1]);
+            Assert.Equal("FFOIS USD dv01 [USD per basis point]", keyedDv01[1, 2]);
+            Assert.Equal(-perDay * 2520.0 * 0.99, (double)keyedDv01[3, 1], 12);
+            Assert.Equal(perDay * 1260.0 * 0.98, (double)keyedDv01[3, 2], 12);
+            var keyedAll = (object[,])Seam.Call("_ReportRisk", keyedResults, "all", "month");
+            Assert.Equal(7, keyedAll.GetLength(1));
+            Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", keyedAll[1, 5]);
+            Assert.Equal("RESERVES FFOIS cross_gamma [LOT per basis point]", keyedAll[1, 6]);
+            Assert.Equal(1.0, (double)keyedAll[3, 1], 12);
+            Assert.Equal(2.0 * 0.99 - 0.98, (double)keyedAll[3, 2], 12);
+            Assert.Equal(-perDay * 2.0 * 0.99, (double)keyedAll[3, 5], 12);
+            Assert.Equal(perDay * 0.98, (double)keyedAll[3, 6], 12);
+            var keyedReadback = (object[,])Seam.Call("util_ReadHandle", keyedResults);
+            Assert.Equal(4, keyedReadback.GetLength(0));
+            Assert.Equal("SOFR", keyedReadback[2, 24]);
+            Assert.Equal("FFOIS", keyedReadback[3, 24]);
+            Assert.Equal("SOFR", keyedReadback[2, 25]);
+            Assert.Equal("FFOIS", keyedReadback[3, 25]);
+            var keyedCollection = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_AggregateResults", keyedResults));
+            Assert.Equal("SOFR, FFOIS", keyedCollection[2, 4]);
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
             var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
-            var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "+2bd", pays));
+            var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "discount_curve_key", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "SOFR", "+2bd", pays));
             var byRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, facedHeaders, facedRows, unfaced));
             Assert.Equal("ACME Trading", byRow[2, 7]);
             Assert.Equal("Beta Energy", byRow[3, 7]);

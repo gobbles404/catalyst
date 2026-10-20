@@ -46,7 +46,7 @@ FIELDS = tuple([field.name for field in FIXED_FLOAT.fields])
 # --- the definitions ------------------------------------------------------------------------
 
 
-def test_the_catalog_holds_the_fixed_float_with_its_eighteen_fields_in_order() -> None:
+def test_the_catalog_holds_the_fixed_float_with_its_nineteen_fields_in_order() -> None:
     assert [each.name for each in CATALOG] == ["fixed_float", "cashflow"]
     assert FIELDS == (
         "trade_id",
@@ -59,6 +59,7 @@ def test_the_catalog_holds_the_fixed_float_with_its_eighteen_fields_in_order() -
         "settlement_method",
         "clearing_house",
         "counterparty",
+        "discount_curve_key",
         "broker",
         "quantity",
         "quantity_unit",
@@ -215,9 +216,9 @@ def test_a_one_field_definition_shows_seven_rows_and_two_columns() -> None:
 
 def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     shown = _ShowInstrument("fixed_float")
-    assert shown.shape == (7, 19)
-    assert tuple([shown.texts[i] for i in (0, 19, 38, 39, 58, 77, 96)]) == ROWS  # column one
-    assert shown.texts[:19] == ("field", *FIELDS)
+    assert shown.shape == (7, 20)
+    assert tuple([shown.texts[i] for i in (0, 20, 40, 41, 61, 81, 101)]) == ROWS  # column one
+    assert shown.texts[:20] == ("field", *FIELDS)
     required = shown.kinds[2]
     assert required[0] == TEXT_CODE and (required[1:] == BOOLEAN_CODE).all()
     np.testing.assert_array_equal(
@@ -226,11 +227,11 @@ def test_the_show_spills_seven_rows_and_a_column_per_field() -> None:
     )
     other_rows = np.delete(shown.kinds, 2, axis=0)
     assert (other_rows == TEXT_CODE).all()
-    assert len(shown.texts) == 7 * 19 - 18
+    assert len(shown.texts) == 7 * 20 - 19
     assert "" not in shown.texts
 
 
-@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 19), (CASHFLOW, 8)])
+@pytest.mark.parametrize(("definition", "columns"), [(FIXED_FLOAT, 20), (CASHFLOW, 8)])
 def test_the_show_page_shows_the_same_cells_as_the_spill(
     definition: Instrument, columns: int
 ) -> None:
@@ -256,7 +257,7 @@ def test_the_two_functions_through_the_seam_and_their_errors() -> None:
     kinds, slots, text = spilled(ENTRY["_ListInstruments"]())
     assert kinds.shape == (3, 2) and text.split("\0")[2::2] == ["fixed_float", "cashflow"]
     kinds, slots, text = spilled(ENTRY["_ShowInstrument"]("fixed_float"))
-    assert kinds.shape == (7, 19) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
+    assert kinds.shape == (7, 20) and slots[2, 1] == 0.0 and slots[2, 2] == 1.0
     assert ENTRY["_ShowInstrument"]("Future") == (
         "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: "
         "'fixed_float', 'cashflow'"

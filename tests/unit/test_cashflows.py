@@ -374,8 +374,8 @@ def test_amounts_are_finite_and_identifiers_whole_each_named_by_its_row() -> Non
 def test_the_curve_starts_on_the_day_and_covers_every_unpaid_day_a_paid_one_needing_none() -> None:
     batch = booked()
     assert refused_valuation(batch, curve=curve_of(("2027-01-05", 1.0), (TWO_YEARS, 0.9))) == (
-        "discount_curve starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve "
-        "is never rebased"
+        "discount curve 'SOFR' starts on 2027-01-05, expected 2027-01-04, the valuation date; "
+        "a curve is never rebased"
     )
     assert refused_valuation(batch, curve=curve_of((AS_OF, 1.0), (A_YEAR, 0.95))) == (
         f"the payment on {TWO_YEARS} is past the discount curve, which runs from {AS_OF} to "
@@ -582,8 +582,8 @@ def test_the_seam_refuses_in_its_own_words_and_relays_the_librarys() -> None:
     )
     later = ENTRY["_CreateValuationDate"](serial("2027-01-05"), 0.5)
     assert ENTRY["_EvaluateCashflows"](sheet["batch"], later, sheet["curve"]) == (
-        "#ERROR _EvaluateCashflows: ValueError: discount_curve starts on 2027-01-04, expected "
-        "2027-01-05, the valuation date; a curve is never rebased"
+        "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2027-01-04, "
+        "expected 2027-01-05, the valuation date; a curve is never rebased"
     )
     assert ENTRY["_ReportRisk"](sheet["results"], "delta", "day") == (
         "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of "

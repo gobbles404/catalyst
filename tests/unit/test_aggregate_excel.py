@@ -25,6 +25,7 @@ from test_trade_valuation import (
     a_market,
     an_index,
     column,
+    curves_of,
     risk_head,
     row,
     rows,
@@ -99,13 +100,23 @@ def sheet() -> dict[str, Any]:
         ENTRY["_CreateTradeTemplate"](
             "fixed_float",
             row(*UNIT_FIELDS),
-            row("LOT", "month", "lastday", "bilateral", "financial", "ACME Trading", payments, 0.0),
+            row(
+                "LOT",
+                "month",
+                "lastday",
+                "bilateral",
+                "financial",
+                "ACME Trading",
+                "SOFR",
+                payments,
+                0.0,
+            ),
         )
     )
     cleared = str(
         ENTRY["_CreateTradeTemplate"](
             "fixed_float",
-            row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[6:]),
+            row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[7:]),
             row(
                 "LOT",
                 "month",
@@ -161,7 +172,9 @@ def valued(
         state[template],
     )
     prepared = ENTRY["_PrepareTrades"](trades, history or state[f"{which}_history"])
-    return str(ENTRY["_EvaluateTrades"](prepared, market or state[f"{which}_market"], curve))
+    return str(
+        ENTRY["_EvaluateTrades"](prepared, market or state[f"{which}_market"], curves_of(curve))
+    )
 
 
 def stacked(values: list[object]) -> Cells:
@@ -450,7 +463,7 @@ def test_a_failed_source_shows_the_creators_failure_once_through_the_collection(
             bridge.MISSING,
         )
     )
-    assert failed.startswith("#ERROR _EvaluateTrades: ValueError: discount_curve is missing")
+    assert failed.startswith("#ERROR _EvaluateTrades: ValueError: discount_curve_set is missing")
     live = bridge.live_handles()
     collection = str(ENTRY["_AggregateResults"](stacked([sheet["b2"], failed])))
     assert collection == (
@@ -497,7 +510,7 @@ def test_the_collector_refuses_its_inputs_at_their_cells_and_publishes_nothing(
             bridge.MISSING,
         )
     )
-    assert failed.startswith("#ERROR _EvaluateTrades: ValueError: discount_curve is missing")
+    assert failed.startswith("#ERROR _EvaluateTrades: ValueError: discount_curve_set is missing")
     later = a_history(sheet["hng"], "2027-01-01", "2027-01-05", UNIT_HOLIDAYS, {"2027-01-04": 82.0})
     on_later = valued(
         sheet,

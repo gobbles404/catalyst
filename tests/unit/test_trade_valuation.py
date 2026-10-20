@@ -265,12 +265,14 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
             "currency",
             "contract_cross_gamma",
             "cross_gamma_unit",
+            "discount_curve_key",
+            "discount_curve",
         ],
         ["str", "str", "datetime64[D]", "bool"]
         + ["float64"] * 7
         + ["str", "str"]
         + ["float64"] * 7
-        + ["str", "float64", "str"],
+        + ["str", "float64", "str", "str", "str"],
     ]
     assert table[2][:6] == ["Z26", "Z26", serial("2026-11-25"), False, 160_000.0, 16.0]
     # The contract's risk four ways, the discounted twins the nominal arrays for a cleared
@@ -287,10 +289,14 @@ def test_the_readers_spill_the_dated_contents_one_row_per_slot(ng: dict[str, Any
         "USD",
         0.0,  # since #197 the contract's cross-gamma, nothing for a cleared batch, and its unit
         NG_PER_BP,
+        "-",  # since named-curves-slice-3.md the key and the curve, none for a cleared batch
+        "-",
     ]
     assert table[3][11:] == ["USD per USD/MMBTU", "lots of NYMEX NG (10000 MMBTU)"] + ["-"] * 8 + [
         0.0,
         NG_PER_BP,
+        "-",
+        "-",
     ]
     assert table[3][4:6] == [160_000.0 * -5 / 16, -5.0]
     assert table[3][6:11] == [pytest.approx(-175_000.0), -50_000.0, -50_000.0, -5.0, -5.0]
@@ -503,8 +509,10 @@ def test_the_paid_contract_reads_back_fixed_and_settled_with_no_live_exposure(
         "USD",
         0.0,
         TOY_PER_BP,
+        "-",
+        "-",
     ]
-    assert table[3][-6:-2] == ["-"] * 4
+    assert table[3][-8:-4] == ["-"] * 4
     assert table[3][:7] == [
         "F27",
         "F27",
@@ -528,12 +536,12 @@ def test_a_fully_fixed_batch_inside_a_live_market_reports_its_cash_and_no_live_e
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 4
-        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP],
+        + [0.0, 0.0, 0.0, "USD", 0.0, TOY_PER_BP, "-", "-"],
         ["F27", "F27", serial("2026-12-29"), serial("2026-12-31"), True]
         + [0.0] * 7
         + TOY_UNITS
         + ["-"] * 8
-        + [0.0, TOY_PER_BP],
+        + [0.0, TOY_PER_BP, "-", "-"],
     ]
     assert valued(results) == (pytest.approx(0.0), pytest.approx(14_300), 0.0)
 
@@ -1150,6 +1158,8 @@ def test_the_pages_example_marks_2000_with_the_row_kept_ready_and_1000_once_it_i
     ] * 8 + [
         0.0,
         NG_PER_BP,
+        "-",
+        "-",
     ]
     sold_trades, sold_prepared, sold = entry_state(ng, -1.0)
     assert sold_trades != trades and sold_prepared != prepared and sold != results
@@ -1280,29 +1290,31 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
     # text, a number, a dead handle or another kind; and a cleared batch given one is the
     # library's refusal, after the seam's.
     assert evaluate(ng["prepared"], ng["market"], None) == (
-        "#ERROR _EvaluateTrades: discount_curve is blank, expected discount curve handle"
+        "#ERROR _EvaluateTrades: discount_curve_set is blank, expected discount curve set handle"
     )
     assert evaluate(ng["prepared"], ng["market"], "") == (
-        "#ERROR _EvaluateTrades: discount_curve is empty text, expected discount curve handle"
+        "#ERROR _EvaluateTrades: discount_curve_set is empty text, expected discount curve set "
+        "handle"
     )
     assert evaluate(ng["prepared"], ng["market"], 1.0) == (
-        "#ERROR _EvaluateTrades: discount_curve is number 1.0, expected discount curve handle"
+        "#ERROR _EvaluateTrades: discount_curve_set is number 1.0, expected discount curve set "
+        "handle"
     )
     assert evaluate(ng["prepared"], ng["market"], "x:discount_curve:9") == (
-        "#ERROR _EvaluateTrades: discount_curve is text 'x:discount_curve:9' naming no live "
-        "object, expected discount curve handle"
+        "#ERROR _EvaluateTrades: discount_curve_set is text 'x:discount_curve:9' naming no live "
+        "object, expected discount curve set handle"
     )
     assert evaluate(ng["prepared"], ng["market"], ng["market"]) == (
-        f"#ERROR _EvaluateTrades: discount_curve is market handle {ng['market']!r}, "
-        "expected discount curve handle"
+        f"#ERROR _EvaluateTrades: discount_curve_set is market handle {ng['market']!r}, "
+        "expected discount curve set handle"
     )
     curve = ENTRY["_CreateDiscountCurve"](
         "SOFR",
         row("date", "discount_factor"),
         rows([serial("2026-11-24"), 1.0], [serial("2027-11-24"), 0.9]),
     )
-    assert evaluate(ng["prepared"], ng["market"], curve) == (
-        "#ERROR _EvaluateTrades: ValueError: discount_curve is supplied, expected none unless "
+    assert evaluate(ng["prepared"], ng["market"], curves_of(curve)) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve_set is supplied, expected none unless "
         "route = bilateral; a cleared batch is undiscounted"
     )
     assert ENTRY["_ReportValues"](ng["prepared"]) == (
@@ -1341,9 +1353,9 @@ def test_the_refusals_come_in_the_seams_order_then_the_librarys(ng: dict[str, An
         "fixed_float",
         row(
             "quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method",
-            "counterparty",
+            "counterparty", "discount_curve_key",
         ),
-        row("NYMEX NG", "month", "lastday", "bilateral", "physical", "ACME Trading"),
+        row("NYMEX NG", "month", "lastday", "bilateral", "physical", "ACME Trading", "SOFR"),
     )  # fmt: skip
     trades = ENTRY["_CreateTrades"](ng["index"], row(*NG_HEADERS), rows(*NG_ROWS), bilateral)
     assert evaluate(prepare(trades, ng["history"]), ng["market"], bridge.MISSING) == (
@@ -2253,10 +2265,12 @@ def test_two_payment_days_on_one_contract_value_on_the_sheet_as_the_ticket_says(
         "currency",
         "contract_cross_gamma",
         "cross_gamma_unit",
+        "discount_curve_key",
+        "discount_curve",
     ]
     assert [line[3] for line in table[2:]] == [line[3] for line in slots[2:]]
-    assert table[2][-6:-2] == [0.0, 0.0, 0.0, "USD"]
-    assert [line[-6:-2] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
+    assert table[2][-8:-4] == [0.0, 0.0, 0.0, "USD"]
+    assert [line[-8:-4] for line in table[3:]] == [["-"] * 4] * 5  # once, not per slot
     assert by_header(results, "contract_lot_delta") == [pytest.approx(delta)] * 6  # the contract's
 
 
@@ -2715,6 +2729,8 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "currency",
         "contract_cross_gamma",
         "cross_gamma_unit",
+        "discount_curve_key",
+        "discount_curve",
     ]
     assert table[2][5:] == [
         pytest.approx(420.0),
@@ -2733,6 +2749,8 @@ def test_an_ete_row_reports_one_lot_whatever_word_entered_it(
         "USD",
         0.0,
         "lots of LOT (1000 BBL) per basis point",
+        "-",
+        "-",
     ]
 
 
@@ -2760,6 +2778,8 @@ def test_the_three_ete_rows_together_report_three_lots(ete: dict[str, Any]) -> N
         "USD",
         0.0,
         "lots of LOT (1000 BBL) per basis point",
+        "-",
+        "-",
     ]
 
 
@@ -2868,6 +2888,8 @@ def test_a_lot_is_one_lot_in_every_quote_and_settlement_unit(
         settled,  # the reserves' currency, the settlement currency
         0.0,
         "lots of LOT (1000 BBL) per basis point",
+        "-",
+        "-",
     ]
 
 
@@ -3750,9 +3772,10 @@ def test_the_tickets_four_rows_report_fifty_and_twenty_dollars_of_reserves(
     # The results readback shows the four once, on its one slot row here; the batch's readback
     # carries no reserve, the owner's choice of the evaluated results as the place to read them.
     table = spilled(ENTRY["util_ReadHandle"](results))
-    assert table[0][-6:-2] == RESERVE_HEADERS  # since #197 the cross-gamma's two columns follow
-    assert table[1][-6:-2] == ["float64", "float64", "float64", "str"]
-    assert len(table) == 3 and table[2][-6:-2] == [50.0, 20.0, 0.0, "USD"]
+    assert table[0][-8:-4] == RESERVE_HEADERS  # the cross-gamma's two columns follow, then
+    # since named-curves-slice-3.md the key and the curve
+    assert table[1][-8:-4] == ["float64", "float64", "float64", "str"]
+    assert len(table) == 3 and table[2][-8:-4] == [50.0, 20.0, 0.0, "USD"]
     batch = spilled(ENTRY["util_ReadHandle"](trades))
     assert not any("reserve" in str(header) for header in batch[0])
     # Value and risk are the free rows': the two LOT rows net, the barrels mark three cents on
@@ -3775,8 +3798,8 @@ def test_the_pricing_days_change_no_reserve_and_the_readback_shows_it_once(
     assert reserved(results) == RESERVE_SPILL
     table = spilled(ENTRY["util_ReadHandle"](results))
     assert len(table) == 2 + slots
-    assert table[2][-6:-2] == [50.0, 20.0, 0.0, "USD"]
-    assert [line[-6:-2] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
+    assert table[2][-8:-4] == [50.0, 20.0, 0.0, "USD"]
+    assert [line[-8:-4] for line in table[3:]] == [["-", "-", "-", "-"]] * (slots - 1)
 
 
 def test_one_batch_keeps_its_reserves_through_ticks_fixings_corrections_and_payment(
@@ -4144,11 +4167,17 @@ MARKETING_ROWS: list[list[object]] = [
     [1003.0, serial("2026-11-20"), "Z26-F27", 1.0, "LOT", 25.0, "lastday", 25.0],
     [1004.0, serial("2026-11-20"), "Z26", 0.0, "LOT", 25.0, "lastday", 5.0],
 ]
-BILATERAL_FIELDS = ("quantity_per", "route", "settlement_method", "payment_time_lag")
-BILATERAL_VALUES: tuple[object, ...] = ("month", "bilateral", "financial", "+1bd")
+BILATERAL_FIELDS = (
+    "quantity_per",
+    "route",
+    "settlement_method",
+    "discount_curve_key",
+    "payment_time_lag",
+)
+BILATERAL_VALUES: tuple[object, ...] = ("month", "bilateral", "financial", "SOFR", "+1bd")
 BILATERAL_REFUSAL = (
-    "#ERROR _EvaluateTrades: ValueError: discount_curve is missing, expected a discount curve "
-    "with a bilateral batch, whose payments it discounts"
+    "#ERROR _EvaluateTrades: ValueError: discount_curve_set is missing, expected a collection of "
+    "discount curves with a bilateral batch, whose payments it discounts"
 )
 
 
@@ -4188,7 +4217,7 @@ def test_the_tickets_rows_book_sixty_five_of_marketing_once_per_row_through_the_
     assert [line[1] for line in table[2:]] == [1001.0, 1002.0, 1003.0, 1003.0, 1004.0]
     assert [line[i] for line in table[2:]] == [15.0, 20.0, 25.0, 25.0, 5.0]
     readback = spilled(ENTRY["util_ReadHandle"](results))
-    assert readback[2][-6:-2] == [60.0, 24.0, 65.0, "USD"]
+    assert readback[2][-8:-4] == [60.0, 24.0, 65.0, "USD"]
     # The same rows without the column: the same value and risk, nought of marketing.
     plain_rows = [line[:-1] for line in MARKETING_ROWS]
     plain_trades, _, plain = ete_state(
@@ -4267,7 +4296,8 @@ def test_a_bilateral_batch_names_its_counterparty_and_is_refused_at_evaluation_a
     assert trades.split(":")[1:3] == ["trades", "ETE"]
     table = spilled(ENTRY["util_ReadHandle"](trades))
     i = table[0].index("counterparty")
-    assert table[0][i - 1] == "settlement_method" and table[0][i + 1] == "quantity"
+    assert table[0][i - 1] == "settlement_method" and table[0][i + 1] == "discount_curve_key"
+    assert table[0][i + 2] == "quantity"  # the key after the counterparty, since slice 3
     assert "clearing_house" not in table[0]
     assert [line[i] for line in table[2:]] == ["ACME Trading"] * 4
     shown = spilled(ENTRY["util_ReadHandle"](shared))
@@ -4323,6 +4353,7 @@ UNIT_FIELDS = (
     "route",
     "settlement_method",
     "counterparty",
+    "discount_curve_key",
     "payment_holiday_calendar",
     "marketing_reserve",
 )
@@ -4361,6 +4392,8 @@ RESULT_COLUMNS = [
     "currency",
     "contract_cross_gamma",
     "cross_gamma_unit",
+    "discount_curve_key",
+    "discount_curve",
 ]
 
 
@@ -4377,11 +4410,21 @@ def unit() -> dict[str, Any]:
     template = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
         row(*UNIT_FIELDS),
-        row("UNIT", "month", "lastday", "bilateral", "financial", "ACME Trading", payments, 5.0),
+        row(
+            "UNIT",
+            "month",
+            "lastday",
+            "bilateral",
+            "financial",
+            "ACME Trading",
+            "SOFR",
+            payments,
+            5.0,
+        ),
     )
     cleared = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[6:]),
+        row(*UNIT_FIELDS[:5], "clearing_house", *UNIT_FIELDS[7:]),
         row(
             "UNIT", "month", "lastday", "cleared", "financial", "Prototype Clearing", payments, 5.0
         ),
@@ -4402,6 +4445,12 @@ def unit_history(unit: dict[str, Any], as_of: str, finals: dict[str, float] | No
     1 January 2027 to the day before, the finals given standing on their days, the fixings creator
     taking them newest first."""
     return a_history(unit["index"], "2027-01-01", as_of, UNIT_HOLIDAYS, finals or {})
+
+
+def curves_of(curve: object) -> object:
+    """The collection of the one curve, the form _EvaluateTrades takes since
+    named-curves-slice-3.md; a left-out argument left out."""
+    return curve if curve is bridge.MISSING else str(ENTRY["_CollectDiscountCurves"](curve))
 
 
 def unit_curve(*anchors: tuple[str, float], name: str = "SOFR") -> str:
@@ -4425,7 +4474,12 @@ def unit_state(
     history = unit_history(unit, as_of, finals)
     market = a_market(history, "UNIT", *quotes)
     prepared = str(ENTRY["_PrepareTrades"](trades, history))
-    return history, market, prepared, str(ENTRY["_EvaluateTrades"](prepared, market, curve))
+    return (
+        history,
+        market,
+        prepared,
+        str(ENTRY["_EvaluateTrades"](prepared, market, curves_of(curve))),
+    )
 
 
 def risk_of(results: str) -> tuple[float, float, float]:
@@ -4526,7 +4580,7 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
     assert table[0] == RESULT_COLUMNS
     assert table[1] == ["str", "str", "datetime64[D]", "datetime64[D]", "bool"] + [
         "float64"
-    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str"]
+    ] * 7 + ["str", "str"] + ["float64"] * 7 + ["str", "float64", "str", "str", "str"]
     assert [line[:5] for line in table[2:]] == [
         ["F27", "F27", serial(UNIT_AS_OF), serial(A_YEAR_OUT), False],
         ["F27", "F27", serial(UNIT_AS_OF), serial(TWO_YEARS_OUT), False],
@@ -4547,6 +4601,8 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         "USD",
         pytest.approx(0.00085),  # since #197 the contract's cross-gamma, on both its rows
         "lots of UNIT (1 BBL) per basis point",
+        "SOFR",  # since named-curves-slice-3.md the group's key and its curve's name
+        "SOFR",
     ]
     assert table[3][12:] == [
         "USD per USD/BBL",
@@ -4558,17 +4614,21 @@ def test_the_two_groups_value_on_the_sheet_as_the_ticket_says(unit: dict[str, An
         *["-"] * 4,
         pytest.approx(0.00085),
         "lots of UNIT (1 BBL) per basis point",
+        "SOFR",
+        "SOFR",
     ]
     # A tick to 81 over the same preparation and curve: 5.5 and 0.00935, the lots as they were,
     # the old results standing; a replacement curve at 0.96 and 0.92 over the same preparation
     # and market: 4, 0.4 and 0.0088. The reserves move for neither.
-    ticked = str(ENTRY["_EvaluateTrades"](prepared, a_market(history, "UNIT", 81.0, 50.0), curve))
+    ticked = str(
+        ENTRY["_EvaluateTrades"](prepared, a_market(history, "UNIT", 81.0, 50.0), curves_of(curve))
+    )
     assert ticked != results
     assert valued(ticked) == (pytest.approx(5.5), 0.0, 0.0)
     assert risk_of(ticked)[1:] == (pytest.approx(0.5), pytest.approx(0.00935))
     assert valued(results) == (pytest.approx(5.0), 0.0, 0.0)
     other = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92))
-    replaced = str(ENTRY["_EvaluateTrades"](prepared, market, other))
+    replaced = str(ENTRY["_EvaluateTrades"](prepared, market, curves_of(other)))
     assert valued(replaced) == (pytest.approx(4.0), 0.0, 0.0)
     assert risk_of(replaced)[1:] == (pytest.approx(0.4), pytest.approx(0.0088))
     # The axes stand on either tick; the payment days' DV01s move with the quote or the curve.
@@ -4618,7 +4678,7 @@ def test_the_one_receivable_values_through_its_life_on_the_sheet(unit: dict[str,
         [serial(A_YEAR_OUT), 0.0, 0.0, pytest.approx(-0.0001 * 364 / 365 * 120.0), 0.0],
     ]
     at_99 = ENTRY["_EvaluateTrades"](
-        prepared, market, unit_curve(("2027-01-05", 1.0), (A_YEAR_OUT, 0.99))
+        prepared, market, curves_of(unit_curve(("2027-01-05", 1.0), (A_YEAR_OUT, 0.99)))
     )
     assert valued(str(at_99)) == (pytest.approx(118.8), 0.0, 0.0)
     for as_of in (A_YEAR_OUT, "2028-01-05"):
@@ -4655,18 +4715,20 @@ def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, An
     history = unit_history(unit, UNIT_AS_OF)
     market = a_market(history, "UNIT", 80.0, 50.0)
     prepared = str(ENTRY["_PrepareTrades"](unit["trades"], history))
-    curve = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.95), (TWO_YEARS_OUT, 0.90))
-    late = unit_curve(("2027-01-05", 1.0), (TWO_YEARS_OUT, 0.9))
-    short = unit_curve((UNIT_AS_OF, 1.0), ("2028-12-31", 0.9))
+    bare = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.95), (TWO_YEARS_OUT, 0.90))
+    curve = curves_of(bare)
+    late = curves_of(unit_curve(("2027-01-05", 1.0), (TWO_YEARS_OUT, 0.9)))
+    short = curves_of(unit_curve((UNIT_AS_OF, 1.0), ("2028-12-31", 0.9)))
+    unnamed = curves_of(unit_curve((UNIT_AS_OF, 1.0), (TWO_YEARS_OUT, 0.9), name="FFOIS"))
     other = a_market(unit_history(unit, UNIT_AS_OF, {"2027-01-01": 3.1}), "UNIT", 80.0, 50.0)
     paid_history = unit_history(unit, A_YEAR_OUT, {"2027-01-04": 82.0})
     paid_market = a_market(paid_history, "UNIT", 50.0)
     paid_prepared = str(ENTRY["_PrepareTrades"](unit["one"], paid_history))
-    one_day = unit_curve((A_YEAR_OUT, 1.0))
+    one_day = curves_of(unit_curve((A_YEAR_OUT, 1.0)))
     physical = ENTRY["_CreateTradeTemplate"](
         "fixed_float",
-        row(*UNIT_FIELDS[:6]),
-        row("UNIT", "month", "lastday", "bilateral", "physical", "ACME Trading"),
+        row(*UNIT_FIELDS[:7]),
+        row("UNIT", "month", "lastday", "bilateral", "physical", "ACME Trading", "SOFR"),
     )
     delivery = str(
         ENTRY["_PrepareTrades"](
@@ -4679,18 +4741,26 @@ def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, An
     live, _ = bridge.live_handles()
     assert evaluate(prepared, market, bridge.MISSING) == BILATERAL_REFUSAL
     assert evaluate(paid_prepared, paid_market, bridge.MISSING) == BILATERAL_REFUSAL
+    assert evaluate(prepared, market, bare) == (
+        f"#ERROR _EvaluateTrades: discount_curve_set is discount curve handle {bare!r}, expected "
+        "discount curve set handle"
+    )
+    assert evaluate(prepared, market, unnamed) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'SOFR' of trade 1001 at row 1 "
+        "names no curve of the collection, which holds FFOIS; expected a curve of that name"
+    )
     assert evaluate(prepared, market, late) == (
-        "#ERROR _EvaluateTrades: ValueError: discount_curve starts on 2027-01-05, expected "
-        "2027-01-04, the valuation date; a curve is never rebased"
+        "#ERROR _EvaluateTrades: ValueError: discount curve 'SOFR' starts on 2027-01-05, "
+        "expected 2027-01-04, the valuation date; a curve is never rebased"
     )
     assert evaluate(paid_prepared, paid_market, curve) == (
-        "#ERROR _EvaluateTrades: ValueError: discount_curve starts on 2027-01-04, expected "
-        "2028-01-04, the valuation date; a curve is never rebased"
+        "#ERROR _EvaluateTrades: ValueError: discount curve 'SOFR' starts on 2027-01-04, "
+        "expected 2028-01-04, the valuation date; a curve is never rebased"
     )
     assert evaluate(prepared, market, short) == (
-        "#ERROR _EvaluateTrades: ValueError: the payment of F27 on 2029-01-03 is past the "
-        "discount curve, which runs from 2027-01-04 to 2028-12-31; expected every unpaid payment "
-        "day covered"
+        "#ERROR _EvaluateTrades: ValueError: the payment of F27 on 2029-01-03 on SOFR is past "
+        "the discount curve 'SOFR', which runs from 2027-01-04 to 2028-12-31; expected every "
+        "unpaid payment day covered"
     )
     assert evaluate(prepared, other, curve) == (
         "#ERROR _EvaluateTrades: ValueError: market is over another history of index 'UNIT', "
@@ -4705,8 +4775,142 @@ def test_the_curves_rules_reach_the_sheet_and_publish_nothing(unit: dict[str, An
     assert str(evaluate(paid_prepared, paid_market, one_day)).split(":")[1] == "trade_results"
 
 
+def test_a_batch_keyed_on_two_curves_reads_back_each_key_and_curve_and_reports_both(
+    unit: dict[str, Any],
+) -> None:
+    # The UNIT rows keyed on the ticket, +10 a year out on SOFR at 0.95 and -10 two years out on
+    # FFOIS at 0.92, under a template without the key: 95 less 92 of mark, no nominal delta, 0.3
+    # discounted, a DV01 and a cross-gamma column per curve in key order, the key read back after
+    # the counterparty, the key and the curve on each slot, both names in the collection's curve
+    # cell, and the SOFR collection alone refused by FFOIS's row.
+    unkeyed = ENTRY["_CreateTradeTemplate"](
+        "fixed_float",
+        row(*UNIT_FIELDS[:6], *UNIT_FIELDS[7:]),
+        row(
+            "UNIT",
+            "month",
+            "lastday",
+            "bilateral",
+            "financial",
+            "ACME Trading",
+            unit["payments"],
+            5.0,
+        ),
+    )
+    trades = str(
+        ENTRY["_CreateTrades"](
+            unit["index"],
+            row(*UNIT_HEADERS, "discount_curve_key"),
+            rows([*UNIT_ROWS[0], "SOFR"], [*UNIT_ROWS[1], "FFOIS"]),
+            unkeyed,
+        )
+    )
+    batch = spilled(ENTRY["util_ReadHandle"](trades))
+    i = batch[0].index("counterparty")
+    assert batch[0][i + 1] == "discount_curve_key"
+    assert [line[i + 1] for line in batch[2:]] == ["SOFR", "FFOIS"]
+    sofr = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.95), (TWO_YEARS_OUT, 0.90))
+    ffois = unit_curve((UNIT_AS_OF, 1.0), (A_YEAR_OUT, 0.96), (TWO_YEARS_OUT, 0.92), name="FFOIS")
+    both = str(ENTRY["_CollectDiscountCurves"](rows([sofr], [ffois])))
+    history = unit_history(unit, UNIT_AS_OF)
+    market = a_market(history, "UNIT", 80.0, 50.0)
+    prepared = str(ENTRY["_PrepareTrades"](trades, history))
+    assert ENTRY["_EvaluateTrades"](prepared, market, curves_of(sofr)) == (
+        "#ERROR _EvaluateTrades: ValueError: discount_curve_key 'FFOIS' of trade 1002 at row 2 "
+        "names no curve of the collection, which holds SOFR; expected a curve of that name"
+    )
+    results = str(ENTRY["_EvaluateTrades"](prepared, market, both))
+    assert valued(results) == (pytest.approx(3.0), 0.0, 0.0)
+    dv01 = spilled(ENTRY["_ReportRisk"](results, "dv01", "year"))
+    assert dv01[:3] == risk_head(
+        UNIT_AS_OF,
+        "SOFR USD dv01 [USD per basis point]",
+        "FFOIS USD dv01 [USD per basis point]",
+    )
+    assert dv01[3] == ["Total", pytest.approx(-0.0095), pytest.approx(0.0184)]
+    cross = spilled(ENTRY["_ReportRisk"](results, "cross_gamma", "year"))
+    assert cross[1] == [
+        "period",
+        "UNIT SOFR cross_gamma [UNIT per basis point]",
+        "UNIT FFOIS cross_gamma [UNIT per basis point]",
+    ]
+    assert cross[3] == ["Total", pytest.approx(-0.00095), pytest.approx(0.00184)]
+    table = spilled(ENTRY["_ReportRisk"](results, "all", "month"))
+    assert len(table[1]) == 7
+    assert table[3][1:3] == [0.0, pytest.approx(0.3)]
+    readback = spilled(ENTRY["util_ReadHandle"](results))
+    assert readback[0] == RESULT_COLUMNS
+    assert by_header(results, "discount_curve_key") == ["SOFR", "FFOIS"]
+    assert by_header(results, "discount_curve") == ["SOFR", "FFOIS"]
+    collection = spilled(ENTRY["util_ReadHandle"](ENTRY["_AggregateResults"](results)))
+    assert collection[2][4] == "SOFR, FFOIS"
+
+
+def test_the_keys_name_rule_refuses_whitespace_where_the_key_is_typed(
+    unit: dict[str, Any],
+) -> None:
+    # The key is read by the curve's own name rule, in a template when it is made and in a ticket
+    # row by row, so whitespace around it or whitespace alone fails there, never later as a name
+    # no curve has.
+    def template(key: str) -> object:
+        return ENTRY["_CreateTradeTemplate"](
+            "fixed_float",
+            row(*UNIT_FIELDS),
+            row(
+                "UNIT",
+                "month",
+                "lastday",
+                "bilateral",
+                "financial",
+                "ACME",
+                key,
+                unit["payments"],
+                5.0,
+            ),
+        )
+
+    assert template(" SOFR") == (
+        "#ERROR _CreateTradeTemplate: ValueError: discount_curve_key is ' SOFR', expected a name "
+        "with no whitespace around it"
+    )
+    assert template("  ") == (
+        "#ERROR _CreateTradeTemplate: ValueError: discount_curve_key is '  ', expected a name, "
+        "not whitespace alone"
+    )
+    assert str(template("Fed Funds OIS")).split(":")[1] == "trade_template"  # spaces inside stand
+    unkeyed = ENTRY["_CreateTradeTemplate"](
+        "fixed_float",
+        row(*UNIT_FIELDS[:6], *UNIT_FIELDS[7:]),
+        row("UNIT", "month", "lastday", "bilateral", "financial", "ACME", unit["payments"], 5.0),
+    )
+    headers = row(*UNIT_HEADERS, "discount_curve_key")
+
+    def ticket(first: str, second: str) -> object:
+        return ENTRY["_CreateTrades"](
+            unit["index"],
+            headers,
+            rows([*UNIT_ROWS[0], first], [*UNIT_ROWS[1], second]),
+            unkeyed,
+        )
+
+    assert ticket("SOFR", "FFOIS ") == (
+        "#ERROR _CreateTrades: ValueError: discount_curve_key row 2 is 'FFOIS ', expected a name "
+        "with no whitespace around it"
+    )
+    assert ticket(" ", "FFOIS") == (
+        "#ERROR _CreateTrades: ValueError: discount_curve_key row 1 is ' ', expected a name, not "
+        "whitespace alone"
+    )
+    assert str(ticket("SOFR", "Fed Funds OIS")).split(":")[1] == "trades"
+
+
 def bilateral_template(fields: tuple[str, ...], values: tuple[object, ...]) -> str:
-    return str(ENTRY["_CreateTradeTemplate"]("fixed_float", row(*fields), row(*values)))
+    """A bilateral template of those fields and the key every bilateral row names, SOFR."""
+    return str(
+        ENTRY["_CreateTradeTemplate"](
+            "fixed_float", row(*fields, "discount_curve_key"), row(*values, "SOFR")
+        )
+    )
 
 
 @pytest.mark.parametrize("which", ["rolling asian over a year end", "two payment days", "mixed"])
@@ -4785,7 +4989,7 @@ def test_bilateral_batches_reconcile_both_deltas_on_every_axis(
     curve = unit_curve((as_of, 1.0), ("2028-12-31", 0.9))
     prepared = ENTRY["_PrepareTrades"](trades, history)
     assert not str(trades).startswith("#ERROR"), trades
-    results = str(ENTRY["_EvaluateTrades"](prepared, market, curve))
+    results = str(ENTRY["_EvaluateTrades"](prepared, market, curves_of(curve)))
     assert not results.startswith("#ERROR"), results
     mark = cast(float, spilled(ENTRY["_ReportValues"](results))[2][0])
     nominal, delta, dv01 = risk_of(results)
@@ -4930,6 +5134,9 @@ def fee_template(route: str, broker: str | None = None) -> str:
         "ETE Clearing" if cleared else "ACME Trading",
         "+1bd",
     ]
+    if not cleared:  # a bilateral row names its curve, since named-curves-slice-3.md
+        fields.insert(4, "discount_curve_key")
+        values.insert(4, "SOFR")
     if broker is not None:
         fields.insert(4, "broker")
         values.insert(4, broker)
@@ -4950,7 +5157,9 @@ def fee_state(
     history = a_history(index, "2026-11-30", "2026-12-02", ETE_HOLIDAYS, {})
     prepared = str(ENTRY["_PrepareTrades"](str(trades), history))
     curve = unit_curve(*FEE_CURVE) if bilateral else bridge.MISSING
-    results = ENTRY["_EvaluateTrades"](prepared, a_market(history, "ETE", 28.0, 29.0), curve)
+    results = ENTRY["_EvaluateTrades"](
+        prepared, a_market(history, "ETE", 28.0, 29.0), curves_of(curve)
+    )
     assert not str(results).startswith("#ERROR"), results
     return str(trades), str(results)
 

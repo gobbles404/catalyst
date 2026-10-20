@@ -220,6 +220,7 @@ def terms_of(
         *bounds_of(ix, CONTRACT[keep]),
         FIXED_PRICE[keep],
         None if pays is None else paying(pays[keep], occurrences),
+        discount_curve_key=None if route is Route.CLEARED else ("SOFR",) * occurrences,
     )
 
 
@@ -5452,6 +5453,7 @@ def fee_terms(
         clearing_house, named,
         dates(*["2026-11-20"] * n), np.arange(n, dtype=np.intp), rows(*([1] * n)),
         numbers(*quantities), *bounds_of(ix, rows(*([1] * n))), numbers(*([70.0] * n)), None,
+        discount_curve_key=None if route is Route.CLEARED else ("SOFR",) * n,
     )  # fmt: skip
 
 

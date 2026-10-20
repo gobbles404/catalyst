@@ -824,6 +824,7 @@ CURVE_LEDGER = {
     "_numbers_of": 1,
     "_CreateDiscountCurve": 1,
     "discount_curve": 1,
+    "curve_name": 1,  # the name rule, shared with the key since slice 3
     "interpolate_discount_factors": 1,
     "_publish": 1,
 }
@@ -2252,9 +2253,9 @@ def test_the_shown_instrument_is_laid_out_once_per_cell(
         "_ShowInstrument": 1,
         "instrument": 1,
         "schema_cells": 1,
-        "schema_cells.<locals>.<genexpr>": 133,  # seven rows of eighteen fields and the labels
+        "schema_cells.<locals>.<genexpr>": 140,  # seven rows of nineteen fields and the labels
         "MixedArray.cells": 1,
-        "_classify": 133,
+        "_classify": 140,
         "_mixed_out": 1,
         "_bad_mixed": 1,
     }
@@ -2501,6 +2502,7 @@ BUMP_LEDGER = {
     "DiscountCurve.start_date": 1,
     "WorkCounter.hit": 1,
     "discount_curve": 1,
+    "curve_name": 1,
     "interpolate_discount_factors": 1,
     "_publish": 1,
 }

@@ -31,19 +31,31 @@ DISPLAY_PERIODS = "display_periods"  # periods of the month and year display axe
 
 
 @dataclass(frozen=True, slots=True)
-class UnpaidPayments:
-    """The unpaid payment groups' days, since #176, for the bilateral path to gather factors by:
-    days, the distinct payment days of the groups not yet settled, increasing; groups, those
-    groups' positions among the batch's groups, increasing; day_of_group[i], the position among
-    days of groups[i]'s payment day; and tau[i], the calendar days from the valuation date to
-    that day over 365, ACT/365F. Made once when the batch is prepared, since the groups settled
-    and the valuation date change only then, so that a tick sorts and counts no day; None for a
-    cleared batch, which discounts nothing, and for a physical one, which pays on no day."""
+class KeyPayments:
+    """One key's unpaid groups, since named-curves-slice-3.md, for the factor reads off its curve:
+    groups, their positions among the batch's groups, increasing; days, their distinct payment
+    days, increasing; and day_of_group[i], the position among days of groups[i]'s day. A batch on
+    one key holds the unpaid groups themselves, by reference."""
 
-    days: NDArray[np.datetime64]
     groups: NDArray[np.intp]
+    days: NDArray[np.datetime64]
     day_of_group: NDArray[np.intp]
+
+
+@dataclass(frozen=True, slots=True)
+class UnpaidPayments:
+    """The unpaid payment groups, since #176, for the bilateral path to value and gather factors
+    by: groups, the positions among the batch's groups of those not yet settled, increasing;
+    tau[i], the calendar days from the valuation date to groups[i]'s payment day over 365,
+    ACT/365F; and since named-curves-slice-3.md by_key, one KeyPayments per key of the batch in
+    key order, each key's unpaid groups and their distinct days, the days a tick reads off that
+    key's curve. Made once when the batch is prepared, since the groups settled and the valuation
+    date change only then, so that a tick sorts and counts no day; None for a cleared batch,
+    which discounts nothing, and for a physical one, which pays on no day."""
+
+    groups: NDArray[np.intp]
     tau: NDArray[np.float64]
+    by_key: tuple[KeyPayments, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,23 +159,42 @@ def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
 def _unpaid_payments(
     encoded: Encoded, unsettled: NDArray[np.bool_], as_of: np.datetime64, counter: WorkCounter
 ) -> UnpaidPayments | None:
-    """The mapping a bilateral batch's ticks gather the curve's factors by, since #176, made once
+    """The mapping a bilateral batch's ticks gather the curves' factors by, since #176, made once
     here, where the groups settled and the valuation date are decided, and for a bilateral batch
     alone, a cleared one discounting nothing: None for a physical batch, which pays on no day and
-    which the evaluation refuses a curve; else the groups not yet settled, their distinct payment
-    days with each group's place among them, one unique over those groups' days, and their time
-    fractions, ACT/365F, every array frozen. Work: one day mapped per distinct unpaid payment day,
-    reported to the counter; nothing on a tick."""
+    which the evaluation refuses a collection; else the groups not yet settled with their time
+    fractions, ACT/365F, and since named-curves-slice-3.md per key, in key order, that key's
+    unpaid groups and their distinct payment days with each group's place among them, one unique
+    per key, a batch on one key holding the unpaid groups themselves; every array frozen. Work:
+    one day mapped per distinct payment day of each key, a day two keys pay on mapped once per
+    key, reported to the counter; nothing on a tick."""
     if encoded.payment_date is None:
         return None
     groups = np.flatnonzero(unsettled)
     pays = encoded.payment_date[groups]
-    days, day_of_group = np.unique(pays, return_inverse=True)
     tau = time_fractions(as_of, pays)
-    for array in (days, groups, day_of_group, tau):
+    key_of_group = cast(NDArray[np.intp], encoded.key_of_group)  # bilateral: keyed
+    by_key: list[KeyPayments] = []
+    mapped = 0
+    if len(encoded.keys) == 1:
+        days, day_of_group = np.unique(pays, return_inverse=True)
+        by_key.append(KeyPayments(groups, days, day_of_group))
+    else:
+        key_of_unpaid = key_of_group[groups]
+        for key in range(len(encoded.keys)):
+            picked = key_of_unpaid == key
+            days, day_of_group = np.unique(pays[picked], return_inverse=True)
+            picked_groups = groups[picked]
+            picked_groups.setflags(write=False)
+            by_key.append(KeyPayments(picked_groups, days, day_of_group))
+    for keyed in by_key:
+        for array in (keyed.days, keyed.day_of_group):
+            array.setflags(write=False)
+        mapped += int(keyed.days.size)
+    for array in (groups, tau):
         array.setflags(write=False)
-    counter.hit(PAYMENT_DAYS_MAPPED, int(days.size))
-    return UnpaidPayments(days, groups, day_of_group, tau)
+    counter.hit(PAYMENT_DAYS_MAPPED, mapped)
+    return UnpaidPayments(groups, tau, tuple(by_key))
 
 
 def _the_set_amounts(
@@ -196,7 +227,12 @@ def _the_set_amounts(
     if outrun.any():
         g = int(outrun.argmax())
         group = group_words(
-            encoded.terms.schedule.codes, encoded.group_contract, encoded.payment_date, g
+            encoded.terms.schedule.codes,
+            encoded.group_contract,
+            encoded.payment_date,
+            g,
+            encoded.keys,
+            encoded.key_of_group,
         )
         raise ValueError(
             f"the set amount of {group} is {float(set_amount[g])!r}, expected a finite amount of "

@@ -460,6 +460,7 @@ def trades_table(obj: Trades) -> MixedArray:
     text("settlement_method", (terms.settlement.value,) * n)
     labels("clearing_house", terms.clearing_house)
     labels("counterparty", terms.counterparty)
+    labels("discount_curve_key", terms.discount_curve_key)  # named-curves-slice-3.md
     labels("broker", terms.broker)
     numbers("quantity", "float64", terms.quantity)
     text(
@@ -547,9 +548,16 @@ def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     the collection holds the object."""
     sources = obj.sources
     n = len(sources)
-    curve = np.full(n, "-", dtype=object)
-    for group in obj.rate_groups:
-        curve[group.occurrences] = group.word
+    # The words of every curve a source used, in its own key order, since named-curves-slice-3.md,
+    # joined with a comma and a space; a cleared source, with no contribution, a dash.
+    word_of_curve = {id(group.curve): group.word for group in obj.rate_groups}
+    curve = np.array(
+        [
+            ", ".join([word_of_curve[id(c.curve)] for c in source.rate_contributions]) or "-"
+            for source in sources
+        ],
+        dtype=object,
+    )
     index_names: list[str] = []
     lots: list[str] = []
     routes: list[str] = []
@@ -616,7 +624,9 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     # since #197, the contract's cross-gamma on every slot, read by the slot's reference as the
     # contract's four risks are and so the same number on every slot of one contract, repeated
     # context and no slot's own risk, a cleared result's zero, and its unit, lots per basis
-    # point, on every row; appended last so that no column before them moves.
+    # point, on every row; appended last so that no column before them moves. Then, since
+    # named-curves-slice-3.md, the slot's group's key and the name of the curve the group was
+    # discounted on, on every row, a cleared result a dash in both; appended last likewise.
     prepared = obj.prepared
     encoding = prepared.encoded
     names, types, columns = _slot_names(encoding)
@@ -675,9 +685,20 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     reserves = obj.reserves
     currency = np.full(slots, "-", dtype=object)
     currency[0] = reserves.currency
-    crosses = obj.cross_contributions  # one today; the sum over several is slice 3's to show
-    cross = crosses[0].cross_gamma[reference] if crosses else np.zeros(slots)
+    # The contract's cross-gamma with every used curve shifted together, the contributions' by
+    # reference summed, one row per curve; a cleared result's zero.
+    cross = np.zeros(slots)
+    for contribution in obj.cross_contributions:
+        cross += contribution.cross_gamma[reference]
     per_bp = np.full(slots, f"{obj.lot_unit} per basis point", dtype=object)
+    key_of_group = encoding.key_of_group
+    if key_of_group is None or not obj.curves:
+        keys = np.full(slots, "-", dtype=object)
+        curve_names = np.full(slots, "-", dtype=object)
+    else:
+        key_of_slot = key_of_group[group]
+        keys = np.array(encoding.keys, dtype=object)[key_of_slot]
+        curve_names = np.array([curve.name for curve in obj.curves], dtype=object)[key_of_slot]
     return _widened(
         table,
         [
@@ -688,6 +709,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
             _words_on("currency", currency),
             _numbers_on("contract_cross_gamma", cross, every),
             _words_on("cross_gamma_unit", per_bp),
+            _words_on("discount_curve_key", keys),
+            _words_on("discount_curve", curve_names),
         ],
     )
 

@@ -55,7 +55,7 @@ In this order, the first failure being the message; a failure publishes no handl
 
 | Rule | Refused as |
 |---|---|
-| the curve starts on the valuation day, never rebased, the rule the trades share | `discount_curve starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is never rebased` |
+| the curve starts on the valuation day, never rebased, the rule the trades share, the words naming the curve since the named-curve arc's slice 3 | `discount curve 'SOFR' starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is never rebased` |
 | the curve covers every unpaid payment day; a paid day needs no factor, so a curve of one day serves a batch paid in full | `the payment on 2029-01-03 is past the discount curve, which runs from 2027-01-04 to 2028-01-04; expected every unpaid payment day covered` |
 | the mark, the cash and the DV01 are finite in all, under numpy's flags down | `the batch has inf of mark in all, expected a finite amount of USD; the payments, each finite, sum past the largest number` |
 | the DV01 by month and by year is finite in every period | `the payment month from 2028-01-01 has inf of DV01 in all, expected a finite amount of USD per basis point; its payments' DV01s sum past the largest number` |

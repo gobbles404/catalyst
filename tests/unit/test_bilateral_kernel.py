@@ -35,6 +35,7 @@ from test_trades import (
 )
 
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
+from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.contract_specifications import contract_specifications
 from goosedove.index_definitions.futures_schedule import futures_schedule
@@ -127,6 +128,11 @@ def curve_of(*anchors: tuple[str, float], name: str = "SOFR") -> DiscountCurve:
     return discount_curve(name, dates(*[d for d, _ in anchors]), numbers(*[f for _, f in anchors]))
 
 
+def curve_set(*curves: DiscountCurve) -> DiscountCurveSet:
+    """A collection of the curves, the form the evaluation takes since named-curves-slice-3.md."""
+    return collect_discount_curves(curves, WorkCounter())
+
+
 FLAT = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))
 
 
@@ -139,6 +145,7 @@ def terms_of(
     contracts: tuple[int, ...] | None = None,
     fixed: float = 70.0,
     ix: Index = UNIT,
+    key: str = "SOFR",
 ) -> ResolvedTrades:
     """One lastday trade per quantity, each its own payment group, at 70 on F27 of UNIT unless
     another schedule row, fixed price or index is given; bilateral and financial unless told
@@ -157,6 +164,7 @@ def terms_of(
         dates(*[AS_OF] * n), np.arange(n, dtype=np.intp), contract, numbers(*quantities),
         *bounds_of(ix, contract), numbers(*[fixed] * n), payment,
         counterparty=None if route is Route.CLEARED else ("ACME Trading",) * n,
+        discount_curve_key=None if route is Route.CLEARED else (key,) * n,
     )  # fmt: skip
 
 
@@ -176,7 +184,12 @@ def valued(
     curve: DiscountCurve | None,
     counter: WorkCounter | None = None,
 ) -> TradeResults:
-    return trade_results(prep, quoted(prep.history, *quotes), counter or WorkCounter(), curve)
+    return trade_results(
+        prep,
+        quoted(prep.history, *quotes),
+        counter or WorkCounter(),
+        None if curve is None else curve_set(curve),
+    )
 
 
 def test_the_unit_lot_makes_the_hand_figures_the_libraries() -> None:
@@ -193,7 +206,7 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     prep = prepared_on(terms_of())
     counter = WorkCounter()
     result = valued(prep, (80.0, 50.0), FLAT, counter)
-    assert result.route is Route.BILATERAL and result.curve is FLAT and result.cash == 0.0
+    assert result.route is Route.BILATERAL and result.curves == (FLAT,) and result.cash == 0.0
     assert result.mark == pytest.approx(5.0, **CLOSE)
     assert result.dv01 == pytest.approx(0.0085, **CLOSE)
     np.testing.assert_allclose(given(result.payment_amount), [100.0, -100.0], **TIGHT)
@@ -211,12 +224,14 @@ def test_two_groups_paying_a_year_apart_discount_before_they_net() -> None:
     np.testing.assert_allclose(result.discounted_monthly_lots, [0.5], **TIGHT)
     np.testing.assert_allclose(result.discounted_yearly_lots, [0.5], **TIGHT)
     assert counter.freeze().as_dict() == {
+        "curves_selected": 1,
         "groups_valued": 2,
         "kernel": 1,
         "live_prices_read": 1,
         "payment_factors_read": 2,
-        "risk_reductions": 11,
+        "risk_reductions": 12,
         "slots_discounted": 2,
+        "slots_weighted": 2,
     }
     # The same preparation under a tick to 81: 110 and -110, 5.5 of NPV, 0.00935 of DV01, the lots
     # as they were; and under another curve, 0.96 and 0.92 at 80: 4 of NPV, 0.4 of lots, 0.0088.
@@ -327,12 +342,14 @@ def test_a_fixed_payment_is_discounted_until_it_is_paid_and_then_is_cash() -> No
             assert array.dtype == np.float64
             np.testing.assert_array_equal(array, [0.0])
         assert counter.freeze().as_dict() == {
+            "curves_selected": 1,
             "groups_valued": 0,
             "kernel": 1,
             "live_prices_read": 0,
             "payment_factors_read": 0,
-            "risk_reductions": 11,
+            "risk_reductions": 12,
             "slots_discounted": 1,
+            "slots_weighted": 1,
         }
 
 
@@ -344,15 +361,15 @@ def test_the_rules_refuse_a_curve_with_a_cleared_batch_and_want_one_with_a_bilat
     with pytest.raises(ValueError) as refused:
         valued(cleared, (80.0, 50.0), FLAT)
     assert str(refused.value) == (
-        "discount_curve is supplied, expected none unless route = bilateral; a cleared batch is "
-        "undiscounted"
+        "discount_curve_set is supplied, expected none unless route = bilateral; a cleared batch "
+        "is undiscounted"
     )
     bilateral = prepared_on(terms_of())
     with pytest.raises(ValueError) as refused:
         valued(bilateral, (80.0, 50.0), None)
     assert str(refused.value) == (
-        "discount_curve is missing, expected a discount curve with a bilateral batch, whose "
-        "payments it discounts"
+        "discount_curve_set is missing, expected a collection of discount curves with a "
+        "bilateral batch, whose payments it discounts"
     )
     physical = prepared_on(terms_of(settlement=Settlement.PHYSICAL))
     with pytest.raises(ValueError) as refused:
@@ -364,20 +381,20 @@ def test_the_rules_refuse_a_curve_with_a_cleared_batch_and_want_one_with_a_bilat
     with pytest.raises(ValueError) as refused:
         valued(bilateral, (80.0, 50.0), curve_of(("2027-01-05", 1.0), (TWO_YEARS, 0.9)))
     assert str(refused.value) == (
-        "discount_curve starts on 2027-01-05, expected 2027-01-04, the valuation date; a curve is "
-        "never rebased"
+        "discount curve 'SOFR' starts on 2027-01-05, expected 2027-01-04, the valuation date; a "
+        "curve is never rebased"
     )
     with pytest.raises(ValueError) as refused:
         valued(bilateral, (80.0, 50.0), curve_of((AS_OF, 1.0), ("2028-12-31", 0.9)))
     assert str(refused.value) == (
-        "the payment of F27 on 2029-01-03 is past the discount curve, which runs from 2027-01-04 "
-        "to 2028-12-31; expected every unpaid payment day covered"
+        "the payment of F27 on 2029-01-03 on SOFR is past the discount curve 'SOFR', which runs "
+        "from 2027-01-04 to 2028-12-31; expected every unpaid payment day covered"
     )
     # A curve ending on the last payment day covers it; a fixed, unpaid group needs its day too.
-    assert valued(bilateral, (80.0, 50.0), FLAT).curve is FLAT
+    assert valued(bilateral, (80.0, 50.0), FLAT).curves == (FLAT,)
     fixed = prepared_on(terms_of((10.0,), (A_YEAR,), (261,)), "2027-01-05", {"F27": 82.0})
     with pytest.raises(
-        ValueError, match=r"^the payment of F27 on 2028-01-04 is past the discount curve"
+        ValueError, match=r"^the payment of F27 on 2028-01-04 on SOFR is past the discount curve"
     ):
         valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), ("2028-01-03", 1.0)))
 
@@ -436,12 +453,14 @@ def test_discounted_lots_are_weighted_by_slot_before_the_reference_and_time_sums
         10 * d365 - 10 * d730 + 5 * d735, **CLOSE
     )
     assert counter.freeze().as_dict() == {
+        "curves_selected": 1,
         "groups_valued": 3,
         "kernel": 1,
         "live_prices_read": 2,
         "payment_factors_read": 3,
-        "risk_reductions": 11,
+        "risk_reductions": 12,
         "slots_discounted": 3,
+        "slots_weighted": 3,
     }
 
 
@@ -452,7 +471,7 @@ def test_a_cleared_batch_shares_its_nominal_arrays_and_keeps_no_group_vector() -
     prep = prepared_on(terms_of(route=Route.CLEARED))
     counter = WorkCounter()
     result = valued(prep, (80.0, 50.0), None, counter)
-    assert result.curve is None and result.dv01 == 0.0
+    assert result.curves == () and result.dv01 == 0.0
     assert result.mark == pytest.approx(0.0, **CLOSE)  # +100 and -100, undiscounted, net
     assert result.discounted_lot_delta is prep.lot_delta
     assert result.discounted_price_sensitivity is prep.price_sensitivity
@@ -478,6 +497,7 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
         "route": "bilateral",
         "settlement_method": "financial",
         "counterparty": "ACME Trading",
+        "discount_curve_key": "SOFR",
         "payment_holiday_calendar": PAY_DAYS,
     }
     template = trade_template(
@@ -496,6 +516,8 @@ def test_the_two_trades_made_through_the_creators_value_the_same() -> None:
     assert batch.encoded.payment_date is not None
     np.testing.assert_array_equal(batch.encoded.payment_date, dates(A_YEAR, TWO_YEARS))
     assert batch.resolved.counterparty == ("ACME Trading", "ACME Trading")
+    assert batch.resolved.discount_curve_key == ("SOFR", "SOFR")
+    assert batch.encoded.keys == ("SOFR",)
     prep = prepared_trades(batch.encoded, history_on(UNIT, AS_OF, {}), WorkCounter())
     result = valued(prep, (80.0, 50.0), FLAT)
     assert result.mark == pytest.approx(5.0, **CLOSE)
@@ -527,26 +549,29 @@ def test_the_preparation_maps_the_unpaid_payment_days_once_for_the_ticks() -> No
     }
     pays = prep.unpaid_payments
     assert pays is not None
-    np.testing.assert_array_equal(pays.days, dates(A_YEAR, TWO_YEARS))
+    # One key: the unpaid groups themselves under it, by reference, since named-curves-slice-3.md.
+    (keyed,) = pays.by_key
+    assert keyed.groups is pays.groups
+    np.testing.assert_array_equal(keyed.days, dates(A_YEAR, TWO_YEARS))
     np.testing.assert_array_equal(pays.groups, [0, 1])
-    np.testing.assert_array_equal(pays.day_of_group, [0, 1])
+    np.testing.assert_array_equal(keyed.day_of_group, [0, 1])
     np.testing.assert_array_equal(pays.tau, [1.0, 2.0])
-    for array in (pays.days, pays.groups, pays.day_of_group, pays.tau):
+    for array in (keyed.days, pays.groups, keyed.day_of_group, pays.tau):
         assert not array.flags.writeable
     later = prepared_on(terms, A_YEAR, {"F27": 82.0}).unpaid_payments
     assert later is not None
-    np.testing.assert_array_equal(later.days, dates(TWO_YEARS))
+    np.testing.assert_array_equal(later.by_key[0].days, dates(TWO_YEARS))
     np.testing.assert_array_equal(later.groups, [1])
-    np.testing.assert_array_equal(later.day_of_group, [0])
+    np.testing.assert_array_equal(later.by_key[0].day_of_group, [0])
     np.testing.assert_array_equal(later.tau, [1.0])
     one_day = prepared_on(
         terms_of((10.0, 5.0), ("2029-01-08", "2029-01-08"), (522, 1), contracts=(1, 2))
     )
     shared = one_day.unpaid_payments
     assert shared is not None
-    np.testing.assert_array_equal(shared.days, dates("2029-01-08"))
+    np.testing.assert_array_equal(shared.by_key[0].days, dates("2029-01-08"))
     np.testing.assert_array_equal(shared.groups, [0, 1])
-    np.testing.assert_array_equal(shared.day_of_group, [0, 0])
+    np.testing.assert_array_equal(shared.by_key[0].day_of_group, [0, 0])
     np.testing.assert_allclose(shared.tau, [735 / 365, 735 / 365], **TIGHT)
     counter = WorkCounter()
     result = valued(one_day, (80.0, 50.0), curve_of((AS_OF, 1.0), ("2029-01-08", 0.90)), counter)
@@ -567,11 +592,11 @@ def test_an_amount_past_the_largest_number_is_refused_by_its_group_or_as_cash() 
     with pytest.raises(ValueError) as refused:
         valued(prepared_on(terms), (1e308, 50.0), curve_of((AS_OF, 1.0), (A_YEAR, 1.0)))
     assert str(refused.value) == (
-        "the payment of F27 on 2028-01-04 is inf, expected a finite amount of USD; its fixed, set "
-        "and live legs sum past the largest number"
+        "the payment of F27 on 2028-01-04 on SOFR is inf, expected a finite amount of USD; its "
+        "fixed, set and live legs sum past the largest number"
     )
     fixed = prepared_on(terms, "2027-01-05", {"F27": 1e308})
-    with pytest.raises(ValueError, match=r"^the payment of F27 on 2028-01-04 is inf, "):
+    with pytest.raises(ValueError, match=r"^the payment of F27 on 2028-01-04 on SOFR is inf, "):
         valued(fixed, (50.0,), curve_of(("2027-01-05", 1.0), (A_YEAR, 1.0)))
     for route in (Route.BILATERAL, Route.CLEARED):
         with pytest.raises(ValueError) as refused:
@@ -873,6 +898,6 @@ def test_a_dv01_bucket_past_the_largest_number_is_refused_by_its_payment_day() -
     with pytest.raises(ValueError) as refused:
         valued(prep, (LARGEST,) * 512, flat_from_a_year)
     assert str(refused.value) == (
-        "the payment day 2100-01-04 has -inf of DV01 in all, expected a finite amount of USD per "
-        "basis point; its groups' DV01s sum past the largest number"
+        "the payment day 2100-01-04 has -inf of DV01 on SOFR in all, expected a finite amount of "
+        "USD per basis point; its groups' DV01s sum past the largest number"
     )

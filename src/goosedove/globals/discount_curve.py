@@ -40,6 +40,19 @@ class DiscountCurve:
         return self.dates[-1]
 
 
+def curve_name(where: str, text: str) -> str:
+    """The rule on a curve's name and, since named-curves-slice-3.md, on a trade's
+    discount_curve_key, which must match one exactly: text with no whitespace around it and
+    not whitespace alone, refused in the words of where it stands, `name` for a curve and the
+    field, with its row where a ticket supplied it, for a key; the text itself otherwise, as
+    typed, since a key matches a name case and all."""
+    if not text.strip():
+        raise ValueError(f"{where} is {text!r}, expected a name, not whitespace alone")
+    if text != text.strip():
+        raise ValueError(f"{where} is {text!r}, expected a name with no whitespace around it")
+    return text
+
+
 def discount_curve(
     name: str, dates: NDArray[np.datetime64], factors: NDArray[np.float64]
 ) -> DiscountCurve:
@@ -55,10 +68,7 @@ def discount_curve(
     factors, made here and frozen, so the curve owns its data and a Python caller keeps whatever
     it passed. Rows count as the sheet counts them, the first row of the body being row 1.
     """
-    if not name.strip():
-        raise ValueError(f"name is {name!r}, expected a name, not whitespace alone")
-    if name != name.strip():
-        raise ValueError(f"name is {name!r}, expected a name with no whitespace around it")
+    curve_name("name", name)
     days = np.asarray(dates, dtype="datetime64[D]")  # read, never written: no copy of the anchors
     # Before any arithmetic: numpy warns on inf - inf, and a warning fails here. The mask is the
     # finite one, asked whether every factor is; its inverse is made only to name the first that

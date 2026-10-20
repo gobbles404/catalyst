@@ -723,7 +723,7 @@ def test_the_evaluation_explains_itself() -> None:
     assert not hidden
     assert description == (
         "Evaluates prepared trades against one market, live observations at their quotes and fixed "
-        "at their settles, a bilateral batch's payments discounted on the curve, into mark, cash, "
+        "at their settles, each bilateral payment discounted on its row's curve, into mark, cash, "
         "delta and DV01, and shows the results' handle, which the reports take."
     )
     assert arguments == [
@@ -738,10 +738,11 @@ def test_the_evaluation_explains_itself() -> None:
             "showing _CreateMarket's result, such as I12, or a name for it, with the day's quotes.",
         ),
         (
-            "[discount_curve]",
-            "The discount-curve handle for a bilateral batch: the cell showing "
-            "_CreateDiscountCurve's result, such as I13, or a name for it, starting on the "
-            "valuation day and covering every unpaid payment day; left out for a cleared batch.",
+            "[discount_curve_set]",
+            "The collection handle for a bilateral batch: the cell showing "
+            "_CollectDiscountCurves's result, such as I13, or a name for it, holding every curve "
+            "the rows name by discount_curve_key, each starting on the valuation day; left out for "
+            "a cleared batch.",
         ),
     ]
 

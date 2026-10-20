@@ -175,6 +175,18 @@ FIXED_FLOAT = Instrument(
             "credit treatment or curve",
         ),
         Field(
+            "discount_curve_key",
+            "The name of the curve a bilateral trade's payments discount on",
+            False,
+            "route = bilateral",
+            FieldType.TEXT,
+            "the name of a curve in the collection given to _EvaluateTrades",
+            "Exact and case-sensitive, no whitespace around it: required with route = bilateral "
+            "and refused with cleared; rows may name different curves; the curve is selected "
+            "when the batch is evaluated, from the collection supplied then, and a key naming "
+            "none of its curves fails the evaluation, never silently the first curve",
+        ),
+        Field(
             "broker",
             "The broker named for the deal, or none for a screen trade",
             False,

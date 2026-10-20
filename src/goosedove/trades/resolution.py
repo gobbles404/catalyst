@@ -22,6 +22,7 @@ from typing import Any, Final, assert_never, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from goosedove.globals.discount_curve import curve_name
 from goosedove.globals.unit_conversions import UnitConversions
 from goosedove.index_definitions.contract_codes import month_label, schedule_months
 from goosedove.index_definitions.date_offsets import shift_days
@@ -77,6 +78,7 @@ PERIOD_FIELDS: Final = ("contract_code", "start_date", "end_date")
 CONDITIONS: Final[dict[str, tuple[str, Route | Settlement]]] = {
     "clearing_house": ("route", Route.CLEARED),
     "counterparty": ("route", Route.BILATERAL),  # since #175
+    "discount_curve_key": ("route", Route.BILATERAL),  # named-curves-slice-3.md
     "payment_time_lag": ("settlement_method", Settlement.FINANCIAL),
     "payment_holiday_calendar": ("settlement_method", Settlement.FINANCIAL),
 }
@@ -263,6 +265,7 @@ def resolved(
         payment,
         counterparty=fields.labels("counterparty"),
         marketing_reserve=fields.amounts("marketing_reserve"),
+        discount_curve_key=fields.keys("discount_curve_key"),
         schedule_month=months,
     )
     return terms, observations, periods.entered
@@ -344,6 +347,22 @@ class _Fields:
     def labels(self, name: str) -> tuple[str, ...] | None:
         """A label field per occurrence, or None when neither supplied it."""
         return self.texts(name) if self.has(name) else None
+
+    def keys(self, name: str) -> tuple[str, ...] | None:
+        """The curve keys per occurrence, since named-curves-slice-3.md, each read by the curve's
+        own name rule, or None when neither supplied them: the template's one, read when the
+        template was made and repeated here, or the ticket's column read now, the first bad row
+        named by the field and the row."""
+        if not self.has(name):
+            return None
+        if name in self.template.defaults:
+            return (cast(str, self.template.defaults[name]),) * self.rows
+        return tuple(
+            [
+                curve_name(self.where(name, k), text)
+                for k, text in enumerate(self.ticket.texts(name))
+            ]
+        )
 
     def ids(self, name: str) -> NDArray[np.int64] | None:
         """The trade IDs per occurrence, whole numbers of at most 15 digits since #168, or None when

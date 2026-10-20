@@ -223,7 +223,7 @@ def test_each_fee_charged_is_one_pass_over_its_components_and_an_uncharged_one_i
     every_row = np.ones(components, dtype=np.bool_)
     every_row.setflags(write=False)
     brokered = replace(terms, broker=("ION",) * components, brokered=every_row)
-    bilateral = replace(terms, route=Route.BILATERAL)
+    bilateral = replace(terms, route=Route.BILATERAL, discount_curve_key=("SOFR",) * components)
     for batch, passes, charged in (
         (terms, 1, components),
         (brokered, 2, 2 * components),

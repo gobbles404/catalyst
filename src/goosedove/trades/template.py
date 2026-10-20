@@ -21,6 +21,7 @@ from typing import Final, assert_never
 import numpy as np
 
 from goosedove.cashflows.rules import currency_of, finite_amounts
+from goosedove.globals.discount_curve import curve_name
 from goosedove.index_definitions.date_offsets import Instruction, read_offset
 from goosedove.index_definitions.periods import period_months
 from goosedove.instruments.definitions import FieldType, Instrument
@@ -203,6 +204,7 @@ READERS: Final[Mapping[str, Callable[[str, str], object]]] = MappingProxyType(
         "settlement_method": settlement_of,
         "quantity_per": quantity_per_of,
         "payment_time_lag": payment_rule_of,
+        "discount_curve_key": curve_name,  # the curve's own name rule, named-curves-slice-3.md
         "currency": currency_of,  # the cashflow instrument's, since #200
     }
 )

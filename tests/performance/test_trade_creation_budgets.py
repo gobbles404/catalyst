@@ -229,24 +229,27 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "quantity_per_of": 1,
         "choice": 4,
         "_Fields.one_text": 2,  # the route and the settlement, one each for the batch
-        "_Fields.has": 18,  # the required fields, the code the first period field found, and
-        # since #175 the counterparty's condition and the marketing reserve looked for
+        "_Fields.has": 20,  # the required fields, the code the first period field found, and
+        # since #175 the counterparty's condition and the marketing reserve looked for, since
+        # slice 3 the key's condition and the key itself
         "_Fields.rows": 10,
         "_Fields.texts": 5,  # the three row fields' columns read once each, the codes apart
         "_Fields.period_texts": 1,  # the codes, with which rows supplied one, since #172
         "_Fields.period_dates": 2,  # the two dates, none supplied by this ticket
         "_Fields.labels": 3,  # clearing_house, counterparty and broker; the IDs are read by ids
+        "_Fields.keys": 1,  # the curve keys, since named-curves-slice-3.md, none on a cleared route
         "_Fields.amounts": 1,  # the marketing reserve, None when neither supplies it, since #175
         "_Fields.ids": 1,  # the trade IDs, whole numbers since #168, none in this ticket
         "_Fields.numbers": 2,
         "_Fields.dates": 1,
         "_Fields.objects": 1,
-        "FieldValues.has": 12,
+        "FieldValues.has": 14,
         "FieldValues.supplied_rows": 1,  # which rows hold a code: every one, the column full
         "FieldValues.texts": 1,
         "FieldValues.numbers": 2,
         "FieldValues.dates": 1,
         "resolved_trades": 1,
+        "_the_keys": 1,  # the keys present exactly on the bilateral route, since slice 3
         "_the_selections": 1,  # each occurrence's unit, method and basis in range
         "_the_method": 1,
         "_the_occurrences": 1,
@@ -735,11 +738,11 @@ def dated_ledger(contracts: int) -> dict[str, int]:
     return {
         **ledger,
         "_Fields.where": 6,  # the lag and the five batch fields, no code named
-        "_Fields.has": 19,  # the three period fields looked for, the two dates found
+        "_Fields.has": 21,  # the three period fields looked for, the two dates found
         "_the_required.<locals>.<genexpr>": 3,
         "_Fields.rows": 9,
         "_Fields.dates": 1,  # the trade dates; the two dates come through the periods' own read
-        "FieldValues.has": 13,
+        "FieldValues.has": 15,
         "FieldValues.dates": 3,
         "FieldValues.supplied_rows": 2,  # which rows hold a start and an end: every one
     }
@@ -934,7 +937,7 @@ def test_a_mixed_ticket_reads_each_distinct_choice_once_and_nothing_per_row(
         "_Fields.where": contracts + 11,  # five more distinct texts named
         "_each_distinct.<locals>.<lambda>": 8,  # likewise
         "_Fields.rows": 7,  # three fewer: the ticket's three columns, no template value repeated
-        "FieldValues.has": 15,  # three columns more looked for
+        "FieldValues.has": 17,  # three columns more looked for
         "FieldValues.texts": 4,  # and read
         "_the_days": 4,  # the four methods present, once each
         "_with_expiries_priced": 1,  # the penultimate and last3day rows' expiries open
