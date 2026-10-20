@@ -200,14 +200,14 @@ def resolution_ledger(distinct: int) -> dict[str, int]:
         "_the_days": 1,  # one method present, its observations once
         "with_holiday_calendar": 1,  # the index's calendar typed once for the methods that read it
         "observations": 1,
-        "_last_days": 1,  # each component's last observation, the day its payment counts from
+        "last_days": 1,  # each component's last observation, the day its payment counts from
         "trade_schedule_of": 3,  # the resolution's, the observations' and then the kernel's
         "reporting_lot_of": 2,  # the resolution's and then the kernel's: the lot delta counts in
         "schedule_months": 1,
         "month_and_year": 25,
         "_the_periods": 1,  # each row's period chosen, since #172, and resolved to its components
         "_the_periods.<locals>.<lambda>": distinct,  # each distinct code named for its first row
-        "_schedule_rows": 1,
+        "schedule_rows": 1,
         "month_bounds": 1,  # the first and last day of each component's month
         "_each_distinct": 3,  # the units, the methods and the bases; the rules below
         "_each_distinct.<locals>.<lambda>": 3,  # each distinct text named for its first row
@@ -592,6 +592,7 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "_the_groups": 1,
         "_distinct": 2,  # the groups by contract and day, the slots by group and day
         "_the_references": 1,
+        "observation_references": 1,  # the reader shared with a quote, template-based-quoting.md
         "requires_booked_reference": 1,  # the methods' fact the references read, once
         "with_holiday_calendar": 2,  # the observations' and the encoding's
         "open_days": 1,
@@ -649,7 +650,7 @@ def test_the_template_creator_reads_each_value_once_and_publishes_once(
         "_CreateTradeTemplate": 1,
         "trade_template": 1,
         "_holds": 8,  # whether the row supplied each field's value, since #172
-        "_value": 8,  # one per field
+        "field_value": 8,  # one per field
         "FieldValues.field": 8,
         "FieldValues.field.<locals>.<genexpr>": 16,
         "FieldValues.texts": 7,

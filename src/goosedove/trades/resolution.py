@@ -231,7 +231,7 @@ def resolved(
     # last observation day, the expiry under lastday on a futures index and the publication day
     # on an IFERC one, handed over as a temporary, not held across the kernel's copies below.
     payment = _the_payment_terms(
-        settlement, fields, _last_days(observations, occurrence.size), occurrence, counter
+        settlement, fields, last_days(observations, occurrence.size), occurrence, counter
     )
     counter.hit(RESOLVED_OCCURRENCES, fields.rows)
     counter.hit(RESOLVED_COMPONENTS, int(occurrence.size))
@@ -602,7 +602,7 @@ def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
             )
         return f"{fields.where('contract_code', i)} is {codes[int(rank_code[i])]!r}"
 
-    contract = _schedule_rows(months, month, occurrence, period_of)
+    contract = schedule_rows(months, month, occurrence, period_of)
     start, end = month_bounds(month)
     on = dated[occurrence]  # the dated rows' components, clipped to their rows' dates
     if on.any():
@@ -614,7 +614,7 @@ def _the_periods(fields: _Fields, months: NDArray[np.int64]) -> _Periods:
     return _Periods(occurrence, contract, start, end, (entered, codes), len(spans))
 
 
-def _schedule_rows(
+def schedule_rows(
     months: NDArray[np.int64],
     month: NDArray[np.int64],
     occurrence: NDArray[np.intp],
@@ -653,7 +653,7 @@ def month_bounds(
 # --- the payment days of a financial settlement ---------------------------------------------
 
 
-def _last_days(observations: Observations, components: int) -> NDArray[np.datetime64]:
+def last_days(observations: Observations, components: int) -> NDArray[np.datetime64]:
     """Each component's last observation day, the anchor its payment counts from: the observations
     are in component order, each component's days increasing and every component holding at
     least one, so the last of each sits just before the first of the next, however many a

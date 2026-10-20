@@ -1,0 +1,76 @@
+# _CreateQuoteTemplate
+
+Built from [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), with [_Quote](quote.md). The static terms of a quote under the `fixed_float`'s definition, created once and taken by every quote made under it beside the market and the contract code the quote prices: the fields a quote reads, held as a trade template holds its defaults, and none of the booking facts, so a quote template books nothing and a trade template quotes nothing. The code is `src/goosedove/quoting/template.py`, the record and its builder, and `src/goosedove/excel/quoting.py`, the worksheet function.
+
+## Worksheet contract
+
+```python
+def _CreateQuoteTemplate(
+    instrument: str,
+    fields: TextRow,
+    values: FieldRow[str],
+) -> Handle[QuoteTemplate]: ...
+```
+
+The ticket's bilateral example, seven fields:
+
+| | A | B | C | D | E | F | G |
+|---|---|---|---|---|---|---|---|
+| 1 | route | settlement_method | schedule_method | quantity_per | payment_time_lag | payment_holiday_calendar | discount_curve_key |
+| 2 | bilateral | financial | asian | calday | +5bd | `30512:holiday_calendar:13` | SOFR |
+| 3 | `=_CreateQuoteTemplate("fixed_float", A1:G1, A2:G2)` | shows `30512:quote_template:41` | | | | | |
+
+A cleared financial template has `route` cleared, no `discount_curve_key` and otherwise the same terms; a cleared physical one `settlement_method` physical, `schedule_method` lastday and no payment fields.
+
+Three arguments, all required, none with a default, in [_CreateTradeTemplate](../trades/trade-template.md)'s forms: the instrument first, one exact name from `_ListInstruments`, `fixed_float`, the one instrument a quote prices; the fields one row of names as `_ShowInstrument` shows them, spelled exactly, case and all, in any order; the values one aligned row beneath them. One field takes the same path as seven, and a template carries at least one. The row crosses as `FieldRow[str]`, bound against the instrument named: the seam checks the name's type, the width, each header against the definition, unknown and repeated headers named, and each cell by its field's type, a code as text and `payment_holiday_calendar` as a holiday calendar handle resolved to its object; more than one row of values is refused by its shape before any cell is looked at. The result is a handle, `30512:quote_template:41`, the kind and the count alone, since a quote template carries no index's name, [handles.md](../../seam/handles.md). An unchanged recalculation shares the live template; a changed cell under it, a value or the calendar's own creator, makes a new one and every quote over it anew, the old released when Excel disconnects its last creator.
+
+## Excel help
+
+| Item | Text |
+|---|---|
+| Function | Creates the static terms of a quote under an instrument and shows their handle, the text _Quote takes as the quote template. |
+| instrument | One instrument name from _ListInstruments; fixed_float, the one a quote prices. |
+| fields | The field-name cells in one row, such as A1:G1, using names _ShowInstrument marks quote_allowed. |
+| values | The values in one row beneath those fields, such as A2:G2. |
+
+## The library checks
+
+Which fields a quote template may hold is the definition's own metadata, the `quote_allowed` row of [_ShowInstrument](../instruments/show-instrument.md): the four codes, the curve key and the two payment fields, and no other. The checks come in this order, the first failure being the cell's text after `#ERROR _CreateQuoteTemplate: ValueError:`.
+
+| Check | Refused as |
+|---|---|
+| the instrument is one a quote prices, `fixed_float`; the cashflow has no quote | `instrument is 'cashflow', expected one a quote prices: 'fixed_float'` |
+| each header, in the sheet's order and before any value is read, is a field a quote template may hold: a booking fact, the identifiers, the dates, the quantity and its unit, the price, the labels and the reserve, is refused by name, and so is a period field, `contract_code`, `start_date` or `end_date`, whose cell may be blank for a trade template and is refused here whatever it holds, since the quote's own contract code argument owns the period | `quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar` |
+| each value, read once for the rule intrinsic to its field by the trade template's readers, [trade-template.md](../trades/trade-template.md) the table of them: a code from its list, a payment rule read whole, a curve key with no whitespace around it | `route is 'Cleared', expected cleared or bilateral`; `payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd`; `discount_curve_key is ' SOFR', expected a name with no whitespace around it` |
+
+Nothing is required of a template, which is a partial record. Which terms a completed quote needs, the four codes always, the payment fields with a financial settlement and the key on the bilateral route, as the `quote_required` and `quote_required_when` rows say, and whether the terms agree with one another and with the index and the market, are [_Quote](quote.md)'s checks, against the template, the contract code and the market together. So a key beside a cleared route, or a lag beside a physical settlement, is held here as typed and refused when a quote is made.
+
+## What it retains
+
+```text
+QuoteTemplate
+    instrument   the library's fixed_float definition, by reference
+    names        the fields the row named, in the sheet's order
+    values       by field name, in the same order: route bilateral, settlement_method financial,
+                 schedule_method asian, quantity_per calday, payment_time_lag +5bd,
+                 payment_holiday_calendar the calendar object, discount_curve_key SOFR
+```
+
+Each value is the one the row held: a code, a payment rule and the curve key as the text typed, the holiday calendar as the object its handle stood for, held by reference so that a quote counts its payment days on it. The key is static text; the curves themselves reach `_Quote` as its own argument, so new rates make a new collection and never a new template. No index, no market, no period and no quantity: a template serves every compatible index, and the quote's own arguments supply the rest. The template is no selector of an instrument for booking: `_CreateTrades` and `_CreateCashflows` take a trade template and refuse this kind, `template is quote template handle '30512:quote_template:41', expected trade template handle`, and a consumer of a quote template refuses a trade template the same way.
+
+## Reading it back
+
+`util_ReadHandle` on the handle spills one row under two heading rows, as a trade template's does: `instrument` first, `fixed_float`, then each field the row named under its name in the sheet's order, text as typed and a holiday calendar as `a holiday calendar`, the words of its kind; every cell holds a value, since no period field may stand in a quote template.
+
+## Tests
+
+| Case | Where |
+|---|---|
+| the ticket's bilateral example of seven fields, a cleared financial six and one field take one path; each value read once by the trade template's reader and kept as typed, the calendar the object itself; a key beside a cleared route held, for the quote to refuse; the builder takes one row | `tests/unit/test_quote_template.py` |
+| every booking field and the three period fields refused by name whatever the cell holds, a blank among them; the first refused header in the sheet's order named before any value is read; the cashflow refused as no instrument a quote prices | the same |
+| the seam's refusals in order, then the library's for each of the seven fields' rules; the creator's handle, the kind and the count alone; the reader's spill; a quote template refused by its kind in `_CreateTrades` and `_CreateCashflows`, and a trade template where a quote template is taken; one handle per creation and none for a read | the same |
+| one read per value and one publication; the peak within four times the seam's slack | `tests/performance/test_quote_budgets.py`, `test_seam_allocation.py` |
+
+## Not here
+
+The quote itself, what it requires of the template, how it prices and what it refuses: [quote.md](quote.md). Booking under a quote template. A quantity, a fixed price, a label, a reserve, an index or a market on the template; a second quote instrument; a reader of what a completed quote resolved.

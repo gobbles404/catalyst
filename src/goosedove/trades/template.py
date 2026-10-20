@@ -64,7 +64,7 @@ def trade_template(values: FieldValues) -> TradeTemplate:
     index the batch is created on, and a contract code for the rows that book by it."""
     if values.rows != 1:
         raise ValueError(f"values has {values.rows} rows, expected one row of field values")
-    defaults = {name: _value(values, name) for name in values.names if _holds(values, name)}
+    defaults = {name: field_value(values, name) for name in values.names if _holds(values, name)}
     return TradeTemplate(values.instrument, values.names, MappingProxyType(defaults))
 
 
@@ -81,11 +81,12 @@ def by_template(selector: TradeTemplate) -> Instrument:
     return selector.instrument
 
 
-def _value(values: FieldValues, name: str) -> object:
+def field_value(values: FieldValues, name: str) -> object:
     """The one value of a field in a one-row record, as the scalar its type names, read for the
     field's own rule where it has one: a number for the kernel's, text for its list or grammar; a
     date, a holiday calendar and since #172 a contract code mean what they are, the code read for
-    its months by the resolution, for the rows that book by it, and by nothing here."""
+    its months by the resolution, for the rows that book by it, and by nothing here. A quote
+    template reads its values by the same rule, since template-based-quoting.md."""
     field_type = values.field(name).type
     match field_type:
         case FieldType.NUMBER:

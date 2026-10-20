@@ -248,6 +248,7 @@ def test_the_preparation_of_a_bilateral_batch_maps_its_unpaid_payment_days_once(
     assert call_profile(lambda: prepared_trades(enc, history, WorkCounter())) == {
         "prepared_trades": 1,
         "_the_slot_rows": 1,
+        "calendar_rows": 1,
         "_the_set_amounts": 1,  # since #190 the set amounts by slot and by group, finite
         "_the_sensitivity": 1,  # the sensitivity by contract, finite
         "_the_unsettled_totals": 1,  # the two unsettled totals, finite

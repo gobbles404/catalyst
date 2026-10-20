@@ -48,7 +48,7 @@
 # hidden_excel.ps1, which makes the refused call again until it is taken or its time runs out;
 # inside a bounded wait that time is the wait's own deadline, never more. A property is read
 # through Read-ExcelProperty, since a refused read made with a dot comes back as nothing.
-param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quit"), [int]$Patience = 20)
+param([string[]]$Groups = @("core", "edits", "books", "processes", "trades", "valuation", "calendars", "bumps", "curves", "cashflows", "quotes", "quit"), [int]$Patience = 20)
 $ErrorActionPreference = "Stop"
 $Groups = @($Groups | ForEach-Object { $_ -split "," })
 $root = Split-Path $PSScriptRoot -Parent
@@ -1441,7 +1441,98 @@ $quit = {
     Check "closing on the way out releases every publication, none missed, none failed" ($c.Live -eq 0 -and $c.Released -eq 11 -and $c.Misses -eq 0 -and $c.DisposalErrors -eq 0 -and $c.Skipped -eq 0) $c.Text
 }
 
-$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quit = $quit }
+# --- quotes ---------------------------------------------------------------------------------------
+# The chain, then template-based-quoting.md: a cleared quote template over six fields in K26:P27 on
+# the payment calendar in D13, the lastday strip n26-q26 quoted off the chain's market, 72.45, the
+# two live quotes at equal weight, a number publishing nothing; the basis changed to calendar days
+# remakes the template, July's and August's 31 days weighing the two alike, 72.45 still; the
+# template cleared fails the quote in the seam's
+# words and restored remakes it; a bilateral template naming SOFR over a curve flat at 0.98 on both
+# payment days, 23 June and 22 July, and its collection quotes the cleared price, August's factor
+# moved to 0.97 remaking the curve and the collection, 72.4482; the key renamed fails the quote
+# naming the key and
+# the collection's names, the template remade and owning nothing of a quote, and repaired recovers.
+$quotes = {
+    param($state)
+    $book = New-Book $state
+    $sheet = Sheet $state $book
+    Build-Chain $state $sheet
+    Put $state $sheet "C13" "1-Jan-2026"
+    Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_time_lag"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "discount_curve_key"
+    Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"
+    Put $state $sheet "K28" "bilateral"; Put $state $sheet "L28" "financial"; Put $state $sheet "M28" "lastday"; Put $state $sheet "N28" "month"; Put $state $sheet "O28" "+1bd"; Put $state $sheet "P28" "=D13"; Put $state $sheet "Q28" "SOFR"
+    Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
+    Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
+    Put $state $sheet "W3" "23-Jun-2026"; Put $state $sheet "X3" "0.98"
+    Put $state $sheet "W4" "22-Jul-2026"; Put $state $sheet "X4" "0.98"
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Put $state $sheet "D27" '=_Quote(D11,"n26-q26",D26)'
+    Put $state $sheet "D28" '=TEXT(D27,"0.0000")'
+    $id = Id $state
+    $template = Text $state $sheet "D26"
+    Check "the template's cell shows its handle, the kind and the count alone" ($template.StartsWith("${id}:quote_template:")) $template
+    Check "the strip quotes 72.45, the two live quotes at equal weight, a number and no handle" ((Text $state $sheet "D27") -eq "72.45") (Text $state $sheet "D27")
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 2) }
+    Check "the chain, the calendar and the template: thirteen live, thirteen published, the quote publishing nothing" ($c.Live -eq 13 -and $c.Published -eq 13 -and $c.Released -eq 0) $c.Text
+
+    # The basis changed to calendar days: a new template, the old released; July's and August's 31
+    # days weigh the two quotes alike, so the price stands.
+    Put $state $sheet "N27" "calday"
+    Check "a changed basis gives the template a new handle" ((Text $state $sheet "D26") -ne $template -and (Text $state $sheet "D26").StartsWith("${id}:quote_template:")) (Text $state $sheet "D26")
+    Check "and the price stands, July's and August's 31 days weighing alike, 72.4500" ((Text $state $sheet "D28") -eq "72.4500") (Text $state $sheet "D28")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 13 -and $c.Released -ge 1 }
+    Check "the old template released, one more published" ($c.Live -eq 13 -and $c.Published -eq 14 -and $c.Released -eq 1) $c.Text
+
+    # The template cleared: the quote fails in the seam's words and owns nothing; restored, a new
+    # template and the price again.
+    $template = Text $state $sheet "D26"
+    Clear-Cell $state $sheet "D26"
+    Check "the template cleared fails the quote in the seam's words" ((Text $state $sheet "D27") -eq "#ERROR _Quote: template is blank, expected quote template handle") (Text $state $sheet "D27")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 12 }
+    Check "twelve live, the template released" ($c.Live -eq 12 -and $c.Published -eq 14 -and $c.Released -eq 2) $c.Text
+    Put $state $sheet "D26" '=_CreateQuoteTemplate("fixed_float",K26:P26,K27:P27)'
+    Check "restored, a new template and the price again" ((Text $state $sheet "D26") -ne $template -and (Text $state $sheet "D26").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D28") -eq "72.4500") ((Text $state $sheet "D26") + " " + (Text $state $sheet "D28"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
+    Check "thirteen live again, one more published" ($c.Live -eq 13 -and $c.Published -eq 15 -and $c.Released -eq 2) $c.Text
+
+    # A bilateral template naming SOFR, the curve flat at 0.98 on both payment days and its
+    # collection: one factor cancels, the quote is the cleared 72.45; August's factor moved to 0.97,
+    # a curve's factors never rising, reprices it.
+    Put $state $sheet "D29" '=_CreateQuoteTemplate("fixed_float",K26:Q26,K28:Q28)'
+    Put $state $sheet "D30" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
+    Put $state $sheet "E30" "=_CollectDiscountCurves(D30)"
+    Put $state $sheet "D31" '=_Quote(D11,"n26-q26",D29,E30)'
+    Put $state $sheet "D32" '=TEXT(D31,"0.0000")'
+    Check "the bilateral template, the curve and the collection show their kinds" ((Text $state $sheet "D29").StartsWith("${id}:quote_template:") -and (Text $state $sheet "D30").StartsWith("${id}:discount_curve:SOFR:") -and (Text $state $sheet "E30").StartsWith("${id}:discount_curve_set:")) ((Text $state $sheet "D29") + " " + (Text $state $sheet "E30"))
+    Check "one factor on both payments cancels: the bilateral strip quotes the cleared 72.45" ((Text $state $sheet "D31") -eq "72.45") (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
+    Check "sixteen live, three more published" ($c.Live -eq 16 -and $c.Published -eq 18 -and $c.Released -eq 2) $c.Text
+    $curve = Text $state $sheet "D30"
+    $collection = Text $state $sheet "E30"
+    Put $state $sheet "X4" "0.97"
+    Check "a moved factor remakes the curve and the collection" ((Text $state $sheet "D30") -ne $curve -and (Text $state $sheet "E30") -ne $collection -and (Text $state $sheet "E30").StartsWith("${id}:discount_curve_set:")) ((Text $state $sheet "D30") + " " + (Text $state $sheet "E30"))
+    Check "and reprices the strip, 72.4482 with July at 0.98 and August at 0.97" ((Text $state $sheet "D32") -eq "72.4482") (Text $state $sheet "D32")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 4 }
+    Check "the old curve and collection released, two more published" ($c.Live -eq 16 -and $c.Published -eq 20 -and $c.Released -eq 4) $c.Text
+
+    # The key renamed: the template remakes and the quote fails naming the key and the collection's
+    # names; repaired, the price again.
+    $template = Text $state $sheet "D29"
+    Put $state $sheet "Q28" "SONIA"
+    Check "a renamed key remakes the template" ((Text $state $sheet "D29") -ne $template -and (Text $state $sheet "D29").StartsWith("${id}:quote_template:")) (Text $state $sheet "D29")
+    Check "and fails the quote naming the key and the collection's names" ((Text $state $sheet "D31") -eq "#ERROR _Quote: ValueError: discount_curve_key 'SONIA' names no curve of the collection, which holds 'SOFR'; expected a curve of that name") (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 5 }
+    Check "the renamed template published, the old released" ($c.Live -eq 16 -and $c.Published -eq 21 -and $c.Released -eq 5) $c.Text
+    Put $state $sheet "Q28" "SOFR"
+    Check "repaired, the quote prices again" ((Text $state $sheet "D32") -eq "72.4482") (Text $state $sheet "D32")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 6 }
+    Check "sixteen live, one more published, the renamed template released" ($c.Live -eq 16 -and $c.Published -eq 22 -and $c.Released -eq 6) $c.Text
+    Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
+    Close-Book $state $book
+}
+
+$bodies = [ordered]@{ core = $core; edits = $edits; books = $books; processes = $processes; trades = $trades; valuation = $valuation; calendars = $calendars; bumps = $bumps; curves = $curves; cashflows = $cashflows; quotes = $quotes; quit = $quit }
 foreach ($name in $Groups) {
     if (-not $bodies.Contains($name)) { throw "no group named $name; the groups are $($bodies.Keys -join ', ')" }
     Run-Group $name $bodies[$name]

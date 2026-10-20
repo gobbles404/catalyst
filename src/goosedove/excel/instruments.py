@@ -1,6 +1,7 @@
 """The worksheet functions of the instrument catalog: the list of the library's definitions, and
-one definition shown with its fields across the columns and its seven metadata rows down, the
-same records a template and a ticket are bound against. Both read, neither creates a handle.
+one definition shown with its fields across the columns and its ten metadata rows down, the seven
+of booking and since template-based-quoting.md the three of quoting, the same records a template,
+a ticket and a quote template are bound against. Both read, neither creates a handle.
 docs/library/instruments/ holds a page per function.
 
 The docstring is what Excel shows about the function, and the words beside each parameter are
@@ -39,15 +40,17 @@ def catalog_cells(instruments: tuple[Instrument, ...]) -> MixedArray:
 def _ShowInstrument(
     instrument: Annotated[str, "One instrument name from _ListInstruments, such as fixed_float."],
 ) -> MixedArray:
-    """Shows an instrument's fields, requirements, types and rules."""
+    """Shows an instrument's fields, requirements, types and rules, for booking and quoting."""
     return schema_cells(definitions.instrument(instrument))
 
 
 def schema_cells(definition: Instrument) -> MixedArray:
-    """The definition as the sheet sees it: seven rows, their labels down the first column, and a
+    """The definition as the sheet sees it: ten rows, their labels down the first column, and a
     column per field to the right, the field's name in the first row, its description, whether
     it is required, as a boolean, the condition that otherwise requires it, its type, its options
-    and its rule beneath. One cell per fact, none of them blank."""
+    and its rule beneath, then since template-based-quoting.md whether a quote template may hold
+    it, as a boolean, whether a completed quote always requires it, as a boolean, and the
+    condition that otherwise requires it. One cell per fact, none of them blank."""
     fields = definition.fields
     rows: list[list[object]] = [
         [ROWS[0], *(field.name for field in fields)],
@@ -57,5 +60,8 @@ def schema_cells(definition: Instrument) -> MixedArray:
         [ROWS[4], *(field.type.value for field in fields)],
         [ROWS[5], *(field.options for field in fields)],
         [ROWS[6], *(field.rule for field in fields)],
+        [ROWS[7], *(field.quote_allowed for field in fields)],
+        [ROWS[8], *(field.quote_required for field in fields)],
+        [ROWS[9], *(field.quote_required_when for field in fields)],
     ]
     return MixedArray.cells(rows)

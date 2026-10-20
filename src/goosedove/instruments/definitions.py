@@ -1,13 +1,26 @@
-"""The definitions themselves: a field is seven facts, an instrument is a name, a description and
-its fields, and the catalog is the instruments in the order the library declares them. The
-records are frozen library data, changed by a reviewed change to this file and by nothing a
-workbook does. docs/library/instruments/show-instrument.md shows them as the sheet sees them."""
+"""The definitions themselves: a field is seven facts of booking and since
+template-based-quoting.md three of quoting, an instrument is a name, a description and its
+fields, and the catalog is the instruments in the order the library declares them. The records
+are frozen library data, changed by a reviewed change to this file and by nothing a workbook
+does. docs/library/instruments/show-instrument.md shows them as the sheet sees them."""
 
 from dataclasses import dataclass
 from enum import Enum
 
-# The metadata rows of a shown instrument, down its first column, in this order.
-ROWS = ("field", "description", "required", "required_when", "type", "options", "rule")
+# The metadata rows of a shown instrument, down its first column, in this order: the seven of
+# booking, then the three of quoting.
+ROWS = (
+    "field",
+    "description",
+    "required",
+    "required_when",
+    "type",
+    "options",
+    "rule",
+    "quote_allowed",
+    "quote_required",
+    "quote_required_when",
+)
 NONE = "none"  # a field with no condition says so, in a cell that is never blank
 
 
@@ -30,7 +43,11 @@ class Field:
     come from; its rule, what holds of its value beyond the type; and whether a cell of it may be
     left unsupplied, a blank or an empty text meaning the row supplies no value, which since #172
     the three period fields allow and no other does: the seam reads the flag off the field a
-    header identified and never guesses it from a cell's position."""
+    header identified and never guesses it from a cell's position. And since
+    template-based-quoting.md the field's part in a quote, three facts beside the booking facts
+    and no second definition: whether a quote template may hold it at all, whether a completed
+    quote always requires it, and the condition that otherwise requires it, or none; a field a
+    quote refuses is never one it requires, the catalog's rule."""
 
     name: str
     description: str
@@ -40,6 +57,9 @@ class Field:
     options: str
     rule: str
     may_be_unsupplied: bool = False
+    quote_allowed: bool = False
+    quote_required: bool = False
+    quote_required_when: str = NONE
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +149,8 @@ FIXED_FLOAT = Instrument(
             "A library rule selected by the trade; all four are built on a futures index, asian "
             "averaging the month's pricing days; lastday alone on an IFERC index, its published "
             "month",
+            quote_allowed=True,
+            quote_required=True,
         ),
         Field(
             "route",
@@ -140,6 +162,8 @@ FIXED_FLOAT = Instrument(
             "Decides the clearing reserve: a cleared trade incurs the selected specification's "
             "clearing rate and a bilateral one none; a cleared batch values undiscounted and takes "
             "no discount curve, a bilateral one is valued on the curve _EvaluateTrades requires",
+            quote_allowed=True,
+            quote_required=True,
         ),
         Field(
             "settlement_method",
@@ -152,6 +176,8 @@ FIXED_FLOAT = Instrument(
             "requires payment_time_lag and payment_holiday_calendar and pays on its payment day; a "
             "physical one pays on no day, takes lastday rows alone, is refused past its expiry and "
             "refused on the bilateral route; the delivery itself is outside the model",
+            quote_allowed=True,
+            quote_required=True,
         ),
         Field(
             "clearing_house",
@@ -185,6 +211,8 @@ FIXED_FLOAT = Instrument(
             "and refused with cleared; rows may name different curves; the curve is selected "
             "when the batch is evaluated, from the collection supplied then, and a key naming "
             "none of its curves fails the evaluation, never silently the first curve",
+            quote_allowed=True,
+            quote_required_when="route = bilateral",
         ),
         Field(
             "broker",
@@ -227,6 +255,8 @@ FIXED_FLOAT = Instrument(
             "month, calday",
             "The quantity per contract month, or per calendar day of it, weekends and holidays "
             "included",
+            quote_allowed=True,
+            quote_required=True,
         ),
         Field(
             "fixed_price",
@@ -249,6 +279,8 @@ FIXED_FLOAT = Instrument(
             "Applied in order from the component's last observation day, business days on the "
             "payment calendar: the expiry under lastday on a futures index, the publication day on "
             "an IFERC one; the payment must be after it; +1bd for PHH, +2bd for Waha",
+            quote_allowed=True,
+            quote_required_when="settlement_method = financial",
         ),
         Field(
             "payment_holiday_calendar",
@@ -258,6 +290,8 @@ FIXED_FLOAT = Instrument(
             FieldType.HOLIDAY_CALENDAR,
             "a _CreateHolidayCalendar handle",
             "Monday to Friday less its holidays; separate from the pricing calendar",
+            quote_allowed=True,
+            quote_required_when="settlement_method = financial",
         ),
         Field(
             "marketing_reserve",
@@ -336,8 +370,10 @@ CASHFLOW = Instrument(
 def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
     """The one way to make a catalog: each name once and nonempty, each description nonempty,
     and within each instrument each field name once and nonempty, with a condition or `none` and
-    nonempty options and rule, so that no cell the sheet reads is ever blank. Checked here, where
-    the definitions are authored, and never on a reader's call."""
+    nonempty options and rule, so that no cell the sheet reads is ever blank; and since
+    template-based-quoting.md no field a quote refuses required by one, always or on a
+    condition. Checked here, where the definitions are authored, and never on a reader's
+    call."""
     names: set[str] = set()
     for each in instruments:
         if not each.name or not each.description:
@@ -350,9 +386,23 @@ def catalog(*instruments: Instrument) -> tuple[Instrument, ...]:
             if field.name in fields:
                 raise ValueError(f"{each.name} defines field {field.name!r} twice")
             fields.add(field.name)
-            texts = (field.name, field.description, field.required_when, field.options, field.rule)
+            texts = (
+                field.name,
+                field.description,
+                field.required_when,
+                field.options,
+                field.rule,
+                field.quote_required_when,
+            )
             if not all(texts):
                 raise ValueError(f"{each.name} field {field.name!r} has an empty cell")
+            if not field.quote_allowed and (
+                field.quote_required or field.quote_required_when != NONE
+            ):
+                raise ValueError(
+                    f"{each.name} field {field.name!r} is required by a quote but not allowed in "
+                    "one"
+                )
     return instruments
 
 

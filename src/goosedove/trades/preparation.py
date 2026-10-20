@@ -7,6 +7,7 @@ selects among. One record per
 history; a tick reads it and makes nothing of it again. docs/library/trades/kernel.md is the
 page."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import assert_never, cast
 
@@ -132,28 +133,40 @@ class PreparedTrades:
 
 
 def _the_slot_rows(encoded: Encoded, calendar: Calendar) -> NDArray[np.intp]:
-    """Each slot's row of the calendar, by the kind of schedule the terms hold. On a futures
-    schedule the day's offset from the calendar's first day, one subtraction, a slot before it
-    refused by name: the first contract only bounds the calendar and nothing prices its days. On
-    an IFERC schedule, since #167, the row whose publication day is the slot's, one searchsorted
-    over the calendar's days, every slot's day being a publication day by the encoding's rule and
-    the first month a month like any other, nothing bounding it."""
-    match encoded.terms.schedule:
+    """Each slot's row of the calendar: calendar_rows over the slots' days, a slot named by its
+    first trade."""
+    return calendar_rows(encoded.terms.schedule, encoded.slot_date, calendar, encoded.slot_trade)
+
+
+def calendar_rows(
+    schedule: FuturesSchedule | IfercSchedule,
+    days: NDArray[np.datetime64],
+    calendar: Calendar,
+    named: Callable[[int], str],
+) -> NDArray[np.intp]:
+    """Each day's row of the calendar, by the kind of schedule, for a batch's slots and since
+    template-based-quoting.md for a quote's observations alike, named(i) the words a refusal
+    gives the i-th day. On a futures schedule the day's offset from the calendar's first day, one
+    subtraction, a day before it refused by name: the first contract only bounds the calendar
+    and nothing prices its days. On an IFERC schedule, since #167, the row whose publication day
+    is the day given, one searchsorted over the calendar's days, every day given being a
+    publication day by the encoding's rule and the first month a month like any other, nothing
+    bounding it."""
+    match schedule:
         case FuturesSchedule():
-            slot_rows = (encoded.slot_date - calendar.dates[0]).astype(np.intp)
-            if (slot_rows < 0).any():
-                s = int((slot_rows < 0).argmax())
+            rows = (days - calendar.dates[0]).astype(np.intp)
+            if (rows < 0).any():
+                s = int((rows < 0).argmax())
                 raise ValueError(
-                    f"{encoded.slot_trade(s)} observes {encoded.slot_date[s]}, before the "
-                    f"calendar begins on {calendar.dates[0]}; the schedule's first contract, "
-                    f"{encoded.terms.schedule.codes[0]}, bounds the calendar and nothing "
-                    "prices its days"
+                    f"{named(s)} observes {days[s]}, before the calendar begins on "
+                    f"{calendar.dates[0]}; the schedule's first contract, {schedule.codes[0]}, "
+                    "bounds the calendar and nothing prices its days"
                 )
-            return slot_rows
+            return rows
         case IfercSchedule():
-            return np.searchsorted(calendar.dates, encoded.slot_date).astype(np.intp)
+            return np.searchsorted(calendar.dates, days).astype(np.intp)
         case _:
-            assert_never(encoded.terms.schedule)
+            assert_never(schedule)
 
 
 def _unpaid_payments(

@@ -625,8 +625,17 @@ $formulas = [ordered]@{
     '=INDEX(_ShowInstrument("fixed_float"),1,20)' = "marketing_reserve"
     '=INDEX(_ShowInstrument("fixed_float"),3,20)' = "FALSE"
     '=INDEX(_ShowInstrument("fixed_float"),6,20)' = "a finite amount of zero or more"
-    '=ROWS(_ShowInstrument("fixed_float"))'       = "7"
+    # Since template-based-quoting.md three rows more: what a quote template may hold, what a quote always
+    # requires, and the condition that otherwise requires it.
+    '=ROWS(_ShowInstrument("fixed_float"))'       = "10"
     '=COLUMNS(_ShowInstrument("fixed_float"))'    = "20"
+    '=INDEX(_ShowInstrument("fixed_float"),8,1)'  = "quote_allowed"
+    '=INDEX(_ShowInstrument("fixed_float"),8,2)'  = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),8,7)'  = "TRUE"
+    '=INDEX(_ShowInstrument("fixed_float"),9,7)'  = "TRUE"
+    '=INDEX(_ShowInstrument("fixed_float"),9,18)' = "FALSE"
+    '=INDEX(_ShowInstrument("fixed_float"),10,18)' = "settlement_method = financial"
+    '=INDEX(_ShowInstrument("fixed_float"),10,12)' = "route = bilateral"
     '=_ShowInstrument("Future")' = "#ERROR _ShowInstrument: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
     '=LEFT(_ShowInstrument("future"),100)' = "#ERROR _ShowInstrument: ValueError: instrument is 'future', expected one of: 'fixed_float', 'cashflo"
     "=_ShowInstrument(C2)"       = "#ERROR _ShowInstrument: instrument is blank, expected text"
@@ -1958,6 +1967,35 @@ $formulas = [ordered]@{
     "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
     "=_EvaluateCashflows(UF5,UF6,AA1)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
+    # A quote, template-based-quoting.md: the ticket's strip on the STRIP index in UX5, valued
+    # 31-Dec-2026 with both months live at 30 and 60, the bilateral template in VF3 and the cleared
+    # calendar-day one in VF7, SOFR collected in VN6: the month price 88.5/1.97, the calendar-day
+    # 2610/59, January alone 30 and the code in either case; the template's handle and its readback;
+    # a trade template, a blank collection and a booking header refused in the seam's words, the
+    # cashflow, a left-out or surplus collection, a curve of another start and a month off the
+    # schedule in the library's.
+    '=TEXT(VP1,"0.000000000000")' = "44.923857868020"
+    '=TEXT(VP2,"0.000000000000")' = "44.237288135593"
+    "=VP3" = "30"
+    '=_Quote(VA7,"f27-g27",VF3,VN6)-VP1' = "0"
+    '=_Quote(VA7,"F27-G27",VF7)-VP2' = "0"
+    '=MID(VF3,FIND(":",VF3)+1,15)' = "quote_template:"
+    "=ROWS(util_ReadHandle(VF3))" = "3"
+    "=COLUMNS(util_ReadHandle(VF3))" = "8"
+    "=INDEX(util_ReadHandle(VF3),1,1)" = "instrument"
+    "=INDEX(util_ReadHandle(VF3),3,1)" = "fixed_float"
+    "=INDEX(util_ReadHandle(VF3),3,7)" = "a holiday calendar"
+    "=INDEX(util_ReadHandle(VF3),3,8)" = "SOFR"
+    '=LEFT(_Quote(VA7,"F27",GP3,VN6),41)' = "#ERROR _Quote: template is trade template"
+    '=_Quote(VA7,"F27",VF3,C2)' = "#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle"
+    '=_Quote(VA7,"F27",VF3)' = "#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts"
+    '=_Quote(VA7,"F27",VF7,VN6)' = "#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
+    '=_Quote(VA7,"F27",VF3,UQ5)' = "#ERROR _Quote: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2026-12-31, the valuation date; a curve is never rebased"
+    '=_Quote(VA7,"CAL28",VF7)' = "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's schedule has a contract for; it has none for 2028-01"
+    '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar"
+    '=_CreateQuoteTemplate("cashflow",UH1:UL1,UH2:UL2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'"
+    '=_CreateQuoteTemplate("fixed_float",VF1:VL1,VF6:VL6)' = "#ERROR _CreateQuoteTemplate: values cell (1, 7) is blank, expected text"
+    "=LEFT(_CreateTrades(UX5,FG1:FK1,FG2:FK2,VF7),55)" = "#ERROR _CreateTrades: template is quote template handle"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
@@ -3200,6 +3238,46 @@ $cells = [ordered]@{
     "UT7" = "=QV8"; "UU7" = "=UT1"; "UV7" = "=UT6"
     "UT8" = "=_AggregateResults(UT7:UV7)"
     "UT9" = "=QV8"; "UT10" = "=UF5"
+    # A quote, template-based-quoting.md: the ticket's strip on an index of Z26 bounding the calendar
+    # and F27 and G27 month-matching in UX1:UY3 and its schedule in UX4, closed on New Year's Day in
+    # UZ1 over UZ3, the energy conventions of HD1 and the UNIT specification of HE1, the index STRIP
+    # in UX5; valued 31-Dec-2026 in VA1:VA2 over the eleven December settles in VB1:VC11, newest
+    # first, the calendar, the fixings and the history in VA3:VA5, the quotes 30 and 60 in VD1:VD2,
+    # the vector and the market in VA6:VA7; the weekend-only payment calendar in VE1 over VE2; the
+    # bilateral template over its seven fields in VF1:VL2 in VF3 and the cleared calendar-day one
+    # over six in VF5:VK6 in VF7; SOFR at 1, 0.99 and 0.98 in VN1:VO4 in VN5 and its collection in
+    # VN6; the strip quoted bilateral in VP1 and cleared in VP2, January alone in VP3.
+    "UX1" = "Z26"; "UY1" = "15-Dec-2026"
+    "UX2" = "F27"; "UY2" = "29-Jan-2027"
+    "UX3" = "G27"; "UY3" = "26-Feb-2027"
+    "UX4" = "=_CreateFuturesSchedule(UX1:UX3,UY1:UY3)"
+    "UZ3" = "1-Jan-2027"
+    "UZ1" = "=_CreateHolidayCalendar(UZ3)"
+    "UX5" = '=_CreateIndex("STRIP","The quoting ticket''s strip",UX4,HD1,HE1,UZ1,"UNIT")'
+    "VA1" = "31-Dec-2026"
+    "VA2" = "=_CreateValuationDate(VA1,0.5)"
+    "VA3" = "=_CreateCalendar(VA2,UX5)"
+    "VA5" = "=_CreateMarketHistory(VA3,VA4)"
+    "VD1" = "30"; "VD2" = "60"
+    "VA6" = '=_CreatePriceVector("STRIP",VD1:VD2)'
+    "VA7" = "=_CreateMarket(VA5,VA6)"
+    "VE2" = "1-Jan-2030"
+    "VE1" = "=_CreateHolidayCalendar(VE2)"
+    "VF1" = "route"; "VG1" = "settlement_method"; "VH1" = "schedule_method"; "VI1" = "quantity_per"; "VJ1" = "payment_time_lag"; "VK1" = "payment_holiday_calendar"; "VL1" = "discount_curve_key"
+    "VF2" = "bilateral"; "VG2" = "financial"; "VH2" = "asian"; "VI2" = "month"; "VJ2" = "+1bd"; "VK2" = "=VE1"; "VL2" = "SOFR"
+    "VF3" = '=_CreateQuoteTemplate("fixed_float",VF1:VL1,VF2:VL2)'
+    "VF5" = "route"; "VG5" = "settlement_method"; "VH5" = "schedule_method"; "VI5" = "quantity_per"; "VJ5" = "payment_time_lag"; "VK5" = "payment_holiday_calendar"
+    "VF6" = "cleared"; "VG6" = "financial"; "VH6" = "asian"; "VI6" = "calday"; "VJ6" = "+1bd"; "VK6" = "=VE1"
+    "VF7" = '=_CreateQuoteTemplate("fixed_float",VF5:VK5,VF6:VK6)'
+    "VN1" = "date"; "VO1" = "discount_factor"
+    "VN2" = "31-Dec-2026"; "VO2" = "1"
+    "VN3" = "1-Feb-2027"; "VO3" = "0.99"
+    "VN4" = "1-Mar-2027"; "VO4" = "0.98"
+    "VN5" = '=_CreateDiscountCurve("SOFR",VN1:VO1,VN2:VO4)'
+    "VN6" = "=_CollectDiscountCurves(VN5)"
+    "VP1" = '=_Quote(VA7,"F27-G27",VF3,VN6)'
+    "VP2" = '=_Quote(VA7,"F27-G27",VF7)'
+    "VP3" = '=_Quote(VA7,"F27",VF3,VN6)'
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January
@@ -3217,6 +3295,21 @@ while ($fixingDay -ge [datetime]"2027-01-01") {
 }
 $fixingRows = $fixingRow - 1
 $cells["RN4"] = "=_CreateFuturesFixings(RO1:RO$fixingRows,RP1:RP$fixingRows,QJ8)"
+# The quoting ticket's strip, template-based-quoting.md: a settle of 3 on every business day from 16
+# to 30 December 2026, the days the STRIP calendar has fixed by the 31st, newest first down VB and VC,
+# and the fixings creator in VA4 over them.
+$quoteDay = [datetime]"2026-12-30"
+$quoteRow = 1
+while ($quoteDay -ge [datetime]"2026-12-16") {
+    if ($quoteDay.DayOfWeek -ne "Saturday" -and $quoteDay.DayOfWeek -ne "Sunday") {
+        $cells["VB$quoteRow"] = $quoteDay.ToString("dd-MMM-yyyy", [Globalization.CultureInfo]::InvariantCulture)
+        $cells["VC$quoteRow"] = "3"
+        $quoteRow++
+    }
+    $quoteDay = $quoteDay.AddDays(-1)
+}
+$quoteRows = $quoteRow - 1
+$cells["VA4"] = "=_CreateFuturesFixings(VB1:VB$quoteRows,VC1:VC$quoteRows,UX5)"
 
 # --- build the host and tell it where Python is -----------------------------
 

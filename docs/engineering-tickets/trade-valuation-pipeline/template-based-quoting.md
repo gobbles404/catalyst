@@ -1,6 +1,6 @@
 # Quote templates and whole period pricing with named discount curves
 
-**Status:** Ready for quoting implementation; quoting itself is not built. The [named discount curves arc](multiple-discount-curves.md) is implemented through #203, and #204 supplies the publication-based IFERC payment anchor. Base the quoting feature branch on that completed stack, or on main once it contains those changes; this is a separate feature PR, not another named-curve slice. Retain the agreed separate quote templates and entire requested period, with factor 1 for payment dates on or before `as_of`. This replaces the public API proposed in the [four-input prototype](quoting-prototype.md); retain its useful examples, not a second worksheet call form.
+**Status:** Built in #207, [quote-template.md](../../library/quoting/quote-template.md) and [quote.md](../../library/quoting/quote.md) the pages; the rest of this ticket is the plan as it was. The [named discount curves arc](multiple-discount-curves.md) is implemented through #203, and #204 supplies the publication-based IFERC payment anchor. Base the quoting feature branch on that completed stack, or on main once it contains those changes; this is a separate feature PR, not another named-curve slice. Retain the agreed separate quote templates and entire requested period, with factor 1 for payment dates on or before `as_of`. This replaces the public API proposed in the [four-input prototype](quoting-prototype.md); retain its useful examples, not a second worksheet call form.
 
 ## Outcome
 

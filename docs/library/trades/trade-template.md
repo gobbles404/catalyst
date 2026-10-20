@@ -89,4 +89,4 @@ The same template supplies its fields to one or many ticket rows. Template field
 
 ## Not here
 
-Trade construction, complete-trade validation, static encoding, market binding and valuation: [create-trades.md](create-trades.md) and the [kernel](kernel.md). Template inheritance, a permission system, a label argument or label field, a template that carries an index. A value read for meaning beyond its own field: a specification name, a code's month, a lag's day wait for the index and the ticket.
+Trade construction, complete-trade validation, static encoding, market binding and valuation: [create-trades.md](create-trades.md) and the [kernel](kernel.md). Template inheritance, a permission system, a label argument or label field, a template that carries an index. A value read for meaning beyond its own field: a specification name, a code's month, a lag's day wait for the index and the ticket. The static terms of a quote are a kind of their own, [quote-template.md](../quoting/quote-template.md), which `_CreateTrades` refuses as it refuses any other kind.

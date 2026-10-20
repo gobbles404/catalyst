@@ -709,10 +709,10 @@ before the third of the planned four stacked slices.
 
 ## 25. Template based quoting
 
-Ready for implementation against the completed named-curve stack and IFERC publication
-anchor; quoting itself is not implemented. The separate feature PR adds
+Built in #207 on the completed named-curve stack and IFERC publication anchor:
 `_CreateQuoteTemplate(instrument, fields, values)` and
-`_Quote(market, contract_code, template, [discount_curve_set])`, one numeric whole-period price.
+`_Quote(market, contract_code, template, [discount_curve_set])`, one numeric whole-period price,
+[quote-template.md](../../library/quoting/quote-template.md) and [quote.md](../../library/quoting/quote.md) the pages.
 The [ticket](template-based-quoting.md) gives quoting its own template handle, with booking
 and quoting requirements on shared instrument field definitions. Booking-only fields are
 refused, not ignored. The quote template supplies schedule method, `month`/`calday` basis,
@@ -721,6 +721,11 @@ payment dates on or before `as_of` use factor 1, future dates the selected curve
 requested in June retains every month, with past fixings and live prices for the remaining
 observations. IFERC payment offsets start on publication under either route. This supersedes
 the [four-input prototype](quoting-prototype.md), not implemented.
+
+To check in UAT: whether the dedicated quote template and the short formula feel natural; whether
+the whole-period price matches the desk's CAL27-in-June request; which component or payment
+readback is actually needed, the quote returning the one number today; and which real requests hit
+the period boundaries, a balance of a period and dated requests being deferred.
 
 UAT will compare cleared and bilateral Jan/Feb prices under both quantity bases, CAL27 in
 June, an entirely fixed and paid financial period, and an Asian across a reference roll.

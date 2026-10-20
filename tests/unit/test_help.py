@@ -636,7 +636,9 @@ def test_the_catalog_list_explains_itself() -> None:
 def test_the_catalog_show_explains_itself() -> None:
     description, arguments, hidden = SPECS["_ShowInstrument"]
     assert not hidden
-    assert description == "Shows an instrument's fields, requirements, types and rules."
+    assert description == (
+        "Shows an instrument's fields, requirements, types and rules, for booking and quoting."
+    )
     assert arguments == [
         ("instrument", "One instrument name from _ListInstruments, such as fixed_float."),
     ]
@@ -739,6 +741,60 @@ def test_the_evaluation_explains_itself() -> None:
             "_CollectDiscountCurves's result, such as I13, or a name for it, holding every curve "
             "the rows name by discount_curve_key, each starting on the valuation day; left out for "
             "a cleared batch.",
+        ),
+    ]
+
+
+def test_the_quote_template_creator_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_CreateQuoteTemplate"]
+    assert not hidden
+    assert description == (
+        "Creates the static terms of a quote under an instrument and shows their handle, the "
+        "text _Quote takes as the quote template."
+    )
+    assert arguments == [
+        (
+            "instrument",
+            "One instrument name from _ListInstruments; fixed_float, the one a quote prices.",
+        ),
+        (
+            "fields",
+            "The field-name cells in one row, such as A1:G1, using names _ShowInstrument marks "
+            "quote_allowed.",
+        ),
+        ("values", "The values in one row beneath those fields, such as A2:G2."),
+    ]
+
+
+def test_the_quote_explains_itself() -> None:
+    description, arguments, hidden = SPECS["_Quote"]
+    assert not hidden
+    assert description == (
+        "Quotes one whole-period fixed price for a contract or strip on one market from a quote "
+        "template's terms, fixings for the observations that have passed and the day's quotes for "
+        "the rest, a bilateral payment discounted on the template's curve."
+    )
+    assert arguments == [
+        (
+            "market",
+            "The market handle: the cell showing _CreateMarket's result, such as I12, or a name "
+            "for it, with the day's quotes over the history they follow.",
+        ),
+        (
+            "contract_code",
+            "The contract or strip to quote, such as Z26, F27-G27, 1H27 or CAL27, every month of "
+            "it a contract of the market's schedule.",
+        ),
+        (
+            "template",
+            "The quote-template handle: the cell showing _CreateQuoteTemplate's result, such as "
+            "B3, or a name for it, which supplies the quote's terms.",
+        ),
+        (
+            "[discount_curve_set]",
+            "The collection handle for a bilateral quote: the cell showing "
+            "_CollectDiscountCurves's result, such as I13, or a name for it, holding the curve "
+            "the template names; left out for a cleared quote.",
         ),
     ]
 

@@ -277,6 +277,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "2bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "+1bd+2xd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
+            // The quote template, template-based-quoting.md: a booking field and a blank period header refused by name, the cashflow refused as no instrument a quote prices, a value by the trade template's rule; and the quote's arguments in the seam's words, the market left out or naming nothing.
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0) }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared") }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "cashflow", Row("currency"), "USD" }, "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared" }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
+            yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
+            yield return new object[] { "_Quote", new object[] { "x:market:gas:9", "F27", "y:quote_template:9", ExcelMissing.Value }, "#ERROR _Quote: market is text 'x:market:gas:9' naming no live object, expected market handle" };
             yield return new object[] { "_CreateTrades", new object[] { ExcelMissing.Value, Row("quantity"), 1.0, ExcelMissing.Value }, "#ERROR _CreateTrades: index is missing, expected index handle" };
             yield return new object[] { "_CreateTrades", new object[] { "x:index:gas:9", Row("quantity"), 1.0, "y:trade_template:9" }, "#ERROR _CreateTrades: index is text 'x:index:gas:9' naming no live object, expected index handle" };
             // The valuation path: the handles left out, naming nothing or of another kind, in the seam's words; the batch itself is in the fact below.
@@ -656,8 +663,9 @@ namespace Goosedove.Host.Tests
         }
 
         // The instrument catalog: the list spills a header and a row per instrument, two text columns;
-        // the shown fixed_float spills seven rows by nineteen columns since #175, the labels down the first column, the
-        // fields across the first row and the required row booleans, every other cell text.
+        // the shown fixed_float spills ten rows by twenty columns, the seven rows of booking and since
+        // template-based-quoting.md the three of quoting, the labels down the first column, the fields across
+        // the first row and the required, quote_allowed and quote_required rows booleans, every other cell text.
         [Fact]
         public void the_instrument_catalog_is_listed_and_the_future_shown()
         {
@@ -670,7 +678,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("cashflow", listed[2, 0]);
             Assert.Equal(8, ((object[,])Seam.Call("_ShowInstrument", "cashflow")).GetLength(1));
             var shown = (object[,])Seam.Call("_ShowInstrument", "fixed_float");
-            Assert.Equal(7, shown.GetLength(0));
+            Assert.Equal(10, shown.GetLength(0));
             Assert.Equal(20, shown.GetLength(1));
             Assert.Equal("field", shown[0, 0]);
             Assert.Equal("trade_id", shown[0, 1]);
@@ -692,6 +700,17 @@ namespace Goosedove.Host.Tests
             Assert.Equal("holiday calendar handle", shown[4, 18]);
             Assert.Equal("the index's specification names", shown[5, 14]);
             Assert.Equal("month, calday", shown[5, 15]);
+            Assert.Equal("quote_allowed", shown[7, 0]);
+            Assert.Equal("quote_required", shown[8, 0]);
+            Assert.Equal("quote_required_when", shown[9, 0]);
+            Assert.Equal(false, shown[7, 1]);  // trade_id: a booking fact no quote template holds
+            Assert.Equal(true, shown[7, 6]);  // schedule_method: held and always required
+            Assert.Equal(true, shown[8, 6]);
+            Assert.Equal(true, shown[7, 17]);  // payment_time_lag: held, required with a financial settlement
+            Assert.Equal(false, shown[8, 17]);
+            Assert.Equal("settlement_method = financial", shown[9, 17]);
+            Assert.Equal("route = bilateral", shown[9, 11]);
+            Assert.Equal("none", shown[9, 1]);
         }
 
         // The NG example of the trade-valuation pipeline: a template of the fixed_float's six shared
@@ -1020,6 +1039,49 @@ namespace Goosedove.Host.Tests
             Assert.Equal(46568.0, Seam.Call("util_EndDate", "bal1h27", midMarch));
             Assert.Equal("#ERROR _CreateTrades: ValueError: contract_code row 1 is '0H27', expected a contract or strip with two-digit years, such as F26, 1Q27, 1H27, CAL28, W29, S28 or F26-Z28", Seam.Call("_CreateTrades", half, headers, Row(3003.0, 46357.0, "0H27", 1.0, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: contract_code row 1 is '2H27', expected months the index's schedule has a contract for; it has none for 2027-08", Seam.Call("_CreateTrades", half, headers, Row(3003.0, 46357.0, "2H27", 1.0, 3.0), template));
+        }
+
+        // A quote, template-based-quoting.md: the ticket's strip on an index of Z26 bounding the calendar
+        // and F27 and G27 month-matching, closed on weekends and New Year's Day, valued 31 December 2026
+        // with both months live at 30 and 60; a bilateral and a cleared quote template over the fields a
+        // quote may hold, SOFR 0.99 on 1 February and 0.98 on 1 March, the two payment days of +1bd on a
+        // weekend-only calendar; the month and calendar-day prices by hand, January alone 30; the
+        // template's readback; a trade template and a blank fourth cell refused by the seam, a left-out or
+        // a surplus collection by the library, and the quote template refused where a trade template is taken.
+        [Fact]
+        public void a_quote_prices_the_tickets_strip_cleared_and_bilateral()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("Z26", "F27", "G27"), Column(46371.0, 46416.0, 46444.0), ExcelMissing.Value);
+            var holidays = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
+            var index = Index(schedule, holidays, "STRIP");
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46387.0, 0.5), index);
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46386.0, 46385.0, 46384.0, 46381.0, 46380.0, 46379.0, 46378.0, 46377.0, 46374.0, 46373.0, 46372.0), Column(3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "STRIP", Column(30.0, 60.0)));
+            var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_time_lag", "payment_holiday_calendar", "discount_curve_key");
+            var otc = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "month", "+1bd", weekends, "SOFR"));
+            var cleared = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_time_lag", "payment_holiday_calendar"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends));
+            Assert.StartsWith(Pid + ":quote_template:", otc);
+            var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
+            var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
+            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "F27-G27", cleared, ExcelMissing.Value), 12);
+            Assert.Equal(44.923857868020306, (double)Seam.Call("_Quote", market, "F27-G27", otc, rates), 12);
+            Assert.Equal(30.0, (double)Seam.Call("_Quote", market, "F27", otc, rates), 12);
+            var shown = (object[,])Seam.Call("util_ReadHandle", otc);
+            Assert.Equal(3, shown.GetLength(0));
+            Assert.Equal(8, shown.GetLength(1));
+            Assert.Equal("instrument", shown[0, 0]);
+            Assert.Equal("fixed_float", shown[2, 0]);
+            Assert.Equal("a holiday calendar", shown[2, 6]);
+            Assert.Equal("discount_curve_key", shown[0, 7]);
+            Assert.Equal("SOFR", shown[2, 7]);
+            var trade = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), "cleared");
+            Assert.Equal($"#ERROR _Quote: template is trade template handle '{trade}', expected quote template handle", Seam.Call("_Quote", market, "F27", trade, ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: discount_curve_set is blank, expected discount curve set handle", Seam.Call("_Quote", market, "F27", otc, ExcelEmpty.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is missing, expected a collection of discount curves holding 'SOFR' with route = bilateral, whose payments it discounts", Seam.Call("_Quote", market, "F27", otc, ExcelMissing.Value));
+            Assert.Equal("#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing", Seam.Call("_Quote", market, "F27", cleared, rates));
+            Assert.Equal($"#ERROR _CreateTrades: template is quote template handle '{otc}', expected trade template handle", Seam.Call("_CreateTrades", index, Row("quantity"), 1.0, otc));
         }
 
         // The penultimate method on the host's chain: a financial template paying one business day

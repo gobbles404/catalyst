@@ -1,6 +1,6 @@
 # _ShowInstrument
 
-Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator. The instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md) renamed it `fixed_float`, its fields and rules unchanged. Two fields joined in #175, `counterparty` and `marketing_reserve`, [booking-fields-and-marketing-reserve.md](../../engineering-tickets/trade-valuation-pipeline/booking-fields-and-marketing-reserve.md), the first booking slice of the bilateral arc.
+Built in #137 as ticket I2 of the [trade-valuation pipeline](../../engineering-tickets/trade-valuation-pipeline/README.md), beside [_ListInstruments](list-instruments.md). The table below is written from the definitions by hand, and a test keeps the two equal, cell for cell; there is no generator. The instrument was named `future` until #174, when [rename-instrument-fixed-float.md](../../engineering-tickets/trade-valuation-pipeline/rename-instrument-fixed-float.md) renamed it `fixed_float`, its fields and rules unchanged. Two fields joined in #175, `counterparty` and `marketing_reserve`, [booking-fields-and-marketing-reserve.md](../../engineering-tickets/trade-valuation-pipeline/booking-fields-and-marketing-reserve.md), the first booking slice of the bilateral arc. Three rows more since [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md), what a quote template may hold and what a quote requires, [quote-template.md](../quoting/quote-template.md) the creator that reads them.
 
 Shows one library-defined instrument schema with fields across columns and metadata down
 rows, including descriptions, requirements and defined options. This is the read-only counterpart of
@@ -27,13 +27,15 @@ declared text input and mixed-table output: [inputs](../../seam/inputs.md) and
 [outputs](../../seam/outputs.md).
 
 Fields run across columns to align with trade-table headers. The first column contains the
-seven row labels `field`, `description`, `required`, `required_when`, `type`, `options`,
-`rule`, in that order. Each subsequent column describes one field in the definition's
-declared order. For N fields, the spill has seven rows and N + 1 columns. In the first row,
-field identifiers begin in column two; those cells match the names used as trade headers.
-The `required` row contains Excel booleans after its text label; all other cells are
-nonempty text. There are no spacer rows, blank placeholders, object handles or additional
-implementation-type row. This is the default layout; no transpose argument is introduced.
+ten row labels `field`, `description`, `required`, `required_when`, `type`, `options`,
+`rule`, and since [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md) `quote_allowed`, `quote_required` and
+`quote_required_when`, in that order. Each subsequent column describes one field in the
+definition's declared order. For N fields, the spill has ten rows and N + 1 columns. In the
+first row, field identifiers begin in column two; those cells match the names used as trade
+headers. The `required`, `quote_allowed` and `quote_required` rows contain Excel booleans
+after their text labels; all other cells are nonempty text. There are no spacer rows, blank
+placeholders, object handles or additional implementation-type row. This is the default
+layout; no transpose argument is introduced.
 
 The `fixed_float` schema as the sheet sees it, `src/goosedove/instruments/definitions.py` laid out by
 `src/goosedove/excel/instruments.py`. A template supplies defaults for
@@ -49,6 +51,9 @@ it as its first argument, once for the whole batch.
 | type | number | date | text | date | date | code | code | code | text | text | text | text | number | text | code | number | text | holiday calendar handle | number |
 | options | a whole number of at most 15 digits | no fixed list | a contract or strip, F26, 1Q27, 1H27, CAL27, Z27-X28 | no fixed list | no fixed list | asian, lastday, penultimate, last3day | cleared, bilateral | physical, financial | no fixed list | no fixed list | the name of a curve in the collection given to _EvaluateTrades | no fixed list | a signed whole count, zero included | the index's specification names | month, calday | no fixed list | +1bd, +3cd, +0em or a chain such as +3em+25cd-1bd+1bd, each a sign, a whole count and bd, cd or em | a _CreateHolidayCalendar handle | a finite amount of zero or more |
 | rule | The source system's deal number, whole, -999999999999999 to 999999999999999, never text; duplicates keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | Typed in either case and resolved by month against the index's schedule when the row supplies no dates, every schedule code read; CAL27 is F27 through Z27, 1H27 F27 through M27, Z27-X28 December 2027 through November 2028; beside both dates it is kept as entered text and not read; a blank or empty cell is not supplied | With end_date the inclusive days the deal covers, split at month ends, whatever the row's code; one date without the other fails; a blank or empty cell is not supplied; util_StartDate gives it from a label | On or after start_date; the two dates book the row's period together, so one without the other fails; a blank or empty cell is not supplied; a part of a month prices under asian alone | A library rule selected by the trade; all four are built on a futures index, asian averaging the month's pricing days; lastday alone on an IFERC index, its published month | Decides the clearing reserve: a cleared trade incurs the selected specification's clearing rate and a bilateral one none; a cleared batch values undiscounted and takes no discount curve, a bilateral one is valued on the curve _EvaluateTrades requires | Selects behavior, validation and payment terms, not a label: a financial batch requires payment_time_lag and payment_holiday_calendar and pays on its payment day; a physical one pays on no day, takes lastday rows alone, is refused past its expiry and refused on the bilateral route; the delivery itself is outside the model | Identifies the organization, kept as typed: required with route = cleared and refused with bilateral; it selects no rate and exempts no fee, the route alone deciding the clearing reserve | A label kept as typed, each row its own; nothing is inferred from it, no netting, credit treatment or curve | Exact and case-sensitive, no whitespace around it: required with route = bilateral and refused with cleared; rows may name different curves; the curve is selected when the batch is evaluated, from the collection supplied then, and a key naming none of its curves fails the evaluation, never silently the first curve | A named broker enables the brokerage reserve for that trade at the selected specification's rate; omit the field, or enter none in any case, for no brokerage; a ticket column may mix names and none; the name selects no rate | A whole count of the selected quantity definition, positive, negative or zero; a zero row is kept, has no exposure and no quantity-based reserve, keeps a marketing reserve it entered and can be filled in later | Selects the lot size and unit from the index given to _CreateTrades, exactly as named there; the template may supply it, and the index owns what it means | The quantity per contract month, or per calendar day of it, weekends and holidays included | A finite number in the index's quote units; the same for every month of a strip | Applied in order from the component's last observation day, business days on the payment calendar: the expiry under lastday on a futures index, the publication day on an IFERC one; the payment must be after it; +1bd for PHH, +2bd for Waha | Monday to Friday less its holidays; separate from the pricing calendar | In the index's settlement currency, counted once per ticket row whatever its months, quantity or days; left out of the template and the ticket, zero; static, never a contribution to value |
+| quote_allowed | FALSE | FALSE | FALSE | FALSE | FALSE | TRUE | TRUE | TRUE | FALSE | FALSE | TRUE | FALSE | FALSE | FALSE | TRUE | FALSE | TRUE | TRUE | FALSE |
+| quote_required | FALSE | FALSE | FALSE | FALSE | FALSE | TRUE | TRUE | TRUE | FALSE | FALSE | FALSE | FALSE | FALSE | FALSE | TRUE | FALSE | FALSE | FALSE | FALSE |
+| quote_required_when | none | none | none | none | none | none | none | none | none | none | route = bilateral | none | none | none | none | none | settlement_method = financial | settlement_method = financial | none |
 
 The `cashflow` schema, since #200: a known signed amount in one currency, payable on one explicit date, seven fields of which the two booking fields are the fixed_float's own definitions, [create-cashflows.md](../cashflows/create-cashflows.md) and [evaluate-cashflows.md](../cashflows/evaluate-cashflows.md) the functions over it.
 
@@ -60,6 +65,9 @@ The `cashflow` schema, since #200: a known signed amount in one currency, payabl
 | type | number | date | number | code | date | text | text |
 | options | a whole number of at most 15 digits | no fixed list | a finite signed amount, fractions and zero included | USD | no fixed list | no fixed list | no fixed list |
 | rule | The source system's deal number, whole, -999999999999999 to 999999999999999, never text; duplicates keep separate occurrences | The day the deal was struck, never inferred from the valuation date or today | The whole payment in whole units of the currency, 100 USD a hundred dollars, not a price or a quantity; a zero row is kept; nothing is read from it beyond its sign | USD exactly, the one currency this version books, one per batch; CENT is a scale of the dollar and no currency, and an amount is never read as cents; no conversion | Used as entered, never rolled, never inferred from a schedule; on or before the valuation day the amount is cash, after it the amount is discounted on the curve | A label kept as typed, each row its own; attribution and nothing more, no curve, no fee and no netting | A label kept as typed; nothing is read from the words |
+| quote_allowed | FALSE | FALSE | FALSE | FALSE | FALSE | FALSE | FALSE |
+| quote_required | FALSE | FALSE | FALSE | FALSE | FALSE | FALSE | FALSE |
+| quote_required_when | none | none | none | none | none | none | none |
 
 `fixed_float`, `future` until #174, is the first instrument defined: a fixed-for-floating position on a monthly contract or strip of a futures or, since #167, an IFERC index, built in
 #139 through #144 as [create-trades.md](../trades/create-trades.md) and
@@ -112,7 +120,7 @@ most 15 digits read back as a number, duplicates kept as separate trades,
 
 | Item | Text |
 |---|---|
-| Function | Shows an instrument's fields, requirements, types and rules. |
+| Function | Shows an instrument's fields, requirements, types and rules, for booking and quoting. |
 | instrument | One instrument name from _ListInstruments, such as fixed_float. |
 
 ## The library checks
@@ -154,6 +162,17 @@ partial spill and creates no object. Optionality of trade fields is unrelated to
   instrument reader cannot enumerate a selected index's contract codes without that index.
 - `rule`: meaning and constraints beyond field type/options, including restrictions imposed
   by a selected traded product/agreement. Independently valid values can form an invalid pair.
+- `quote_allowed`, since [template-based-quoting.md](../../engineering-tickets/trade-valuation-pipeline/template-based-quoting.md): whether a quote template may
+  hold the field at all. A quote prices a contract on a market from a trade's terms and books
+  nothing, so the booking facts, the identifiers, dates, quantity, price, labels and reserve,
+  are refused in a quote template by name, and the seven fields a quote reads are allowed:
+  the four codes, the curve key and the two payment fields. The cashflow allows none.
+- `quote_required`: whether a completed quote always requires the field, as `required` reads
+  for a trade: `schedule_method`, `route`, `settlement_method` and `quantity_per`.
+- `quote_required_when`: the condition that otherwise requires it in a quote, `none` when
+  absent: the two payment fields with a financial settlement and the curve key on the
+  bilateral route. A field a quote refuses is never one it requires; the catalog refuses a
+  definition that says otherwise.
 
 A fact is mandatory when `required` is TRUE or its `required_when` condition holds. Validate
 supplied values even when optional; do not replace missing facts with zero or empty text.
@@ -212,16 +231,17 @@ the rows in Excel and `host/Goosedove.Host.Tests/CallTests.cs` their replay.
 | Case | Kind |
 |---|---|
 | the fixed_float's nineteen fields in order, `counterparty` and `marketing_reserve` since #175 and `discount_curve_key` since the named-curve arc's slice 3, which are required, the conditions, the period fields' three among them since #161 and their words since #172, the three alone letting a cell go unsupplied, the types and the codes | example |
-| a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell | example |
+| a definition that cannot be authored says why: an empty name or description, a name or a field twice, an empty cell, a field a quote requires but refuses | example |
+| the quote metadata: the seven fields a quote template may hold, the four a quote always requires, the payment pair with a financial settlement and the curve key on the bilateral route; no cashflow field | example |
 | the name matched exactly, `Future`, ` fixed_float` and `future`, the name until #174, refused naming `fixed_float`, an empty catalog saying so, two instruments both named | example |
-| seven rows and twenty columns since the named-curve arc's slice 3, the labels down column one, the fields across row one, booleans in the required row and text in every other cell, none blank | example |
+| ten rows and twenty columns, the three quote rows since template-based-quoting.md, the labels down column one, the fields across row one, booleans in the required, quote_allowed and quote_required rows and text in every other cell, none blank | example |
 | the page's table equals the spill, cell for cell | example against the page |
 | through the seam, the spill's shape and booleans, and the errors for another case, a blank, empty text, a number and a left-out name | example through the seam |
-| every listed name is shown; a one-field definition shows seven rows and two columns | example |
+| every listed name is shown; a one-field definition shows ten rows and two columns | example |
 | three reads publish nothing | example |
 | the cell-wise builder: kinds and texts in sheet order; a ragged grid, a cell holding nothing and a whole number beyond what a cell holds exactly, 2^53 either side, refused, the edge itself taken | example |
-| twelve functions, the classification once per cell, 133 for the fixed_float since #175, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, and two columns more since #175, 115 cells of text, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
-| the labels, the fields, two booleans, a condition and a type in a real Excel, the two new fields' names, condition and rule since #175; another case and a blank refused | Excel smoke |
+| twelve functions, the classification once per cell, 133 for the fixed_float since #175 and 200 over the ten rows since template-based-quoting.md, and the mixed way out's numpy; a peak of 12,869 bytes since #161's two period fields, 103 cells of text, about 108 a cell, and 15,041 since #172 lengthened the three period fields' texts, about 126 a cell, and two columns more since #175, 115 cells of text, within 130 a cell and the slack, what a text cell costs, where 110 a cell covered the texts before and a hundred a cell and the slack covered fifteen columns; nothing published | budget |
+| the labels, the fields, two booleans, a condition and a type in a real Excel, the two new fields' names, condition and rule since #175, the three quote rows' labels, booleans and conditions; another case and a blank refused | Excel smoke |
 
 The shape has a text label column and field columns holding text with one boolean each, which
 the mixed way out carries and the seam's table builder, columns of one kind, could not build:

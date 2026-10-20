@@ -6,6 +6,7 @@ what it shows about that argument as a person types the formula. How to write a 
 docs/library/conventions.md under Excel help; the pages quote the lines.
 """
 
+from collections.abc import Mapping
 from functools import singledispatch
 from typing import Annotated, Any, assert_never, cast
 
@@ -45,7 +46,7 @@ from goosedove.index_definitions.index_conventions import IndexConventions
 from goosedove.index_definitions.kind import named
 from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.instrumentation.work_counts import WorkCounter
-from goosedove.instruments.definitions import FieldType
+from goosedove.instruments.definitions import FieldType, Instrument
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.market_data.futures_fixings import FuturesFixings
@@ -53,6 +54,7 @@ from goosedove.market_data.gas_daily_fixings import GasDailyFixings
 from goosedove.market_data.iferc_fixings import IfercFixings
 from goosedove.market_data.interpolated_contracts import interpolate_contracts
 from goosedove.market_data.price_vector import PriceVector
+from goosedove.quoting.template import QuoteTemplate
 from goosedove.trades.aggregation import AggregateResults
 from goosedove.trades.encoding import Encoded
 from goosedove.trades.preparation import PreparedTrades
@@ -377,17 +379,35 @@ def trade_template_table(obj: TradeTemplate) -> MixedArray:
     # kind, since the spill shows what the template holds and is no round trip of a handle; and
     # since #172 the words `(not supplied)`, text, under a period field whose cell held nothing,
     # the header the template owns and the value it supplies to no row.
+    return template_table(obj.instrument, obj.names, obj.defaults)
+
+
+@shown.register
+def quote_template_table(obj: QuoteTemplate) -> MixedArray:
+    # The same spill for a quote template, since template-based-quoting.md: the instrument, then
+    # each field its row named under its name, every one holding a value, since no period field
+    # may stand in a quote template.
+    return template_table(obj.instrument, obj.names, obj.values)
+
+
+def template_table(
+    instrument: Instrument, names: tuple[str, ...], values: Mapping[str, object]
+) -> MixedArray:
+    """A template's spill, a trade template's and a quote template's alike: the instrument, then
+    each field named under its name in the order given, one row, a number, a day and text as
+    they are, a holiday calendar as the words of its kind, and `(not supplied)` under a field
+    named with no value."""
     headers: list[str] = ["instrument"]
     types: list[str] = ["str"]
-    columns: list[NDArray[Any] | tuple[str, ...]] = [(obj.instrument.name,)]
-    for name in obj.names:
+    columns: list[NDArray[Any] | tuple[str, ...]] = [(instrument.name,)]
+    for name in names:
         headers.append(name)
-        if name not in obj.defaults:
+        if name not in values:
             types.append("str")
             columns.append((NOT_SUPPLIED,))
             continue
-        value = obj.defaults[name]
-        field_type = next(field for field in obj.instrument.fields if field.name == name).type
+        value = values[name]
+        field_type = next(field for field in instrument.fields if field.name == name).type
         match field_type:
             case FieldType.NUMBER:
                 types.append("float64")
