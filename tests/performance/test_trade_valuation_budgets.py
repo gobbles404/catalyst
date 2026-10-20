@@ -148,6 +148,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         ),
     )
     curve = PATH["_CreateDiscountCurve"](
+        "SOFR",
         Cells.from_rows([["date", "discount_factor"]]),
         Cells.from_rows([[serial(AS_OF), 1.0], [serial(np.datetime64("2028-12-31", "D")), 0.9]]),
     )

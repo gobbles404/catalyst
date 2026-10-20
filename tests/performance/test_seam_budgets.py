@@ -801,14 +801,15 @@ def anchor_body(anchors: int, days: int) -> Cells:
     return Cells.from_rows([[46276.0 + i * step, 1.0 - i * step * 1e-5] for i in range(anchors)])
 
 
-# A curve: the table path, the builder's own looks on the anchors, the days between them filled,
-# and one publication. The same functions run and the same looks are taken whether the anchors
-# are every day of ten years or a dozen over them: the work of filling is per day, inside one
-# numpy call, and no ledger counts it.
+# A curve: the name's text rule, since #201, the table path, the builder's own looks on the
+# anchors, the days between them filled, and one publication. The same functions run and the
+# same looks are taken whether the anchors are every day of ten years or a dozen over them: the
+# work of filling is per day, inside one numpy call, and no ledger counts it.
 CURVE_LEDGER = {
     "Registered.run": 1,
     "_arguments": 1,
-    "_validate": 2,
+    "_validate": 3,
+    "_text": 1,  # the name
     "_text_row": 1,
     "_one_row": 1,
     "_shape": 1,
@@ -843,18 +844,30 @@ def test_a_discount_curve_is_a_table_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     body = curve_body(3_631)
-    PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)
-    assert call_profile(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
-    assert numpy_calls(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
+    PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body)
+    assert (
+        call_profile(lambda: PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        == CURVE_LEDGER
+    )
+    assert (
+        numpy_calls(lambda: PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        == CURVE_NUMPY
+    )
 
 
 def test_a_curve_from_a_dozen_anchors_runs_what_a_daily_table_runs(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
     body = anchor_body(12, 3_630)
-    PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)
-    assert call_profile(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_LEDGER
-    assert numpy_calls(lambda: PATH["_CreateDiscountCurve"](CURVE_HEADERS, body)) == CURVE_NUMPY
+    PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body)
+    assert (
+        call_profile(lambda: PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        == CURVE_LEDGER
+    )
+    assert (
+        numpy_calls(lambda: PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        == CURVE_NUMPY
+    )
 
 
 # The reader of any handle: the text rule and one lookup, the kind's table built a column at a
@@ -862,7 +875,7 @@ def test_a_curve_from_a_dozen_anchors_runs_what_a_daily_table_runs(
 def test_a_reader_is_a_text_call_one_lookup_and_a_table_out(
     call_profile: CallProfile, numpy_calls: CallProfile
 ) -> None:
-    handle = PATH["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
+    handle = PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, curve_body(3_631))
     PATH["util_ReadHandle"](handle)
     assert call_profile(lambda: PATH["util_ReadHandle"](handle)) == {
         "Registered.run": 1,
@@ -2509,7 +2522,7 @@ BUMP_NUMPY = {
 def test_a_bump_is_a_handle_and_a_number_in_and_one_publication_out(
     call_profile: CallProfile, numpy_calls: CallProfile, days: int
 ) -> None:
-    handle = PATH["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(days))
+    handle = PATH["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, curve_body(days))
     PATH["util_BumpDiscountCurve"](handle, 1.0)
     assert call_profile(lambda: PATH["util_BumpDiscountCurve"](handle, 1.0)) == BUMP_LEDGER
     assert numpy_calls(lambda: PATH["util_BumpDiscountCurve"](handle, 1.0)) == BUMP_NUMPY

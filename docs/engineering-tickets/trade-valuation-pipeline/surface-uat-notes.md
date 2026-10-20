@@ -52,6 +52,7 @@ these additions. This is an implementation checklist, not confirmation of releas
 | 21 / item 18 | [Brokerage and clearing applicability](reserve-fee-applicability.md) | [#188](https://github.com/gobbles404/goosedove/pull/188), awaiting review | On a specification charging 10 brokerage and 4 clearing per LOT, book one +10 LOT month four ways and read `_ReportReserves`: bilateral direct 0/0, bilateral brokered 100/0, cleared direct 0/40, cleared brokered 100/40; type `None`, `none` or `NONE` as the broker and see no brokerage; mix `ION` and `None` in a ticket column; move the broker between template and ticket; sell instead of buy; read the kept workbook's block from row 2722. |
 | 23 / item 21 | [Linear interpolation of contract prices](interpolate-contract-prices.md) | [#198](https://github.com/gobbles404/goosedove/pull/198), awaiting review | Point `util_InterpolateContracts` at an index handle, a column of two or more contract months as codes or as CME spells them, `202704`, typed as text, and a column of their prices: the spill names every month from the first anchor's through the last's with its futures expiry and its price on the line between the anchors by calendar days, the ticket's `J27` at 70 and `M27` at 76 putting `K27` at 72.949, 29 of 59 days along. Feed the price column to `_CreatePriceVector` from the market's prompt; move an anchor price or a schedule expiry and watch the spill, the market and the mark follow; type the anchors out of order, twice, or as numbers and read the refusals. The kept workbook's block from row 2812 holds the example with its two moves and the same mark on the prices typed by hand. |
 | 24 / item 22 | [Bump a discount curve](bump-discount-curve.md) | [#199](https://github.com/gobbles404/goosedove/pull/199), awaiting review | Point `util_BumpDiscountCurve` at a curve handle and a signed number of basis points, `1`, `-1`, `0.5` or `0`: the result is an ordinary curve, read back with `util_ReadHandle`, 0.95 a year out becoming 0.9499050047498416 under +1 and 0.9500950047501583 under -1, the first factor 1 and every day kept; evaluate the same prepared trades and market on the curve bumped each way and compare half the difference of the marks with the saved DV01 and half the difference of the deltas with the saved cross-gamma; bump a curve of ones down and read the refusal; type `+1bp` and read the seam's. The kept workbook's block from row 2849 holds the cross-gamma block's curve bumped each way with the centered checks. |
+| 26 / item 24 | [Named curves and their collection](named-curves-slice-1.md) | [#201](https://github.com/gobbles404/goosedove/pull/201), awaiting review | Give every `_CreateDiscountCurve` its name first, `"SOFR"`, and read the handle, `pid:discount_curve:SOFR:N`, and the readback's third column, `name` over `str` over the name on every row; type a name with a space around it, spaces alone, a number and an empty cell and read the refusals; bump a curve and read the source's name on the bump. Make a second curve under `"FFOIS"`, refer to the two in a row or a column and collect them with `_CollectDiscountCurves`: the handle is compact, `pid:discount_curve_set:N`, and `util_ReadHandle` shows one row per curve, name, start, end and days, in the order given; collect one curve alone; collect the base and the bumped SOFR together and read the refusal naming cells 1 and 2; collect a range holding a collection, a date or a failed curve and read the seam's refusal at that cell. Nothing takes a collection yet: `_EvaluateTrades` and `_EvaluateCashflows` keep their one curve, which now has a name. The kept workbook's sixteen curves are named SOFR in place; its two whole-curve readbacks, F6 and F79, spill a third column. |
 | 25 / item 23 | [Cashflow instrument](cashflow-instrument.md) | [#200](https://github.com/gobbles404/goosedove/pull/200), awaiting review | Make a template with `_CreateTradeTemplate("cashflow", ...)` holding `currency` USD and a `counterparty`; book rows of `trade_id`, `trade_date`, `amount`, `payment_date` and `description` with `_CreateCashflows`; value them with `_EvaluateCashflows` on a valuation-date handle and a curve starting on that day; read `_ReportValues` for `cashflow_mark` and `cashflow_cash`, `_ReportRisk(results,"dv01","year")` and `util_ReadHandle` on both handles; move a factor, roll the day onto a payment, type `CENT` or `usd`, a fixed_float template and `delta`, and read the refusals. The kept workbook's block from row 2864 holds the ticket's example. |
 
 Test lot normalization before the newer risk views so unit mistakes do not obscure the
@@ -657,3 +658,50 @@ fractional and zero amounts, duplicate rows, different payment dates, a curve up
 date roll to payment; a fixed_float template refused; `delta` refused. The kept workbook's
 block from row 2864 holds the example over the cross-gamma block's curve and valuation date,
 and the receipt of a hundred on the two curves and on its payment day.
+
+## 24. Multiple discount curves within one trade batch
+
+Slice 1 built in #201, [named-curves-slice-1.md](named-curves-slice-1.md): every curve is
+created under a name, `_CreateDiscountCurve("SOFR", A1:B1, A2:B4)`, carried in its handle and
+shown last on every row of its readback, the bump keeping it; `_CollectDiscountCurves` gathers
+named curves by reference under a compact handle, each name once, read back as one row per
+curve. Every creation on the sheets, in the host, the tests and the pages supplies a name; the
+kept workbook's sixteen were renamed in place with every economic cell unchanged. Nothing takes
+a collection yet. The rest of the arc, slices 2 to 4, is not implemented.
+
+Agreed direction: the [named-curve arc](multiple-discount-curves.md) names
+ordinary curves, gathers them with `_CollectDiscountCurves(curve_handles)`, and requires
+every bilateral trade to select one by `discount_curve_key`, even with a singleton set.
+One collection cell can feed many evaluations. It preserves payment/curve ownership
+through valuation and saved risk. Individual handles show the curve name; collection
+handles stay compact, with membership in readback.
+Quotes in item 25 will reuse that completed worksheet contract. Cashflow multi-curve
+evaluation remains separate; its existing one-curve path is preserved.
+
+UAT target: mixed-key batches agree with separately evaluated batches collected together;
+opposing exposures on different curves retain their discounted value/risk; replacing a
+curve under the same key reuses the trades/preparation; changing a ticket's key rebuilds
+them; missing keys fail, including a singleton with the wrong name; adding an unused
+curve changes no selection. Reports identify each contribution's curve and qualify both
+snapshots when distinct curves share a name. The cashflow aggregation PR lands separately
+before the third of the planned four stacked slices.
+
+## 25. Template based quoting
+
+Updated owner direction, 18 October: follow the named-curve arc with
+`_CreateQuoteTemplate(instrument, fields, values)` and
+`_Quote(market, contract_code, template, [discount_curve_set])`, one numeric whole-period price.
+The [ticket](template-based-quoting.md) gives quoting its own template handle, with booking
+and quoting requirements on shared instrument field definitions. Booking-only fields are
+refused, not ignored. The quote template supplies schedule method, `month`/`calday` basis,
+route, payment terms and the static curve key. Cleared quotes are undiscounted; bilateral
+payment dates on or before `as_of` use factor 1, future dates the selected curve. CAL27
+requested in June retains every month, with past fixings and live prices for the remaining
+observations. This supersedes the [four-input prototype](quoting-prototype.md), not implemented.
+
+UAT will compare cleared and bilateral Jan/Feb prices under both quantity bases, CAL27 in
+June, an entirely fixed and paid financial period, and an Asian across a reference roll.
+Check a payment exactly on `as_of` at factor 1 and a fully fixed but unpaid month still
+discounted. Exercise payment-calendar, market, fixing, selected-curve and key changes,
+partial quote templates and wrong-template/booking-field refusals. Record whether the
+dedicated quote template feels natural and what inspection the scalar is missing.

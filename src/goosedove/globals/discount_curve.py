@@ -21,10 +21,13 @@ MAX_DAYS: Final = 1_048_574
 
 @dataclass(frozen=True, slots=True)
 class DiscountCurve:
-    """Dates and factors aligned by position, both read-only, one row per calendar day: dates[i]
-    and factors[i] describe the same day. The first date is the curve's start and the last is
-    the furthest date the library may price."""
+    """A name, and dates and factors aligned by position, both read-only, one row per calendar
+    day: dates[i] and factors[i] describe the same day. The first date is the curve's start and
+    the last is the furthest date the library may price. The name, since #201, is the desk's
+    word for the curve, SOFR, exact and case-sensitive, what a trade's key will select among a
+    collection and what the reports will show; a snapshot of the curve made later keeps it."""
 
+    name: str
     dates: NDArray[np.datetime64]
     factors: NDArray[np.float64]
 
@@ -37,16 +40,25 @@ class DiscountCurve:
         return self.dates[-1]
 
 
-def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) -> DiscountCurve:
-    """The one way to make a DiscountCurve: the rules of meaning on the anchors, checked once,
-    vectorized, then every day from the first anchor to the last filled in.
+def discount_curve(
+    name: str, dates: NDArray[np.datetime64], factors: NDArray[np.float64]
+) -> DiscountCurve:
+    """The one way to make a DiscountCurve: the rule on the name, then the rules of meaning on
+    the anchors, checked once, vectorized, then every day from the first anchor to the last
+    filled in.
 
-    The anchors are the rows the desk supplies, the first the curve's start, with any gaps
-    between their dates: a daily table is anchors with no gaps. What the curve keeps is the days
-    and their factors, made here and frozen, so the curve owns its data and a Python caller keeps
-    whatever it passed. Rows count as the sheet counts them, the first row of the body being
-    row 1.
+    The name is a name: text with no whitespace around it and not whitespace alone, since a key
+    will match it exactly, case and all, and a name that is a space would select nothing a desk
+    could type; empty text never arrives from a cell, the seam refusing it. The anchors are the
+    rows the desk supplies, the first the curve's start, with any gaps between their dates: a
+    daily table is anchors with no gaps. What the curve keeps is the name, the days and their
+    factors, made here and frozen, so the curve owns its data and a Python caller keeps whatever
+    it passed. Rows count as the sheet counts them, the first row of the body being row 1.
     """
+    if not name.strip():
+        raise ValueError(f"name is {name!r}, expected a name, not whitespace alone")
+    if name != name.strip():
+        raise ValueError(f"name is {name!r}, expected a name with no whitespace around it")
     days = np.asarray(dates, dtype="datetime64[D]")  # read, never written: no copy of the anchors
     # Before any arithmetic: numpy warns on inf - inf, and a warning fails here. The mask is the
     # finite one, asked whether every factor is; its inverse is made only to name the first that
@@ -87,7 +99,7 @@ def discount_curve(dates: NDArray[np.datetime64], factors: NDArray[np.float64]) 
     every_day, values = interpolate_discount_factors(days, factors)
     every_day.setflags(write=False)
     values.setflags(write=False)
-    return DiscountCurve(every_day, values)
+    return DiscountCurve(name, every_day, values)
 
 
 FACTORS_SHIFTED = "factors_shifted"  # one per stored day of the curve bumped, since each is moved
@@ -120,4 +132,4 @@ def bump_discount_curve(
     with np.errstate(over="ignore", under="ignore"):  # the constructor's rules are the judge
         shifted = curve.factors * np.exp(-(bump_bps / 10000.0) * tau)
     counter.hit(FACTORS_SHIFTED, int(shifted.size))
-    return discount_curve(curve.dates, shifted)
+    return discount_curve(curve.name, curve.dates, shifted)  # the source's name, since #201

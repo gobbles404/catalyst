@@ -227,13 +227,15 @@ def test_a_creator_of_a_small_object_and_its_reader_stay_small() -> None:
     assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 2 * SLACK
 
 
-# Reading a ten-year curve back builds its table, the kinds and the slots of 3,633 rows by two,
-# the serials on the way, and the mixed road's masks: measured 128,381 bytes on 2026-09-15,
-# about 18 bytes per cell out.
+# Reading a ten-year curve back builds its table, the kinds and the slots of 3,633 rows by three,
+# the serials on the way, the name's column of one text repeated, and the mixed road's masks:
+# measured 128,381 bytes on 2026-09-15 over two columns, about 18 bytes per cell out, and
+# 215,280 on 2026-10-18 over three, about 20 per cell, the third column's slots and kinds and
+# the texts' tuple the difference.
 def test_reading_a_curve_back_peaks_at_its_table_and_the_roads_masks() -> None:
-    handle = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(3_631))
-    cells = 3_633 * 2
-    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 18 * cells + SLACK
+    handle = ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, curve_body(3_631))
+    cells = 3_633 * 3
+    assert least_peak(lambda: ENTRY["util_ReadHandle"](handle)) <= 20 * cells + SLACK
 
 
 def anchor_body(anchors: int, days: int) -> Cells:
@@ -251,7 +253,8 @@ def test_a_discount_curve_from_a_daily_table_pays_its_looks_and_its_filling_once
     days = 3_631
     body = curve_body(days)
     assert (
-        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 60 * days + SLACK
+        least_peak(lambda: ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        <= 60 * days + SLACK
     )
 
 
@@ -262,7 +265,8 @@ def test_a_discount_curve_from_a_dozen_anchors_pays_for_the_days_it_fills() -> N
     days = 3_631
     body = anchor_body(12, days - 1)
     assert (
-        least_peak(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body)) <= 25 * days + SLACK
+        least_peak(lambda: ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
+        <= 25 * days + SLACK
     )
 
 
@@ -1001,7 +1005,7 @@ def test_the_retained_measure_counts_new_numpy_buffers_and_nothing_else() -> Non
 def test_a_discount_curve_keeps_its_two_columns_and_release_frees_them(given: str) -> None:
     days = 3_631
     body = curve_body(days) if given == "a daily table" else anchor_body(12, days - 1)
-    kept = retained_numpy_bytes(lambda: ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, body))
+    kept = retained_numpy_bytes(lambda: ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, body))
     assert kept == (days * (DAY_BYTES + NUMBER_BYTES), 0)
 
 
@@ -1220,7 +1224,7 @@ def test_an_interpolation_costs_its_months_and_publishes_nothing(contracts: int)
 # nothing once released; the source curve is not its to keep.
 @pytest.mark.parametrize("days", [3, 3_631])
 def test_a_bump_costs_its_days_and_keeps_two_columns_until_released(days: int) -> None:
-    handle = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, curve_body(days))
+    handle = ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, curve_body(days))
     assert least_peak(lambda: ENTRY["util_BumpDiscountCurve"](handle, 1.0)) <= (
         64 * days + 3 * SLACK
     )

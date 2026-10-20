@@ -109,8 +109,8 @@ def given(array: NDArray[np.float64] | None) -> NDArray[np.float64]:
     return array
 
 
-def curve_of(*anchors: tuple[str, float]) -> DiscountCurve:
-    return discount_curve(dates(*[d for d, _ in anchors]), numbers(*[f for _, f in anchors]))
+def curve_of(*anchors: tuple[str, float], name: str = "SOFR") -> DiscountCurve:
+    return discount_curve(name, dates(*[d for d, _ in anchors]), numbers(*[f for _, f in anchors]))
 
 
 FLAT = curve_of((AS_OF, 1.0), (A_YEAR, 0.95), (TWO_YEARS, 0.90))

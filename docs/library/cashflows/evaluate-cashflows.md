@@ -15,7 +15,7 @@ def _EvaluateCashflows(
 | | A | B | C | D |
 |---|---|---|---|---|
 | 10 | `=_CreateValuationDate(DATE(2027,1,4),0.5)` | shows `30512:valuation_date:4` | | |
-| 11 | `=_CreateDiscountCurve(G1:H1,G2:H4)` | shows `30512:discount_curve:5`, 1 on 4 January 2027, 0.95 a year out, 0.90 two years out | | |
+| 11 | `=_CreateDiscountCurve("SOFR",G1:H1,G2:H4)` | shows `30512:discount_curve:SOFR:5`, 1 on 4 January 2027, 0.95 a year out, 0.90 two years out | | |
 | 12 | `=_EvaluateCashflows(A8,A10,A11)` | shows `30512:cashflow_results:USD:6` | | |
 | 13 | `=_ReportValues(A12)` | | | |
 | | cashflow_mark | cashflow_cash | currency | as_of |

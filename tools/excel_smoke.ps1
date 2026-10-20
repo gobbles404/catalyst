@@ -62,7 +62,7 @@ $formulas = [ordered]@{
     # Handles. A creator cell shows its handle, the process ID first, so MID reads the kind after
     # the first colon and LEFT reads the process ID before it; the reader rows refer to creator
     # cells the way a sheet does, and read the spill one cell at a time with INDEX.
-    '=MID(AA1,FIND(":",AA1)+1,15)' = "discount_curve:"
+    '=MID(AA1,FIND(":",AA1)+1,20)' = "discount_curve:SOFR:"
     '=MID(AA2,FIND(":",AA2)+1,15)' = "valuation_date:"
     "=INDEX(util_ReadHandle(AA1),1,1)" = "date"
     "=INDEX(util_ReadHandle(AA1),2,2)" = "float64"
@@ -78,8 +78,8 @@ $formulas = [ordered]@{
     "=util_ReadHandle(AA4)"            = "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
     '=util_ReadHandle("discount_curve:9999999")' = "#ERROR util_ReadHandle: handle is text 'discount_curve:9999999' naming no live object, expected a handle"
     "=_CreateValuationDate(Y2,1.5)" = "#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1"
-    "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)" = "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
-    "=_CreateDiscountCurve(Y1:Z1,Y1:Z3)" = "#ERROR _CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
+    '=_CreateDiscountCurve("SOFR",Y1:Z1,AB2:AC4)' = "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    '=_CreateDiscountCurve("SOFR",Y1:Z1,Y1:Z3)' = "#ERROR _CreateDiscountCurve: table cell (1, 1) is text 'date', expected date"
     # The curve from anchors: three anchors over eleven days, read back day by day through
     # util_ReadHandle, an anchor exact and a day between on the straight line; dates that run
     # backwards; and a span no sheet could show.
@@ -87,8 +87,43 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(AW1),5,2)" = "0.9998"
     "=INDEX(util_ReadHandle(AW1),6,2)" = "0.9997"
     "=INDEX(util_ReadHandle(AW1),13,1)" = "46286"
-    "=_CreateDiscountCurve(Y1:Z1,AX2:AY3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
-    "=_CreateDiscountCurve(Y1:Z1,BA2:BB3)" = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
+    '=_CreateDiscountCurve("SOFR",Y1:Z1,AX2:AY3)' = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14"
+    '=_CreateDiscountCurve("SOFR",Y1:Z1,BA2:BB3)' = "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11"
+    # Named curves and their collection, named-curves-slice-1.md: the name in the handle, on every
+    # row of the readback, last, and kept by a bump; the collection's compact handle and its
+    # membership readback, one row per curve in the order given; two snapshots of one name
+    # refused by the library, and the seam's refusals of a failed curve, a number, a block, a nested
+    # collection and the argument left out; the name's own refusals.
+    '=MID(UQ1,FIND(":",UQ1)+1,21)' = "discount_curve:FFOIS:"
+    '=MID(UC1,FIND(":",UC1)+1,20)' = "discount_curve:SOFR:"
+    "=COLUMNS(util_ReadHandle(AA1))" = "3"
+    "=INDEX(util_ReadHandle(AA1),1,3)" = "name"
+    "=INDEX(util_ReadHandle(AA1),2,3)" = "str"
+    "=INDEX(util_ReadHandle(AA1),5,3)" = "SOFR"
+    "=INDEX(util_ReadHandle(UC1),3,3)" = "SOFR"
+    '=MID(UQ3,FIND(":",UQ3)+1,19)' = "discount_curve_set:"
+    "=ROWS(util_ReadHandle(UQ3))" = "4"
+    "=COLUMNS(util_ReadHandle(UQ3))" = "4"
+    "=INDEX(util_ReadHandle(UQ3),1,2)" = "start_date"
+    "=INDEX(util_ReadHandle(UQ3),2,4)" = "int64"
+    "=INDEX(util_ReadHandle(UQ3),3,1)" = "SOFR"
+    "=INDEX(util_ReadHandle(UQ3),4,1)" = "FFOIS"
+    "=INDEX(util_ReadHandle(UQ3),4,2)" = "46276"
+    "=INDEX(util_ReadHandle(UQ3),3,3)" = "46278"
+    "=INDEX(util_ReadHandle(UQ3),4,4)" = "3"
+    "=ROWS(util_ReadHandle(UQ5))" = "3"
+    "=_CollectDiscountCurves(UQ4:UR4)" = "#ERROR _CollectDiscountCurves: ValueError: curve_handles cell 1 and cell 2 are both named 'SOFR', expected each name once"
+    "=_CollectDiscountCurves(AA3)" = "#ERROR _CollectDiscountCurves: curve_handles is the creator's failure, expected discount curve handle: #ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date"
+    "=_CollectDiscountCurves(Y2:Z2)" = "#ERROR _CollectDiscountCurves: curve_handles cell (1, 1) is number 46276.0, expected discount curve handle"
+    "=_CollectDiscountCurves(UQ2:UR4)" = "#ERROR _CollectDiscountCurves: curve_handles is 3x2 array, expected one cell, one row or one column of discount curve handles"
+    "=_CollectDiscountCurves()" = "#ERROR _CollectDiscountCurves: curve_handles is missing, expected discount curve handles in a cell, a row or a column"
+    "=LEFT(_CollectDiscountCurves(UQ3),73)" = "#ERROR _CollectDiscountCurves: curve_handles is discount curve set handle"
+    '=_CreateDiscountCurve(" SOFR",Y1:Z1,Y2:Z4)' = "#ERROR _CreateDiscountCurve: ValueError: name is ' SOFR', expected a name with no whitespace around it"
+    '=_CreateDiscountCurve("  ",Y1:Z1,Y2:Z4)' = "#ERROR _CreateDiscountCurve: ValueError: name is '  ', expected a name, not whitespace alone"
+    "=_CreateDiscountCurve(Y2,Y1:Z1,Y2:Z4)" = "#ERROR _CreateDiscountCurve: name is number 46276.0, expected text"
+    '=_CreateDiscountCurve("",Y1:Z1,Y2:Z4)' = "#ERROR _CreateDiscountCurve: name is empty text, expected text"
+    "=_CreateDiscountCurve(Y1:Z1,Y1:Z1,Y2:Z4)" = "#ERROR _CreateDiscountCurve: name is 1x2 array, expected text"
+    "=_CreateDiscountCurve(UQ9,Y1:Z1,Y2:Z4)" = "#ERROR _CreateDiscountCurve: name is blank, expected text"
     # The futures schedule: a creator with three columns and one with two, read back through
     # util_ReadHandle with the options last; a futures column one row short and a blank in the
     # options column.
@@ -1883,9 +1918,9 @@ $cells = [ordered]@{
     "AB2" = "11-Sep-2026"; "AC2" = "0.98"
     "AB3" = "12-Sep-2026"; "AC3" = "0.9"
     "AB4" = "13-Sep-2026"; "AC4" = "0.8"
-    "AA1" = "=_CreateDiscountCurve(Y1:Z1,Y2:Z4)"
+    "AA1" = '=_CreateDiscountCurve("SOFR",Y1:Z1,Y2:Z4)'
     "AA2" = "=_CreateValuationDate(Y2,0.5)"
-    "AA3" = "=_CreateDiscountCurve(Y1:Z1,AB2:AC4)"
+    "AA3" = '=_CreateDiscountCurve("SOFR",Y1:Z1,AB2:AC4)'
     "AA4" = "=util_ReadHandle(AA3)"
     # A futures schedule: six contract codes as the desk types them, the futures and options
     # expiry beside each, a copy of the options column with a blank, and two creator cells, with
@@ -2527,7 +2562,7 @@ $cells = [ordered]@{
     "AU4" = "21-Sep-2026"; "AV4" = "0.999"
     "AX2" = "14-Sep-2026"; "AY2" = "1"
     "AX3" = "11-Sep-2026"; "AY3" = "0.9997"
-    "AW1" = "=_CreateDiscountCurve(Y1:Z1,AU2:AV4)"
+    "AW1" = '=_CreateDiscountCurve("SOFR",Y1:Z1,AU2:AV4)'
     # Two anchors 1,048,574 days apart, typed as serials: one day more than a sheet can show.
     "BA2" = "46276"; "BB2" = "1"
     "BA3" = "1094850"; "BB3" = "0.5"
@@ -2871,7 +2906,7 @@ $cells = [ordered]@{
     "QY2" = "4-Jan-2027"; "QZ2" = "1"
     "QY3" = "4-Jan-2028"; "QZ3" = "0.95"
     "QY4" = "3-Jan-2029"; "QZ4" = "0.9"
-    "QV12" = "=_CreateDiscountCurve(QY1:QZ1,QY2:QZ4)"
+    "QV12" = '=_CreateDiscountCurve("SOFR",QY1:QZ1,QY2:QZ4)'
     "QV8" = "=_EvaluateTrades(QV7,QV9,QV12)"
     "QV13" = "81"; "QV14" = "50"
     "QV15" = '=_CreatePriceVector("UNIT",QV13:QV14)'
@@ -2881,12 +2916,12 @@ $cells = [ordered]@{
     "RA2" = "4-Jan-2027"; "RB2" = "1"
     "RA3" = "4-Jan-2028"; "RB3" = "0.96"
     "RA4" = "3-Jan-2029"; "RB4" = "0.92"
-    "QV18" = "=_CreateDiscountCurve(RA1:RB1,RA2:RB4)"
+    "QV18" = '=_CreateDiscountCurve("SOFR",RA1:RB1,RA2:RB4)'
     "QV19" = "=_EvaluateTrades(QV7,QV9,QV18)"
     "RC1" = "date"; "RD1" = "discount_factor"
     "RC2" = "4-Jan-2027"; "RD2" = "1"
     "RC3" = "4-Jan-2028"; "RD3" = "1"
-    "QV20" = "=_CreateDiscountCurve(RC1:RD1,RC2:RD3)"
+    "QV20" = '=_CreateDiscountCurve("SOFR",RC1:RD1,RC2:RD3)'
     "QV21" = "=_PrepareTrades(QJ13,QV5)"
     "QV22" = "=_EvaluateTrades(QV21,QV9,QV20)"
     "QV23" = "=_PrepareTrades(QJ14,QV5)"
@@ -2905,12 +2940,12 @@ $cells = [ordered]@{
     "RI1" = "date"; "RJ1" = "discount_factor"
     "RI2" = "5-Jan-2027"; "RJ2" = "1"
     "RI3" = "4-Jan-2028"; "RJ3" = "1"
-    "RF12" = "=_CreateDiscountCurve(RI1:RJ1,RI2:RJ3)"
+    "RF12" = '=_CreateDiscountCurve("SOFR",RI1:RJ1,RI2:RJ3)'
     "RF8" = "=_EvaluateTrades(RF7,RF9,RF12)"
     "RK1" = "date"; "RL1" = "discount_factor"
     "RK2" = "5-Jan-2027"; "RL2" = "1"
     "RK3" = "4-Jan-2028"; "RL3" = "0.99"
-    "RF13" = "=_CreateDiscountCurve(RK1:RL1,RK2:RL3)"
+    "RF13" = '=_CreateDiscountCurve("SOFR",RK1:RL1,RK2:RL3)'
     "RF14" = "=_EvaluateTrades(RF7,RF9,RF13)"
     "RN1" = "4-Jan-2028"
     "RN2" = "=_CreateValuationDate(RN1,0.5)"
@@ -2922,7 +2957,7 @@ $cells = [ordered]@{
     "RN7" = "=_PrepareTrades(QJ13,RN5)"
     "RQ1" = "date"; "RR1" = "discount_factor"
     "RQ2" = "4-Jan-2028"; "RR2" = "1"
-    "RN12" = "=_CreateDiscountCurve(RQ1:RR1,RQ2:RR2)"
+    "RN12" = '=_CreateDiscountCurve("SOFR",RQ1:RR1,RQ2:RR2)'
     "RN8" = "=_EvaluateTrades(RN7,RN9,RN12)"
     # The collection, aggregate-risk-excel-integration.md: QV8, QV22 and QV24 referred to across
     # RT1:RV1 and down RT3:RT5, collected in RT9 and RT8, QV24 alone in RT10; QV8 beside the next
@@ -3027,7 +3062,7 @@ $cells = [ordered]@{
     "UD1" = "11-Sep-2026"; "UE1" = "1"
     "UD2" = "12-Sep-2026"; "UE2" = "1"
     "UD3" = "13-Sep-2026"; "UE3" = "1"
-    "UC3" = "=_CreateDiscountCurve(Y1:Z1,UD1:UE3)"
+    "UC3" = '=_CreateDiscountCurve("SOFR",Y1:Z1,UD1:UE3)'
     # The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the ticket's
     # three payments, the valuation date and the curve, and the batch valued.
     "UF1" = "currency"; "UG1" = "counterparty"
@@ -3043,8 +3078,16 @@ $cells = [ordered]@{
     "UN3" = "4-Jan-2028"; "UO3" = "0.95"
     "UN4" = "3-Jan-2029"; "UO4" = "0.9"
     "UF6" = "=_CreateValuationDate(UN2,0.5)"
-    "UF7" = "=_CreateDiscountCurve(UN1:UO1,UN2:UO4)"
+    "UF7" = '=_CreateDiscountCurve("SOFR",UN1:UO1,UN2:UO4)'
     "UF8" = "=_EvaluateCashflows(UF5,UF6,UF7)"
+    # Named curves and their collection, named-curves-slice-1.md: AA1's table under a second name,
+    # the two curves beside each other through cells referring to them and their collection, the
+    # SOFR of AA1 beside the bumped SOFR of UC1, two snapshots of one name, and a collection of one.
+    "UQ1" = '=_CreateDiscountCurve("FFOIS",Y1:Z1,Y2:Z4)'
+    "UQ2" = "=AA1"; "UR2" = "=UQ1"
+    "UQ3" = "=_CollectDiscountCurves(UQ2:UR2)"
+    "UQ4" = "=AA1"; "UR4" = "=UC1"
+    "UQ5" = "=_CollectDiscountCurves(AA1)"
 }
 # The one receivable's paid state, bilateral-excel-integration.md: synthetic fixings generated on the
 # UNIT index's own calendar, a settle of 3 on every business day from 1 January 2027 to 3 January

@@ -1,4 +1,5 @@
-"""The discount curve: the rules of meaning on the anchors, and the daily arrays the curve keeps."""
+"""The discount curve: the rule on its name, the rules of meaning on the anchors, and the name
+and the daily arrays the curve keeps."""
 
 import numpy as np
 import pytest
@@ -39,7 +40,8 @@ SAMPLE_DATES = EPOCH + np.array(SAMPLE_SERIALS).astype("timedelta64[D]")
 
 
 def test_a_daily_table_keeps_every_pair_aligned() -> None:
-    curve = discount_curve(THREE_DAYS, THREE_FACTORS)
+    curve = discount_curve("SOFR", THREE_DAYS, THREE_FACTORS)
+    assert curve.name == "SOFR"
     assert (curve.dates == THREE_DAYS).all()
     assert curve.factors.tolist() == [1.0, 0.9999, 0.9998]
     assert curve.start_date == np.datetime64("2026-09-11")
@@ -48,14 +50,14 @@ def test_a_daily_table_keeps_every_pair_aligned() -> None:
 
 # Anchors two days apart: the day between takes the straight line, and the anchors stay exact.
 def test_a_gap_between_anchors_is_filled_a_day_at_a_time() -> None:
-    curve = discount_curve(dates("2026-09-11", "2026-09-12", "2026-09-14"), THREE_FACTORS)
+    curve = discount_curve("SOFR", dates("2026-09-11", "2026-09-12", "2026-09-14"), THREE_FACTORS)
     assert np.array_equal(curve.dates, days("2026-09-11", 4))
     assert curve.factors[[0, 1, 3]].tolist() == [1.0, 0.9999, 0.9998]
     assert abs(curve.factors[2] - 0.99985) < 1e-15
 
 
 def test_the_pages_eleven_anchors_fill_two_hundred_and_eleven_days() -> None:
-    curve = discount_curve(SAMPLE_DATES, SAMPLE_FACTORS)
+    curve = discount_curve("SOFR", SAMPLE_DATES, SAMPLE_FACTORS)
     assert curve.dates.size == curve.factors.size == 211
     assert curve.start_date == np.datetime64("2026-05-22")
     assert curve.max_date == np.datetime64("2026-12-18")
@@ -66,7 +68,7 @@ def test_the_pages_eleven_anchors_fill_two_hundred_and_eleven_days() -> None:
 
 def test_consecutive_days_run_across_a_year_end_and_a_leap_day() -> None:
     count = 100  # 1 December 2027 to 9 March 2028, which holds 29 February 2028
-    curve = discount_curve(days("2027-12-01", count), np.linspace(1.0, 0.99, count))
+    curve = discount_curve("SOFR", days("2027-12-01", count), np.linspace(1.0, 0.99, count))
     assert curve.factors.size == count
     assert curve.max_date == np.datetime64("2028-03-09")
 
@@ -77,7 +79,7 @@ def test_consecutive_days_run_across_a_year_end_and_a_leap_day() -> None:
     ids=["a flat step", "all ones", "one row"],
 )
 def test_flat_and_one_row_curves_are_curves(values: NDArray[np.float64]) -> None:
-    curve = discount_curve(days("2026-09-11", values.size), values)
+    curve = discount_curve("SOFR", days("2026-09-11", values.size), values)
     assert curve.factors.tolist() == values.tolist()
 
 
@@ -85,7 +87,7 @@ def test_flat_and_one_row_curves_are_curves(values: NDArray[np.float64]) -> None
 # near underflow.
 def test_a_curve_near_underflow_never_rises() -> None:
     anchor_dates = EPOCH + np.array([46023, 46024, 46324]).astype("timedelta64[D]")
-    curve = discount_curve(anchor_dates, factors(1.0, 1e-307, 9.9999999999999e-308))
+    curve = discount_curve("SOFR", anchor_dates, factors(1.0, 1e-307, 9.9999999999999e-308))
     assert (curve.factors[1:] <= curve.factors[:-1]).all()
     assert curve.factors[-1] == 9.9999999999999e-308
 
@@ -95,14 +97,46 @@ def test_a_curve_near_underflow_never_rises() -> None:
 def test_a_curve_holds_at_most_what_a_sheet_shows() -> None:
     first = np.datetime64("2026-09-11")
     last = first + np.timedelta64(1_048_573, "D")
-    longest = discount_curve(np.array([first, last]), factors(1.0, 0.5))
+    longest = discount_curve("SOFR", np.array([first, last]), factors(1.0, 0.5))
     assert longest.dates.size == 1_048_574
     beyond = last + ONE_DAY
     with pytest.raises(ValueError) as failure:
-        discount_curve(np.array([first, beyond]), factors(1.0, 0.5))
+        discount_curve("SOFR", np.array([first, beyond]), factors(1.0, 0.5))
     assert str(failure.value) == (
         f"date row 2 is {beyond}, expected within 1048573 days of row 1's 2026-09-11"
     )
+
+
+# --- the name ---------------------------------------------------------------
+
+
+# The name is kept as typed, case and all, and any text with no whitespace around it is a
+# name: two curves of one table under two names are two curves.
+@pytest.mark.parametrize("name", ["SOFR", "sofr", "FFOIS", "Fed Funds OIS", "SOFR:1", "€STR", "x"])
+def test_a_name_is_kept_as_typed(name: str) -> None:
+    curve = discount_curve(name, THREE_DAYS, THREE_FACTORS)
+    assert curve.name == name
+    other = discount_curve("OTHER", THREE_DAYS, THREE_FACTORS)
+    assert other.name != curve.name and other.factors.tolist() == curve.factors.tolist()
+
+
+# Since a key will match the name exactly, whitespace around it would select nothing a desk
+# could type, and whitespace alone is no name; empty text never arrives from a cell.
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        (" SOFR", "name is ' SOFR', expected a name with no whitespace around it"),
+        ("SOFR ", "name is 'SOFR ', expected a name with no whitespace around it"),
+        ("\tSOFR\n", "name is '\\tSOFR\\n', expected a name with no whitespace around it"),
+        ("  ", "name is '  ', expected a name, not whitespace alone"),
+        ("", "name is '', expected a name, not whitespace alone"),
+    ],
+    ids=["a space before", "a space after", "a tab and a newline", "spaces alone", "empty"],
+)
+def test_a_name_is_text_with_no_whitespace_around_it(name: str, message: str) -> None:
+    with pytest.raises(ValueError) as failure:
+        discount_curve(name, THREE_DAYS, THREE_FACTORS)
+    assert str(failure.value) == message
 
 
 # --- what is rejected, with the row named as the sheet counts ---------------
@@ -128,7 +162,7 @@ def test_a_curve_holds_at_most_what_a_sheet_shows() -> None:
 )
 def test_dates_are_never_sorted(bad_dates: NDArray[np.datetime64], message: str) -> None:
     with pytest.raises(ValueError) as failure:
-        discount_curve(bad_dates, THREE_FACTORS)
+        discount_curve("SOFR", bad_dates, THREE_FACTORS)
     assert str(failure.value) == message
 
 
@@ -172,7 +206,7 @@ def test_factors_are_neither_rescaled_nor_clipped(
     values: NDArray[np.float64], message: str
 ) -> None:
     with pytest.raises(ValueError) as failure:
-        discount_curve(days("2026-09-11", values.size), values)
+        discount_curve("SOFR", days("2026-09-11", values.size), values)
     assert str(failure.value) == message
 
 
@@ -186,7 +220,7 @@ def test_any_daily_table_keeps_pairing_and_length(
     steps = data.draw(st.lists(st.floats(0.0, 0.001), min_size=count - 1, max_size=count - 1))
     values = np.concatenate(([1.0], 1.0 - np.cumsum(steps)))
     table_dates = EPOCH + (start + np.arange(count)).astype("timedelta64[D]")
-    curve = discount_curve(table_dates, values)
+    curve = discount_curve("SOFR", table_dates, values)
     assert curve.dates.size == curve.factors.size == count
     assert (curve.dates == table_dates).all()
     assert (curve.factors == values).all()
@@ -201,7 +235,7 @@ def test_any_anchors_give_one_day_per_calendar_day_with_every_anchor_kept(
     steps = data.draw(st.lists(st.floats(0.0, 0.01), min_size=count - 1, max_size=count - 1))
     values = np.concatenate(([1.0], 1.0 - np.cumsum(steps)))
     anchor_dates = EPOCH + (start + offsets).astype("timedelta64[D]")
-    curve = discount_curve(anchor_dates, values)
+    curve = discount_curve("SOFR", anchor_dates, values)
     assert curve.dates.size == curve.factors.size == int(offsets[-1]) + 1
     assert (np.diff(curve.dates) == ONE_DAY).all()
     assert curve.factors[offsets].tolist() == values.tolist()
@@ -209,7 +243,7 @@ def test_any_anchors_give_one_day_per_calendar_day_with_every_anchor_kept(
 
 def test_the_curve_owns_its_arrays() -> None:
     table_dates, values = days("2026-09-11", 3), factors(1.0, 0.9999, 0.9998)
-    curve = discount_curve(table_dates, values)
+    curve = discount_curve("SOFR", table_dates, values)
     values[1] = 0.5
     table_dates[1] = np.datetime64("2030-01-01")
     assert curve.factors.tolist() == [1.0, 0.9999, 0.9998]
@@ -221,5 +255,5 @@ def test_the_curve_owns_its_arrays() -> None:
 
 
 def test_a_one_row_curve_starts_and_ends_on_its_one_day() -> None:
-    curve = discount_curve(days("2026-09-11", 1), factors(1.0))
+    curve = discount_curve("SOFR", days("2026-09-11", 1), factors(1.0))
     assert curve.start_date == curve.max_date == np.datetime64("2026-09-11")

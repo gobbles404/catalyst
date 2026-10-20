@@ -18,18 +18,18 @@ def util_ReadHandle(handle: Handle[object]) -> MixedArray: ...
 | 2 | 11-Sep-2026 | 1 |
 | 3 | 12-Sep-2026 | 0.9999 |
 | 4 | 13-Sep-2026 | 0.9998 |
-| 5 | `=_CreateDiscountCurve(A1:B1, A2:B4)` | shows `30512:discount_curve:2` |
-| 7 | `=util_ReadHandle(B5)` | spills A7:B11, below |
+| 5 | `=_CreateDiscountCurve("SOFR", A1:B1, A2:B4)` | shows `30512:discount_curve:SOFR:2` |
+| 7 | `=util_ReadHandle(B5)` | spills A7:C11, below |
 
-| | A | B |
-|---|---|---|
-| 7 | date | discount_factor |
-| 8 | datetime64[D] | float64 |
-| 9 | 11-Sep-2026 | 1 |
-| 10 | 12-Sep-2026 | 0.9999 |
-| 11 | 13-Sep-2026 | 0.9998 |
+| | A | B | C |
+|---|---|---|---|
+| 7 | date | discount_factor | name |
+| 8 | datetime64[D] | float64 | str |
+| 9 | 11-Sep-2026 | 1 | SOFR |
+| 10 | 12-Sep-2026 | 0.9999 | SOFR |
+| 11 | 13-Sep-2026 | 0.9998 | SOFR |
 
-One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the daily table `_CreateDiscountCurve` built, which as anchors with no gaps is one it takes, so `=_CreateDiscountCurve(A7:B7, A9:B11)` makes an equal curve: a spill can be fed back to a creator. A curve built from sparse anchors spills its days, not its anchors, since #70.
+One argument, required: any live handle, the cell showing a creator's result or a name for it. The seam resolves it to the object, and every failure is the seam's, in the seam's words: a number or a blank where the handle should be, text naming no live object, or a creator's failure relayed by the reference. The result spills as returned: dates go out as Excel dates, serials the sheet formats, as every date the seam sends does, so a fresh column shows `46276` until it is formatted once; the row of types says which columns to format. Rows 7 and 9 to 11 are the daily table `_CreateDiscountCurve` built, which as anchors with no gaps is one it takes, with the curve's name on every row, last, so that every positional read of the two columns stands; `=_CreateDiscountCurve(C9, A7:B7, A9:B11)` makes an equal curve under the same name: a spill can be fed back to a creator. A curve built from sparse anchors spills its days, not its anchors, since #70.
 
 ## Excel help
 
@@ -53,7 +53,8 @@ What each kind shows:
 | Kind | Headers | Types | Rows |
 |---|---|---|---|
 | `valuation_date` | `as_of`, `day_fraction_elapsed` | `datetime64[D]`, `float` | one |
-| `discount_curve` | `date`, `discount_factor` | `datetime64[D]`, `float64` | one per calendar day, the anchors and every day filled between them |
+| `discount_curve` | `date`, `discount_factor`, `name` | `datetime64[D]`, `float64`, `str` | one per calendar day, the anchors and every day filled between them, the curve's name on every row, last |
+| `discount_curve_set` | `name`, `start_date`, `end_date`, `days` | `str`, `datetime64[D]`, `datetime64[D]`, `int64` | one per curve in the order given, its name, its first and its last day and the days between, inclusive; the daily factors are each curve's own handle's to spill; [collect-discount-curves.md](../globals/collect-discount-curves.md) |
 | `futures_schedule` | `contract_code`, `future_expiry`, then `option_expiry` when the index has options | `str`, then `datetime64[D]` per date column | one per contract |
 | `holiday_calendar` | `holiday` | `datetime64[D]` | one per holiday |
 | `iferc_schedule` | `contract_code`, `last_trading_date`, `publication_date` | `str`, `datetime64[D]`, `datetime64[D]` | one per contract month |
@@ -105,7 +106,8 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | Case | Kind |
 |---|---|
 | a valuation date: the two headers, the two types, one row, the date and the fraction exactly | example |
-| the three-day curve: the two headers, the two types, three rows, dates as serials, factors exactly | example |
+| the three-day curve: the three headers, the three types, three rows, dates as serials, factors exactly and the name on every row | example |
+| a collection of curves: one row per curve in the order given, the name, the span as serials and the days; a collection of one | example |
 | the six-contract schedule with options: three columns; without options: two | example |
 | a three-day calendar: one column of dates under its two heading rows | example |
 | the IFERC schedule: three headers, three types, then a code as text and two dates as serials per contract month | example |
@@ -121,8 +123,8 @@ The tests are `tests/unit/test_utilities.py`, through the seam; the help is pinn
 | a market of one day: the quote a number on the open day, `closed` as text when the day is a holiday; a Gas Daily and an IFERC market of one month, the print or the index where fixed and the quote elsewhere; and for any history of any of the three kinds with any count of quotes from one to the contracts that remain, the calendar's rows through the last contract quoted and every period's fixing, quote or `closed` | example and property |
 | the calendar: four columns, the day as a serial, the code as text and the two flags as booleans, their kinds the boolean code | example |
 | the market history: five columns, the calendar's kinds then a number on the fixed day and text on a day without a price, over a futures calendar and over the other two | example |
-| a curve's spill, headers and body, fed back to `_CreateDiscountCurve` gives a curve with equal dates and factors | example, through the seam |
-| for any valid curve of N days, the spill is N + 2 rows by 2 columns, headers first, types second, and row i + 2 holds day i and its factor | property |
+| a curve's spill, its name from a body row, its first two headers and its rows' first two cells, fed back to `_CreateDiscountCurve` gives a curve with equal dates, factors and spill | example, through the seam |
+| for any valid curve of N days, the spill is N + 2 rows by 3 columns, headers first, types second, and row i + 2 holds day i, its factor and the name | property |
 | a number, a blank, text naming no live object, a creator's failure relayed: the seam's words, and nothing spilled | example, through the seam |
 | a kind with no table fails in the cell rather than guessing; every kind a creator publishes has one | example |
 | each kind inspected on a real sheet, with a schedule without options, a calendar of one day, a history and a market over 34 days and a vector of four prices | Excel smoke |

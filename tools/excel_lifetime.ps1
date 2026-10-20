@@ -614,7 +614,7 @@ $bumps = {
     Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:R26,K27:R27)'
     Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
     Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
-    Put $state $sheet "D29" "=_CreateDiscountCurve(W1:X1,W2:X4)"
+    Put $state $sheet "D29" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
     Put $state $sheet "D30" "=_EvaluateTrades(D28,D11,D29)"
     Put $state $sheet "D31" "=INDEX(_ReportValues(D30),3,1)"
     Put $state $sheet "D34" '=TEXT(INDEX(_ReportRisk(D30,"dv01","day"),4,2),"0.000000")'
@@ -632,7 +632,7 @@ $bumps = {
     $down = Text $state $sheet "H30"
     $onBump = Text $state $sheet "G30"
     Check "the mark on the curve is 5,544, two lots of 2.8 over 70 at 0.99" ((Text $state $sheet "D31") -eq "5544") (Text $state $sheet "D31")
-    Check "the bump's cell shows a discount curve handle of its own" ($bump.StartsWith("${id}:discount_curve:") -and $bump -ne $curve) $bump
+    Check "the bump's cell shows a discount curve handle of its own" ($bump.StartsWith("${id}:discount_curve:SOFR:") -and $bump -ne $curve) $bump
     Check "the payment day's factor a basis point up, 0.99 less 58 days of a basis point" ((Text $state $sheet "G32") -eq "0.989984268618") (Text $state $sheet "G32")
     Check "and the mark on the bump follows it" ((Text $state $sheet "G31") -eq "5543.911904") (Text $state $sheet "G31")
     Check "the results on the bump show a handle of their own" ($onBump.StartsWith("${id}:trade_results:WTI NYMEX:") -and $onBump -ne (Text $state $sheet "D30")) $onBump
@@ -657,7 +657,7 @@ $bumps = {
     Check "the equal call cleared releases nothing, the bump held by its own cell" ($c.Live -eq 21 -and $c.Published -eq 26 -and $c.Released -eq 5) $c.Text
     $onBump = Text $state $sheet "G30"
     Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
-    Check "a changed bump gives the bump a new handle" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "G29")
+    Check "a changed bump gives the bump a new handle" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "G29")
     Check "and the factor two basis points up" ((Text $state $sheet "G32") -eq "0.989968537486") (Text $state $sheet "G32")
     Check "and its results a new one, while the curve stands" ((Text $state $sheet "G30") -ne $onBump -and (Text $state $sheet "D29") -eq $curve) (Text $state $sheet "G30")
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 7 }
@@ -667,8 +667,8 @@ $bumps = {
     # released.
     $bump = Text $state $sheet "G29"
     Put $state $sheet "X3" "0.98"
-    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D29")
-    Check "and both bumps new ones" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "H30") -ne $down -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:")) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "D29")
+    Check "and both bumps new ones" ((Text $state $sheet "G29") -ne $bump -and (Text $state $sheet "H30") -ne $down -and (Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:")) ((Text $state $sheet "G29") + " " + (Text $state $sheet "H30"))
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 -and $c.Released -ge 13 }
     Check "the old curve, bumps and results are released; six more published" ($c.Live -eq 21 -and $c.Published -eq 34 -and $c.Released -eq 13) $c.Text
 
@@ -681,7 +681,7 @@ $bumps = {
     $c = Settle $state $sheet { param($c) $c.Live -eq 19 }
     Check "the bump and its results own nothing: nineteen live, two released, nothing published" ($c.Live -eq 19 -and $c.Published -eq 34 -and $c.Released -eq 15) $c.Text
     Put $state $sheet "G29" "=util_BumpDiscountCurve(D29,2)"
-    Check "repaired, the bump and its results rebuild" ((Text $state $sheet "G29").StartsWith("${id}:discount_curve:") -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
+    Check "repaired, the bump and its results rebuild" ((Text $state $sheet "G29").StartsWith("${id}:discount_curve:SOFR:") -and (Text $state $sheet "G30").StartsWith("${id}:trade_results:WTI NYMEX:")) (Text $state $sheet "G30")
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
     Check "twenty-one live again, two more published" ($c.Live -eq 21 -and $c.Published -eq 36 -and $c.Released -eq 15) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
@@ -717,7 +717,7 @@ $cashflows = {
     Put $state $sheet "D22" '=_CreateTradeTemplate("cashflow",A14:B14,A15:B15)'
     Put $state $sheet "D23" "=_CreateCashflows(A17:E17,A18:E20,D22)"
     Put $state $sheet "D24" "=_CreateValuationDate(G14,0.5)"
-    Put $state $sheet "D25" "=_CreateDiscountCurve(H14:I14,H15:I17)"
+    Put $state $sheet "D25" '=_CreateDiscountCurve("SOFR",H14:I14,H15:I17)'
     Put $state $sheet "D26" "=_EvaluateCashflows(D23,D24,D25)"
     Put $state $sheet "D27" "=INDEX(_ReportValues(D26),3,1)"
     Put $state $sheet "D28" "=INDEX(_ReportValues(D26),3,2)"
@@ -744,7 +744,7 @@ $cashflows = {
     # A changed factor: the curve and the results publish anew, the old two released; the batch
     # stands and the mark follows, 600 at 0.96.
     Put $state $sheet "I16" "0.96"
-    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D25") -ne $curve -and (Text $state $sheet "D25").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D25")
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D25") -ne $curve -and (Text $state $sheet "D25").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "D25")
     Check "and the results a new one, 600 of mark" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D27") -eq "600") (Text $state $sheet "D27")
     Check "while the batch stands" ((Text $state $sheet "D23") -eq $batch) (Text $state $sheet "D23")
     $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 4 }
@@ -759,7 +759,7 @@ $cashflows = {
     Put $state $sheet "H15" "4-Jan-2028"; Put $state $sheet "I15" "1"
     Put $state $sheet "H16" "3-Jan-2029"; Put $state $sheet "I16" "0.9"
     Clear-Cell $state $sheet "H17"; Clear-Cell $state $sheet "I17"
-    Put $state $sheet "D25" "=_CreateDiscountCurve(H14:I14,H15:I16)"
+    Put $state $sheet "D25" '=_CreateDiscountCurve("SOFR",H14:I14,H15:I16)'
     Invoke-ExcelCall "calculation" { $state.Excel.Calculate() }
     Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
     Check "the day rolled gives the results a new handle" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:")) (Text $state $sheet "D26")
@@ -1110,7 +1110,7 @@ $valuation = {
     Put $state $sheet "D26" '=_CreateTradeTemplate("fixed_float",K26:R26,K27:R27)'
     Put $state $sheet "D27" "=_CreateTrades(D5,K4:N4,K6:N6,D26)"
     Put $state $sheet "D28" "=_PrepareTrades(D27,D9)"
-    Put $state $sheet "D29" "=_CreateDiscountCurve(W1:X1,W2:X4)"
+    Put $state $sheet "D29" '=_CreateDiscountCurve("SOFR",W1:X1,W2:X4)'
     Put $state $sheet "D30" "=_EvaluateTrades(D28,D11,D29)"
     Put $state $sheet "D31" "=INDEX(_ReportValues(D30),3,1)"
     Put $state $sheet "D32" '=INDEX(_ReportRisk(D30,"nominal_delta","year"),4,2)'
@@ -1145,7 +1145,7 @@ $valuation = {
     $market = Text $state $sheet "D11"
     $bilateral = Text $state $sheet "D30"
     Put $state $sheet "X3" "0.98"
-    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:")) (Text $state $sheet "D29")
+    Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D29") -ne $curve -and (Text $state $sheet "D29").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "D29")
     Check "and the results a new one, 7,448 at 0.98" ((Text $state $sheet "D30") -ne $bilateral -and (Text $state $sheet "D31") -eq "7448") (Text $state $sheet "D31")
     Check "the cross-gamma follows the factor, -0.0000161 at 0.98" ((Text $state $sheet "D36") -eq "-0.0000161") (Text $state $sheet "D36")
     Check "the market and the preparation stand" ((Text $state $sheet "D11") -eq $market -and (Text $state $sheet "D28") -eq $prepared) ((Text $state $sheet "D11") + " " + (Text $state $sheet "D28"))
@@ -1208,7 +1208,7 @@ $valuation = {
     Put $state $sheet "AB2" "24-Jun-2026"; Put $state $sheet "AC2" "1"
     Put $state $sheet "AB3" "23-Jul-2026"; Put $state $sheet "AC3" "0.98"
     Put $state $sheet "AB4" "31-Dec-2027"; Put $state $sheet "AC4" "0.9"
-    Put $state $sheet "F29" "=_CreateDiscountCurve(AB1:AC1,AB2:AC4)"
+    Put $state $sheet "F29" '=_CreateDiscountCurve("SOFR",AB1:AC1,AB2:AC4)'
     Put $state $sheet "F30" "=_EvaluateTrades(D28,D11,F29)"
     Put $state $sheet "F31" "=INDEX(_ReportValues(F30),3,1)"
     Put $state $sheet "F32" '=TEXT(INDEX(_ReportRisk(F30,"cross_gamma","year"),4,2),"0.0000000")'

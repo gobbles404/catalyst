@@ -122,10 +122,13 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "Fail", new object[] { }, "#ERROR Fail: ValueError: as asked" };
             // Handles: a creator's own rule, a curve that cannot be made, and text naming no live object.
             yield return new object[] { "_CreateValuationDate", new object[] { 46276.0, 1.5 }, "#ERROR _CreateValuationDate: ValueError: day_fraction_elapsed is number 1.5, expected a number from 0 to 1" };
-            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Curve(0.98) }, "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { "SOFR", Row("date", "discount_factor"), Curve(0.98) }, "#ERROR _CreateDiscountCurve: ValueError: discount_factor row 1 is 0.98, expected exactly 1 at the curve's first date" };
             // The curve from anchors: dates that run backwards are never sorted, and a span no sheet could show is refused.
-            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
-            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { "SOFR", Row("date", "discount_factor"), new object[,] { { 46279.0, 1.0 }, { 46276.0, 0.9997 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 2026-09-11, expected a date after row 1's 2026-09-14" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { "SOFR", Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 1094850.0, 0.5 } } }, "#ERROR _CreateDiscountCurve: ValueError: date row 2 is 4897-08-04, expected within 1048573 days of row 1's 2026-09-11" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { "SOFR ", Row("date", "discount_factor"), Curve() }, "#ERROR _CreateDiscountCurve: ValueError: name is 'SOFR ', expected a name with no whitespace around it" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { "", Row("date", "discount_factor"), Curve() }, "#ERROR _CreateDiscountCurve: name is empty text, expected text" };
+            yield return new object[] { "_CreateDiscountCurve", new object[] { Row("date", "discount_factor"), Row("date", "discount_factor"), Curve() }, "#ERROR _CreateDiscountCurve: name is 1x2 array, expected text" };
             yield return new object[] { "util_ReadHandle", new object[] { "x" }, "#ERROR util_ReadHandle: handle is text 'x' naming no live object, expected a handle" };
             yield return new object[] { "util_ReadHandle", new object[] { 46276.0 }, "#ERROR util_ReadHandle: handle is number 46276.0, expected a handle" };
             // The prompt reader: one calendar handle. Left out, a number and text naming no live object fail in the seam's words; the live calendars are in the calendar fact below.
@@ -444,13 +447,14 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_discount_curve_is_bumped_by_basis_points_into_an_ordinary_curve()
         {
-            var curve = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), Curve());
+            var curve = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), Curve());
             var bumped = (string)Seam.Call("util_BumpDiscountCurve", curve, 1.0);
-            Assert.StartsWith(Pid + ":discount_curve:", bumped);
+            Assert.StartsWith(Pid + ":discount_curve:SOFR:", bumped);
             Assert.NotEqual(curve, bumped);
             var spill = (object[,])Seam.Call("util_ReadHandle", bumped);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("SOFR", spill[2, 2]);
             Assert.Equal("date", spill[0, 0]);
             Assert.Equal("discount_factor", spill[0, 1]);
             Assert.Equal("float64", spill[1, 1]);
@@ -462,8 +466,69 @@ namespace Goosedove.Host.Tests
             var still = (object[,])Seam.Call("util_ReadHandle", Seam.Call("util_BumpDiscountCurve", curve, 0.0));
             Assert.Equal(0.9998, still[4, 1]);
             Assert.Equal("#ERROR util_BumpDiscountCurve: bump_bps is text '1bp', expected number", Seam.Call("util_BumpDiscountCurve", curve, "1bp"));
-            var ones = Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 46277.0, 1.0 }, { 46278.0, 1.0 } });
+            var ones = Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 46277.0, 1.0 }, { 46278.0, 1.0 } });
             Assert.Equal("#ERROR util_BumpDiscountCurve: ValueError: discount_factor rises at row 2, from 1.0 to 1.0000002739726404", Seam.Call("util_BumpDiscountCurve", ones, -1.0));
+        }
+
+        // Named curves and their collection, named-curves-slice-1.md: a curve is created under its
+        // name, SOFR, carried in its handle and on every row of its readback, last; a bump keeps it;
+        // _CollectDiscountCurves gathers curves into a compact set handle whose readback is one row
+        // per curve, the name, the span and the days, in the order given; each name once, two
+        // snapshots of FFOIS refused by the library, a valuation date and a nested collection by the
+        // seam at their cells; and the name's own refusals, whitespace around it, whitespace alone,
+        // a number and the argument left out.
+        [Fact]
+        public void discount_curves_are_named_and_collected_each_name_once()
+        {
+            var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), Curve());
+            Assert.StartsWith(Pid + ":discount_curve:SOFR:", sofr);
+            var ffois = (string)Seam.Call("_CreateDiscountCurve", "FFOIS", Row("date", "discount_factor"), new object[,] { { 46276.0, 1.0 }, { 46279.0, 0.9997 } });
+            Assert.StartsWith(Pid + ":discount_curve:FFOIS:", ffois);
+            var spill = (object[,])Seam.Call("util_ReadHandle", sofr);
+            Assert.Equal(5, spill.GetLength(0));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("name", spill[0, 2]);
+            Assert.Equal("str", spill[1, 2]);
+            Assert.Equal("SOFR", spill[2, 2]);
+            Assert.Equal("SOFR", spill[4, 2]);
+            Assert.Equal(0.9998, spill[4, 1]);
+            var bumped = (string)Seam.Call("util_BumpDiscountCurve", ffois, 1.0);
+            Assert.StartsWith(Pid + ":discount_curve:FFOIS:", bumped);
+            Assert.Equal("FFOIS", ((object[,])Seam.Call("util_ReadHandle", bumped))[3, 2]);
+            var both = (string)Seam.Call("_CollectDiscountCurves", Column(sofr, ffois));
+            Assert.StartsWith(Pid + ":discount_curve_set:", both);
+            var table = (object[,])Seam.Call("util_ReadHandle", both);
+            Assert.Equal(4, table.GetLength(0));
+            Assert.Equal(4, table.GetLength(1));
+            Assert.Equal("name", table[0, 0]);
+            Assert.Equal("start_date", table[0, 1]);
+            Assert.Equal("end_date", table[0, 2]);
+            Assert.Equal("days", table[0, 3]);
+            Assert.Equal("str", table[1, 0]);
+            Assert.Equal("datetime64[D]", table[1, 2]);
+            Assert.Equal("int64", table[1, 3]);
+            Assert.Equal("SOFR", table[2, 0]);
+            Assert.Equal(46276.0, table[2, 1]);
+            Assert.Equal(46278.0, table[2, 2]);
+            Assert.Equal(3.0, table[2, 3]);
+            Assert.Equal("FFOIS", table[3, 0]);
+            Assert.Equal(46279.0, table[3, 2]);
+            Assert.Equal(4.0, table[3, 3]);
+            var row = (string)Seam.Call("_CollectDiscountCurves", Row(bumped, sofr));
+            Assert.StartsWith(Pid + ":discount_curve_set:", row);
+            Assert.NotEqual(both, row);
+            Assert.Equal("FFOIS", ((object[,])Seam.Call("util_ReadHandle", row))[2, 0]);
+            var one = (string)Seam.Call("_CollectDiscountCurves", sofr);
+            Assert.Equal(3, ((object[,])Seam.Call("util_ReadHandle", one)).GetLength(0));
+            Assert.Equal("#ERROR _CollectDiscountCurves: ValueError: curve_handles cell 1 and cell 2 are both named 'FFOIS', expected each name once", Seam.Call("_CollectDiscountCurves", Column(ffois, bumped)));
+            var date = (string)Seam.Call("_CreateValuationDate", 46276.0, 0.5);
+            Assert.Equal("#ERROR _CollectDiscountCurves: curve_handles cell (2, 1) is valuation date handle '" + date + "', expected discount curve handle", Seam.Call("_CollectDiscountCurves", Column(sofr, date)));
+            Assert.Equal("#ERROR _CollectDiscountCurves: curve_handles is discount curve set handle '" + both + "', expected discount curve handle", Seam.Call("_CollectDiscountCurves", both));
+            Assert.Equal("#ERROR _CollectDiscountCurves: curve_handles is missing, expected discount curve handles in a cell, a row or a column", Seam.Call("_CollectDiscountCurves", ExcelMissing.Value));
+            Assert.Equal("#ERROR _CreateDiscountCurve: ValueError: name is ' SOFR', expected a name with no whitespace around it", Seam.Call("_CreateDiscountCurve", " SOFR", Row("date", "discount_factor"), Curve()));
+            Assert.Equal("#ERROR _CreateDiscountCurve: ValueError: name is '  ', expected a name, not whitespace alone", Seam.Call("_CreateDiscountCurve", "  ", Row("date", "discount_factor"), Curve()));
+            Assert.Equal("#ERROR _CreateDiscountCurve: name is number 1.0, expected text", Seam.Call("_CreateDiscountCurve", 1.0, Row("date", "discount_factor"), Curve()));
+            Assert.Equal("#ERROR _CreateDiscountCurve: name is missing, expected text", Seam.Call("_CreateDiscountCurve", ExcelMissing.Value, Row("date", "discount_factor"), Curve()));
         }
 
         // The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the
@@ -482,7 +547,7 @@ namespace Goosedove.Host.Tests
             var batch = (string)Seam.Call("_CreateCashflows", fields, rows, template);
             Assert.StartsWith(Pid + ":cashflows:USD:", batch);
             var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
-            var curve = Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
+            var curve = Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
             var results = (string)Seam.Call("_EvaluateCashflows", batch, date, curve);
             Assert.StartsWith(Pid + ":cashflow_results:USD:", results);
             var values = (object[,])Seam.Call("_ReportValues", results);
@@ -1916,7 +1981,7 @@ namespace Goosedove.Host.Tests
         public void a_curve_from_anchors_spills_every_day_between_them()
         {
             var anchors = new object[,] { { 46276.0, 1.0 }, { 46279.0, 0.9997 }, { 46286.0, 0.999 } };
-            var handle = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), anchors);
+            var handle = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), anchors);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(13, spill.GetLength(0));
             Assert.Equal(46276.0, spill[2, 0]);
@@ -1933,17 +1998,19 @@ namespace Goosedove.Host.Tests
         [Fact]
         public void a_curve_is_created_as_a_handle_and_read_back_through_it()
         {
-            var handle = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), Curve());
-            Assert.StartsWith(Pid + ":discount_curve:", handle);
+            var handle = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), Curve());
+            Assert.StartsWith(Pid + ":discount_curve:SOFR:", handle);
             var spill = (object[,])Seam.Call("util_ReadHandle", handle);
             Assert.Equal(5, spill.GetLength(0));
-            Assert.Equal(2, spill.GetLength(1));
+            Assert.Equal(3, spill.GetLength(1));
+            Assert.Equal("name", spill[0, 2]);
+            Assert.Equal("SOFR", spill[3, 2]);
             Assert.Equal("date", spill[0, 0]);
             Assert.Equal("float64", spill[1, 1]);
             Assert.Equal(46277.0, spill[3, 0]);
             Assert.Equal(0.9999, spill[3, 1]);
             var swapped = new object[,] { { 1.0, 46276.0 }, { 0.9999, 46277.0 }, { 0.9998, 46278.0 } };
-            var reversed = (string)Seam.Call("_CreateDiscountCurve", Row("discount_factor", "date"), swapped);
+            var reversed = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("discount_factor", "date"), swapped);
             Assert.NotEqual(handle, reversed);
             var again = (object[,])Seam.Call("util_ReadHandle", reversed);
             Assert.Equal(0.9998, again[4, 1]);
@@ -2388,7 +2455,7 @@ namespace Goosedove.Host.Tests
             // 5 January 2027, 34 days out: a lot of Z26 net, 0.99 discounted, and -0.0001 times 33 over 365 times 0.99
             // of cross-gamma on the contract's 2026 under the curve's label; all four five wide; the readback's
             // last two columns the contract's cross-gamma on every row and its unit.
-            var facedCurve = (string)Seam.Call("_CreateDiscountCurve", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.99 } });
+            var facedCurve = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46358.0, 1.0 }, { 46392.0, 0.99 } });
             var facedResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurve);
             var facedCross = (object[,])Seam.Call("_ReportRisk", facedResults, "cross_gamma", "year");
             Assert.Equal(5, facedCross.GetLength(0));

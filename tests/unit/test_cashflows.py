@@ -454,7 +454,7 @@ def a_sheet() -> dict[str, Any]:
     )
     batch = ENTRY["_CreateCashflows"](FIELDS, ROWS, template)
     date = ENTRY["_CreateValuationDate"](serial(AS_OF), 0.5)
-    curve = ENTRY["_CreateDiscountCurve"](CURVE_HEADERS, CURVE_BODY)
+    curve = ENTRY["_CreateDiscountCurve"]("SOFR", CURVE_HEADERS, CURVE_BODY)
     results = ENTRY["_EvaluateCashflows"](batch, date, curve)
     return {
         "template": template, "batch": batch, "date": date, "curve": curve, "results": results

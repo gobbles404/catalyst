@@ -13,17 +13,20 @@ from goosedove.excel.bridge import (
     Date,
     DateColumn,
     Handle,
+    Handles,
     NumberColumn,
     Table,
     TextRow,
     excel_function,
 )
 from goosedove.globals.discount_curve import DiscountCurve, discount_curve
+from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_discount_curves
 from goosedove.globals.valuation_date import ValuationDate, valuation_date
+from goosedove.instrumentation.work_counts import WorkCounter
 
 # The worksheet functions this module registers, named here so that their leading underscore
 # reads as Excel's filter, docs/library/conventions.md under Names, and not as Python's privacy.
-__all__ = ["_CreateDiscountCurve", "_CreateValuationDate"]
+__all__ = ["_CollectDiscountCurves", "_CreateDiscountCurve", "_CreateValuationDate"]
 
 
 @excel_function
@@ -49,6 +52,11 @@ class DiscountCurveTable(Table):
 
 @excel_function
 def _CreateDiscountCurve(
+    name: Annotated[
+        str,
+        "The curve's name, text such as SOFR, exact and case-sensitive with no whitespace around "
+        "it: what a trade's discount_curve_key will select and the reports will show.",
+    ],
     header_row: Annotated[
         TextRow,
         "The header cells of your curve table, such as A1:B1, reading date and discount_factor "
@@ -60,6 +68,21 @@ def _CreateDiscountCurve(
         "factor, dates increasing from the valuation date at 1, the factors never rising.",
     ],
 ) -> Handle[DiscountCurve]:
-    """Creates a discount curve from anchor dates and their discount factors, every day between
-    filled in, and shows its handle, the text other formulas take as the curve."""
-    return discount_curve(table.date, table.discount_factor)
+    """Creates a discount curve under its name from anchor dates and their discount factors,
+    every day between filled in, and shows its handle, the text other formulas take as the
+    curve."""
+    return discount_curve(name, table.date, table.discount_factor)
+
+
+@excel_function
+def _CollectDiscountCurves(
+    curve_handles: Annotated[
+        Handles[DiscountCurve],
+        "The curves to collect: a cell, a row or a column of cells showing _CreateDiscountCurve's "
+        "or util_BumpDiscountCurve's results, such as B2:B3, each name once.",
+    ],
+) -> Handle[DiscountCurveSet]:
+    """Collects named discount curves into one collection, each name once, the curves as they
+    are and nothing of their factors combined, and shows its handle, the text other formulas
+    take as the collection."""
+    return collect_discount_curves(curve_handles, WorkCounter())

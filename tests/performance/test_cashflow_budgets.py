@@ -52,7 +52,7 @@ def a_ticket(rows: int, days: int) -> FieldValues:
 def a_curve(days: int) -> DiscountCurve:
     """A curve from the valuation day past the last payment day, two anchors."""
     dates = np.array([AS_OF, AS_OF + np.timedelta64(days + 1, "D")], dtype="datetime64[D]")
-    return discount_curve(dates, np.array([1.0, 0.9]))
+    return discount_curve("SOFR", dates, np.array([1.0, 0.9]))
 
 
 def a_batch(rows: int, days: int) -> Cashflows:
@@ -226,7 +226,7 @@ def a_sheet(rows: int, days: int) -> dict[str, Any]:
         "body": body,
         "date": ENTRY["_CreateValuationDate"](SERIAL, 0.5),
         "curve": ENTRY["_CreateDiscountCurve"](
-            CURVE_HEADERS, Cells.from_rows([[SERIAL, 1.0], [SERIAL + days + 1, 0.9]])
+            "SOFR", CURVE_HEADERS, Cells.from_rows([[SERIAL, 1.0], [SERIAL + days + 1, 0.9]])
         ),
     }
 
