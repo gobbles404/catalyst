@@ -1045,7 +1045,9 @@ namespace Goosedove.Host.Tests
         // and F27 and G27 month-matching, closed on weekends and New Year's Day, valued 31 December 2026
         // with both months live at 30 and 60; a bilateral and a cleared quote template over the fields a
         // quote may hold, SOFR 0.99 on 1 February and 0.98 on 1 March, the two payment days of +1bd on a
-        // weekend-only calendar; the month and calendar-day prices by hand, January alone 30; the
+        // weekend-only calendar; the month and calendar-day prices by hand, January alone 30, the strip's
+        // balance the strip with both months ahead and the balance of a month gone refused, since
+        // balance-of-period-quotes.md; the
         // template's readback; a trade template and a blank fourth cell refused by the seam, a left-out or
         // a surplus collection by the library, and the quote template refused where a trade template is taken.
         [Fact]
@@ -1068,6 +1070,8 @@ namespace Goosedove.Host.Tests
             Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "F27-G27", cleared, ExcelMissing.Value), 12);
             Assert.Equal(44.923857868020306, (double)Seam.Call("_Quote", market, "F27-G27", otc, rates), 12);
             Assert.Equal(30.0, (double)Seam.Call("_Quote", market, "F27", otc, rates), 12);
+            Assert.Equal(44.23728813559322, (double)Seam.Call("_Quote", market, "BALF27-G27", cleared, ExcelMissing.Value), 12);
+            Assert.Equal("#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day", Seam.Call("_Quote", market, "BALX26", cleared, ExcelMissing.Value));
             var shown = (object[,])Seam.Call("util_ReadHandle", otc);
             Assert.Equal(3, shown.GetLength(0));
             Assert.Equal(8, shown.GetLength(1));

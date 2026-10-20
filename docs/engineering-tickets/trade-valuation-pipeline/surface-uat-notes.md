@@ -720,7 +720,10 @@ route, payment terms and the static curve key. Cleared quotes are undiscounted; 
 payment dates on or before `as_of` use factor 1, future dates the selected curve. CAL27
 requested in June retains every month, with past fixings and live prices for the remaining
 observations. IFERC payment offsets start on publication under either route. This supersedes
-the [four-input prototype](quoting-prototype.md), not implemented.
+the [four-input prototype](quoting-prototype.md), not implemented. Since #208 a balance,
+`BALZ26` or `BALCAL27`, prices from the market's valuation day,
+[balance-of-period-quotes.md](balance-of-period-quotes.md): a balance is asked for by name, and
+`CAL27` keeps every month.
 
 To check in UAT: whether the dedicated quote template and the short formula feel natural; whether
 the whole-period price matches the desk's CAL27-in-June request; which component or payment

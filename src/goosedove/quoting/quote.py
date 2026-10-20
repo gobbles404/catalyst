@@ -30,6 +30,7 @@ from goosedove.index_definitions.futures_schedule import FuturesSchedule
 from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.iferc_schedule import IfercSchedule
 from goosedove.index_definitions.kind import named
+from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import NONE
@@ -49,7 +50,6 @@ from goosedove.trades.resolution import (
 )
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import (
-    months_of,
     payment_rule_of,
     quantity_per_of,
     route_of,
@@ -98,7 +98,8 @@ def quote(
     quote and left out for a cleared one, the key bound to the curve of that exact name and the
     curve starting on the valuation day; the market's index takes the terms, a futures index the
     four methods and an IFERC index lastday with a financial settlement, a physical settlement
-    lastday alone; every month of the period is a contract of the schedule; the observations,
+    lastday alone; the period, a label or since balance-of-period-quotes.md the balance of one
+    from the valuation day, every month of it a contract of the schedule; the observations,
     their pricing contracts and their calendar rows by the pipeline's rules, a fixed day's price
     off the history and a live day's off the market's quotes; a financial quote's payments after
     each month's last observation, within the sheet's calendar, and a physical quote's contracts
@@ -114,14 +115,14 @@ def quote(
     schedule = trade_schedule_of(index)
     _the_method(terms, schedule)
     codes = schedule.codes
-    contract, first, last = _the_months(contract_code, schedule, counter)
+    contract, first, last = _the_period(contract_code, schedule, as_of, counter)
     n = contract.size
 
     def component(k: int) -> str:
         return codes[int(contract[k])]
 
     method = np.full(n, METHODS.index(terms.method), dtype=np.intp)
-    observations = observed(method, index, contract, first, last, component)
+    observations = observed(method, index, contract, first, last, lambda _: "the quote")
     counter.hit(OBSERVATIONS_MADE, observations.component.size)
     references = observation_references(
         schedule, index.holiday_calendar, observations, contract, method, component
@@ -297,15 +298,24 @@ def _the_method(terms: _Terms, schedule: FuturesSchedule | IfercSchedule) -> Non
 # --- the period --------------------------------------------------------------------------------
 
 
-def _the_months(
-    contract_code: str, schedule: FuturesSchedule | IfercSchedule, counter: WorkCounter
+def _the_period(
+    contract_code: str,
+    schedule: FuturesSchedule | IfercSchedule,
+    as_of: np.datetime64,
+    counter: WorkCounter,
 ) -> tuple[NDArray[np.intp], NDArray[np.datetime64], NDArray[np.datetime64]]:
-    """The period's months as rows of the schedule, through the period grammar and the
-    batch's own lookup, every schedule code read for its month, a month the schedule lacks
-    refused by name; and each month's first and last calendar day, the days a whole-month
-    component covers. Work: the codes read and the months resolved."""
-    first_month, after = months_of("contract_code", contract_code)
-    month = np.arange(first_month, after, dtype=np.int64)
+    """The period's months as rows of the schedule and the days each covers. The request is read
+    through the readers the two date utilities use: a label's whole months whatever the day, and
+    since balance-of-period-quotes.md a balance, BALZ26, from the later of the market's valuation
+    day and the period's first day to its last, a period that has ended refused in the readers'
+    own words. The span is split at month ends, the first and the last month clipped to the days
+    the span covers and a month between them whole, as the resolution splits a dated row; every
+    schedule code is read for its month, and a month the schedule lacks is refused by name.
+    Work: the codes read and the months resolved, the balance's months among them."""
+    first_day, last_day = _the_span(contract_code, as_of)
+    first_month = int(first_day.astype("datetime64[M]").astype(np.int64))
+    last_month = int(last_day.astype("datetime64[M]").astype(np.int64))
+    month = np.arange(first_month, last_month + 1, dtype=np.int64)
     months = schedule_months(schedule)
     counter.hit(SCHEDULE_CODES_READ, len(schedule.codes))
     contract = schedule_rows(
@@ -316,7 +326,22 @@ def _the_months(
     )
     counter.hit(MONTHS_RESOLVED, month.size)
     first, last = month_bounds(month)
+    first[0] = max(first[0], first_day)
+    last[-1] = min(last[-1], last_day)
     return contract, first, last
+
+
+def _the_span(contract_code: str, as_of: np.datetime64) -> tuple[np.datetime64, np.datetime64]:
+    """The first and the last day the request covers, as util_StartDate and util_EndDate read a
+    label with the valuation day: the grammar's refusal given again naming the argument as the
+    sheet has it, and the balance's, which names the valuation day, in its own words."""
+    try:
+        return start_date(contract_code, as_of), end_date(contract_code, as_of)
+    except ValueError as refusal:
+        words = str(refusal)
+        if not words.startswith("period is "):
+            raise
+        raise ValueError(f"contract_code{words[len('period') :]}") from None
 
 
 def _the_prices(

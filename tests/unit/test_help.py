@@ -782,8 +782,9 @@ def test_the_quote_explains_itself() -> None:
         ),
         (
             "contract_code",
-            "The contract or strip to quote, such as Z26, F27-G27, 1H27 or CAL27, every month of "
-            "it a contract of the market's schedule.",
+            "The contract, strip or balance to quote, such as Z26, F27-G27, CAL27 or BALZ26, the "
+            "balance from the market's valuation day, every month of it a contract of the "
+            "market's schedule.",
         ),
         (
             "template",

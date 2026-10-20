@@ -1996,6 +1996,12 @@ $formulas = [ordered]@{
     '=_CreateQuoteTemplate("cashflow",UH1:UL1,UH2:UL2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'"
     '=_CreateQuoteTemplate("fixed_float",VF1:VL1,VF6:VL6)' = "#ERROR _CreateQuoteTemplate: values cell (1, 7) is blank, expected text"
     "=LEFT(_CreateTrades(UX5,FG1:FK1,FG2:FK2,VF7),55)" = "#ERROR _CreateTrades: template is quote template handle"
+    # The balance of a period, balance-of-period-quotes.md: with both months ahead BALF27-G27 is the
+    # strip; December's balance on its last day is that day alone, priced by F27 as the calendar says;
+    # November's has ended.
+    '=_Quote(VA7,"BALF27-G27",VF7)-VP2' = "0"
+    '=_Quote(VA7,"BALZ26",VF7)' = "30"
+    '=_Quote(VA7,"BALX26",VF7)' = "#ERROR _Quote: ValueError: valuation_date is 2026-12-31, after 'BALX26' ended on 2026-11-30, expected a valuation day on or before the period's last day"
 }
 
 # What the cells hold before the formulas run, typed the way a person would type them.
