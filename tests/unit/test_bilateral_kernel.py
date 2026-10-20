@@ -44,6 +44,7 @@ from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
+from goosedove.trades.contributions import CrossContribution, RateContribution
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import PreparedTrades, prepared_trades
@@ -107,6 +108,19 @@ def given(array: NDArray[np.float64] | None) -> NDArray[np.float64]:
     """A bilateral field, which a bilateral result always holds."""
     assert array is not None
     return array
+
+
+def rate(result: TradeResults) -> RateContribution:
+    """A bilateral result's one rate contribution, its curve's share of the DV01, the whole of
+    it while a batch is valued on one curve."""
+    (contribution,) = result.rate_contributions
+    return contribution
+
+
+def cross(result: TradeResults) -> CrossContribution:
+    """A bilateral result's one cross contribution, its curve's share of the cross-gamma."""
+    (contribution,) = result.cross_contributions
+    return contribution
 
 
 def curve_of(*anchors: tuple[str, float], name: str = "SOFR") -> DiscountCurve:
@@ -622,8 +636,8 @@ def test_a_contribution_past_the_largest_number_is_refused_before_either_route_s
 ALL_LABELS = (
     "UNIT nominal_delta [UNIT]",
     "UNIT delta [UNIT]",
-    "curve_1 USD dv01 [USD per basis point]",
-    "UNIT curve_1 cross_gamma [UNIT per basis point]",
+    "SOFR USD dv01 [USD per basis point]",
+    "UNIT SOFR cross_gamma [UNIT per basis point]",
 )
 
 
@@ -714,12 +728,12 @@ def test_groups_paying_on_one_day_share_it_and_days_in_one_month_share_the_month
     by_group = given(result.dv01_by_group)
     assert np.all(by_group != 0.0)
     np.testing.assert_allclose(
-        given(result.dv01_by_day),
+        rate(result).dv01_by_day,
         [by_group[axes.day_of_group == 0].sum(), by_group[axes.day_of_group == 1].sum()],
         **TIGHT,
     )
-    np.testing.assert_allclose(given(result.dv01_by_month), [by_group.sum()], **TIGHT)
-    np.testing.assert_allclose(given(result.dv01_by_year), [by_group.sum()], **TIGHT)
+    np.testing.assert_allclose(rate(result).dv01_by_month, [by_group.sum()], **TIGHT)
+    np.testing.assert_allclose(rate(result).dv01_by_year, [by_group.sum()], **TIGHT)
     assert result.dv01 == pytest.approx(float(by_group.sum()), **CLOSE)
     straddle = prepared_on(terms_of((10.0, -10.0), ("2027-12-31", "2028-01-03"), (258, 259)))
     axes = axes_of(straddle)
@@ -755,9 +769,9 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     flat_from_a_year = curve_of((AS_OF, 1.0), (A_YEAR, 0.9), ("2029-01-10", 0.9))
     result = valued(prep, (80.0, 50.0), flat_from_a_year)
     first, second = -0.0001 * 732 / 365 * 90.0, -0.0001 * 737 / 365 * -90.0
-    np.testing.assert_allclose(given(result.dv01_by_day), [first, second], **TIGHT)
-    np.testing.assert_allclose(given(result.dv01_by_month), [first + second], **TIGHT)
-    np.testing.assert_allclose(given(result.dv01_by_year), [first + second], **TIGHT)
+    np.testing.assert_allclose(rate(result).dv01_by_day, [first, second], **TIGHT)
+    np.testing.assert_allclose(rate(result).dv01_by_month, [first + second], **TIGHT)
+    np.testing.assert_allclose(rate(result).dv01_by_year, [first + second], **TIGHT)
     nominal = risk_view(result, Risk.NOMINAL_DELTA, Bucket.DAY)
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (15.0,)
@@ -771,7 +785,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
     assert delta.labels == ALL_LABELS[1:2]
     assert delta.totals == (pytest.approx(13.5, **CLOSE),)
     dv01 = risk_view(result, Risk.DV01, Bucket.DAY)
-    assert dv01.dates is axes.days and dv01.columns[0] is result.dv01_by_day
+    assert dv01.dates is axes.days and dv01.columns[0] is rate(result).dv01_by_day
     assert dv01.labels == ALL_LABELS[2:3] and dv01.totals == (
         pytest.approx(first + second, **CLOSE),
     )
@@ -799,7 +813,7 @@ def test_the_views_select_by_reference_and_all_places_both_kinds_on_one_axis() -
 def test_a_cleared_result_has_no_rate_axis_and_its_views_share_the_nominal_arrays() -> None:
     prep = prepared_on(terms_of(route=Route.CLEARED))
     result = valued(prep, (80.0, 50.0), None)
-    assert (result.dv01_by_day, result.dv01_by_month, result.dv01_by_year) == (None, None, None)
+    assert result.rate_contributions == () and result.cross_contributions == ()
     nominal = risk_view(result, Risk.NOMINAL_DELTA, Bucket.DAY)
     assert nominal.dates is prep.encoded.days and nominal.columns[0] is prep.daily_lots
     assert nominal.labels == ALL_LABELS[:1] and nominal.totals == (0.0,)

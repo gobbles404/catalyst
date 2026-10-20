@@ -24,6 +24,7 @@ from test_bilateral_kernel import (
     PAY_DAYS,
     TIGHT,
     UNIT,
+    cross,
     curve_of,
     given,
     prepared_on,
@@ -82,13 +83,15 @@ LAGS = ("+337cd", "+702cd")  # from the observation day, 1 February 2027, in cal
 CURVE = curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90))
 QUOTES = (72.0, 50.0)  # G27 and F29
 PER_BP = "lots of LOT (1 BBL) per basis point"
-HNG_CROSS = "HNG curve_1 cross_gamma [LOT per basis point]"
-HNG_CROSS_2 = "HNG curve_2 cross_gamma [LOT per basis point]"
+HNG_CROSS = "HNG SOFR cross_gamma [LOT per basis point]"
+# Two snapshots of one name in a collection: both qualified, by first appearance.
+HNG_CROSS_1 = "HNG SOFR (curve_1) cross_gamma [LOT per basis point]"
+HNG_CROSS_2 = "HNG SOFR (curve_2) cross_gamma [LOT per basis point]"
 HNG_CLEARED = "HNG cleared cross_gamma [LOT per basis point]"
 HNG_LABELS = (
     "HNG nominal_delta [LOT]",
     "HNG delta [LOT]",
-    "curve_1 USD dv01 [USD per basis point]",
+    "SOFR USD dv01 [USD per basis point]",
     HNG_CROSS,
 )
 
@@ -135,10 +138,10 @@ def ticket_batch(
 def cross_of(result: TradeResults) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """The four saved vectors a bilateral result always holds."""
     return (
-        given(result.cross_gamma),
-        given(result.cross_gamma_by_day),
-        given(result.cross_gamma_by_month),
-        given(result.cross_gamma_by_year),
+        cross(result).cross_gamma,
+        cross(result).cross_gamma_by_day,
+        cross(result).cross_gamma_by_month,
+        cross(result).cross_gamma_by_year,
     )
 
 
@@ -173,7 +176,8 @@ def test_the_worked_example_prices_by_hand() -> None:
     assert all(
         not array.flags.writeable and array.dtype == np.float64 for array in cross_of(result)
     )
-    assert result.early_cross_gamma.month is None and result.early_cross_gamma.year is None
+    early = cross(result).early_cross_gamma
+    assert early.month is None and early.year is None
     assert counter.freeze().as_dict() == {
         "groups_valued": 2,
         "kernel": 1,
@@ -237,7 +241,7 @@ def test_the_cross_gamma_stands_where_the_npv_or_the_discounted_delta_is_nothing
     assert netted.dv01 == pytest.approx(0.0171, **CLOSE)
     assert netted.lot_delta_total == -1.0
     assert netted.discounted_lot_delta_total == pytest.approx(0.0, **CLOSE)
-    np.testing.assert_allclose(given(netted.cross_gamma), [0.00171], **TIGHT)
+    np.testing.assert_allclose(cross(netted).cross_gamma, [0.00171], **TIGHT)
     assert netted.cross_gamma_total == pytest.approx(0.00171, **CLOSE)
 
 
@@ -360,9 +364,7 @@ def test_a_cleared_batch_holds_the_known_zero_and_asks_for_no_curve() -> None:
         prep = prepared_on(terms_of(route=Route.CLEARED, settlement=settlement))
         result = valued(prep, (80.0, 50.0), None)
         assert result.curve is None and result.cross_gamma_total == 0.0
-        assert result.cross_gamma is None and result.cross_gamma_by_day is None
-        assert result.cross_gamma_by_month is None and result.cross_gamma_by_year is None
-        assert result.early_cross_gamma.month is None and result.early_cross_gamma.year is None
+        assert result.rate_contributions == () and result.cross_contributions == ()
 
 
 # --- the axes -------------------------------------------------------------------------------------
@@ -462,7 +464,7 @@ def test_a_contract_month_before_the_valuation_month_is_a_saved_fact() -> None:
         trades_on(ng3, (3.0,), (3.0,), ("2027-10-14",), ("+364cd",), as_of=OCTOBER), OCTOBER
     )
     result = valued(prep, (3.2, 3.3), curve_of((OCTOBER, 1.0), ("2027-10-14", 0.95)))
-    early = result.early_cross_gamma
+    early = cross(result).early_cross_gamma
     assert early.month is not None and early.year is None
     assert early.month.period == np.datetime64("2026-09-01")
     assert early.month.value == pytest.approx(-0.000285, **CLOSE)
@@ -522,7 +524,7 @@ def test_the_batch_is_its_rows_in_any_order_a_repeat_counts_and_a_zero_row_adds_
         curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90), ("2030-01-03", 0.85)),
     )
     assert given(three.payment_amount).size == 3
-    np.testing.assert_allclose(given(three.cross_gamma), [-0.00056], **TIGHT)
+    np.testing.assert_allclose(cross(three).cross_gamma, [-0.00056], **TIGHT)
     assert three.cross_gamma_total == pytest.approx(-0.00056, **CLOSE)
 
 
@@ -595,7 +597,9 @@ def test_the_views_select_the_cross_gamma_by_reference_and_all_four_place_it_wit
     prep = ticket_batch()
     result = valued(prep, QUOTES, CURVE)
     by_day = risk_view(result, Risk.CROSS_GAMMA, Bucket.DAY)
-    assert by_day.dates is prep.encoded.days and by_day.columns[0] is result.cross_gamma_by_day
+    assert (
+        by_day.dates is prep.encoded.days and by_day.columns[0] is cross(result).cross_gamma_by_day
+    )
     assert by_day.labels == (HNG_CROSS,)
     assert by_day.totals == (pytest.approx(-0.00005, **CLOSE),)
     by_month = risk_view(result, Risk.CROSS_GAMMA, Bucket.MONTH)
@@ -732,7 +736,7 @@ def test_sources_on_one_index_and_one_curve_combine_and_the_collection_is_their_
     counter = WorkCounter()
     agg = aggregate_results([a, b], counter)
     (group,) = agg.cross_groups
-    assert group.index is HNG and group.curve is CURVE and group.number == 1
+    assert group.index is HNG and group.curve is CURVE and group.word == "SOFR"
     np.testing.assert_array_equal(group.occurrences, [0, 1])
     np.testing.assert_array_equal(group.references, [1])
     np.testing.assert_allclose(group.cross_gamma, [-0.00005], **TIGHT)
@@ -745,6 +749,7 @@ def test_sources_on_one_index_and_one_curve_combine_and_the_collection_is_their_
     assert counter.freeze().as_dict() == {
         # The lots twice onto four axes, the DV01 onto three and the cross-gamma onto four.
         "aggregate_reductions": 15,
+        "contributions_collected": 4,
         "cross_groups": 1,
         "entries_aligned": 22,  # two sources' four delta axes, three payment axes, four again
         "index_groups": 1,
@@ -761,7 +766,7 @@ def test_sources_on_one_index_and_one_curve_combine_and_the_collection_is_their_
     np.testing.assert_allclose(everything.columns[3], [-0.00005, 0.0, 0.0], **TIGHT)
     for again in (collected(a, b, a), collected(b, a)):
         (group,) = again.cross_groups
-        assert group.number == 1
+        assert group.word == "SOFR"
     assert collected(a, b, a).cross_groups[0].cross_gamma_total == pytest.approx(
         -0.00095 * 2 + 0.0009, **CLOSE
     )
@@ -783,7 +788,8 @@ def test_one_source_collected_reports_as_itself() -> None:
 
 def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> None:
     # A on CURVE and B on a curve equal in every value but another object: two groups under
-    # curve_1 and curve_2, the rate groups' numbers, -0.00095 and +0.0009 apart and never netted;
+    # SOFR (curve_1) and SOFR (curve_2), two snapshots of one name, -0.00095 and +0.0009 apart
+    # and never netted;
     # HNG and WTI on one curve: two groups, one per index, the lots never summed; a cleared HNG
     # beside a bilateral one: the cleared pair's known zero shown as its own column of zeros,
     # under the cleared label, even in the mixed collection.
@@ -791,10 +797,13 @@ def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> Non
     other = curve_of((AS_OF, 1.0), (PAYS[0], 0.95), (PAYS[1], 0.90))
     b_other = hng_source(-5.0, 74.0, PAYS[1], LAGS[1], other)
     agg = collected(a, b_other)
-    assert [(c.curve, c.number) for c in agg.cross_groups] == [(CURVE, 1), (other, 2)]
-    assert [r.number for r in agg.rate_groups] == [1, 2]
+    assert [(c.curve, c.word) for c in agg.cross_groups] == [
+        (CURVE, "SOFR (curve_1)"),
+        (other, "SOFR (curve_2)"),
+    ]
+    assert [r.word for r in agg.rate_groups] == ["SOFR (curve_1)", "SOFR (curve_2)"]
     view = aggregate_view(agg, Risk.CROSS_GAMMA, Bucket.DAY)
-    assert view.labels == (HNG_CROSS, HNG_CROSS_2)
+    assert view.labels == (HNG_CROSS_1, HNG_CROSS_2)
     assert view.totals == (pytest.approx(-0.00095, **CLOSE), pytest.approx(0.0009, **CLOSE))
     assert len(aggregate_view(agg, Risk.ALL, Bucket.YEAR).labels) == 6
     wti = valued_on(
@@ -802,15 +811,15 @@ def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> Non
     )
     assert wti.cross_gamma_total == pytest.approx(-0.000095, **CLOSE)
     both = collected(a, wti)
-    assert [(c.index, c.number) for c in both.cross_groups] == [(HNG, 1), (WTI, 1)]
+    assert [(c.index, c.word) for c in both.cross_groups] == [(HNG, "SOFR"), (WTI, "SOFR")]
     view = aggregate_view(both, Risk.CROSS_GAMMA, Bucket.DAY)
     np.testing.assert_array_equal(view.dates, dates("2027-02-01", "2027-02-02"))
-    assert view.labels == (HNG_CROSS, "WTI curve_1 cross_gamma [LOT per basis point]")
+    assert view.labels == (HNG_CROSS, "WTI SOFR cross_gamma [LOT per basis point]")
     np.testing.assert_allclose(view.columns[0], [-0.00095, 0.0], **TIGHT)
     np.testing.assert_allclose(view.columns[1], [0.0, -0.000095], **TIGHT)
     cleared = hng_source(10.0, 70.0, PAYS[0], LAGS[0], None)
     mixed = collected(cleared, a)
-    assert [(c.curve, c.number) for c in mixed.cross_groups] == [(None, None), (CURVE, 1)]
+    assert [(c.curve, c.word) for c in mixed.cross_groups] == [(None, None), (CURVE, "SOFR")]
     zero = mixed.cross_groups[0]
     assert zero.cross_gamma_total == 0.0 and zero.days.size == 0 and zero.references.size == 0
     assert zero.cross_gamma.size == 0 and zero.months.size == 0 and zero.years.size == 0
@@ -830,7 +839,8 @@ def test_another_curve_another_index_or_no_curve_is_another_cross_group() -> Non
 def test_cancellation_within_a_cross_group_follows_the_weighting_and_never_crosses_groups() -> None:
     # +18 a year out and -19 two years out at 70, quoted 80, as two sources on one curve: 17.1
     # and -17.1 of discounted lots, nothing in all, and +0.00171 of cross-gamma within the group;
-    # the same two on two curves of one value: -0.00171 and +0.00342 under curve_1 and curve_2,
+    # the same two on two curves of one value: -0.00171 and +0.00342 under SOFR (curve_1) and
+    # SOFR (curve_2),
     # each its own column and total.
     a = valued_on(
         trades_on(HNG, (18.0,), (70.0,), PAYS[:1], LAGS[:1]),
@@ -859,7 +869,7 @@ def test_cancellation_within_a_cross_group_follows_the_weighting_and_never_cross
         trades_on(HNG, (-19.0,), (70.0,), PAYS[1:], LAGS[1:]), HNG_HISTORY, hot, other
     )
     apart = aggregate_view(collected(a, b_other), Risk.CROSS_GAMMA, Bucket.YEAR)
-    assert apart.labels == (HNG_CROSS, HNG_CROSS_2)
+    assert apart.labels == (HNG_CROSS_1, HNG_CROSS_2)
     assert apart.totals == (pytest.approx(-0.00171, **CLOSE), pytest.approx(0.00342, **CLOSE))
 
 
@@ -879,7 +889,7 @@ def test_a_cross_group_summing_past_the_largest_number_is_refused_by_its_contrac
     with pytest.raises(ValueError) as refused:
         collected(*([bought, sold] * 4))
     assert str(refused.value) == (
-        "the cross-gamma of index 'UNIT' on curve_1 for contract F27 is -inf, expected a finite "
+        "the cross-gamma of index 'UNIT' on SOFR for contract F27 is -inf, expected a finite "
         "number of lots of UNIT (1 BBL) per basis point; the results' cross-gammas sum past the "
         "largest number"
     )

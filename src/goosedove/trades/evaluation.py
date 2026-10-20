@@ -29,7 +29,8 @@ from goosedove.globals.discount_curve import DiscountCurve
 from goosedove.globals.payments import curve_starts_on, discounted, factors_on
 from goosedove.instrumentation.work_counts import KERNEL, WorkCounter
 from goosedove.market.market import Market
-from goosedove.trades.display_axes import NONE_EARLY, EarlyRisk, early_risk
+from goosedove.trades.contributions import CrossContribution, RateContribution
+from goosedove.trades.display_axes import EarlyRisk, early_risk
 from goosedove.trades.encoding import PaymentAxes
 from goosedove.trades.preparation import PreparedTrades, UnpaidPayments
 from goosedove.trades.results import TradeResults
@@ -182,19 +183,12 @@ def trade_results(
         npv_by_group=None,
         dv01_by_group=None,
         payment_factor=None,
-        dv01_by_day=None,
-        dv01_by_month=None,
-        dv01_by_year=None,
         early_delta=prepared.early_nominal,  # the same lots: worded as the delta when asked for
-        early_dv01=NONE_EARLY,
-        # Since #197: nothing discounts, so no rate moves the lots, the known zero held as
-        # None and no buffer, as the DV01's axes are.
-        cross_gamma=None,
+        # Nothing discounts, so no rate moves the mark or the lots: the known zero, no
+        # contribution and no buffer, as the DV01's axes are.
         cross_gamma_total=0.0,
-        cross_gamma_by_day=None,
-        cross_gamma_by_month=None,
-        cross_gamma_by_year=None,
-        early_cross_gamma=NONE_EARLY,
+        rate_contributions=(),
+        cross_contributions=(),
     )
 
 
@@ -407,7 +401,7 @@ def _discounted(
         prepared.by_year.contract_from,
     )
     early_dv01 = early_risk(
-        "the batch",
+        f"{curve.name} {currency}",
         "payment",
         as_of,
         f"{currency} per basis point",
@@ -468,18 +462,39 @@ def _discounted(
         npv_by_group=npv,
         dv01_by_group=dv01_by_group,
         payment_factor=payment_factor,
-        dv01_by_day=dv01_by_day,
-        dv01_by_month=dv01_by_month,
-        dv01_by_year=dv01_by_year,
         early_delta=early_delta,
-        early_dv01=early_dv01,
-        # Since #197: the cross-gamma on the four commodity axes and its total, _cross_gamma's.
-        cross_gamma=cross_gamma,
         cross_gamma_total=cross_total,
-        cross_gamma_by_day=cross_by_day,
-        cross_gamma_by_month=cross_by_month,
-        cross_gamma_by_year=cross_by_year,
-        early_cross_gamma=early_cross,
+        # The curve's share of the DV01 and of the cross-gamma, the whole of each here, by
+        # reference to the vectors above and the axes they were summed onto.
+        rate_contributions=(
+            RateContribution(
+                curve,
+                currency,
+                dv01,
+                axes.days,
+                dv01_by_day,
+                axes.months,
+                dv01_by_month,
+                axes.years,
+                dv01_by_year,
+                early_dv01,
+            ),
+        ),
+        cross_contributions=(
+            CrossContribution(
+                curve,
+                encoded.references,
+                cross_gamma,
+                encoded.days,
+                cross_by_day,
+                encoded.contract_months,
+                cross_by_month,
+                encoded.contract_years,
+                cross_by_year,
+                cross_total,
+                early_cross,
+            ),
+        ),
     )
 
 

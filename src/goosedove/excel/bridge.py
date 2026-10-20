@@ -93,7 +93,8 @@ BooleanColumn = NewType("BooleanColumn", NDArray[np.bool_])  # one column, hande
 # mark that selects publishing on the way out and resolving on the way in.
 type Handle[T] = T
 # A vector of handles, since #180: a cell, a row or a column of texts, each the handle of a live
-# object of the one kind inside the brackets, handed over as the objects in sheet order, every
+# object of the kind inside the brackets, or of either of two written there with a bar,
+# `Handles[TradeResults | CashflowResults]`, handed over as the objects in sheet order, every
 # cell counted and a repeated text its object again. `result_handles: Handles[TradeResults]`;
 # docs/seam/inputs.md decision 44. A handle of one of two kinds is declared as the union of the
 # two forms, `results: Handle[TradeResults] | Handle[AggregateResults]`, decision 45.
@@ -1471,7 +1472,23 @@ def _handle_kinds(annotation: object) -> tuple[type[object], ...] | None:
 
 def _handle_kind(annotation: object) -> type[object] | None:
     """The class inside Handle[...]: any class but the seam's own, or None when it is not one."""
-    kind = get_args(annotation)[0]
+    return _class_kind(get_args(annotation)[0])
+
+
+def _vector_kinds(annotation: object) -> tuple[type[object], ...] | None:
+    """The classes inside `Handles[...]`: one, `Handles[Kind]`, decision 44, or two or more written
+    with a bar, `Handles[A | B]`, decisions 44 and 45 together, every cell then a handle of either
+    kind; None when any is not a kind a handle may name."""
+    inner = get_args(annotation)[0]
+    parts = get_args(inner) if get_origin(inner) in (Union, UnionType) else (inner,)
+    kinds = tuple(_class_kind(part) for part in parts)
+    if any(kind is None or kind is object for kind in kinds):
+        return None
+    return cast(tuple[type[object], ...], kinds)
+
+
+def _class_kind(kind: object) -> type[object] | None:
+    """A kind a handle may name: any class but the seam's own, or None when it is not one."""
     if (
         not isinstance(kind, type)
         or kind in _DECLARED
@@ -1558,7 +1575,7 @@ def _resolve(kinds: tuple[type[object], ...], expected: str, name: str, value: o
 
 
 def _resolve_each(
-    kind: type[object], expected: str, name: str, value: object
+    kinds: tuple[type[object], ...], expected: str, name: str, value: object
 ) -> tuple[object, ...]:
     """The objects a cell, a row or a column of handles stand for, in sheet order, decision 44,
     since #180: the shape first, one cell, one row or one column, a wider and taller range refused
@@ -1571,7 +1588,7 @@ def _resolve_each(
     whole behind the cell's name, and the relay rule reads through that name, so a consumer of
     the failed vector shows the creator's text once."""
     if not isinstance(value, Cells):
-        return (_resolve((kind,), expected, name, value),)
+        return (_resolve(kinds, expected, name, value),)
     rows, cols = value.kinds.shape
     if rows != 1 and cols != 1:
         raise _Rejected(None, value, "", f"expected one cell, one row or one column of {expected}s")
@@ -1579,7 +1596,7 @@ def _resolve_each(
     for i, cell in enumerate(_values(value)):
         r, c = divmod(i, cols)
         try:
-            objects.append(_resolve((kind,), expected, f"{name} cell ({r + 1}, {c + 1})", cell))
+            objects.append(_resolve(kinds, expected, f"{name} cell ({r + 1}, {c + 1})", cell))
         except _Rejected:
             raise _Rejected((r + 1, c + 1), cell, expected) from None
     return tuple(objects)
@@ -1927,13 +1944,13 @@ def _handle_form(
     if spec.default is not inspect.Parameter.empty:
         raise TypeError(f"{function}: {spec.name} declares a handle, which takes no default")
     if _is_handles(spec.annotation):
-        kind = _handle_kind(spec.annotation)
-        if kind is None or kind is object:
-            # A vector names the one kind it collects: the seam's own types are no kind, and a
+        kinds = _vector_kinds(spec.annotation)
+        if kinds is None:
+            # A vector names the kinds it collects: the seam's own types are no kind, and a
             # vector of any kind would hand a function objects it could not take together.
             return None
-        one = f"{_words(kind)} handle"
-        return f"{one}s in a cell, a row or a column", partial(_resolve_each, kind, one, spec.name)
+        one = f"{' or '.join(_words(kind) for kind in kinds)} handle"
+        return f"{one}s in a cell, a row or a column", partial(_resolve_each, kinds, one, spec.name)
     kinds = _handle_kinds(spec.annotation)
     if kinds is not None:
         expected = f"{' or '.join(_words(kind) for kind in kinds)} handle"

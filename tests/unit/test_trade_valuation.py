@@ -132,10 +132,10 @@ def a_market(history: str, name: str, *quotes: float) -> str:
 NG_NOMINAL = "Henry Hub NYMEX nominal_delta [NYMEX NG]"
 NG_DELTA = "Henry Hub NYMEX delta [NYMEX NG]"
 CLEARED_DV01 = "cleared USD dv01 [USD per basis point]"
-CURVE_DV01 = "curve_1 USD dv01 [USD per basis point]"
+CURVE_DV01 = "SOFR USD dv01 [USD per basis point]"
 NG_CROSS = "Henry Hub NYMEX cleared cross_gamma [NYMEX NG per basis point]"
 NG_PER_BP = "lots of NYMEX NG (10000 MMBTU) per basis point"
-UNIT_CROSS = "UNIT curve_1 cross_gamma [UNIT per basis point]"
+UNIT_CROSS = "UNIT SOFR cross_gamma [UNIT per basis point]"
 
 
 def risk_head(as_of: str, *labels: str) -> list[list[object]]:
@@ -4404,10 +4404,10 @@ def unit_history(unit: dict[str, Any], as_of: str, finals: dict[str, float] | No
     return a_history(unit["index"], "2027-01-01", as_of, UNIT_HOLIDAYS, finals or {})
 
 
-def unit_curve(*anchors: tuple[str, float]) -> str:
+def unit_curve(*anchors: tuple[str, float], name: str = "SOFR") -> str:
     return str(
         ENTRY["_CreateDiscountCurve"](
-            "SOFR", row("date", "discount_factor"), rows(*[[serial(d), f] for d, f in anchors])
+            name, row("date", "discount_factor"), rows(*[[serial(d), f] for d, f in anchors])
         )
     )
 

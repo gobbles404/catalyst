@@ -84,16 +84,17 @@ def delta_labels(index: Index, reporting_lot: ReportingLot) -> tuple[str, str]:
 
 
 def dv01_label(group: str, currency: str) -> str:
-    """The DV01 column's heading over the group its caller named, `curve_1` by first appearance
-    among a collection's curves or `cleared` where no curve values, in the group's currency:
-    `curve_1 USD dv01 [USD per basis point]`. Which group and which currency are the caller's."""
+    """The DV01 column's heading over the group its caller named, the curve's word, its name or
+    the name qualified where a collection holds two objects of it, or `cleared` where no curve
+    values, in the group's currency: `SOFR USD dv01 [USD per basis point]`. Which group and
+    which currency are the caller's."""
     return f"{group} {currency} dv01 [{currency} per basis point]"
 
 
 def cross_gamma_label(index: Index, group: str, reporting_lot: ReportingLot) -> str:
     """The cross-gamma column's heading, since #197: the index's short name as the desk typed it,
-    the group its caller named, `curve_1` by first appearance among a collection's curves or
-    `cleared` where no curve values, the risk and the reporting lot's name per basis point in
-    brackets, `HNG curve_1 cross_gamma [LOT per basis point]`, read off the records and nothing
-    resolved or converted here. Which group is the caller's."""
+    the group its caller named, the curve's word or `cleared` where no curve values, the risk
+    and the reporting lot's name per basis point in brackets, `HNG SOFR cross_gamma [LOT per
+    basis point]`, read off the records and nothing resolved or converted here. Which group is
+    the caller's."""
     return f"{index.name} {group} cross_gamma [{reporting_lot.name} per basis point]"

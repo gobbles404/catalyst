@@ -1,6 +1,6 @@
 # _CollectDiscountCurves
 
-A collection of named discount curves: the curves a batch of trades will select among by name, gathered as they are and held by reference, nothing of their factors constructed or combined, each name once. It is the first worksheet piece of the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md), built as [slice 1](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-1.md): today a collection is made, read back and refused, and nothing takes one yet; `_EvaluateTrades` takes a collection in the arc's fourth slice, when every bilateral trade names its curve by `discount_curve_key`. The code is `src/goosedove/globals/discount_curve_set.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
+A collection of named discount curves: the curves a batch of trades will select among by name, gathered as they are and held by reference, nothing of their factors constructed or combined, each name once. It is the first worksheet piece of the [named-curve arc](../../engineering-tickets/trade-valuation-pipeline/multiple-discount-curves.md), built as [slice 1](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-1.md): today a collection is made, read back and refused, and nothing takes one yet; `_EvaluateTrades` takes a collection in the arc's third slice, when every bilateral trade names its curve by `discount_curve_key`. The code is `src/goosedove/globals/discount_curve_set.py`, the record and its builder, and `src/goosedove/excel/globals.py`, the worksheet function.
 
 ## Worksheet contract
 
@@ -88,4 +88,4 @@ The record and the rule are `tests/unit/test_discount_curve_set.py`; the seam's 
 
 ## Not here
 
-Taking a collection: `_EvaluateTrades` takes one in the arc's fourth slice, with the `discount_curve_key` field on every bilateral trade, and the kernel selects by name in slices 2 and 3; `_EvaluateCashflows` keeps its one curve. A collection of collections, a curve added to or removed from a held collection, a lookup of one member by name on the sheet, and any check of the curves' dates: none; the readback shows the members and the evaluation judges the dates.
+Taking a collection: `_EvaluateTrades` takes one in the arc's third slice, with the `discount_curve_key` field on every bilateral trade and the kernel's selection by name; `_EvaluateCashflows` keeps its one curve. A collection of collections, a curve added to or removed from a held collection, a lookup of one member by name on the sheet, and any check of the curves' dates: none; the readback shows the members and the evaluation judges the dates.

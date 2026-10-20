@@ -287,10 +287,10 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_ReportRisk", new object[] { ExcelEmpty.Value, "all", "day" }, "#ERROR _ReportRisk: results is blank, expected trade results or aggregate results or cashflow results handle" };
             yield return new object[] { "_ReportReserves", new object[] { ExcelEmpty.Value }, "#ERROR _ReportReserves: results is blank, expected trade results handle" };
             // The collector, since #180: the vector left out, a scalar that is no text, a true array, and a cell naming nothing, in the seam's words.
-            yield return new object[] { "_AggregateResults", new object[] { ExcelMissing.Value }, "#ERROR _AggregateResults: result_handles is missing, expected trade results handles in a cell, a row or a column" };
-            yield return new object[] { "_AggregateResults", new object[] { 1.0 }, "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results handles in a cell, a row or a column" };
-            yield return new object[] { "_AggregateResults", new object[] { new object[,] { { "a", "b" }, { "c", "d" } } }, "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results handles" };
-            yield return new object[] { "_AggregateResults", new object[] { Column("x:trade_results:gas:9", ExcelEmpty.Value) }, "#ERROR _AggregateResults: result_handles cell (1, 1) is text 'x:trade_results:gas:9' naming no live object, expected trade results handle" };
+            yield return new object[] { "_AggregateResults", new object[] { ExcelMissing.Value }, "#ERROR _AggregateResults: result_handles is missing, expected trade results or cashflow results handles in a cell, a row or a column" };
+            yield return new object[] { "_AggregateResults", new object[] { 1.0 }, "#ERROR _AggregateResults: result_handles is number 1.0, expected trade results or cashflow results handles in a cell, a row or a column" };
+            yield return new object[] { "_AggregateResults", new object[] { new object[,] { { "a", "b" }, { "c", "d" } } }, "#ERROR _AggregateResults: result_handles is 2x2 array, expected one cell, one row or one column of trade results or cashflow results handles" };
+            yield return new object[] { "_AggregateResults", new object[] { Column("x:trade_results:gas:9", ExcelEmpty.Value) }, "#ERROR _AggregateResults: result_handles cell (1, 1) is text 'x:trade_results:gas:9' naming no live object, expected trade results or cashflow results handle" };
             // A creator's failure is relayed whole, and a relay of a relay shows the same text.
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
             yield return new object[] { "util_ReadHandle", new object[] { "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" }, "#ERROR util_ReadHandle: handle is the creator's failure, expected a handle: #ERROR _CreateDiscountCurve: ValueError: x" };
@@ -531,6 +531,59 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateDiscountCurve: name is missing, expected text", Seam.Call("_CreateDiscountCurve", ExcelMissing.Value, Row("date", "discount_factor"), Curve()));
         }
 
+        // Trades and cashflows in one collection, named-curves-slice-2.md, from the host's side:
+        // a batch of cashflows collected alone reports its own DV01 under its curve's name and
+        // refuses the commodity selectors in the cashflow result's words; the same batch on two
+        // curves makes two columns under the curves' names; the membership readback shows a
+        // cashflow row with cashflow under the route, its curve's word, its currency and its DV01,
+        // and a dash where a batch of cashflows has no number; and a cashflows handle among the
+        // results is refused at its cell naming both kinds.
+        [Fact]
+        public void cashflows_collect_alone_and_beside_each_other_under_their_curves_names()
+        {
+            var template = (string)Seam.Call("_CreateTradeTemplate", "cashflow", Row("currency"), Row("USD"));
+            var fields = Row("trade_id", "trade_date", "amount", "payment_date");
+            var rows = new object[,] { { 1.0, 46391.0, 10000.0, 46756.0 }, { 2.0, 46391.0, -10000.0, 47121.0 }, { 3.0, 46391.0, 250.0, 46390.0 } };
+            var batch = (string)Seam.Call("_CreateCashflows", fields, rows, template);
+            var date = Seam.Call("_CreateValuationDate", 46391.0, 0.5);
+            var sofr = Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.95 }, { 47121.0, 0.9 } });
+            var ffois = Seam.Call("_CreateDiscountCurve", "FFOIS", Row("date", "discount_factor"), new object[,] { { 46391.0, 1.0 }, { 46756.0, 0.96 }, { 47121.0, 0.92 } });
+            var onSofr = (string)Seam.Call("_EvaluateCashflows", batch, date, sofr);
+            var onFfois = (string)Seam.Call("_EvaluateCashflows", batch, date, ffois);
+            var alone = (string)Seam.Call("_AggregateResults", onSofr);
+            Assert.StartsWith(Pid + ":aggregate_results:", alone);
+            var own = (object[,])Seam.Call("_ReportRisk", onSofr, "dv01", "year");
+            var collected = (object[,])Seam.Call("_ReportRisk", alone, "dv01", "year");
+            Assert.Equal(own.GetLength(0), collected.GetLength(0));
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", collected[1, 1]);
+            Assert.Equal(0.85, (double)collected[3, 1], 12);
+            Assert.Equal((double)own[5, 1], (double)collected[5, 1], 12);
+            Assert.Equal(-0.95, (double)collected[5, 1], 12);
+            Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a collection of cashflows alone, which has no commodity risk", Seam.Call("_ReportRisk", alone, "delta", "day"));
+            var both = (string)Seam.Call("_AggregateResults", Column(onSofr, onFfois));
+            var two = (object[,])Seam.Call("_ReportRisk", both, "dv01", "year");
+            Assert.Equal(3, two.GetLength(1));
+            Assert.Equal("FFOIS USD dv01 [USD per basis point]", two[1, 2]);
+            Assert.Equal(0.85, (double)two[3, 1], 12);
+            Assert.Equal(0.88, (double)two[3, 2], 12);
+            var members = (object[,])Seam.Call("util_ReadHandle", both);
+            Assert.Equal(4, members.GetLength(0));
+            Assert.Equal(12, members.GetLength(1));
+            Assert.Equal("-", members[2, 1]);
+            Assert.Equal("-", members[2, 2]);
+            Assert.Equal("cashflow", members[2, 3]);
+            Assert.Equal("SOFR", members[2, 4]);
+            Assert.Equal("FFOIS", members[3, 4]);
+            Assert.Equal("USD", members[2, 5]);
+            Assert.Equal("-", members[2, 6]);
+            Assert.Equal("-", members[2, 7]);
+            Assert.Equal(0.85, (double)members[2, 8], 12);
+            Assert.Equal(46391.0, members[2, 9]);
+            Assert.Equal("-", members[2, 10]);
+            Assert.Equal("-", members[2, 11]);
+            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is cashflows handle '" + batch + "', expected trade results or cashflow results handle", Seam.Call("_AggregateResults", Column(onSofr, batch)));
+        }
+
         // The cashflow instrument, cashflow-instrument.md: a template of USD and Firm A, the
         // ticket's three payments, valued on 4 January 2027 over the curve 1, 0.95 and 0.90: 500 of
         // mark, 250 of cash and 0.85 of DV01, the handles named for the currency; the values and
@@ -560,7 +613,7 @@ namespace Goosedove.Host.Tests
             var risk = (object[,])Seam.Call("_ReportRisk", results, "dv01", "year");
             Assert.Equal(7, risk.GetLength(0));
             Assert.Equal(2, risk.GetLength(1));
-            Assert.Equal("curve_1 USD dv01 [USD per basis point]", risk[1, 1]);
+            Assert.Equal("SOFR USD dv01 [USD per basis point]", risk[1, 1]);
             Assert.Equal("Total", risk[3, 0]);
             Assert.Equal(0.85, (double)risk[3, 1], 12);
             Assert.Equal(46753.0, risk[5, 0]);
@@ -869,14 +922,14 @@ namespace Goosedove.Host.Tests
             Assert.Equal(0.0, members[3, 8]);
             Assert.Equal(46168.0, members[3, 9]);
             Assert.Equal("#ERROR _AggregateResults: ValueError: results 2 is on index 'sample' quoted off another price vector than results 1, expected one price vector for one index", Seam.Call("_AggregateResults", Row(results, later)));
-            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is blank, expected trade results handle", Seam.Call("_AggregateResults", Column(results, ExcelEmpty.Value)));
-            Assert.Equal("#ERROR _AggregateResults: result_handles is prepared trades handle '" + prepared + "', expected trade results handle", Seam.Call("_AggregateResults", prepared));
+            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is blank, expected trade results or cashflow results handle", Seam.Call("_AggregateResults", Column(results, ExcelEmpty.Value)));
+            Assert.Equal("#ERROR _AggregateResults: result_handles is prepared trades handle '" + prepared + "', expected trade results or cashflow results handle", Seam.Call("_AggregateResults", prepared));
             Assert.Equal("#ERROR _ReportValues: results is aggregate results handle '" + collection + "', expected trade results or cashflow results handle", Seam.Call("_ReportValues", collection));
             Assert.Equal("#ERROR _ReportReserves: results is aggregate results handle '" + collection + "', expected trade results handle", Seam.Call("_ReportReserves", collection));
             // A failed evaluation in a cell fails the collection behind the cell's name, the creator's text
             // whole, and the reader over the failed collection shows that text once behind its own wrapper.
             var broken = (string)Seam.Call("_AggregateResults", Column(results, "#ERROR _EvaluateTrades: ValueError: x"));
-            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results handle: #ERROR _EvaluateTrades: ValueError: x", broken);
+            Assert.Equal("#ERROR _AggregateResults: result_handles cell (2, 1) is the creator's failure, expected trade results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: x", broken);
             Assert.Equal("#ERROR _ReportRisk: results is the creator's failure, expected trade results or aggregate results or cashflow results handle: #ERROR _EvaluateTrades: ValueError: x", Seam.Call("_ReportRisk", broken, "all", "day"));
         }
 
@@ -2459,13 +2512,13 @@ namespace Goosedove.Host.Tests
             var facedResults = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", faced, history), Market(), facedCurve);
             var facedCross = (object[,])Seam.Call("_ReportRisk", facedResults, "cross_gamma", "year");
             Assert.Equal(5, facedCross.GetLength(0));
-            Assert.Equal("RESERVES curve_1 cross_gamma [LOT per basis point]", facedCross[1, 1]);
+            Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedCross[1, 1]);
             Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedCross[3, 1], 12);
             Assert.Equal(46023.0, facedCross[4, 0]);
             Assert.Equal(-0.0001 * 34 / 365 * 0.99, (double)facedCross[4, 1], 12);
             var facedAll = (object[,])Seam.Call("_ReportRisk", facedResults, "all", "month");
             Assert.Equal(5, facedAll.GetLength(1));
-            Assert.Equal("RESERVES curve_1 cross_gamma [LOT per basis point]", facedAll[1, 4]);
+            Assert.Equal("RESERVES SOFR cross_gamma [LOT per basis point]", facedAll[1, 4]);
             Assert.Equal(0.99, (double)facedAll[3, 2], 12);
             var facedReadback = (object[,])Seam.Call("util_ReadHandle", facedResults);
             Assert.Equal(24, facedReadback.GetLength(1));

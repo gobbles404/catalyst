@@ -169,6 +169,7 @@ def test_the_same_functions_and_numpy_calls_at_any_size(
     assert call_profile(lambda: result.report(Risk.DV01, Bucket.MONTH)) == {
         "CashflowResults.report": 1,
         "EarlyRisk.refuse": 1,
+        "curve_words": 1,  # the curve's word, as every report names it
         "dv01_label": 1,
         "placed": 1,
     }
@@ -204,7 +205,7 @@ def test_the_peaks_follow_the_rows_and_the_days_and_the_records_keep_their_colum
         + result.payment_factor.nbytes
         + result.npv.nbytes
         + result.payment_cash.nbytes
-        + result.dv01_by_day.nbytes
+        + result.rate_contributions[0].dv01_by_day.nbytes
     )
     assert held == 33 * days
 

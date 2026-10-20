@@ -389,13 +389,11 @@ def test_a_bilateral_tick_allocates_by_group_slot_and_bucket_and_retains_its_vec
         result.npv_by_group,
         result.dv01_by_group,
         result.payment_factor,
-        result.dv01_by_day,
-        result.dv01_by_month,
-        result.dv01_by_year,
-        result.cross_gamma,
-        result.cross_gamma_by_day,
-        result.cross_gamma_by_month,
-        result.cross_gamma_by_year,
+        *next((c.dv01_by_day, c.dv01_by_month, c.dv01_by_year) for c in result.rate_contributions),
+        *next(
+            (c.cross_gamma, c.cross_gamma_by_day, c.cross_gamma_by_month, c.cross_gamma_by_year)
+            for c in result.cross_contributions
+        ),
     )
     retained = sum(0 if array is None else array.nbytes for array in new)
     assert retained == 8 * (3 * refs + 2 * buckets + paid + 4 * groups)
@@ -501,16 +499,27 @@ def test_a_risk_view_copies_through_saved_places_and_discovers_nothing(
         selected = (
             {"_day_view": 1}
             if bucket is Bucket.DAY
-            else {"_period_view": 1, "_saved": 1, "EarlyRisk.refuse": 4}
+            else {
+                "_period_view": 1,
+                "_period_all": 1,
+                "_saved": 1,
+                "EarlyRisk.refuse": 4,
+                "_dv01_of": 1,
+                "_cross_of": 1,
+            }
         )
         assert call_profile(lambda b=bucket: risk_view(result, Risk.ALL, b)) == {
             "risk_view": 1,
             "delta_labels": 1,  # the headings, spelled once in risk_report.py for both paths
             "dv01_label": 1,
             "cross_gamma_label": 1,
+            "curve_words": 1,  # the curve's word, since slice 2
             **selected,
             "placed": 4,
         }
+        # Since slice 2 the view makes the curve's word and the label tuples, about 150 bytes
+        # of small objects beyond the slack: measured 1,207 bytes over one row and 1,815 over
+        # twenty on 2026-10-18.
         assert least_peak(lambda b=bucket: risk_view(result, Risk.ALL, b)) <= (
-            32 * view.dates.size + SLACK
+            32 * view.dates.size + 2 * SLACK
         )

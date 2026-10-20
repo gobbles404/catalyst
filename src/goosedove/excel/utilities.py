@@ -537,59 +537,61 @@ def prepared_trades_table(obj: PreparedTrades) -> MixedArray:
 def aggregate_results_table(obj: AggregateResults) -> MixedArray:
     """The collection's membership, since #180, one row per occurrence in the order given, a
     repeat a row again: its position counted from one as the sheet counts, its index's name and
-    reporting lot, its route, the collection's number for its curve or a dash for a cleared
-    source, its currency, its own saved nominal delta, delta and DV01, the day every source
-    shares and, since #197, its own saved cross-gamma total with its unit, lots per basis point.
-    The collection's totals and vectors are _ReportRisk's to show; no handle text, since a
-    source's cell may have been released while the collection holds the object."""
+    reporting lot, its route, its curve's word, the heading's, or a dash for a cleared source,
+    its currency, its own saved nominal delta, delta and DV01, the day every source shares and,
+    since #197, its own saved cross-gamma total with its unit, lots per basis point. Since
+    named-curves-slice-2.md a batch of cashflows is a row too: a dash under the index, the lot,
+    the two deltas, the cross-gamma and its unit, numbers it has not, `cashflow` under the route,
+    its curve's word, its currency and its DV01. The collection's totals and vectors are
+    _ReportRisk's to show; no handle text, since a source's cell may have been released while
+    the collection holds the object."""
     sources = obj.sources
-    curve = np.full(len(sources), "-", dtype=object)
+    n = len(sources)
+    curve = np.full(n, "-", dtype=object)
     for group in obj.rate_groups:
-        curve[group.occurrences] = f"curve_{group.number}"
-    terms = [source.prepared.encoded.terms for source in sources]
-    return MixedArray.table(
+        curve[group.occurrences] = group.word
+    index_names: list[str] = []
+    lots: list[str] = []
+    routes: list[str] = []
+    trade = np.zeros(n, dtype=np.bool_)
+    nominal = np.zeros(n)
+    delta = np.zeros(n)
+    cross = np.zeros(n)
+    units = np.full(n, "-", dtype=object)
+    for k, source in enumerate(sources):
+        match source:
+            case TradeResults():
+                terms = source.prepared.encoded.terms
+                index_names.append(terms.index.name)
+                lots.append(terms.reporting_lot.name)
+                routes.append(source.route.value)
+                trade[k] = True
+                nominal[k] = source.lot_delta_total
+                delta[k] = source.discounted_lot_delta_total
+                cross[k] = source.cross_gamma_total
+                units[k] = f"{source.lot_unit} per basis point"
+            case CashflowResults():
+                index_names.append("-")
+                lots.append("-")
+                routes.append("cashflow")
+            case _:
+                assert_never(source)
+    every = np.ones(n, dtype=np.bool_)
+    return _assembled(
         [
-            (
-                "position",
-                "index",
-                "reporting_lot",
-                "route",
-                "curve",
-                "currency",
-                "nominal_delta",
-                "delta",
-                "dv01",
-                "as_of",
-                "cross_gamma",
-                "cross_gamma_unit",
-            ),
-            (
-                "int64",
-                "str",
-                "str",
-                "str",
-                "str",
-                "str",
-                "float64",
-                "float64",
-                "float64",
-                "datetime64[D]",
-                "float64",
-                "str",
-            ),
-        ],
-        np.arange(1, len(sources) + 1, dtype=np.int64),
-        tuple([t.index.name for t in terms]),
-        tuple([t.reporting_lot.name for t in terms]),
-        tuple([source.route.value for source in sources]),
-        tuple([str(c) for c in curve]),
-        tuple([source.currency for source in sources]),
-        np.array([source.lot_delta_total for source in sources]),
-        np.array([source.discounted_lot_delta_total for source in sources]),
-        np.array([source.dv01 for source in sources]),
-        np.full(len(sources), obj.as_of, dtype="datetime64[D]"),
-        np.array([source.cross_gamma_total for source in sources]),
-        tuple([f"{source.lot_unit} per basis point" for source in sources]),
+            _numbers_on("position", np.arange(1, n + 1, dtype=np.float64), every, "int64"),
+            _words_on("index", np.array(index_names, dtype=object)),
+            _words_on("reporting_lot", np.array(lots, dtype=object)),
+            _words_on("route", np.array(routes, dtype=object)),
+            _words_on("curve", curve),
+            _words_on("currency", np.array([source.currency for source in sources], dtype=object)),
+            _numbers_on("nominal_delta", nominal[trade], trade),
+            _numbers_on("delta", delta[trade], trade),
+            _numbers_on("dv01", np.array([source.dv01 for source in sources]), every),
+            _dates_on("as_of", np.full(n, obj.as_of, dtype="datetime64[D]")),
+            _numbers_on("cross_gamma", cross[trade], trade),
+            _words_on("cross_gamma_unit", units),
+        ]
     )
 
 
@@ -673,7 +675,8 @@ def trade_results_table(obj: TradeResults) -> MixedArray:
     reserves = obj.reserves
     currency = np.full(slots, "-", dtype=object)
     currency[0] = reserves.currency
-    cross = np.zeros(slots) if obj.cross_gamma is None else obj.cross_gamma[reference]
+    crosses = obj.cross_contributions  # one today; the sum over several is slice 3's to show
+    cross = crosses[0].cross_gamma[reference] if crosses else np.zeros(slots)
     per_bp = np.full(slots, f"{obj.lot_unit} per basis point", dtype=object)
     return _widened(
         table,
@@ -768,7 +771,7 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
         obj.payment_factor,
         obj.npv,
         obj.payment_cash,
-        obj.dv01_by_day,
+        obj.rate_contributions[0].dv01_by_day,  # one curve values a batch of cashflows
         (obj.currency,) * n,
         np.full(n, obj.as_of, dtype="datetime64[D]"),
     )
@@ -790,19 +793,50 @@ def cashflow_results_table(obj: CashflowResults) -> MixedArray:
 Added = tuple[str, str, NDArray[np.uint8], NDArray[np.float64], NDArray[np.object_]]
 
 
-def _numbers_on(name: str, held: NDArray[np.float64], holds: NDArray[np.bool_]) -> Added:
-    """A float64 column holding a number on the rows that hold one, in row order, and a dash on
-    the rest: every row, no row or the first row of each group, as the caller's mask says."""
+def _numbers_on(
+    name: str, held: NDArray[np.float64], holds: NDArray[np.bool_], kind: str = "float64"
+) -> Added:
+    """A numeric column, float64 unless the caller says int64, holding a number on the rows that
+    hold one, in row order, and a dash on the rest: every row, no row or the first row of each
+    group, as the caller's mask says."""
     kinds = np.where(holds, NUMBER_CODE, TEXT_CODE).astype(np.uint8)
     slots = np.full(holds.size, np.nan)
     slots[holds] = held
-    return name, "float64", kinds, slots, np.full(holds.size, "-", dtype=object)
+    return name, kind, kinds, slots, np.full(holds.size, "-", dtype=object)
+
+
+def _dates_on(name: str, days: NDArray[np.datetime64]) -> Added:
+    """A datetime64[D] column holding a day on every row, as the serials the sheet formats, the
+    check a date result gets."""
+    serials = MixedArray.table([], days).numeric_slots[:, 0]
+    kinds = np.full(days.size, NUMBER_CODE, dtype=np.uint8)
+    return name, "datetime64[D]", kinds, serials, np.full(days.size, "-", dtype=object)
 
 
 def _words_on(name: str, words: NDArray[np.object_]) -> Added:
     """A str column holding the caller's word on every row, a dash where it gives none."""
     kinds = np.full(words.size, TEXT_CODE, dtype=np.uint8)
     return name, "str", kinds, np.full(words.size, np.nan), words
+
+
+def _assembled(added: list[Added]) -> MixedArray:
+    """A table written by kind from columns alone, in the order given, for a readback whose
+    dashed columns stand among columns every row holds, where _widened would put them last: the
+    headings and the types first, then each body row's texts left to right, one per text cell,
+    as _widened writes them."""
+    body = added[0][2].size
+    width = len(added)
+    kinds = np.full((body + 2, width), TEXT_CODE, dtype=np.uint8)
+    slots = np.full((body + 2, width), np.nan)
+    words = np.full((body, width), "-", dtype=object)
+    placed = np.zeros((body, width), dtype=np.bool_)
+    for j, (_, _, column_kinds, column_slots, column_words) in enumerate(added):
+        kinds[2:, j] = column_kinds
+        slots[2:, j] = column_slots
+        words[:, j] = column_words
+        placed[:, j] = column_kinds == TEXT_CODE
+    headings = (*(name for name, *_ in added), *(kind for _, kind, *_ in added))
+    return MixedArray(kinds, slots, (*headings, *words[placed]))
 
 
 def _widened(base: MixedArray, added: list[Added]) -> MixedArray:

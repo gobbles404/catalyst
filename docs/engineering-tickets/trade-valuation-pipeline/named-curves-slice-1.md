@@ -6,7 +6,7 @@
 
 ## Outcome
 
-Every discount curve has a name, given when it is created, shown in its readback and in its handle text. `_CollectDiscountCurves` gathers existing named curves into a collection that evaluation will take in slice 4: it keeps references, constructs nothing, refuses a repeated name and reads back its membership. `util_BumpDiscountCurve` keeps the source curve's name on the curve it makes. Every caller that creates a curve, on the sheets, in the host, in the tests and on the pages, supplies a name. Nothing else moves: `_EvaluateTrades` and `_EvaluateCashflows` still take one curve, the trade terms have no key yet, and the reports' labels still say `curve_1` until slice 3.
+Every discount curve has a name, given when it is created, shown in its readback and in its handle text. `_CollectDiscountCurves` gathers existing named curves into a collection that evaluation will take in slice 3: it keeps references, constructs nothing, refuses a repeated name and reads back its membership. `util_BumpDiscountCurve` keeps the source curve's name on the curve it makes. Every caller that creates a curve, on the sheets, in the host, in the tests and on the pages, supplies a name. Nothing else moves: `_EvaluateTrades` and `_EvaluateCashflows` still take one curve, the trade terms have no key yet, and the reports' labels still say `curve_1` until slice 3.
 
 ## Worksheet contract
 
@@ -40,7 +40,7 @@ A range given to `_CollectDiscountCurves` holds curve handles alone: A6:A9 would
 | the name has no whitespace around it and is not whitespace alone, since a key will match it exactly, case and all | `name is ' SOFR', expected a name with no whitespace around it`; `name is '  ', expected a name, not whitespace alone` |
 | each name once in a collection, the same handle twice included; the first repeat named with the cell it repeats, the cells counted from one in the order given | `curve_handles cell 1 and cell 2 are both named 'SOFR', expected each name once` |
 
-Nothing else: a collection checks no date, since which curves must start on the valuation day and cover which payments is the evaluation's to decide for the curves a batch selects, in slice 4; two curves of different spans sit in one collection. Equal factors under different names are two curves; two snapshots of one name are refused in one collection and, across results, kept apart by identity in slice 3.
+Nothing else: a collection checks no date, since which curves must start on the valuation day and cover which payments is the evaluation's to decide for the curves a batch selects, in slice 3; two curves of different spans sit in one collection. Equal factors under different names are two curves; two snapshots of one name are refused in one collection and, across results, kept apart by identity in slice 3.
 
 ## Reading it back
 
@@ -68,7 +68,7 @@ Every creation of a curve supplies a name; no caller is left on the old form and
 | the unit and performance tests | 16 files | `SOFR`, and `FFOIS` where a test needs a second name |
 | the pages | 17 mention the creator | the grids and the examples gain the name |
 
-A migration harness rewrites each kept-workbook formula in place and takes a snapshot of every cell that depends on a curve before and after. It saves only when every economic result stands, each mark, cash, delta, DV01, cross-gamma, factor and date showing what it showed; the changes it allows are the intended ones alone, a curve's handle text carrying its name, its readback three columns wide and the spills that moved for it; and it rejects any other difference and any new error, `#SPILL!` where a wider spill meets an occupied cell included. The evaluation formulas, the templates and the tickets are slice 4's. The pages that own the creator, the bump and the handles say what changed; the arc's parent ticket stays the design record.
+A migration harness rewrites each kept-workbook formula in place and takes a snapshot of every cell that depends on a curve before and after. It saves only when every economic result stands, each mark, cash, delta, DV01, cross-gamma, factor and date showing what it showed; the changes it allows are the intended ones alone, a curve's handle text carrying its name, its readback three columns wide and the spills that moved for it; and it rejects any other difference and any new error, `#SPILL!` where a wider spill meets an occupied cell included. The evaluation formulas, the templates and the tickets are slice 3's. The pages that own the creator, the bump and the handles say what changed; the arc's parent ticket stays the design record.
 
 ## Work and budgets
 
@@ -80,4 +80,4 @@ The names, the two rules, the readbacks, the bump keeping the name and the handl
 
 ## Not in this slice
 
-The `discount_curve_key` field, the collection as `_EvaluateTrades`'s input, the key's binding, per-curve risk and the labels `SOFR USD dv01`: slices 2 to 4. The cashflow collection through `_AggregateResults`: its own PR before slice 3. Anything numeric about the curves themselves.
+Per-curve risk, the labels `SOFR USD dv01` and the cashflow collection through `_AggregateResults`: slice 2, [named-curves-slice-2.md](named-curves-slice-2.md). The `discount_curve_key` field, the collection as `_EvaluateTrades`'s input and the key's binding: slice 3. Anything numeric about the curves themselves.

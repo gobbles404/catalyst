@@ -299,9 +299,9 @@ def test_discounting_and_collection_keep_the_contract_month_and_the_payment_mont
             "period",
             "NG2 nominal_delta [LOT]",
             "NG2 delta [LOT]",
-            "curve_1 USD dv01 [USD per basis point]",
+            "SOFR USD dv01 [USD per basis point]",
             "NG2 cleared cross_gamma [LOT per basis point]",
-            "NG2 curve_1 cross_gamma [LOT per basis point]",
+            "NG2 SOFR cross_gamma [LOT per basis point]",
         ]
         dv01 = cast(float, everything[3][3])
         assert dv01 != 0.0

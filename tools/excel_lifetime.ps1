@@ -723,23 +723,27 @@ $cashflows = {
     Put $state $sheet "D28" "=INDEX(_ReportValues(D26),3,2)"
     Put $state $sheet "D29" '=TEXT(INDEX(_ReportRisk(D26,"dv01","year"),4,2),"0.0000")'
     Put $state $sheet "D30" "=ROWS(util_ReadHandle(D26))"
+    Put $state $sheet "D31" "=_AggregateResults(D26)"
+    Put $state $sheet "D32" '=TEXT(INDEX(_ReportRisk(D31,"dv01","year"),4,2),"0.0000")'
     $id = Id $state
     $batch = Text $state $sheet "D23"
     $curve = Text $state $sheet "D25"
     $results = Text $state $sheet "D26"
+    $collection = Text $state $sheet "D31"
     Check "the batch's cell shows a cashflows handle named for the currency" ($batch.StartsWith("${id}:cashflows:USD:")) $batch
     Check "and the results' cell a cashflow results handle" ($results.StartsWith("${id}:cashflow_results:USD:")) $results
     Check "500 of mark, 250 of cash and 0.85 of DV01" ((Text $state $sheet "D27") -eq "500" -and (Text $state $sheet "D28") -eq "250" -and (Text $state $sheet "D29") -eq "0.8500") ((Text $state $sheet "D27") + " " + (Text $state $sheet "D28") + " " + (Text $state $sheet "D29"))
     Check "the readback holds three payment days under two heading rows" ((Text $state $sheet "D30") -eq "5") (Text $state $sheet "D30")
-    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 5) }
-    Check "the chain, the template, the batch, the date, the curve and the results: sixteen live, sixteen published" ($c.Live -eq 16 -and $c.Published -eq 16 -and $c.Released -eq 0) $c.Text
+    Check "the batch alone collected shows a collection handle and its own DV01, 0.85" ($collection.StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "D32") -eq "0.8500") ($collection + " " + (Text $state $sheet "D32"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq ($ChainCreators + 6) }
+    Check "the chain, the template, the batch, the date, the curve, the results and the collection: seventeen live, seventeen published" ($c.Live -eq 17 -and $c.Published -eq 17 -and $c.Released -eq 0) $c.Text
 
     # A commodity tick: the chain's vector and market publish anew, the old two released; the
     # cashflows are no consumer of a quote and stand.
     Put $state $sheet "A11" "73.8"
-    Check "a commodity tick leaves the batch, the curve and the results as they are" ((Text $state $sheet "D23") -eq $batch -and (Text $state $sheet "D25") -eq $curve -and (Text $state $sheet "D26") -eq $results) (Text $state $sheet "D26")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 2 }
-    Check "the old vector and market are released; two more published" ($c.Live -eq 16 -and $c.Published -eq 18 -and $c.Released -eq 2) $c.Text
+    Check "a commodity tick leaves the batch, the curve, the results and the collection as they are" ((Text $state $sheet "D23") -eq $batch -and (Text $state $sheet "D25") -eq $curve -and (Text $state $sheet "D26") -eq $results -and (Text $state $sheet "D31") -eq $collection) (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 2 }
+    Check "the old vector and market are released; two more published" ($c.Live -eq 17 -and $c.Published -eq 19 -and $c.Released -eq 2) $c.Text
 
     # A changed factor: the curve and the results publish anew, the old two released; the batch
     # stands and the mark follows, 600 at 0.96.
@@ -747,8 +751,9 @@ $cashflows = {
     Check "a changed factor gives the curve a new handle" ((Text $state $sheet "D25") -ne $curve -and (Text $state $sheet "D25").StartsWith("${id}:discount_curve:SOFR:")) (Text $state $sheet "D25")
     Check "and the results a new one, 600 of mark" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D27") -eq "600") (Text $state $sheet "D27")
     Check "while the batch stands" ((Text $state $sheet "D23") -eq $batch) (Text $state $sheet "D23")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 4 }
-    Check "the old curve and results are released; two more published" ($c.Live -eq 16 -and $c.Published -eq 20 -and $c.Released -eq 4) $c.Text
+    Check "and the collection follows the results, a new handle with the same DV01" ((Text $state $sheet "D31") -ne $collection -and (Text $state $sheet "D31").StartsWith("${id}:aggregate_results:") -and (Text $state $sheet "D32") -eq "0.8400" -and (Text $state $sheet "D29") -eq "0.8400") ((Text $state $sheet "D31") + " " + (Text $state $sheet "D32"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 5 }
+    Check "the old curve, results and collection are released; three more published" ($c.Live -eq 17 -and $c.Published -eq 22 -and $c.Released -eq 5) $c.Text
 
     # The day rolled onto the receivable's payment day with the curve moved to start there, the
     # three together under manual calculation: the date, the curve and the results publish anew,
@@ -764,9 +769,9 @@ $cashflows = {
     Invoke-ExcelCall "automatic calculation" { $state.Excel.Calculation = -4105 }
     Check "the day rolled gives the results a new handle" ((Text $state $sheet "D26") -ne $results -and (Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:")) (Text $state $sheet "D26")
     Check "the receivable and the rebate are cash, 10,250, and the payable -9,000 of mark" ((Text $state $sheet "D27") -eq "-9000" -and (Text $state $sheet "D28") -eq "10250") ((Text $state $sheet "D27") + " " + (Text $state $sheet "D28"))
-    Check "and the DV01 the payable's alone, 0.9" ((Text $state $sheet "D29") -eq "0.9000") (Text $state $sheet "D29")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 -and $c.Released -ge 7 }
-    Check "the old date, curve and results are released; three more published" ($c.Live -eq 16 -and $c.Published -eq 23 -and $c.Released -eq 7) $c.Text
+    Check "and the DV01 the payable's alone, 0.9, in the collection too" ((Text $state $sheet "D29") -eq "0.9000" -and (Text $state $sheet "D32") -eq "0.9000") ((Text $state $sheet "D29") + " " + (Text $state $sheet "D32"))
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 -and $c.Released -ge 9 }
+    Check "the old date, curve, results and collection are released; four more published" ($c.Live -eq 17 -and $c.Published -eq 26 -and $c.Released -eq 9) $c.Text
 
     # The template cleared: the batch fails in the seam's words and the results as its consumer,
     # the three own nothing; typed back, all three rebuild.
@@ -774,12 +779,13 @@ $cashflows = {
     $refused = "#ERROR _CreateCashflows: template is blank, expected trade template handle"
     Check "the template cleared fails the batch in the seam's words" ((Text $state $sheet "D23") -eq $refused) (Text $state $sheet "D23")
     Check "and the results as its consumer" ((Text $state $sheet "D26") -eq "#ERROR _EvaluateCashflows: cashflows is the creator's failure, expected cashflows handle: $refused") (Text $state $sheet "D26")
+    Check "and the collection as the results' consumer, the creator's text carried once" ((Text $state $sheet "D31") -eq "#ERROR _AggregateResults: result_handles is the creator's failure, expected trade results or cashflow results handle: $refused") (Text $state $sheet "D31")
     $c = Settle $state $sheet { param($c) $c.Live -eq 13 }
-    Check "the template, the batch and the results own nothing: thirteen live, three released" ($c.Live -eq 13 -and $c.Published -eq 23 -and $c.Released -eq 10) $c.Text
+    Check "the template, the batch, the results and the collection own nothing: thirteen live, four released" ($c.Live -eq 13 -and $c.Published -eq 26 -and $c.Released -eq 13) $c.Text
     Put $state $sheet "D22" '=_CreateTradeTemplate("cashflow",A14:B14,A15:B15)'
-    Check "typed back, the three rebuild" ((Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:") -and (Text $state $sheet "D28") -eq "10250") (Text $state $sheet "D26")
-    $c = Settle $state $sheet { param($c) $c.Live -eq 16 }
-    Check "sixteen live again, three more published" ($c.Live -eq 16 -and $c.Published -eq 26 -and $c.Released -eq 10) $c.Text
+    Check "typed back, the four rebuild" ((Text $state $sheet "D26").StartsWith("${id}:cashflow_results:USD:") -and (Text $state $sheet "D28") -eq "10250" -and (Text $state $sheet "D31").StartsWith("${id}:aggregate_results:")) (Text $state $sheet "D31")
+    $c = Settle $state $sheet { param($c) $c.Live -eq 17 }
+    Check "seventeen live again, four more published" ($c.Live -eq 17 -and $c.Published -eq 30 -and $c.Released -eq 13) $c.Text
     Check "no release missed, no disposal error" ($c.Misses -eq 0 -and $c.DisposalErrors -eq 0) $c.Text
     Close-Book $state $book
 }
@@ -1257,7 +1263,7 @@ $valuation = {
     # A cell naming nothing fails the collection visibly and releases it; the reads show #REF!;
     # the cell restored, the collection publishes anew.
     Put $state $sheet "AE2" "x"
-    Check "a cell naming nothing fails the collection in the seam's words" ((Text $state $sheet "AE4") -eq "#ERROR _AggregateResults: result_handles cell (2, 1) is text 'x' naming no live object, expected trade results handle") (Text $state $sheet "AE4")
+    Check "a cell naming nothing fails the collection in the seam's words" ((Text $state $sheet "AE4") -eq "#ERROR _AggregateResults: result_handles cell (2, 1) is text 'x' naming no live object, expected trade results or cashflow results handle") (Text $state $sheet "AE4")
     Check "and its reads show #REF!, no number" ((Text $state $sheet "AE5") -eq "#REF!") (Text $state $sheet "AE5")
     $c = Settle $state $sheet { param($c) $c.Live -eq 21 }
     Check "the failed collection owns nothing: twenty-one live, one released, nothing published" ($c.Live -eq 21 -and $c.Published -eq 72 -and $c.Released -eq 51) $c.Text

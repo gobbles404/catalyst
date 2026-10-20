@@ -22,14 +22,14 @@ def _EvaluateCashflows(
 | | float64 | float64 | str | datetime64[D] |
 | | 500 | 250 | USD | 4-Jan-2027 |
 | 17 | `=_ReportRisk(A12,"dv01","year")` | 4-Jan-2027 | | |
-| | period | curve_1 USD dv01 [USD per basis point] | | |
+| | period | SOFR USD dv01 [USD per basis point] | | |
 | | str \| datetime64[D] | float64 | | |
 | | Total | 0.85 | | |
 | | 1-Jan-2027 | 0 | | |
 | | 1-Jan-2028 | -0.95 | | |
 | | 1-Jan-2029 | 1.8 | | |
 
-Three handles, every one required: the batch, the cell showing [_CreateCashflows](create-cashflows.md)'s result; the valuation date, the cell showing `_CreateValuationDate`'s, which supplies `as_of` explicitly, the day's fraction elapsed read for nothing; and the curve, the cell showing `_CreateDiscountCurve`'s or [util_BumpDiscountCurve](../utilities/bump-discount-curve.md)'s, each resolved as any handle is and refused by its kind in the seam's words. The result is a handle, declared `Handle[CashflowResults]`, carrying the batch's currency, `30512:cashflow_results:USD:6`, and no new kind of reader or report: [_ReportValues](../trades/report-values.md) shows the mark and the cash under `cashflow_mark` and `cashflow_cash`, the cashflow mark being the discounted value of the unpaid payments, [_ReportRisk](../trades/report-risk.md) the DV01 by day, month or year, and `util_ReadHandle` the days. The worked example is the ticket's: 10,000 receivable a year out at 0.95 is 9,500 and -0.95 of DV01, 10,000 payable two years out at 0.90 is -9,000 and +1.80, and a rebate of 250 paid the day before is cash; the two nominal amounts net to nothing while their values and DV01s do not, since their days differ.
+The DV01 column's heading is the curve's word as [report-risk.md](../trades/report-risk.md) gives every heading, the name as created, or `cleared (curve_1)` for a curve named `cleared`, the same word a collection of the batch alone shows. Three handles, every one required: the batch, the cell showing [_CreateCashflows](create-cashflows.md)'s result; the valuation date, the cell showing `_CreateValuationDate`'s, which supplies `as_of` explicitly, the day's fraction elapsed read for nothing; and the curve, the cell showing `_CreateDiscountCurve`'s or [util_BumpDiscountCurve](../utilities/bump-discount-curve.md)'s, each resolved as any handle is and refused by its kind in the seam's words. The result is a handle, declared `Handle[CashflowResults]`, carrying the batch's currency, `30512:cashflow_results:USD:6`, and no new kind of reader or report: [_ReportValues](../trades/report-values.md) shows the mark and the cash under `cashflow_mark` and `cashflow_cash`, the cashflow mark being the discounted value of the unpaid payments, [_ReportRisk](../trades/report-risk.md) the DV01 by day, month or year, and `util_ReadHandle` the days. The worked example is the ticket's: 10,000 receivable a year out at 0.95 is 9,500 and -0.95 of DV01, 10,000 payable two years out at 0.90 is -9,000 and +1.80, and a rebate of 250 paid the day before is cash; the two nominal amounts net to nothing while their values and DV01s do not, since their days differ.
 
 ## The valuation
 
@@ -64,7 +64,7 @@ In this order, the first failure being the message; a failure publishes no handl
 
 ## What it retains
 
-The batch and the curve by reference, `as_of` and the currency; the mark, the cash and the DV01; per distinct payment day, increasing, paid or not, whether it has paid, its factor, 1 on a paid day, its value, its cash and its DV01; the DV01 by payment month and by year on the batch's axes; the two display axes from the valuation day's period; and the facts refusing a month or a year report of a DV01 before the start, found once here and never found. Nothing is valued again by a report.
+The batch and the curve by reference, `as_of` and the currency; the mark, the cash and the DV01; per distinct payment day, increasing, paid or not, whether it has paid, its factor, 1 on a paid day, its value, its cash and its DV01; the DV01 by payment month and by year on the batch's axes; the two display axes from the valuation day's period; and the facts refusing a month or a year report of a DV01 before the start, found once here and never found; since [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md) the DV01 by day, by month and by year with their axes, the total and those facts are held as the curve's one rate contribution, `RateContribution` in `trades/contributions.py`, the same arrays by reference, which the reports read and [_AggregateResults](../trades/aggregate-results.md) collects. Nothing is valued again by a report.
 
 ## Reading it back
 
@@ -76,4 +76,4 @@ The worked example and the receipt of a hundred through a curve move, the paymen
 
 ## Not here
 
-A collection of cashflow results with a batch of trades' through `_AggregateResults`: the next ticket's, which adds the batch's DV01 to the curve's and currency's group and no commodity group. Another currency, FX, credit adjustments, several curves within one batch, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.
+A collection of cashflow results with a batch of trades' through `_AggregateResults`: built as [named-curves-slice-2.md](../../engineering-tickets/trade-valuation-pipeline/named-curves-slice-2.md), the batch's one rate contribution joining the group of its curve and currency and no commodity group, [aggregate-results.md](../trades/aggregate-results.md). Another currency, FX, credit adjustments, several curves within one batch, an overdue balance, a partial payment, an intraday cutoff and actual payment reconciliation: outside this instrument. The curve's own rules are [discount-curve.md](../globals/discount-curve.md)'s and the convention [evaluate-trades.md](../trades/evaluate-trades.md)'s, said once there.
