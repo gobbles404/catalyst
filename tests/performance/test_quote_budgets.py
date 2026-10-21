@@ -284,6 +284,8 @@ LEDGER = {
     "_the_payments": 1,
     "last_days": 1,
     "shift_days": 1,
+    "payments_after_observations": 1,  # the kernel's rule, one owner since
+    # payment-day-date-or-rule.md
     "_the_factors": 1,
     "factors_on": 1,
     "WorkCounter.__init__": 1,

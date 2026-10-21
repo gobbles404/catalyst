@@ -34,7 +34,7 @@ from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.trades.observations import Observations
 from goosedove.trades.reserves import Reserves, reserves
 from goosedove.trades.schedule_methods import METHODS, requires_booked_reference
-from goosedove.trades.terms import ResolvedTrades, Route
+from goosedove.trades.terms import ResolvedTrades, Route, payments_after_observations
 
 ENCODED_COMPONENTS = "encoded_components"  # components turned into quantities and offsets
 ENCODED_GROUPS = "encoded_groups"  # payment groups formed, summed into and checked
@@ -749,17 +749,16 @@ def _payments_after_observations(
     slot_group: NDArray[np.intp],
     slot_date: NDArray[np.datetime64],
 ) -> None:
-    """A financial settlement's rule: each group pays after its last observation, the day its
-    final price exists; the first group paying on or before it is refused by its contract and the
-    two days. The slots stand in group order and by day, so each group's last slot is its last
-    observation, and every group has one, every component observing at least once."""
+    """A financial settlement's rule, the kernel's one owner of it since
+    payment-day-date-or-rule.md, applied here to the groups: each group pays after its last
+    observation, the day its final price exists; the first group paying on or before it is
+    refused by its contract and the two days. The slots stand in group order and by day, so
+    each group's last slot is its last observation, and every group has one, every component
+    observing at least once."""
     last = np.ones(slot_group.size, dtype=np.bool_)
     last[:-1] = slot_group[1:] != slot_group[:-1]
-    last_observed = slot_date[last]
-    early = payment_date <= last_observed
-    if early.any():
-        g = int(early.argmax())
-        raise ValueError(
-            f"{terms.schedule.codes[int(group_contract[g])]} pays on {payment_date[g]}, expected "
-            f"a day after its last observation, {last_observed[g]}, when its final price exists"
-        )
+    payments_after_observations(
+        payment_date,
+        slot_date[last],
+        lambda g: terms.schedule.codes[int(group_contract[g])],
+    )

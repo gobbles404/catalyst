@@ -56,7 +56,13 @@ from goosedove.trades.template import (
     schedule_method_of,
     settlement_of,
 )
-from goosedove.trades.terms import QuantityPer, Route, Settlement, trade_schedule_of
+from goosedove.trades.terms import (
+    QuantityPer,
+    Route,
+    Settlement,
+    payments_after_observations,
+    trade_schedule_of,
+)
 
 # The work a quote reports, beside the pipeline's own names where the fact is the same: the
 # schedule's codes read, the fixings and the live prices read, the payment rules and shifts,
@@ -396,9 +402,9 @@ def _the_payments(
     """A financial quote's payment days, the batch's rules: each month's rule applied to its last
     observation day, the expiry under lastday on a futures index and the publication day on an
     IFERC one, instruction by instruction on the payment calendar, within the sheet's calendar and
-    after that last observation, when the month's final price exists; None for a physical
-    settlement, which pays on no day. Work: the rule read, its instructions applied once over the
-    months, and the payment days made."""
+    after that last observation, when the month's final price exists, the kernel's own rule for
+    it; None for a physical settlement, which pays on no day. Work: the rule read, its
+    instructions applied once over the months, and the payment days made."""
     if terms.payment_rule is None:
         return None
     anchors = last_days(observations, components)
@@ -418,13 +424,7 @@ def _the_payments(
             f"{SHEET_FIRST_DAY} to {SHEET_LAST_DAY}"
         )
     pays = shifted.days
-    early = pays <= anchors
-    if early.any():
-        k = int(early.argmax())
-        raise ValueError(
-            f"{component(k)} pays on {pays[k]}, expected a day after its last observation, "
-            f"{anchors[k]}, when its final price exists"
-        )
+    payments_after_observations(pays, anchors, component)
     return pays
 
 

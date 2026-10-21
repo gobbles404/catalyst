@@ -603,6 +603,8 @@ def test_the_creator_binds_once_per_column_resolves_once_and_publishes_once(
         "UnitConversions.factor": 2,
         "UnitConversions.category": 2,
         "_payments_after_observations": 1,
+        "payments_after_observations": 1,  # the kernel's rule, one owner since
+        # payment-day-date-or-rule.md
         "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
         "_charged": 1,  # clearing, the one fee a cleared, unbrokered template charges, since #188
         "_publish": 1,

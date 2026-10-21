@@ -633,6 +633,26 @@ def finite_prices(prices: NDArray[np.float64], where: Callable[[int], str]) -> N
         raise ValueError(f"{where(k)} is {float(prices[k])!r}, expected a finite price")
 
 
+def payments_after_observations(
+    payment_date: NDArray[np.datetime64],
+    last_observed: NDArray[np.datetime64],
+    where: Callable[[int], str],
+) -> None:
+    """A financial settlement's rule, one owner since payment-day-date-or-rule.md: each payment
+    falls after the last observation it pays for, the day its final price exists, since a
+    payment on or before it would have nothing to pay; the first on or before it, in the
+    caller's order, is refused in the caller's words for its position, a group's contract in
+    the encoding and a month's code in a quote, with the two days. The two arrays stand
+    aligned, one payment day and one last observation per item."""
+    early = payment_date <= last_observed
+    if early.any():
+        k = int(early.argmax())
+        raise ValueError(
+            f"{where(k)} pays on {payment_date[k]}, expected a day after its last observation, "
+            f"{last_observed[k]}, when its final price exists"
+        )
+
+
 def marketing_reserves(
     amounts: NDArray[np.float64], where: Callable[[int], str]
 ) -> NDArray[np.float64]:
