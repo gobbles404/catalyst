@@ -1,10 +1,10 @@
 # Payment day as a date or a rule
 
-**Status:** Ready for engineering review, 20 October 2026. One feature PR against
-main, implementing [issue #213](https://github.com/gobbles404/goosedove/issues/213).
-The quoting and named-curve stack is merged. This work is independent of issues
-#211 and #212. Include this ticket in the implementation PR and close #213 when
-the implementation lands.
+**Status:** Built in #214, 21 October 2026, one feature PR against main implementing
+[issue #213](https://github.com/gobbles404/goosedove/issues/213) in four commits: the
+shared validation first, then the field, then the host, the smoke, the lifetime and the
+kept workbook, then the pages. The quoting and named-curve stack is merged. This work is
+independent of issues #211 and #212.
 
 ## Purpose
 
