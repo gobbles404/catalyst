@@ -739,3 +739,28 @@ market, fixing, selected-curve and key changes; an unused curve with a different
 coverage must not affect the quote, while a wrong singleton key must fail. Check
 partial quote templates and wrong-template/booking-field refusals. Record whether the
 dedicated quote template feels natural and what inspection the scalar is missing.
+
+## 26. Payment day as a date or a rule
+
+Built in #214 on main after the quoting stack, [payment-day-date-or-rule.md](payment-day-date-or-rule.md),
+issue #213: the payment field of a financial `fixed_float` is `payment_day`, a date or a rule,
+where `payment_time_lag` held a rule alone; [create-trades.md](../../library/trades/create-trades.md),
+[quote-template.md](../../library/quoting/quote-template.md) and
+[show-instrument.md](../../library/instruments/show-instrument.md) the pages. The seam tells a
+date from a rule by type, a whole-day serial or a text, and refuses a boolean, a fraction of a
+day, a blank and an empty text as `date or text`. A rule pays each component from its last
+observation as before. A date is the row's one payment day for every component of the row, as
+entered and never rolled, and must fall after the row's last observation, a strip dated before
+its final month refused naming that month's day. The field comes from the template or the
+ticket, never both: a batch on one rule keeps it in the template, a batch with any agreed day
+carries the whole column in its ticket. The readback shows what each row entered, a date as a
+date and a rule as its text, under one header typed `date or text`, beside the resolved
+`payment_date`. A quote template may hold the date and serves any request whose last observation
+falls before it. The old header is refused as an unknown field; every template and ticket on a
+sheet types `payment_day` where it typed `payment_time_lag`.
+
+To check in UAT: a confirmation's day the chain could not write, modified following or a day
+agreed once, booked as the date and marked against the desk's own number; a strip with a monthly
+convention booked as a row per month; a dated row's cash on the day itself; whether typing the
+whole column into a ticket, where one row has a date, is the friction expected; and whether the
+readback's column, text on some rows and a date on others, reads well on the sheet.

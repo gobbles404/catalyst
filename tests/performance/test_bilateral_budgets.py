@@ -43,6 +43,7 @@ from goosedove.globals.discount_curve_set import DiscountCurveSet, collect_disco
 from goosedove.globals.unit_conversions import UNITS
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market
 from goosedove.trades.encoding import PaymentAxes, encoded
 from goosedove.trades.evaluation import trade_results
@@ -134,7 +135,7 @@ def bilateral_terms(
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0), *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(
-            ("+2bd",) * components,
+            DatesOrTexts.of_texts(("+2bd",) * components),
             (PAYMENT_CALENDAR,) * components,
             (ASIAN_PAYS if asian else PAYS)[rows],
         ),

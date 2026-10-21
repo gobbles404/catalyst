@@ -33,7 +33,7 @@ from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT, NONE, FieldType, Instrument
-from goosedove.instruments.fields import FieldValues
+from goosedove.instruments.fields import DatesOrTexts, FieldValues
 from goosedove.trades.resolution import CONDITIONS, PERIOD_FIELDS, Trades, resolved, trades
 from goosedove.trades.schedule_methods import METHODS, ScheduleMethod
 from goosedove.trades.template import TradeTemplate, trade_template
@@ -110,7 +110,7 @@ TOY_TEMPLATE: dict[str, object] = {
     "quantity_unit": "TOY",
     "settlement_method": "financial",
     "clearing_house": "TEST_CLEARER",
-    "payment_time_lag": "+2bd",
+    "payment_day": "+2bd",
     "payment_holiday_calendar": PAYMENT_CALENDAR,
 }
 NG_TICKET: dict[str, list[object]] = {
@@ -133,6 +133,12 @@ def typed(definition: Instrument, name: str, values: list[object]) -> object:
             return tuple(str(value) for value in values)
         case FieldType.HOLIDAY_CALENDAR:
             return tuple(values)
+        case FieldType.DATE_OR_TEXT:  # a text is a rule and anything else a date
+            return DatesOrTexts(
+                np.array([not isinstance(value, str) for value in values]),
+                np.array([v for v in values if not isinstance(v, str)], dtype="datetime64[D]"),
+                tuple(v for v in values if isinstance(v, str)),
+            )
 
 
 def a_ticket(
@@ -263,7 +269,7 @@ def test_a_strip_makes_one_component_per_month_on_its_one_occurrence() -> None:
     np.testing.assert_array_equal(
         terms.payment.date, dates("2026-11-30", "2026-12-31", "2026-12-31")
     )  # two business days after each expiry, the page's dates, 26 November closed
-    assert terms.payment.lag == ("+2bd", "+2bd")  # the rule as written, per occurrence
+    assert terms.payment.entered.texts == ("+2bd", "+2bd")  # the rule as written, per occurrence
     assert terms.payment.calendar == (PAYMENT_CALENDAR, PAYMENT_CALENDAR)
     assert terms.named(1) == "trade 1 at row 1"
     assert counter.freeze()["resolved_components"] == 3
@@ -372,7 +378,7 @@ def one_payment_day(expiry: str, holidays: tuple[str, ...], lag: str) -> np.date
         },
         {
             **TOY_TEMPLATE,
-            "payment_time_lag": lag,
+            "payment_day": lag,
             "payment_holiday_calendar": holiday_calendar(dates(*holidays)),
         },
     )
@@ -409,14 +415,14 @@ def payment_refusal(lag: str, in_ticket: bool = False) -> str:
     }
     template = {
         **TOY_TEMPLATE,
-        "payment_time_lag": lag,
+        "payment_day": lag,
         "payment_holiday_calendar": holiday_calendar(dates()),
     }
     if in_ticket:
         return refused(
             ix,
-            {**ticket, "payment_time_lag": [lag]},
-            {k: v for k, v in template.items() if k != "payment_time_lag"},
+            {**ticket, "payment_day": [lag]},
+            {k: v for k, v in template.items() if k != "payment_day"},
         )
     return refused(ix, ticket, template)
 
@@ -430,15 +436,15 @@ def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day
     # seven significant digits is refused by its digits before any day is counted, so no number
     # overflows the arithmetic unnamed.
     assert payment_refusal("+2100000bd") == (
-        "payment_time_lag is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected a "
+        "payment_day is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected a "
         "payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     assert payment_refusal("+2100000bd", in_ticket=True) == (
-        "payment_time_lag row 1 is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected "
+        "payment_day row 1 is '+2100000bd', counted from 2026-11-25 to 10076-05-06, expected "
         "a payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     assert payment_refusal("+99999999999999999999bd", in_ticket=True) == (
-        "payment_time_lag row 1 has a count of 20 digits, expected at most 7; the sheet's "
+        "payment_day row 1 has a count of 20 digits, expected at most 7; the sheet's "
         "calendar runs 1900-03-01 to 9999-12-31"
     )
     long_lag = "+" + "9" * 4301 + "bd"  # fits a cell, and would fail Python's own conversion
@@ -446,17 +452,17 @@ def test_a_lag_is_held_to_the_sheets_calendar_and_its_day_to_the_sheets_last_day
         "has a count of 4301 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to "
         "9999-12-31"
     )
-    assert payment_refusal(long_lag) == f"payment_time_lag {bound}"
-    assert payment_refusal(long_lag, in_ticket=True) == f"payment_time_lag row 1 {bound}"
+    assert payment_refusal(long_lag) == f"payment_day {bound}"
+    assert payment_refusal(long_lag, in_ticket=True) == f"payment_day row 1 {bound}"
     longest = int(np.busday_count(day("2026-11-25"), day("9999-12-31")))
     assert longest == 2_080_082
     assert one_payment_day("2026-11-25", (), f"+{longest}bd") == day("9999-12-31")
     assert payment_refusal(f"+{longest + 1}bd") == (
-        "payment_time_lag is '+2080083bd', counted from 2026-11-25 to 10000-01-03, expected a "
+        "payment_day is '+2080083bd', counted from 2026-11-25 to 10000-01-03, expected a "
         "payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     assert payment_refusal("+9999999cd-9999999cd", in_ticket=True) == (
-        "payment_time_lag row 1 is '+9999999cd-9999999cd', counted from 2026-11-25 to 29405-12-20 "
+        "payment_day row 1 is '+9999999cd-9999999cd', counted from 2026-11-25 to 29405-12-20 "
         "at instruction 1, '+9999999cd', expected a payment day within the sheet's calendar, "
         "1900-03-01 to 9999-12-31"
     )
@@ -473,7 +479,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     template = {
         name: value
         for name, value in TOY_TEMPLATE.items()
-        if name not in ("payment_time_lag", "payment_holiday_calendar")
+        if name not in ("payment_day", "payment_holiday_calendar")
     }
     batch, _ = created(
         TOY,
@@ -483,7 +489,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
             "contract_code": ["Z26", "F27"],
             "quantity": [1, 1],
             "fixed_price": [3.0, 3.0],
-            "payment_time_lag": ["+1bd", "+3bd"],
+            "payment_day": ["+1bd", "+3bd"],
             "payment_holiday_calendar": [after_z26, before_new_year],
         },
         template,
@@ -491,7 +497,7 @@ def test_payment_calendars_and_lags_in_the_ticket_apply_row_by_row() -> None:
     payment = batch.resolved.payment
     assert payment is not None
     np.testing.assert_array_equal(payment.date, dates("2026-11-27", "2027-01-04"))
-    assert payment.lag == ("+1bd", "+3bd")
+    assert payment.entered.texts == ("+1bd", "+3bd")
     assert payment.calendar == (after_z26, before_new_year)
 
 
@@ -509,7 +515,7 @@ PEN_TEMPLATE: dict[str, object] = {
     "schedule_method": "penultimate",
     "settlement_method": "financial",
     "clearing_house": "ICE Clear Europe",
-    "payment_time_lag": "+1bd",
+    "payment_day": "+1bd",
     "payment_holiday_calendar": CLEARING,
 }
 NG_2026 = an_index(
@@ -642,7 +648,7 @@ L3D_TEMPLATE: dict[str, object] = {
     "schedule_method": "last3day",
     "settlement_method": "financial",
     "clearing_house": "Prototype Clearing",
-    "payment_time_lag": "+2bd",
+    "payment_day": "+2bd",
     "payment_holiday_calendar": WEEKDAYS,
 }
 L3D_TICKET: dict[str, list[object]] = {
@@ -748,7 +754,7 @@ def test_a_physical_last3day_future_is_refused_when_the_batch_is_made() -> None:
     physical = {
         name: value
         for name, value in L3D_TEMPLATE.items()
-        if name not in ("payment_time_lag", "payment_holiday_calendar")
+        if name not in ("payment_day", "payment_holiday_calendar")
     }
     assert refused(SYN, L3D_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' with the last3day method of "
@@ -779,7 +785,7 @@ ASIAN_TEMPLATE: dict[str, object] = {
     "schedule_method": "asian",
     "settlement_method": "financial",
     "clearing_house": "Prototype Clearing",
-    "payment_time_lag": "+2bd",
+    "payment_day": "+2bd",
     "payment_holiday_calendar": PAY_JAN_1,
 }
 ASIAN_TICKET: dict[str, list[object]] = {
@@ -907,7 +913,7 @@ def test_a_physical_asian_future_is_refused_when_the_batch_is_made() -> None:
     physical = {
         name: value
         for name, value in ASIAN_TEMPLATE.items()
-        if name not in ("payment_time_lag", "payment_holiday_calendar")
+        if name not in ("payment_day", "payment_holiday_calendar")
     }
     assert refused(ETHANE, ASIAN_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' with the asian method of trade 1 "
@@ -1610,8 +1616,8 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         ),
         (
             NG_TICKET,
-            {**NG_TEMPLATE, "payment_time_lag": "+1bd"},
-            "payment_time_lag is '+1bd', expected none unless settlement_method = financial",
+            {**NG_TEMPLATE, "payment_day": "+1bd"},
+            "payment_day is '+1bd', expected none unless settlement_method = financial",
         ),
         (
             NG_TICKET,
@@ -1622,11 +1628,11 @@ def test_a_zero_row_counts_the_selected_unit_whatever_its_row_or_size() -> None:
         (
             NG_TICKET,
             {**NG_TEMPLATE, "settlement_method": "financial"},
-            "payment_time_lag is missing, expected it when settlement_method = financial",
+            "payment_day is missing, expected it when settlement_method = financial",
         ),
         (
             NG_TICKET,
-            {**NG_TEMPLATE, "settlement_method": "financial", "payment_time_lag": "+1bd"},
+            {**NG_TEMPLATE, "settlement_method": "financial", "payment_day": "+1bd"},
             "payment_holiday_calendar is missing, expected it when settlement_method = financial",
         ),
         (  # since #175: a bilateral batch names its counterparty
@@ -1707,10 +1713,10 @@ def test_a_quantity_is_named_by_its_trades_row_though_a_strip_sits_before_it() -
 def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> None:
     # NG-002 at +3bd pays 1 December where the other Z26 rows pay 30 November: Z26 is two
     # groups, the earlier day first, and F27 one, each row in the group of its own day.
-    template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_time_lag"}
+    template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_day"}
     batch, counter = created(
         TOY,
-        {**NG_TICKET, "payment_time_lag": ["+2bd", "+3bd", "+2bd", "+2bd", "+2bd"]},
+        {**NG_TICKET, "payment_day": ["+2bd", "+3bd", "+2bd", "+2bd", "+2bd"]},
         template,
     )
     np.testing.assert_array_equal(batch.encoded.group_contract, [1, 1, 2])
@@ -1733,7 +1739,7 @@ def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> No
             "contract_code": ["J27"] * 4,
             "quantity": [1, 1, 1, 1],
             "fixed_price": [3.0] * 4,
-            "payment_time_lag": ["+2bd", "+2bd", "+2bd", "+3bd"],
+            "payment_day": ["+2bd", "+2bd", "+2bd", "+3bd"],
         },
         template,
     )
@@ -1748,7 +1754,7 @@ def test_two_lags_for_one_contract_make_two_payment_groups_by_their_days() -> No
         TOY,
         {
             **NG_TICKET,
-            "payment_time_lag": ["+1bd", "+2bd", "+2bd", "+2bd", "+1bd"],
+            "payment_day": ["+1bd", "+2bd", "+2bd", "+2bd", "+1bd"],
             "payment_holiday_calendar": [
                 friday_closed,
                 PAYMENT_CALENDAR,
@@ -1777,13 +1783,13 @@ def test_a_code_or_a_lag_the_grammar_refuses_is_named_by_its_first_bad_row() -> 
         "contract_code": ["Z26", "ZZ26", "AAA", "F27", "Z26"],
     }
     assert refused(NG, later_bad).startswith("contract_code row 2 is 'ZZ26', expected a contract")
-    template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_time_lag"}
+    template = {k: v for k, v in TOY_TEMPLATE.items() if k != "payment_day"}
     lags: dict[str, list[object]] = {
         **NG_TICKET,
-        "payment_time_lag": ["+2BD", "+2bd+", "+2xd", "+2bd", "+2bd"],
+        "payment_day": ["+2BD", "+2bd+", "+2xd", "+2bd", "+2bd"],
     }
     assert refused(TOY, lags, template) == (  # row 1 reads since #181; row 2 is the first bad
-        "payment_time_lag row 2 is '+2bd+', expected one or more of a sign, a whole count and bd, "
+        "payment_day row 2 is '+2bd+', expected one or more of a sign, a whole count and bd, "
         "cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+' "
         "begins with no "
         "instruction"
@@ -2268,7 +2274,7 @@ def test_a_financial_batchs_spill_carries_its_payment_terms(sheet: dict[str, Any
         "quantity_unit",
         "quantity_per",
         "fixed_price",
-        "payment_time_lag",
+        "payment_day",
         "payment_date",
         "entered_contract_code",
         "start_date",
@@ -2490,7 +2496,7 @@ MIXED_TEMPLATE: dict[str, object] = {
     "settlement_method": "financial",
     "trade_date": day("2026-11-30"),
     "fixed_price": 10.0,
-    "payment_time_lag": "+1bd",
+    "payment_day": "+1bd",
     "payment_holiday_calendar": holiday_calendar(dates("2027-01-01")),
 }
 MIXED_TICKET: dict[str, list[object]] = {
@@ -2718,7 +2724,7 @@ MONTHLY = an_index(
 )
 PEN_ASIAN_TEMPLATE: dict[str, object] = {
     key: value for key, value in WTI_TEMPLATE.items() if key != "schedule_method"
-} | {"quantity_unit": "LOT", "payment_time_lag": "+1bd"}
+} | {"quantity_unit": "LOT", "payment_day": "+1bd"}
 ASIAN_AND_PEN: dict[str, list[object]] = {
     "trade_id": [1, 16],
     "trade_date": ["2026-11-20", "2026-11-20"],
@@ -2755,8 +2761,8 @@ def test_the_asian_and_pen_share_one_december_axis_of_22_days_one_month_and_one_
     np.testing.assert_array_equal(turned.encoded.day_of_slot, enc.day_of_slot)
     later, _ = created(
         MONTHLY,
-        {**ASIAN_AND_PEN, "payment_time_lag": ["+1bd", "+2bd"]},
-        {key: value for key, value in PEN_ASIAN_TEMPLATE.items() if key != "payment_time_lag"},
+        {**ASIAN_AND_PEN, "payment_day": ["+1bd", "+2bd"]},
+        {key: value for key, value in PEN_ASIAN_TEMPLATE.items() if key != "payment_day"},
     )
     assert later.encoded.slot_group.size == 22 and later.encoded.group_contract.size == 1
     np.testing.assert_array_equal(later.encoded.days, enc.days)
@@ -2795,7 +2801,7 @@ WAHA_TEMPLATE: dict[str, object] = {
     "route": "cleared",
     "settlement_method": "financial",
     "clearing_house": "ICE Clear Europe",
-    "payment_time_lag": "+2bd",
+    "payment_day": "+2bd",
     "payment_holiday_calendar": WAHA_PAYS,
 }
 WAHA_TICKET: dict[str, list[object]] = {
@@ -2825,7 +2831,7 @@ def test_an_iferc_basis_future_observes_publication_day_and_pays_from_it() -> No
     np.testing.assert_array_equal(terms.quantity, [1])
     np.testing.assert_array_equal(terms.fixed_price, [-0.5])
     assert terms.payment is not None
-    assert terms.payment.lag == ("+2bd",)
+    assert terms.payment.entered.texts == ("+2bd",)
     assert terms.payment.calendar == (WAHA_PAYS,)
     np.testing.assert_array_equal(terms.payment.date, dates("2026-12-03"))
     enc = batch.encoded
@@ -2890,14 +2896,14 @@ def test_iferc_payment_counts_from_publication_on_the_payment_calendar() -> None
             "contract_code": ["Z26", "Z26"],
             "quantity": [1, -1],
             "fixed_price": [-0.50, -0.50],
-            "payment_time_lag": ["+2bd", "+3bd"],
+            "payment_day": ["+2bd", "+3bd"],
         },
-        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_time_lag"},
+        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_day"},
     )
     np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-03", "2026-12-04"))
     np.testing.assert_array_equal(pair.encoded.group_contract, [1, 1])
     assert pair.encoded.slot_group.size == 2
-    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0bd"}) == (
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_day": "+0bd"}) == (
         "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
         "final price exists"
     )
@@ -2909,7 +2915,7 @@ def test_an_iferc_batch_is_financial_lastday_whole_months_on_a_reporting_index_o
     physical = {
         key: value
         for key, value in WAHA_TEMPLATE.items()
-        if key not in ("payment_time_lag", "payment_holiday_calendar")
+        if key not in ("payment_day", "payment_holiday_calendar")
     }
     assert refused(WAHA, WAHA_TICKET, {**physical, "settlement_method": "physical"}) == (
         "settlement_method is 'physical', expected 'financial' on an IFERC index; an IFERC basis "
@@ -3090,10 +3096,10 @@ def chained(
     }
     template: dict[str, object] = {**TOY_TEMPLATE, "payment_holiday_calendar": WEEKDAYS_ONLY}
     if template_rule is None:
-        del template["payment_time_lag"]
-        ticket["payment_time_lag"] = [rule for _, rule in rows]
+        del template["payment_day"]
+        ticket["payment_day"] = [rule for _, rule in rows]
     else:
-        template["payment_time_lag"] = template_rule
+        template["payment_day"] = template_rule
     if calendars is not None:
         del template["payment_holiday_calendar"]
         ticket["payment_holiday_calendar"] = list(calendars)
@@ -3111,7 +3117,7 @@ def test_the_compound_tickets_payment_rules_on_the_chain_fixture() -> None:
     # one calendar are three instructions applied.
     batch, counter = chained([("V26", "+1bd"), ("V26", "+3cd"), ("V26", "+4cd")])
     assert batch.resolved.payment is not None
-    assert batch.resolved.payment.lag == ("+1bd", "+3cd", "+4cd")
+    assert batch.resolved.payment.entered.texts == ("+1bd", "+3cd", "+4cd")
     np.testing.assert_array_equal(paid_on(batch), dates("2026-10-12", "2026-10-12", "2026-10-13"))
     np.testing.assert_array_equal(batch.encoded.payment_date, dates("2026-10-12", "2026-10-13"))
     np.testing.assert_array_equal(batch.encoded.group_contract, [1, 1])
@@ -3172,7 +3178,10 @@ def test_rules_and_calendars_vary_by_row_and_a_strip_applies_its_rule_per_compon
     np.testing.assert_array_equal(paid_on(templated), dates("2026-11-02", "2026-11-30"))
     twice, _ = chained([("V26", "+0EM-1bd+1BD"), ("V26", "+0EM-1bd+1BD")])
     assert twice.resolved.payment is not None
-    assert twice.resolved.payment.lag == ("+0EM-1bd+1BD", "+0EM-1bd+1BD")  # as written, each
+    assert twice.resolved.payment.entered.texts == (
+        "+0EM-1bd+1BD",
+        "+0EM-1bd+1BD",
+    )  # as written, each
     np.testing.assert_array_equal(twice.encoded.payment_date, dates("2026-11-02"))
     assert twice.encoded.slot_group.size == 1
 
@@ -3191,7 +3200,7 @@ def test_a_rule_that_leaves_the_sheet_names_the_first_offending_row_in_ticket_or
             calendars=(cal_x, cal_y, cal_z),
         )
     assert str(strayed.value) == (
-        "payment_time_lag row 2 is '+9999999cd', counted from 2026-10-09 to 29405-11-03, expected "
+        "payment_day row 2 is '+9999999cd', counted from 2026-10-09 to 29405-11-03, expected "
         "a payment day within the sheet's calendar, 1900-03-01 to 9999-12-31"
     )
     exact, _ = chained([("V26", "+2912161cd")])
@@ -3203,7 +3212,7 @@ def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() ->
     # business days on with New Year's Day closed, 5 January 2027; +3cd is 4 December, the day
     # +3bd pays, so the two are one group; +0cd is the publication day itself, refused by the
     # existing rule, since the final price does not exist until that day is done.
-    chain, _ = created(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0em+2bd"})
+    chain, _ = created(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_day": "+0em+2bd"})
     np.testing.assert_array_equal(paid_on(chain), dates("2027-01-05"))
     np.testing.assert_array_equal(chain.encoded.slot_date, dates("2026-12-01"))
     pair, _ = created(
@@ -3214,14 +3223,14 @@ def test_an_iferc_chain_counts_from_publication_and_may_not_pay_on_that_day() ->
             "contract_code": ["Z26", "Z26"],
             "quantity": [1, -1],
             "fixed_price": [-0.50, -0.50],
-            "payment_time_lag": ["+3bd", "+3cd"],
+            "payment_day": ["+3bd", "+3cd"],
         },
-        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_time_lag"},
+        {key: value for key, value in WAHA_TEMPLATE.items() if key != "payment_day"},
     )
     assert pair.resolved.payment is not None
-    assert pair.resolved.payment.lag == ("+3bd", "+3cd")
+    assert pair.resolved.payment.entered.texts == ("+3bd", "+3cd")
     np.testing.assert_array_equal(pair.encoded.payment_date, dates("2026-12-04"))
-    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": "+0cd"}) == (
+    assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_day": "+0cd"}) == (
         "Z26 pays on 2026-12-01, expected a day after its last observation, 2026-12-01, when its "
         "final price exists"
     )
@@ -3257,9 +3266,9 @@ def test_the_tickets_date_examples_pin_on_both_routes() -> None:
         "discount_curve_key": "SOFR",
     }
     for template in (WAHA_TEMPLATE, bilateral):
-        two, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+2bd"})
+        two, _ = created(WAHA, WAHA_TICKET, {**template, "payment_day": "+2bd"})
         np.testing.assert_array_equal(paid_on(two), dates("2026-12-03"))
-        five, _ = created(WAHA, WAHA_TICKET, {**template, "payment_time_lag": "+5bd"})
+        five, _ = created(WAHA, WAHA_TICKET, {**template, "payment_day": "+5bd"})
         np.testing.assert_array_equal(paid_on(five), dates("2026-12-08"))
     closed, _ = created(
         WAHA,
@@ -3272,7 +3281,7 @@ def test_the_tickets_date_examples_pin_on_both_routes() -> None:
         WAHA_TICKET,
         {
             **WAHA_TEMPLATE,
-            "payment_time_lag": "+1bd",
+            "payment_day": "+1bd",
             "payment_holiday_calendar": holiday_calendar(dates("2026-12-04")),
         },
     )
@@ -3280,11 +3289,11 @@ def test_the_tickets_date_examples_pin_on_both_routes() -> None:
     earlier, _ = created(
         LATE,
         {**WAHA_TICKET, "trade_date": ["2025-11-28"], "contract_code": ["Z25"]},
-        {**WAHA_TEMPLATE, "payment_time_lag": "+5bd"},
+        {**WAHA_TEMPLATE, "payment_day": "+5bd"},
     )
     np.testing.assert_array_equal(paid_on(earlier), dates("2025-12-08"))
     for lag, day in (("+0bd", "2026-12-01"), ("-1bd", "2026-11-30")):
-        assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_time_lag": lag}) == (
+        assert refused(WAHA, WAHA_TICKET, {**WAHA_TEMPLATE, "payment_day": lag}) == (
             f"Z26 pays on {day}, expected a day after its last observation, 2026-12-01, when its "
             "final price exists"
         )
@@ -3450,7 +3459,7 @@ def anchored_payment(calendar: HolidayCalendar, lag: str = "+1bd") -> str:
         {
             **TOY_TEMPLATE,
             "quantity_unit": "LOT",
-            "payment_time_lag": lag,
+            "payment_day": lag,
             "payment_holiday_calendar": calendar,
         },
     )

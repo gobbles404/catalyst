@@ -605,7 +605,7 @@ $bumps = {
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_time_lag"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
@@ -712,7 +712,7 @@ $curves = {
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"; Put $state $sheet "O4" "discount_curve_key"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"; Put $state $sheet "O6" "SOFR"
     Put $state $sheet "K7" "11-May-2026"; Put $state $sheet "L7" "q26"; Put $state $sheet "M7" "-1"; Put $state $sheet "N7" "70"; Put $state $sheet "O7" "FFOIS"
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_time_lag"; Put $state $sheet "R26" "payment_holiday_calendar"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
     Put $state $sheet "W2" "26-May-2026"; Put $state $sheet "X2" "1"
@@ -908,7 +908,7 @@ $trades = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_time_lag"; Put $state $sheet "R1" "payment_holiday_calendar"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"
     Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
@@ -1086,7 +1086,7 @@ $valuation = {
     $sheet = Sheet $state $book
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
-    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_time_lag"; Put $state $sheet "R1" "payment_holiday_calendar"
+    Put $state $sheet "K1" "quantity_unit"; Put $state $sheet "L1" "quantity_per"; Put $state $sheet "M1" "schedule_method"; Put $state $sheet "N1" "route"; Put $state $sheet "O1" "settlement_method"; Put $state $sheet "P1" "clearing_house"; Put $state $sheet "Q1" "payment_day"; Put $state $sheet "R1" "payment_holiday_calendar"
     Put $state $sheet "K2" "NYMEX"; Put $state $sheet "L2" "month"; Put $state $sheet "M2" "lastday"; Put $state $sheet "N2" "cleared"; Put $state $sheet "O2" "financial"; Put $state $sheet "P2" "ICE Clear"; Put $state $sheet "Q2" "+1bd"; Put $state $sheet "R2" "=D13"
     Put $state $sheet "K4" "trade_date"; Put $state $sheet "L4" "contract_code"; Put $state $sheet "M4" "quantity"; Put $state $sheet "N4" "fixed_price"
     Put $state $sheet "K5" "11-May-2026"; Put $state $sheet "L5" "N26"; Put $state $sheet "M5" "2"; Put $state $sheet "N5" "70"
@@ -1203,7 +1203,7 @@ $valuation = {
     # curve moves; a curve its creator refuses fails the results as its consumer and publishes
     # nothing until repaired; and a copy holding the results while the curve changes keeps them and
     # their curve alive and readable at the old mark, released when it is cleared.
-    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_time_lag"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
+    Put $state $sheet "K26" "quantity_unit"; Put $state $sheet "L26" "quantity_per"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "route"; Put $state $sheet "O26" "settlement_method"; Put $state $sheet "P26" "counterparty"; Put $state $sheet "Q26" "payment_day"; Put $state $sheet "R26" "payment_holiday_calendar"; Put $state $sheet "S26" "discount_curve_key"
     Put $state $sheet "K27" "NYMEX"; Put $state $sheet "L27" "month"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "bilateral"; Put $state $sheet "O27" "financial"; Put $state $sheet "P27" "ACME Trading"; Put $state $sheet "Q27" "+2bd"; Put $state $sheet "R27" "=D13"; Put $state $sheet "S27" "SOFR"
     Put $state $sheet "K6" "11-May-2026"; Put $state $sheet "L6" "q26"; Put $state $sheet "M6" "2"; Put $state $sheet "N6" "70"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"
@@ -1459,7 +1459,7 @@ $quotes = {
     Build-Chain $state $sheet
     Put $state $sheet "C13" "1-Jan-2026"
     Put $state $sheet "D13" "=_CreateHolidayCalendar(C13)"
-    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_time_lag"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "discount_curve_key"
+    Put $state $sheet "K26" "route"; Put $state $sheet "L26" "settlement_method"; Put $state $sheet "M26" "schedule_method"; Put $state $sheet "N26" "quantity_per"; Put $state $sheet "O26" "payment_day"; Put $state $sheet "P26" "payment_holiday_calendar"; Put $state $sheet "Q26" "discount_curve_key"
     Put $state $sheet "K27" "cleared"; Put $state $sheet "L27" "financial"; Put $state $sheet "M27" "lastday"; Put $state $sheet "N27" "month"; Put $state $sheet "O27" "+1bd"; Put $state $sheet "P27" "=D13"
     Put $state $sheet "K28" "bilateral"; Put $state $sheet "L28" "financial"; Put $state $sheet "M28" "lastday"; Put $state $sheet "N28" "month"; Put $state $sheet "O28" "+1bd"; Put $state $sheet "P28" "=D13"; Put $state $sheet "Q28" "SOFR"
     Put $state $sheet "W1" "date"; Put $state $sheet "X1" "discount_factor"

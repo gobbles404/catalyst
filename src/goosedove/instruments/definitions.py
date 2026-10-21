@@ -33,6 +33,9 @@ class FieldType(Enum):
     DATE = "date"
     CODE = "code"  # text from a fixed list, the list in the options
     HOLIDAY_CALENDAR = "holiday calendar handle"
+    # A date or a text, told apart by type once at the seam and never by reading, since
+    # payment-day-date-or-rule.md: the payment day, a day as entered or the rule that finds it.
+    DATE_OR_TEXT = "date or text"
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,9 +176,10 @@ FIXED_FLOAT = Instrument(
             FieldType.CODE,
             "physical, financial",
             "Selects behavior, validation and payment terms, not a label: a financial batch "
-            "requires payment_time_lag and payment_holiday_calendar and pays on its payment day; a "
-            "physical one pays on no day, takes lastday rows alone, is refused past its expiry and "
-            "refused on the bilateral route; the delivery itself is outside the model",
+            "requires payment_day and payment_holiday_calendar and pays on its payment day, the "
+            "row's date or the day its rule finds; a physical one pays on no day, takes lastday "
+            "rows alone, is refused past its expiry and refused on the bilateral route; the "
+            "delivery itself is outside the model",
             quote_allowed=True,
             quote_required=True,
         ),
@@ -268,17 +272,19 @@ FIXED_FLOAT = Instrument(
             "A finite number in the index's quote units; the same for every month of a strip",
         ),
         Field(
-            "payment_time_lag",
-            "Date offset from the component's last observation day, one instruction or a chain "
-            "applied left to right",
+            "payment_day",
+            "The day a component pays, as a date, or the rule that finds it from the component's "
+            "last observation day",
             False,
             "settlement_method = financial",
-            FieldType.TEXT,
-            "+1bd, +3cd, +0em or a chain such as +3em+25cd-1bd+1bd, each a sign, a whole count "
-            "and bd, cd or em",
-            "Applied in order from the component's last observation day, business days on the "
-            "payment calendar: the expiry under lastday on a futures index, the publication day on "
-            "an IFERC one; the payment must be after it; +1bd for PHH, +2bd for Waha",
+            FieldType.DATE_OR_TEXT,
+            "a date, or +1bd, +3cd, +0em or a chain such as +3em+25cd-1bd+1bd, each a sign, a "
+            "whole count and bd, cd or em",
+            "A date is the row's one payment day, every component of the row paying on it as "
+            "entered, never rolled, after the row's last observation; a rule is applied in order "
+            "from each component's last observation day, business days on the payment calendar: "
+            "the expiry under lastday on a futures index, the publication day on an IFERC one; "
+            "the payment must be after it; +1bd for PHH, +2bd for Waha",
             quote_allowed=True,
             quote_required_when="settlement_method = financial",
         ),
@@ -289,7 +295,8 @@ FIXED_FLOAT = Instrument(
             "settlement_method = financial",
             FieldType.HOLIDAY_CALENDAR,
             "a _CreateHolidayCalendar handle",
-            "Monday to Friday less its holidays; separate from the pricing calendar",
+            "Monday to Friday less its holidays, counted by a rule's business days; separate from "
+            "the pricing calendar; read for nothing by a row paying on a date",
             quote_allowed=True,
             quote_required_when="settlement_method = financial",
         ),

@@ -28,6 +28,7 @@ from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -140,7 +141,11 @@ def some_terms(
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, PAYS[rows]),
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * components),
+            (PAYMENT_CALENDAR,) * components,
+            PAYS[rows],
+        ),
     )
 
 
@@ -391,6 +396,8 @@ ENCODING_LEDGER = {
     "_the_day_axis": 1,  # the day axis, since #166
     "_the_contract_periods": 1,  # the contract month and year axes, since #186
     "_payments_after_observations": 1,
+    "payments_after_observations": 1,  # the kernel's rule, one owner since
+    # payment-day-date-or-rule.md
     "reserves": 1,  # the booked brokerage and clearing, once over the components, since #170
     "_charged": 1,  # clearing, the one fee a cleared, unbrokered batch charges, since #188
     "UnitConversions.factor": 2,
@@ -475,7 +482,11 @@ def asian_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * components),
+            (PAYMENT_CALENDAR,) * components,
+            ASIAN_PAYS[rows],
+        ),
     )
 
 
@@ -810,7 +821,7 @@ def two_day_terms(components: int, contracts: int) -> ResolvedTrades:
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
         PaymentTerms(
-            tuple(f"+{n}bd" for n in (2 + later).tolist()),
+            DatesOrTexts.of_texts(tuple(f"+{n}bd" for n in (2 + later).tolist())),
             (PAYMENT_CALENDAR,) * components,
             PAYS[rows] + later.astype("timedelta64[D]"),
         ),
@@ -972,7 +983,9 @@ def mixed_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, pays),
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * components), (PAYMENT_CALENDAR,) * components, pays
+        ),
     )
 
 
@@ -1142,7 +1155,11 @@ def rolling_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(("+2bd",) * components, (PAYMENT_CALENDAR,) * components, ASIAN_PAYS[rows]),
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * components),
+            (PAYMENT_CALENDAR,) * components,
+            ASIAN_PAYS[rows],
+        ),
     )
 
 
@@ -1256,7 +1273,11 @@ def iferc_terms(components: int, contracts: int) -> ResolvedTrades:
         np.where(np.arange(components) % 3 == 0, -3.0, 2.0),
         *month_bounds(SCHEDULE_MONTHS[rows]),
         3.0 + (np.arange(components) % 7) / 100,
-        PaymentTerms(("+3bd",) * components, (PAYMENT_CALENDAR,) * components, IFERC_PAYS[rows]),
+        PaymentTerms(
+            DatesOrTexts.of_texts(("+3bd",) * components),
+            (PAYMENT_CALENDAR,) * components,
+            IFERC_PAYS[rows],
+        ),
     )
 
 

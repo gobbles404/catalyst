@@ -30,6 +30,7 @@ from goosedove.index_definitions.index import Index, index
 from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market, market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -190,7 +191,11 @@ PAYMENT_CALENDAR = holiday_calendar(dates("2026-11-26", "2026-12-25", "2027-01-0
 
 def paying(pays: NDArray[np.datetime64], occurrences: int, lag: int = 2) -> PaymentTerms:
     """The toy's terms over those days: the lag and the calendar for every occurrence."""
-    return PaymentTerms((f"+{lag}bd",) * occurrences, (PAYMENT_CALENDAR,) * occurrences, pays)
+    return PaymentTerms(
+        DatesOrTexts.of_texts((f"+{lag}bd",) * occurrences),
+        (PAYMENT_CALENDAR,) * occurrences,
+        pays,
+    )
 
 
 def terms_of(
@@ -273,14 +278,15 @@ def test_the_terms_own_frozen_copies_of_their_columns() -> None:
         *picks(ScheduleMethod.LASTDAY, QuantityPer.MONTH, 5), TRADE_IDS, ("CME Clearing",) * 5,
         None, TRADE_DATES,
         np.arange(5, dtype=np.intp), CONTRACT, lots, *bounds_of(TOY, CONTRACT), FIXED_PRICE,
-        PaymentTerms(lags, (PAYMENT_CALENDAR,) * 5, pays),
+        PaymentTerms(DatesOrTexts.of_texts(lags), (PAYMENT_CALENDAR,) * 5, pays),
     )  # fmt: skip
     lots[0], pays[0] = 99.0, day("2030-01-01")  # the arrays passed, changed after
     assert terms.quantity[0] == 10.0 and terms.schedule is TOY.schedule
     np.testing.assert_array_equal(terms.covered_days, [31, 31, 31, 31, 31])  # December, January
     np.testing.assert_array_equal(terms.component_quantity, terms.quantity)  # month: as entered
     assert terms.payment is not None and terms.payment.date[0] == day("2026-11-30")
-    assert terms.payment.lag[0] == "+2bd" and terms.payment.calendar[0] is PAYMENT_CALENDAR
+    assert terms.payment.entered.texts[0] == "+2bd"
+    assert terms.payment.calendar[0] is PAYMENT_CALENDAR
     for column in (
         terms.trade_dates,
         terms.occurrence,
@@ -404,8 +410,8 @@ GAS_DAILY = index(
         ),
         (
             {"settlement": Settlement.FINANCIAL},
-            "payment is missing, expected a lag and a calendar per occurrence and one date per "
-            "component with a financial settlement",
+            "payment is missing, expected a payment day and a calendar per occurrence and one "
+            "date per component with a financial settlement",
         ),
         (
             {"settlement": Settlement.FINANCIAL, "payment": paying(dates("2026-11-30"), 5)},
@@ -413,12 +419,14 @@ GAS_DAILY = index(
         ),
         (
             {"settlement": Settlement.FINANCIAL, "payment": paying(TOY_PAYS, 4)},
-            "payment lag has 4, expected 5, one per occurrence",
+            "payment day has 4, expected 5, one per occurrence",
         ),
         (
             {
                 "settlement": Settlement.FINANCIAL,
-                "payment": PaymentTerms(("+2bd",) * 5, (PAYMENT_CALENDAR,) * 3, TOY_PAYS),
+                "payment": PaymentTerms(
+                    DatesOrTexts.of_texts(("+2bd",) * 5), (PAYMENT_CALENDAR,) * 3, TOY_PAYS
+                ),
             },
             "payment calendar has 3, expected 5, one per occurrence",
         ),
@@ -1037,7 +1045,7 @@ def pen_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(("+1bd",), (CLEARING_CALENDAR,), dates(pays))
+        else PaymentTerms(DatesOrTexts.of_texts(("+1bd",)), (CLEARING_CALENDAR,), dates(pays))
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -1280,7 +1288,7 @@ def strip_terms(order: tuple[tuple[int, tuple[int, ...], float, float], ...]) ->
         *bounds_of(STRIP_INDEX, rows(*(c for _, c, _, _ in components))),
         numbers(*(p for _, _, _, p in components)),
         PaymentTerms(
-            ("+1bd",) * n,
+            DatesOrTexts.of_texts(("+1bd",) * n),
             (CLEARING_CALENDAR,) * n,
             dates(*(STRIP_PAYS[c] for _, c, _, _ in components)),
         ),
@@ -2064,7 +2072,11 @@ def l3d_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(("+2bd",) * n, (WEEKDAYS,) * n, dates(*(L3D_PAYS[c] for c in contracts)))
+        else PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * n),
+            (WEEKDAYS,) * n,
+            dates(*(L3D_PAYS[c] for c in contracts)),
+        )
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -2375,7 +2387,11 @@ def asian_terms(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(("+2bd",) * n, (PAY_JAN_1,) * n, dates(*(pays[c] for c in contracts)))
+        else PaymentTerms(
+            DatesOrTexts.of_texts(("+2bd",) * n),
+            (PAY_JAN_1,) * n,
+            dates(*(pays[c] for c in contracts)),
+        )
     )
     return resolved_trades(
         FIXED_FLOAT,
@@ -2853,7 +2869,9 @@ def period_terms(
         dates(*(end for _, end in periods)),
         numbers(*([price] * n)),
         PaymentTerms(
-            ("+2bd",) * n, (PAY_JAN_1,) * n, dates(*(("2027-01-05",) * n if pays is None else pays))
+            DatesOrTexts.of_texts(("+2bd",) * n),
+            (PAY_JAN_1,) * n,
+            dates(*(("2027-01-05",) * n if pays is None else pays)),
         ),
     )
 
@@ -3070,7 +3088,7 @@ def group_terms(
         *bounds_of(PAYS, rows(*contracts)),
         numbers(*prices),
         PaymentTerms(
-            tuple(f"+{lag}bd" for lag in lags),
+            DatesOrTexts.of_texts(tuple(f"+{lag}bd" for lag in lags)),
             (WEEKDAYS,) * n if calendars is None else calendars,
             days,
         ),
@@ -3488,7 +3506,7 @@ def mixed_terms(
         None
         if settlement is Settlement.PHYSICAL
         else PaymentTerms(
-            tuple(f"+{lag}bd" for lag in lag_days.tolist()),
+            DatesOrTexts.of_texts(tuple(f"+{lag}bd" for lag in lag_days.tolist())),
             (pay_calendar,) * n,
             np.busday_offset(anchors, lag_days[occurrence], holidays=pay_calendar.holiday),
         )
@@ -4354,7 +4372,7 @@ def wti_terms(
         dates(*(start for start, _ in periods)),
         dates(*(end for _, end in periods)),
         numbers(*([price] * n)),
-        PaymentTerms(("+2bd",) * n, (WTI_PAYS,) * n, dates(*pays)),
+        PaymentTerms(DatesOrTexts.of_texts(("+2bd",) * n), (WTI_PAYS,) * n, dates(*pays)),
     )
 
 
@@ -5034,7 +5052,7 @@ def waha_terms(
             dates(*(WAHA_PAYMENT[int(c)] for c in contract)) if pays is None else dates(*pays)
         )
         lag = ("+2bd",) * m if lags is None else tuple(f"+{n}bd" for n in lags)
-        payment = PaymentTerms(lag, (WAHA_PAYS,) * m, pay_days)
+        payment = PaymentTerms(DatesOrTexts.of_texts(lag), (WAHA_PAYS,) * m, pay_days)
     return resolved_trades(
         FIXED_FLOAT,
         WAHA,

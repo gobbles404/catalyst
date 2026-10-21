@@ -16,7 +16,7 @@ The ticket's bilateral example, seven fields:
 
 | | A | B | C | D | E | F | G |
 |---|---|---|---|---|---|---|---|
-| 1 | route | settlement_method | schedule_method | quantity_per | payment_time_lag | payment_holiday_calendar | discount_curve_key |
+| 1 | route | settlement_method | schedule_method | quantity_per | payment_day | payment_holiday_calendar | discount_curve_key |
 | 2 | bilateral | financial | asian | calday | +5bd | `30512:holiday_calendar:13` | SOFR |
 | 3 | `=_CreateQuoteTemplate("fixed_float", A1:G1, A2:G2)` | shows `30512:quote_template:41` | | | | | |
 
@@ -40,8 +40,9 @@ Which fields a quote template may hold is the definition's own metadata, the `qu
 | Check | Refused as |
 |---|---|
 | the instrument is one a quote prices, `fixed_float`; the cashflow has no quote | `instrument is 'cashflow', expected one a quote prices: 'fixed_float'` |
-| each header, in the sheet's order and before any value is read, is a field a quote template may hold: a booking fact, the identifiers, the dates, the quantity and its unit, the price, the labels and the reserve, is refused by name, and so is a period field, `contract_code`, `start_date` or `end_date`, whose cell may be blank for a trade template and is refused here whatever it holds, since the quote's own contract code argument owns the period | `quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar` |
-| each value, read once for the rule intrinsic to its field by the trade template's readers, [trade-template.md](../trades/trade-template.md) the table of them: a code from its list, a payment rule read whole, a curve key with no whitespace around it | `route is 'Cleared', expected cleared or bilateral`; `payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd`; `discount_curve_key is ' SOFR', expected a name with no whitespace around it` |
+| each header, in the sheet's order and before any value is read, is a field a quote template may hold: a booking fact, the identifiers, the dates, the quantity and its unit, the price, the labels and the reserve, is refused by name, and so is a period field, `contract_code`, `start_date` or `end_date`, whose cell may be blank for a trade template and is refused here whatever it holds, since the quote's own contract code argument owns the period | `quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar` |
+| each value, read once for the rule intrinsic to its field by the trade template's readers, [trade-template.md](../trades/trade-template.md) the table of them: a code from its list, a payment day as the date it holds or as a rule read whole, a curve key with no whitespace around it | `route is 'Cleared', expected cleared or bilateral`; `payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd`; `discount_curve_key is ' SOFR', expected a name with no whitespace around it` |
+| a payment day held as a date, since [payment-day-date-or-rule.md](../../engineering-tickets/trade-valuation-pipeline/payment-day-date-or-rule.md), is kept as the day and serves any request whose last observation falls before it, every month then paying on the day; a month observing on or after it is refused by the quote, by the month, the comparison being with the observation day and not the period's end, so the template is not one deal's | `H27 pays on 2027-03-15, expected a day after its last observation, 2027-03-31, when its final price exists` |
 
 Nothing is required of a template, which is a partial record. Which terms a completed quote needs, the four codes always, the payment fields with a financial settlement and the key on the bilateral route, as the `quote_required` and `quote_required_when` rows say, and whether the terms agree with one another and with the index and the market, are [_Quote](quote.md)'s checks, against the template, the contract code and the market together. So a key beside a cleared route, or a lag beside a physical settlement, is held here as typed and refused when a quote is made.
 
@@ -52,7 +53,7 @@ QuoteTemplate
     instrument   the library's fixed_float definition, by reference
     names        the fields the row named, in the sheet's order
     values       by field name, in the same order: route bilateral, settlement_method financial,
-                 schedule_method asian, quantity_per calday, payment_time_lag +5bd,
+                 schedule_method asian, quantity_per calday, payment_day +5bd,
                  payment_holiday_calendar the calendar object, discount_curve_key SOFR
 ```
 

@@ -19,6 +19,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues
 from goosedove.quoting.template import QuoteTemplate, quote_template
+from goosedove.trades.template import DayOrRule
 
 ENTRY = {
     name: bridge.entry(name)
@@ -126,13 +127,13 @@ BILATERAL: dict[str, object] = {
     "settlement_method": "financial",
     "schedule_method": "asian",
     "quantity_per": "calday",
-    "payment_time_lag": "+5bd",
+    "payment_day": "+5bd",
     "payment_holiday_calendar": None,
     "discount_curve_key": "SOFR",
 }
 ALLOWED = (
     "schedule_method, route, settlement_method, discount_curve_key, quantity_per, "
-    "payment_time_lag, payment_holiday_calendar"
+    "payment_day, payment_holiday_calendar"
 )
 
 
@@ -155,7 +156,9 @@ def test_the_tickets_bilateral_example_makes_a_template_of_its_seven_fields() ->
     held = template.values["payment_holiday_calendar"]
     assert type(held) is HolidayCalendar and held is behind("CatchQuoteCalendar", calendar)
     texts = {k: v for k, v in template.values.items() if k != "payment_holiday_calendar"}
-    assert texts == {k: v for k, v in BILATERAL.items() if k != "payment_holiday_calendar"}
+    expected = {k: v for k, v in BILATERAL.items() if k != "payment_holiday_calendar"}
+    expected["payment_day"] = DayOrRule(None, "+5bd")  # the rule as a template holds it
+    assert texts == expected
 
 
 def test_a_cleared_financial_template_needs_no_key_and_one_field_takes_the_same_path() -> None:
@@ -164,7 +167,7 @@ def test_a_cleared_financial_template_needs_no_key_and_one_field_takes_the_same_
         settlement_method="financial",
         schedule_method="lastday",
         quantity_per="month",
-        payment_time_lag="+2bd",
+        payment_day="+2bd",
         payment_holiday_calendar=a_calendar(),
     )
     assert len(cleared.values) == 6 and cleared.values["route"] == "cleared"
@@ -178,14 +181,16 @@ def test_a_cleared_financial_template_needs_no_key_and_one_field_takes_the_same_
 
 def test_each_value_is_read_once_by_the_trade_templates_reader_and_kept_as_typed() -> None:
     template = a_quote_template(
-        payment_time_lag="+2BD", schedule_method="asian", discount_curve_key="ffois"
+        payment_day="+2BD", schedule_method="asian", discount_curve_key="ffois"
     )
     assert dict(template.values) == {
-        "payment_time_lag": "+2BD",
+        "payment_day": DayOrRule(None, "+2BD"),
         "schedule_method": "asian",
         "discount_curve_key": "ffois",
     }
-    assert all(type(value) is str for value in template.values.values())
+    assert all(
+        type(value) is str for name, value in template.values.items() if name != "payment_day"
+    )
 
 
 def test_the_builder_takes_one_row_of_field_values() -> None:
@@ -295,8 +300,8 @@ def test_the_creators_refusals_come_in_the_seams_order_then_the_librarys() -> No
     assert create("fixed_float", row("quantity_per"), row("day")) == (
         library + "quantity_per is 'day', expected month or calday"
     )
-    assert create("fixed_float", row("payment_time_lag"), row("2bd")) == (
-        library + "payment_time_lag is '2bd', expected one or more of a sign, a whole count and "
+    assert create("fixed_float", row("payment_day"), row("2bd")) == (
+        library + "payment_day is '2bd', expected one or more of a sign, a whole count and "
         "bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
     )
     assert create("fixed_float", row("discount_curve_key"), row(" SOFR")) == (

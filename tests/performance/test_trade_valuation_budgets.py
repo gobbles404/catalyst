@@ -69,7 +69,7 @@ def sheet() -> dict[str, Any]:
         "route",
         "settlement_method",
         "clearing_house",
-        "payment_time_lag",
+        "payment_day",
         "payment_holiday_calendar",
     ]
     template = PATH["_CreateTradeTemplate"](
@@ -127,7 +127,7 @@ def bilateral(sheet: dict[str, Any]) -> dict[str, Any]:
         "settlement_method",
         "counterparty",
         "discount_curve_key",
-        "payment_time_lag",
+        "payment_day",
         "payment_holiday_calendar",
     ]
     template = PATH["_CreateTradeTemplate"](
@@ -623,7 +623,7 @@ def test_a_combined_payment_calendar_adds_no_work_after_creation(
                 "route",
                 "settlement_method",
                 "clearing_house",
-                "payment_time_lag",
+                "payment_day",
                 "payment_holiday_calendar",
             ]
         ]

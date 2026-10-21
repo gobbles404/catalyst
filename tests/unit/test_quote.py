@@ -47,6 +47,7 @@ from goosedove.index_definitions.index_conventions import index_conventions
 from goosedove.index_definitions.periods import end_date, start_date
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory, market_history
 from goosedove.market_data.futures_fixings import futures_fixings
@@ -57,6 +58,7 @@ from goosedove.trades.encoding import encoded
 from goosedove.trades.evaluation import trade_results
 from goosedove.trades.preparation import prepared_trades
 from goosedove.trades.schedule_methods import ScheduleMethod
+from goosedove.trades.template import DayOrRule
 from goosedove.trades.terms import PaymentTerms, QuantityPer, Route, Settlement, resolved_trades
 
 ENTRY = {
@@ -107,13 +109,17 @@ def financial(
     lag: str = "+1bd",
     payment_calendar: object = WEEKENDS_ONLY,
     key: str | None = None,
+    day: str | None = None,
 ) -> QuoteTemplate:
+    # The payment day as the template reads it: the rule given, or the date when one is.
     values: dict[str, object] = {
         "route": route,
         "settlement_method": "financial",
         "schedule_method": method,
         "quantity_per": per,
-        "payment_time_lag": lag,
+        "payment_day": DayOrRule(None, lag)
+        if day is None
+        else DayOrRule(np.datetime64(day, "D"), None),
         "payment_holiday_calendar": payment_calendar,
     }
     if key is not None:
@@ -127,8 +133,9 @@ def bilateral(
     per: str = "month",
     lag: str = "+1bd",
     payment_calendar: object = WEEKENDS_ONLY,
+    day: str | None = None,
 ) -> QuoteTemplate:
-    return financial("bilateral", method, per, lag, payment_calendar, key)
+    return financial("bilateral", method, per, lag, payment_calendar, key, day)
 
 
 def physical(method: str = "lastday", per: str = "month") -> QuoteTemplate:
@@ -617,7 +624,7 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="financial",
             schedule_method="asian",
             quantity_per="month",
-            payment_time_lag="+1bd",
+            payment_day=DayOrRule(None, "+1bd"),
         ),
         f"payment_holiday_calendar is missing, {in_template} when settlement_method = financial",
     )
@@ -629,9 +636,9 @@ def test_the_templates_terms_are_complete_and_agree_before_anything_is_priced() 
             settlement_method="physical",
             schedule_method="lastday",
             quantity_per="month",
-            payment_time_lag="+1bd",
+            payment_day=DayOrRule(None, "+1bd"),
         ),
-        "payment_time_lag is '+1bd', expected none in the quote template unless "
+        "payment_day is '+1bd', expected none in the quote template unless "
         "settlement_method = financial",
     )
     refused(
@@ -721,7 +728,7 @@ def test_the_period_and_the_market_refuse_what_they_cannot_price() -> None:
         m,
         "F27",
         financial(lag="+9999999cd"),
-        "payment_time_lag is '+9999999cd', counted from 2027-01-29 to 29406-02-23, expected a "
+        "payment_day is '+9999999cd', counted from 2027-01-29 to 29406-02-23, expected a "
         "payment day within the sheet's calendar, 1900-03-01 to 9999-12-31",
     )
     # A Gas Daily index has no fixed_float and so no quote.
@@ -797,7 +804,11 @@ def test_an_equivalent_trade_booked_at_the_quote_marks_zero_with_every_payment_a
             numbers(1.0, 1.0),
             *bounds_of(STRIP, contract),
             numbers(k, k),
-            PaymentTerms(("+1bd", "+1bd"), (WEEKENDS_ONLY,) * 2, dates("2027-02-01", "2027-03-01")),
+            PaymentTerms(
+                DatesOrTexts.of_texts(("+1bd", "+1bd")),
+                (WEEKENDS_ONLY,) * 2,
+                dates("2027-02-01", "2027-03-01"),
+            ),
             counterparty=("ACME Trading",) * 2 if bilateral_only else None,
             discount_curve_key=("SOFR",) * 2 if bilateral_only else None,
         )
@@ -958,7 +969,9 @@ def test_an_equivalent_trade_booked_on_the_balances_dates_marks_zero() -> None:
                 ends,
                 numbers(k, k),
                 PaymentTerms(
-                    ("+1bd", "+1bd"), (WEEKENDS_ONLY,) * 2, dates("2027-02-01", "2027-03-01")
+                    DatesOrTexts.of_texts(("+1bd", "+1bd")),
+                    (WEEKENDS_ONLY,) * 2,
+                    dates("2027-02-01", "2027-03-01"),
                 ),
                 counterparty=("ACME Trading",) * 2 if keyed else None,
                 discount_curve_key=("SOFR",) * 2 if keyed else None,
@@ -992,7 +1005,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
         "settlement_method",
         "schedule_method",
         "quantity_per",
-        "payment_time_lag",
+        "payment_day",
         "payment_holiday_calendar",
         "discount_curve_key",
     )
@@ -1008,7 +1021,7 @@ def test_the_page_example_through_the_seam_and_the_seams_refusals() -> None:
             "settlement_method",
             "schedule_method",
             "quantity_per",
-            "payment_time_lag",
+            "payment_day",
             "payment_holiday_calendar",
         ),
         row("cleared", "financial", "asian", "calday", "+1bd", weekends),

@@ -51,6 +51,7 @@ from goosedove.globals.unit_conversions import UNITS
 from goosedove.index_definitions.index import Index
 from goosedove.instrumentation.work_counts import WorkCounter
 from goosedove.instruments.definitions import FIXED_FLOAT
+from goosedove.instruments.fields import DatesOrTexts
 from goosedove.market.market import Market
 from goosedove.market.market_history import MarketHistory
 from goosedove.trades.aggregation import AggregateResults, aggregate_results, aggregate_view
@@ -118,7 +119,7 @@ def trades_on(
     payment = (
         None
         if settlement is Settlement.PHYSICAL
-        else PaymentTerms(tuple(lags), (PAY_DAYS,) * n, dates(*pays))
+        else PaymentTerms(DatesOrTexts.of_texts(tuple(lags)), (PAY_DAYS,) * n, dates(*pays))
     )
     return resolved_trades(
         FIXED_FLOAT, ix, spec(n), route, settlement,

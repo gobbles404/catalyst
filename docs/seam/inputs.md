@@ -241,7 +241,12 @@ is checked against its field's type with the table rules, text for a code, and a
 holds a handle, `holiday calendar handle`, is a column of handle texts resolved one cell at a
 time through decision 35's rule, in row order, each cell's text found at its own place in the
 body and each cell named as a scalar handle argument is named, the first bad cell down the
-column whichever way it is bad; a blank
+column whichever way it is bad; and a field of a date or a text, `date or text`, since
+[payment-day-date-or-rule.md](../engineering-tickets/trade-valuation-pipeline/payment-day-date-or-rule.md),
+is a column told apart cell by cell by type, a whole-day serial inside the calendar a date and a
+nonempty text a text, any other cell refused as the first bad one down the column, `expected
+date or text`, and handed over as the dates, the texts and which rows hold which, read for no
+meaning; a blank
 cell failed as the mixed range refuses it, and leaving a field out was the only way not to
 supply it, until decision 43. A row of field values is held to its one row before any cell is looked at, since
 #151, as decision 15 holds every row type: a range one row too tall fails by its shape, whatever

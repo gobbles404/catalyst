@@ -18,7 +18,7 @@ from goosedove.index_definitions.holiday_calendar import HolidayCalendar
 from goosedove.index_definitions.sheet_days import SHEET_FIRST_DAY, SHEET_LAST_DAY
 from goosedove.instruments.definitions import FIXED_FLOAT
 from goosedove.instruments.fields import FieldValues, selected
-from goosedove.trades.template import TradeTemplate, trade_template
+from goosedove.trades.template import DayOrRule, TradeTemplate, trade_template
 
 ENTRY = {
     name: bridge.entry(name)
@@ -107,7 +107,7 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itsel
         quantity=10.0,
         trade_date=46289.0,
         contract_code="z26",
-        payment_time_lag="+2bd",
+        payment_day="+2bd",
         payment_holiday_calendar=calendar,
     )
     defaults = template.defaults
@@ -116,7 +116,7 @@ def test_each_value_is_the_scalar_its_type_names_and_a_calendar_the_object_itsel
         defaults["trade_date"], np.datetime64
     )
     assert defaults["contract_code"] == "z26"  # as typed; resolution reads either case
-    assert defaults["payment_time_lag"] == "+2bd"
+    assert defaults["payment_day"] == DayOrRule(None, "+2bd")  # the rule, read for the grammar
     held = defaults["payment_holiday_calendar"]
     assert type(held) is HolidayCalendar
     assert held is behind("CatchCalendar", calendar)
@@ -161,20 +161,20 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ),
         ({"quantity_per": "day"}, "quantity_per is 'day', expected month or calday"),
         (  # since #181 the utility's grammar, one or more instructions, read whole
-            {"payment_time_lag": "2bd"},
-            "payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd "
+            {"payment_day": "2bd"},
+            "payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd "
             "or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd",
         ),
         (
-            {"payment_time_lag": "+1bd+2xd"},
-            "payment_time_lag is '+1bd+2xd', expected one or more of a sign, a whole count and "
+            {"payment_day": "+1bd+2xd"},
+            "payment_day is '+1bd+2xd', expected one or more of a sign, a whole count and "
             "bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, "
             "'+2xd' begins "
             "with no instruction",
         ),
         (
-            {"payment_time_lag": "+1bd "},
-            "payment_time_lag is '+1bd ', expected one or more of a sign, a whole count and bd, "
+            {"payment_day": "+1bd "},
+            "payment_day is '+1bd ', expected one or more of a sign, a whole count and bd, "
             "cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, ' ' "
             "begins with no "
             "instruction",
@@ -200,13 +200,13 @@ LONG_LAG = "+" + "9" * 4301 + "bd"
         ),
         ({"fixed_price": float("inf")}, "fixed_price is inf, expected a finite price"),
         (
-            {"payment_time_lag": LONG_LAG},
-            "payment_time_lag has a count of 4301 digits, expected at most 7; the sheet's "
+            {"payment_day": LONG_LAG},
+            "payment_day has a count of 4301 digits, expected at most 7; the sheet's "
             "calendar runs 1900-03-01 to 9999-12-31",
         ),
         (
-            {"payment_time_lag": "+99999999999999999999bd"},
-            "payment_time_lag has a count of 20 digits, expected at most 7; the sheet's calendar "
+            {"payment_day": "+99999999999999999999bd"},
+            "payment_day has a count of 20 digits, expected at most 7; the sheet's calendar "
             "runs 1900-03-01 to 9999-12-31",
         ),
     ],
@@ -337,5 +337,5 @@ def test_a_contract_code_is_text_here_and_read_for_its_months_when_a_row_books_b
 # check, against the sheet's calendar and after the last observation.
 def test_a_payment_rule_in_any_of_the_grammars_forms_is_a_template() -> None:
     for rule in ("+0bd", "+01bd", "+2BD", "+3em+25cd-1bd+1bd", "-1BD+1bd", "+0em+0cd+0bd"):
-        made = ENTRY["_CreateTradeTemplate"]("fixed_float", row("payment_time_lag"), row(rule))
+        made = ENTRY["_CreateTradeTemplate"]("fixed_float", row("payment_day"), row(rule))
         assert ":trade_template:" in str(made), (rule, made)

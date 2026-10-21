@@ -262,7 +262,7 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "CountFieldRows", new object[] { "fixed_float", Row("quantity", "fixed_price"), new object[,] { { 1.0, 3.1 }, { 2.0, 3.2 }, { 3.0, 3.3 } } }, 3.0 };
             yield return new object[] { "EchoFieldRow", new object[] { "Future", Row("quantity"), 1.0 }, "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields has 1 headers, expected 2, one per column of values" };
-            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve" };
+            yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("Quantity"), 1.0 }, "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "quantity"), Row(1.0, 2.0) }, "#ERROR EchoFieldRow: fields cell (1, 2) is text 'quantity', already given at cell (1, 1)" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("quantity", "fixed_price"), Row("ten", "eleven") }, "#ERROR EchoFieldRow: values cell (1, 1) is text 'ten', expected number" };
             yield return new object[] { "EchoFieldRow", new object[] { "fixed_float", Row("trade_date"), 46164.5 }, "#ERROR EchoFieldRow: values cell (1, 1) is number 46164.5, expected date" };
@@ -274,12 +274,12 @@ namespace Goosedove.Host.Tests
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), Column("NYMEX NG", ExcelEmpty.Value) }, "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit"), 1.0 }, "#ERROR _CreateTradeTemplate: values cell (1, 1) is number 1.0, expected text" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity_unit", "schedule_method"), Row("NYMEX NG", "Asian") }, "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'Asian', expected lastday, penultimate, last3day or asian" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "2bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
-            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_time_lag"), "+1bd+2xd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_day"), "2bd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd" };
+            yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("payment_day"), "+1bd+2xd" }, "#ERROR _CreateTradeTemplate: ValueError: payment_day is '+1bd+2xd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd; from character 5, '+2xd' begins with no instruction" };
             yield return new object[] { "_CreateTradeTemplate", new object[] { "fixed_float", Row("quantity"), 1.5 }, "#ERROR _CreateTradeTemplate: ValueError: quantity is 1.5, expected a whole number" };
             // The quote template, template-based-quoting.md: a booking field and a blank period header refused by name, the cashflow refused as no instrument a quote prices, a value by the trade template's rule; and the quote's arguments in the seam's words, the market left out or naming nothing.
-            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0) }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar" };
-            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared") }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route", "quantity"), Row("cleared", 10.0) }, "#ERROR _CreateQuoteTemplate: ValueError: quantity is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar" };
+            yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("contract_code", "route"), Row(ExcelEmpty.Value, "cleared") }, "#ERROR _CreateQuoteTemplate: ValueError: contract_code is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "cashflow", Row("currency"), "USD" }, "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'" };
             yield return new object[] { "_CreateQuoteTemplate", new object[] { "fixed_float", Row("route"), "Cleared" }, "#ERROR _CreateQuoteTemplate: ValueError: route is 'Cleared', expected cleared or bilateral" };
             yield return new object[] { "_Quote", new object[] { ExcelMissing.Value, "F27", ExcelMissing.Value, ExcelMissing.Value }, "#ERROR _Quote: market is missing, expected market handle" };
@@ -638,7 +638,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("Firm A", booked[2, 5]);
             Assert.Equal("#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk", Seam.Call("_ReportRisk", results, "delta", "day"));
             var fixedFloat = Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route"), Row("cleared"));
-            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
+            Assert.Equal("#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve", Seam.Call("_CreateCashflows", fields, rows, fixedFloat));
             Assert.Equal("#ERROR _CreateCashflows: ValueError: template is of instrument 'fixed_float', expected cashflow, the one instrument whose cashflows are built", Seam.Call("_CreateCashflows", Row("trade_date"), Row(46391.0), fixedFloat));
         }
 
@@ -706,7 +706,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(false, shown[7, 1]);  // trade_id: a booking fact no quote template holds
             Assert.Equal(true, shown[7, 6]);  // schedule_method: held and always required
             Assert.Equal(true, shown[8, 6]);
-            Assert.Equal(true, shown[7, 17]);  // payment_time_lag: held, required with a financial settlement
+            Assert.Equal(true, shown[7, 17]);  // payment_day: held, required with a financial settlement
             Assert.Equal(false, shown[8, 17]);
             Assert.Equal("settlement_method = financial", shown[9, 17]);
             Assert.Equal("route = bilateral", shown[9, 11]);
@@ -771,7 +771,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: route is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price", "route"), Row(46289.0, "Z26", 1.0, 3.0, "cleared"), template));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity of trade 1 at row 1 is 2.5, expected a whole number", Seam.Call("_CreateTrades", ng, headers, Row(1.0, 46289.0, "Z26", 2.5, 3.0), template));
             Assert.Equal("#ERROR _CreateTrades: template is holiday calendar handle '" + holidays + "', expected trade template handle", Seam.Call("_CreateTrades", ng, headers, rows, holidays));
-            var financial = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("NYMEX NG", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
+            var financial = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar"), Row("NYMEX NG", "month", "lastday", "cleared", "financial", "TEST", "+2bd", holidays));
             var strip = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", ng, Row("trade_date", "contract_code", "quantity", "fixed_price"), Row(46289.0, "Z26-F27", 3.0, 3.2), financial));
             Assert.Equal(4, strip.GetLength(0));
             Assert.Equal(21, strip.GetLength(1));
@@ -986,7 +986,7 @@ namespace Goosedove.Host.Tests
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("U26", "V26", "X26"), Column(46261.0, 46293.0, 46304.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
             var anchored = Index(schedule, holidays, "ANCHORED");
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "cleared", "financial", "Prototype Clearing", "+1bd", combined));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var trade = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", anchored, headers, Row(4001.0, 46296.0, "X26", 1.0, 3.0), template));
@@ -1014,7 +1014,7 @@ namespace Goosedove.Host.Tests
             var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27", "H27", "J27", "K27", "M27", "N27"), Column(46351.0, 46385.0, 46414.0, 46442.0, 46475.0, 46505.0, 46533.0, 46566.0, 46596.0), ExcelMissing.Value);
             var holidays = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
             var half = Index(schedule, holidays, "HALF");
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var one = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", half, headers, Row(3001.0, 46357.0, "1h27", 1.0, 3.0), template));
@@ -1061,9 +1061,9 @@ namespace Goosedove.Host.Tests
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "STRIP", Column(30.0, 60.0)));
             var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
-            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_time_lag", "payment_holiday_calendar", "discount_curve_key");
+            var fields = Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_calendar", "discount_curve_key");
             var otc = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", fields, Row("bilateral", "financial", "asian", "month", "+1bd", weekends, "SOFR"));
-            var cleared = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_time_lag", "payment_holiday_calendar"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends));
+            var cleared = (string)Seam.Call("_CreateQuoteTemplate", "fixed_float", Row("route", "settlement_method", "schedule_method", "quantity_per", "payment_day", "payment_holiday_calendar"), Row("cleared", "financial", "asian", "calday", "+1bd", weekends));
             Assert.StartsWith(Pid + ":quote_template:", otc);
             var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46387.0, 1.0 }, { 46419.0, 0.99 }, { 46447.0, 0.98 } });
             var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
@@ -1088,6 +1088,56 @@ namespace Goosedove.Host.Tests
             Assert.Equal($"#ERROR _CreateTrades: template is quote template handle '{otc}', expected trade template handle", Seam.Call("_CreateTrades", index, Row("quantity"), 1.0, otc));
         }
 
+        // Since payment-day-date-or-rule.md the payment field holds a date or a rule: the ticket's two
+        // bilateral rows on a synthetic index, F27 expiring Friday 29 January 2027, 46416, 10,000 MMBtu at
+        // 2.65 each, F27 quoted 3.10 on 15 December 2026, 46371; one pays +2bd, Tuesday 2 February, 46420,
+        // and one on Thursday 25 February, 46443, entered as a date: 4,455 on SOFR 0.990 and 4,432.50 on
+        // 0.985, 8,887.50 in all and no cash. The readback holds the rule as text and the date as a date
+        // under one header typed `date or text`, beside the day each resolved to; a date on the expiry is
+        // refused by its trade, a boolean by the seam, and the old header is a field of nothing.
+        [Fact]
+        public void a_payment_day_is_a_date_or_a_rule_and_reads_back_as_entered()
+        {
+            var schedule = (string)Seam.Call("_CreateFuturesSchedule", Column("X26", "Z26", "F27", "G27"), Column(46323.0, 46351.0, 46416.0, 46444.0), ExcelMissing.Value);
+            var weekends = (string)Seam.Call("_CreateHolidayCalendar", 47484.0);
+            var conventions = Seam.Call("_CreateIndexConventions", "USD", "MMBTU", "USD", "ENERGY", "MMBTU");
+            var specifications = Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
+            var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the payment-day example", schedule, conventions, specifications, weekends, "MMBTU");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_holiday_calendar");
+            var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("MMBTU", "month", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", weekends));
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_day");
+            var rows = new object[,] { { 1001.0, 46371.0, "F27", 10000.0, 2.65, "+2bd" }, { 1002.0, 46371.0, "F27", 10000.0, 2.65, 46443.0 } };
+            var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
+            var batch = (object[,])Seam.Call("util_ReadHandle", trades);
+            var at = -1;
+            for (var c = 0; c < batch.GetLength(1); c++) { if (Equals(batch[0, c], "payment_day")) { at = c; } }
+            Assert.True(at >= 0);
+            Assert.Equal("date or text", batch[1, at]);
+            Assert.Equal("+2bd", batch[2, at]);
+            Assert.Equal(46443.0, batch[3, at]);
+            Assert.Equal("payment_date", batch[0, at + 1]);
+            Assert.Equal(46420.0, batch[2, at + 1]);
+            Assert.Equal(46443.0, batch[3, at + 1]);
+            // The calendar runs from the day after X26 expires, Thursday 29 October 2026, 46324; every
+            // fixed business day before the valuation day holds a settle of 3, newest first.
+            var days = new List<object>();
+            var settles = new List<object>();
+            for (var d = 46370.0; d >= 46324.0; d--) { if (d % 7 >= 2 && d % 7 <= 6) { days.Add(d); settles.Add(3.0); } }
+            var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(days.ToArray()), Column(settles.ToArray()), index);
+            var calendar = (string)Seam.Call("_CreateCalendar", (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5), index);
+            var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
+            var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "SYN", Column(3.10)));
+            var sofr = (string)Seam.Call("_CreateDiscountCurve", "SOFR", Row("date", "discount_factor"), new object[,] { { 46371.0, 1.0 }, { 46420.0, 0.990 }, { 46443.0, 0.985 } });
+            var rates = (string)Seam.Call("_CollectDiscountCurves", sofr);
+            var results = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", trades, history), market, rates);
+            var values = (object[,])Seam.Call("_ReportValues", results);
+            Assert.Equal(8887.5, (double)values[2, 0], 6);
+            Assert.Equal(0.0, values[2, 1]);
+            Assert.Equal("#ERROR _CreateTrades: ValueError: trade 1002 at row 2 pays on 2027-01-29, expected a day after its last observation, 2027-01-29, when its final price exists", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1001.0, 46371.0, "F27", 10000.0, 2.65, "+2bd" }, { 1002.0, 46371.0, "F27", 10000.0, 2.65, 46416.0 } }, template));
+            Assert.Equal("#ERROR _CreateTrades: trade_rows cell (2, 6) is boolean TRUE, expected date or text", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1001.0, 46371.0, "F27", 10000.0, 2.65, "+2bd" }, { 1002.0, 46371.0, "F27", 10000.0, 2.65, true } }, template));
+            Assert.StartsWith("#ERROR _CreateTradeTemplate: fields cell (1, 1) is text 'payment_time_lag', expected a field of fixed_float: ", (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("payment_time_lag"), "+2bd"));
+        }
+
         // The penultimate method on the host's chain: a financial template paying one business day
         // after the pen day on the chain's holiday calendar, the same two trades under it. n26
         // expires Monday 22 June 2026, so its pen day is Friday the 19th, 46192, and it pays on
@@ -1104,7 +1154,7 @@ namespace Goosedove.Host.Tests
             var fixings = (string)Seam.Call("_CreateFuturesFixings", Column(46164.0, 46163.0, 46162.0), Column(71.25, 71.10, 70.85), index);
             var history = (string)Seam.Call("_CreateMarketHistory", calendar, fixings);
             var market = (string)Seam.Call("_CreateMarket", history, (string)Seam.Call("_CreatePriceVector", "sample", Column(72.10, 72.80)));
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("NYMEX NG", "month", "penultimate", "cleared", "financial", "ICE Clear Europe", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46153.0, "n26", 2.0, 70.0 }, { 2.0, 46153.0, "q26", -1.0, 72.0 } };
@@ -1147,7 +1197,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("UNIT", 1.0, "MMBTU", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "SYN", "Synthetic gas index for the last3day example", schedule, conventions, specifications, holidays, "UNIT");
             var weekdays = (string)Seam.Call("_CreateHolidayCalendar", 46023.0);
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("UNIT", "month", "last3day", "cleared", "financial", "Prototype Clearing", "+2bd", weekdays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46346.0, "Z26", 60.0, 70.0 }, { 2.0, 46346.0, "Z26", -30.0, 72.0 } };
@@ -1201,7 +1251,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("GAL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var rows = new object[,] { { 1.0, 46346.0, "Z26", 4400.0, 0.25 }, { 2.0, 46346.0, "Z26", -2200.0, 0.26 } };
@@ -1292,7 +1342,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), Row("GAL", 1.0, "GAL", 0.0, 0.0));
             var index = (string)Seam.Call("_CreateIndex", "ETHANE", "Ethane - synthetic volume index", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("GAL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", payments));
             var midDecember = (string)Seam.Call("_CreateValuationDate", 46371.0, 0.5);  // the helpers take the handle since #173
             var start = (double)Seam.Call("util_StartDate", "BALZ26", midDecember);
@@ -1346,7 +1396,7 @@ namespace Goosedove.Host.Tests
             var index = (string)Seam.Call("_CreateIndex", "PAYS", "Synthetic gas index for the payment-groups example", schedule, conventions, specifications, holidays, "UNIT");
             var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("UNIT", "month", "last3day", "cleared", "financial", "Prototype Clearing", holidays));
-            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_time_lag");
+            var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "payment_day");
             var rows = new object[,] { { 1.0, 46356.0, "Z26", 60.0, 70.0, "+1bd" }, { 2.0, 46356.0, "Z26", -30.0, 72.0, "+3bd" } };
             var trades = (string)Seam.Call("_CreateTrades", index, headers, rows, template);
             var spill = (object[,])Seam.Call("util_ReadHandle", trades);
@@ -1412,7 +1462,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "GAL", 1.0, "GAL", 0.0, 0.0 }, { "BBL", 1.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "MIXED", "Synthetic volume index for the mixed-fields example", schedule, conventions, specifications, holidays, "GAL");
             var payments = (string)Seam.Call("_CreateHolidayCalendar", 46388.0);
-            var fields = Row("route", "settlement_method", "trade_date", "fixed_price", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments));
             var headers = Row("trade_id", "contract_code", "quantity", "quantity_unit", "quantity_per", "schedule_method", "clearing_house");
             var rows = new object[,] { { 1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { 2.0, "Z26", -2.0, "GAL", "calday", "penultimate", "Clearer B" }, { 3.0, "Z26", 3.0, "BBL", "month", "last3day", "Clearer A" }, { 4.0, "Z26", 22.0, "GAL", "month", "asian", "Clearer B" } };
@@ -1459,7 +1509,7 @@ namespace Goosedove.Host.Tests
             var risk = (object[,])Seam.Call("_ReportRisk", paid, "nominal_delta", "year");
             Assert.Equal(85.0, (double)risk[3, 1], 6);
             Assert.Equal("MIXED nominal_delta [GAL]", risk[1, 1]);
-            var withMethod = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_time_lag", "payment_holiday_calendar", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
+            var withMethod = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("route", "settlement_method", "trade_date", "fixed_price", "payment_day", "payment_holiday_calendar", "schedule_method"), Row("cleared", "financial", 46356.0, 10.0, "+1bd", payments, "lastday"));
             Assert.Equal("#ERROR _CreateTrades: ValueError: schedule_method is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, headers, rows, withMethod));
             Assert.Equal("#ERROR _CreateTrades: ValueError: quantity_unit row 2 is 'ICE', expected one of the index's specifications: 'GAL', 'BBL'", Seam.Call("_CreateTrades", index, headers, new object[,] { { 1.0, "Z26", 1.0, "BBL", "month", "lastday", "Clearer A" }, { 5.0, "Z26", 1.0, "ICE", "month", "lastday", "Clearer A" } }, template));
             // A batch on an index made without a reporting lot is refused when it is made, never when its risk is read.
@@ -2204,7 +2254,7 @@ namespace Goosedove.Host.Tests
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "WTI", "West Texas Intermediate crude oil - NYMEX", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "month", "asian", "cleared", "financial", "Prototype Clearing", "+2bd", holidays));
             var headers = Row("trade_id", "trade_date", "start_date", "end_date", "quantity", "fixed_price");
             var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { 23.0, 46346.0, 46374.0, 46384.0, 1200.0, 70.0 } }, template);
@@ -2279,7 +2329,7 @@ namespace Goosedove.Host.Tests
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "MONTHLY", "Month-aligned WTI-like index", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "quantity_per", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "cleared", "financial", "Prototype Clearing", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price", "schedule_method");
             var trades = (string)Seam.Call("_CreateTrades", index, headers, new object[,] { { 1.0, 46346.0, "Z26", 22.0, 70.0, "asian" }, { 16.0, 46346.0, "Z26", 3.0, 70.0, "penultimate" } }, template);
@@ -2370,7 +2420,7 @@ namespace Goosedove.Host.Tests
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "LOT", 2500.0, "MMBTU", 0.0, 0.0 }, { "MMBTU", 1.0, "MMBTU", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "WAHA", "Waha basis - ICE", schedule, conventions, specifications, ExcelMissing.Value, "LOT");
             Assert.StartsWith(Pid + ":index:WAHA:", index);
-            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("LOT", "month", "lastday", "cleared", "financial", "ICE Clear Europe", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "fixed_price");
             var row = new object[,] { { 1001.0, 46356.0, "Z26", 1.0, -0.5 } };
@@ -2453,7 +2503,7 @@ namespace Goosedove.Host.Tests
             var pays = (string)Seam.Call("_CreateHolidayCalendar", Column(46388.0));
             // Since #188, reserve-fee-applicability.md, the template names ION as broker: brokerage charges the rows
             // naming a broker and clearing the cleared route, so the 50 below stands and the readback gains a column.
-            var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays));
             var headers = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price");
             var rows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25 }, { 102.0, 46346.0, "Z26", -2.0, "LOT", 0.25 }, { 103.0, 46346.0, "Z26", 1000.0, "BBL", 0.25 }, { 104.0, 46346.0, "Z26", 0.0, "LOT", 0.25 } };
@@ -2469,7 +2519,7 @@ namespace Goosedove.Host.Tests
             // month's end, the same day, and the business day after, past New Year's Day closed, Monday 4 January.
             var chained = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+0em+1bd", pays));
             var ruled = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, headers, rows, chained));
-            Assert.Equal("payment_time_lag", ruled[0, 13]);
+            Assert.Equal("payment_day", ruled[0, 13]);
             Assert.Equal("payment_date", ruled[0, 14]);
             Assert.Equal("+0em+1bd", ruled[2, 13]);
             Assert.Equal(46391.0, ruled[2, 14]);
@@ -2535,7 +2585,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal(65.0, (double)marketedReserves[2, 2], 9);
             Assert.Equal("USD", marketedReserves[2, 3]);
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve row 2 is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTrades", index, marketedHeaders, new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, 15.0 }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, -5.0 } }, template));
-            var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_time_lag", "payment_holiday_calendar", "marketing_reserve"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
+            var seven = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "broker", "payment_day", "payment_holiday_calendar", "marketing_reserve"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "ION", "+2bd", pays, 7.0));
             var templated = (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, seven), history), Market(), ExcelMissing.Value);
             var templatedReserves = (object[,])Seam.Call("_ReportReserves", templated);
             Assert.Equal(50.0, (double)templatedReserves[2, 0], 9);
@@ -2545,7 +2595,7 @@ namespace Goosedove.Host.Tests
             // Since #188, reserve-fee-applicability.md: the same rows under a cleared template naming no broker book no
             // brokerage and the same 20 of clearing; a broker column mixing ION and None, none and NONE charges the
             // ION row alone, 20, every text read back as typed; a broker from both the template and the ticket is refused.
-            var direct = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
+            var direct = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar"), Row("month", "lastday", "cleared", "financial", "Prototype Clearing", "+2bd", pays));
             var directReserves = (object[,])Seam.Call("_ReportReserves", (string)Seam.Call("_EvaluateTrades", (string)Seam.Call("_PrepareTrades", (string)Seam.Call("_CreateTrades", index, headers, rows, direct), history), Market(), ExcelMissing.Value));
             Assert.Equal(0.0, (double)directReserves[2, 0], 9);
             Assert.Equal(20.0, (double)directReserves[2, 1], 9);
@@ -2562,7 +2612,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("#ERROR _CreateTrades: ValueError: broker is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, brokeredHeaders, brokeredRows, template));
             Assert.Equal("#ERROR _CreateTradeTemplate: ValueError: marketing_reserve is -5.0, expected a finite amount of zero or more", Seam.Call("_CreateTradeTemplate", "fixed_float", Row("marketing_reserve"), -5.0));
             Assert.Equal("#ERROR _CreateTrades: ValueError: marketing_reserve is supplied by the template and by the ticket, expected by one of them", Seam.Call("_CreateTrades", index, marketedHeaders, marketedRows, seven));
-            var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
+            var bilateral = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "SOFR", "+2bd", pays));
             var faced = (string)Seam.Call("_CreateTrades", index, headers, rows, bilateral);
             var facedTable = (object[,])Seam.Call("util_ReadHandle", faced);
             Assert.Equal(23, facedTable.GetLength(1));
@@ -2605,7 +2655,7 @@ namespace Goosedove.Host.Tests
             // and a collection missing a key refused with the key, the row and the names it holds.
             var keyedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "discount_curve_key");
             var keyedRows = new object[,] { { 101.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "SOFR" }, { 102.0, 46346.0, "Z26", -1.0, "LOT", 0.25, "FFOIS" } };
-            var unkeyed = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
+            var unkeyed = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "counterparty", "payment_day", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "ACME Trading", "+2bd", pays));
             var keyed = (string)Seam.Call("_CreateTrades", index, keyedHeaders, keyedRows, unkeyed);
             var keyedTable = (object[,])Seam.Call("util_ReadHandle", keyed);
             Assert.Equal("discount_curve_key", keyedTable[0, 8]);
@@ -2642,7 +2692,7 @@ namespace Goosedove.Host.Tests
             Assert.Equal("SOFR, FFOIS", keyedCollection[2, 4]);
             var facedHeaders = Row("trade_id", "trade_date", "contract_code", "quantity", "quantity_unit", "fixed_price", "counterparty");
             var facedRows = new object[,] { { 1001.0, 46346.0, "Z26", 2.0, "LOT", 0.25, "ACME Trading" }, { 1002.0, 46346.0, "Z26", -2.0, "LOT", 0.25, "Beta Energy" } };
-            var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "discount_curve_key", "payment_time_lag", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "SOFR", "+2bd", pays));
+            var unfaced = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", Row("quantity_per", "schedule_method", "route", "settlement_method", "discount_curve_key", "payment_day", "payment_holiday_calendar"), Row("month", "lastday", "bilateral", "financial", "SOFR", "+2bd", pays));
             var byRow = (object[,])Seam.Call("util_ReadHandle", (string)Seam.Call("_CreateTrades", index, facedHeaders, facedRows, unfaced));
             Assert.Equal("ACME Trading", byRow[2, 7]);
             Assert.Equal("Beta Energy", byRow[3, 7]);
@@ -2672,7 +2722,7 @@ namespace Goosedove.Host.Tests
             var conventions = (string)Seam.Call("_CreateIndexConventions", "USD", "BBL", "USD", "VOLUME", "BBL");
             var specifications = (string)Seam.Call("_CreateContractSpecifications", Row("name", "lot_size", "lot_unit", "brokerage_rate_per_lot", "clearing_rate_per_lot"), new object[,] { { "BBL", 1.0, "BBL", 0.0, 0.0 }, { "LOT", 1000.0, "BBL", 0.0, 0.0 } });
             var index = (string)Seam.Call("_CreateIndex", "BBL_ASIAN", "Synthetic barrel index for the codes-and-dates example", schedule, conventions, specifications, holidays, "LOT");
-            var fields = Row("quantity_unit", "schedule_method", "route", "settlement_method", "clearing_house", "payment_time_lag", "payment_holiday_calendar");
+            var fields = Row("quantity_unit", "schedule_method", "route", "settlement_method", "clearing_house", "payment_day", "payment_holiday_calendar");
             var template = (string)Seam.Call("_CreateTradeTemplate", "fixed_float", fields, Row("BBL", "asian", "cleared", "financial", "Prototype Clearing", "+1bd", holidays));
             var headers = Row("trade_id", "trade_date", "contract_code", "start_date", "end_date", "quantity", "quantity_per", "fixed_price");
             var rows = new object[,] { { 1.0, 46280.0, "V26", "", "", 100.0, "month", 70.0 }, { 2.0, 46280.0, "V26", 46307.0, 46326.0, 100.0, "month", 70.0 }, { 3.0, 46280.0, "", 46307.0, 46315.0, 10.0, "calday", 70.0 } };
