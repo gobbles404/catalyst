@@ -650,7 +650,7 @@ $formulas = [ordered]@{
     '=COLUMNS(EchoFieldRow("fixed_float",EP1:EU1,EP2:EU2))'  = "6"
     '=CountFieldRows("fixed_float",EP4:EQ4,EP5:EQ7)'        = "3"
     '=EchoFieldRow("Future",EP1:EU1,EP2:EU2)' = "#ERROR EchoFieldRow: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
-    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
+    '=EchoFieldRow("fixed_float",EP9,EP10)'       = "#ERROR EchoFieldRow: fields cell (1, 1) is text 'Quantity', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EQ7)' = "#ERROR EchoFieldRow: values is 3x2 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP5:EP7)' = "#ERROR EchoFieldRow: values is 3x1 array, expected one row of field values"
     '=EchoFieldRow("fixed_float",EP4:EQ4,EP7:EQ8)' = "#ERROR EchoFieldRow: values is 2x2 array, expected one row of field values"
@@ -701,8 +701,8 @@ $formulas = [ordered]@{
     '=_CreateTradeTemplate("Future",EW1:FB1,EW2:FB2)' = "#ERROR _CreateTradeTemplate: ValueError: instrument is 'Future', expected one of: 'fixed_float', 'cashflow'"
     '=_CreateTradeTemplate("fixed_float",EY1,EX2)'         = "#ERROR _CreateTradeTemplate: ValueError: schedule_method is 'month', expected lastday, penultimate, last3day or asian"
     '=_CreateTradeTemplate("fixed_float",EZ4,EZ15)'        = "#ERROR _CreateTradeTemplate: ValueError: quantity is 2.5, expected a whole number"
-    '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
-    '=_CreateTradeTemplate("fixed_float",{"payment_time_lag"},{"2bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_time_lag is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
+    '=_CreateTradeTemplate("fixed_float",{"payment_day"},{"+99999999999999999999bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_day has a count of 20 digits, expected at most 7; the sheet's calendar runs 1900-03-01 to 9999-12-31"
+    '=_CreateTradeTemplate("fixed_float",{"payment_day"},{"2bd"})' = "#ERROR _CreateTradeTemplate: ValueError: payment_day is '2bd', expected one or more of a sign, a whole count and bd, cd or em, such as +1bd, -1bd, +7cd, +0em or +3em+25cd-1bd+1bd"
     '=_CreateTradeTemplate("fixed_float",EW1:FB1,EW2:FA2)' = "#ERROR _CreateTradeTemplate: fields has 6 headers, expected 5, one per column of values"
     '=_CreateTradeTemplate("fixed_float",EY1,EY2:EY3)'     = "#ERROR _CreateTradeTemplate: values is 2x1 array, expected one row of field values"
     "=_CreateTrades(EB1,EW1:FB1,EW2:FB2,EW3)"    = "#ERROR _CreateTrades: ValueError: quantity_unit is supplied by the template and by the ticket, expected by one of them"
@@ -1698,10 +1698,19 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(QV24),3,15)"  = "-"
     # The chain's trade, since #181: the rule as written beside the day it made, 25 May 2027; a rule
     # coming back to the expiry refused by the kernel as any payment on the last observation is.
-    "=INDEX(util_ReadHandle(QJ15),1,13)"  = "payment_time_lag"
+    "=INDEX(util_ReadHandle(QJ15),1,13)"  = "payment_day"
     "=INDEX(util_ReadHandle(QJ15),3,13)"  = "+3em+25cd-1bd+1bd"
     "=INDEX(util_ReadHandle(QJ15),3,14)"  = "46532"
     '=_CreateTrades(QJ8,QM9:QR9,{1003,46391,"F27",10,70,"+1bd-1bd"},QJ11)' = "#ERROR _CreateTrades: ValueError: F27 pays on 2027-01-04, expected a day after its last observation, 2027-01-04, when its final price exists"
+    # Since payment-day-date-or-rule.md: one header for a date or a rule, typed `date or text`,
+    # the rule's row reading back its text and the dated row its date beside the day each
+    # resolved to; a date on the expiry refused by its trade, and a boolean by the seam.
+    "=INDEX(util_ReadHandle(QJ16),2,13)"  = "date or text"
+    "=INDEX(util_ReadHandle(QJ16),3,13)"  = "+3em+25cd-1bd+1bd"
+    "=INDEX(util_ReadHandle(QJ16),4,13)"  = "46443"
+    "=INDEX(util_ReadHandle(QJ16),4,14)"  = "46443"
+    '=_CreateTrades(QJ8,QM9:QR9,{1005,46391,"F27",10,70,46391},QJ11)' = "#ERROR _CreateTrades: ValueError: trade 1005 at row 1 pays on 2027-01-04, expected a day after its last observation, 2027-01-04, when its final price exists"
+    '=_CreateTrades(QJ8,QM9:QR9,{1006,46391,"F27",10,70,TRUE},QJ11)' = "#ERROR _CreateTrades: trade_rows cell (1, 6) is boolean TRUE, expected date or text"
     "=INDEX(_ReportReserves(QV24),3,3)"   = "5"
     "=INDEX(_ReportValues(RF8),3,1)"      = "120"
     "=INDEX(_ReportValues(RF8),3,2)"      = "0"
@@ -1964,7 +1973,7 @@ $formulas = [ordered]@{
     "=INDEX(util_ReadHandle(UF8),4,10)" = "-"
     "=INDEX(util_ReadHandle(UF5),3,6)" = "Firm A"
     '=_ReportRisk(UF8,"delta","day")' = "#ERROR _ReportRisk: ValueError: risk is 'delta', expected dv01 or all for a batch of cashflows, which has no commodity risk"
-    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_time_lag, payment_holiday_calendar, marketing_reserve"
+    "=_CreateCashflows(UH1:UL1,UH2:UL4,SA16)" = "#ERROR _CreateCashflows: fields cell (1, 3) is text 'amount', expected a field of fixed_float: trade_id, trade_date, contract_code, start_date, end_date, schedule_method, route, settlement_method, clearing_house, counterparty, discount_curve_key, broker, quantity, quantity_unit, quantity_per, fixed_price, payment_day, payment_holiday_calendar, marketing_reserve"
     "=_EvaluateCashflows(UF5,UF6,AA1)" = "#ERROR _EvaluateCashflows: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2027-01-04, the valuation date; a curve is never rebased"
     "=_EvaluateCashflows(UF5)" = "#ERROR _EvaluateCashflows: valuation_date is missing, expected valuation date handle"
     # A quote, template-based-quoting.md: the ticket's strip on the STRIP index in UX5, valued
@@ -1992,7 +2001,7 @@ $formulas = [ordered]@{
     '=_Quote(VA7,"F27",VF7,VN6)' = "#ERROR _Quote: ValueError: discount_curve_set is a collection of 1 curve, expected none with route = cleared; a cleared quote discounts nothing"
     '=_Quote(VA7,"F27",VF3,UQ5)' = "#ERROR _Quote: ValueError: discount curve 'SOFR' starts on 2026-09-11, expected 2026-12-31, the valuation date; a curve is never rebased"
     '=_Quote(VA7,"CAL28",VF7)' = "#ERROR _Quote: ValueError: contract_code is 'CAL28', expected months the index's schedule has a contract for; it has none for 2028-01"
-    '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_time_lag, payment_holiday_calendar"
+    '=_CreateQuoteTemplate("fixed_float",FG1:FK1,FG2:FK2)' = "#ERROR _CreateQuoteTemplate: ValueError: trade_id is a field of booking alone, expected one a quote template holds: schedule_method, route, settlement_method, discount_curve_key, quantity_per, payment_day, payment_holiday_calendar"
     '=_CreateQuoteTemplate("cashflow",UH1:UL1,UH2:UL2)' = "#ERROR _CreateQuoteTemplate: ValueError: instrument is 'cashflow', expected one a quote prices: 'fixed_float'"
     '=_CreateQuoteTemplate("fixed_float",VF1:VL1,VF6:VL6)' = "#ERROR _CreateQuoteTemplate: values cell (1, 7) is blank, expected text"
     "=LEFT(_CreateTrades(UX5,FG1:FK1,FG2:FK2,VF7),55)" = "#ERROR _CreateTrades: template is quote template handle"
@@ -2088,7 +2097,7 @@ $cells = [ordered]@{
     "EI12" = "mmbtu"; "EJ12" = "1"; "EK12" = "MMBTU"; "EL12" = "0"; "EM12" = "0"
     # A row of the fixed_float's fields and rows of two of them, for the field-value probes: the handle
     # cell refers to the holiday calendar creator in AM1, as a sheet does.
-    "EP1" = "quantity_unit"; "EQ1" = "schedule_method"; "ER1" = "payment_time_lag"; "ES1" = "payment_holiday_calendar"; "ET1" = "trade_date"; "EU1" = "quantity"
+    "EP1" = "quantity_unit"; "EQ1" = "schedule_method"; "ER1" = "payment_day"; "ES1" = "payment_holiday_calendar"; "ET1" = "trade_date"; "EU1" = "quantity"
     "EP2" = "lots"; "EQ2" = "lastday"; "ER2" = "+2bd"; "ES2" = "=AM1"; "ET2" = "22-May-2026"; "EU2" = "10"
     "EP4" = "quantity"; "EQ4" = "fixed_price"
     "EP5" = "1"; "EQ5" = "3.1"; "EP6" = "2"; "EQ6" = "3.2"; "EP7" = "3"; "EQ7" = "3.3"
@@ -2108,7 +2117,7 @@ $cells = [ordered]@{
     "EW6" = "2"; "EX6" = "24-Sep-2026"; "EY6" = "X26"; "EZ6" = "-4"; "FA6" = "71.5"
     "EW7" = "1"; "EX7" = "24-Sep-2026"; "EY7" = "U26"; "EZ7" = "10"; "FA7" = "70"
     "EW8" = "=_CreateTrades(EB1,EW4:FA4,EW5:FA7,EW3)"
-    "EW9" = "quantity_unit"; "EX9" = "quantity_per"; "EY9" = "schedule_method"; "EZ9" = "route"; "FA9" = "settlement_method"; "FB9" = "clearing_house"; "FC9" = "payment_time_lag"; "FD9" = "payment_holiday_calendar"
+    "EW9" = "quantity_unit"; "EX9" = "quantity_per"; "EY9" = "schedule_method"; "EZ9" = "route"; "FA9" = "settlement_method"; "FB9" = "clearing_house"; "FC9" = "payment_day"; "FD9" = "payment_holiday_calendar"
     "EW10" = "lots"; "EX10" = "month"; "EY10" = "lastday"; "EZ10" = "cleared"; "FA10" = "financial"; "FB10" = "ICE Clear"; "FC10" = "+2bd"; "FD10" = "=AM1"
     "EW11" = '=_CreateTradeTemplate("fixed_float",EW9:FD9,EW10:FD10)'
     "EX12" = "24-Sep-2026"; "EY12" = "q26-u26"; "EZ12" = "2"; "FA12" = "71"
@@ -2171,7 +2180,7 @@ $cells = [ordered]@{
     "FW20" = "30-Oct-2026"; "FX20" = "3"
     "FW21" = "29-Oct-2026"; "FX21" = "3"
     "FY1" = "3.5"; "FY2" = "3.6"
-    "FZ1" = "quantity_unit"; "GA1" = "quantity_per"; "GB1" = "schedule_method"; "GC1" = "route"; "GD1" = "settlement_method"; "GE1" = "clearing_house"; "GF1" = "payment_time_lag"; "GG1" = "payment_holiday_calendar"
+    "FZ1" = "quantity_unit"; "GA1" = "quantity_per"; "GB1" = "schedule_method"; "GC1" = "route"; "GD1" = "settlement_method"; "GE1" = "clearing_house"; "GF1" = "payment_day"; "GG1" = "payment_holiday_calendar"
     "FZ2" = "TOY"; "GA2" = "month"; "GB2" = "lastday"; "GC2" = "cleared"; "GD2" = "financial"; "GE2" = "TEST_CLEARER"; "GF2" = "+2bd"; "GG2" = "=FM4"
     "GJ1" = "trade_id"; "GK1" = "trade_date"; "GL1" = "contract_code"; "GM1" = "quantity"; "GN1" = "fixed_price"
     "GJ2" = "1001"; "GK2" = "24-Sep-2026"; "GL2" = "Z26"; "GM2" = "10"; "GN2" = "3.1"
@@ -2196,7 +2205,7 @@ $cells = [ordered]@{
     # under it in GP4, prepared against the chain's history in GP5 and evaluated in GP6; a
     # physical penultimate template in GP9, which no batch can be made under, and one naming
     # LOT in GP11, which no index of the smoke defines.
-    "GP1" = "quantity_unit"; "GQ1" = "quantity_per"; "GR1" = "schedule_method"; "GS1" = "route"; "GT1" = "settlement_method"; "GU1" = "clearing_house"; "GV1" = "payment_time_lag"; "GW1" = "payment_holiday_calendar"
+    "GP1" = "quantity_unit"; "GQ1" = "quantity_per"; "GR1" = "schedule_method"; "GS1" = "route"; "GT1" = "settlement_method"; "GU1" = "clearing_house"; "GV1" = "payment_day"; "GW1" = "payment_holiday_calendar"
     "GP2" = "lots"; "GQ2" = "month"; "GR2" = "penultimate"; "GS2" = "cleared"; "GT2" = "financial"; "GU2" = "ICE Clear Europe"; "GV2" = "+1bd"; "GW2" = "=AM1"
     "GP3" = '=_CreateTradeTemplate("fixed_float",GP1:GW1,GP2:GW2)'
     "GP4" = "=_CreateTrades(ED1,FG1:FK1,FG2:FK2,GP3)"
@@ -2232,7 +2241,7 @@ $cells = [ordered]@{
     "HE2" = "UNIT"; "HF2" = "1"; "HG2" = "MMBTU"; "HH2" = "0"; "HI2" = "0"
     "HE1" = "=_CreateContractSpecifications(EI1:EM1,HE2:HI2)"
     "HA5" = '=_CreateIndex("SYN","Synthetic gas index for the last3day example",HA4,HD1,HE1,HC1,"UNIT")'
-    "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_time_lag"; "HQ1" = "payment_holiday_calendar"
+    "HJ1" = "quantity_unit"; "HK1" = "quantity_per"; "HL1" = "schedule_method"; "HM1" = "route"; "HN1" = "settlement_method"; "HO1" = "clearing_house"; "HP1" = "payment_day"; "HQ1" = "payment_holiday_calendar"
     "HJ2" = "UNIT"; "HK2" = "month"; "HL2" = "last3day"; "HM2" = "cleared"; "HN2" = "financial"; "HO2" = "Prototype Clearing"; "HP2" = "+2bd"; "HQ2" = "=HC2"
     "HJ3" = '=_CreateTradeTemplate("fixed_float",HJ1:HQ1,HJ2:HQ2)'
     "HJ5" = "UNIT"; "HK5" = "month"; "HL5" = "last3day"; "HM5" = "cleared"; "HN5" = "physical"; "HO5" = "Prototype Clearing"
@@ -2280,7 +2289,7 @@ $cells = [ordered]@{
     "IE2" = "GAL"; "IF2" = "1"; "IG2" = "GAL"; "IH2" = "0"; "II2" = "0"
     "IE1" = "=_CreateContractSpecifications(EI1:EM1,IE2:II2)"
     "IA6" = '=_CreateIndex("ETHANE","Ethane - synthetic volume index",IA5,ID1,IE1,IC1,"GAL")'
-    "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_time_lag"; "IQ1" = "payment_holiday_calendar"
+    "IJ1" = "quantity_unit"; "IK1" = "quantity_per"; "IL1" = "schedule_method"; "IM1" = "route"; "IN1" = "settlement_method"; "IO1" = "clearing_house"; "IP1" = "payment_day"; "IQ1" = "payment_holiday_calendar"
     "IJ2" = "GAL"; "IK2" = "month"; "IL2" = "asian"; "IM2" = "cleared"; "IN2" = "financial"; "IO2" = "Prototype Clearing"; "IP2" = "+2bd"; "IQ2" = "=IC2"
     "IJ3" = '=_CreateTradeTemplate("fixed_float",IJ1:IQ1,IJ2:IQ2)'
     "IJ5" = "GAL"; "IK5" = "month"; "IL5" = "asian"; "IM5" = "cleared"; "IN5" = "physical"; "IO5" = "Prototype Clearing"
@@ -2360,7 +2369,7 @@ $cells = [ordered]@{
     "JL1" = "quantity_unit"; "JM1" = "quantity_per"; "JN1" = "schedule_method"; "JO1" = "route"; "JP1" = "settlement_method"; "JQ1" = "clearing_house"; "JR1" = "payment_holiday_calendar"
     "JL2" = "UNIT"; "JM2" = "month"; "JN2" = "last3day"; "JO2" = "cleared"; "JP2" = "financial"; "JQ2" = "Prototype Clearing"; "JR2" = "=JD1"
     "JL3" = '=_CreateTradeTemplate("fixed_float",JL1:JR1,JL2:JR2)'
-    "JT1" = "trade_id"; "JU1" = "trade_date"; "JV1" = "contract_code"; "JW1" = "quantity"; "JX1" = "fixed_price"; "JY1" = "payment_time_lag"
+    "JT1" = "trade_id"; "JU1" = "trade_date"; "JV1" = "contract_code"; "JW1" = "quantity"; "JX1" = "fixed_price"; "JY1" = "payment_day"
     "JT2" = "1"; "JU2" = "30-Nov-2026"; "JV2" = "Z26"; "JW2" = "60"; "JX2" = "70"; "JY2" = "+1bd"
     "JT3" = "2"; "JU3" = "30-Nov-2026"; "JV3" = "Z26"; "JW3" = "-30"; "JX3" = "72"; "JY3" = "+3bd"
     "JT5" = "=_CreateTrades(JB5,JT1:JY1,JT2:JY3,JL3)"
@@ -2407,10 +2416,10 @@ $cells = [ordered]@{
     "KH3" = "BBL"; "KI3" = "1"; "KJ3" = "BBL"; "KK3" = "0"; "KL3" = "0"
     "KH1" = "=_CreateContractSpecifications(EI1:EM1,KH2:KL3)"
     "KD6" = '=_CreateIndex("MIXED","Synthetic volume index for the mixed-fields example",KD5,KG1,KH1,KF1,"GAL")'
-    "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_time_lag"; "KS1" = "payment_holiday_calendar"
+    "KN1" = "route"; "KO1" = "settlement_method"; "KP1" = "trade_date"; "KQ1" = "fixed_price"; "KR1" = "payment_day"; "KS1" = "payment_holiday_calendar"
     "KN2" = "cleared"; "KO2" = "financial"; "KP2" = "30-Nov-2026"; "KQ2" = "10"; "KR2" = "+1bd"; "KS2" = "=KF2"
     "KN3" = '=_CreateTradeTemplate("fixed_float",KN1:KS1,KN2:KS2)'
-    "KN4" = "route"; "KO4" = "settlement_method"; "KP4" = "trade_date"; "KQ4" = "fixed_price"; "KR4" = "payment_time_lag"; "KS4" = "payment_holiday_calendar"; "KT4" = "schedule_method"
+    "KN4" = "route"; "KO4" = "settlement_method"; "KP4" = "trade_date"; "KQ4" = "fixed_price"; "KR4" = "payment_day"; "KS4" = "payment_holiday_calendar"; "KT4" = "schedule_method"
     "KN5" = "cleared"; "KO5" = "financial"; "KP5" = "30-Nov-2026"; "KQ5" = "10"; "KR5" = "+1bd"; "KS5" = "=KF2"; "KT5" = "lastday"
     "KN6" = '=_CreateTradeTemplate("fixed_float",KN4:KT4,KN5:KT5)'
     "KU1" = "trade_id"; "KV1" = "contract_code"; "KW1" = "quantity"; "KX1" = "quantity_unit"; "KY1" = "quantity_per"; "KZ1" = "schedule_method"; "LA1" = "clearing_house"
@@ -2545,7 +2554,7 @@ $cells = [ordered]@{
     "NR9" = '=_CreateTradeTemplate("fixed_float",IJ1:IO1,NR8:NW8)'
     "NR11" = "trade_id"; "NS11" = "trade_date"; "NT11" = "contract_code"; "NU11" = "quantity"; "NV11" = "fixed_price"; "NW11" = "schedule_method"
     "NR12" = "1001"; "NS12" = "30-Nov-2026"; "NT12" = "Z26"; "NU12" = "1"; "NV12" = "-0.5"; "NW12" = "asian"
-    "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_time_lag"; "NX14" = "payment_holiday_calendar"
+    "NR14" = "quantity_unit"; "NS14" = "quantity_per"; "NT14" = "route"; "NU14" = "settlement_method"; "NV14" = "clearing_house"; "NW14" = "payment_day"; "NX14" = "payment_holiday_calendar"
     "NR15" = "LOT"; "NS15" = "month"; "NT15" = "cleared"; "NU15" = "financial"; "NV15" = "ICE Clear Europe"; "NW15" = "+2bd"; "NX15" = "=NK2"
     "NR16" = '=_CreateTradeTemplate("fixed_float",NR14:NX14,NR15:NX15)'
     "OA1" = "Z26"; "OB1" = "-0.2"
@@ -2600,7 +2609,7 @@ $cells = [ordered]@{
     "OR3" = "GAL"; "OS3" = "1"; "OT3" = "GAL"; "OU3" = "0"; "OV3" = "0"
     "OR4" = "=_CreateContractSpecifications(EI1:EM1,OR1:OV3)"
     "OR5" = '=_CreateIndex("RESERVES","Ethane with the reserve ticket rates",IA5,ID1,OR4,IC1,"LOT")'
-    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_time_lag"; "OX7" = "payment_holiday_calendar"; "OY7" = "broker"
+    "OR7" = "quantity_per"; "OS7" = "schedule_method"; "OT7" = "route"; "OU7" = "settlement_method"; "OV7" = "clearing_house"; "OW7" = "payment_day"; "OX7" = "payment_holiday_calendar"; "OY7" = "broker"
     "OR8" = "month"; "OS8" = "lastday"; "OT8" = "cleared"; "OU8" = "financial"; "OV8" = "Prototype Clearing"; "OW8" = "+2bd"; "OX8" = "=IC2"; "OY8" = "ION"
     "OR9" = '=_CreateTradeTemplate("fixed_float",OR7:OY7,OR8:OY8)'
     "OR10" = "trade_id"; "OS10" = "trade_date"; "OT10" = "contract_code"; "OU10" = "quantity"; "OV10" = "quantity_unit"; "OW10" = "fixed_price"
@@ -2637,13 +2646,13 @@ $cells = [ordered]@{
     "OR38" = "=_PrepareTrades(OR37,OR19)"
     "OR39" = "=_EvaluateTrades(OR38,OR21)"
     "OR40" = "1002"; "OS40" = "20-Nov-2026"; "OT40" = "Z26"; "OU40" = "-2"; "OV40" = "LOT"; "OW40" = "0.25"; "OX40" = "-5"
-    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_time_lag"; "OX42" = "payment_holiday_calendar"; "OY42" = "marketing_reserve"; "OZ42" = "broker"
+    "OR42" = "quantity_per"; "OS42" = "schedule_method"; "OT42" = "route"; "OU42" = "settlement_method"; "OV42" = "clearing_house"; "OW42" = "payment_day"; "OX42" = "payment_holiday_calendar"; "OY42" = "marketing_reserve"; "OZ42" = "broker"
     "OR43" = "month"; "OS43" = "lastday"; "OT43" = "cleared"; "OU43" = "financial"; "OV43" = "Prototype Clearing"; "OW43" = "+2bd"; "OX43" = "=IC2"; "OY43" = "7"; "OZ43" = "ION"
     "OR44" = '=_CreateTradeTemplate("fixed_float",OR42:OZ42,OR43:OZ43)'
     "OR45" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR44)"
     "OR46" = "=_PrepareTrades(OR45,OR19)"
     "OR47" = "=_EvaluateTrades(OR46,OR21)"
-    "OR49" = "quantity_per"; "OS49" = "schedule_method"; "OT49" = "route"; "OU49" = "settlement_method"; "OV49" = "counterparty"; "OW49" = "payment_time_lag"; "OX49" = "payment_holiday_calendar"; "OY49" = "discount_curve_key"
+    "OR49" = "quantity_per"; "OS49" = "schedule_method"; "OT49" = "route"; "OU49" = "settlement_method"; "OV49" = "counterparty"; "OW49" = "payment_day"; "OX49" = "payment_holiday_calendar"; "OY49" = "discount_curve_key"
     "OR50" = "month"; "OS50" = "lastday"; "OT50" = "bilateral"; "OU50" = "financial"; "OV50" = "ACME Trading"; "OW50" = "+2bd"; "OX50" = "=IC2"; "OY50" = "SOFR"
     "OR51" = '=_CreateTradeTemplate("fixed_float",OR49:OY49,OR50:OY50)'
     "OR52" = "=_CreateTrades(OR5,OR10:OW10,OR11:OW14,OR51)"
@@ -2652,7 +2661,7 @@ $cells = [ordered]@{
     "OR56" = "101"; "OS56" = "20-Nov-2026"; "OT56" = "Z26"; "OU56" = "2"; "OV56" = "LOT"; "OW56" = "0.25"; "OX56" = "ACME Trading"
     "OR57" = "102"; "OS57" = "20-Nov-2026"; "OT57" = "Z26"; "OU57" = "-2"; "OV57" = "LOT"; "OW57" = "0.25"; "OX57" = "Beta Energy"
     "OR58" = "=_CreateTrades(OR5,OR55:OX55,OR56:OX57,OR60)"
-    "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_time_lag"; "OW61" = "payment_holiday_calendar"; "OX61" = "discount_curve_key"
+    "OR61" = "quantity_per"; "OS61" = "schedule_method"; "OT61" = "route"; "OU61" = "settlement_method"; "OV61" = "payment_day"; "OW61" = "payment_holiday_calendar"; "OX61" = "discount_curve_key"
     "OR62" = "month"; "OS62" = "lastday"; "OT62" = "bilateral"; "OU62" = "financial"; "OV62" = "+2bd"; "OW62" = "=IC2"; "OX62" = "SOFR"
     "OR60" = '=_CreateTradeTemplate("fixed_float",OR61:OX61,OR62:OX62)'
     # Since #188, reserve-fee-applicability.md: the cleared template without a broker over the same
@@ -2940,7 +2949,7 @@ $cells = [ordered]@{
     "PH3" = "LOT"; "PI3" = "1000"; "PJ3" = "BBL"; "PK3" = "0"; "PL3" = "0"
     "PH1" = "=_CreateContractSpecifications(EI1:EM1,PH2:PL3)"
     "PD6" = '=_CreateIndex("BBL_ASIAN","Synthetic barrel index for the codes-and-dates example",PD5,PG1,PH1,PF1,"LOT")'
-    "PN1" = "quantity_unit"; "PO1" = "schedule_method"; "PP1" = "route"; "PQ1" = "settlement_method"; "PR1" = "clearing_house"; "PS1" = "payment_time_lag"; "PT1" = "payment_holiday_calendar"
+    "PN1" = "quantity_unit"; "PO1" = "schedule_method"; "PP1" = "route"; "PQ1" = "settlement_method"; "PR1" = "clearing_house"; "PS1" = "payment_day"; "PT1" = "payment_holiday_calendar"
     "PN2" = "BBL"; "PO2" = "asian"; "PP2" = "cleared"; "PQ2" = "financial"; "PR2" = "Prototype Clearing"; "PS2" = "+1bd"; "PT2" = "=PF1"
     "PN3" = '=_CreateTradeTemplate("fixed_float",PN1:PT1,PN2:PT2)'
     "PN5" = "contract_code"; "PO5" = "quantity_unit"
@@ -3002,7 +3011,7 @@ $cells = [ordered]@{
     "QM6" = "quantity_unit"; "QN6" = "quantity_per"; "QO6" = "schedule_method"; "QP6" = "route"; "QQ6" = "settlement_method"; "QR6" = "clearing_house"; "QS6" = "payment_holiday_calendar"; "QT6" = "marketing_reserve"
     "QM7" = "UNIT"; "QN7" = "month"; "QO7" = "lastday"; "QP7" = "cleared"; "QQ7" = "financial"; "QR7" = "Prototype Clearing"; "QS7" = "=QJ9"; "QT7" = "5"
     "QJ11" = '=_CreateTradeTemplate("fixed_float",QM6:QT6,QM7:QT7)'
-    "QM9" = "trade_id"; "QN9" = "trade_date"; "QO9" = "contract_code"; "QP9" = "quantity"; "QQ9" = "fixed_price"; "QR9" = "payment_time_lag"
+    "QM9" = "trade_id"; "QN9" = "trade_date"; "QO9" = "contract_code"; "QP9" = "quantity"; "QQ9" = "fixed_price"; "QR9" = "payment_day"
     "QM10" = "1001"; "QN10" = "4-Jan-2027"; "QO10" = "F27"; "QP10" = "10"; "QQ10" = "70"; "QR10" = "+261bd"
     "QM11" = "1002"; "QN11" = "4-Jan-2027"; "QO11" = "F27"; "QP11" = "-10"; "QQ11" = "70"; "QR11" = "+522bd"
     "QJ12" = "=_CreateTrades(QJ8,QM9:QR9,QM10:QR11,QJ10)"
@@ -3012,6 +3021,11 @@ $cells = [ordered]@{
     # ahead of its 4 January 2027 expiry, 25 days on, the business day before and the one after.
     "QM12" = "1003"; "QN12" = "4-Jan-2027"; "QO12" = "F27"; "QP12" = "10"; "QQ12" = "70"; "QR12" = "+3em+25cd-1bd+1bd"
     "QJ15" = "=_CreateTrades(QJ8,QM9:QR9,QM12:QR12,QJ11)"
+    # Since payment-day-date-or-rule.md the ticket's column may hold a date: row 1004 pays on
+    # 25 February 2027 as entered, in one batch with the chained rule's row under the cleared
+    # template.
+    "QM13" = "1004"; "QN13" = "4-Jan-2027"; "QO13" = "F27"; "QP13" = "10"; "QQ13" = "70"; "QR13" = "25-Feb-2027"
+    "QJ16" = "=_CreateTrades(QJ8,QM9:QR9,QM12:QR13,QJ11)"
     "QV1" = "4-Jan-2027"
     "QV2" = "=_CreateValuationDate(QV1,0.5)"
     "QV3" = "=_CreateCalendar(QV2,QJ8)"
@@ -3135,7 +3149,7 @@ $cells = [ordered]@{
     "SA13" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "SA14" = "=_CreateContractSpecifications(SD1:SH1,SD2:SH2)"
     "SA15" = '=_CreateIndex("HALF","Synthetic one-unit index for half-year strips",SA11,SA13,SA14,SA12,"LOT")'
-    "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_time_lag"; "SK4" = "payment_holiday_calendar"
+    "SD4" = "quantity_unit"; "SE4" = "quantity_per"; "SF4" = "schedule_method"; "SG4" = "route"; "SH4" = "settlement_method"; "SI4" = "clearing_house"; "SJ4" = "payment_day"; "SK4" = "payment_holiday_calendar"
     "SD5" = "LOT"; "SE5" = "month"; "SF5" = "lastday"; "SG5" = "cleared"; "SH5" = "financial"; "SI5" = "Prototype Clearing"; "SJ5" = "+2bd"; "SK5" = "=SA12"
     "SA16" = '=_CreateTradeTemplate("fixed_float",SD4:SK4,SD5:SK5)'
     "SD7" = "trade_id"; "SE7" = "trade_date"; "SF7" = "contract_code"; "SG7" = "quantity"; "SH7" = "fixed_price"
@@ -3187,7 +3201,7 @@ $cells = [ordered]@{
     "TE8" = '=_CreateIndexConventions("USD","MMBTU","USD","ENERGY","MMBTU")'
     "TE9" = "=_CreateContractSpecifications(TJ1:TN1,TJ2:TN2)"
     "TE10" = '=_CreateIndex("ANCHORED","Synthetic index anchored on 9 October 2026",TE6,TE8,TE9,TE7,"LOT")'
-    "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_time_lag"; "TQ4" = "payment_holiday_calendar"
+    "TJ4" = "quantity_unit"; "TK4" = "quantity_per"; "TL4" = "schedule_method"; "TM4" = "route"; "TN4" = "settlement_method"; "TO4" = "clearing_house"; "TP4" = "payment_day"; "TQ4" = "payment_holiday_calendar"
     "TJ5" = "LOT"; "TK5" = "month"; "TL5" = "lastday"; "TM5" = "cleared"; "TN5" = "financial"; "TO5" = "Prototype Clearing"; "TP5" = "+1bd"; "TQ5" = "=TE1"
     "TE11" = '=_CreateTradeTemplate("fixed_float",TJ4:TQ4,TJ5:TQ5)'
     "TJ7" = "trade_id"; "TK7" = "trade_date"; "TL7" = "contract_code"; "TM7" = "quantity"; "TN7" = "fixed_price"
@@ -3269,10 +3283,10 @@ $cells = [ordered]@{
     "VA7" = "=_CreateMarket(VA5,VA6)"
     "VE2" = "1-Jan-2030"
     "VE1" = "=_CreateHolidayCalendar(VE2)"
-    "VF1" = "route"; "VG1" = "settlement_method"; "VH1" = "schedule_method"; "VI1" = "quantity_per"; "VJ1" = "payment_time_lag"; "VK1" = "payment_holiday_calendar"; "VL1" = "discount_curve_key"
+    "VF1" = "route"; "VG1" = "settlement_method"; "VH1" = "schedule_method"; "VI1" = "quantity_per"; "VJ1" = "payment_day"; "VK1" = "payment_holiday_calendar"; "VL1" = "discount_curve_key"
     "VF2" = "bilateral"; "VG2" = "financial"; "VH2" = "asian"; "VI2" = "month"; "VJ2" = "+1bd"; "VK2" = "=VE1"; "VL2" = "SOFR"
     "VF3" = '=_CreateQuoteTemplate("fixed_float",VF1:VL1,VF2:VL2)'
-    "VF5" = "route"; "VG5" = "settlement_method"; "VH5" = "schedule_method"; "VI5" = "quantity_per"; "VJ5" = "payment_time_lag"; "VK5" = "payment_holiday_calendar"
+    "VF5" = "route"; "VG5" = "settlement_method"; "VH5" = "schedule_method"; "VI5" = "quantity_per"; "VJ5" = "payment_day"; "VK5" = "payment_holiday_calendar"
     "VF6" = "cleared"; "VG6" = "financial"; "VH6" = "asian"; "VI6" = "calday"; "VJ6" = "+1bd"; "VK6" = "=VE1"
     "VF7" = '=_CreateQuoteTemplate("fixed_float",VF5:VK5,VF6:VK6)'
     "VN1" = "date"; "VO1" = "discount_factor"
